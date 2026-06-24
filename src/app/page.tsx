@@ -1,65 +1,191 @@
-import Image from "next/image";
-
+// 홈 랜딩 — 발신자(보내는 쪽) 여정 중심. MVP: 업체 리스트 노출 X (cold-start).
+// 등록 → 카드 만들기 → 공유. design.md §9.6 온보딩 3스텝.
 export default function Home() {
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <main className="mx-auto w-full max-w-[960px] px-4 py-12 sm:px-6">
+      {/* Hero */}
+      <section className="mx-auto max-w-[600px] text-center">
+        <div className="mb-4 inline-flex items-center gap-1.5 rounded-pill bg-surface-soft px-3 py-1">
+          <span className="h-2 w-2 rounded-pill bg-primary" />
+          <span className="text-xs font-medium text-mute">잘 맞는 콜라보</span>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
+        <h1 className="break-keep text-[32px] font-bold leading-tight tracking-[-0.02em] text-ink sm:text-[40px]">
+          당신다운 콜라보 제안,
+          <br />
+          카드 한 장으로.
+        </h1>
+        <p className="mx-auto mt-4 max-w-[460px] text-base leading-relaxed text-body">
+          작은 가게도, 1인 브랜드도. 부담스러운 DM 대신
+          카드 한 장으로 정중하게 콜라보를 제안해요.
+        </p>
+        <div className="mt-7 flex flex-col items-center justify-center gap-2.5 sm:flex-row">
           <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+            href="/register"
+            className="flex h-12 w-full items-center justify-center rounded-md bg-primary px-6 text-base font-medium text-primary-on sm:w-auto"
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
+            내 브랜드 등록하기
           </a>
           <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+            href="/c/canvasgarden-demo"
+            className="flex h-12 w-full items-center justify-center rounded-md border border-border-strong bg-surface px-6 text-base font-medium text-ink sm:w-auto"
           >
-            Documentation
+            예시 카드 보기
           </a>
         </div>
-      </main>
+      </section>
+
+      {/* §9.6 온보딩 3스텝 */}
+      <section className="mt-16">
+        <h2 className="text-center text-xl font-bold tracking-tight text-ink">
+          이렇게 써요
+        </h2>
+        <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <StepCard
+            n={1}
+            title="내 브랜드를 소개해요"
+            desc="몇 번 누르면 끝나요. 나를 보여주는 공개 페이지가 생겨요."
+            illu={<NodeIllu />}
+          />
+          <StepCard
+            n={2}
+            title="콜라보 카드를 만들어요"
+            desc="보낼 상대와 하고 싶은 말만 적으면, 청첩장 같은 카드가 만들어져요."
+            illu={<CardIllu />}
+          />
+          <StepCard
+            n={3}
+            title="보내고, 관심을 받아요"
+            desc="인스타 DM이나 이메일로 링크를 보내요. 받는 분은 로그인 없이 열어봐요."
+            illu={<ConnectIllu />}
+          />
+        </div>
+      </section>
+
+      {/* 왜 카드? — DM vs 카드 */}
+      <section className="mt-16">
+        <h2 className="text-center text-xl font-bold tracking-tight text-ink">
+          왜 카드로 보낼까요?
+        </h2>
+        <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
+          {/* 그냥 DM */}
+          <div className="rounded-lg border border-hairline bg-surface-soft p-5">
+            <p className="text-sm font-bold text-mute">그냥 DM으로 보내면</p>
+            <ul className="mt-3 space-y-2.5">
+              {[
+                "내가 누군지 길게 설명해야 해요",
+                "받는 분은 망설이다 흘려보내요",
+                "다른 메시지에 금세 묻혀요",
+              ].map((t) => (
+                <li key={t} className="flex gap-2 text-sm text-body">
+                  <span className="text-faint">·</span>
+                  {t}
+                </li>
+              ))}
+            </ul>
+          </div>
+          {/* 콜라보 카드 */}
+          <div className="rounded-lg border border-primary bg-surface p-5 shadow-e1">
+            <p className="flex items-center gap-1.5 text-sm font-bold text-ink">
+              <span className="h-2 w-2 rounded-pill bg-primary" />
+              콜라보 카드로 보내면
+            </p>
+            <ul className="mt-3 space-y-2.5">
+              {[
+                "내 브랜드와 제안이 한 장에 정리돼요",
+                "받는 분이 한눈에 보고 판단해요",
+                "부담 없이, 정중하게 닿아요",
+              ].map((t) => (
+                <li key={t} className="flex gap-2 text-sm text-body">
+                  <span className="font-bold text-primary-on">✓</span>
+                  {t}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      {/* 마무리 CTA */}
+      <section className="mt-12 text-center">
+        <a
+          href="/register"
+          className="inline-flex h-12 items-center justify-center rounded-md bg-primary px-7 text-base font-medium text-primary-on"
+        >
+          30초 만에 시작하기
+        </a>
+      </section>
+    </main>
+  );
+}
+
+function StepCard({
+  n,
+  title,
+  desc,
+  illu,
+}: {
+  n: number;
+  title: string;
+  desc: string;
+  illu: React.ReactNode;
+}) {
+  return (
+    <div className="rounded-lg border border-hairline bg-surface p-5">
+      <div className="flex h-12 w-12 items-center justify-center text-ink">{illu}</div>
+      <p className="mt-4 text-[11px] font-bold tracking-wide text-primary-on">
+        STEP {n}
+      </p>
+      <h3 className="mt-1 text-[15px] font-bold text-ink">{title}</h3>
+      <p className="mt-1 text-xs leading-relaxed text-mute">{desc}</p>
     </div>
+  );
+}
+
+/* ── 아톰 라인 일러스트 (design.md §9.7: 잉크선 + 키위 핵 1점) ── */
+function NodeIllu() {
+  // 노드 형성
+  return (
+    <svg viewBox="0 0 48 48" className="h-11 w-11" fill="none" aria-hidden="true">
+      <ellipse
+        cx="24"
+        cy="24"
+        rx="16"
+        ry="6"
+        transform="rotate(-25 24 24)"
+        stroke="currentColor"
+        strokeWidth="1.8"
+      />
+      <circle cx="24" cy="24" r="5.5" fill="var(--primary)" stroke="currentColor" strokeWidth="1.8" />
+    </svg>
+  );
+}
+function CardIllu() {
+  // 카드 + 아톰
+  return (
+    <svg viewBox="0 0 48 48" className="h-11 w-11" fill="none" aria-hidden="true">
+      <rect x="9" y="7" width="30" height="34" rx="5" stroke="currentColor" strokeWidth="1.8" />
+      <line x1="15" y1="30" x2="33" y2="30" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      <line x1="15" y1="35" x2="27" y2="35" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      <circle cx="24" cy="18" r="4.5" fill="var(--primary)" stroke="currentColor" strokeWidth="1.6" />
+    </svg>
+  );
+}
+function ConnectIllu() {
+  // 두 노드 점선 연결
+  return (
+    <svg viewBox="0 0 48 48" className="h-11 w-11" fill="none" aria-hidden="true">
+      <line
+        x1="14"
+        y1="24"
+        x2="34"
+        y2="24"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeDasharray="3 3.5"
+      />
+      <circle cx="12" cy="24" r="5" stroke="currentColor" strokeWidth="1.8" />
+      <circle cx="36" cy="24" r="5" fill="var(--primary)" stroke="currentColor" strokeWidth="1.8" />
+    </svg>
   );
 }

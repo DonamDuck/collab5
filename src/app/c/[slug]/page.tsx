@@ -1,0 +1,170 @@
+import { notFound } from "next/navigation";
+import { repo } from "@/lib/repo";
+import { RsvpBar, ShareBar, ViewTracker } from "./card-client";
+
+// ★ 청첩장형 콜라보 카드 — design.md §9.1 v1. 무계정 열람. North Star = 카드 view.
+export default async function CardPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ slug: string }>;
+  searchParams: Promise<{ new?: string }>;
+}) {
+  const { slug } = await params;
+  const isNew = (await searchParams)?.new === "1";
+  const card = await repo.getCardBySlug(slug);
+  if (!card) notFound();
+  const maker = await repo.getMakerById(card.fromMakerId);
+  if (!maker) notFound();
+
+  const p = card.proposal;
+  const initial = maker.name.trim().charAt(0) || "C";
+  const trust = [
+    maker.trust.instagram && { icon: "📷", label: maker.trust.instagram },
+    maker.trust.homepage && { icon: "🔗", label: "홈페이지" },
+    maker.trust.address && { icon: "📍", label: maker.trust.address },
+  ].filter(Boolean) as { icon: string; label: string }[];
+
+  // 제안 본문: 키워드 1개만 키위 하이라이트
+  const keywords = [...maker.offers, ...maker.seeks, ...maker.soul.values];
+
+  return (
+    <main className="mx-auto w-full max-w-[420px] px-4 py-8">
+      <ViewTracker cardId={card.id} />
+      {isNew && <ShareBar />}
+
+      <article className="rounded-[24px] bg-surface p-5 shadow-e3">
+        {/* 1. 상단 라벨 — collab5 존재감은 여기까지 (상태배지 없음) */}
+        <div className="flex items-center gap-1.5">
+          <span className="inline-block h-2 w-2 rounded-pill bg-primary" />
+          <span className="text-[11px] font-medium tracking-wide text-mute">
+            콜라보 제안
+          </span>
+        </div>
+
+        {/* 2. 커버(무대) — 없으면 브랜드 틴트 + 이니셜 */}
+        <div className="mt-5 h-[108px] overflow-hidden rounded-md">
+          {maker.coverImageUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={maker.coverImageUrl}
+              alt={maker.name}
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center bg-primary-pale">
+              <span className="text-[40px] font-bold leading-none text-primary-on">
+                {initial}
+              </span>
+            </div>
+          )}
+        </div>
+
+        {/* 3. 상호명 + 결 한줄 (같은 그룹, 4px) */}
+        <h1 className="mt-5 text-[23px] font-bold leading-tight tracking-[-0.03em] text-ink line-clamp-2">
+          {maker.name}
+        </h1>
+        {maker.oneLiner && (
+          <p className="mt-1 text-[13px] text-body line-clamp-1">{maker.oneLiner}</p>
+        )}
+
+        {/* 4. 신뢰 시그널 — 검증된 것만, 0개면 숨김 */}
+        {trust.length > 0 && (
+          <div className="mt-5 flex flex-wrap gap-1.5">
+            {trust.map((t) => (
+              <span
+                key={t.label}
+                className="inline-flex h-6 items-center gap-1 rounded-sm bg-surface-soft px-2 text-[11px] font-medium text-mute"
+              >
+                {t.icon} {t.label}
+              </span>
+            ))}
+          </div>
+        )}
+
+        {/* 5. 구분선 */}
+        <div className="my-[22px] border-t border-hairline" />
+
+        {/* 6. 제안 — 라벨 + 본문(키워드 1개 하이라이트) + 칩 */}
+        <div>
+          <p className="text-[11px] font-medium tracking-wide text-faint">
+            {p.toName ? `${p.toName}님께 드리는 제안` : "제안"}
+          </p>
+          {p.why && (
+            <p className="mt-2 text-[14px] leading-relaxed text-ink">
+              {highlight(p.why, keywords)}
+            </p>
+          )}
+          {p.picture && (
+            <p className="mt-2 text-[14px] leading-relaxed text-body">{p.picture}</p>
+          )}
+          {p.expectedEffect && (
+            <p className="mt-2 text-[13px] leading-relaxed text-mute">
+              {p.expectedEffect}
+            </p>
+          )}
+
+          {/* 하드축 칩(키위틴트) + 결 칩(파스텔, 보조층) */}
+          {(maker.offers.length > 0 || maker.soul.values.length > 0) && (
+            <div className="mt-4 flex flex-wrap gap-1.5">
+              {maker.offers.map((o) => (
+                <span
+                  key={`o-${o}`}
+                  className="inline-flex h-6 items-center rounded-pill bg-primary-tint px-2.5 text-[11px] font-medium text-primary-on"
+                >
+                  {o}
+                </span>
+              ))}
+              {maker.soul.values.map((v) => (
+                <span
+                  key={`v-${v}`}
+                  className="inline-flex h-6 items-center rounded-pill bg-mint-pale px-2.5 text-[11px] font-medium text-mint-on"
+                >
+                  {v}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* 7. RSVP (앞 24px) */}
+        <div className="mt-6">
+          <RsvpBar cardId={card.id} />
+        </div>
+
+        {/* 8. 푸터 — 아톰 마크(mono, currentColor=다크대응) + 카피 */}
+        <div className="mt-5 flex items-center justify-center gap-1.5 text-faint">
+          <svg viewBox="0 0 56 56" className="h-4 w-4" aria-hidden="true" fill="none">
+            <g stroke="currentColor" strokeWidth="2">
+              <ellipse cx="28" cy="28" rx="20" ry="7" transform="rotate(30 28 28)" />
+              <ellipse cx="28" cy="28" rx="20" ry="7" transform="rotate(-30 28 28)" />
+            </g>
+            <circle cx="45.32" cy="38" r="2.8" fill="currentColor" />
+            <circle cx="10.68" cy="18" r="2.8" fill="currentColor" />
+            <circle cx="45.32" cy="18" r="2.8" fill="currentColor" />
+            <circle cx="28" cy="28" r="7" fill="currentColor" />
+          </svg>
+          <span className="text-[11px]">collab5로 만든 카드 · 답장은 편하실 때</span>
+        </div>
+      </article>
+    </main>
+  );
+}
+
+/** 본문에서 첫 키워드 1개만 키위 하이라이트 */
+function highlight(text: string, keywords: string[]): React.ReactNode {
+  for (const kw of keywords) {
+    if (!kw) continue;
+    const idx = text.indexOf(kw);
+    if (idx !== -1) {
+      return (
+        <>
+          {text.slice(0, idx)}
+          <mark className="rounded bg-primary-pale px-1 text-primary-on">{kw}</mark>
+          {text.slice(idx + kw.length)}
+        </>
+      );
+    }
+  }
+  return text;
+}

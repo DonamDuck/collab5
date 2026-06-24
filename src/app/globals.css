@@ -1,26 +1,91 @@
 @import "tailwindcss";
+/* Pretendard(한글 우선)는 layout.tsx의 <link>로 로드 — design.md §4 */
 
+/* 다크는 [data-theme="dark"] 속성 기준 — design.md §2 */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/* ───────────────────────────────────────────────
+   design.md §2 토큰 (Source of Truth = design.md)
+   원시값은 여기, Tailwind 유틸 매핑은 아래 @theme.
+   ─────────────────────────────────────────────── */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --primary: #98ff5c; --primary-strong: #7ce63f; --primary-on: #1f5c00;
+  --primary-tint: #d6ffc0; --primary-pale: #ecffe0;
+  --lemon: #f2d81e; --lemon-pale: #fbf3b8; --lemon-on: #5c4a00;
+  --corn: #6e86d6; --corn-pale: #dce3f7; --corn-on: #1b2a5c;
+  --mint: #b8e9c8; --mint-pale: #e3f6ea; --mint-on: #27500a;
+  --ink: #222222; --body: #4a4a45; --mute: #6b6a63; --faint: #9b9a91; --on-dark: #fbfaf6;
+  --canvas: #fbfaf6; --surface: #ffffff; --surface-soft: #f4f2ec; --surface-dark: #2c2c2a;
+  --hairline: #e7e4da; --border-strong: #d8d5cb;
+  --success: #3b6d11; --warning: #ba7517; --danger: #e24b4a; --info: #378add;
+  --focus: #6e86d6; --scrim: #222222;
+  --r-sm: 10px; --r-md: 16px; --r-lg: 22px; --r-xl: 28px; --r-pill: 9999px;
+  --e1: 0 1px 2px rgba(34,34,34,.06);
+  --e2: 0 4px 16px rgba(34,34,34,.10);
+  --e3: 0 8px 32px rgba(34,34,34,.14);
+  --dur-fast: 120ms; --dur-base: 200ms; --dur-slow: 320ms; --ease: cubic-bezier(.2,.8,.2,1);
+  --font-sans: "Pretendard Variable", "Pretendard", -apple-system, BlinkMacSystemFont,
+    system-ui, "Apple SD Gothic Neo", sans-serif;
+}
+[data-theme="dark"] {
+  --canvas: #222222; --surface: #2c2c2a; --surface-soft: #33332f;
+  --ink: #fbfaf6; --body: #b4b2a9; --mute: #888780; --faint: #6b6a63;
+  --hairline: #3a3a36; --border-strong: #4a4a45; --primary-on: #222222; --focus: #9db3f0;
 }
 
+/* ── Tailwind v4 매핑: 유틸(bg-primary, text-ink, rounded-lg, shadow-e2 …) ← 토큰 ── */
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-primary: var(--primary);
+  --color-primary-strong: var(--primary-strong);
+  --color-primary-on: var(--primary-on);
+  --color-primary-tint: var(--primary-tint);
+  --color-primary-pale: var(--primary-pale);
+  --color-lemon: var(--lemon);
+  --color-lemon-pale: var(--lemon-pale);
+  --color-lemon-on: var(--lemon-on);
+  --color-corn: var(--corn);
+  --color-corn-pale: var(--corn-pale);
+  --color-corn-on: var(--corn-on);
+  --color-mint: var(--mint);
+  --color-mint-pale: var(--mint-pale);
+  --color-mint-on: var(--mint-on);
+  --color-ink: var(--ink);
+  --color-body: var(--body);
+  --color-mute: var(--mute);
+  --color-faint: var(--faint);
+  --color-on-dark: var(--on-dark);
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-surface-soft: var(--surface-soft);
+  --color-hairline: var(--hairline);
+  --color-border-strong: var(--border-strong);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+  --color-info: var(--info);
+  --color-focus: var(--focus);
+  --radius-sm: var(--r-sm);
+  --radius-md: var(--r-md);
+  --radius-lg: var(--r-lg);
+  --radius-xl: var(--r-xl);
+  --radius-pill: var(--r-pill);
+  --shadow-e1: var(--e1);
+  --shadow-e2: var(--e2);
+  --shadow-e3: var(--e3);
+  --font-sans: var(--font-sans);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
+html { background: var(--canvas); }
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--canvas);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* 접근성: 보이는 focus 링 (design.md §11) */
+:where(a, button, input, textarea, select, [role="switch"], [tabindex]):focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
 }

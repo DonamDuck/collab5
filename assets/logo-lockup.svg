@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 232 56" width="232" height="56" role="img" aria-label="collab5">
+  <g fill="none" stroke="#111111" stroke-width="2">
+    <ellipse cx="28" cy="28" rx="20" ry="7" transform="rotate(30 28 28)"/>
+    <ellipse cx="28" cy="28" rx="20" ry="7" transform="rotate(-30 28 28)"/>
+  </g>
+  <circle cx="45.32" cy="38" r="2.8" fill="#111111"/>
+  <circle cx="10.68" cy="18" r="2.8" fill="#111111"/>
+  <circle cx="45.32" cy="18" r="2.8" fill="#111111"/>
+  <circle cx="28" cy="28" r="7" fill="#98FF5C" stroke="#111111" stroke-width="2.5"/>
+  <text x="72" y="38" font-family="Pretendard, -apple-system, system-ui, sans-serif" font-weight="700" font-size="34" letter-spacing="-1" fill="#111111">collab5</text>
+</svg>

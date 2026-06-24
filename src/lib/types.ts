@@ -1,0 +1,81 @@
+// collab5 도메인 엔티티 — spec(Notion v1) 기준으로 한 번 확정.
+// mock과 미래 Supabase 구현이 공유하는 단일 형태(shape). UI는 이 타입에만 의존.
+
+/** 하드 축 (클릭=필터). design.md 등록폼 / Notion §6-1 */
+export type CollabType =
+  | "공간대여"
+  | "제품컬래버"
+  | "워크숍"
+  | "팝업"
+  | "굿즈"
+  | "콘텐츠"
+  | "행사참여";
+
+export type BusinessSize = "1인" | "소규모" | "중간" | "대형";
+
+/** AI distill 결(結) 층 — 보조, 사용자가 칩으로 교정 */
+export interface SoulLayer {
+  values: string[]; // 핵심 가치 (예: ["친환경", "손맛", "느린 호흡"])
+  tone: string; // 톤·무드 한 줄
+  trajectory: string; // 브랜드 행보 한 줄
+}
+
+/** 검증 가능한 신뢰 시그널 — 표시층(사람이 다각도 검토) */
+export interface TrustSignals {
+  homepage?: string;
+  instagram?: string;
+  address?: string;
+  description?: string; // 본인 작성(폴리셔 보정)
+}
+
+/** 업체 프로필 = 콜라보 카드의 '집' + 공개 상세페이지(검색 대상) */
+export interface Maker {
+  id: string;
+  slug: string; // 공개 URL 용
+  name: string;
+  oneLiner: string; // 한 줄 정체성
+  coverImageUrl?: string;
+  logoUrl?: string;
+  region?: string;
+  size?: BusinessSize;
+  offers: CollabType[]; // 제공 가능
+  seeks: CollabType[]; // 희망
+  targetAudience: string[];
+  soul: SoulLayer;
+  trust: TrustSignals;
+  collabOpen: boolean; // 콜라보 열림/닫힘 토글
+  createdAt: string; // ISO
+}
+
+/** 상대별 맞춤 제안 본문 */
+export interface Proposal {
+  toName: string; // 받는 쪽 이름
+  why: string; // 왜 당신과
+  picture: string; // 어떤 그림(콜라보 형태)
+  expectedEffect: string; // 기대 효과
+}
+
+/** 청첩장형 콜라보 요청 카드 — 히어로 아티팩트. North Star=view */
+export interface CollabCard {
+  id: string;
+  slug: string; // 공유 링크 경로
+  fromMakerId: string;
+  proposal: Proposal;
+  createdAt: string;
+}
+
+/** North Star: 카드 view (외부 공유링크 → 우리 도메인 오픈) */
+export interface ViewEvent {
+  id: string;
+  cardId: string;
+  at: string; // ISO
+  ref?: string; // 유입 출처 라벨
+}
+
+/** 보조 지표: 카드 내 RSVP 반응 */
+export interface Reaction {
+  id: string;
+  cardId: string;
+  type: "관심" | "패스";
+  at: string;
+}
