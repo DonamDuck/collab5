@@ -298,8 +298,8 @@ class SupabaseRepo implements Repo {
   }
 }
 
-// SUPABASE_URL + SUPABASE_SECRET_KEY 있으면 SupabaseRepo, 없으면 mock(로컬 개발용)
+// SUPABASE_URL + SUPABASE_ANON_KEY 있으면 SupabaseRepo, 없으면 mock(로컬 개발용)
 export const repo: Repo =
-  process.env.SUPABASE_URL && process.env.SUPABASE_SECRET_KEY
-    ? new SupabaseRepo(process.env.SUPABASE_URL, process.env.SUPABASE_SECRET_KEY)
+  process.env.SUPABASE_URL && process.env.SUPABASE_ANON_KEY
+    ? new SupabaseRepo(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY)
     : new InMemoryRepo();
