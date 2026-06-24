@@ -7,6 +7,7 @@
 //
 // ⚠️ 서버 전용 모듈. 클라이언트(register/page.tsx)는 `import type`로 타입만 가져간다.
 import Anthropic from "@anthropic-ai/sdk";
+import { GoogleGenAI, Type } from "@google/genai";
 import { z } from "zod";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 
@@ -267,14 +268,194 @@ class ClaudeSearchProvider implements SearchProvider {
   }
 }
 
-// 검색 단계 추상화 — env에 유효한 키가 있으면 Claude, 없으면 Mock(자동 전환).
+// ── 네이버 검색(무료) + Gemini Flash(구조화) provider ──
+// ⚡ 비용 최적화: 검색비 0(네이버 일 25,000회 무료) + 구조화 Gemini Flash(호출당 ~5원).
+//    Claude web_search($0.18/호출) 대비 30배 이상 절감. 한국 로컬 업체 주소/업종 정확도↑.
+
+/** 네이버 검색 응답 item (필요 필드만) */
+interface NaverItem {
+  title?: string;
+  link?: string;
+  category?: string;
+  description?: string;
+  telephone?: string;
+  address?: string;
+  roadAddress?: string;
+  bloggername?: string;
+}
+
+/** Gemini용 응답 스키마 (EnrichResultSchema의 OpenAPI 형태) */
+const GEMINI_RESULT_SCHEMA = {
+  type: Type.OBJECT,
+  properties: {
+    candidates: {
+      type: Type.ARRAY,
+      description: "같은 이름의 서로 다른 업체는 각각 별도 후보로",
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          name: { type: Type.STRING, description: "정규화된 상호명" },
+          oneLiner: { type: Type.STRING, description: "한 줄 소개 초안 (없으면 빈 문자열)" },
+          region: { type: Type.STRING, description: "지역 (예: 서울 성수). 없으면 빈 문자열" },
+          address: { type: Type.STRING, description: "주소. 없으면 빈 문자열" },
+          instagram: { type: Type.STRING, description: "@handle 형식. 없으면 빈 문자열" },
+          homepage: { type: Type.STRING, description: "홈페이지 URL. 없으면 빈 문자열" },
+          description: { type: Type.STRING, description: "소개 한 문단 초안" },
+          values: { type: Type.ARRAY, items: { type: Type.STRING }, description: "브랜드 결 칩 2~4개" },
+          sources: {
+            type: Type.ARRAY,
+            description: "확인된 검증가능 필드의 출처",
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                field: { type: Type.STRING, description: "instagram|homepage|address|name|description" },
+                label: { type: Type.STRING },
+                url: { type: Type.STRING },
+              },
+              required: ["field", "label", "url"],
+            },
+          },
+          missing: {
+            type: Type.ARRAY,
+            items: { type: Type.STRING },
+            description: "웹에서 확인 못 한 검증가능 필드 (instagram|homepage|address)",
+          },
+          hint: { type: Type.STRING, description: "동명 구분용 한 줄 (지역·업종). 없으면 빈 문자열" },
+        },
+        required: ["name", "oneLiner", "description", "values", "sources", "missing"],
+      },
+    },
+  },
+  required: ["candidates"],
+};
+
+class NaverGeminiProvider implements SearchProvider {
+  private naverId = process.env.NAVER_CLIENT_ID!;
+  private naverSecret = process.env.NAVER_CLIENT_SECRET!;
+  private _ai: GoogleGenAI | null = null;
+  private ai() {
+    return (this._ai ??= new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! }));
+  }
+
+  /** 네이버 검색 API 1종 호출. 실패해도 throw 안 하고 빈 배열(graceful). */
+  private async naver(type: "local" | "webkr" | "blog", query: string, display: number): Promise<NaverItem[]> {
+    try {
+      const url = `https://openapi.naver.com/v1/search/${type}.json?query=${encodeURIComponent(query)}&display=${display}`;
+      const res = await fetch(url, {
+        headers: { "X-Naver-Client-Id": this.naverId, "X-Naver-Client-Secret": this.naverSecret },
+      });
+      if (!res.ok) {
+        console.warn(`[enrich] naver ${type} ${res.status}`);
+        return [];
+      }
+      const data = (await res.json()) as { items?: NaverItem[] };
+      return data.items ?? [];
+    } catch (e) {
+      console.warn(`[enrich] naver ${type} error`, e);
+      return [];
+    }
+  }
+
+  /** 네이버 결과의 <b>태그·HTML 엔티티 제거 */
+  private clean(s?: string): string {
+    if (!s) return "";
+    return s
+      .replace(/<[^>]+>/g, "")
+      .replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
+      .replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&nbsp;/g, " ")
+      .trim();
+  }
+
+  /** 지역+웹문서+블로그를 병렬 검색해 Gemini에 줄 '조사 메모'로 조립 */
+  private async gather(query: string): Promise<string> {
+    const [local, web, blog] = await Promise.all([
+      this.naver("local", query, 5),
+      this.naver("webkr", query, 5),
+      this.naver("blog", query, 3),
+    ]);
+
+    const parts: string[] = [];
+    if (local.length) {
+      parts.push("[네이버 지역검색 — 주소·업종·전화]");
+      for (const it of local) {
+        parts.push(
+          `· ${this.clean(it.title)} | 업종:${this.clean(it.category)} | 도로명:${this.clean(it.roadAddress)} | 지번:${this.clean(it.address)} | 전화:${this.clean(it.telephone)} | 링크:${it.link ?? ""}`
+        );
+      }
+    }
+    if (web.length) {
+      parts.push("\n[네이버 웹문서 — 홈페이지·SNS 단서]");
+      for (const it of web) {
+        parts.push(`· ${this.clean(it.title)} | ${this.clean(it.description)} | 링크:${it.link ?? ""}`);
+      }
+    }
+    if (blog.length) {
+      parts.push("\n[네이버 블로그 — 분위기·후기 단서]");
+      for (const it of blog) {
+        parts.push(`· ${this.clean(it.title)} | ${this.clean(it.description)}`);
+      }
+    }
+    return parts.join("\n") || "(검색 결과 없음)";
+  }
+
+  /** 조사 메모 → 등록 폼 후보 (Gemini structured output) */
+  private async structure(query: string, research: string, extra = ""): Promise<EnrichCandidate[]> {
+    const response = await this.ai().models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: `원래 검색어: "${query}"\n\n[네이버 조사 메모]\n${research}${extra}\n\n위 조사 내용을 등록 폼 후보로 정리해줘. 빈 문자열 필드는 missing 처리하거나 생략해.`,
+      config: {
+        systemInstruction: ENRICH_SYSTEM,
+        responseMimeType: "application/json",
+        responseSchema: GEMINI_RESULT_SCHEMA,
+        temperature: 0.4,
+      },
+    });
+    const text = response.text ?? "";
+    let parsed: EnrichResult;
+    try {
+      parsed = JSON.parse(text) as EnrichResult;
+    } catch {
+      console.warn("[enrich] gemini JSON parse 실패");
+      return [];
+    }
+    // 빈 문자열 optional 필드 정리(Gemini가 ""로 채우는 경우 → undefined)
+    return (parsed.candidates ?? []).map((c) => ({
+      ...c,
+      region: c.region || undefined,
+      address: c.address || undefined,
+      instagram: c.instagram || undefined,
+      homepage: c.homepage || undefined,
+      hint: c.hint || undefined,
+    }));
+  }
+
+  async lookup(query: string, hintUrl?: string): Promise<EnrichCandidate[]> {
+    const research = await this.gather(query);
+    const extra = hintUrl ? `\n\n참고 링크(우선 확인): ${hintUrl}` : "";
+    return this.structure(query, research, extra);
+  }
+
+  async recrawl(input: RecrawlInput): Promise<EnrichCandidate | null> {
+    // 인스타 핸들·홈피 도메인까지 검색어에 섞어 더 깊이 조사
+    const terms = [input.name, input.homepage, input.instagram?.replace(/^@/, "")].filter(Boolean).join(" ");
+    const research = await this.gather(terms);
+    const extra = `\n\n사용자가 알려준 링크: 인스타=${input.instagram ?? "없음"}, 홈페이지=${input.homepage ?? "없음"} (이 둘은 확인된 것으로 sources에 넣어도 됨)`;
+    const cands = await this.structure(input.name, research, extra);
+    return cands[0] ?? null;
+  }
+}
+
+// 검색 단계 추상화 — 우선순위: 네이버+Gemini → Claude → Mock. ENRICH_FORCE_MOCK=1이면 무조건 Mock.
 // ⚡ ENRICH_FORCE_MOCK=1 이면 키가 있어도 무조건 Mock(=비용 0). 위저드 UX 개발 중 안전장치.
-// 대표가 .env.local에서 ENRICH_FORCE_MOCK 줄을 지우고 dev 재시작하면 진짜 모드로 켜진다.
-const forceMock = process.env.ENRICH_FORCE_MOCK === "1";
-const provider: SearchProvider =
-  !forceMock && process.env.ANTHROPIC_API_KEY?.startsWith("sk-ant")
-    ? new ClaudeSearchProvider()
-    : new MockSearchProvider();
+function pickProvider(): SearchProvider {
+  if (process.env.ENRICH_FORCE_MOCK === "1") return new MockSearchProvider();
+  const hasNaver = !!(process.env.NAVER_CLIENT_ID && process.env.NAVER_CLIENT_SECRET);
+  const hasGemini = !!process.env.GEMINI_API_KEY;
+  if (hasNaver && hasGemini) return new NaverGeminiProvider();
+  if (process.env.ANTHROPIC_API_KEY?.startsWith("sk-ant")) return new ClaudeSearchProvider();
+  return new MockSearchProvider();
+}
+const provider: SearchProvider = pickProvider();
 
 export async function enrichLookup(query: string, hintUrl?: string): Promise<EnrichResult> {
   return { candidates: await provider.lookup(query, hintUrl) };
