@@ -336,6 +336,11 @@ class NaverGeminiProvider implements SearchProvider {
   private ai() {
     return (this._ai ??= new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! }));
   }
+  private _claude: Anthropic | null = null;
+  private claude() {
+    // Gemini 전멸 시 폴백용. ANTHROPIC_API_KEY 사용(이미 결제된 키).
+    return (this._claude ??= new Anthropic({ maxRetries: 2 }));
+  }
 
   /** 네이버 검색 API 1종 호출. 실패해도 throw 안 하고 빈 배열(graceful). */
   private async naver(type: "local" | "webkr" | "blog", query: string, display: number): Promise<NaverItem[]> {
@@ -398,28 +403,43 @@ class NaverGeminiProvider implements SearchProvider {
     return parts.join("\n") || "(검색 결과 없음)";
   }
 
-  /** 조사 메모 → 등록 폼 후보 (Gemini structured output) */
-  private async structure(query: string, research: string, extra = ""): Promise<EnrichCandidate[]> {
-    const response = await this.ai().models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: `원래 검색어: "${query}"\n\n[네이버 조사 메모]\n${research}${extra}\n\n위 조사 내용을 등록 폼 후보로 정리해줘. 빈 문자열 필드는 missing 처리하거나 생략해.`,
-      config: {
-        systemInstruction: ENRICH_SYSTEM,
-        responseMimeType: "application/json",
-        responseSchema: GEMINI_RESULT_SCHEMA,
-        temperature: 0.4,
-      },
-    });
-    const text = response.text ?? "";
-    let parsed: EnrichResult;
-    try {
-      parsed = JSON.parse(text) as EnrichResult;
-    } catch {
-      console.warn("[enrich] gemini JSON parse 실패");
-      return [];
+  // 과부하(503)·레이트리밋(429) 시 같은 모델 재시도 → 안 되면 다음 모델로 폴백.
+  // ⚡ flash-lite를 1순위로: 무료 티어에서 2.5-flash는 상시 503(인기 과부하), lite는 가용성↑·빠름.
+  //   구조화(JSON 추출)는 단순 작업이라 lite 품질로 충분. description은 사용자 검수 전제.
+  private static readonly GEMINI_MODELS = ["gemini-2.5-flash-lite", "gemini-2.0-flash", "gemini-2.5-flash"];
+
+  // 모델당 1회 시도(무료 티어 RPM 절약) → 503/429면 즉시 다음 모델로. 전부 실패하면 throw.
+  private async generate(contents: string): Promise<string> {
+    let lastErr: unknown;
+    for (const model of NaverGeminiProvider.GEMINI_MODELS) {
+      try {
+        const response = await this.ai().models.generateContent({
+          model,
+          contents,
+          config: {
+            systemInstruction: ENRICH_SYSTEM,
+            responseMimeType: "application/json",
+            responseSchema: GEMINI_RESULT_SCHEMA,
+            temperature: 0.4,
+          },
+        });
+        return response.text ?? "";
+      } catch (e) {
+        lastErr = e;
+        const status = (e as { status?: number; code?: number })?.status ?? (e as { code?: number })?.code;
+        if (status === 503 || status === 429) {
+          console.warn(`[enrich] gemini ${model} ${status} → 다음 모델 폴백`);
+          continue;
+        }
+        throw e; // 과부하 외 에러는 즉시 전파
+      }
     }
-    // 빈 문자열 optional 필드 정리(Gemini가 ""로 채우는 경우 → undefined)
-    return (parsed.candidates ?? []).map((c) => ({
+    throw lastErr;
+  }
+
+  /** 빈 문자열 optional 필드 정리 (Gemini/Haiku가 ""로 채우는 경우 → undefined) */
+  private normalize(cands: EnrichCandidate[]): EnrichCandidate[] {
+    return cands.map((c) => ({
       ...c,
       region: c.region || undefined,
       address: c.address || undefined,
@@ -427,6 +447,37 @@ class NaverGeminiProvider implements SearchProvider {
       homepage: c.homepage || undefined,
       hint: c.hint || undefined,
     }));
+  }
+
+  /** Gemini 전멸 시 안전망 — Haiku(이미 결제된 Anthropic 키)로 구조화. 안정적·저렴. */
+  private async structureWithHaiku(query: string, research: string, extra: string): Promise<EnrichCandidate[]> {
+    const structured = await this.claude().messages.parse({
+      model: "claude-haiku-4-5",
+      max_tokens: 1500,
+      system: ENRICH_SYSTEM,
+      messages: [
+        {
+          role: "user",
+          content: `원래 검색어: "${query}"\n\n[웹 조사 요약]\n${research}${extra}\n\n위 조사 내용을 등록 폼 후보로 정리해줘.`,
+        },
+      ],
+      output_config: { format: zodOutputFormat(EnrichResultSchema) },
+    });
+    return this.normalize((structured.parsed_output?.candidates ?? []) as EnrichCandidate[]);
+  }
+
+  /** 조사 메모 → 등록 폼 후보. Gemini 우선, 전멸 시 Haiku 폴백. */
+  private async structure(query: string, research: string, extra = ""): Promise<EnrichCandidate[]> {
+    const prompt = `원래 검색어: "${query}"\n\n[네이버 조사 메모]\n${research}${extra}\n\n위 조사 내용을 등록 폼 후보로 정리해줘. 빈 문자열 필드는 missing 처리하거나 생략해.`;
+    try {
+      const text = await this.generate(prompt);
+      const parsed = JSON.parse(text) as EnrichResult;
+      return this.normalize(parsed.candidates ?? []);
+    } catch (e) {
+      const status = (e as { status?: number })?.status;
+      console.warn(`[enrich] Gemini 구조화 실패(${status ?? "parse?"}) → Haiku 폴백`);
+      return this.structureWithHaiku(query, research, extra);
+    }
   }
 
   async lookup(query: string, hintUrl?: string): Promise<EnrichCandidate[]> {
