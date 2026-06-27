@@ -3,7 +3,8 @@
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createMakerAction } from "@/lib/actions";
-import type { CollabType } from "@/lib/types";
+import type { CollabHistory, CollabType } from "@/lib/types";
+import { deriveRegion } from "@/lib/region";
 import type { EnrichField } from "@/lib/enrich";
 import { EnrichWizard, type WizardFill } from "./EnrichWizard";
 import {
@@ -43,6 +44,25 @@ const SUGGESTED_VIBES = [
   "지속가능",
 ];
 
+// 타겟 고객 추천 어휘 — 분위기칩과 동일 패턴. 직접 추가 가능.
+const SUGGESTED_AUDIENCE = [
+  "20-30대 여성",
+  "20-30대 남성",
+  "30-40대",
+  "로컬 주민",
+  "직장인",
+  "학생",
+  "가족 단위",
+  "여행자",
+  "감성 소비층",
+  "친환경 관심층",
+  "반려인",
+  "비건",
+];
+
+// 콜라보 이력 년도 선택지 (최신순 정렬용)
+const HISTORY_YEARS = ["2025", "2024", "2023", "2022", "2021", "그 이전", "모름"];
+
 // 5-2 수정/보강 제안 (수기 입력 vs 크롤링값 비교)
 type Suggestion = { key: string; label: string; current: string; suggested: string };
 
@@ -52,17 +72,26 @@ export default function RegisterPage() {
 
   const [name, setName] = useState("");
   const [oneLiner, setOneLiner] = useState("");
-  const [region, setRegion] = useState("");
   const [offers, setOffers] = useState<CollabType[]>([]);
   const [seeks, setSeeks] = useState<CollabType[]>([]);
   const [values, setValues] = useState<string[]>([]);
   const [customVibe, setCustomVibe] = useState("");
+  const [targetAudience, setTargetAudience] = useState<string[]>([]);
+  const [customAudience, setCustomAudience] = useState("");
+  const [collabHistory, setCollabHistory] = useState<CollabHistory[]>([]);
+  const [histDraft, setHistDraft] = useState<{
+    partner: string;
+    types: string[];
+    year: string;
+  } | null>(null);
+  const [histCustomType, setHistCustomType] = useState("");
   const [collabOpen, setCollabOpen] = useState(true);
   const [instagram, setInstagram] = useState("");
   const [homepage, setHomepage] = useState("");
   const [description, setDescription] = useState("");
   const [address, setAddress] = useState("");
   const [photos, setPhotos] = useState<{ name: string; url: string }[]>([]);
+  const region = deriveRegion(address); // 주소에서 자동 추출 (별도 입력 없음)
 
   // ── enrich(딸깍 자동완성) 상태 ──
   const [query, setQuery] = useState(""); // 불러오기 검색어(업체명만)
@@ -94,6 +123,43 @@ export default function RegisterPage() {
     setCustomVibe("");
   };
 
+  // ── 타겟 고객 (분위기칩과 동일 패턴) ──
+  const toggleAudience = (a: string) =>
+    setTargetAudience((p) => (p.includes(a) ? p.filter((x) => x !== a) : [...p, a]));
+  const addCustomAudience = () => {
+    const a = customAudience.trim();
+    if (a && !targetAudience.includes(a)) setTargetAudience((p) => [...p, a]);
+    setCustomAudience("");
+  };
+
+  // ── 콜라보 이력 ──
+  const toggleHistType = (t: string) =>
+    setHistDraft((d) =>
+      d ? { ...d, types: d.types.includes(t) ? d.types.filter((x) => x !== t) : [...d.types, t] } : d
+    );
+  const addHistCustomType = () => {
+    const t = histCustomType.trim();
+    if (t) setHistDraft((d) => (d && !d.types.includes(t) ? { ...d, types: [...d.types, t] } : d));
+    setHistCustomType("");
+  };
+  const addHistory = () => {
+    if (!histDraft || !histDraft.partner.trim()) return;
+    setCollabHistory((p) =>
+      [
+        ...p,
+        {
+          partner: histDraft.partner.trim(),
+          types: histDraft.types,
+          year: histDraft.year && histDraft.year !== "모름" ? histDraft.year : undefined,
+        },
+      ].slice(0, 3)
+    );
+    setHistDraft(null);
+    setHistCustomType("");
+  };
+  const removeHistory = (i: number) =>
+    setCollabHistory((p) => p.filter((_, j) => j !== i));
+
   const onPhotos = (files: FileList | null) => {
     if (!files) return;
     const next = Array.from(files)
@@ -116,8 +182,7 @@ export default function RegisterPage() {
   const buildSuggestions = (c: Record<string, unknown>): Suggestion[] => {
     const rows: [string, string, string][] = [
       ["name", "상호", name],
-      ["oneLiner", "한 줄 소개", oneLiner],
-      ["region", "지역", region],
+      ["oneLiner", "한 줄로 말하면", oneLiner],
       ["instagram", "인스타그램", instagram],
       ["homepage", "홈페이지", homepage],
     ];
@@ -175,7 +240,6 @@ export default function RegisterPage() {
       if (!val) return;
       if (key === "name") setName(val);
       else if (key === "oneLiner") setOneLiner(val);
-      else if (key === "region") setRegion(val);
       else if (key === "instagram") setInstagram(val);
       else if (key === "homepage") setHomepage(val);
     });
@@ -229,10 +293,6 @@ export default function RegisterPage() {
     if (fill.oneLiner !== undefined) {
       setOneLiner(fill.oneLiner);
       filled.add("oneLiner");
-    }
-    if (fill.region !== undefined) {
-      setRegion(fill.region);
-      filled.add("region");
     }
     if (fill.address !== undefined) {
       setAddress(fill.address);
@@ -292,10 +352,11 @@ export default function RegisterPage() {
       const { slug } = await createMakerAction({
         name,
         oneLiner,
-        region,
         offers,
         seeks,
         values,
+        targetAudience,
+        collabHistory,
         collabOpen,
         instagram,
         homepage,
@@ -349,7 +410,7 @@ export default function RegisterPage() {
         </div>
       </div>
 
-      <div className="mt-7 space-y-7">
+      <div className="mt-7 space-y-8">
         {/* 검수 게이트 배너 — AI가 채운 직후 */}
         {reviewMode && (
           <div className="rounded-lg border border-primary bg-surface px-4 py-3 shadow-e1">
@@ -359,218 +420,445 @@ export default function RegisterPage() {
             </p>
           </div>
         )}
-        {/* 기본 정보 */}
-        <Field label="상호 *" hint={hintFor("name")}>
-          <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="예: 캔버스가든"
-            className="h-11 w-full rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
-          />
-        </Field>
-        <Field label="한 줄 소개" hint={hintFor("oneLiner")}>
-          <input
-            value={oneLiner}
-            onChange={(e) => setOneLiner(e.target.value)}
-            placeholder="예: 패브릭으로 짓는 친환경 가방과 조각 워크숍"
-            className="h-11 w-full rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
-          />
-        </Field>
-        <Field label="지역" hint={hintFor("region")}>
-          <input
-            value={region}
-            onChange={(e) => setRegion(e.target.value)}
-            placeholder="예: 서울"
-            className="h-11 w-full rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
-          />
-        </Field>
 
-        {/* 브랜드 사진 (선택) — 클라이언트 썸네일 프리뷰 */}
-        <div>
-          <label className="mb-1 block text-sm font-medium text-body">
-            브랜드 사진 (선택)
-          </label>
-          <p className="mb-2.5 text-xs text-mute">
-            분위기를 보여주는 사진을 올리면 카드가 더 풍성해져요. 최대 4장.
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {photos.map((p, i) => (
-              <div
-                key={i}
-                className="relative h-20 w-20 overflow-hidden rounded-md border border-hairline"
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={p.url} alt={p.name} className="h-full w-full object-cover" />
-                <button
-                  type="button"
-                  onClick={() => setPhotos((ps) => ps.filter((_, j) => j !== i))}
-                  aria-label="사진 삭제"
-                  className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-pill bg-ink/60 text-[11px] text-white"
+        {/* ── 그룹 A. 정체성 ── */}
+        <GroupHeader n="①" title="정체성" sub="우리는 누구인가요" />
+        <div className="space-y-7">
+          <Field label="상호 *" hint={hintFor("name")}>
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="예: 캔버스가든"
+              className="h-11 w-full rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
+            />
+          </Field>
+          <Field label="한 줄로 말하면" hint={hintFor("oneLiner")}>
+            <input
+              value={oneLiner}
+              onChange={(e) => setOneLiner(e.target.value)}
+              placeholder="예: 패브릭으로 짓는 친환경 가방과 조각 워크숍"
+              className="h-11 w-full rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
+            />
+          </Field>
+
+          {/* 브랜드 사진 (선택) */}
+          <div>
+            <label className="mb-1 block text-sm font-medium text-body">
+              브랜드 사진 (선택)
+            </label>
+            <p className="mb-2.5 text-xs text-mute">
+              분위기를 보여주는 사진을 올리면 카드가 더 풍성해져요. 최대 4장.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {photos.map((p, i) => (
+                <div
+                  key={i}
+                  className="relative h-20 w-20 overflow-hidden rounded-md border border-hairline"
                 >
-                  ✕
-                </button>
-              </div>
-            ))}
-            {photos.length < 4 && (
-              <label className="flex h-20 w-20 cursor-pointer flex-col items-center justify-center rounded-md border border-dashed border-border-strong bg-surface text-mute">
-                <span className="text-xl leading-none">＋</span>
-                <span className="mt-1 text-[11px]">사진</span>
-                <input
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  className="hidden"
-                  onChange={(e) => onPhotos(e.target.files)}
-                />
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={p.url} alt={p.name} className="h-full w-full object-cover" />
+                  <button
+                    type="button"
+                    onClick={() => setPhotos((ps) => ps.filter((_, j) => j !== i))}
+                    aria-label="사진 삭제"
+                    className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-pill bg-ink/60 text-[11px] text-white"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+              {photos.length < 4 && (
+                <label className="flex h-20 w-20 cursor-pointer flex-col items-center justify-center rounded-md border border-dashed border-border-strong bg-surface text-mute">
+                  <span className="text-xl leading-none">＋</span>
+                  <span className="mt-1 text-[11px]">사진</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    className="hidden"
+                    onChange={(e) => onPhotos(e.target.files)}
+                  />
+                </label>
+              )}
+            </div>
+          </div>
+
+          {/* 분위기칩 — 우리를 표현하는 말 */}
+          <div>
+            <label className="mb-1 flex items-center gap-2 text-sm font-medium text-body">
+              <span>우리 브랜드를 표현하는 말</span>
+              {aiFilled.has("values") && <AiBadge />}
+            </label>
+            <p className="mb-2.5 text-xs text-mute">
+              어울리는 단어를 골라보세요. 우리가 고른 말들이에요. 직접 더해도 좋아요.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {SUGGESTED_VIBES.map((v) => {
+                const on = values.includes(v);
+                return (
+                  <button
+                    key={v}
+                    type="button"
+                    onClick={() => toggleVibe(v)}
+                    className={`inline-flex h-8 items-center rounded-pill border px-3 text-sm transition-colors ${
+                      on
+                        ? "border-primary bg-primary-tint text-primary-on"
+                        : "border-hairline bg-surface text-mute"
+                    }`}
+                  >
+                    {v}
+                    {on ? " ✓" : ""}
+                  </button>
+                );
+              })}
+              {values
+                .filter((v) => !SUGGESTED_VIBES.includes(v))
+                .map((v) => (
+                  <button
+                    key={v}
+                    type="button"
+                    onClick={() => toggleVibe(v)}
+                    className="inline-flex h-8 items-center rounded-pill border border-primary bg-primary-tint px-3 text-sm text-primary-on"
+                  >
+                    {v} ✕
+                  </button>
+                ))}
+            </div>
+            <div className="mt-2 flex gap-2">
+              <input
+                value={customVibe}
+                onChange={(e) => setCustomVibe(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    addCustomVibe();
+                  }
+                }}
+                placeholder="직접 더하기 (예: 아날로그)"
+                className="h-10 flex-1 rounded-sm border border-hairline bg-surface px-3 text-sm text-ink outline-none placeholder:text-faint focus:border-focus"
+              />
+              <button
+                type="button"
+                onClick={addCustomVibe}
+                className="h-10 rounded-sm border border-border-strong bg-surface px-4 text-sm font-medium text-ink"
+              >
+                추가
+              </button>
+            </div>
+          </div>
+
+          {/* 소개 — 우리를 소개할게요 */}
+          <div>
+            <div className="mb-2 flex items-center justify-between">
+              <label className="flex items-center gap-2 text-sm font-medium text-body">
+                <span>우리를 소개할게요</span>
+                {aiFilled.has("description") && <AiBadge />}
               </label>
+              <button
+                type="button"
+                onClick={draftDescription}
+                disabled={!canDraft || draftBusy}
+                className="inline-flex h-7 items-center gap-1 rounded-pill border border-primary bg-primary-pale px-2.5 text-xs font-medium text-primary-on disabled:opacity-40"
+              >
+                {draftBusy
+                  ? "찾는 중…"
+                  : description.trim()
+                    ? "✨ 초안 다시 받기"
+                    : "✨ 초안 받기"}
+              </button>
+            </div>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={3}
+              placeholder="버려지는 천에 새 이야기를 입히는 패브릭 브랜드."
+              className="w-full rounded-sm border border-hairline bg-surface px-3 py-2 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
+            />
+            <p className="mt-1.5 text-xs text-mute">
+              위 정보로 초안을 만들어드려요. 그대로 써도, 더 다듬어도 좋아요.
+            </p>
+          </div>
+
+          {/* 실시간 미리보기 */}
+          <PreviewCard
+            name={name}
+            oneLiner={oneLiner}
+            region={region}
+            values={values}
+            offers={offers}
+          />
+        </div>
+
+        {/* ── 그룹 B. 콜라보 ── */}
+        <GroupHeader n="②" title="콜라보" sub="어떻게 함께해요" />
+        <div className="space-y-7">
+          <Field label="이런 콜라보 제공할 수 있어요">
+            <ChipRow
+              options={COLLAB_TYPES}
+              selected={offers}
+              onToggle={(t) => toggle(offers, setOffers, t)}
+            />
+          </Field>
+          <Field label="이런 콜라보 찾고 있어요">
+            <ChipRow
+              options={COLLAB_TYPES}
+              selected={seeks}
+              onToggle={(t) => toggle(seeks, setSeeks, t)}
+            />
+          </Field>
+
+          {/* 함께한 콜라보 (이력) */}
+          <div>
+            <label className="mb-1 flex items-center gap-2 text-sm font-medium text-body">
+              <span>함께한 콜라보</span>
+              <span className="text-[11px] font-normal text-faint">선택 · 최대 3개</span>
+            </label>
+            <p className="mb-2.5 text-xs text-mute">
+              지난 콜라보를 더하면 “검증된 파트너”라는 신호가 돼요.
+            </p>
+
+            {collabHistory.length > 0 && (
+              <div className="mb-2 space-y-2">
+                {collabHistory.map((h, i) => (
+                  <div
+                    key={i}
+                    className="flex items-center justify-between rounded-md bg-surface-soft px-3 py-2"
+                  >
+                    <span className="text-sm text-ink">
+                      <span className="font-medium">{h.partner}</span>
+                      {h.types.length > 0 && (
+                        <span className="text-mute"> · {h.types.join("·")}</span>
+                      )}
+                      {h.year && <span className="text-mute"> · {h.year}</span>}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => removeHistory(i)}
+                      aria-label="이력 삭제"
+                      className="text-faint hover:text-ink"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {histDraft !== null ? (
+              <div className="space-y-3 rounded-md border border-border-strong bg-surface p-3">
+                <input
+                  value={histDraft.partner}
+                  onChange={(e) =>
+                    setHistDraft((d) => (d ? { ...d, partner: e.target.value } : d))
+                  }
+                  autoFocus
+                  placeholder="함께한 곳 (예: 오월의숲)"
+                  className="h-10 w-full rounded-sm border border-hairline bg-surface px-3 text-sm text-ink outline-none placeholder:text-faint focus:border-focus"
+                />
+                <div>
+                  <p className="mb-1.5 text-xs text-mute">어떤 콜라보였나요?</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {COLLAB_TYPES.map((t) => {
+                      const on = histDraft.types.includes(t);
+                      return (
+                        <button
+                          key={t}
+                          type="button"
+                          onClick={() => toggleHistType(t)}
+                          className={`inline-flex h-7 items-center rounded-pill border px-2.5 text-xs transition-colors ${
+                            on
+                              ? "border-primary bg-primary-tint text-primary-on"
+                              : "border-hairline bg-surface text-mute"
+                          }`}
+                        >
+                          {t}
+                          {on ? " ✓" : ""}
+                        </button>
+                      );
+                    })}
+                    {histDraft.types
+                      .filter((t) => !COLLAB_TYPES.includes(t as CollabType))
+                      .map((t) => (
+                        <button
+                          key={t}
+                          type="button"
+                          onClick={() => toggleHistType(t)}
+                          className="inline-flex h-7 items-center rounded-pill border border-primary bg-primary-tint px-2.5 text-xs text-primary-on"
+                        >
+                          {t} ✕
+                        </button>
+                      ))}
+                  </div>
+                  <div className="mt-2 flex gap-2">
+                    <input
+                      value={histCustomType}
+                      onChange={(e) => setHistCustomType(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          addHistCustomType();
+                        }
+                      }}
+                      placeholder="유형 직접 더하기"
+                      className="h-9 flex-1 rounded-sm border border-hairline bg-surface px-3 text-sm text-ink outline-none placeholder:text-faint focus:border-focus"
+                    />
+                    <button
+                      type="button"
+                      onClick={addHistCustomType}
+                      className="h-9 rounded-sm border border-border-strong bg-surface px-3 text-xs font-medium text-ink"
+                    >
+                      추가
+                    </button>
+                  </div>
+                </div>
+                <select
+                  value={histDraft.year}
+                  onChange={(e) =>
+                    setHistDraft((d) => (d ? { ...d, year: e.target.value } : d))
+                  }
+                  className="h-10 w-full rounded-sm border border-hairline bg-surface px-3 text-sm text-ink outline-none focus:border-focus"
+                >
+                  <option value="">시기 (선택)</option>
+                  {HISTORY_YEARS.map((y) => (
+                    <option key={y} value={y}>
+                      {y}
+                    </option>
+                  ))}
+                </select>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={addHistory}
+                    disabled={!histDraft.partner.trim()}
+                    className="h-10 flex-1 rounded-md bg-primary text-sm font-medium text-primary-on disabled:opacity-40"
+                  >
+                    추가
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setHistDraft(null);
+                      setHistCustomType("");
+                    }}
+                    className="h-10 rounded-md border border-border-strong bg-surface px-4 text-sm font-medium text-ink"
+                  >
+                    취소
+                  </button>
+                </div>
+              </div>
+            ) : collabHistory.length < 3 ? (
+              <button
+                type="button"
+                onClick={() => setHistDraft({ partner: "", types: [], year: "" })}
+                className="flex w-full items-center justify-center gap-1.5 rounded-md border border-dashed border-border-strong bg-surface py-2.5 text-sm text-mute"
+              >
+                ＋ {collabHistory.length === 0 ? "콜라보 경험이 있으신가요?" : "직접 입력하기"}
+              </button>
+            ) : null}
+
+            {collabHistory.length === 0 && histDraft === null && (
+              <p className="mt-2 text-xs text-faint">
+                아직 콜라보 경험이 없어요 — 카드에 그대로 표시돼요.
+              </p>
             )}
           </div>
-        </div>
 
-        {/* 하드축 */}
-        <Field label="이런 콜라보 제공할 수 있어요">
-          <ChipRow
-            options={COLLAB_TYPES}
-            selected={offers}
-            onToggle={(t) => toggle(offers, setOffers, t)}
-          />
-        </Field>
-        <Field label="이런 콜라보 찾고 있어요">
-          <ChipRow
-            options={COLLAB_TYPES}
-            selected={seeks}
-            onToggle={(t) => toggle(seeks, setSeeks, t)}
-          />
-        </Field>
-
-        {/* 결 — 추천 어휘 + 커스텀 (분석 도움) */}
-        <div>
-          <label className="mb-1 flex items-center gap-2 text-sm font-medium text-body">
-            <span>우리 브랜드를 표현하는 말</span>
-            {aiFilled.has("values") && <AiBadge />}
-          </label>
-          <p className="mb-2.5 text-xs text-mute">
-            어울리는 단어를 골라보세요. 우리가 고른 말들이에요. 직접 더해도 좋아요.
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {SUGGESTED_VIBES.map((v) => {
-              const on = values.includes(v);
-              return (
-                <button
-                  key={v}
-                  type="button"
-                  onClick={() => toggleVibe(v)}
-                  className={`inline-flex h-8 items-center rounded-pill border px-3 text-sm transition-colors ${
-                    on
-                      ? "border-primary bg-primary-tint text-primary-on"
-                      : "border-hairline bg-surface text-mute"
-                  }`}
-                >
-                  {v}
-                  {on ? " ✓" : ""}
-                </button>
-              );
-            })}
-            {/* 커스텀으로 추가된 결 (추천 목록에 없는 것) */}
-            {values
-              .filter((v) => !SUGGESTED_VIBES.includes(v))
-              .map((v) => (
-                <button
-                  key={v}
-                  type="button"
-                  onClick={() => toggleVibe(v)}
-                  className="inline-flex h-8 items-center rounded-pill border border-primary bg-primary-tint px-3 text-sm text-primary-on"
-                >
-                  {v} ✕
-                </button>
-              ))}
-          </div>
-          <div className="mt-2 flex gap-2">
-            <input
-              value={customVibe}
-              onChange={(e) => setCustomVibe(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  addCustomVibe();
-                }
-              }}
-              placeholder="직접 더하기 (예: 아날로그)"
-              className="h-10 flex-1 rounded-sm border border-hairline bg-surface px-3 text-sm text-ink outline-none placeholder:text-faint focus:border-focus"
-            />
-            <button
-              type="button"
-              onClick={addCustomVibe}
-              className="h-10 rounded-sm border border-border-strong bg-surface px-4 text-sm font-medium text-ink"
-            >
-              추가
-            </button>
-          </div>
-        </div>
-
-        {/* ✨ 실시간 미리보기 — "본인도 몰랐던 나"가 카드로 */}
-        <PreviewCard
-          name={name}
-          oneLiner={oneLiner}
-          region={region}
-          values={values}
-          offers={offers}
-        />
-
-        {/* 신뢰 시그널 */}
-        <Field label="인스타그램" hint={hintFor("instagram", "instagram")}>
-          <input
-            value={instagram}
-            onChange={(e) => setInstagram(e.target.value)}
-            placeholder="@handle"
-            className="h-11 w-full rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
-          />
-        </Field>
-        <Field label="홈페이지" hint={hintFor("homepage", "homepage")}>
-          <input
-            value={homepage}
-            onChange={(e) => setHomepage(e.target.value)}
-            placeholder="https://"
-            className="h-11 w-full rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
-          />
-        </Field>
-        <Field label="주소" hint={hintFor("address", "address")}>
-          <input
-            value={address}
-            onChange={(e) => setAddress(e.target.value)}
-            placeholder="예: 서울 성동구 성수동"
-            className="h-11 w-full rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
-          />
-        </Field>
-        <div>
-          <div className="mb-2 flex items-center justify-between">
-            <label className="flex items-center gap-2 text-sm font-medium text-body">
-              <span>소개 (한 문단)</span>
-              {aiFilled.has("description") && <AiBadge />}
+          {/* 이런 분들과 만나요 (타겟 고객) */}
+          <div>
+            <label className="mb-1 block text-sm font-medium text-body">
+              이런 분들과 만나요
             </label>
-            <button
-              type="button"
-              onClick={draftDescription}
-              disabled={!canDraft || draftBusy}
-              className="inline-flex h-7 items-center gap-1 rounded-pill border border-primary bg-primary-pale px-2.5 text-xs font-medium text-primary-on disabled:opacity-40"
-            >
-              {draftBusy
-                ? "찾는 중…"
-                : description.trim()
-                  ? "✨ 초안 다시 받기"
-                  : "✨ 초안 받기"}
-            </button>
+            <p className="mb-2.5 text-xs text-mute">
+              우리 고객층이에요. 수신자가 “내 손님과 결이 맞나” 가늠하는 핵심이에요.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {SUGGESTED_AUDIENCE.map((a) => {
+                const on = targetAudience.includes(a);
+                return (
+                  <button
+                    key={a}
+                    type="button"
+                    onClick={() => toggleAudience(a)}
+                    className={`inline-flex h-8 items-center rounded-pill border px-3 text-sm transition-colors ${
+                      on
+                        ? "border-primary bg-primary-tint text-primary-on"
+                        : "border-hairline bg-surface text-mute"
+                    }`}
+                  >
+                    {a}
+                    {on ? " ✓" : ""}
+                  </button>
+                );
+              })}
+              {targetAudience
+                .filter((a) => !SUGGESTED_AUDIENCE.includes(a))
+                .map((a) => (
+                  <button
+                    key={a}
+                    type="button"
+                    onClick={() => toggleAudience(a)}
+                    className="inline-flex h-8 items-center rounded-pill border border-primary bg-primary-tint px-3 text-sm text-primary-on"
+                  >
+                    {a} ✕
+                  </button>
+                ))}
+            </div>
+            <div className="mt-2 flex gap-2">
+              <input
+                value={customAudience}
+                onChange={(e) => setCustomAudience(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    addCustomAudience();
+                  }
+                }}
+                placeholder="직접 더하기 (예: 신혼부부)"
+                className="h-10 flex-1 rounded-sm border border-hairline bg-surface px-3 text-sm text-ink outline-none placeholder:text-faint focus:border-focus"
+              />
+              <button
+                type="button"
+                onClick={addCustomAudience}
+                className="h-10 rounded-sm border border-border-strong bg-surface px-4 text-sm font-medium text-ink"
+              >
+                추가
+              </button>
+            </div>
           </div>
-          <textarea
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            rows={3}
-            placeholder="버려지는 천에 새 이야기를 입히는 패브릭 브랜드."
-            className="w-full rounded-sm border border-hairline bg-surface px-3 py-2 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
-          />
-          <p className="mt-1.5 text-xs text-mute">
-            위 정보로 초안을 만들어드려요. 그대로 써도, 더 다듬어도 좋아요.
-          </p>
+        </div>
+
+        {/* ── 그룹 C. 신뢰·연결 ── */}
+        <GroupHeader n="③" title="신뢰·연결" sub="어디서 만나요" />
+        <div className="space-y-7">
+          <Field label="주소" hint={hintFor("address", "address")}>
+            <input
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+              placeholder="예: 서울 성동구 성수동"
+              className="h-11 w-full rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
+            />
+            {region && (
+              <p className="mt-1 text-xs text-mute">
+                지역 자동 인식: <span className="text-body">{region}</span>
+              </p>
+            )}
+          </Field>
+          <Field label="인스타그램" hint={hintFor("instagram", "instagram")}>
+            <input
+              value={instagram}
+              onChange={(e) => setInstagram(e.target.value)}
+              placeholder="@handle"
+              className="h-11 w-full rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
+            />
+          </Field>
+          <Field label="홈페이지" hint={hintFor("homepage", "homepage")}>
+            <input
+              value={homepage}
+              onChange={(e) => setHomepage(e.target.value)}
+              placeholder="https://"
+              className="h-11 w-full rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
+            />
+          </Field>
         </div>
 
         {/* 콜라보 열림/닫힘 */}
@@ -747,6 +1035,18 @@ export default function RegisterPage() {
         </div>
       )}
     </main>
+  );
+}
+
+function GroupHeader({ n, title, sub }: { n: string; title: string; sub: string }) {
+  return (
+    <div className="flex items-baseline gap-2 border-b border-hairline pb-2">
+      <span className="rounded-pill bg-primary-tint px-2 py-0.5 text-sm font-bold text-primary-on">
+        {n}
+      </span>
+      <span className="text-base font-bold text-ink">{title}</span>
+      <span className="text-xs text-mute">{sub}</span>
+    </div>
   );
 }
 

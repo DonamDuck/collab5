@@ -1,19 +1,21 @@
 "use server";
 
 import { repo } from "./repo";
-import type { CollabType, Maker } from "./types";
+import { deriveRegion } from "./region";
+import type { CollabHistory, CollabType, Maker } from "./types";
 
 export interface RegisterInput {
   name: string;
   oneLiner: string;
-  region?: string;
   offers: CollabType[];
   seeks: CollabType[];
-  values: string[]; // 결(임시: 직접 입력, 이후 AI distill)
+  values: string[]; // 분위기칩(우리를 표현하는 말)
+  targetAudience: string[]; // 이런 분들과 만나요
+  collabHistory: CollabHistory[]; // 함께한 콜라보
   collabOpen: boolean;
   instagram?: string;
   homepage?: string;
-  address?: string;
+  address?: string; // 지역은 여기서 자동 추출
   description?: string;
 }
 
@@ -34,10 +36,11 @@ export async function createMakerAction(
     slug: slugify(input.name),
     name: input.name.trim(),
     oneLiner: input.oneLiner.trim(),
-    region: input.region?.trim() || undefined,
+    region: deriveRegion(input.address ?? "") || undefined,
     offers: input.offers,
     seeks: input.seeks,
-    targetAudience: [],
+    targetAudience: input.targetAudience,
+    collabHistory: input.collabHistory,
     soul: { values: input.values, tone: "", trajectory: "" },
     trust: {
       instagram: input.instagram?.trim() || undefined,

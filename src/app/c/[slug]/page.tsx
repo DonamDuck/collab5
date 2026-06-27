@@ -82,6 +82,45 @@ export default async function CardPage({
           </div>
         )}
 
+        {/* 함께한 콜라보 — 수신자 신뢰의 결정타 */}
+        {maker.collabHistory.length > 0 ? (
+          <div className="mt-5">
+            <p className="text-[11px] font-medium tracking-wide text-faint">함께한 콜라보</p>
+            <div className="mt-2 space-y-1">
+              {maker.collabHistory.map((h, i) => (
+                <p key={i} className="text-[13px] text-body">
+                  <span className="font-medium text-ink">{h.partner}</span>
+                  {h.types.length > 0 && (
+                    <span className="text-mute"> · {h.types.join("·")}</span>
+                  )}
+                  {h.year && <span className="text-mute"> · {h.year}</span>}
+                </p>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <p className="mt-5 text-[12px] text-faint">아직 콜라보 경험이 없어요</p>
+        )}
+
+        {/* 이런 분들과 만나요 — 수신자가 "내 손님과 결이 맞나" 가늠 */}
+        {maker.targetAudience.length > 0 && (
+          <div className="mt-4">
+            <p className="text-[11px] font-medium tracking-wide text-faint">
+              이런 분들과 만나요
+            </p>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {maker.targetAudience.map((a) => (
+                <span
+                  key={a}
+                  className="inline-flex h-6 items-center rounded-pill bg-surface-soft px-2.5 text-[11px] font-medium text-mute"
+                >
+                  {a}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* 5. 구분선 */}
         <div className="my-[22px] border-t border-hairline" />
 
@@ -121,6 +160,21 @@ export default async function CardPage({
                   className="inline-flex h-6 items-center rounded-pill bg-mint-pale px-2.5 text-[11px] font-medium text-mint-on"
                 >
                   {v}
+                </span>
+              ))}
+            </div>
+          )}
+
+          {/* 찾는 콜라보 — 제안 접점 (수신자가 "내가 줄 수 있는 게 있나") */}
+          {maker.seeks.length > 0 && (
+            <div className="mt-2 flex flex-wrap items-center gap-1.5">
+              <span className="text-[11px] text-faint">찾는 콜라보</span>
+              {maker.seeks.map((s) => (
+                <span
+                  key={`s-${s}`}
+                  className="inline-flex h-6 items-center rounded-pill border border-hairline bg-surface px-2.5 text-[11px] font-medium text-mute"
+                >
+                  {s}
                 </span>
               ))}
             </div>

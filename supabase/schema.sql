@@ -15,11 +15,15 @@ CREATE TABLE IF NOT EXISTS makers (
   offers          TEXT[]  NOT NULL DEFAULT '{}',
   seeks           TEXT[]  NOT NULL DEFAULT '{}',
   target_audience TEXT[]  NOT NULL DEFAULT '{}',
+  collab_history  JSONB   NOT NULL DEFAULT '[]',
   soul            JSONB   NOT NULL DEFAULT '{}',
   trust           JSONB   NOT NULL DEFAULT '{}',
   collab_open     BOOLEAN NOT NULL DEFAULT true,
   created_at      TEXT    NOT NULL
 );
+
+-- 기존 배포 DB 업그레이드용 (이미 makers 테이블이 있으면 컬럼만 추가)
+ALTER TABLE makers ADD COLUMN IF NOT EXISTS collab_history JSONB NOT NULL DEFAULT '[]';
 
 -- ── 콜라보 카드 ──
 CREATE TABLE IF NOT EXISTS collab_cards (

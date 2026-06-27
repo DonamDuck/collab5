@@ -28,6 +28,13 @@ export interface TrustSignals {
   description?: string; // 본인 작성(폴리셔 보정)
 }
 
+/** 함께한 콜라보 이력 — 자기보고(말랑한 층). ✓검증마크 X. 수신자 신뢰의 결정타. */
+export interface CollabHistory {
+  partner: string; // 함께한 곳
+  types: string[]; // 콜라보 유형 (CollabType 또는 자유 입력)
+  year?: string; // 년도 (최신순 정렬용)
+}
+
 /** 업체 프로필 = 콜라보 카드의 '집' + 공개 상세페이지(검색 대상) */
 export interface Maker {
   id: string;
@@ -41,6 +48,7 @@ export interface Maker {
   offers: CollabType[]; // 제공 가능
   seeks: CollabType[]; // 희망
   targetAudience: string[];
+  collabHistory: CollabHistory[]; // 함께한 콜라보 이력
   soul: SoulLayer;
   trust: TrustSignals;
   collabOpen: boolean; // 콜라보 열림/닫힘 토글

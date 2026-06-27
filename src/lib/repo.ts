@@ -40,6 +40,10 @@ const seedMakers: Maker[] = [
     offers: ["워크숍", "제품컬래버", "팝업"],
     seeks: ["공간대여", "행사참여", "콘텐츠"],
     targetAudience: ["20-30대 여성", "친환경 라이프스타일", "핸드메이드 애호가"],
+    collabHistory: [
+      { partner: "오월의숲", types: ["팝업", "워크숍"], year: "2025" },
+      { partner: "스톤브루", types: ["제품컬래버"] },
+    ],
     soul: {
       values: ["친환경", "손맛", "느린 호흡"],
       tone: "단단하지만 다정한, 정성스러운",
@@ -64,6 +68,7 @@ const seedMakers: Maker[] = [
     offers: ["공간대여", "팝업", "행사참여"],
     seeks: ["워크숍", "제품컬래버"],
     targetAudience: ["빈티지 애호가", "동네 단골", "감성 공간 탐방러"],
+    collabHistory: [],
     soul: {
       values: ["빈티지", "큐레이션", "계절감"],
       tone: "조용하고 단정한, 취향이 또렷한",
@@ -87,6 +92,7 @@ const seedMakers: Maker[] = [
     offers: ["공간대여", "콘텐츠", "굿즈"],
     seeks: ["제품컬래버", "팝업"],
     targetAudience: ["커피 애호가", "로컬 워커", "여행자"],
+    collabHistory: [],
     soul: {
       values: ["로컬", "정성", "느긋함"],
       tone: "투박하지만 따뜻한",
@@ -110,6 +116,7 @@ const seedMakers: Maker[] = [
     offers: ["워크숍", "행사참여", "공간대여"],
     seeks: ["콘텐츠", "굿즈"],
     targetAudience: ["그림책 애호가", "아이와 부모", "여행자"],
+    collabHistory: [],
     soul: {
       values: ["다정함", "느린 호흡", "손글씨"],
       tone: "포근하고 말랑한",
@@ -202,6 +209,7 @@ interface MakerRow {
   cover_image_url: string | null; logo_url: string | null;
   region: string | null; size: string | null;
   offers: string[]; seeks: string[]; target_audience: string[];
+  collab_history: Maker["collabHistory"];
   soul: Maker["soul"]; trust: Maker["trust"];
   collab_open: boolean; created_at: string;
 }
@@ -221,6 +229,7 @@ function rowToMaker(r: MakerRow): Maker {
     size: (r.size as BusinessSize) ?? undefined,
     offers: r.offers as CollabType[], seeks: r.seeks as CollabType[],
     targetAudience: r.target_audience,
+    collabHistory: r.collab_history ?? [],
     soul: r.soul, trust: r.trust,
     collabOpen: r.collab_open, createdAt: r.created_at,
   };
@@ -239,6 +248,7 @@ class SupabaseRepo implements Repo {
       cover_image_url: input.coverImageUrl ?? null, logo_url: input.logoUrl ?? null,
       region: input.region ?? null, size: input.size ?? null,
       offers: input.offers, seeks: input.seeks, target_audience: input.targetAudience,
+      collab_history: input.collabHistory,
       soul: input.soul, trust: input.trust, collab_open: input.collabOpen, created_at: now(),
     };
     const { data, error } = await this.db.from("makers").insert(row).select().single();
