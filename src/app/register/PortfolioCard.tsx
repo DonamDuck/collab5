@@ -212,7 +212,7 @@ export const PortfolioCard = forwardRef<HTMLDivElement, { data: PortfolioData }>
             letterSpacing: "0.04em",
           }}
         >
-          made with collab5
+          collab5로 만들었어요
         </div>
       </div>
     );

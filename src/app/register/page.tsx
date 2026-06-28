@@ -414,7 +414,7 @@ export default function RegisterPage() {
         {/* 검수 게이트 배너 — AI가 채운 직후 */}
         {reviewMode && (
           <div className="rounded-lg border border-primary bg-surface px-4 py-3 shadow-e1">
-            <p className="text-sm font-medium text-ink">✨ AI가 초안을 채웠어요</p>
+            <p className="text-sm font-medium text-ink">✨ 미리 채워놨어요, 확인해주세요</p>
             <p className="mt-0.5 text-xs text-mute">
               맞는지 확인하고 자유롭게 고쳐주세요. 못 찾은 곳은 직접 채우면 돼요.
             </p>
@@ -887,13 +887,18 @@ export default function RegisterPage() {
           </button>
         </div>
 
-        <button
-          onClick={submit}
-          disabled={!canSubmit}
-          className="h-12 w-full rounded-md bg-primary text-base font-medium text-primary-on disabled:opacity-40"
-        >
-          {pending ? "만드는 중…" : "등록하고 내 페이지 만들기"}
-        </button>
+        <div className="space-y-2">
+          <button
+            onClick={submit}
+            disabled={!canSubmit}
+            className="h-12 w-full rounded-md bg-primary text-base font-medium text-primary-on disabled:opacity-40"
+          >
+            {pending ? "만드는 중…" : "콜라보 카드 등록하기"}
+          </button>
+          <p className="text-center text-xs text-mute">
+            등록 후에는 콜라보 카드를 다운로드·공유할 수 있어요.
+          </p>
+        </div>
       </div>
 
       {/* 딸깍 자동완성 위저드 — 로딩·후보확인·인스타/홈피·재크롤링·항목선택 */}
@@ -1074,7 +1079,7 @@ function Field({
 function AiBadge() {
   return (
     <span className="inline-flex items-center rounded-pill bg-primary-tint px-1.5 py-0.5 text-[10px] font-medium text-primary-on">
-      ✨ AI가 채웠어요
+      ✨ 미리 채웠어요
     </span>
   );
 }

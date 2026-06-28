@@ -33,7 +33,7 @@ export default function RootLayout({
               href="/register"
               className="rounded-md border border-border-strong bg-surface px-3 py-1.5 font-medium text-ink"
             >
-              업체 등록
+              콜라보 카드 만들기
             </a>
           </nav>
         </header>

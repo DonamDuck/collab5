@@ -10,13 +10,13 @@ export default function Home() {
           <span className="text-xs font-medium text-mute">잘 맞는 콜라보</span>
         </div>
         <h1 className="break-keep text-[32px] font-bold leading-tight tracking-[-0.02em] text-ink sm:text-[40px]">
-          당신다운 콜라보 제안,
+          좋은 협업은,
           <br />
-          카드 한 장으로.
+          좋은 소개에서 시작돼요.
         </h1>
         <p className="mx-auto mt-4 max-w-[460px] text-base leading-relaxed text-body">
-          작은 가게도, 1인 브랜드도. 부담스러운 DM 대신
-          카드 한 장으로 정중하게 콜라보를 제안해요.
+          작은 가게도, 1인 브랜드도 괜찮아요. 길게 설명하지 않아도,
+          당신다운 모습 그대로 첫인사를 건넬 수 있어요.
         </p>
         <div className="mt-7 flex flex-col items-center justify-center gap-2.5 sm:flex-row">
           <a
