@@ -4,33 +4,72 @@ export default function Home() {
   return (
     <main className="mx-auto w-full max-w-[960px] px-4 py-12 sm:px-6">
       {/* Hero */}
-      <section className="mx-auto max-w-[600px] text-center">
-        <div className="mb-4 inline-flex items-center gap-1.5 rounded-pill bg-surface-soft px-3 py-1">
-          <span className="h-2 w-2 rounded-pill bg-primary" />
-          <span className="text-xs font-medium text-mute">잘 맞는 콜라보</span>
+      <section className="grid items-center gap-10 lg:grid-cols-2">
+        {/* 왼쪽: 텍스트 */}
+        <div className="text-center lg:text-left">
+          <div className="mb-4 inline-flex items-center gap-1.5 rounded-pill bg-surface-soft px-3 py-1">
+            <span className="h-2 w-2 rounded-pill bg-primary" />
+            <span className="text-xs font-medium text-mute">잘 맞는 콜라보</span>
+          </div>
+          <h1 className="break-keep text-[32px] font-bold leading-tight tracking-[-0.02em] text-ink sm:text-[40px]">
+            좋은 협업은,
+            <br />
+            좋은 소개에서 시작돼요.
+          </h1>
+          <p className="mt-4 text-lg font-bold leading-snug text-primary-on">
+            콜라보를 제안하는 카드를
+            <br />
+            3분 만에 만들어보세요.
+          </p>
+          <p className="mt-3 break-keep text-base leading-relaxed text-body">
+            작은 가게도, 1인 브랜드도 괜찮아요.
+            <br />
+            길게 설명하지 않아도 당신다운 첫인상을 전할 수 있어요.
+          </p>
+          <div className="mt-7 flex flex-col items-center justify-center gap-2.5 sm:flex-row lg:justify-start">
+            <a
+              href="/register"
+              className="flex h-12 w-full items-center justify-center rounded-md bg-primary px-6 text-base font-medium text-primary-on sm:w-auto"
+            >
+              내 브랜드 등록하기
+            </a>
+            <a
+              href="/c/canvasgarden-demo"
+              className="flex h-12 w-full items-center justify-center rounded-md border border-border-strong bg-surface px-6 text-base font-medium text-ink sm:w-auto"
+            >
+              예시 카드 보기
+            </a>
+          </div>
         </div>
-        <h1 className="break-keep text-[32px] font-bold leading-tight tracking-[-0.02em] text-ink sm:text-[40px]">
-          좋은 협업은,
-          <br />
-          좋은 소개에서 시작돼요.
-        </h1>
-        <p className="mx-auto mt-4 max-w-[460px] text-base leading-relaxed text-body">
-          작은 가게도, 1인 브랜드도 괜찮아요. 길게 설명하지 않아도,
-          당신다운 모습 그대로 첫인사를 건넬 수 있어요.
-        </p>
-        <div className="mt-7 flex flex-col items-center justify-center gap-2.5 sm:flex-row">
-          <a
-            href="/register"
-            className="flex h-12 w-full items-center justify-center rounded-md bg-primary px-6 text-base font-medium text-primary-on sm:w-auto"
-          >
-            내 브랜드 등록하기
-          </a>
-          <a
-            href="/c/canvasgarden-demo"
-            className="flex h-12 w-full items-center justify-center rounded-md border border-border-strong bg-surface px-6 text-base font-medium text-ink sm:w-auto"
-          >
-            예시 카드 보기
-          </a>
+
+        {/* 오른쪽: 일러스트 (DM의 답답함 → 카드의 깔끔함) */}
+        <div
+          className="relative mx-auto h-[300px] w-full max-w-[360px]"
+          aria-hidden="true"
+        >
+          {/* 긴 DM 말풍선 */}
+          <div className="absolute left-0 top-2 w-[220px] rounded-[16px] rounded-bl-[4px] bg-surface-soft px-4 py-3">
+            <p className="text-[13px] leading-relaxed text-mute">
+              저희는 이런 브랜드이고, 이런 제품을 만들고 있고… 협업 어떠신가요?
+            </p>
+            <p className="mt-1 tracking-[3px] text-faint">···</p>
+          </div>
+          {/* 콜라보 카드 */}
+          <div className="absolute bottom-2 right-0 w-[195px] rounded-[18px] border border-hairline bg-surface p-4 shadow-e3">
+            <div className="mb-2.5 flex items-center gap-1.5">
+              <span className="h-1.5 w-1.5 rounded-pill bg-primary" />
+              <span className="text-[10px] tracking-wide text-mute">콜라보 제안</span>
+            </div>
+            <div className="mb-2 flex h-9 w-9 items-center justify-center rounded-md bg-primary-pale text-base font-bold text-primary-on">
+              캔
+            </div>
+            <p className="text-[13px] font-bold text-ink">캔버스가든</p>
+            <div className="my-2 h-1.5 w-4/5 rounded-pill bg-surface-soft" />
+            <div className="h-1.5 w-3/5 rounded-pill bg-surface-soft" />
+            <div className="mt-3 rounded-md bg-primary py-1.5 text-center text-[11px] font-medium text-primary-on">
+              관심 있어요
+            </div>
+          </div>
         </div>
       </section>
 
