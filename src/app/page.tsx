@@ -29,7 +29,7 @@ export default function Home() {
             href="/register"
             className="flex h-12 w-full items-center justify-center rounded-md bg-primary px-6 text-base font-medium text-primary-on sm:w-auto"
           >
-            내 브랜드 등록하기
+            브랜드 카드 만들기
           </a>
           <a
             href="/c/canvasgarden-demo"
@@ -42,10 +42,10 @@ export default function Home() {
 
       {/* §9.6 온보딩 3스텝 */}
       <section className="mt-16">
-        <h2 className="text-center text-xl font-bold tracking-tight text-ink">
+        <h2 className="text-center text-2xl font-bold tracking-tight text-ink sm:text-[28px]">
           콜라보 카드를 만들어보세요
         </h2>
-        <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
           <StepCard
             n={1}
             title="내 브랜드를 소개해요"
@@ -69,20 +69,20 @@ export default function Home() {
 
       {/* 왜 카드? — DM vs 카드 */}
       <section className="mt-16">
-        <h2 className="text-center text-xl font-bold tracking-tight text-ink">
+        <h2 className="text-center text-2xl font-bold tracking-tight text-ink sm:text-[28px]">
           왜 카드가 더 효과적일까요?
         </h2>
-        <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2">
           {/* 그냥 DM */}
-          <div className="rounded-lg border border-hairline bg-surface-soft p-5">
-            <p className="text-sm font-bold text-mute">이런 경험 있으셨나요?</p>
-            <ul className="mt-3 space-y-2.5">
+          <div className="rounded-xl border border-hairline bg-surface-soft p-6">
+            <p className="text-[17px] font-bold text-mute">이런 경험 있으셨나요?</p>
+            <ul className="mt-4 space-y-3">
               {[
                 "내가 어떤 브랜드인지 하나씩 설명해야 해요.",
                 "상대는 내용을 이해하기 전부터 부담을 느껴요.",
                 "다른 메시지 사이에 금방 묻혀버려요.",
               ].map((t) => (
-                <li key={t} className="flex gap-2 text-sm text-body">
+                <li key={t} className="flex gap-2 text-base leading-relaxed text-body">
                   <span className="text-faint">·</span>
                   {t}
                 </li>
@@ -90,18 +90,18 @@ export default function Home() {
             </ul>
           </div>
           {/* 콜라보 카드 */}
-          <div className="rounded-lg border border-primary bg-surface p-5 shadow-e1">
-            <p className="flex items-center gap-1.5 text-sm font-bold text-ink">
+          <div className="rounded-xl border border-primary bg-surface p-6 shadow-e1">
+            <p className="flex items-center gap-1.5 text-[17px] font-bold text-ink">
               <span className="h-2 w-2 rounded-pill bg-primary" />
               이렇게 달라집니다.
             </p>
-            <ul className="mt-3 space-y-2.5">
+            <ul className="mt-4 space-y-3">
               {[
                 "브랜드와 협업 제안을 한 번에 전달할 수 있어요.",
                 "상대가 필요한 정보를 한눈에 이해할 수 있어요.",
                 "더 편하게, 더 자신 있게 협업을 시작할 수 있어요.",
               ].map((t) => (
-                <li key={t} className="flex gap-2 text-sm text-body">
+                <li key={t} className="flex gap-2 text-base leading-relaxed text-body">
                   <span className="font-bold text-primary-on">✓</span>
                   {t}
                 </li>
@@ -136,13 +136,13 @@ function StepCard({
   illu: React.ReactNode;
 }) {
   return (
-    <div className="rounded-lg border border-hairline bg-surface p-5">
+    <div className="rounded-xl border border-hairline bg-surface p-6">
       <div className="flex h-12 w-12 items-center justify-center text-ink">{illu}</div>
-      <p className="mt-4 text-[11px] font-bold tracking-wide text-primary-on">
+      <p className="mt-4 text-xs font-bold tracking-wide text-primary-on">
         STEP {n}
       </p>
-      <h3 className="mt-1 text-[15px] font-bold text-ink">{title}</h3>
-      <p className="mt-1 text-xs leading-relaxed text-mute">{desc}</p>
+      <h3 className="mt-1.5 text-[18px] font-bold leading-snug text-ink">{title}</h3>
+      <p className="mt-2 text-[15px] leading-relaxed text-mute">{desc}</p>
     </div>
   );
 }
