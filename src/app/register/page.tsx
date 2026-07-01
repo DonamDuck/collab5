@@ -371,20 +371,20 @@ export default function RegisterPage() {
 
   return (
     <main className="mx-auto w-full max-w-[640px] px-4 py-8 sm:px-6">
-      <h1 className="text-2xl font-bold tracking-tight text-ink">
-        당신의 브랜드, 멋지게 정리해드릴게요
+      <h1 className="text-[28px] font-bold tracking-tight text-ink sm:text-[32px]">
+        브랜드 소개서, 생각보다 금방 완성돼요.
       </h1>
-      <p className="mt-1 text-base text-body">
-        몇 가지만 알려주면 콜라보 카드를 만들 수 있는 내 페이지가 생겨요. 1분이면 충분해요.
+      <p className="mt-2 text-[17px] leading-relaxed text-body">
+        브랜드 이름만 입력하면 AI가 소개서 초안을 준비해드려요. 확인하고 다듬으면 1분 안에 완성할 수 있어요.
       </p>
 
       {/* ✨ 딸깍 자동완성 — 이름만 알려주면 채워드릴게요 */}
-      <div className="mt-6 rounded-lg border border-primary bg-primary-pale px-4 py-4">
-        <p className="text-sm font-bold text-ink">
-          ✨ 이름만 알려주세요, 나머지는 채워드릴게요
+      <div className="mt-10 rounded-xl border border-primary bg-primary-pale px-5 py-5">
+        <p className="text-base font-bold text-ink">
+          ✨ 브랜드 이름을 알려주세요. 나머지는 AI가 준비해드릴게요.
         </p>
-        <p className="mt-0.5 text-xs text-mute">
-          브랜드 이름을 적고 불러오면, 웹에서 찾아 소개·분위기·링크를 초안으로 채워드려요. 찾은 내용은 확인하고 고치면 돼요.
+        <p className="mt-1 text-[15px] leading-relaxed text-mute">
+          웹, SNS에서 찾은 정보를 기준으로 소개 초안을 준비해드려요. 찾아온 정보는 언제든 자유롭게 수정할 수 있어요.
         </p>
         <div className="mt-3 flex gap-2">
           <input
@@ -410,7 +410,7 @@ export default function RegisterPage() {
         </div>
       </div>
 
-      <div className="mt-7 space-y-8">
+      <div className="mt-10 space-y-8">
         {/* 검수 게이트 배너 — AI가 채운 직후 */}
         {reviewMode && (
           <div className="rounded-lg border border-primary bg-surface px-4 py-3 shadow-e1">
@@ -1066,7 +1066,7 @@ function Field({
 }) {
   return (
     <div>
-      <label className="mb-2 flex items-center gap-2 text-sm font-medium text-body">
+      <label className="mb-2 flex items-center gap-2 text-base font-medium text-body">
         <span>{label}</span>
         {hint}
       </label>

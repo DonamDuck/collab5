@@ -24,8 +24,8 @@ export default async function MakerPage({
           </span>
         )}
       </div>
-      {maker.oneLiner && <p className="mt-2 text-base text-body">{maker.oneLiner}</p>}
-      {maker.region && <p className="mt-1 text-sm text-mute">📍 {maker.region}</p>}
+      {maker.oneLiner && <p className="mt-2 text-[17px] leading-relaxed text-body">{maker.oneLiner}</p>}
+      {maker.region && <p className="mt-1 text-[15px] text-mute">📍 {maker.region}</p>}
 
       {/* 결 — AI 보조층(파스텔, 검증처럼 강조하지 않음) */}
       {maker.soul.values.length > 0 && (
@@ -91,7 +91,7 @@ export default async function MakerPage({
           {maker.trust.address && <TrustTag>📍 {maker.trust.address}</TrustTag>}
         </div>
         {maker.trust.description && (
-          <p className="mt-3 text-base leading-relaxed text-body">
+          <p className="mt-3 text-[17px] leading-relaxed text-body">
             {maker.trust.description}
           </p>
         )}

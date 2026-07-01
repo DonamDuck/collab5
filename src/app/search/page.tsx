@@ -56,8 +56,8 @@ export default function SearchPage() {
 
   return (
     <main className="mx-auto w-full max-w-[640px] px-4 py-8 sm:px-6 lg:max-w-4xl">
-      <h1 className="text-2xl font-bold tracking-tight text-ink">메이커 찾기</h1>
-      <p className="mt-1 text-base text-body">잘 맞는 콜라보 파트너를 찾아보세요.</p>
+      <h1 className="text-[28px] font-bold tracking-tight text-ink sm:text-[32px]">메이커 찾기</h1>
+      <p className="mt-2 text-[17px] leading-relaxed text-body">잘 맞는 콜라보 파트너를 찾아보세요.</p>
 
       {/* 검색바 — 데스크탑 폭 캡(QA P2) */}
       <div className="mt-5 flex h-11 max-w-xl items-center gap-2 rounded-pill bg-surface-soft px-4">
