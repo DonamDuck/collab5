@@ -269,17 +269,28 @@ export function EnrichWizard({
                 : `같은 이름을 ${candidates.length}곳 찾았어요. 맞는 곳을 골라주세요.`}
             </p>
             <div className="mt-4 space-y-2">
-              {candidates.map((c, i) => (
-                <button
-                  key={i}
-                  type="button"
-                  onClick={() => pickCandidate(c)}
-                  className="block w-full rounded-md border border-hairline bg-surface px-4 py-3 text-left transition-colors hover:bg-surface-soft"
-                >
-                  <p className="text-sm font-medium text-ink">{c.name}</p>
-                  {c.hint && <p className="mt-0.5 text-xs text-mute">{c.hint}</p>}
-                </button>
-              ))}
+              {candidates.map((c, i) => {
+                // 식별 정보 조합: 지역/주소 · 업종(한줄) → SNS/홈피. 상호만 있으면 헷갈리니 함께 보여줌.
+                const idLine =
+                  [c.region || c.address, c.oneLiner].filter(Boolean).join(" · ") || c.hint;
+                const link = [c.instagram, c.homepage?.replace(/^https?:\/\//, "")]
+                  .filter(Boolean)
+                  .join("  ·  ");
+                return (
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={() => pickCandidate(c)}
+                    className="block w-full rounded-md border border-hairline bg-surface px-4 py-3 text-left transition-colors hover:bg-surface-soft"
+                  >
+                    <p className="text-[15px] font-medium text-ink">{c.name}</p>
+                    {idLine && (
+                      <p className="mt-0.5 text-sm text-mute line-clamp-2">{idLine}</p>
+                    )}
+                    {link && <p className="mt-0.5 text-xs text-faint">{link}</p>}
+                  </button>
+                );
+              })}
               <button
                 type="button"
                 onClick={onClose}
