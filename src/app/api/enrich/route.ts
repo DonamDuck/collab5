@@ -3,7 +3,7 @@
 // 이 라우트는 그대로 동작한다(응답 스키마 동일).
 import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
-import { enrichLookup, enrichRecrawl, enrichDraft } from "@/lib/enrich";
+import { enrichLookup, enrichRecrawl, enrichDraft, enrichResearch, enrichOptions } from "@/lib/enrich";
 
 // 임시 진단: web_search 없는 최소 호출 — 전반 과부하 vs web_search 특정 구분용.
 export async function GET() {
@@ -37,6 +37,8 @@ export async function POST(req: Request) {
     values?: unknown;
     offers?: unknown;
     targetAudience?: unknown;
+    focusKeywords?: unknown;
+    research?: unknown;
     round?: unknown;
   };
   try {
@@ -67,28 +69,63 @@ export async function POST(req: Request) {
     }
   }
 
-  // ── 초안 모드: 폼 정보 기반 소개 한 문단 생성(백엔드 크롤링 + AI 작성) ──
+  const strArr = (v: unknown): string[] | undefined =>
+    Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : undefined;
+
+  // ── 조사 모드: 브랜드명 → 조사 메모만(백그라운드 크롤). 위저드가 키워드 받는 동안 먼저 호출 ──
+  if (body.mode === "research") {
+    const name = typeof body.name === "string" ? body.name.trim() : "";
+    if (!name) return NextResponse.json({ error: "브랜드 이름이 필요해요." }, { status: 400 });
+    try {
+      const research = await enrichResearch(name);
+      return NextResponse.json({ research });
+    } catch (e) {
+      console.error("[enrich] research failed:", e);
+      return NextResponse.json({ research: "", error: "조사에 실패했어요." }, { status: 200 });
+    }
+  }
+
+  // ── 5지선다 모드: 조사 메모 + 가중 키워드 → 한줄소개·브랜드소개 후보 5개씩 ──
+  if (body.mode === "options") {
+    const name = typeof body.name === "string" ? body.name.trim() : "";
+    if (!name) return NextResponse.json({ error: "브랜드 이름이 필요해요." }, { status: 400 });
+    try {
+      const options = await enrichOptions({
+        name,
+        research: typeof body.research === "string" ? body.research : "",
+        focusKeywords: strArr(body.focusKeywords),
+      });
+      return NextResponse.json({ options });
+    } catch (e) {
+      console.error("[enrich] options failed:", e);
+      return NextResponse.json(
+        { options: null, error: "지금은 후보 만들기가 어려워요. 잠시 후 다시 시도해 주세요." },
+        { status: 200 }
+      );
+    }
+  }
+
+  // ── 초안 모드: 폼 정보 기반 브랜드 소개 5지선다(백엔드 크롤링 + AI 작성) ──
   if (body.mode === "draft") {
     const name = typeof body.name === "string" ? body.name.trim() : "";
     if (!name) {
       return NextResponse.json({ error: "브랜드 이름이 필요해요." }, { status: 400 });
     }
-    const strArr = (v: unknown): string[] | undefined =>
-      Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : undefined;
     try {
-      const description = await enrichDraft({
+      const descriptions = await enrichDraft({
         name,
         oneLiner: typeof body.oneLiner === "string" ? body.oneLiner : undefined,
         values: strArr(body.values),
         offers: strArr(body.offers),
         targetAudience: strArr(body.targetAudience),
+        focusKeywords: strArr(body.focusKeywords),
         round: typeof body.round === "number" ? body.round : 0,
       });
-      return NextResponse.json({ description });
+      return NextResponse.json({ descriptions });
     } catch (e) {
       console.error("[enrich] draft failed:", e);
       return NextResponse.json(
-        { description: "", error: "지금은 초안 작성이 어려워요. 잠시 후 다시 시도하거나 직접 입력해 주세요." },
+        { descriptions: [], error: "지금은 초안 작성이 어려워요. 잠시 후 다시 시도하거나 직접 입력해 주세요." },
         { status: 200 }
       );
     }

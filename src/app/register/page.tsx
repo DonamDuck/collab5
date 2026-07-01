@@ -91,6 +91,8 @@ export default function RegisterPage() {
   const [draftBusy, setDraftBusy] = useState(false);
   const [draftGenerated, setDraftGenerated] = useState(false); // AI 초안을 한 번이라도 생성했나(버튼 분기 기준)
   const [draftRound, setDraftRound] = useState(0); // 다시 받기마다 다른 각도로 변주
+  const [descChoices, setDescChoices] = useState<string[]>([]); // 브랜드 소개 5지선다 후보
+  const [descModalOpen, setDescModalOpen] = useState(false); // 5지선다 모달
 
   const toggle = (
     list: CollabType[],
@@ -164,8 +166,8 @@ export default function RegisterPage() {
     if (parts.length) setDescription(parts.join(" "));
   };
 
-  // 초안받기: 폼에 입력한 정보 기준으로 백엔드 AI 크롤링+작성.
-  // 첫 클릭='초안 받기', 이후='초안 다시 받기'(round 증가 → 다른 각도의 글).
+  // 초안받기: 폼 정보 기준으로 백엔드 AI 크롤링 → 소개 후보 5개 생성 → 5지선다 모달.
+  // 첫 클릭='초안 받기', 이후='초안 다시 받기'(round 증가 → 다른 각도의 후보들).
   const draftDescription = async () => {
     if (!name.trim()) {
       ruleDraft();
@@ -188,8 +190,14 @@ export default function RegisterPage() {
         }),
       });
       const data = await res.json();
-      if (typeof data.description === "string" && data.description.trim()) {
-        setDescription(data.description.trim());
+      const choices: string[] = Array.isArray(data.descriptions)
+        ? data.descriptions.filter((s: unknown): s is string => typeof s === "string" && !!s.trim())
+        : [];
+      if (choices.length > 1) {
+        setDescChoices(choices);
+        setDescModalOpen(true);
+      } else if (choices.length === 1) {
+        setDescription(choices[0]);
       } else {
         ruleDraft();
       }
@@ -200,6 +208,10 @@ export default function RegisterPage() {
       setDraftRound((r) => r + 1);
       setDraftBusy(false);
     }
+  };
+  const pickDesc = (v: string) => {
+    setDescription(v);
+    setDescModalOpen(false);
   };
   const canDraft = !!(name.trim() || oneLiner.trim() || values.length);
 
@@ -865,13 +877,51 @@ export default function RegisterPage() {
         </div>
       </div>
 
-      {/* 딸깍 자동완성 위저드 — 로딩·후보확인·인스타/홈피·재크롤링·항목선택 */}
+      {/* 딸깍 자동완성 위저드 — 가중 키워드 → 백그라운드 크롤 → 한줄/소개 5지선다 */}
       {wizardOpen && (
         <EnrichWizard
           query={query.trim()}
           onClose={() => setWizardOpen(false)}
           onApply={applyWizard}
         />
+      )}
+
+      {/* 브랜드 소개 5지선다 — '초안 받기' 결과 */}
+      {descModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 p-4 sm:items-center"
+          onClick={() => setDescModalOpen(false)}
+        >
+          <div
+            className="relative w-full max-w-md rounded-lg border border-hairline bg-surface p-5 shadow-e2"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={() => setDescModalOpen(false)}
+              aria-label="닫기"
+              className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-pill text-lg text-mute hover:bg-surface-soft hover:text-ink"
+            >
+              ✕
+            </button>
+            <p className="pr-8 text-base font-bold text-ink">마음에 드는 소개를 골라주세요</p>
+            <p className="mt-1 text-sm text-mute">
+              골라서 채우고, 폼에서 자유롭게 다듬을 수 있어요.
+            </p>
+            <div className="mt-4 max-h-[52vh] space-y-2 overflow-y-auto pr-0.5">
+              {descChoices.map((d, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => pickDesc(d)}
+                  className="block w-full rounded-md border border-hairline bg-surface px-3 py-2.5 text-left text-sm leading-relaxed text-body transition-colors hover:border-primary hover:bg-primary-pale"
+                >
+                  {d}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
       )}
 
       {/* 소개서 캡처용 — 화면 밖에서 렌더(다운로드 대상) */}

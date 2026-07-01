@@ -1,9 +1,11 @@
 "use client";
 
-// 딸깍 자동완성 위저드 — 업체명 → 크롤링 → 후보확인 → (인스타/홈피 옵셔널) → 재크롤링 → 항목선택 → 폼 반영.
-// mock 기반(ENRICH_FORCE_MOCK). 실제 API 연결은 비용 최적화 후. 정책: master-brain 2026-06-24.
+// 딸깍 자동완성 위저드 (2026-07-01 재설계):
+//  ① 가중 키워드 입력(뱃지 max 4) — 동시에 백그라운드로 브랜드명 크롤링 시작(#3 로딩 체감↓)
+//  ② 키워드 제출 → 크롤 완료 대기 → 키워드 가중 5지선다 생성
+//  ③ 한 줄 소개·브랜드 소개를 각각 5개 중 택1 → 폼 반영
 import { useEffect, useRef, useState } from "react";
-import type { EnrichCandidate } from "@/lib/enrich";
+import type { EnrichOptions } from "@/lib/enrich";
 import { josa } from "@/lib/josa";
 
 export type WizardFill = {
@@ -17,40 +19,19 @@ export type WizardFill = {
   description?: string;
 };
 
-type FieldKey = keyof WizardFill;
-const FIELD_ROWS: { key: FieldKey; label: string }[] = [
-  { key: "name", label: "상호" },
-  { key: "oneLiner", label: "한 줄 소개" },
-  { key: "region", label: "지역" },
-  { key: "address", label: "주소" },
-  { key: "instagram", label: "인스타그램" },
-  { key: "homepage", label: "홈페이지" },
-  { key: "values", label: "분위기" },
-  { key: "description", label: "소개" },
+const SUGGESTED_KEYWORDS = [
+  "친환경",
+  "핸드메이드",
+  "로컬",
+  "감성",
+  "프리미엄",
+  "스토리",
+  "실용성",
+  "지속가능",
 ];
+const MAX_KEYWORDS = 4;
 
-// 로딩 순환 메시지 (2단계 파이프라인 반영)
-const ENRICH_STEPS = [
-  "웹에서 정보를 모으는 중…",
-  "인스타·홈페이지를 살펴보는 중…",
-  "브랜드의 분위기를 읽는 중…",
-  "카드로 담는 중…",
-];
-
-function fillFromCandidate(c: EnrichCandidate): WizardFill {
-  return {
-    name: c.name || undefined,
-    oneLiner: c.oneLiner || undefined,
-    region: c.region,
-    address: c.address,
-    instagram: c.instagram,
-    homepage: c.homepage,
-    values: c.values?.length ? c.values : undefined,
-    description: c.description || undefined,
-  };
-}
-
-type Kind = "loading" | "pick" | "askIg" | "askHp" | "recrawl" | "fields" | "error";
+type Kind = "keywords" | "loading" | "options" | "error";
 
 export function EnrichWizard({
   query,
@@ -59,171 +40,78 @@ export function EnrichWizard({
 }: {
   query: string;
   onClose: () => void;
-  onApply: (fill: WizardFill, filledKeys: string[]) => void;
+  onApply: (fill: WizardFill) => void;
 }) {
-  const [kind, setKind] = useState<Kind>("loading");
-  const [candidates, setCandidates] = useState<EnrichCandidate[]>([]);
-  const [cand, setCand] = useState<EnrichCandidate | null>(null);
-  const [igInput, setIgInput] = useState("");
-  const [hpInput, setHpInput] = useState("");
-  const [addedIg, setAddedIg] = useState(false);
-  const [picks, setPicks] = useState<Record<string, boolean>>({}); // 채울지 여부
-  const [edited, setEdited] = useState<Record<string, string>>({}); // 텍스트 항목 수정값
-  const [vibes, setVibes] = useState<string[]>([]); // 분위기 칩 선택 상태
-  const [vibeInput, setVibeInput] = useState(""); // 분위기 직접 추가
-  const [editingKey, setEditingKey] = useState<string | null>(null); // 인라인 편집 중인 항목
-  const [history, setHistory] = useState<Kind[]>([]); // 뒤로가기 스택(6번)
+  const [kind, setKind] = useState<Kind>("keywords");
+  const [keywords, setKeywords] = useState<string[]>([]);
+  const [kwInput, setKwInput] = useState("");
+  const [options, setOptions] = useState<EnrichOptions | null>(null);
+  const [pickOne, setPickOne] = useState(""); // 선택한 한 줄 소개
+  const [pickDesc, setPickDesc] = useState(""); // 선택한 브랜드 소개
   const [errMsg, setErrMsg] = useState("");
-  const started = useRef(false);
 
-  // 단계 전환: 현재 단계를 히스토리에 쌓는다(로딩 단계는 제외 — 자동 전환이라 뒤로 대상 아님)
-  const advance = (next: Kind) => {
-    setHistory((h) => (kind === "loading" || kind === "recrawl" ? h : [...h, kind]));
-    setKind(next);
-  };
-  const back = () => {
-    setHistory((h) => {
-      if (!h.length) return h;
-      const nh = [...h];
-      setKind(nh.pop()!);
-      return nh;
-    });
-  };
-
-  // 시작: 1차 크롤링
+  // 백그라운드 크롤: 열리자마자 브랜드명으로 조사 시작(사용자가 키워드 고르는 동안 진행 → 체감 속도↑)
+  const researchRef = useRef<Promise<string> | null>(null);
   useEffect(() => {
-    if (started.current) return;
-    started.current = true;
-    (async () => {
-      try {
-        const r = await fetch("/api/enrich", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ query }),
-        });
-        const d = await r.json();
-        if (d.error || !d.candidates?.length) {
-          setErrMsg(d.error || "웹에서 정보를 충분히 못 찾았어요. 직접 입력해 주세요.");
-          setKind("error");
-          return;
-        }
-        setCandidates(d.candidates);
-        setKind("pick");
-      } catch {
-        setErrMsg("불러오기에 실패했어요. 잠시 후 다시 시도해 주세요.");
-        setKind("error");
-      }
-    })();
+    researchRef.current = fetch("/api/enrich", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mode: "research", name: query }),
+    })
+      .then((r) => r.json())
+      .then((d) => (typeof d.research === "string" ? d.research : ""))
+      .catch(() => "");
   }, [query]);
 
-  const enterFields = (c: EnrichCandidate) => {
-    const fill = fillFromCandidate(c);
-    const init: Record<string, boolean> = {};
-    const ed: Record<string, string> = {};
-    FIELD_ROWS.forEach(({ key }) => {
-      if (fill[key] !== undefined) {
-        init[key] = true; // 기본 전부 선택
-        if (key !== "values") ed[key] = String(fill[key]);
-      }
-    });
-    setPicks(init);
-    setEdited(ed);
-    setVibes(fill.values ?? []);
-    setVibeInput("");
-    setEditingKey(null);
-    setCand(c);
-    advance("fields");
+  const toggleKw = (k: string) =>
+    setKeywords((p) =>
+      p.includes(k) ? p.filter((x) => x !== k) : p.length >= MAX_KEYWORDS ? p : [...p, k]
+    );
+  const addKw = () => {
+    const v = kwInput.trim();
+    if (v && !keywords.includes(v) && keywords.length < MAX_KEYWORDS) setKeywords((p) => [...p, v]);
+    setKwInput("");
   };
 
-  const doRecrawl = async (c: EnrichCandidate) => {
-    setKind("recrawl");
+  const runOptions = async () => {
+    setKind("loading");
     try {
+      const research = (await researchRef.current) ?? "";
       const r = await fetch("/api/enrich", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          mode: "recrawl",
-          name: c.name,
-          instagram: c.instagram,
-          homepage: c.homepage,
-        }),
+        body: JSON.stringify({ mode: "options", name: query, research, focusKeywords: keywords }),
       });
       const d = await r.json();
-      enterFields(d.candidate ?? c);
+      const o: EnrichOptions | null = d.options ?? null;
+      if (!o || (!o.oneLiners.length && !o.descriptions.length)) {
+        setErrMsg(d.error || "정보를 충분히 못 찾았어요. 직접 입력해 주세요.");
+        setKind("error");
+        return;
+      }
+      setOptions(o);
+      setPickOne(o.oneLiners[0] ?? "");
+      setPickDesc(o.descriptions[0] ?? "");
+      setKind("options");
     } catch {
-      enterFields(c); // 재크롤 실패해도 1차 결과로 진행
+      setErrMsg("불러오기에 실패했어요. 잠시 후 다시 시도해 주세요.");
+      setKind("error");
     }
-  };
-
-  // 후보 선택 → 인스타/홈피 체크
-  const pickCandidate = (c: EnrichCandidate) => {
-    setCand(c);
-    setAddedIg(false);
-    if (!c.instagram) {
-      setIgInput("");
-      advance("askIg");
-      return;
-    }
-    if (!c.homepage) {
-      setHpInput("");
-      advance("askHp");
-      return;
-    }
-    enterFields(c); // 둘 다 있으면 재크롤 없이 항목선택
-  };
-
-  const afterIg = (ig: string | null) => {
-    const base = cand!;
-    let c = base;
-    if (ig) {
-      c = { ...base, instagram: ig.startsWith("@") ? ig : `@${ig}` };
-      setCand(c);
-      setAddedIg(true);
-    }
-    if (!c.homepage) {
-      setHpInput("");
-      advance("askHp");
-      return;
-    }
-    if (ig) doRecrawl(c);
-    else enterFields(c);
-  };
-
-  const afterHp = (hp: string | null) => {
-    const base = cand!;
-    let c = base;
-    if (hp) {
-      c = { ...base, homepage: hp };
-      setCand(c);
-    }
-    if (hp || addedIg) doRecrawl(c);
-    else enterFields(c);
-  };
-
-  const togglePick = (k: string) => setPicks((p) => ({ ...p, [k]: !p[k] }));
-  const toggleVibe = (v: string) =>
-    setVibes((p) => (p.includes(v) ? p.filter((x) => x !== v) : [...p, v]));
-  const addVibe = () => {
-    const v = vibeInput.trim();
-    if (v && !vibes.includes(v)) setVibes((p) => [...p, v]);
-    setVibeInput("");
   };
 
   const apply = () => {
-    if (!cand) return;
-    const fill = fillFromCandidate(cand);
-    const out: WizardFill = {};
-    FIELD_ROWS.forEach(({ key }) => {
-      if (!picks[key] || fill[key] === undefined) return;
-      if (key === "values") {
-        if (vibes.length) out.values = vibes;
-      } else {
-        const v = (edited[key] ?? String(fill[key])).trim();
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        if (v) (out as any)[key] = v;
-      }
+    if (!options) return;
+    const id = options.identity;
+    onApply({
+      name: id.name || query || undefined,
+      oneLiner: pickOne || undefined,
+      description: pickDesc || undefined,
+      region: id.region,
+      address: id.address,
+      instagram: id.instagram,
+      homepage: id.homepage,
+      values: options.values.length ? options.values : undefined,
     });
-    onApply(out, Object.keys(out));
   };
 
   return (
@@ -232,24 +120,22 @@ export function EnrichWizard({
       onClick={onClose}
     >
       <div
-        className="w-full max-w-md rounded-lg border border-hairline bg-surface p-5 shadow-e2"
+        className="relative w-full max-w-md rounded-lg border border-hairline bg-surface p-5 shadow-e2"
         onClick={(e) => e.stopPropagation()}
       >
-        {history.length > 0 &&
-          (kind === "pick" || kind === "askIg" || kind === "askHp" || kind === "fields") && (
-            <button
-              type="button"
-              onClick={back}
-              className="mb-3 -ml-1 inline-flex items-center gap-1 text-xs font-medium text-mute hover:text-ink"
-            >
-              ← 뒤로
-            </button>
-          )}
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="닫기"
+          className="absolute right-3 top-3 z-10 flex h-8 w-8 items-center justify-center rounded-pill text-lg text-mute hover:bg-surface-soft hover:text-ink"
+        >
+          ✕
+        </button>
+
         {kind === "loading" && <LoadingView name={query} />}
-        {kind === "recrawl" && <LoadingView name={query} deep />}
 
         {kind === "error" && (
-          <div className="text-center">
+          <div className="pt-4 text-center">
             <p className="text-base font-bold text-ink">앗, 자동으로 못 채웠어요</p>
             <p className="mt-1 text-sm text-mute">{errMsg}</p>
             <button
@@ -261,190 +147,111 @@ export function EnrichWizard({
           </div>
         )}
 
-        {kind === "pick" && (
+        {kind === "keywords" && (
           <div>
-            <p className="text-base font-bold text-ink">어느 곳이 맞나요?</p>
-            <p className="mt-0.5 text-sm text-mute">
-              {candidates.length === 1
-                ? "이 곳이 맞는지 확인해 주세요."
-                : `같은 이름을 ${candidates.length}곳 찾았어요. 맞는 곳을 골라주세요.`}
+            <p className="pr-8 text-base font-bold text-ink">어떤 점을 강조할까요?</p>
+            <p className="mt-1 text-sm text-mute">
+              골라주신 키워드를 중심으로 소개를 찾아드려요. 건너뛰어도 괜찮아요.
             </p>
-            <div className="mt-4 space-y-2">
-              {candidates.map((c, i) => {
-                // 식별 정보 조합: 지역/주소 · 업종(한줄) → SNS/홈피. 상호만 있으면 헷갈리니 함께 보여줌.
-                const idLine =
-                  [c.region || c.address, c.oneLiner].filter(Boolean).join(" · ") || c.hint;
-                const link = [c.instagram, c.homepage?.replace(/^https?:\/\//, "")]
-                  .filter(Boolean)
-                  .join("  ·  ");
+            <div className="mt-4 flex flex-wrap gap-2">
+              {SUGGESTED_KEYWORDS.map((k) => {
+                const on = keywords.includes(k);
+                const full = !on && keywords.length >= MAX_KEYWORDS;
                 return (
                   <button
-                    key={i}
+                    key={k}
                     type="button"
-                    onClick={() => pickCandidate(c)}
-                    className="block w-full rounded-md border border-hairline bg-surface px-4 py-3 text-left transition-colors hover:bg-surface-soft"
+                    onClick={() => toggleKw(k)}
+                    disabled={full}
+                    className={`inline-flex h-9 items-center rounded-pill border px-3.5 text-sm transition-colors ${
+                      on
+                        ? "border-primary bg-primary-tint text-primary-on"
+                        : "border-hairline bg-surface text-mute"
+                    } ${full ? "cursor-not-allowed opacity-40" : ""}`}
                   >
-                    <p className="text-[15px] font-medium text-ink">{c.name}</p>
-                    {idLine && (
-                      <p className="mt-0.5 text-sm text-mute line-clamp-2">{idLine}</p>
-                    )}
-                    {link && <p className="mt-0.5 text-xs text-faint">{link}</p>}
+                    {k}
+                    {on ? " ✓" : ""}
                   </button>
                 );
               })}
+              {keywords
+                .filter((k) => !SUGGESTED_KEYWORDS.includes(k))
+                .map((k) => (
+                  <button
+                    key={k}
+                    type="button"
+                    onClick={() => toggleKw(k)}
+                    className="inline-flex h-9 items-center rounded-pill border border-primary bg-primary-tint px-3.5 text-sm text-primary-on"
+                  >
+                    {k} ✕
+                  </button>
+                ))}
+            </div>
+            <div className="mt-3 flex gap-2">
+              <input
+                value={kwInput}
+                onChange={(e) => setKwInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+                    e.preventDefault();
+                    addKw();
+                  }
+                }}
+                placeholder="직접 더하기 (예: 반려동물)"
+                disabled={keywords.length >= MAX_KEYWORDS}
+                className="h-11 flex-1 rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus disabled:opacity-40"
+              />
               <button
                 type="button"
-                onClick={onClose}
-                className="block w-full rounded-md px-4 py-3 text-center text-sm text-mute"
+                onClick={addKw}
+                disabled={keywords.length >= MAX_KEYWORDS}
+                className="h-11 shrink-0 rounded-md border border-border-strong bg-surface px-4 text-sm font-medium text-ink disabled:opacity-40"
               >
-                직접 입력할게요
+                추가
               </button>
             </div>
+            <p className="mt-2 text-xs text-mute">
+              {keywords.length} / {MAX_KEYWORDS} · 그동안 {query}
+              {josa(query, "을", "를")} 미리 찾고 있어요
+            </p>
+            <button
+              onClick={runOptions}
+              className="mt-4 h-11 w-full rounded-md bg-primary text-sm font-medium text-primary-on"
+            >
+              {keywords.length ? "이 방향으로 찾기" : "그냥 찾아주세요"}
+            </button>
           </div>
         )}
 
-        {kind === "askIg" && (
-          <AskView
-            title="인스타그램 계정이 있나요?"
-            sub="핸들을 알려주시면 더 많은 정보를 찾는 데 도움이 돼요!"
-            placeholder="@handle"
-            value={igInput}
-            onChange={setIgInput}
-            onSubmit={() => afterIg(igInput.trim() || null)}
-            onSkip={() => afterIg(null)}
-          />
-        )}
-
-        {kind === "askHp" && (
-          <AskView
-            title="홈페이지가 있나요?"
-            sub="주소를 알려주시면 더 정확하게 정리해드려요!"
-            placeholder="https://"
-            value={hpInput}
-            onChange={setHpInput}
-            onSubmit={() => afterHp(hpInput.trim() || null)}
-            onSkip={() => afterHp(null)}
-          />
-        )}
-
-        {kind === "fields" && cand && (
+        {kind === "options" && options && (
           <div>
-            <p className="text-base font-bold text-ink">이 정보들을 채울까요?</p>
-            <p className="mt-0.5 text-sm text-mute">
-              체크한 항목만 폼에 담을게요. 수정 버튼으로 바로 고칠 수도 있어요.
+            <p className="pr-8 text-base font-bold text-ink">
+              {options.identity.name || query}
             </p>
-            <div className="mt-4 max-h-[44vh] space-y-1.5 overflow-y-auto pr-0.5">
-              {FIELD_ROWS.map(({ key, label }) => {
-                const fill = fillFromCandidate(cand);
-                if (fill[key] === undefined) return null;
-                const on = !!picks[key];
-                const isVibes = key === "values";
-                const editing = editingKey === key;
-                return (
-                  <div
-                    key={key}
-                    className={`rounded-md border transition-colors ${
-                      on ? "border-primary bg-primary-pale" : "border-hairline bg-surface"
-                    }`}
-                  >
-                    <div className="flex items-start gap-2.5 px-3 py-2.5">
-                      <button
-                        type="button"
-                        onClick={() => togglePick(key)}
-                        aria-label={on ? "제외" : "포함"}
-                        className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border text-[10px] font-bold ${
-                          on
-                            ? "border-primary bg-primary text-primary-on"
-                            : "border-border-strong text-transparent"
-                        }`}
-                      >
-                        ✓
-                      </button>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-medium text-mute">{label}</span>
-                          {!isVibes && (
-                            <button
-                              type="button"
-                              onClick={() => setEditingKey(editing ? null : key)}
-                              className="text-[11px] font-medium text-primary-on underline-offset-2 hover:underline"
-                            >
-                              {editing ? "완료" : "수정"}
-                            </button>
-                          )}
-                        </div>
-
-                        {isVibes ? (
-                          <div className="mt-1.5">
-                            <div className="flex flex-wrap gap-1.5">
-                              {vibes.map((v) => (
-                                <button
-                                  key={v}
-                                  type="button"
-                                  onClick={() => toggleVibe(v)}
-                                  className="inline-flex h-7 items-center rounded-pill border border-primary bg-primary-tint px-2.5 text-xs text-primary-on"
-                                >
-                                  {v} ✕
-                                </button>
-                              ))}
-                              {vibes.length === 0 && (
-                                <span className="text-xs text-faint">아래에서 더해보세요</span>
-                              )}
-                            </div>
-                            <div className="mt-1.5 flex gap-1.5">
-                              <input
-                                value={vibeInput}
-                                onChange={(e) => setVibeInput(e.target.value)}
-                                onKeyDown={(e) => {
-                                  if (e.key === "Enter" && !e.nativeEvent.isComposing) {
-                                    e.preventDefault();
-                                    addVibe();
-                                  }
-                                }}
-                                placeholder="직접 더하기 (예: 아날로그)"
-                                className="h-8 flex-1 rounded-sm border border-hairline bg-surface px-2.5 text-xs text-ink outline-none placeholder:text-faint focus:border-focus"
-                              />
-                              <button
-                                type="button"
-                                onClick={addVibe}
-                                className="h-8 rounded-sm border border-border-strong bg-surface px-3 text-xs font-medium text-ink"
-                              >
-                                추가
-                              </button>
-                            </div>
-                          </div>
-                        ) : editing ? (
-                          <input
-                            value={edited[key] ?? ""}
-                            onChange={(e) =>
-                              setEdited((p) => ({ ...p, [key]: e.target.value }))
-                            }
-                            autoFocus
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter" && !e.nativeEvent.isComposing) {
-                                e.preventDefault();
-                                setEditingKey(null);
-                              }
-                            }}
-                            className="mt-1 h-8 w-full rounded-sm border border-hairline bg-surface px-2.5 text-sm text-ink outline-none focus:border-focus"
-                          />
-                        ) : (
-                          <span className="mt-0.5 block text-sm text-ink line-clamp-2">
-                            {edited[key] || "—"}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
+            {(options.identity.address || options.identity.region) && (
+              <p className="mt-0.5 text-sm text-mute">
+                {options.identity.address || options.identity.region}
+              </p>
+            )}
+            <div className="mt-4 max-h-[52vh] space-y-5 overflow-y-auto pr-0.5">
+              <OptionGroup title="한 줄 소개" items={options.oneLiners} value={pickOne} onPick={setPickOne} />
+              <OptionGroup
+                title="브랜드 소개"
+                items={options.descriptions}
+                value={pickDesc}
+                onPick={setPickDesc}
+                multiline
+              />
             </div>
             <button
               onClick={apply}
               className="mt-4 h-11 w-full rounded-md bg-primary text-sm font-medium text-primary-on"
             >
-              선택한 정보로 채우기
+              선택한 내용으로 채우기
             </button>
+            <p className="mt-2 text-center text-xs text-mute">
+              고른 내용은 폼에서 자유롭게 다듬을 수 있어요.
+            </p>
           </div>
         )}
       </div>
@@ -452,11 +259,66 @@ export function EnrichWizard({
   );
 }
 
-// 아톰 마크 + 순환 메시지 로딩 (회전 X = 어지럼 방지). 디자인팀 시안 도착 시 교체(master-brain 멘션).
-function LoadingView({ name, deep }: { name: string; deep?: boolean }) {
+// 5지선다 한 그룹 — 라디오처럼 하나만 선택
+function OptionGroup({
+  title,
+  items,
+  value,
+  onPick,
+  multiline,
+}: {
+  title: string;
+  items: string[];
+  value: string;
+  onPick: (v: string) => void;
+  multiline?: boolean;
+}) {
+  return (
+    <div>
+      <p className="mb-2 text-sm font-semibold text-body">
+        {title} <span className="font-normal text-faint">· 하나 골라주세요</span>
+      </p>
+      <div className="space-y-2">
+        {items.map((it, i) => {
+          const on = value === it;
+          return (
+            <button
+              key={i}
+              type="button"
+              onClick={() => onPick(it)}
+              className={`flex w-full items-start gap-2.5 rounded-md border px-3 py-2.5 text-left text-sm transition-colors ${
+                on
+                  ? "border-primary bg-primary-pale text-ink"
+                  : "border-hairline bg-surface text-body hover:bg-surface-soft"
+              }`}
+            >
+              <span
+                className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-pill border text-[10px] font-bold ${
+                  on ? "border-primary bg-primary text-primary-on" : "border-border-strong text-transparent"
+                }`}
+              >
+                ✓
+              </span>
+              <span className={multiline ? "leading-relaxed" : "line-clamp-1"}>{it}</span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// 아톰 마크 + 순환 메시지 로딩 (회전 X = 어지럼 방지)
+const LOADING_STEPS = [
+  "웹에서 정보를 모으는 중…",
+  "인스타·홈페이지를 살펴보는 중…",
+  "브랜드의 분위기를 읽는 중…",
+  "소개 후보를 다듬는 중…",
+];
+function LoadingView({ name }: { name: string }) {
   const [i, setI] = useState(0);
   useEffect(() => {
-    const t = setInterval(() => setI((p) => (p + 1) % ENRICH_STEPS.length), 2400);
+    const t = setInterval(() => setI((p) => (p + 1) % LOADING_STEPS.length), 2000);
     return () => clearInterval(t);
   }, []);
   return (
@@ -472,68 +334,9 @@ function LoadingView({ name, deep }: { name: string; deep?: boolean }) {
         <circle cx="28" cy="28" r="7" fill="var(--primary)" stroke="currentColor" strokeWidth="2" />
       </svg>
       <p className="mt-5 text-base font-bold text-ink">
-        {deep
-          ? "더 깊이 살펴보는 중…"
-          : name
-            ? `${name}${josa(name, "을", "를")} 살펴보는 중이에요`
-            : "브랜드를 살펴보는 중이에요"}
+        {name ? `${name}${josa(name, "을", "를")} 살펴보는 중이에요` : "브랜드를 살펴보는 중이에요"}
       </p>
-      <p className="mt-1.5 text-sm text-mute">
-        {deep ? "인스타·홈페이지까지 함께 보고 있어요" : ENRICH_STEPS[i]}
-      </p>
-    </div>
-  );
-}
-
-function AskView({
-  title,
-  sub,
-  placeholder,
-  value,
-  onChange,
-  onSubmit,
-  onSkip,
-}: {
-  title: string;
-  sub: string;
-  placeholder: string;
-  value: string;
-  onChange: (v: string) => void;
-  onSubmit: () => void;
-  onSkip: () => void;
-}) {
-  return (
-    <div>
-      <p className="text-base font-bold text-ink">{title}</p>
-      <p className="mt-0.5 text-sm text-mute">{sub}</p>
-      <input
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        autoFocus
-        onKeyDown={(e) => {
-          if (e.key === "Enter" && !e.nativeEvent.isComposing) {
-            e.preventDefault();
-            onSubmit();
-          }
-        }}
-        className="mt-4 h-11 w-full rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
-      />
-      <div className="mt-3 flex gap-2">
-        <button
-          onClick={onSubmit}
-          disabled={!value.trim()}
-          className="h-11 flex-1 rounded-md bg-primary text-sm font-medium text-primary-on disabled:opacity-40"
-        >
-          이걸로 더 찾아보기
-        </button>
-        <button
-          onClick={onSkip}
-          className="h-11 rounded-md border border-border-strong bg-surface px-4 text-sm font-medium text-mute"
-        >
-          다음에 입력
-        </button>
-      </div>
+      <p className="mt-1.5 text-sm text-mute">{LOADING_STEPS[i]}</p>
     </div>
   );
 }
