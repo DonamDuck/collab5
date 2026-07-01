@@ -10,6 +10,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { GoogleGenAI, Type } from "@google/genai";
 import { z } from "zod";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
+import { josa } from "./josa";
 
 /** 검증가능 신뢰 시그널 필드 — 못 찾으면 missing, 찾으면 sources에 출처 */
 export type EnrichField = "instagram" | "homepage" | "address";
@@ -220,12 +221,12 @@ export class MockSearchProvider implements SearchProvider {
     const round = input.round ?? 0;
     const name = input.name.trim() || "우리 브랜드";
     const vibe = input.values?.slice(0, 3).join(", ");
-    const line = vibe ? `${vibe}을(를) 담아 ` : "";
+    const line = vibe ? `${vibe}${josa(vibe, "을", "를")} 담아 ` : "";
     const variants = [
-      `${name}은(는) ${input.oneLiner?.trim() || "자기만의 이야기를 담은 곳"}이에요. 작은 시작에서 출발해 한 걸음씩 자기 색을 쌓아왔어요. 유행보다 오래 남을 것을 고민하며, ${line}만드는 사람과 쓰는 사람 사이에 이야기가 오가도록 해요. 지금은 더 넓은 만남을 준비하고 있어요.`,
-      `${line}${name}이(가) 지켜온 태도가 있어요. 빠르게 많이 만들기보다, 하나를 정성껏 매만지는 방식을 택했어요. 그렇게 쌓인 시간이 브랜드의 결이 되었고, 찾아주시는 분들과의 신뢰로 이어지고 있어요. 함께라면 그 색을 더 멀리 나눌 수 있어요.`,
-      `${name}을(를) 찾는 분들은 결이 맞는 경험을 기대해요. 우리는 그 기대에 정직하게 답하는 걸 가장 중요하게 생각해요. 화려한 말보다 실제로 손에 남는 것으로 이야기하려 하고, 그 담백함을 알아봐 주시는 분들과 오래 함께하고 있어요.`,
-      `함께 무언가를 만든다면, ${name}은(는) ${vibe || "우리다운 색"}으로 서로의 이야기를 넓혀줄 파트너가 될 거예요. 우리가 쌓아온 방식과 팬들이 겹쳐질 때 어떤 장면이 나올지 늘 궁금해해요. 작은 협업이라도 서로에게 좋은 첫인상으로 남기를 바라요.`,
+      `${name}${josa(name, "은", "는")} ${input.oneLiner?.trim() || "자기만의 이야기를 담은 곳"}이에요. 작은 시작에서 출발해 한 걸음씩 자기 색을 쌓아왔어요. 유행보다 오래 남을 것을 고민하며, ${line}만드는 사람과 쓰는 사람 사이에 이야기가 오가도록 해요. 지금은 더 넓은 만남을 준비하고 있어요.`,
+      `${line}${name}${josa(name, "이", "가")} 지켜온 태도가 있어요. 빠르게 많이 만들기보다, 하나를 정성껏 매만지는 방식을 택했어요. 그렇게 쌓인 시간이 브랜드의 결이 되었고, 찾아주시는 분들과의 신뢰로 이어지고 있어요. 함께라면 그 색을 더 멀리 나눌 수 있어요.`,
+      `${name}${josa(name, "을", "를")} 찾는 분들은 결이 맞는 경험을 기대해요. 우리는 그 기대에 정직하게 답하는 걸 가장 중요하게 생각해요. 화려한 말보다 실제로 손에 남는 것으로 이야기하려 하고, 그 담백함을 알아봐 주시는 분들과 오래 함께하고 있어요.`,
+      `함께 무언가를 만든다면, ${name}${josa(name, "은", "는")} ${vibe || "우리다운 색"}으로 서로의 이야기를 넓혀줄 파트너가 될 거예요. 우리가 쌓아온 방식과 팬들이 겹쳐질 때 어떤 장면이 나올지 늘 궁금해해요. 작은 협업이라도 서로에게 좋은 첫인상으로 남기를 바라요.`,
     ];
     return variants[round % variants.length];
   }

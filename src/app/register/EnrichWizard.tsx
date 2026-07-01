@@ -4,6 +4,7 @@
 // mock 기반(ENRICH_FORCE_MOCK). 실제 API 연결은 비용 최적화 후. 정책: master-brain 2026-06-24.
 import { useEffect, useRef, useState } from "react";
 import type { EnrichCandidate } from "@/lib/enrich";
+import { josa } from "@/lib/josa";
 
 export type WizardFill = {
   name?: string;
@@ -471,7 +472,11 @@ function LoadingView({ name, deep }: { name: string; deep?: boolean }) {
         <circle cx="28" cy="28" r="7" fill="var(--primary)" stroke="currentColor" strokeWidth="2" />
       </svg>
       <p className="mt-5 text-base font-bold text-ink">
-        {deep ? "더 깊이 살펴보는 중…" : name ? `${name}을 살펴보는 중이에요` : "브랜드를 살펴보는 중이에요"}
+        {deep
+          ? "더 깊이 살펴보는 중…"
+          : name
+            ? `${name}${josa(name, "을", "를")} 살펴보는 중이에요`
+            : "브랜드를 살펴보는 중이에요"}
       </p>
       <p className="mt-1.5 text-sm text-mute">
         {deep ? "인스타·홈페이지까지 함께 보고 있어요" : ENRICH_STEPS[i]}
