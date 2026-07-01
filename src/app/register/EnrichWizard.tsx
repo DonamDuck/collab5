@@ -176,8 +176,8 @@ export function EnrichWizard({
 
         {kind === "error" && (
           <div className="pt-4 text-center">
-            <p className="text-base font-bold text-ink">앗, 자동으로 못 채웠어요</p>
-            <p className="mt-1 text-sm text-mute">{errMsg}</p>
+            <p className="text-lg font-bold text-ink">앗, 자동으로 못 채웠어요</p>
+            <p className="mt-1.5 text-[15px] leading-relaxed text-mute">{errMsg}</p>
             <button
               onClick={onClose}
               className="mt-4 h-11 w-full rounded-md bg-primary text-sm font-medium text-primary-on"
@@ -189,30 +189,30 @@ export function EnrichWizard({
 
         {kind === "keywords" && (
           <div>
-            <p className="pr-8 text-base font-bold text-ink">소개의 중심을 잡아볼까요?</p>
-            <p className="mt-1 text-sm text-mute">
-              사장님이 직접 잡아주시면, 그 방향으로 소개를 만들어드려요.
+            <p className="pr-8 text-lg font-bold text-ink">소개의 방향을 함께 정해볼까요?</p>
+            <p className="mt-1.5 text-[15px] leading-relaxed text-mute">
+              몇 줄만 적어주시면, 그 내용을 바탕으로 브랜드 소개 초안을 만들어드려요.
             </p>
 
             {/* 사장 핵심 설명 — 생성의 중심축 */}
-            <div className="mt-4">
-              <label className="mb-1.5 block text-sm font-semibold text-body">
-                이 브랜드를 짤막하게 설명해주세요
+            <div className="mt-5">
+              <label className="mb-2 block text-[15px] font-semibold text-body">
+                브랜드를 짧게 소개해주세요.
               </label>
               <textarea
                 value={intro}
                 onChange={(e) => setIntro(e.target.value)}
                 rows={3}
-                placeholder="예: 버려지는 천으로 가방을 만드는 업사이클링 브랜드예요. 손님이 직접 만드는 워크숍도 열어요."
-                className="w-full rounded-sm border border-hairline bg-surface px-3 py-2 text-base leading-relaxed text-ink outline-none placeholder:text-faint focus:border-focus"
+                placeholder="예: 버려지는 천으로 가방을 만드는 업사이클링 브랜드예요. 직접 만드는 워크숍도 함께 운영하고 있어요."
+                className="w-full rounded-sm border border-hairline bg-surface px-3 py-2.5 text-base leading-relaxed text-ink outline-none placeholder:text-faint focus:border-focus"
               />
-              <p className="mt-1 text-xs text-mute">
-                한두 문장이면 충분해요. 적어주시면 결과가 훨씬 정확해져요.
+              <p className="mt-1.5 text-[13px] leading-relaxed text-mute">
+                한두 문장이면 충분해요. 적어주실수록 브랜드에 더 잘 맞는 소개를 만들어드릴 수 있어요.
               </p>
             </div>
 
             {/* 가중 키워드 */}
-            <label className="mb-1.5 mt-5 block text-sm font-semibold text-body">
+            <label className="mb-2 mt-6 block text-[15px] font-semibold text-body">
               강조할 키워드 <span className="font-normal text-faint">· 선택 · 최대 {MAX_KEYWORDS}개</span>
             </label>
             <div className="flex flex-wrap gap-2">
@@ -288,8 +288,8 @@ export function EnrichWizard({
         {/* 스텝 1 — 개별 필드 확인·수정 */}
         {kind === "fields" && (
           <div>
-            <p className="pr-8 text-base font-bold text-ink">찾은 정보가 맞나요?</p>
-            <p className="mt-1 text-sm text-mute">틀리면 바로 고쳐주세요. 빈 칸은 건너뛰어도 돼요.</p>
+            <p className="pr-8 text-lg font-bold text-ink">찾은 정보가 맞나요?</p>
+            <p className="mt-1.5 text-[15px] leading-relaxed text-mute">틀리면 바로 고쳐주세요. 빈 칸은 건너뛰어도 돼요.</p>
             <div className="mt-4 space-y-3">
               <FieldEdit label="상호" value={fName} onChange={setFName} placeholder="예: 캔버스가든" />
               <FieldEdit label="주소" value={fAddress} onChange={setFAddress} placeholder="예: 서울 성동구 성수동" />
@@ -308,8 +308,8 @@ export function EnrichWizard({
         {/* 스텝 2 — 한 줄 소개 5지선다 */}
         {kind === "oneLiner" && options && (
           <div>
-            <p className="pr-8 text-base font-bold text-ink">한 줄 소개를 골라주세요</p>
-            <p className="mt-1 text-sm text-mute">고른 뒤 아래에서 직접 다듬어도 돼요.</p>
+            <p className="pr-8 text-lg font-bold text-ink">한 줄 소개를 골라주세요</p>
+            <p className="mt-1.5 text-[15px] leading-relaxed text-mute">고른 뒤 아래에서 직접 다듬어도 돼요.</p>
             <div className="mt-4 max-h-[42vh] overflow-y-auto pr-0.5">
               <OptionPicker items={options.oneLiners} value={pickOne} onChange={setPickOne} />
             </div>
@@ -325,8 +325,8 @@ export function EnrichWizard({
         {/* 스텝 3 — 브랜드 소개 5지선다 */}
         {kind === "desc" && options && (
           <div>
-            <p className="pr-8 text-base font-bold text-ink">브랜드 소개를 골라주세요</p>
-            <p className="mt-1 text-sm text-mute">고른 뒤 아래에서 직접 다듬어도 돼요.</p>
+            <p className="pr-8 text-lg font-bold text-ink">브랜드 소개를 골라주세요</p>
+            <p className="mt-1.5 text-[15px] leading-relaxed text-mute">고른 뒤 아래에서 직접 다듬어도 돼요.</p>
             <div className="mt-4 max-h-[42vh] overflow-y-auto pr-0.5">
               <OptionPicker items={options.descriptions} value={pickDesc} onChange={setPickDesc} multiline />
             </div>
@@ -357,7 +357,7 @@ function FieldEdit({
 }) {
   return (
     <div>
-      <label className="mb-1 block text-sm font-medium text-body">{label}</label>
+      <label className="mb-1.5 block text-[15px] font-medium text-body">{label}</label>
       <input
         value={value}
         onChange={(e) => onChange(e.target.value)}
@@ -391,7 +391,7 @@ function OptionPicker({
               key={i}
               type="button"
               onClick={() => onChange(it)}
-              className={`flex w-full items-start gap-2.5 rounded-md border px-3 py-2.5 text-left text-sm transition-colors ${
+              className={`flex w-full items-start gap-2.5 rounded-md border px-3 py-3 text-left text-[15px] transition-colors ${
                 on
                   ? "border-primary bg-primary-pale text-ink"
                   : "border-hairline bg-surface text-body hover:bg-surface-soft"
@@ -410,7 +410,7 @@ function OptionPicker({
         })}
       </div>
       <div className="mt-3">
-        <p className="mb-1 text-xs font-medium text-mute">
+        <p className="mb-1.5 text-[13px] font-medium text-mute">
           고른 내용 · 직접 다듬어도 돼요{custom ? " (수정됨)" : ""}
         </p>
         {multiline ? (
@@ -418,13 +418,13 @@ function OptionPicker({
             value={value}
             onChange={(e) => onChange(e.target.value)}
             rows={4}
-            className="w-full rounded-sm border border-hairline bg-surface px-3 py-2 text-sm leading-relaxed text-ink outline-none focus:border-focus"
+            className="w-full rounded-sm border border-hairline bg-surface px-3 py-2.5 text-[15px] leading-relaxed text-ink outline-none focus:border-focus"
           />
         ) : (
           <input
             value={value}
             onChange={(e) => onChange(e.target.value)}
-            className="h-11 w-full rounded-sm border border-hairline bg-surface px-3 text-sm text-ink outline-none focus:border-focus"
+            className="h-11 w-full rounded-sm border border-hairline bg-surface px-3 text-[15px] text-ink outline-none focus:border-focus"
           />
         )}
       </div>
