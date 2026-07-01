@@ -446,11 +446,11 @@ export default function RegisterPage() {
 
           {/* 브랜드 사진 (선택) */}
           <div>
-            <label className="mb-1 block text-sm font-medium text-body">
+            <label className="mb-1 block text-base font-medium text-body">
               브랜드 사진 (선택)
             </label>
-            <p className="mb-2.5 text-sm text-mute">
-              브랜드를 표현할 사진을 올려주세요.
+            <p className="mb-2.5 text-[15px] text-mute">
+              콜라보 카드에 담을 사진을 올려주세요.
             </p>
             <div className="flex flex-wrap gap-2">
               {photos.map((p, i) => (
@@ -495,13 +495,13 @@ export default function RegisterPage() {
                 {values.length} / {MAX_VIBES}
               </span>
             </label>
-            <p className="mb-3 text-sm text-mute">
+            <p className="mb-3 text-[15px] text-mute">
               브랜드와 어울리는 단어를 선택해주세요. 직접 추가도 가능해요. 최대 10개
             </p>
             <div className="space-y-3">
               {VIBE_CATEGORIES.map((cat) => (
                 <div key={cat.label}>
-                  <p className="mb-1.5 text-xs font-medium text-faint">{cat.label}</p>
+                  <p className="mb-1.5 text-sm font-semibold text-body">{cat.label}</p>
                   <div className="flex flex-wrap gap-2">
                     {cat.words.map((v) => {
                       const on = values.includes(v);
@@ -572,7 +572,7 @@ export default function RegisterPage() {
           {/* 소개 — 우리를 소개할게요 */}
           <div>
             <div className="mb-2 flex items-center justify-between">
-              <label className="flex items-center gap-2 text-sm font-medium text-body">
+              <label className="flex items-center gap-2 text-base font-medium text-body">
                 <span>우리를 소개할게요</span>
                 {aiFilled.has("description") && <AiBadge />}
               </label>
@@ -580,7 +580,7 @@ export default function RegisterPage() {
                 type="button"
                 onClick={draftDescription}
                 disabled={!canDraft || draftBusy}
-                className="inline-flex h-7 items-center gap-1 rounded-pill border border-primary bg-primary-pale px-2.5 text-xs font-medium text-primary-on disabled:opacity-40"
+                className="inline-flex h-7 items-center gap-1 rounded-pill border border-primary bg-primary-pale px-2.5 text-sm font-medium text-primary-on disabled:opacity-40"
               >
                 {draftBusy
                   ? "찾는 중…"
@@ -596,7 +596,7 @@ export default function RegisterPage() {
               placeholder="버려지는 천에 새 이야기를 입히는 패브릭 브랜드."
               className="w-full rounded-sm border border-hairline bg-surface px-3 py-2 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
             />
-            <p className="mt-1.5 text-xs text-mute">
+            <p className="mt-1.5 text-sm text-mute">
               위 정보로 초안을 만들어드려요. 그대로 써도, 더 다듬어도 좋아요.
             </p>
           </div>
@@ -631,11 +631,11 @@ export default function RegisterPage() {
 
           {/* 함께한 콜라보 (이력) */}
           <div>
-            <label className="mb-1 flex items-center gap-2 text-sm font-medium text-body">
+            <label className="mb-1 flex items-center gap-2 text-base font-medium text-body">
               <span>함께한 콜라보</span>
-              <span className="text-[11px] font-normal text-faint">선택 · 최대 3개</span>
+              <span className="text-sm font-normal text-faint">선택 · 최대 3개</span>
             </label>
-            <p className="mb-2.5 text-xs text-mute">
+            <p className="mb-2.5 text-[15px] text-mute">
               지난 콜라보를 더하면 “검증된 파트너”라는 신호가 돼요.
             </p>
 
@@ -678,7 +678,7 @@ export default function RegisterPage() {
                   className="h-10 w-full rounded-sm border border-hairline bg-surface px-3 text-sm text-ink outline-none placeholder:text-faint focus:border-focus"
                 />
                 <div>
-                  <p className="mb-1.5 text-xs text-mute">어떤 콜라보였나요?</p>
+                  <p className="mb-1.5 text-sm text-mute">어떤 콜라보였나요?</p>
                   <div className="flex flex-wrap gap-1.5">
                     {COLLAB_TYPES.map((t) => {
                       const on = histDraft.types.includes(t);
@@ -687,7 +687,7 @@ export default function RegisterPage() {
                           key={t}
                           type="button"
                           onClick={() => toggleHistType(t)}
-                          className={`inline-flex h-7 items-center rounded-pill border px-2.5 text-xs transition-colors ${
+                          className={`inline-flex h-7 items-center rounded-pill border px-2.5 text-sm transition-colors ${
                             on
                               ? "border-primary bg-primary-tint text-primary-on"
                               : "border-hairline bg-surface text-mute"
@@ -705,7 +705,7 @@ export default function RegisterPage() {
                           key={t}
                           type="button"
                           onClick={() => toggleHistType(t)}
-                          className="inline-flex h-7 items-center rounded-pill border border-primary bg-primary-tint px-2.5 text-xs text-primary-on"
+                          className="inline-flex h-7 items-center rounded-pill border border-primary bg-primary-tint px-2.5 text-sm text-primary-on"
                         >
                           {t} ✕
                         </button>
@@ -727,7 +727,7 @@ export default function RegisterPage() {
                     <button
                       type="button"
                       onClick={addHistCustomType}
-                      className="h-9 rounded-sm border border-border-strong bg-surface px-3 text-xs font-medium text-ink"
+                      className="h-9 rounded-sm border border-border-strong bg-surface px-3 text-sm font-medium text-ink"
                     >
                       추가
                     </button>
@@ -779,7 +779,7 @@ export default function RegisterPage() {
             ) : null}
 
             {collabHistory.length === 0 && histDraft === null && (
-              <p className="mt-2 text-xs text-faint">
+              <p className="mt-2 text-sm text-faint">
                 아직 콜라보 경험이 없어요 — 카드에 그대로 표시돼요.
               </p>
             )}
@@ -787,10 +787,10 @@ export default function RegisterPage() {
 
           {/* 이런 분들과 만나요 (타겟 고객) */}
           <div>
-            <label className="mb-1 block text-sm font-medium text-body">
+            <label className="mb-1 block text-base font-medium text-body">
               이런 분들과 만나요
             </label>
-            <p className="mb-2.5 text-xs text-mute">
+            <p className="mb-2.5 text-[15px] text-mute">
               우리 고객층이에요. 수신자가 “내 손님과 결이 맞나” 가늠하는 핵심이에요.
             </p>
             <div className="flex flex-wrap gap-2">
@@ -860,7 +860,7 @@ export default function RegisterPage() {
               className="h-11 w-full rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
             />
             {region && (
-              <p className="mt-1 text-xs text-mute">
+              <p className="mt-1 text-sm text-mute">
                 지역 자동 인식: <span className="text-body">{region}</span>
               </p>
             )}
@@ -917,7 +917,7 @@ export default function RegisterPage() {
           >
             {pending ? "만드는 중…" : "콜라보 카드 등록하기"}
           </button>
-          <p className="text-center text-xs text-mute">
+          <p className="text-center text-sm text-mute">
             등록 후에는 콜라보 카드를 다운로드·공유할 수 있어요.
           </p>
         </div>
@@ -1055,7 +1055,7 @@ export default function RegisterPage() {
             <button type="button" onClick={goToPage} className="mt-3 text-sm font-medium text-mute">
               닫고 내 페이지로 가기
             </button>
-            <p className="mt-3 text-xs text-faint">
+            <p className="mt-3 text-sm text-faint">
               소개서는 내 프로필에서 언제든 다운로드할 수 있어요
             </p>
           </div>
@@ -1071,8 +1071,8 @@ function GroupHeader({ n, title, sub }: { n: string; title: string; sub?: string
       <span className="rounded-pill bg-primary-tint px-2 py-0.5 text-sm font-bold text-primary-on">
         {n}
       </span>
-      <span className="text-base font-bold text-ink">{title}</span>
-      {sub && <span className="text-xs text-mute">{sub}</span>}
+      <span className="text-[17px] font-bold text-ink">{title}</span>
+      {sub && <span className="text-sm text-mute">{sub}</span>}
     </div>
   );
 }
@@ -1161,7 +1161,7 @@ function PreviewCard({
   const initial = name.trim().charAt(0) || "?";
   return (
     <div className="rounded-lg border border-dashed border-border-strong bg-surface-soft p-4">
-      <p className="mb-3 text-xs font-medium text-mute">✨ 이렇게 카드에 담겨요</p>
+      <p className="mb-3 text-sm font-medium text-mute">✨ 이렇게 카드에 담겨요</p>
       <div className="rounded-lg border border-hairline bg-surface p-4">
         <div className="flex items-center gap-3">
           <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-md bg-primary-pale text-xl font-bold text-primary-on">
