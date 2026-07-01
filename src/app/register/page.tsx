@@ -488,20 +488,26 @@ export default function RegisterPage() {
 
           {/* 분위기칩 — 우리를 표현하는 말 */}
           <div>
-            <label className="mb-1 flex items-center gap-2 text-base font-medium text-body">
+            <label className="mb-1 flex items-center gap-2 text-lg font-bold text-ink">
               <span>우리 브랜드를 표현하는 말</span>
               {aiFilled.has("values") && <AiBadge />}
               <span className="ml-auto text-xs font-normal text-mute">
                 {values.length} / {MAX_VIBES}
               </span>
             </label>
-            <p className="mb-3 text-[15px] text-mute">
+            <p className="mb-4 text-[15px] text-mute">
               브랜드와 어울리는 단어를 선택해주세요. 직접 추가도 가능해요. 최대 10개
             </p>
-            <div className="space-y-3">
-              {VIBE_CATEGORIES.map((cat) => (
-                <div key={cat.label}>
-                  <p className="mb-1.5 text-sm font-semibold text-body">{cat.label}</p>
+            <div className="space-y-4">
+              {VIBE_CATEGORIES.map((cat, i) => (
+                <div
+                  key={cat.label}
+                  className={i > 0 ? "border-t border-hairline pt-4" : ""}
+                >
+                  <p className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-body">
+                    <span className="h-1.5 w-1.5 rounded-full bg-mint" />
+                    {cat.label}
+                  </p>
                   <div className="flex flex-wrap gap-2">
                     {cat.words.map((v) => {
                       const on = values.includes(v);
