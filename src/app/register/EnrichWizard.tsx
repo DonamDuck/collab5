@@ -1,9 +1,10 @@
 "use client";
 
-// 딸깍 자동완성 위저드 (2026-07-01 재설계):
+// 딸깍 자동완성 위저드 (2026-07-01 재설계 v2):
 //  ① 가중 키워드 입력(뱃지 max 4) — 동시에 백그라운드로 브랜드명 크롤링 시작(#3 로딩 체감↓)
-//  ② 키워드 제출 → 크롤 완료 대기 → 키워드 가중 5지선다 생성
-//  ③ 한 줄 소개·브랜드 소개를 각각 5개 중 택1 → 폼 반영
+//  ② 개별 필드 확인·수정(상호·주소·인스타·홈피)
+//  ③ 한 줄 소개 5지선다(택1 + 직접 수정)
+//  ④ 브랜드 소개 5지선다(택1 + 직접 수정) → 폼 반영
 import { useEffect, useRef, useState } from "react";
 import type { EnrichOptions } from "@/lib/enrich";
 import { josa } from "@/lib/josa";
@@ -31,7 +32,9 @@ const SUGGESTED_KEYWORDS = [
 ];
 const MAX_KEYWORDS = 4;
 
-type Kind = "keywords" | "loading" | "options" | "error";
+// 진행 단계: 키워드 → (로딩) → 필드 → 한줄소개 → 브랜드소개
+type Kind = "keywords" | "loading" | "fields" | "oneLiner" | "desc" | "error";
+const STEP_ORDER: Kind[] = ["fields", "oneLiner", "desc"];
 
 export function EnrichWizard({
   query,
@@ -46,9 +49,16 @@ export function EnrichWizard({
   const [keywords, setKeywords] = useState<string[]>([]);
   const [kwInput, setKwInput] = useState("");
   const [options, setOptions] = useState<EnrichOptions | null>(null);
-  const [pickOne, setPickOne] = useState(""); // 선택한 한 줄 소개
-  const [pickDesc, setPickDesc] = useState(""); // 선택한 브랜드 소개
   const [errMsg, setErrMsg] = useState("");
+
+  // 개별 필드(수정 가능)
+  const [fName, setFName] = useState("");
+  const [fAddress, setFAddress] = useState("");
+  const [fInstagram, setFInstagram] = useState("");
+  const [fHomepage, setFHomepage] = useState("");
+  // 5지선다 선택값(직접 수정 가능)
+  const [pickOne, setPickOne] = useState("");
+  const [pickDesc, setPickDesc] = useState("");
 
   // 백그라운드 크롤: 열리자마자 브랜드명으로 조사 시작(사용자가 키워드 고르는 동안 진행 → 체감 속도↑)
   const researchRef = useRef<Promise<string> | null>(null);
@@ -90,27 +100,32 @@ export function EnrichWizard({
         return;
       }
       setOptions(o);
+      setFName(o.identity.name || query);
+      setFAddress(o.identity.address || "");
+      setFInstagram(o.identity.instagram || "");
+      setFHomepage(o.identity.homepage || "");
       setPickOne(o.oneLiners[0] ?? "");
       setPickDesc(o.descriptions[0] ?? "");
-      setKind("options");
+      setKind("fields");
     } catch {
       setErrMsg("불러오기에 실패했어요. 잠시 후 다시 시도해 주세요.");
       setKind("error");
     }
   };
 
+  const stepIdx = STEP_ORDER.indexOf(kind);
+  const goNext = () => stepIdx >= 0 && stepIdx < STEP_ORDER.length - 1 && setKind(STEP_ORDER[stepIdx + 1]);
+  const goBack = () => stepIdx > 0 && setKind(STEP_ORDER[stepIdx - 1]);
+
   const apply = () => {
-    if (!options) return;
-    const id = options.identity;
     onApply({
-      name: id.name || query || undefined,
-      oneLiner: pickOne || undefined,
-      description: pickDesc || undefined,
-      region: id.region,
-      address: id.address,
-      instagram: id.instagram,
-      homepage: id.homepage,
-      values: options.values.length ? options.values : undefined,
+      name: fName.trim() || query || undefined,
+      oneLiner: pickOne.trim() || undefined,
+      description: pickDesc.trim() || undefined,
+      address: fAddress.trim() || undefined,
+      instagram: fInstagram.trim() || undefined,
+      homepage: fHomepage.trim() || undefined,
+      values: options?.values.length ? options.values : undefined,
     });
   };
 
@@ -131,6 +146,24 @@ export function EnrichWizard({
         >
           ✕
         </button>
+
+        {/* 진행 단계 표시 + 뒤로 */}
+        {stepIdx >= 0 && (
+          <div className="mb-3 flex items-center gap-2 pr-8">
+            {stepIdx > 0 && (
+              <button
+                type="button"
+                onClick={goBack}
+                className="-ml-1 inline-flex items-center gap-1 text-xs font-medium text-mute hover:text-ink"
+              >
+                ← 뒤로
+              </button>
+            )}
+            <span className="ml-auto text-xs font-medium text-mute">
+              {stepIdx + 1} / {STEP_ORDER.length}
+            </span>
+          </div>
+        )}
 
         {kind === "loading" && <LoadingView name={query} />}
 
@@ -223,25 +256,50 @@ export function EnrichWizard({
           </div>
         )}
 
-        {kind === "options" && options && (
+        {/* 스텝 1 — 개별 필드 확인·수정 */}
+        {kind === "fields" && (
           <div>
-            <p className="pr-8 text-base font-bold text-ink">
-              {options.identity.name || query}
-            </p>
-            {(options.identity.address || options.identity.region) && (
-              <p className="mt-0.5 text-sm text-mute">
-                {options.identity.address || options.identity.region}
-              </p>
-            )}
-            <div className="mt-4 max-h-[52vh] space-y-5 overflow-y-auto pr-0.5">
-              <OptionGroup title="한 줄 소개" items={options.oneLiners} value={pickOne} onPick={setPickOne} />
-              <OptionGroup
-                title="브랜드 소개"
-                items={options.descriptions}
-                value={pickDesc}
-                onPick={setPickDesc}
-                multiline
-              />
+            <p className="pr-8 text-base font-bold text-ink">찾은 정보가 맞나요?</p>
+            <p className="mt-1 text-sm text-mute">틀리면 바로 고쳐주세요. 빈 칸은 건너뛰어도 돼요.</p>
+            <div className="mt-4 space-y-3">
+              <FieldEdit label="상호" value={fName} onChange={setFName} placeholder="예: 캔버스가든" />
+              <FieldEdit label="주소" value={fAddress} onChange={setFAddress} placeholder="예: 서울 성동구 성수동" />
+              <FieldEdit label="인스타그램" value={fInstagram} onChange={setFInstagram} placeholder="@handle" />
+              <FieldEdit label="홈페이지" value={fHomepage} onChange={setFHomepage} placeholder="https://" />
+            </div>
+            <button
+              onClick={goNext}
+              className="mt-5 h-11 w-full rounded-md bg-primary text-sm font-medium text-primary-on"
+            >
+              다음 · 한 줄 소개 고르기
+            </button>
+          </div>
+        )}
+
+        {/* 스텝 2 — 한 줄 소개 5지선다 */}
+        {kind === "oneLiner" && options && (
+          <div>
+            <p className="pr-8 text-base font-bold text-ink">한 줄 소개를 골라주세요</p>
+            <p className="mt-1 text-sm text-mute">고른 뒤 아래에서 직접 다듬어도 돼요.</p>
+            <div className="mt-4 max-h-[42vh] overflow-y-auto pr-0.5">
+              <OptionPicker items={options.oneLiners} value={pickOne} onChange={setPickOne} />
+            </div>
+            <button
+              onClick={goNext}
+              className="mt-4 h-11 w-full rounded-md bg-primary text-sm font-medium text-primary-on"
+            >
+              다음 · 브랜드 소개 고르기
+            </button>
+          </div>
+        )}
+
+        {/* 스텝 3 — 브랜드 소개 5지선다 */}
+        {kind === "desc" && options && (
+          <div>
+            <p className="pr-8 text-base font-bold text-ink">브랜드 소개를 골라주세요</p>
+            <p className="mt-1 text-sm text-mute">고른 뒤 아래에서 직접 다듬어도 돼요.</p>
+            <div className="mt-4 max-h-[42vh] overflow-y-auto pr-0.5">
+              <OptionPicker items={options.descriptions} value={pickDesc} onChange={setPickDesc} multiline />
             </div>
             <button
               onClick={apply}
@@ -249,9 +307,6 @@ export function EnrichWizard({
             >
               선택한 내용으로 채우기
             </button>
-            <p className="mt-2 text-center text-xs text-mute">
-              고른 내용은 폼에서 자유롭게 다듬을 수 있어요.
-            </p>
           </div>
         )}
       </div>
@@ -259,25 +314,46 @@ export function EnrichWizard({
   );
 }
 
-// 5지선다 한 그룹 — 라디오처럼 하나만 선택
-function OptionGroup({
-  title,
-  items,
+// 개별 필드 — 라벨 + 수정 가능한 입력
+function FieldEdit({
+  label,
   value,
-  onPick,
-  multiline,
+  onChange,
+  placeholder,
 }: {
-  title: string;
-  items: string[];
+  label: string;
   value: string;
-  onPick: (v: string) => void;
-  multiline?: boolean;
+  onChange: (v: string) => void;
+  placeholder?: string;
 }) {
   return (
     <div>
-      <p className="mb-2 text-sm font-semibold text-body">
-        {title} <span className="font-normal text-faint">· 하나 골라주세요</span>
-      </p>
+      <label className="mb-1 block text-sm font-medium text-body">{label}</label>
+      <input
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        className="h-11 w-full rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
+      />
+    </div>
+  );
+}
+
+// 5지선다 + 선택값 직접 수정(AI 초안 → 사장 보강)
+function OptionPicker({
+  items,
+  value,
+  onChange,
+  multiline,
+}: {
+  items: string[];
+  value: string;
+  onChange: (v: string) => void;
+  multiline?: boolean;
+}) {
+  const custom = value.trim().length > 0 && !items.includes(value);
+  return (
+    <div>
       <div className="space-y-2">
         {items.map((it, i) => {
           const on = value === it;
@@ -285,7 +361,7 @@ function OptionGroup({
             <button
               key={i}
               type="button"
-              onClick={() => onPick(it)}
+              onClick={() => onChange(it)}
               className={`flex w-full items-start gap-2.5 rounded-md border px-3 py-2.5 text-left text-sm transition-colors ${
                 on
                   ? "border-primary bg-primary-pale text-ink"
@@ -303,6 +379,25 @@ function OptionGroup({
             </button>
           );
         })}
+      </div>
+      <div className="mt-3">
+        <p className="mb-1 text-xs font-medium text-mute">
+          고른 내용 · 직접 다듬어도 돼요{custom ? " (수정됨)" : ""}
+        </p>
+        {multiline ? (
+          <textarea
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            rows={4}
+            className="w-full rounded-sm border border-hairline bg-surface px-3 py-2 text-sm leading-relaxed text-ink outline-none focus:border-focus"
+          />
+        ) : (
+          <input
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            className="h-11 w-full rounded-sm border border-hairline bg-surface px-3 text-sm text-ink outline-none focus:border-focus"
+          />
+        )}
       </div>
     </div>
   );
