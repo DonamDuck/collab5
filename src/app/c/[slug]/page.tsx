@@ -82,6 +82,16 @@ export default async function CardPage({
           </div>
         )}
 
+        {/* 브랜드 소개 — 등록 때 작성한 소개(정리되어 카드에 노출) */}
+        {maker.trust.description && (
+          <div className="mt-5">
+            <p className="text-[11px] font-medium tracking-wide text-faint">소개</p>
+            <p className="mt-2 whitespace-pre-line text-[13.5px] leading-relaxed text-body">
+              {maker.trust.description}
+            </p>
+          </div>
+        )}
+
         {/* 함께한 콜라보 — 수신자 신뢰의 결정타 */}
         {maker.collabHistory.length > 0 ? (
           <div className="mt-5">
