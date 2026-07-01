@@ -182,7 +182,7 @@ export default function RegisterPage() {
   const buildSuggestions = (c: Record<string, unknown>): Suggestion[] => {
     const rows: [string, string, string][] = [
       ["name", "상호", name],
-      ["oneLiner", "한 줄로 말하면", oneLiner],
+      ["oneLiner", "한 줄 소개", oneLiner],
       ["instagram", "인스타그램", instagram],
       ["homepage", "홈페이지", homepage],
     ];
@@ -414,7 +414,7 @@ export default function RegisterPage() {
       <div className="mt-10 flex items-center gap-3">
         <div className="h-px flex-1 bg-hairline" />
         <span className="shrink-0 text-sm font-medium text-mute">
-          또는 아래에서 하나씩 직접 입력해도 돼요
+          또는 아래에 직접 입력 할 수 있어요.
         </span>
         <div className="h-px flex-1 bg-hairline" />
       </div>
@@ -423,15 +423,17 @@ export default function RegisterPage() {
         {/* 검수 게이트 배너 — AI가 채운 직후 */}
         {reviewMode && (
           <div className="rounded-lg border border-primary bg-surface px-4 py-3 shadow-e1">
-            <p className="text-sm font-medium text-ink">✨ 미리 채워놨어요, 확인해주세요</p>
-            <p className="mt-0.5 text-xs text-mute">
+            <p className="text-[15px] font-medium text-ink">
+              ✨ 온라인 정보와 SNS를 참고해서 브랜드를 분석해봤어요.
+            </p>
+            <p className="mt-0.5 text-sm text-mute">
               맞는지 확인하고 자유롭게 고쳐주세요. 못 찾은 곳은 직접 채우면 돼요.
             </p>
           </div>
         )}
 
         {/* ── 그룹 A. 정체성 ── */}
-        <GroupHeader n="①" title="정체성" sub="우리는 누구인가요" />
+        <GroupHeader n="①" title="브랜드 소개" />
         <div className="space-y-7">
           <Field label="상호 *" hint={hintFor("name")}>
             <input
@@ -441,7 +443,7 @@ export default function RegisterPage() {
               className="h-11 w-full rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
             />
           </Field>
-          <Field label="한 줄로 말하면" hint={hintFor("oneLiner")}>
+          <Field label="한 줄 소개" hint={hintFor("oneLiner")}>
             <input
               value={oneLiner}
               onChange={(e) => setOneLiner(e.target.value)}
@@ -455,8 +457,8 @@ export default function RegisterPage() {
             <label className="mb-1 block text-sm font-medium text-body">
               브랜드 사진 (선택)
             </label>
-            <p className="mb-2.5 text-xs text-mute">
-              분위기를 보여주는 사진을 올리면 카드가 더 풍성해져요. 최대 4장.
+            <p className="mb-2.5 text-sm text-mute">
+              브랜드를 표현할 사진을 올려주세요.
             </p>
             <div className="flex flex-wrap gap-2">
               {photos.map((p, i) => (
@@ -1052,14 +1054,14 @@ export default function RegisterPage() {
   );
 }
 
-function GroupHeader({ n, title, sub }: { n: string; title: string; sub: string }) {
+function GroupHeader({ n, title, sub }: { n: string; title: string; sub?: string }) {
   return (
     <div className="flex items-baseline gap-2 border-b border-hairline pb-2">
       <span className="rounded-pill bg-primary-tint px-2 py-0.5 text-sm font-bold text-primary-on">
         {n}
       </span>
       <span className="text-base font-bold text-ink">{title}</span>
-      <span className="text-xs text-mute">{sub}</span>
+      {sub && <span className="text-xs text-mute">{sub}</span>}
     </div>
   );
 }
