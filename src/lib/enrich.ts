@@ -47,12 +47,39 @@ export interface RecrawlInput {
   homepage?: string;
 }
 
+/** 소개 초안 생성 입력 — 폼에 입력된 정보 기반. round로 '다시 받기' 시 다른 각도로 변주. */
+export interface DraftInput {
+  name: string;
+  oneLiner?: string;
+  values?: string[];
+  offers?: string[];
+  targetAudience?: string[];
+  round?: number; // 0=첫 초안, 1+=다시 받기(다른 맥락)
+}
+
 /** 검색 단계 추상화 — mock ↔ Claude/Gemini 교체 지점. */
 export interface SearchProvider {
   lookup(query: string, hintUrl?: string): Promise<EnrichCandidate[]>;
   /** (선택) 인스타/홈피 기반 재크롤링 — 더 풍부한 단일 후보 */
   recrawl?(input: RecrawlInput): Promise<EnrichCandidate | null>;
+  /** (선택) 폼 정보 기반 소개 한 문단 초안 — round로 다른 각도 변주 */
+  draft?(input: DraftInput): Promise<string>;
 }
+
+/** 소개 초안 카피라이터 system + 라운드별 서술 각도(다시 받기마다 순환) */
+const DRAFT_SYSTEM = `너는 콜라보 플랫폼 collab5의 브랜드 소개 카피라이터야. 브랜드의 등록 정보와 웹 조사 메모를 바탕으로, 콜라보 제안 카드에 실릴 '소개 한 문단'을 매력적으로 쓴다.
+규칙:
+- 2~3문장, 자연스러운 한국어 해요체.
+- 과장·상투어(최고의/혁신적인/최고 품질) 금지. 구체적이고 담백하게.
+- 사용자가 검수·수정할 초안이다.
+- 소개 문단 본문만 출력한다(따옴표·머리말·설명 금지).`;
+
+const DRAFT_ANGLES = [
+  "브랜드의 시작과 이야기(스토리)를 중심으로",
+  "브랜드가 지켜온 가치와 태도를 중심으로",
+  "고객이 얻는 경험과 감정을 중심으로",
+  "함께하면 좋은 콜라보 파트너의 시선에서",
+];
 
 // ── mock fixture: 알려진 곳은 풍부하게(데모용) ──
 const FIXTURES: Record<string, EnrichCandidate[]> = {
@@ -170,6 +197,21 @@ export class MockSearchProvider implements SearchProvider {
       missing,
       hint: undefined,
     };
+  }
+
+  // 소개 초안 mock — round마다 다른 각도의 문단 반환(다시 받기 변주 데모)
+  async draft(input: DraftInput): Promise<string> {
+    await new Promise((r) => setTimeout(r, 900));
+    const round = input.round ?? 0;
+    const name = input.name.trim() || "우리 브랜드";
+    const vibe = input.values?.slice(0, 3).join(", ");
+    const variants = [
+      `${name}은(는) ${input.oneLiner?.trim() || "자기만의 이야기를 담은 곳"}이에요. 작은 시작에서 출발해 한 걸음씩 자기 색을 쌓아가고 있어요.`,
+      `${vibe ? `${vibe} — ` : ""}${name}이(가) 지켜온 태도예요. 유행을 좇기보다 우리다운 방식으로 오래 남을 것을 만들어요.`,
+      `${name}을(를) 찾는 분들은 결이 맞는 경험을 기대해요. 그 기대에 정직하게 답하는 것이 우리가 일하는 방식이에요.`,
+      `함께 무언가를 만든다면, ${name}은(는) ${vibe || "우리다운 색"}으로 서로의 이야기를 더 넓혀줄 파트너가 될 거예요.`,
+    ];
+    return variants[round % variants.length];
   }
 }
 
@@ -486,6 +528,72 @@ class NaverGeminiProvider implements SearchProvider {
     return this.structure(query, research, extra);
   }
 
+  // 스키마 없는 순수 텍스트 생성(소개 초안용). 503/429 → 다음 모델 폴백.
+  private async generateText(prompt: string, temperature: number): Promise<string> {
+    let lastErr: unknown;
+    for (const model of NaverGeminiProvider.GEMINI_MODELS) {
+      try {
+        const response = await this.ai().models.generateContent({
+          model,
+          contents: prompt,
+          config: { systemInstruction: DRAFT_SYSTEM, temperature },
+        });
+        return (response.text ?? "").trim();
+      } catch (e) {
+        lastErr = e;
+        const status = (e as { status?: number; code?: number })?.status ?? (e as { code?: number })?.code;
+        if (status === 503 || status === 429) {
+          console.warn(`[draft] gemini ${model} ${status} → 다음 모델 폴백`);
+          continue;
+        }
+        throw e;
+      }
+    }
+    throw lastErr;
+  }
+
+  // Gemini 전멸 시 안전망 — Haiku로 소개 초안 생성.
+  private async draftWithHaiku(prompt: string): Promise<string> {
+    const res = await this.claude().messages.create({
+      model: "claude-haiku-4-5",
+      max_tokens: 400,
+      system: DRAFT_SYSTEM,
+      messages: [{ role: "user", content: prompt }],
+    });
+    return res.content
+      .filter((b): b is Anthropic.TextBlock => b.type === "text")
+      .map((b) => b.text)
+      .join("")
+      .trim();
+  }
+
+  // 폼 정보 + 네이버 조사 메모 → 소개 한 문단. round마다 다른 각도·높은 temperature로 변주.
+  async draft(input: DraftInput): Promise<string> {
+    const research = await this.gather(input.name);
+    const round = input.round ?? 0;
+    const angle = DRAFT_ANGLES[round % DRAFT_ANGLES.length];
+    const info = [
+      input.oneLiner?.trim() && `한 줄 소개: ${input.oneLiner.trim()}`,
+      input.values?.length && `브랜드를 표현하는 말: ${input.values.join(", ")}`,
+      input.offers?.length && `제공 가능한 콜라보: ${input.offers.join(", ")}`,
+      input.targetAudience?.length && `주요 고객: ${input.targetAudience.join(", ")}`,
+    ]
+      .filter(Boolean)
+      .join("\n");
+    const prompt = `아래는 "${input.name}" 브랜드의 등록 정보와 네이버 조사 메모야.\n\n[사용자 입력]\n${
+      info || "(입력이 적어요 — 조사 메모 위주로)"
+    }\n\n[네이버 조사 메모]\n${research}\n\n이 브랜드의 소개 한 문단을 ${angle} 매력적으로 써줘.${
+      round > 0 ? " 이전 초안과는 확실히 다른 각도·표현으로 새롭게 써줘." : ""
+    }`;
+    try {
+      const text = await this.generateText(prompt, round > 0 ? 1.0 : 0.8);
+      return text || this.draftWithHaiku(prompt);
+    } catch (e) {
+      console.warn("[draft] gemini 실패 → Haiku 폴백", (e as { status?: number })?.status);
+      return this.draftWithHaiku(prompt);
+    }
+  }
+
   async recrawl(input: RecrawlInput): Promise<EnrichCandidate | null> {
     // 인스타 핸들·홈피 도메인까지 검색어에 섞어 더 깊이 조사
     const terms = [input.name, input.homepage, input.instagram?.replace(/^@/, "")].filter(Boolean).join(" ");
@@ -515,4 +623,15 @@ export async function enrichLookup(query: string, hintUrl?: string): Promise<Enr
 /** 재크롤링 — provider가 지원하면 더 풍부한 단일 후보, 아니면 null. */
 export async function enrichRecrawl(input: RecrawlInput): Promise<EnrichCandidate | null> {
   return provider.recrawl ? provider.recrawl(input) : null;
+}
+
+/** 소개 초안 — provider가 지원하면 AI 생성, 아니면 규칙 기반 폴백. */
+export async function enrichDraft(input: DraftInput): Promise<string> {
+  if (provider.draft) return provider.draft(input);
+  const bits: string[] = [];
+  if (input.oneLiner?.trim()) bits.push(input.oneLiner.trim().replace(/[.\s]*$/, "."));
+  if (input.values?.length)
+    bits.push(`${input.values.slice(0, 3).join(", ")} — 우리를 잘 보여주는 말이에요.`);
+  if (input.name.trim()) bits.push(`${input.name.trim()}의 이야기를 카드에 담았어요.`);
+  return bits.join(" ");
 }

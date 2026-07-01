@@ -53,9 +53,6 @@ const SUGGESTED_AUDIENCE = [
 // 콜라보 이력 년도 선택지 (최신순 정렬용)
 const HISTORY_YEARS = ["2025", "2024", "2023", "2022", "2021", "그 이전", "모름"];
 
-// 5-2 수정/보강 제안 (수기 입력 vs 크롤링값 비교)
-type Suggestion = { key: string; label: string; current: string; suggested: string };
-
 export default function RegisterPage() {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -90,13 +87,10 @@ export default function RegisterPage() {
   const [missing, setMissing] = useState<EnrichField[]>([]); // 못 찾은 필드(직접 입력 노티)
   const [reviewMode, setReviewMode] = useState(false); // 검수 게이트 배너
 
-  // ── 5-2 초안받기(수기 고객) 상태 ──
+  // ── 초안받기 상태 ──
   const [draftBusy, setDraftBusy] = useState(false);
-  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
-  const [suggestIdx, setSuggestIdx] = useState(0);
-  const [suggestPicks, setSuggestPicks] = useState<Record<string, string | null>>({});
-  const [suggestDirect, setSuggestDirect] = useState<string | null>(null); // 직접입력 모드 값
-  const [stopSuggest, setStopSuggest] = useState(false); // "더이상 제안마세요"
+  const [draftGenerated, setDraftGenerated] = useState(false); // AI 초안을 한 번이라도 생성했나(버튼 분기 기준)
+  const [draftRound, setDraftRound] = useState(0); // 다시 받기마다 다른 각도로 변주
 
   const toggle = (
     list: CollabType[],
@@ -160,7 +154,7 @@ export default function RegisterPage() {
     setPhotos((p) => [...p, ...next].slice(0, 4));
   };
 
-  // 규칙 기반 소개 초안 (mock — 입력값 조합)
+  // 규칙 기반 소개 초안 폴백 (AI 실패 시 — 입력값 조합)
   const ruleDraft = () => {
     const parts: string[] = [];
     if (oneLiner.trim()) parts.push(oneLiner.trim().replace(/[.\s]*$/, "."));
@@ -170,28 +164,12 @@ export default function RegisterPage() {
     if (parts.length) setDescription(parts.join(" "));
   };
 
-  // 수기 입력 vs 크롤링값 비교 → 수정/보강 제안 목록
-  const buildSuggestions = (c: Record<string, unknown>): Suggestion[] => {
-    const rows: [string, string, string][] = [
-      ["name", "상호", name],
-      ["oneLiner", "한 줄 소개", oneLiner],
-      ["instagram", "인스타그램", instagram],
-      ["homepage", "홈페이지", homepage],
-    ];
-    const out: Suggestion[] = [];
-    rows.forEach(([key, label, cur]) => {
-      const sug = c[key];
-      if (typeof sug === "string" && sug.trim() && sug.trim() !== cur.trim()) {
-        out.push({ key, label, current: cur.trim(), suggested: sug.trim() });
-      }
-    });
-    return out;
-  };
-
-  // 초안받기: 딸깍으로 채웠으면 규칙 재생성 / 수기 고객은 상호로 크롤링 → 초안 + 제안
+  // 초안받기: 폼에 입력한 정보 기준으로 백엔드 AI 크롤링+작성.
+  // 첫 클릭='초안 받기', 이후='초안 다시 받기'(round 증가 → 다른 각도의 글).
   const draftDescription = async () => {
-    if (aiFilled.size > 0 || !name.trim()) {
+    if (!name.trim()) {
       ruleDraft();
+      setDraftGenerated(true);
       return;
     }
     setDraftBusy(true);
@@ -199,75 +177,31 @@ export default function RegisterPage() {
       const res = await fetch("/api/enrich", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: name.trim() }),
+        body: JSON.stringify({
+          mode: "draft",
+          name: name.trim(),
+          oneLiner,
+          values,
+          offers,
+          targetAudience,
+          round: draftRound,
+        }),
       });
       const data = await res.json();
-      const c = data.candidates?.[0];
-      if (!c) {
+      if (typeof data.description === "string" && data.description.trim()) {
+        setDescription(data.description.trim());
+      } else {
         ruleDraft();
-        return;
-      }
-      if (typeof c.description === "string" && c.description) setDescription(c.description);
-      else ruleDraft();
-      if (!stopSuggest) {
-        const sugg = buildSuggestions(c);
-        if (sugg.length) {
-          setSuggestions(sugg);
-          setSuggestIdx(0);
-          setSuggestPicks({});
-          setSuggestDirect(null);
-        }
       }
     } catch {
       ruleDraft();
     } finally {
+      setDraftGenerated(true);
+      setDraftRound((r) => r + 1);
       setDraftBusy(false);
     }
   };
-  const canDraft = !!(oneLiner.trim() || values.length || name.trim());
-
-  // 제안 일괄 적용 + 순차 처리 (6번 뒤로가기 포함)
-  const applySuggestionPicks = (picks: Record<string, string | null>) => {
-    Object.entries(picks).forEach(([key, val]) => {
-      if (!val) return;
-      if (key === "name") setName(val);
-      else if (key === "oneLiner") setOneLiner(val);
-      else if (key === "instagram") setInstagram(val);
-      else if (key === "homepage") setHomepage(val);
-    });
-  };
-  const closeSuggest = () => {
-    setSuggestions([]);
-    setSuggestIdx(0);
-    setSuggestPicks({});
-    setSuggestDirect(null);
-  };
-  const answerSuggestion = (action: "accept" | "skip" | "direct", directVal?: string) => {
-    const s = suggestions[suggestIdx];
-    if (!s) return;
-    if (action === "skip") {
-      setStopSuggest(true);
-      applySuggestionPicks(suggestPicks);
-      closeSuggest();
-      return;
-    }
-    const val = action === "direct" ? (directVal ?? "").trim() : s.suggested;
-    const picks = { ...suggestPicks, [s.key]: val || null };
-    setSuggestPicks(picks);
-    setSuggestDirect(null);
-    if (suggestIdx < suggestions.length - 1) {
-      setSuggestIdx((i) => i + 1);
-    } else {
-      applySuggestionPicks(picks);
-      closeSuggest();
-    }
-  };
-  const backSuggestion = () => {
-    if (suggestIdx > 0) {
-      setSuggestDirect(null);
-      setSuggestIdx((i) => i - 1);
-    }
-  };
+  const canDraft = !!(name.trim() || oneLiner.trim() || values.length);
 
   // ── enrich: 업체명 → 위저드 오픈(불러오기) ──
   const openWizard = () => {
@@ -305,6 +239,7 @@ export default function RegisterPage() {
     if (fill.description !== undefined) {
       setDescription(fill.description);
       filled.add("description");
+      setDraftGenerated(true); // 위저드가 이미 소개 초안을 채움 → 버튼은 '다시 받기'로
     }
     setAiFilled(filled);
     setMissing([]);
@@ -575,11 +510,11 @@ export default function RegisterPage() {
             </div>
           </div>
 
-          {/* 소개 — 우리를 소개할게요 */}
+          {/* 소개 — 브랜드를 소개해주세요 */}
           <div>
             <div className="mb-2 flex items-center justify-between">
               <label className="flex items-center gap-2 text-base font-medium text-body">
-                <span>우리를 소개할게요</span>
+                <span>브랜드를 소개해주세요.</span>
                 {aiFilled.has("description") && <AiBadge />}
               </label>
               <button
@@ -589,32 +524,36 @@ export default function RegisterPage() {
                 className="inline-flex h-7 items-center gap-1 rounded-pill border border-primary bg-primary-pale px-2.5 text-sm font-medium text-primary-on disabled:opacity-40"
               >
                 {draftBusy
-                  ? "찾는 중…"
-                  : description.trim()
+                  ? "쓰는 중…"
+                  : draftGenerated
                     ? "✨ 초안 다시 받기"
                     : "✨ 초안 받기"}
               </button>
             </div>
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              rows={3}
-              placeholder="버려지는 천에 새 이야기를 입히는 패브릭 브랜드."
-              className="w-full rounded-sm border border-hairline bg-surface px-3 py-2 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
-            />
+            <div className="relative">
+              <textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                rows={3}
+                disabled={draftBusy}
+                placeholder="버려지는 천에 새 이야기를 입히는 패브릭 브랜드."
+                className="w-full rounded-sm border border-hairline bg-surface px-3 py-2 text-base text-ink outline-none placeholder:text-faint focus:border-focus disabled:opacity-60"
+              />
+              {draftBusy && (
+                <div className="absolute inset-0 flex items-center justify-center rounded-sm bg-surface/80 backdrop-blur-[1px]">
+                  <p className="flex items-center gap-2 text-sm font-medium text-primary-on">
+                    <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                    온라인 정보를 살펴 소개를 쓰고 있어요…
+                  </p>
+                </div>
+              )}
+            </div>
             <p className="mt-1.5 text-sm text-mute">
-              위 정보로 초안을 만들어드려요. 그대로 써도, 더 다듬어도 좋아요.
+              {draftGenerated
+                ? "‘초안 다시 받기’를 누르면 다른 느낌의 소개로 새로 써드려요."
+                : "‘초안 받기’를 누르면 입력한 정보로 소개를 대신 써드려요. 그대로 써도, 더 다듬어도 좋아요."}
             </p>
           </div>
-
-          {/* 실시간 미리보기 */}
-          <PreviewCard
-            name={name}
-            oneLiner={oneLiner}
-            region={region}
-            values={values}
-            offers={offers}
-          />
         </div>
 
         {/* ── 그룹 B. 콜라보 ── */}
@@ -938,91 +877,6 @@ export default function RegisterPage() {
         />
       )}
 
-      {/* 5-2 수정/보강 제안 — 수기 고객 초안받기 후, 순차 + 뒤로가기(6번) */}
-      {suggestions.length > 0 && suggestions[suggestIdx] && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 p-4 sm:items-center">
-          <div className="w-full max-w-md rounded-lg border border-hairline bg-surface p-5 shadow-e2">
-            {suggestIdx > 0 && (
-              <button
-                type="button"
-                onClick={backSuggestion}
-                className="mb-3 -ml-1 inline-flex items-center gap-1 text-xs font-medium text-mute hover:text-ink"
-              >
-                ← 뒤로
-              </button>
-            )}
-            <p className="text-xs font-medium text-mute">
-              제안 {suggestIdx + 1} / {suggestions.length}
-            </p>
-            <p className="mt-1 text-base font-bold text-ink">
-              {suggestions[suggestIdx].current
-                ? `${suggestions[suggestIdx].label}, 이렇게 고쳐볼까요?`
-                : `${suggestions[suggestIdx].label} 정보를 찾았어요`}
-            </p>
-            <div className="mt-3 rounded-md border border-hairline bg-surface-soft p-3">
-              {suggestions[suggestIdx].current && (
-                <p className="text-sm text-faint line-through">
-                  {suggestions[suggestIdx].current}
-                </p>
-              )}
-              <p className="text-sm font-medium text-ink">
-                {suggestions[suggestIdx].suggested}
-              </p>
-            </div>
-
-            {suggestDirect !== null ? (
-              <div className="mt-4 flex gap-2">
-                <input
-                  value={suggestDirect}
-                  onChange={(e) => setSuggestDirect(e.target.value)}
-                  autoFocus
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.nativeEvent.isComposing) {
-                      e.preventDefault();
-                      answerSuggestion("direct", suggestDirect);
-                    }
-                  }}
-                  className="h-11 flex-1 rounded-sm border border-hairline bg-surface px-3 text-sm text-ink outline-none focus:border-focus"
-                />
-                <button
-                  type="button"
-                  onClick={() => answerSuggestion("direct", suggestDirect)}
-                  className="h-11 rounded-md bg-primary px-4 text-sm font-medium text-primary-on"
-                >
-                  적용
-                </button>
-              </div>
-            ) : (
-              <div className="mt-4 space-y-2">
-                <button
-                  type="button"
-                  onClick={() => answerSuggestion("accept")}
-                  className="h-11 w-full rounded-md bg-primary text-sm font-medium text-primary-on"
-                >
-                  {suggestIdx < suggestions.length - 1 ? "네, 바꿀게요" : "네, 반영할게요"}
-                </button>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setSuggestDirect(suggestions[suggestIdx].current || "")}
-                    className="h-11 flex-1 rounded-md border border-border-strong bg-surface text-sm font-medium text-ink"
-                  >
-                    직접 입력
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => answerSuggestion("skip")}
-                    className="h-11 flex-1 rounded-md text-sm font-medium text-mute"
-                  >
-                    그만 제안
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
       {/* 소개서 캡처용 — 화면 밖에서 렌더(다운로드 대상) */}
       <div style={{ position: "fixed", left: -9999, top: 0 }} aria-hidden="true">
         <PortfolioCard ref={portfolioRef} data={portfolioData} />
@@ -1146,64 +1000,6 @@ function ChipRow({
           </button>
         );
       })}
-    </div>
-  );
-}
-
-// 실시간 미리보기 — 채울수록 브랜드가 카드로 완성되는 "분석 도움" 순간
-function PreviewCard({
-  name,
-  oneLiner,
-  region,
-  values,
-  offers,
-}: {
-  name: string;
-  oneLiner: string;
-  region: string;
-  values: string[];
-  offers: CollabType[];
-}) {
-  const initial = name.trim().charAt(0) || "?";
-  return (
-    <div className="rounded-lg border border-dashed border-border-strong bg-surface-soft p-4">
-      <p className="mb-3 text-sm font-medium text-mute">✨ 이렇게 카드에 담겨요</p>
-      <div className="rounded-lg border border-hairline bg-surface p-4">
-        <div className="flex items-center gap-3">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-md bg-primary-pale text-xl font-bold text-primary-on">
-            {initial}
-          </div>
-          <div className="min-w-0">
-            <p className="truncate text-base font-bold text-ink">
-              {name.trim() || "내 브랜드 이름"}
-            </p>
-            <p className="truncate text-sm text-mute">
-              {oneLiner.trim() || "한 줄 소개가 여기 보여요"}
-              {region.trim() ? ` · ${region.trim()}` : ""}
-            </p>
-          </div>
-        </div>
-        {(values.length > 0 || offers.length > 0) && (
-          <div className="mt-3 flex flex-wrap gap-1.5">
-            {values.map((v) => (
-              <span
-                key={`v-${v}`}
-                className="rounded-pill bg-mint-pale px-2.5 py-0.5 text-[11px] font-medium text-mint-on"
-              >
-                {v}
-              </span>
-            ))}
-            {offers.map((o) => (
-              <span
-                key={`o-${o}`}
-                className="rounded-pill bg-primary-pale px-2.5 py-0.5 text-[11px] font-medium text-primary-on"
-              >
-                {o}
-              </span>
-            ))}
-          </div>
-        )}
-      </div>
     </div>
   );
 }

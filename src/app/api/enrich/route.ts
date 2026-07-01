@@ -3,7 +3,7 @@
 // 이 라우트는 그대로 동작한다(응답 스키마 동일).
 import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
-import { enrichLookup, enrichRecrawl } from "@/lib/enrich";
+import { enrichLookup, enrichRecrawl, enrichDraft } from "@/lib/enrich";
 
 // 임시 진단: web_search 없는 최소 호출 — 전반 과부하 vs web_search 특정 구분용.
 export async function GET() {
@@ -33,6 +33,11 @@ export async function POST(req: Request) {
     name?: unknown;
     instagram?: unknown;
     homepage?: unknown;
+    oneLiner?: unknown;
+    values?: unknown;
+    offers?: unknown;
+    targetAudience?: unknown;
+    round?: unknown;
   };
   try {
     body = await req.json();
@@ -57,6 +62,33 @@ export async function POST(req: Request) {
       console.error("[enrich] recrawl failed:", e);
       return NextResponse.json(
         { candidate: null, error: "추가 조사에 실패했어요. 찾은 정보로 계속 진행할게요." },
+        { status: 200 }
+      );
+    }
+  }
+
+  // ── 초안 모드: 폼 정보 기반 소개 한 문단 생성(백엔드 크롤링 + AI 작성) ──
+  if (body.mode === "draft") {
+    const name = typeof body.name === "string" ? body.name.trim() : "";
+    if (!name) {
+      return NextResponse.json({ error: "브랜드 이름이 필요해요." }, { status: 400 });
+    }
+    const strArr = (v: unknown): string[] | undefined =>
+      Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : undefined;
+    try {
+      const description = await enrichDraft({
+        name,
+        oneLiner: typeof body.oneLiner === "string" ? body.oneLiner : undefined,
+        values: strArr(body.values),
+        offers: strArr(body.offers),
+        targetAudience: strArr(body.targetAudience),
+        round: typeof body.round === "number" ? body.round : 0,
+      });
+      return NextResponse.json({ description });
+    } catch (e) {
+      console.error("[enrich] draft failed:", e);
+      return NextResponse.json(
+        { description: "", error: "지금은 초안 작성이 어려워요. 잠시 후 다시 시도하거나 직접 입력해 주세요." },
         { status: 200 }
       );
     }
