@@ -70,9 +70,10 @@ export interface SearchProvider {
 // 모든 AI 생성 텍스트(소개·구조화 description)는 이 기준을 통과한다.
 const BRAND_VOICE = `[collab5 브랜드 보이스 — 이 말투를 반드시 지켜라]
 말투:
+- ⭐반드시 '해요체'로 쓴다 (예: ~해요, ~예요, ~이에요, ~드려요, ~있어요). '~합니다/~습니다/~입니다' 같은 격식체는 절대 쓰지 마라.
 - 친절하지만 과하지 않게. 감성적이지만 오글거리지 않게. 담백하고 단단하게.
 - 마케팅 문구가 아니라 '좋은 브랜드가 스스로를 담담히 소개하는' 느낌. 읽고 "이 브랜드 괜찮네, 같이 해보고 싶다"가 들도록.
-- 자연스러운 한국어 해요체. 쉽고 부담 없이. 문장은 짧고 명료하게.
+- 쉽고 부담 없이. 문장은 짧고 명료하게.
 - 관점: 단순 소개가 아니라 '함께 협업하고 싶어지는 첫인상'을 만든다.
 금지: 최고의 / 혁신적인 / 압도적 / 완벽한 / 트렌디한 / 퀄리티 / 솔루션 같은 홍보·상투어, 과장, 이모지, 느낌표 남발, "생성/자동" 같은 기계적 표현.
 지향: 함께 / 정성 / 담다 / 첫인상 / 꾸준히 / 결이 맞는 — 구체적 사실(무엇을·어떻게·누구에게) 위주로.`;
@@ -462,10 +463,10 @@ class NaverGeminiProvider implements SearchProvider {
     return parts.join("\n") || "(검색 결과 없음)";
   }
 
-  // 과부하(503)·레이트리밋(429) 시 같은 모델 재시도 → 안 되면 다음 모델로 폴백.
-  // ⚡ flash-lite를 1순위로: 무료 티어에서 2.5-flash는 상시 503(인기 과부하), lite는 가용성↑·빠름.
-  //   구조화(JSON 추출)는 단순 작업이라 lite 품질로 충분. description은 사용자 검수 전제.
-  private static readonly GEMINI_MODELS = ["gemini-2.5-flash-lite", "gemini-2.0-flash", "gemini-2.5-flash"];
+  // 과부하(503)·레이트리밋(429) 시 다음 모델로 폴백.
+  // ⚡ 3.1-flash-lite 1순위: 무료 티어 RPM 30(최고)·빠르고 저렴. 구조화·검색엔 이 품질로 충분.
+  //   폴백 3.5-flash(더 똑똑, RPM 15) → 2.5-flash-lite(레거시 안전망). 라이브 모델목록으로 ID 확인(2026-07-01).
+  private static readonly GEMINI_MODELS = ["gemini-3.1-flash-lite", "gemini-3.5-flash", "gemini-2.5-flash-lite"];
 
   // 모델당 1회 시도(무료 티어 RPM 절약) → 503/429면 즉시 다음 모델로. 전부 실패하면 throw.
   private async generate(contents: string): Promise<string> {
@@ -563,7 +564,7 @@ class NaverGeminiProvider implements SearchProvider {
 
   /** 조사 메모 → 등록 폼 후보. Gemini 우선, 전멸 시 Haiku 폴백. */
   private async structure(query: string, research: string, extra = ""): Promise<EnrichCandidate[]> {
-    const prompt = `원래 검색어: "${query}"\n\n[조사 자료 — 네이버 검색 + 제미나이 웹 조사]\n${research}${extra}\n\n두 출처를 비교·종합해서 등록 폼 후보로 정리해줘. 서로 보완되는 정보는 합치고, 확실한 것만 채워. 빈 문자열 필드는 missing 처리하거나 생략해.`;
+    const prompt = `원래 검색어: "${query}"\n\n[조사 자료 — 네이버 검색 + 제미나이 웹 조사]\n${research}${extra}\n\n두 출처를 비교·종합해서 등록 폼 후보로 정리해줘. 서로 보완되는 정보는 합치고, 확실한 것만 채워. 빈 문자열 필드는 missing 처리하거나 생략해. description은 모든 문장을 '해요체'로 끝내(~해요/~예요/~있어요). '~합니다/~습니다' 금지.`;
     try {
       const text = await this.generate(prompt);
       const parsed = JSON.parse(text) as EnrichResult;
@@ -643,7 +644,7 @@ class NaverGeminiProvider implements SearchProvider {
       info || "(입력이 적어요 — 조사 자료 위주로)"
     }\n\n[조사 자료]\n${research}\n\n두 출처를 종합해서 이 브랜드의 소개 글을 ${angle} 써줘. 조사 자료에 쓸 만한 정보(무엇을 만드는지·특징·시작·고객·분위기)가 많으면 4~6문장으로 넉넉하고 풍부하게, 정보가 적으면 담백하게 써줘.${
       round > 0 ? " 이전 초안과는 확실히 다른 각도·표현으로 새롭게 써줘." : ""
-    }`;
+    }\n\n⭐중요: 모든 문장을 '해요체'로 끝내(~해요/~예요/~이에요/~있어요/~드려요/~기다려요). '~합니다/~습니다/~입니다'로 끝나는 문장은 하나도 쓰지 마.`;
     try {
       const text = await this.generateText(prompt, round > 0 ? 1.0 : 0.8);
       return text || this.draftWithHaiku(prompt);
