@@ -557,16 +557,16 @@ export default function RegisterPage() {
         </div>
 
         {/* ── 그룹 B. 콜라보 ── */}
-        <GroupHeader n="②" title="콜라보" sub="어떻게 함께해요" />
+        <GroupHeader n="②" title="콜라보 정보" />
         <div className="space-y-7">
-          <Field label="이런 콜라보 제공할 수 있어요">
+          <Field label="이런 콜라보를 제공할 수 있어요">
             <ChipRow
               options={COLLAB_TYPES}
               selected={offers}
               onToggle={(t) => toggle(offers, setOffers, t)}
             />
           </Field>
-          <Field label="이런 콜라보 찾고 있어요">
+          <Field label="이런 콜라보를 찾고 있어요">
             <ChipRow
               options={COLLAB_TYPES}
               selected={seeks}
@@ -732,12 +732,9 @@ export default function RegisterPage() {
 
           {/* 이런 분들과 만나요 (타겟 고객) */}
           <div>
-            <label className="mb-1 block text-base font-medium text-body">
-              이런 분들과 만나요
+            <label className="mb-2.5 block text-base font-medium text-body">
+              이런 고객들과 함께하고 있어요
             </label>
-            <p className="mb-2.5 text-[15px] text-mute">
-              우리 고객층이에요. 수신자가 “내 손님과 결이 맞나” 가늠하는 핵심이에요.
-            </p>
             <div className="flex flex-wrap gap-2">
               {SUGGESTED_AUDIENCE.map((a) => {
                 const on = targetAudience.includes(a);
@@ -795,7 +792,7 @@ export default function RegisterPage() {
         </div>
 
         {/* ── 그룹 C. 신뢰·연결 ── */}
-        <GroupHeader n="③" title="신뢰·연결" sub="어디서 만나요" />
+        <GroupHeader n="③" title="브랜드 정보" />
         <div className="space-y-7">
           <Field label="주소" hint={hintFor("address", "address")}>
             <input
