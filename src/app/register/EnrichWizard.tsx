@@ -384,7 +384,7 @@ export function EnrichWizard({
                                 value={vibeInput}
                                 onChange={(e) => setVibeInput(e.target.value)}
                                 onKeyDown={(e) => {
-                                  if (e.key === "Enter") {
+                                  if (e.key === "Enter" && !e.nativeEvent.isComposing) {
                                     e.preventDefault();
                                     addVibe();
                                   }
@@ -409,7 +409,7 @@ export function EnrichWizard({
                             }
                             autoFocus
                             onKeyDown={(e) => {
-                              if (e.key === "Enter") {
+                              if (e.key === "Enter" && !e.nativeEvent.isComposing) {
                                 e.preventDefault();
                                 setEditingKey(null);
                               }
@@ -496,7 +496,7 @@ function AskView({
         placeholder={placeholder}
         autoFocus
         onKeyDown={(e) => {
-          if (e.key === "Enter") {
+          if (e.key === "Enter" && !e.nativeEvent.isComposing) {
             e.preventDefault();
             onSubmit();
           }

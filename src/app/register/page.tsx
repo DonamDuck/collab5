@@ -391,7 +391,7 @@ export default function RegisterPage() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === "Enter") {
+              if (e.key === "Enter" && !e.nativeEvent.isComposing) {
                 e.preventDefault();
                 openWizard();
               }
@@ -410,7 +410,16 @@ export default function RegisterPage() {
         </div>
       </div>
 
-      <div className="mt-10 space-y-8">
+      {/* AI 불러오기(위) ↔ 직접 입력(아래) 구분 소제목 */}
+      <div className="mt-10 flex items-center gap-3">
+        <div className="h-px flex-1 bg-hairline" />
+        <span className="shrink-0 text-sm font-medium text-mute">
+          또는 아래에서 하나씩 직접 입력해도 돼요
+        </span>
+        <div className="h-px flex-1 bg-hairline" />
+      </div>
+
+      <div className="mt-8 space-y-8">
         {/* 검수 게이트 배너 — AI가 채운 직후 */}
         {reviewMode && (
           <div className="rounded-lg border border-primary bg-surface px-4 py-3 shadow-e1">
@@ -529,7 +538,7 @@ export default function RegisterPage() {
                 value={customVibe}
                 onChange={(e) => setCustomVibe(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter") {
+                  if (e.key === "Enter" && !e.nativeEvent.isComposing) {
                     e.preventDefault();
                     addCustomVibe();
                   }
@@ -694,7 +703,7 @@ export default function RegisterPage() {
                       value={histCustomType}
                       onChange={(e) => setHistCustomType(e.target.value)}
                       onKeyDown={(e) => {
-                        if (e.key === "Enter") {
+                        if (e.key === "Enter" && !e.nativeEvent.isComposing) {
                           e.preventDefault();
                           addHistCustomType();
                         }
@@ -808,7 +817,7 @@ export default function RegisterPage() {
                 value={customAudience}
                 onChange={(e) => setCustomAudience(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter") {
+                  if (e.key === "Enter" && !e.nativeEvent.isComposing) {
                     e.preventDefault();
                     addCustomAudience();
                   }
@@ -949,7 +958,7 @@ export default function RegisterPage() {
                   onChange={(e) => setSuggestDirect(e.target.value)}
                   autoFocus
                   onKeyDown={(e) => {
-                    if (e.key === "Enter") {
+                    if (e.key === "Enter" && !e.nativeEvent.isComposing) {
                       e.preventDefault();
                       answerSuggestion("direct", suggestDirect);
                     }
