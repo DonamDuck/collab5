@@ -38,6 +38,7 @@ export async function POST(req: Request) {
     offers?: unknown;
     targetAudience?: unknown;
     focusKeywords?: unknown;
+    ownerNote?: unknown;
     research?: unknown;
     round?: unknown;
   };
@@ -94,6 +95,7 @@ export async function POST(req: Request) {
         name,
         research: typeof body.research === "string" ? body.research : "",
         focusKeywords: strArr(body.focusKeywords),
+        ownerNote: typeof body.ownerNote === "string" ? body.ownerNote : undefined,
       });
       return NextResponse.json({ options });
     } catch (e) {

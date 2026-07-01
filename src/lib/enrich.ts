@@ -64,6 +64,7 @@ export interface OptionsInput {
   name: string;
   research: string; // enrichResearch()가 만든 조사 메모(네이버+제미나이)
   focusKeywords?: string[];
+  ownerNote?: string; // 사장이 직접 쓴 한두 문장 — 생성의 최우선 중심축
 }
 
 /** 5지선다 결과 — 확인된 identity + 한줄소개/브랜드소개 후보 5개씩 + 결 단어 */
@@ -727,12 +728,15 @@ class NaverGeminiProvider implements SearchProvider {
     }
   }
 
-  // 조사 메모 + 키워드 → 한줄소개·브랜드소개 5지선다(빠른 생성 단계).
+  // 조사 메모 + (사장 설명 + 키워드) → 한줄소개·브랜드소개 5지선다(빠른 생성 단계).
   async options(input: OptionsInput): Promise<EnrichOptions> {
-    const kw = input.focusKeywords?.length
-      ? `⭐가중 키워드(가장 중요하게 반영): ${input.focusKeywords.join(", ")}\n\n`
+    const note = input.ownerNote?.trim()
+      ? `⭐⭐가장 중요 — 사장이 직접 쓴 브랜드 핵심 설명이야. 이 내용·관점·강조점을 모든 후보의 최우선 중심으로 삼아줘(조사 자료보다 이걸 우선):\n"${input.ownerNote.trim()}"\n\n`
       : "";
-    const prompt = `브랜드명: "${input.name}"\n\n${kw}[조사 자료 — 네이버 검색 + 제미나이 웹 조사]\n${input.research}\n\n위 자료로 한 줄 소개 5개, 브랜드 소개 5개(각 3~5문장, 모두 해요체), 브랜드 결 단어 2~4개, 확인된 identity(지역·주소·인스타·홈피)를 뽑아줘. 사실만 쓰고, 확인 안 된 필드는 빈 문자열. 모든 문장은 '해요체'로 끝내('~합니다/~습니다' 금지).`;
+    const kw = input.focusKeywords?.length
+      ? `⭐가중 키워드(중요하게 반영): ${input.focusKeywords.join(", ")}\n\n`
+      : "";
+    const prompt = `브랜드명: "${input.name}"\n\n${note}${kw}[조사 자료 — 네이버 검색 + 제미나이 웹 조사]\n${input.research}\n\n위 정보로 한 줄 소개 5개, 브랜드 소개 5개(각 3~5문장, 모두 해요체), 브랜드 결 단어 2~4개, 확인된 identity(지역·주소·인스타·홈피)를 뽑아줘. 사실만 쓰고, 확인 안 된 필드는 빈 문자열. 모든 문장은 '해요체'로 끝내('~합니다/~습니다' 금지).`;
     return this.generateOptions(prompt, 0.9);
   }
 

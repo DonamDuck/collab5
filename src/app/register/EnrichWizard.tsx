@@ -46,6 +46,7 @@ export function EnrichWizard({
   onApply: (fill: WizardFill) => void;
 }) {
   const [kind, setKind] = useState<Kind>("keywords");
+  const [intro, setIntro] = useState(""); // 사장이 직접 쓴 한두 문장(생성의 중심축)
   const [keywords, setKeywords] = useState<string[]>([]);
   const [kwInput, setKwInput] = useState("");
   const [options, setOptions] = useState<EnrichOptions | null>(null);
@@ -90,7 +91,13 @@ export function EnrichWizard({
       const r = await fetch("/api/enrich", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mode: "options", name: query, research, focusKeywords: keywords }),
+        body: JSON.stringify({
+          mode: "options",
+          name: query,
+          research,
+          focusKeywords: keywords,
+          ownerNote: intro.trim() || undefined,
+        }),
       });
       const d = await r.json();
       const o: EnrichOptions | null = d.options ?? null;
@@ -182,11 +189,33 @@ export function EnrichWizard({
 
         {kind === "keywords" && (
           <div>
-            <p className="pr-8 text-base font-bold text-ink">어떤 점을 강조할까요?</p>
+            <p className="pr-8 text-base font-bold text-ink">소개의 중심을 잡아볼까요?</p>
             <p className="mt-1 text-sm text-mute">
-              골라주신 키워드를 중심으로 소개를 찾아드려요. 건너뛰어도 괜찮아요.
+              사장님이 직접 잡아주시면, 그 방향으로 소개를 만들어드려요.
             </p>
-            <div className="mt-4 flex flex-wrap gap-2">
+
+            {/* 사장 핵심 설명 — 생성의 중심축 */}
+            <div className="mt-4">
+              <label className="mb-1.5 block text-sm font-semibold text-body">
+                이 브랜드를 짤막하게 설명해주세요
+              </label>
+              <textarea
+                value={intro}
+                onChange={(e) => setIntro(e.target.value)}
+                rows={3}
+                placeholder="예: 버려지는 천으로 가방을 만드는 업사이클링 브랜드예요. 손님이 직접 만드는 워크숍도 열어요."
+                className="w-full rounded-sm border border-hairline bg-surface px-3 py-2 text-base leading-relaxed text-ink outline-none placeholder:text-faint focus:border-focus"
+              />
+              <p className="mt-1 text-xs text-mute">
+                한두 문장이면 충분해요. 적어주시면 결과가 훨씬 정확해져요.
+              </p>
+            </div>
+
+            {/* 가중 키워드 */}
+            <label className="mb-1.5 mt-5 block text-sm font-semibold text-body">
+              강조할 키워드 <span className="font-normal text-faint">· 선택 · 최대 {MAX_KEYWORDS}개</span>
+            </label>
+            <div className="flex flex-wrap gap-2">
               {SUGGESTED_KEYWORDS.map((k) => {
                 const on = keywords.includes(k);
                 const full = !on && keywords.length >= MAX_KEYWORDS;
@@ -251,7 +280,7 @@ export function EnrichWizard({
               onClick={runOptions}
               className="mt-4 h-11 w-full rounded-md bg-primary text-sm font-medium text-primary-on"
             >
-              {keywords.length ? "이 방향으로 찾기" : "그냥 찾아주세요"}
+              {intro.trim() || keywords.length ? "이 방향으로 찾기" : "그냥 찾아주세요"}
             </button>
           </div>
         )}
