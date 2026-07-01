@@ -464,9 +464,10 @@ class NaverGeminiProvider implements SearchProvider {
   }
 
   // 과부하(503)·레이트리밋(429) 시 다음 모델로 폴백.
-  // ⚡ 3.1-flash-lite 1순위: 무료 티어 RPM 30(최고)·빠르고 저렴. 구조화·검색엔 이 품질로 충분.
-  //   폴백 3.5-flash(더 똑똑, RPM 15) → 2.5-flash-lite(레거시 안전망). 라이브 모델목록으로 ID 확인(2026-07-01).
-  private static readonly GEMINI_MODELS = ["gemini-3.1-flash-lite", "gemini-3.5-flash", "gemini-2.5-flash-lite"];
+  // ⚡ 2.5-flash-lite 1순위(2026-07-01 가성비 최적화): 토큰 $0.10/$0.40 + grounding 무료 1,500건/일.
+  //   3.1-flash-lite 대비 토큰 2.5배↓ & grounding 무료 9배↑(일1500 vs 월5000). 구조화·검색엔 이 품질로 충분.
+  //   폴백 2.0-flash-lite(토큰 최저 $0.075/$0.30) → 2.5-flash(더 똑똑, 안전망).
+  private static readonly GEMINI_MODELS = ["gemini-2.5-flash-lite", "gemini-2.0-flash-lite", "gemini-2.5-flash"];
 
   // 모델당 1회 시도(무료 티어 RPM 절약) → 503/429면 즉시 다음 모델로. 전부 실패하면 throw.
   private async generate(contents: string): Promise<string> {
