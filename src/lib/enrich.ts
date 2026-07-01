@@ -66,13 +66,27 @@ export interface SearchProvider {
   draft?(input: DraftInput): Promise<string>;
 }
 
+// collab5 브랜드 보이스 — `~/Desktop/COLLAB_BRAND_SYSTEM.md`(v0.2)를 소개 글 생성용으로 증류.
+// 모든 AI 생성 텍스트(소개·구조화 description)는 이 기준을 통과한다.
+const BRAND_VOICE = `[collab5 브랜드 보이스 — 이 말투를 반드시 지켜라]
+말투:
+- 친절하지만 과하지 않게. 감성적이지만 오글거리지 않게. 담백하고 단단하게.
+- 마케팅 문구가 아니라 '좋은 브랜드가 스스로를 담담히 소개하는' 느낌. 읽고 "이 브랜드 괜찮네, 같이 해보고 싶다"가 들도록.
+- 자연스러운 한국어 해요체. 쉽고 부담 없이. 문장은 짧고 명료하게.
+- 관점: 단순 소개가 아니라 '함께 협업하고 싶어지는 첫인상'을 만든다.
+금지: 최고의 / 혁신적인 / 압도적 / 완벽한 / 트렌디한 / 퀄리티 / 솔루션 같은 홍보·상투어, 과장, 이모지, 느낌표 남발, "생성/자동" 같은 기계적 표현.
+지향: 함께 / 정성 / 담다 / 첫인상 / 꾸준히 / 결이 맞는 — 구체적 사실(무엇을·어떻게·누구에게) 위주로.`;
+
 /** 소개 초안 카피라이터 system + 라운드별 서술 각도(다시 받기마다 순환) */
-const DRAFT_SYSTEM = `너는 콜라보 플랫폼 collab5의 브랜드 소개 카피라이터야. 브랜드의 등록 정보와 웹 조사 메모를 바탕으로, 콜라보 제안 카드에 실릴 '소개 한 문단'을 매력적으로 쓴다.
-규칙:
-- 2~3문장, 자연스러운 한국어 해요체.
-- 과장·상투어(최고의/혁신적인/최고 품질) 금지. 구체적이고 담백하게.
+const DRAFT_SYSTEM = `너는 콜라보 플랫폼 collab5의 브랜드 소개 카피라이터야. 브랜드의 등록 정보와 웹 조사 메모를 바탕으로, 콜라보 제안 카드에 실릴 브랜드 '소개 글'을 쓴다.
+
+${BRAND_VOICE}
+
+작성 규칙:
+- 조사 메모에 구체적 정보(무엇을 만드는지·어떻게 시작했는지·특징·주요 고객·분위기)가 넉넉하면 4~6문장으로 풍부하게 쓴다. 정보가 적으면 2~3문장으로 담백하게. 정보가 없는 내용을 지어내 억지로 늘리지는 않는다.
+- 조사 메모·입력 정보 안에서만 쓴다. 사실을 창작하지 마라.
 - 사용자가 검수·수정할 초안이다.
-- 소개 문단 본문만 출력한다(따옴표·머리말·설명 금지).`;
+- 소개 글 본문만 출력한다(따옴표·머리말·해설·이모지 금지).`;
 
 const DRAFT_ANGLES = [
   "브랜드의 시작과 이야기(스토리)를 중심으로",
@@ -205,11 +219,12 @@ export class MockSearchProvider implements SearchProvider {
     const round = input.round ?? 0;
     const name = input.name.trim() || "우리 브랜드";
     const vibe = input.values?.slice(0, 3).join(", ");
+    const line = vibe ? `${vibe}을(를) 담아 ` : "";
     const variants = [
-      `${name}은(는) ${input.oneLiner?.trim() || "자기만의 이야기를 담은 곳"}이에요. 작은 시작에서 출발해 한 걸음씩 자기 색을 쌓아가고 있어요.`,
-      `${vibe ? `${vibe} — ` : ""}${name}이(가) 지켜온 태도예요. 유행을 좇기보다 우리다운 방식으로 오래 남을 것을 만들어요.`,
-      `${name}을(를) 찾는 분들은 결이 맞는 경험을 기대해요. 그 기대에 정직하게 답하는 것이 우리가 일하는 방식이에요.`,
-      `함께 무언가를 만든다면, ${name}은(는) ${vibe || "우리다운 색"}으로 서로의 이야기를 더 넓혀줄 파트너가 될 거예요.`,
+      `${name}은(는) ${input.oneLiner?.trim() || "자기만의 이야기를 담은 곳"}이에요. 작은 시작에서 출발해 한 걸음씩 자기 색을 쌓아왔어요. 유행보다 오래 남을 것을 고민하며, ${line}만드는 사람과 쓰는 사람 사이에 이야기가 오가도록 해요. 지금은 더 넓은 만남을 준비하고 있어요.`,
+      `${line}${name}이(가) 지켜온 태도가 있어요. 빠르게 많이 만들기보다, 하나를 정성껏 매만지는 방식을 택했어요. 그렇게 쌓인 시간이 브랜드의 결이 되었고, 찾아주시는 분들과의 신뢰로 이어지고 있어요. 함께라면 그 색을 더 멀리 나눌 수 있어요.`,
+      `${name}을(를) 찾는 분들은 결이 맞는 경험을 기대해요. 우리는 그 기대에 정직하게 답하는 걸 가장 중요하게 생각해요. 화려한 말보다 실제로 손에 남는 것으로 이야기하려 하고, 그 담백함을 알아봐 주시는 분들과 오래 함께하고 있어요.`,
+      `함께 무언가를 만든다면, ${name}은(는) ${vibe || "우리다운 색"}으로 서로의 이야기를 넓혀줄 파트너가 될 거예요. 우리가 쌓아온 방식과 팬들이 겹쳐질 때 어떤 장면이 나올지 늘 궁금해해요. 작은 협업이라도 서로에게 좋은 첫인상으로 남기를 바라요.`,
     ];
     return variants[round % variants.length];
   }
@@ -246,12 +261,14 @@ const EnrichResultSchema = z.object({
 });
 
 const ENRICH_SYSTEM = `너는 콜라보 플랫폼 collab5의 등록 도우미야. 조사된 웹 내용을 바탕으로 한국 업체/브랜드의 '등록 폼 초안'을 만든다.
+
+${BRAND_VOICE}
+
 규칙:
-- description(소개 한 문단)과 values(브랜드 결 칩 2~4개)는 매력적인 '초안'으로 작성한다. 사용자가 검수·수정할 전제다.
+- description은 위 브랜드 보이스를 지켜 쓴다. 조사 내용이 넉넉하면 3~5문장으로 풍부하게, 적으면 담백하게. values(브랜드 결 칩 2~4개)도 매력적인 '초안'으로. 사용자가 검수·수정할 전제다.
 - instagram·homepage·address는 조사에서 실제로 확인된 것만 채우고, 각각 sources에 출처(label=도메인/서비스명, url)를 남긴다. 확인 안 되면 비우고 missing에 넣는다. 절대 지어내지 마라.
 - 콜라보 유형·지역규모 같은 필터 항목은 추측하지 마라(폼에서 사람이 직접 고른다).
-- 같은 이름의 서로 다른 업체가 보이면 candidates 배열에 각각 담고, hint(지역·업종 한 줄)로 구분한다.
-- 모든 텍스트는 자연스러운 한국어 해요체.`;
+- 같은 이름의 서로 다른 업체가 보이면 candidates 배열에 각각 담고, hint(지역·업종 한 줄)로 구분한다.`;
 
 class ClaudeSearchProvider implements SearchProvider {
   private _client: Anthropic | null = null;
@@ -556,7 +573,7 @@ class NaverGeminiProvider implements SearchProvider {
   private async draftWithHaiku(prompt: string): Promise<string> {
     const res = await this.claude().messages.create({
       model: "claude-haiku-4-5",
-      max_tokens: 400,
+      max_tokens: 800,
       system: DRAFT_SYSTEM,
       messages: [{ role: "user", content: prompt }],
     });
@@ -582,7 +599,7 @@ class NaverGeminiProvider implements SearchProvider {
       .join("\n");
     const prompt = `아래는 "${input.name}" 브랜드의 등록 정보와 네이버 조사 메모야.\n\n[사용자 입력]\n${
       info || "(입력이 적어요 — 조사 메모 위주로)"
-    }\n\n[네이버 조사 메모]\n${research}\n\n이 브랜드의 소개 한 문단을 ${angle} 매력적으로 써줘.${
+    }\n\n[네이버 조사 메모]\n${research}\n\n이 브랜드의 소개 글을 ${angle} 써줘. 조사 메모에 쓸 만한 정보(무엇을 만드는지·특징·시작·고객·분위기)가 많으면 4~6문장으로 넉넉하고 풍부하게, 정보가 적으면 담백하게 써줘.${
       round > 0 ? " 이전 초안과는 확실히 다른 각도·표현으로 새롭게 써줘." : ""
     }`;
     try {
