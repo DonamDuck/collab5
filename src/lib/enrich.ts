@@ -496,6 +496,42 @@ class NaverGeminiProvider implements SearchProvider {
     throw lastErr;
   }
 
+  // 제미나이 자체 웹 검색(Google Search grounding). 네이버와 별개 소스로 조사.
+  // ⚠️ grounding은 responseSchema와 동시 사용 불가 → 순수 텍스트 조사 단계로만.
+  //    ENRICH_GEMINI_SEARCH=0 이면 비활성(네이버 단독). grounding은 유료 쿼터 소모.
+  private async geminiSearch(query: string): Promise<string> {
+    if (process.env.ENRICH_GEMINI_SEARCH === "0") return "";
+    const prompt = `"${query}" 브랜드/업체를 웹에서 조사해줘. 무엇을 하는 곳인지, 시작·스토리, 특징·강점, 주요 고객, 분위기·평판, 인스타그램 핸들·홈페이지·주소 단서를 사실 위주로 간결한 메모로 정리해줘. 확실하지 않은 건 추측하지 말고 넘어가. 짧은 개조식으로.`;
+    // 보조 소스라 실패 시 빠르게 포기(네이버 단독). 429는 쿼터/레이트리밋 → 모델 공유라 재시도 무의미.
+    for (const model of NaverGeminiProvider.GEMINI_MODELS) {
+      try {
+        const response = await this.ai().models.generateContent({
+          model,
+          contents: prompt,
+          config: { tools: [{ googleSearch: {} }], temperature: 0.2 },
+        });
+        return (response.text ?? "").trim();
+      } catch (e) {
+        const status = (e as { status?: number; code?: number })?.status ?? (e as { code?: number })?.code;
+        if (status === 503) {
+          console.warn(`[enrich] gemini search ${model} 503 → 다음 모델 폴백`);
+          continue; // 일시 과부하만 다음 모델 시도
+        }
+        // 429(쿼터)·grounding 미지원·기타 → 즉시 네이버 단독으로 degrade(지연 최소화)
+        console.warn(`[enrich] gemini search ${model} 실패(${status ?? "?"}) → 네이버 단독`);
+        return "";
+      }
+    }
+    return "";
+  }
+
+  // 네이버 메모 + 제미나이 웹 조사 메모를 라벨 붙여 합침(구조화 단계 입력용).
+  private combineResearch(naver: string, gemini: string): string {
+    const parts = [`[출처 1 · 네이버 검색]\n${naver || "(결과 없음)"}`];
+    if (gemini) parts.push(`[출처 2 · 제미나이 웹 조사]\n${gemini}`);
+    return parts.join("\n\n");
+  }
+
   /** 빈 문자열 optional 필드 정리 (Gemini/Haiku가 ""로 채우는 경우 → undefined) */
   private normalize(cands: EnrichCandidate[]): EnrichCandidate[] {
     return cands.map((c) => ({
@@ -517,7 +553,7 @@ class NaverGeminiProvider implements SearchProvider {
       messages: [
         {
           role: "user",
-          content: `원래 검색어: "${query}"\n\n[웹 조사 요약]\n${research}${extra}\n\n위 조사 내용을 등록 폼 후보로 정리해줘.`,
+          content: `원래 검색어: "${query}"\n\n[조사 자료]\n${research}${extra}\n\n두 출처를 비교·종합해서 등록 폼 후보로 정리해줘. 서로 보완되는 정보는 합치고, 확실한 것만 채워.`,
         },
       ],
       output_config: { format: zodOutputFormat(EnrichResultSchema) },
@@ -527,7 +563,7 @@ class NaverGeminiProvider implements SearchProvider {
 
   /** 조사 메모 → 등록 폼 후보. Gemini 우선, 전멸 시 Haiku 폴백. */
   private async structure(query: string, research: string, extra = ""): Promise<EnrichCandidate[]> {
-    const prompt = `원래 검색어: "${query}"\n\n[네이버 조사 메모]\n${research}${extra}\n\n위 조사 내용을 등록 폼 후보로 정리해줘. 빈 문자열 필드는 missing 처리하거나 생략해.`;
+    const prompt = `원래 검색어: "${query}"\n\n[조사 자료 — 네이버 검색 + 제미나이 웹 조사]\n${research}${extra}\n\n두 출처를 비교·종합해서 등록 폼 후보로 정리해줘. 서로 보완되는 정보는 합치고, 확실한 것만 채워. 빈 문자열 필드는 missing 처리하거나 생략해.`;
     try {
       const text = await this.generate(prompt);
       const parsed = JSON.parse(text) as EnrichResult;
@@ -540,7 +576,9 @@ class NaverGeminiProvider implements SearchProvider {
   }
 
   async lookup(query: string, hintUrl?: string): Promise<EnrichCandidate[]> {
-    const research = await this.gather(query);
+    // 네이버 검색 + 제미나이 웹 조사를 병렬로 → 두 소스 종합 → 제미나이 구조화
+    const [naver, gemini] = await Promise.all([this.gather(query), this.geminiSearch(query)]);
+    const research = this.combineResearch(naver, gemini);
     const extra = hintUrl ? `\n\n참고 링크(우선 확인): ${hintUrl}` : "";
     return this.structure(query, research, extra);
   }
@@ -584,9 +622,13 @@ class NaverGeminiProvider implements SearchProvider {
       .trim();
   }
 
-  // 폼 정보 + 네이버 조사 메모 → 소개 한 문단. round마다 다른 각도·높은 temperature로 변주.
+  // 폼 정보 + (네이버 + 제미나이 웹 조사) → 소개 글. round마다 다른 각도·높은 temperature로 변주.
   async draft(input: DraftInput): Promise<string> {
-    const research = await this.gather(input.name);
+    const [naver, gemini] = await Promise.all([
+      this.gather(input.name),
+      this.geminiSearch(input.name),
+    ]);
+    const research = this.combineResearch(naver, gemini);
     const round = input.round ?? 0;
     const angle = DRAFT_ANGLES[round % DRAFT_ANGLES.length];
     const info = [
@@ -597,9 +639,9 @@ class NaverGeminiProvider implements SearchProvider {
     ]
       .filter(Boolean)
       .join("\n");
-    const prompt = `아래는 "${input.name}" 브랜드의 등록 정보와 네이버 조사 메모야.\n\n[사용자 입력]\n${
-      info || "(입력이 적어요 — 조사 메모 위주로)"
-    }\n\n[네이버 조사 메모]\n${research}\n\n이 브랜드의 소개 글을 ${angle} 써줘. 조사 메모에 쓸 만한 정보(무엇을 만드는지·특징·시작·고객·분위기)가 많으면 4~6문장으로 넉넉하고 풍부하게, 정보가 적으면 담백하게 써줘.${
+    const prompt = `아래는 "${input.name}" 브랜드의 등록 정보와 웹 조사 자료(네이버 검색 + 제미나이 웹 조사)야.\n\n[사용자 입력]\n${
+      info || "(입력이 적어요 — 조사 자료 위주로)"
+    }\n\n[조사 자료]\n${research}\n\n두 출처를 종합해서 이 브랜드의 소개 글을 ${angle} 써줘. 조사 자료에 쓸 만한 정보(무엇을 만드는지·특징·시작·고객·분위기)가 많으면 4~6문장으로 넉넉하고 풍부하게, 정보가 적으면 담백하게 써줘.${
       round > 0 ? " 이전 초안과는 확실히 다른 각도·표현으로 새롭게 써줘." : ""
     }`;
     try {
@@ -612,9 +654,10 @@ class NaverGeminiProvider implements SearchProvider {
   }
 
   async recrawl(input: RecrawlInput): Promise<EnrichCandidate | null> {
-    // 인스타 핸들·홈피 도메인까지 검색어에 섞어 더 깊이 조사
+    // 인스타 핸들·홈피 도메인까지 검색어에 섞어 네이버+제미나이 둘 다 더 깊이 조사
     const terms = [input.name, input.homepage, input.instagram?.replace(/^@/, "")].filter(Boolean).join(" ");
-    const research = await this.gather(terms);
+    const [naver, gemini] = await Promise.all([this.gather(terms), this.geminiSearch(terms)]);
+    const research = this.combineResearch(naver, gemini);
     const extra = `\n\n사용자가 알려준 링크: 인스타=${input.instagram ?? "없음"}, 홈페이지=${input.homepage ?? "없음"} (이 둘은 확인된 것으로 sources에 넣어도 됨)`;
     const cands = await this.structure(input.name, research, extra);
     return cands[0] ?? null;
