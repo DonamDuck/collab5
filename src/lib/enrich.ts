@@ -602,7 +602,9 @@ class NaverGeminiProvider implements SearchProvider {
   //    ENRICH_GEMINI_SEARCH=0 이면 비활성(네이버 단독). grounding은 유료 쿼터 소모.
   private async geminiSearch(query: string): Promise<string> {
     if (process.env.ENRICH_GEMINI_SEARCH === "0") return "";
-    const prompt = `"${query}" 브랜드/업체를 웹에서 조사해줘. 무엇을 하는 곳인지, 시작·스토리, 특징·강점, 주요 고객, 분위기·평판, 인스타그램 핸들·홈페이지·주소 단서를 사실 위주로 간결한 메모로 정리해줘. 확실하지 않은 건 추측하지 말고 넘어가. 짧은 개조식으로.`;
+    const prompt = `"${query}" 브랜드/업체를 웹에서 조사해줘. 무엇을 하는 곳인지, 시작·스토리, 특징·강점, 주요 고객, 분위기·평판을 사실 위주로 간결한 메모로 정리해줘.
+⭐특히 공식 **인스타그램 계정(@핸들)**과 **홈페이지 URL**은 반드시 찾아줘 — instagram.com/○○ 링크나 @핸들을 직접 확인해서 정확히 적어줘. 홈페이지 도메인의 브랜드명과 같은 인스타 핸들일 가능성이 높으니 그것도 검색해봐(예: 홈피가 canvasgarden.shop이면 instagram.com/canvasgarden 확인).
+확실하지 않은 건 추측하지 말고 넘어가되, 인스타·홈피는 최대한 찾아줘. 짧은 개조식으로.`;
     // 보조 소스라 실패 시 빠르게 포기(네이버 단독). 429는 쿼터/레이트리밋 → 모델 공유라 재시도 무의미.
     for (const model of NaverGeminiProvider.GEMINI_MODELS) {
       try {
@@ -736,7 +738,9 @@ class NaverGeminiProvider implements SearchProvider {
     const kw = input.focusKeywords?.length
       ? `⭐가중 키워드(중요하게 반영): ${input.focusKeywords.join(", ")}\n\n`
       : "";
-    const prompt = `브랜드명: "${input.name}"\n\n${note}${kw}[조사 자료 — 네이버 검색 + 제미나이 웹 조사]\n${input.research}\n\n위 정보로 한 줄 소개 5개, 브랜드 소개 5개(각 3~5문장, 모두 해요체), 브랜드 결 단어 2~4개, 확인된 identity(지역·주소·인스타·홈피)를 뽑아줘. 사실만 쓰고, 확인 안 된 필드는 빈 문자열. 모든 문장은 '해요체'로 끝내('~합니다/~습니다' 금지).`;
+    const prompt = `브랜드명: "${input.name}"\n\n${note}${kw}[조사 자료 — 네이버 검색 + 제미나이 웹 조사]\n${input.research}\n\n위 정보로 한 줄 소개 5개, 브랜드 소개 5개(각 3~5문장, 모두 해요체), 브랜드 결 단어 2~4개, identity(지역·주소·인스타·홈피)를 뽑아줘.
+⭐identity.instagram·identity.homepage는 브랜드에 거의 항상 있는 핵심 정보야. 조사 자료 어디든 이 브랜드('${input.name}')의 instagram.com 링크·@핸들·홈페이지 URL(.shop/.com 등)이 보이면 반드시 identity에 채워줘. 인스타 핸들은 @포함 형식으로. ⚠️단 반드시 이 브랜드의 공식 계정만 — 조사 자료에 섞인 무관한 다른 브랜드/사람의 인스타 계정은 절대 넣지 마. 확신 없거나 근거 없으면 빈 문자열(지어내기 금지).
+나머지는 사실만 쓰고, 확인 안 된 필드는 빈 문자열. 모든 문장은 '해요체'로 끝내('~합니다/~습니다' 금지).`;
     return this.generateOptions(prompt, 0.9);
   }
 
