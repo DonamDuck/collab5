@@ -24,25 +24,15 @@ const COLLAB_TYPES: CollabType[] = [
   "행사참여",
 ];
 
-// 결 추천 어휘 — "우리가 멋진 말을 골라드려요"(분석 도움). 직접 추가도 가능.
-const SUGGESTED_VIBES = [
-  "친환경",
-  "손맛",
-  "느린 호흡",
-  "빈티지",
-  "다정함",
-  "로컬",
-  "정성",
-  "미니멀",
-  "핸드메이드",
-  "계절감",
-  "큐레이션",
-  "따뜻함",
-  "실험적",
-  "클래식",
-  "위트",
-  "지속가능",
+// 브랜드 표현 어휘 — 4카테고리(감성·가치·스타일·성격). 직접 추가 가능, 최대 10개 선택.
+const VIBE_CATEGORIES: { label: string; words: string[] }[] = [
+  { label: "브랜드 감성", words: ["따뜻함", "감성", "정성", "손맛", "핸드메이드", "큐레이션"] },
+  { label: "브랜드 가치", words: ["지속가능", "친환경", "로컬", "윤리적", "사회적 가치", "공정무역"] },
+  { label: "브랜드 스타일", words: ["미니멀", "클래식", "빈티지", "모던", "실험적", "프리미엄"] },
+  { label: "브랜드 성격", words: ["위트", "대담함", "유쾌함", "진정성", "감각적", "섬세함"] },
 ];
+const ALL_VIBES = VIBE_CATEGORIES.flatMap((c) => c.words);
+const MAX_VIBES = 10;
 
 // 타겟 고객 추천 어휘 — 분위기칩과 동일 패턴. 직접 추가 가능.
 const SUGGESTED_AUDIENCE = [
@@ -115,11 +105,13 @@ export default function RegisterPage() {
   ) => setList(list.includes(t) ? list.filter((x) => x !== t) : [...list, t]);
 
   const toggleVibe = (v: string) =>
-    setValues((p) => (p.includes(v) ? p.filter((x) => x !== v) : [...p, v]));
+    setValues((p) =>
+      p.includes(v) ? p.filter((x) => x !== v) : p.length >= MAX_VIBES ? p : [...p, v]
+    );
 
   const addCustomVibe = () => {
     const v = customVibe.trim();
-    if (v && !values.includes(v)) setValues((p) => [...p, v]);
+    if (v && !values.includes(v) && values.length < MAX_VIBES) setValues((p) => [...p, v]);
     setCustomVibe("");
   };
 
@@ -496,46 +488,63 @@ export default function RegisterPage() {
 
           {/* 분위기칩 — 우리를 표현하는 말 */}
           <div>
-            <label className="mb-1 flex items-center gap-2 text-sm font-medium text-body">
+            <label className="mb-1 flex items-center gap-2 text-base font-medium text-body">
               <span>우리 브랜드를 표현하는 말</span>
               {aiFilled.has("values") && <AiBadge />}
+              <span className="ml-auto text-xs font-normal text-mute">
+                {values.length} / {MAX_VIBES}
+              </span>
             </label>
-            <p className="mb-2.5 text-xs text-mute">
-              어울리는 단어를 골라보세요. 우리가 고른 말들이에요. 직접 더해도 좋아요.
+            <p className="mb-3 text-sm text-mute">
+              브랜드와 어울리는 단어를 선택해주세요. 직접 추가도 가능해요. 최대 10개
             </p>
-            <div className="flex flex-wrap gap-2">
-              {SUGGESTED_VIBES.map((v) => {
-                const on = values.includes(v);
-                return (
-                  <button
-                    key={v}
-                    type="button"
-                    onClick={() => toggleVibe(v)}
-                    className={`inline-flex h-8 items-center rounded-pill border px-3 text-sm transition-colors ${
-                      on
-                        ? "border-primary bg-primary-tint text-primary-on"
-                        : "border-hairline bg-surface text-mute"
-                    }`}
-                  >
-                    {v}
-                    {on ? " ✓" : ""}
-                  </button>
-                );
-              })}
-              {values
-                .filter((v) => !SUGGESTED_VIBES.includes(v))
-                .map((v) => (
-                  <button
-                    key={v}
-                    type="button"
-                    onClick={() => toggleVibe(v)}
-                    className="inline-flex h-8 items-center rounded-pill border border-primary bg-primary-tint px-3 text-sm text-primary-on"
-                  >
-                    {v} ✕
-                  </button>
-                ))}
+            <div className="space-y-3">
+              {VIBE_CATEGORIES.map((cat) => (
+                <div key={cat.label}>
+                  <p className="mb-1.5 text-xs font-medium text-faint">{cat.label}</p>
+                  <div className="flex flex-wrap gap-2">
+                    {cat.words.map((v) => {
+                      const on = values.includes(v);
+                      const full = !on && values.length >= MAX_VIBES;
+                      return (
+                        <button
+                          key={v}
+                          type="button"
+                          onClick={() => toggleVibe(v)}
+                          disabled={full}
+                          className={`inline-flex h-8 items-center rounded-pill border px-3 text-sm transition-colors ${
+                            on
+                              ? "border-primary bg-primary-tint text-primary-on"
+                              : "border-hairline bg-surface text-mute"
+                          } ${full ? "cursor-not-allowed opacity-40" : ""}`}
+                        >
+                          {v}
+                          {on ? " ✓" : ""}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
             </div>
-            <div className="mt-2 flex gap-2">
+            {/* 직접 추가한 칩 (추천 목록에 없는 것) */}
+            {values.some((v) => !ALL_VIBES.includes(v)) && (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {values
+                  .filter((v) => !ALL_VIBES.includes(v))
+                  .map((v) => (
+                    <button
+                      key={v}
+                      type="button"
+                      onClick={() => toggleVibe(v)}
+                      className="inline-flex h-8 items-center rounded-pill border border-primary bg-primary-tint px-3 text-sm text-primary-on"
+                    >
+                      {v} ✕
+                    </button>
+                  ))}
+              </div>
+            )}
+            <div className="mt-3 flex gap-2">
               <input
                 value={customVibe}
                 onChange={(e) => setCustomVibe(e.target.value)}
@@ -546,12 +555,14 @@ export default function RegisterPage() {
                   }
                 }}
                 placeholder="직접 더하기 (예: 아날로그)"
-                className="h-10 flex-1 rounded-sm border border-hairline bg-surface px-3 text-sm text-ink outline-none placeholder:text-faint focus:border-focus"
+                disabled={values.length >= MAX_VIBES}
+                className="h-10 flex-1 rounded-sm border border-hairline bg-surface px-3 text-sm text-ink outline-none placeholder:text-faint focus:border-focus disabled:opacity-40"
               />
               <button
                 type="button"
                 onClick={addCustomVibe}
-                className="h-10 rounded-sm border border-border-strong bg-surface px-4 text-sm font-medium text-ink"
+                disabled={values.length >= MAX_VIBES}
+                className="h-10 rounded-sm border border-border-strong bg-surface px-4 text-sm font-medium text-ink disabled:opacity-40"
               >
                 추가
               </button>
