@@ -57,9 +57,11 @@ export function EnrichWizard({
   const [fAddress, setFAddress] = useState("");
   const [fInstagram, setFInstagram] = useState("");
   const [fHomepage, setFHomepage] = useState("");
-  // 5지선다 선택값(직접 수정 가능)
-  const [pickOne, setPickOne] = useState("");
-  const [pickDesc, setPickDesc] = useState("");
+  // 5지선다: 편집 가능한 후보 리스트 + 선택 인덱스(스텝 오가도 유지)
+  const [oneLinerList, setOneLinerList] = useState<string[]>([]);
+  const [oneLinerSel, setOneLinerSel] = useState(0);
+  const [descList, setDescList] = useState<string[]>([]);
+  const [descSel, setDescSel] = useState(0);
 
   // 백그라운드 크롤: 열리자마자 브랜드명으로 조사 시작(사용자가 키워드 고르는 동안 진행 → 체감 속도↑)
   const researchRef = useRef<Promise<string> | null>(null);
@@ -111,8 +113,10 @@ export function EnrichWizard({
       setFAddress(o.identity.address || "");
       setFInstagram(o.identity.instagram || "");
       setFHomepage(o.identity.homepage || "");
-      setPickOne(o.oneLiners[0] ?? "");
-      setPickDesc(o.descriptions[0] ?? "");
+      setOneLinerList(o.oneLiners);
+      setOneLinerSel(0);
+      setDescList(o.descriptions);
+      setDescSel(0);
       setKind("fields");
     } catch {
       setErrMsg("불러오기에 실패했어요. 잠시 후 다시 시도해 주세요.");
@@ -127,8 +131,8 @@ export function EnrichWizard({
   const apply = () => {
     onApply({
       name: fName.trim() || query || undefined,
-      oneLiner: pickOne.trim() || undefined,
-      description: pickDesc.trim() || undefined,
+      oneLiner: oneLinerList[oneLinerSel]?.trim() || undefined,
+      description: descList[descSel]?.trim() || undefined,
       address: fAddress.trim() || undefined,
       instagram: fInstagram.trim() || undefined,
       homepage: fHomepage.trim() || undefined,
@@ -316,9 +320,14 @@ export function EnrichWizard({
         {kind === "oneLiner" && options && (
           <div>
             <p className="pr-8 text-lg font-bold text-ink">한 줄 소개를 골라주세요</p>
-            <p className="mt-1.5 text-[15px] leading-relaxed text-mute">고른 뒤 아래에서 직접 다듬어도 돼요.</p>
+            <p className="mt-1.5 text-[15px] leading-relaxed text-mute">‘수정’으로 다듬으며 비교하고, 마음에 드는 하나를 골라주세요.</p>
             <div className="mt-4 max-h-[42vh] overflow-y-auto pr-0.5">
-              <OptionPicker items={options.oneLiners} value={pickOne} onChange={setPickOne} />
+              <OptionPicker
+                list={oneLinerList}
+                sel={oneLinerSel}
+                onSelect={setOneLinerSel}
+                onEdit={(i, v) => setOneLinerList((p) => p.map((x, j) => (j === i ? v : x)))}
+              />
             </div>
             <button
               onClick={goNext}
@@ -333,9 +342,15 @@ export function EnrichWizard({
         {kind === "desc" && options && (
           <div>
             <p className="pr-8 text-lg font-bold text-ink">브랜드 소개를 골라주세요</p>
-            <p className="mt-1.5 text-[15px] leading-relaxed text-mute">고른 뒤 아래에서 직접 다듬어도 돼요.</p>
+            <p className="mt-1.5 text-[15px] leading-relaxed text-mute">‘수정’으로 다듬으며 비교하고, 마음에 드는 하나를 골라주세요.</p>
             <div className="mt-4 max-h-[42vh] overflow-y-auto pr-0.5">
-              <OptionPicker items={options.descriptions} value={pickDesc} onChange={setPickDesc} multiline />
+              <OptionPicker
+                list={descList}
+                sel={descSel}
+                onSelect={setDescSel}
+                onEdit={(i, v) => setDescList((p) => p.map((x, j) => (j === i ? v : x)))}
+                multiline
+              />
             </div>
             <button
               onClick={apply}
@@ -398,66 +413,92 @@ function FieldEdit({
   );
 }
 
-// 5지선다 + 선택값 직접 수정(AI 초안 → 사장 보강)
+// 5지선다 — 각 보기를 그 자리에서 수정 가능(controlled). 보기로 둔 채 다듬으며 비교→선택.
 function OptionPicker({
-  items,
-  value,
-  onChange,
+  list,
+  sel,
+  onSelect,
+  onEdit,
   multiline,
 }: {
-  items: string[];
-  value: string;
-  onChange: (v: string) => void;
+  list: string[];
+  sel: number;
+  onSelect: (i: number) => void;
+  onEdit: (i: number, v: string) => void;
   multiline?: boolean;
 }) {
-  const custom = value.trim().length > 0 && !items.includes(value);
+  const [editing, setEditing] = useState<number | null>(null);
+  const setSel = onSelect;
+  const editItem = onEdit;
+
   return (
-    <div>
-      <div className="space-y-2">
-        {items.map((it, i) => {
-          const on = value === it;
-          return (
-            <button
-              key={i}
-              type="button"
-              onClick={() => onChange(it)}
-              className={`flex w-full items-start gap-2.5 rounded-md border px-3 py-3 text-left text-[15px] transition-colors ${
-                on
-                  ? "border-primary bg-primary-pale text-ink"
-                  : "border-hairline bg-surface text-body hover:bg-surface-soft"
-              }`}
-            >
-              <span
+    <div className="space-y-2">
+      {list.map((it, i) => {
+        const on = sel === i;
+        const isEditing = editing === i;
+        return (
+          <div
+            key={i}
+            className={`rounded-md border transition-colors ${
+              on ? "border-primary bg-primary-pale" : "border-hairline bg-surface"
+            }`}
+          >
+            <div className="flex items-start gap-2.5 px-3 py-3">
+              <button
+                type="button"
+                onClick={() => setSel(i)}
+                aria-label="이 소개 선택"
                 className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-pill border text-[10px] font-bold ${
                   on ? "border-primary bg-primary text-primary-on" : "border-border-strong text-transparent"
                 }`}
               >
                 ✓
-              </span>
-              <span className={multiline ? "leading-relaxed" : "line-clamp-1"}>{it}</span>
-            </button>
-          );
-        })}
-      </div>
-      <div className="mt-3">
-        <p className="mb-1.5 text-[13px] font-medium text-mute">
-          고른 내용 · 직접 다듬어도 돼요{custom ? " (수정됨)" : ""}
-        </p>
-        {multiline ? (
-          <textarea
-            value={value}
-            onChange={(e) => onChange(e.target.value)}
-            rows={4}
-            className="w-full rounded-sm border border-hairline bg-surface px-3 py-2.5 text-[15px] leading-relaxed text-ink outline-none focus:border-focus"
-          />
-        ) : (
-          <input
-            value={value}
-            onChange={(e) => onChange(e.target.value)}
-            className="h-11 w-full rounded-sm border border-hairline bg-surface px-3 text-[15px] text-ink outline-none focus:border-focus"
-          />
-        )}
-      </div>
+              </button>
+              {isEditing ? (
+                multiline ? (
+                  <textarea
+                    value={it}
+                    onChange={(e) => editItem(i, e.target.value)}
+                    autoFocus
+                    rows={4}
+                    className="flex-1 rounded-sm border border-hairline bg-surface px-2.5 py-2 text-[15px] leading-relaxed text-ink outline-none focus:border-focus"
+                  />
+                ) : (
+                  <input
+                    value={it}
+                    onChange={(e) => editItem(i, e.target.value)}
+                    autoFocus
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+                        e.preventDefault();
+                        setEditing(null);
+                      }
+                    }}
+                    className="h-9 flex-1 rounded-sm border border-hairline bg-surface px-2.5 text-[15px] text-ink outline-none focus:border-focus"
+                  />
+                )
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setSel(i)}
+                  className={`flex-1 text-left text-[15px] ${
+                    on ? "text-ink" : "text-body"
+                  } ${multiline ? "leading-relaxed" : "line-clamp-2"}`}
+                >
+                  {it}
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setEditing(isEditing ? null : i)}
+                className="shrink-0 text-[13px] font-medium text-primary-on underline-offset-2 hover:underline"
+              >
+                {isEditing ? "완료" : "수정"}
+              </button>
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
