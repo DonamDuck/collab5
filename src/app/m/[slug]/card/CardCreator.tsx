@@ -3,15 +3,18 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createCardAction } from "@/lib/actions";
+import { PhotoSlider } from "@/components/PhotoSlider";
 
 export default function CardCreator({
   makerId,
   fromSlug,
   fromName,
+  photos = [],
 }: {
   makerId: string;
   fromSlug: string;
   fromName: string;
+  photos?: string[];
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -43,6 +46,16 @@ export default function CardCreator({
         <span className="font-medium text-ink">{fromName}</span> 이름으로 보내는 제안이에요.
         편하게 적어도 괜찮아요.
       </p>
+
+      {/* 내 브랜드 사진 — 카드에 함께 담겨요 */}
+      {photos.length > 0 && (
+        <div className="mt-6">
+          <p className="mb-2 text-sm font-medium text-mute">카드에 담길 브랜드 사진</p>
+          <div className="max-w-[460px]">
+            <PhotoSlider photos={photos} />
+          </div>
+        </div>
+      )}
 
       <div className="mt-7 space-y-6">
         <Field label="누구에게 보내나요? *">

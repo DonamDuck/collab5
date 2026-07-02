@@ -49,6 +49,7 @@ export interface Maker {
   seeks: CollabType[]; // 희망
   targetAudience: string[];
   collabHistory: CollabHistory[]; // 함께한 콜라보 이력
+  photos: string[]; // 브랜드 사진(카드·프로필 슬라이드용). MVP=리사이즈 data URL
   soul: SoulLayer;
   trust: TrustSignals;
   collabOpen: boolean; // 콜라보 열림/닫힘 토글

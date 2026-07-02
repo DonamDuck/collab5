@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { repo } from "@/lib/repo";
 import { instagramUrl, instagramHandle, normalizeUrl, prettyUrl } from "@/lib/links";
+import { PhotoSlider } from "@/components/PhotoSlider";
 
 // 공개 업체 상세페이지 — 누구나 열람(MVP 검색 결과의 도착지). 검증 가능한 신뢰 시그널 노출.
 export default async function MakerPage({
@@ -27,6 +28,13 @@ export default async function MakerPage({
       </div>
       {maker.oneLiner && <p className="mt-2 text-[17px] leading-relaxed text-body">{maker.oneLiner}</p>}
       {maker.region && <p className="mt-1 text-[15px] text-mute">📍 {maker.region}</p>}
+
+      {/* 브랜드 사진 — 스와이프 슬라이드 */}
+      {maker.photos.length > 0 && (
+        <div className="mt-6 max-w-[460px]">
+          <PhotoSlider photos={maker.photos} />
+        </div>
+      )}
 
       {/* 결 — AI 보조층(파스텔, 검증처럼 강조하지 않음) */}
       {maker.soul.values.length > 0 && (

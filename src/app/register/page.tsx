@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { createMakerAction } from "@/lib/actions";
 import type { CollabHistory, CollabType } from "@/lib/types";
 import { deriveRegion } from "@/lib/region";
+import { fileToResizedDataUrl } from "@/lib/image";
 import type { EnrichField } from "@/lib/enrich";
 import { EnrichWizard, type WizardFill } from "./EnrichWizard";
 import {
@@ -77,7 +78,7 @@ export default function RegisterPage() {
   const [homepage, setHomepage] = useState("");
   const [description, setDescription] = useState("");
   const [address, setAddress] = useState("");
-  const [photos, setPhotos] = useState<{ name: string; url: string }[]>([]);
+  const [photos, setPhotos] = useState<{ name: string; url: string; file: File }[]>([]);
   const region = deriveRegion(address); // 주소에서 자동 추출 (별도 입력 없음)
 
   // ── enrich(딸깍 자동완성) 상태 ──
@@ -152,7 +153,7 @@ export default function RegisterPage() {
     if (!files) return;
     const next = Array.from(files)
       .filter((f) => f.type.startsWith("image/"))
-      .map((f) => ({ name: f.name, url: URL.createObjectURL(f) }));
+      .map((f) => ({ name: f.name, url: URL.createObjectURL(f), file: f }));
     setPhotos((p) => [...p, ...next].slice(0, 4));
   };
 
@@ -288,6 +289,13 @@ export default function RegisterPage() {
 
   const submit = () => {
     startTransition(async () => {
+      // 사진은 리사이즈·압축해 data URL로 저장(카드·프로필 슬라이드용)
+      let photoUrls: string[] = [];
+      try {
+        photoUrls = await Promise.all(photos.map((p) => fileToResizedDataUrl(p.file)));
+      } catch {
+        photoUrls = [];
+      }
       const { slug } = await createMakerAction({
         name,
         oneLiner,
@@ -296,6 +304,7 @@ export default function RegisterPage() {
         values,
         targetAudience,
         collabHistory,
+        photos: photoUrls,
         collabOpen,
         instagram,
         homepage,

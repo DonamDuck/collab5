@@ -89,3 +89,7 @@ body {
   outline: 2px solid var(--focus);
   outline-offset: 2px;
 }
+
+/* 스와이프 슬라이드용 — 스크롤바 숨김(넘김 제스처만) */
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }

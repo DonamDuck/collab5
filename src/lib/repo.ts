@@ -44,6 +44,11 @@ const seedMakers: Maker[] = [
       { partner: "오월의숲", types: ["팝업", "워크숍"], year: "2025" },
       { partner: "스톤브루", types: ["제품컬래버"] },
     ],
+    photos: [
+      "https://picsum.photos/seed/canvasgarden1/900/700",
+      "https://picsum.photos/seed/canvasgarden2/900/700",
+      "https://picsum.photos/seed/canvasgarden3/900/700",
+    ],
     soul: {
       values: ["친환경", "손맛", "느린 호흡"],
       tone: "단단하지만 다정한, 정성스러운",
@@ -69,6 +74,7 @@ const seedMakers: Maker[] = [
     seeks: ["워크숍", "제품컬래버"],
     targetAudience: ["빈티지 애호가", "동네 단골", "감성 공간 탐방러"],
     collabHistory: [],
+    photos: [],
     soul: {
       values: ["빈티지", "큐레이션", "계절감"],
       tone: "조용하고 단정한, 취향이 또렷한",
@@ -93,6 +99,7 @@ const seedMakers: Maker[] = [
     seeks: ["제품컬래버", "팝업"],
     targetAudience: ["커피 애호가", "로컬 워커", "여행자"],
     collabHistory: [],
+    photos: [],
     soul: {
       values: ["로컬", "정성", "느긋함"],
       tone: "투박하지만 따뜻한",
@@ -117,6 +124,7 @@ const seedMakers: Maker[] = [
     seeks: ["콘텐츠", "굿즈"],
     targetAudience: ["그림책 애호가", "아이와 부모", "여행자"],
     collabHistory: [],
+    photos: [],
     soul: {
       values: ["다정함", "느린 호흡", "손글씨"],
       tone: "포근하고 말랑한",
@@ -210,6 +218,7 @@ interface MakerRow {
   region: string | null; size: string | null;
   offers: string[]; seeks: string[]; target_audience: string[];
   collab_history: Maker["collabHistory"];
+  photos: string[] | null;
   soul: Maker["soul"]; trust: Maker["trust"];
   collab_open: boolean; created_at: string;
 }
@@ -230,6 +239,7 @@ function rowToMaker(r: MakerRow): Maker {
     offers: r.offers as CollabType[], seeks: r.seeks as CollabType[],
     targetAudience: r.target_audience,
     collabHistory: r.collab_history ?? [],
+    photos: r.photos ?? [],
     soul: r.soul, trust: r.trust,
     collabOpen: r.collab_open, createdAt: r.created_at,
   };
@@ -249,6 +259,7 @@ class SupabaseRepo implements Repo {
       region: input.region ?? null, size: input.size ?? null,
       offers: input.offers, seeks: input.seeks, target_audience: input.targetAudience,
       collab_history: input.collabHistory,
+      photos: input.photos,
       soul: input.soul, trust: input.trust, collab_open: input.collabOpen, created_at: now(),
     };
     const { data, error } = await this.db.from("makers").insert(row).select().single();

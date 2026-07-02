@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { repo } from "@/lib/repo";
 import { instagramUrl, instagramHandle, normalizeUrl, prettyUrl } from "@/lib/links";
+import { PhotoSlider } from "@/components/PhotoSlider";
 import { RsvpBar, ShareBar, ViewTracker } from "./card-client";
 
 // ★ 청첩장형 콜라보 카드 — design.md §9.1 v1. 무계정 열람. North Star = 카드 view.
@@ -51,23 +52,29 @@ export default async function CardPage({
           </span>
         </div>
 
-        {/* 2. 커버(무대) — 없으면 브랜드 틴트 + 이니셜 */}
-        <div className="mt-5 h-[108px] overflow-hidden rounded-md">
-          {maker.coverImageUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={maker.coverImageUrl}
-              alt={maker.name}
-              className="h-full w-full object-cover"
-            />
-          ) : (
-            <div className="flex h-full w-full items-center justify-center bg-primary-pale">
-              <span className="text-[40px] font-bold leading-none text-primary-on">
-                {initial}
-              </span>
-            </div>
-          )}
-        </div>
+        {/* 2. 커버(무대) — 사진 있으면 스와이프 슬라이드, 없으면 커버/이니셜 폴백 */}
+        {maker.photos.length > 0 ? (
+          <div className="mt-5">
+            <PhotoSlider photos={maker.photos} rounded="rounded-md" />
+          </div>
+        ) : (
+          <div className="mt-5 h-[108px] overflow-hidden rounded-md">
+            {maker.coverImageUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={maker.coverImageUrl}
+                alt={maker.name}
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center bg-primary-pale">
+                <span className="text-[40px] font-bold leading-none text-primary-on">
+                  {initial}
+                </span>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* 3. 상호명 + 결 한줄 (같은 그룹, 4px) */}
         <h1 className="mt-5 text-[23px] font-bold leading-tight tracking-[-0.03em] text-ink line-clamp-2">

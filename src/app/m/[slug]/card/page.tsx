@@ -12,6 +12,11 @@ export default async function CardCreatePage({
   if (!maker) notFound();
 
   return (
-    <CardCreator makerId={maker.id} fromSlug={maker.slug} fromName={maker.name} />
+    <CardCreator
+      makerId={maker.id}
+      fromSlug={maker.slug}
+      fromName={maker.name}
+      photos={maker.photos}
+    />
   );
 }
