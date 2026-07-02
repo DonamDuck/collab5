@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { repo } from "@/lib/repo";
+import { instagramUrl, instagramHandle, normalizeUrl, prettyUrl } from "@/lib/links";
 import { RsvpBar, ShareBar, ViewTracker } from "./card-client";
 
 // ★ 청첩장형 콜라보 카드 — design.md §9.1 v1. 무계정 열람. North Star = 카드 view.
@@ -20,10 +21,18 @@ export default async function CardPage({
   const p = card.proposal;
   const initial = maker.name.trim().charAt(0) || "C";
   const trust = [
-    maker.trust.instagram && { icon: "📷", label: maker.trust.instagram },
-    maker.trust.homepage && { icon: "🔗", label: "홈페이지" },
+    maker.trust.instagram && {
+      icon: "📷",
+      label: instagramHandle(maker.trust.instagram),
+      href: instagramUrl(maker.trust.instagram),
+    },
+    maker.trust.homepage && {
+      icon: "🔗",
+      label: prettyUrl(maker.trust.homepage),
+      href: normalizeUrl(maker.trust.homepage),
+    },
     maker.trust.address && { icon: "📍", label: maker.trust.address },
-  ].filter(Boolean) as { icon: string; label: string }[];
+  ].filter(Boolean) as { icon: string; label: string; href?: string }[];
 
   // 제안 본문: 키워드 1개만 키위 하이라이트
   const keywords = [...maker.offers, ...maker.seeks, ...maker.soul.values];
@@ -37,7 +46,7 @@ export default async function CardPage({
         {/* 1. 상단 라벨 — collab5 존재감은 여기까지 (상태배지 없음) */}
         <div className="flex items-center gap-1.5">
           <span className="inline-block h-2 w-2 rounded-pill bg-primary" />
-          <span className="text-[11px] font-medium tracking-wide text-mute">
+          <span className="text-[12px] font-medium tracking-wide text-mute">
             콜라보 제안
           </span>
         </div>
@@ -65,28 +74,40 @@ export default async function CardPage({
           {maker.name}
         </h1>
         {maker.oneLiner && (
-          <p className="mt-1 text-[13px] text-body line-clamp-1">{maker.oneLiner}</p>
+          <p className="mt-1.5 text-[15px] leading-relaxed text-body line-clamp-2">{maker.oneLiner}</p>
         )}
 
-        {/* 4. 신뢰 시그널 — 검증된 것만, 0개면 숨김 */}
+        {/* 4. 신뢰 시그널 — 검증된 것만, 0개면 숨김. 인스타·홈피는 클릭 시 새 탭 */}
         {trust.length > 0 && (
           <div className="mt-5 flex flex-wrap gap-1.5">
-            {trust.map((t) => (
-              <span
-                key={t.label}
-                className="inline-flex h-6 items-center gap-1 rounded-sm bg-surface-soft px-2 text-[11px] font-medium text-mute"
-              >
-                {t.icon} {t.label}
-              </span>
-            ))}
+            {trust.map((t) =>
+              t.href ? (
+                <a
+                  key={t.label}
+                  href={t.href}
+                  target="_blank"
+                  rel="noopener noreferrer nofollow"
+                  className="inline-flex h-8 max-w-full items-center gap-1 truncate rounded-sm bg-surface-soft px-2.5 text-[13px] font-medium text-body transition-colors hover:bg-primary-pale hover:text-primary-on"
+                >
+                  {t.icon} {t.label}
+                </a>
+              ) : (
+                <span
+                  key={t.label}
+                  className="inline-flex h-8 items-center gap-1 rounded-sm bg-surface-soft px-2.5 text-[13px] font-medium text-mute"
+                >
+                  {t.icon} {t.label}
+                </span>
+              )
+            )}
           </div>
         )}
 
         {/* 브랜드 소개 — 등록 때 작성한 소개(정리되어 카드에 노출) */}
         {maker.trust.description && (
           <div className="mt-5">
-            <p className="text-[11px] font-medium tracking-wide text-faint">소개</p>
-            <p className="mt-2 whitespace-pre-line text-[13.5px] leading-relaxed text-body">
+            <p className="text-[12px] font-medium tracking-wide text-faint">소개</p>
+            <p className="mt-2 whitespace-pre-line text-[15px] leading-relaxed text-body">
               {maker.trust.description}
             </p>
           </div>
@@ -95,10 +116,10 @@ export default async function CardPage({
         {/* 함께한 콜라보 — 수신자 신뢰의 결정타 */}
         {maker.collabHistory.length > 0 ? (
           <div className="mt-5">
-            <p className="text-[11px] font-medium tracking-wide text-faint">함께한 콜라보</p>
+            <p className="text-[12px] font-medium tracking-wide text-faint">함께한 콜라보</p>
             <div className="mt-2 space-y-1">
               {maker.collabHistory.map((h, i) => (
-                <p key={i} className="text-[13px] text-body">
+                <p key={i} className="text-[14px] text-body">
                   <span className="font-medium text-ink">{h.partner}</span>
                   {h.types.length > 0 && (
                     <span className="text-mute"> · {h.types.join("·")}</span>
@@ -109,20 +130,20 @@ export default async function CardPage({
             </div>
           </div>
         ) : (
-          <p className="mt-5 text-[12px] text-faint">아직 콜라보 경험이 없어요</p>
+          <p className="mt-5 text-[13px] text-faint">아직 콜라보 경험이 없어요</p>
         )}
 
         {/* 이런 분들과 만나요 — 수신자가 "내 손님과 결이 맞나" 가늠 */}
         {maker.targetAudience.length > 0 && (
           <div className="mt-4">
-            <p className="text-[11px] font-medium tracking-wide text-faint">
+            <p className="text-[12px] font-medium tracking-wide text-faint">
               이런 분들과 만나요
             </p>
             <div className="mt-2 flex flex-wrap gap-1.5">
               {maker.targetAudience.map((a) => (
                 <span
                   key={a}
-                  className="inline-flex h-6 items-center rounded-pill bg-surface-soft px-2.5 text-[11px] font-medium text-mute"
+                  className="inline-flex h-7 items-center rounded-pill bg-surface-soft px-2.5 text-[12px] font-medium text-mute"
                 >
                   {a}
                 </span>
@@ -136,19 +157,19 @@ export default async function CardPage({
 
         {/* 6. 제안 — 라벨 + 본문(키워드 1개 하이라이트) + 칩 */}
         <div>
-          <p className="text-[11px] font-medium tracking-wide text-faint">
+          <p className="text-[12px] font-medium tracking-wide text-faint">
             {p.toName ? `${p.toName}님께 드리는 제안` : "제안"}
           </p>
           {p.why && (
-            <p className="mt-2 text-[14px] leading-relaxed text-ink">
+            <p className="mt-2 text-[15px] leading-relaxed text-ink">
               {highlight(p.why, keywords)}
             </p>
           )}
           {p.picture && (
-            <p className="mt-2 text-[14px] leading-relaxed text-body">{p.picture}</p>
+            <p className="mt-2 text-[15px] leading-relaxed text-body">{p.picture}</p>
           )}
           {p.expectedEffect && (
-            <p className="mt-2 text-[13px] leading-relaxed text-mute">
+            <p className="mt-2 text-[14px] leading-relaxed text-mute">
               {p.expectedEffect}
             </p>
           )}
@@ -159,7 +180,7 @@ export default async function CardPage({
               {maker.offers.map((o) => (
                 <span
                   key={`o-${o}`}
-                  className="inline-flex h-6 items-center rounded-pill bg-primary-tint px-2.5 text-[11px] font-medium text-primary-on"
+                  className="inline-flex h-7 items-center rounded-pill bg-primary-tint px-2.5 text-[12px] font-medium text-primary-on"
                 >
                   {o}
                 </span>
@@ -167,7 +188,7 @@ export default async function CardPage({
               {maker.soul.values.map((v) => (
                 <span
                   key={`v-${v}`}
-                  className="inline-flex h-6 items-center rounded-pill bg-mint-pale px-2.5 text-[11px] font-medium text-mint-on"
+                  className="inline-flex h-7 items-center rounded-pill bg-mint-pale px-2.5 text-[12px] font-medium text-mint-on"
                 >
                   {v}
                 </span>
@@ -178,11 +199,11 @@ export default async function CardPage({
           {/* 찾는 콜라보 — 제안 접점 (수신자가 "내가 줄 수 있는 게 있나") */}
           {maker.seeks.length > 0 && (
             <div className="mt-2 flex flex-wrap items-center gap-1.5">
-              <span className="text-[11px] text-faint">찾는 콜라보</span>
+              <span className="text-[12px] text-faint">찾는 콜라보</span>
               {maker.seeks.map((s) => (
                 <span
                   key={`s-${s}`}
-                  className="inline-flex h-6 items-center rounded-pill border border-hairline bg-surface px-2.5 text-[11px] font-medium text-mute"
+                  className="inline-flex h-7 items-center rounded-pill border border-hairline bg-surface px-2.5 text-[12px] font-medium text-mute"
                 >
                   {s}
                 </span>
@@ -208,7 +229,7 @@ export default async function CardPage({
             <circle cx="45.32" cy="18" r="2.8" fill="currentColor" />
             <circle cx="28" cy="28" r="7" fill="currentColor" />
           </svg>
-          <span className="text-[11px]">collab5로 만든 카드 · 답장은 편하실 때</span>
+          <span className="text-[12px]">collab5로 만든 카드 · 답장은 편하실 때</span>
         </div>
       </article>
     </main>

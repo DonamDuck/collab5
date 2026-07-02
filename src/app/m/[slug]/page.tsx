@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { repo } from "@/lib/repo";
+import { instagramUrl, instagramHandle, normalizeUrl, prettyUrl } from "@/lib/links";
 
 // 공개 업체 상세페이지 — 누구나 열람(MVP 검색 결과의 도착지). 검증 가능한 신뢰 시그널 노출.
 export default async function MakerPage({
@@ -35,7 +36,7 @@ export default async function MakerPage({
             {maker.soul.values.map((v) => (
               <span
                 key={v}
-                className="rounded-sm bg-mint-pale px-2 py-0.5 text-xs font-medium text-mint-on"
+                className="inline-flex h-8 items-center rounded-sm bg-mint-pale px-2.5 text-[13px] font-medium text-mint-on"
               >
                 {v}
               </span>
@@ -54,7 +55,7 @@ export default async function MakerPage({
                 {maker.offers.map((o) => (
                   <span
                     key={o}
-                    className="inline-flex h-7 items-center rounded-pill border border-hairline bg-surface px-2.5 text-xs text-body"
+                    className="inline-flex h-8 items-center rounded-pill border border-hairline bg-surface px-3 text-[13px] text-body"
                   >
                     {o}
                   </span>
@@ -69,7 +70,7 @@ export default async function MakerPage({
                 {maker.seeks.map((s) => (
                   <span
                     key={s}
-                    className="inline-flex h-7 items-center rounded-pill border border-hairline bg-surface px-2.5 text-xs text-body"
+                    className="inline-flex h-8 items-center rounded-pill border border-hairline bg-surface px-3 text-[13px] text-body"
                   >
                     {s}
                   </span>
@@ -85,9 +86,15 @@ export default async function MakerPage({
         <h2 className="mb-2 text-sm font-medium text-faint">더 알아보기</h2>
         <div className="flex flex-wrap gap-2">
           {maker.trust.instagram && (
-            <TrustTag>📷 {maker.trust.instagram}</TrustTag>
+            <TrustLink href={instagramUrl(maker.trust.instagram)}>
+              📷 {instagramHandle(maker.trust.instagram)}
+            </TrustLink>
           )}
-          {maker.trust.homepage && <TrustTag>🔗 홈페이지</TrustTag>}
+          {maker.trust.homepage && (
+            <TrustLink href={normalizeUrl(maker.trust.homepage)}>
+              🔗 {prettyUrl(maker.trust.homepage)}
+            </TrustLink>
+          )}
           {maker.trust.address && <TrustTag>📍 {maker.trust.address}</TrustTag>}
         </div>
         {maker.trust.description && (
@@ -112,8 +119,22 @@ export default async function MakerPage({
 
 function TrustTag({ children }: { children: React.ReactNode }) {
   return (
-    <span className="inline-flex h-7 items-center gap-1 rounded-sm bg-surface-soft px-2.5 text-xs font-medium text-mute">
+    <span className="inline-flex h-8 items-center gap-1 rounded-sm bg-surface-soft px-3 text-[13px] font-medium text-mute">
       {children}
     </span>
+  );
+}
+
+// 클릭하면 새 탭으로 링크 열림(인스타·홈피)
+function TrustLink({ href, children }: { href: string; children: React.ReactNode }) {
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer nofollow"
+      className="inline-flex h-8 items-center gap-1 rounded-sm bg-surface-soft px-3 text-[13px] font-medium text-body transition-colors hover:bg-primary-pale hover:text-primary-on"
+    >
+      {children}
+    </a>
   );
 }
