@@ -73,10 +73,11 @@ export interface EnrichOptions {
     name: string;
     region?: string;
     address?: string;
-    instagram?: string;
+    instagram?: string; // 확실히 확인된 것만(홈페이지 링크 등)
     homepage?: string;
     hint?: string;
   };
+  instagramCandidates: string[]; // 불확실할 때 사장이 고를 인스타 후보(추정 포함)
   oneLiners: string[];
   descriptions: string[];
   values: string[];
@@ -253,8 +254,10 @@ export class MockSearchProvider implements SearchProvider {
     await new Promise((r) => setTimeout(r, 500));
     const name = input.name.trim() || "우리 브랜드";
     const kw = input.focusKeywords?.length ? ` (${input.focusKeywords.join("·")} 강조)` : "";
+    const slug = name.replace(/\s+/g, "").toLowerCase();
     return {
       identity: { name, region: "서울 성수", address: "서울 성동구 성수동", hint: "mock" },
+      instagramCandidates: [`@${slug}`, `@${slug}_official`],
       oneLiners: [
         `정성으로 짓는 우리만의 이야기${kw}`,
         `일상에 스며드는 손맛의 브랜드`,
@@ -318,6 +321,9 @@ const OptionsResultSchema = z.object({
     homepage: z.string().optional(),
     hint: z.string().optional(),
   }),
+  instagramCandidates: z
+    .array(z.string())
+    .describe("인스타 핸들 후보 0~4개(@형식) — 확정 안 됐을 때 사장이 고를 추정치"),
   oneLiners: z.array(z.string()).describe("한 줄 소개 후보 5개 — 서로 다른 앵글"),
   descriptions: z.array(z.string()).describe("브랜드 소개 후보 5개 — 서로 다른 앵글, 각 3~5문장 해요체"),
   values: z.array(z.string()).describe("브랜드 결 단어 2~4개"),
@@ -338,6 +344,12 @@ const GEMINI_OPTIONS_SCHEMA = {
       },
       required: ["name"],
     },
+    instagramCandidates: {
+      type: Type.ARRAY,
+      items: { type: Type.STRING },
+      description:
+        "인스타 핸들 후보 0~4개(@형식). identity.instagram이 확정 안 됐을 때 사장이 고를 수 있게, 도메인·브랜드명 기반 그럴듯한 추정 핸들을 제시. 확정값은 여기 중복하지 말 것.",
+    },
     oneLiners: {
       type: Type.ARRAY,
       items: { type: Type.STRING },
@@ -350,7 +362,7 @@ const GEMINI_OPTIONS_SCHEMA = {
     },
     values: { type: Type.ARRAY, items: { type: Type.STRING }, description: "브랜드 결 단어 2~4개" },
   },
-  required: ["identity", "oneLiners", "descriptions", "values"],
+  required: ["identity", "instagramCandidates", "oneLiners", "descriptions", "values"],
 };
 
 const OPTIONS_SYSTEM = `너는 콜라보 플랫폼 collab5의 브랜드 소개 카피라이터야. 웹 조사 메모를 바탕으로 브랜드가 고를 수 있는 '한 줄 소개'와 '브랜드 소개'를 각각 5개씩 서로 다른 앵글로 만든다.
@@ -361,7 +373,8 @@ ${BRAND_VOICE}
 - oneLiners 5개: 한 줄(15~30자), 서로 확실히 다른 관점(무엇을 만드는지 / 가치 / 고객 경험 / 분위기 / 시작 스토리).
 - descriptions 5개: 각 3~5문장, 서로 다른 앵글. 모두 해요체. '~합니다/~습니다' 금지.
 - ⭐가중 키워드가 주어지면 그 방향을 최우선으로 반영해 모든 후보를 그 결에 맞춘다.
-- 조사 메모 안의 사실만 쓴다. 창작·과장 금지. identity(주소·인스타·홈피 등)는 확인된 것만, 없으면 빈 문자열.`;
+- 조사 메모 안의 사실만 쓴다. 창작·과장 금지. identity(주소·홈피 등)는 확인된 것만, 없으면 빈 문자열.
+- 인스타: 실제 확인된 핸들만 identity.instagram에 넣는다(추측 금지). 확정 못 하면 identity.instagram은 빈 문자열로 두고, 대신 instagramCandidates에 도메인·브랜드명 기반 그럴듯한 추정 핸들 2~4개를 제시한다(사장이 직접 고를 후보용). 예: 도메인이 canvasgarden.shop이면 @canvasgarden, @canvasgarden_official, @canvasgarden.shop 등.`;
 
 class ClaudeSearchProvider implements SearchProvider {
   private _client: Anthropic | null = null;
@@ -753,6 +766,17 @@ class NaverGeminiProvider implements SearchProvider {
         homepage: id.homepage || undefined,
         hint: id.hint || undefined,
       },
+      instagramCandidates: Array.from(
+        new Set(
+          (o.instagramCandidates ?? [])
+            .filter((s): s is string => typeof s === "string" && !!s.trim())
+            .map((s) => {
+              const h = s.trim().replace(/^@?/, "@");
+              return h;
+            })
+            .filter((h) => h !== id.instagram) // 확정값과 중복 제거
+        )
+      ).slice(0, 4),
       oneLiners: (o.oneLiners ?? []).filter(Boolean).slice(0, 5),
       descriptions: (o.descriptions ?? []).filter(Boolean).slice(0, 5),
       values: (o.values ?? []).filter(Boolean).slice(0, 4),
@@ -788,7 +812,8 @@ class NaverGeminiProvider implements SearchProvider {
       ? `⭐가중 키워드(중요하게 반영): ${input.focusKeywords.join(", ")}\n\n`
       : "";
     const prompt = `브랜드명: "${input.name}"\n\n${note}${kw}[조사 자료 — 네이버 검색 + 제미나이 웹 조사]\n${input.research}\n\n위 정보로 한 줄 소개 5개, 브랜드 소개 5개(각 3~5문장, 모두 해요체), 브랜드 결 단어 2~4개, identity(지역·주소·인스타·홈피)를 뽑아줘.
-⭐identity.homepage는 조사 자료에 URL이 있으면 채워줘. identity.instagram은 ⚠️'홈페이지 직접 확인' 항목에서 실제 확인된 핸들이 있을 때만 채워 — 그 외에는 브랜드명·도메인으로 추측하지 말고 빈 문자열로 둬. 조사 자료에 섞인 무관한 다른 브랜드/사람의 인스타 계정도 절대 넣지 마. 인스타는 "확인 안 됨"이면 반드시 빈 문자열(틀린 핸들 넣는 게 빈칸보다 나빠).
+⭐identity.homepage는 조사 자료에 URL이 있으면 채워줘. identity.instagram은 ⚠️'홈페이지 직접 확인' 항목에서 실제 확인된 핸들이 있을 때만 채워 — 그 외에는 추측하지 말고 빈 문자열로 둬(무관한 계정도 금지).
+⭐단 instagram이 확정 안 됐으면 instagramCandidates에 도메인·브랜드명 기반 그럴듯한 추정 핸들 2~4개를 넣어줘(사장이 직접 고를 후보). 예: 도메인이 canvasgarden.shop이면 @canvasgarden, @canvasgarden_official, @canvasgarden.shop 등.
 나머지는 사실만 쓰고, 확인 안 된 필드는 빈 문자열. 모든 문장은 '해요체'로 끝내('~합니다/~습니다' 금지).`;
     return this.generateOptions(prompt, 0.9);
   }

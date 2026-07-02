@@ -293,7 +293,14 @@ export function EnrichWizard({
             <div className="mt-4 space-y-3">
               <FieldEdit label="상호" value={fName} onChange={setFName} placeholder="예: 캔버스가든" />
               <FieldEdit label="주소" value={fAddress} onChange={setFAddress} placeholder="예: 서울 성동구 성수동" />
-              <FieldEdit label="인스타그램" value={fInstagram} onChange={setFInstagram} placeholder="@handle" />
+              <FieldEdit
+                label="인스타그램"
+                value={fInstagram}
+                onChange={setFInstagram}
+                placeholder="@handle"
+                candidates={options?.instagramCandidates}
+                candidateHint="정확한 계정을 못 찾았어요. 아래 후보 중 맞는 걸 고르거나 직접 입력해주세요."
+              />
               <FieldEdit label="홈페이지" value={fHomepage} onChange={setFHomepage} placeholder="https://" />
             </div>
             <button
@@ -343,18 +350,24 @@ export function EnrichWizard({
   );
 }
 
-// 개별 필드 — 라벨 + 수정 가능한 입력
+// 개별 필드 — 라벨 + 수정 가능한 입력 (+ 불확실할 때 후보 칩)
 function FieldEdit({
   label,
   value,
   onChange,
   placeholder,
+  candidates,
+  candidateHint,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
   placeholder?: string;
+  candidates?: string[];
+  candidateHint?: string;
 }) {
+  // 값이 비어있고(=자동으로 확정 못함) 후보가 있으면 골라서 채우게 노출
+  const showCandidates = !value.trim() && !!candidates?.length;
   return (
     <div>
       <label className="mb-1.5 block text-[15px] font-medium text-body">{label}</label>
@@ -364,6 +377,23 @@ function FieldEdit({
         placeholder={placeholder}
         className="h-11 w-full rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
       />
+      {showCandidates && (
+        <div className="mt-2 rounded-md border border-hairline bg-surface-soft p-2.5">
+          {candidateHint && <p className="mb-2 text-[13px] leading-relaxed text-mute">{candidateHint}</p>}
+          <div className="flex flex-wrap gap-1.5">
+            {candidates!.map((c) => (
+              <button
+                key={c}
+                type="button"
+                onClick={() => onChange(c)}
+                className="inline-flex h-8 items-center rounded-pill border border-border-strong bg-surface px-3 text-sm text-ink hover:border-primary hover:bg-primary-pale"
+              >
+                {c}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
