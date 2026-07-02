@@ -523,7 +523,43 @@ class NaverGeminiProvider implements SearchProvider {
       .trim();
   }
 
-  /** 지역+웹문서+블로그를 병렬 검색해 Gemini에 줄 '조사 메모'로 조립 */
+  /** 네이버 결과 링크에서 브랜드 홈페이지(네이버/블로그/SNS 아닌 도메인) 하나 고르기 */
+  private pickHomepage(items: NaverItem[]): string | undefined {
+    for (const it of items) {
+      try {
+        const u = new URL(it.link ?? "");
+        const host = u.hostname.replace(/^www\./, "");
+        if (/(^|\.)(naver|blog|instagram|facebook|youtube|tistory|kakao)\./.test(host)) continue;
+        return u.origin;
+      } catch {
+        /* 잘못된 URL 스킵 */
+      }
+    }
+    return undefined;
+  }
+
+  /** 홈페이지 정적 HTML에서 실제 instagram.com/핸들 링크만 추출(확실한 신호 — 추측 아님) */
+  private async sniffInstagram(homepage: string): Promise<string | undefined> {
+    const SKIP = new Set(["p", "reel", "reels", "explore", "accounts", "about", "developer", "legal", "tv", "stories"]);
+    try {
+      const res = await fetch(homepage, {
+        headers: { "User-Agent": "Mozilla/5.0 (compatible; collab5bot/1.0)" },
+        signal: AbortSignal.timeout(4500),
+      });
+      if (!res.ok) return undefined;
+      const html = await res.text();
+      // instagram.com/handle (이메일·문구가 아닌 실제 링크만)
+      for (const m of html.matchAll(/instagram\.com\/([A-Za-z0-9_.]{2,30})/g)) {
+        const handle = m[1].replace(/\.$/, "");
+        if (!SKIP.has(handle.toLowerCase())) return "@" + handle;
+      }
+      return undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
+  /** 지역+웹문서+블로그 병렬 검색 + 홈페이지 인스타 스니핑 → '조사 메모'로 조립 */
   private async gather(query: string): Promise<string> {
     const [local, web, blog] = await Promise.all([
       this.naver("local", query, 3),
@@ -531,9 +567,22 @@ class NaverGeminiProvider implements SearchProvider {
       this.naver("blog", query, 2),
     ]);
 
+    // 홈페이지 정적 HTML에서 인스타 링크 직접 확인(가장 신뢰할 수 있는 신호)
+    const homepage = this.pickHomepage([...local, ...web]);
+    const sniffedIg = homepage ? await this.sniffInstagram(homepage) : undefined;
+
     const parts: string[] = [];
+    if (sniffedIg || homepage) {
+      parts.push("[홈페이지 직접 확인 — 신뢰도 높음]");
+      if (homepage) parts.push(`· 홈페이지: ${homepage}`);
+      parts.push(
+        sniffedIg
+          ? `· 인스타그램: ${sniffedIg} (홈페이지 링크에서 실제 확인됨 — 이 값을 신뢰해서 채워)`
+          : `· 인스타그램: 홈페이지 정적 HTML에서 링크 확인 안 됨(추측하지 말 것)`
+      );
+    }
     if (local.length) {
-      parts.push("[네이버 지역검색 — 주소·업종·전화]");
+      parts.push("\n[네이버 지역검색 — 주소·업종·전화]");
       for (const it of local) {
         parts.push(
           `· ${this.clean(it.title)} | 업종:${this.clean(it.category)} | 도로명:${this.clean(it.roadAddress)} | 지번:${this.clean(it.address)} | 전화:${this.clean(it.telephone)} | 링크:${it.link ?? ""}`
@@ -602,9 +651,9 @@ class NaverGeminiProvider implements SearchProvider {
   //    ENRICH_GEMINI_SEARCH=0 이면 비활성(네이버 단독). grounding은 유료 쿼터 소모.
   private async geminiSearch(query: string): Promise<string> {
     if (process.env.ENRICH_GEMINI_SEARCH === "0") return "";
-    const prompt = `"${query}" 브랜드/업체를 웹에서 조사해줘. 무엇을 하는 곳인지, 시작·스토리, 특징·강점, 주요 고객, 분위기·평판을 사실 위주로 간결한 메모로 정리해줘.
-⭐특히 공식 **인스타그램 계정(@핸들)**과 **홈페이지 URL**은 반드시 찾아줘 — instagram.com/○○ 링크나 @핸들을 직접 확인해서 정확히 적어줘. 홈페이지 도메인의 브랜드명과 같은 인스타 핸들일 가능성이 높으니 그것도 검색해봐(예: 홈피가 canvasgarden.shop이면 instagram.com/canvasgarden 확인).
-확실하지 않은 건 추측하지 말고 넘어가되, 인스타·홈피는 최대한 찾아줘. 짧은 개조식으로.`;
+    const prompt = `"${query}" 브랜드/업체를 웹에서 조사해줘. 무엇을 하는 곳인지, 시작·스토리, 특징·강점, 주요 고객, 분위기·평판, 홈페이지 URL을 사실 위주로 간결한 메모로 정리해줘.
+⭐인스타그램은 실제 instagram.com/○○ 페이지를 웹에서 확인한 경우에만 @핸들을 적어. 브랜드명이나 도메인으로 추측하지 마 — 도메인이 canvasgarden.shop이라도 instagram.com/canvasgarden이 실제 존재하는지 확인 안 되면 절대 적지 말고 "인스타: 확인 안 됨"이라고 해. 지어낸 핸들은 틀린 정보라 넣으면 안 돼.
+확실하지 않은 건 추측하지 말고 넘어가. 짧은 개조식으로.`;
     // 보조 소스라 실패 시 빠르게 포기(네이버 단독). 429는 쿼터/레이트리밋 → 모델 공유라 재시도 무의미.
     for (const model of NaverGeminiProvider.GEMINI_MODELS) {
       try {
@@ -739,7 +788,7 @@ class NaverGeminiProvider implements SearchProvider {
       ? `⭐가중 키워드(중요하게 반영): ${input.focusKeywords.join(", ")}\n\n`
       : "";
     const prompt = `브랜드명: "${input.name}"\n\n${note}${kw}[조사 자료 — 네이버 검색 + 제미나이 웹 조사]\n${input.research}\n\n위 정보로 한 줄 소개 5개, 브랜드 소개 5개(각 3~5문장, 모두 해요체), 브랜드 결 단어 2~4개, identity(지역·주소·인스타·홈피)를 뽑아줘.
-⭐identity.instagram·identity.homepage는 브랜드에 거의 항상 있는 핵심 정보야. 조사 자료 어디든 이 브랜드('${input.name}')의 instagram.com 링크·@핸들·홈페이지 URL(.shop/.com 등)이 보이면 반드시 identity에 채워줘. 인스타 핸들은 @포함 형식으로. ⚠️단 반드시 이 브랜드의 공식 계정만 — 조사 자료에 섞인 무관한 다른 브랜드/사람의 인스타 계정은 절대 넣지 마. 확신 없거나 근거 없으면 빈 문자열(지어내기 금지).
+⭐identity.homepage는 조사 자료에 URL이 있으면 채워줘. identity.instagram은 ⚠️'홈페이지 직접 확인' 항목에서 실제 확인된 핸들이 있을 때만 채워 — 그 외에는 브랜드명·도메인으로 추측하지 말고 빈 문자열로 둬. 조사 자료에 섞인 무관한 다른 브랜드/사람의 인스타 계정도 절대 넣지 마. 인스타는 "확인 안 됨"이면 반드시 빈 문자열(틀린 핸들 넣는 게 빈칸보다 나빠).
 나머지는 사실만 쓰고, 확인 안 된 필드는 빈 문자열. 모든 문장은 '해요체'로 끝내('~합니다/~습니다' 금지).`;
     return this.generateOptions(prompt, 0.9);
   }
