@@ -458,7 +458,7 @@ export default function RegisterPage() {
         <div className="h-px flex-1 bg-hairline" />
       </div>
 
-      <div className="mt-8 space-y-12">
+      <div className="mt-8 space-y-[51px]">
         {/* 검수 게이트 배너 — AI가 채운 직후 */}
         {reviewMode && (
           <div className="rounded-lg border border-primary bg-surface px-4 py-3 shadow-e1">
@@ -1255,7 +1255,7 @@ export default function RegisterPage() {
 
 function GroupHeader({ n, title, sub }: { n: string; title: string; sub?: string }) {
   return (
-    <div className="flex items-baseline gap-2 border-b border-hairline pb-2">
+    <div className="mb-[-28px] flex items-baseline gap-2 border-b border-hairline pb-2">
       <span className="rounded-pill bg-primary-tint px-2 py-0.5 text-sm font-bold text-primary-on">
         {n}
       </span>
