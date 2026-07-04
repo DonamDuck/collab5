@@ -1303,7 +1303,7 @@ export default function RegisterPage() {
           <div className="w-full max-w-md rounded-lg border border-hairline bg-surface p-6 text-center shadow-e2">
             <p className="text-lg font-bold text-ink">✨ 브랜드 소개서가 완성됐어요!</p>
             <p className="mt-3 text-[15px] leading-relaxed text-body">
-              브랜드 소개서 페이지에서 내용을 확인해보세요
+              브랜드 소개서 페이지에서 내용을 확인해보세요.
             </p>
             <p className="mt-2 text-[15px] leading-relaxed text-body">
               이제, 링크를 복사해 협업을 제안해 볼 수 있어요.
