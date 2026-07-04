@@ -155,7 +155,7 @@ export default function RegisterPage() {
     const next = Array.from(files)
       .filter((f) => f.type.startsWith("image/"))
       .map((f) => ({ name: f.name, url: URL.createObjectURL(f), file: f }));
-    setPhotos((p) => [...p, ...next].slice(0, 4));
+    setPhotos((p) => [...p, ...next].slice(0, 10));
   };
 
   // 규칙 기반 소개 초안 폴백 (AI 실패 시 — 입력값 조합)
@@ -381,9 +381,9 @@ export default function RegisterPage() {
           </div>
         )}
 
-        {/* ── 그룹 A. 정체성 ── */}
-        <GroupHeader n="①" title="브랜드 소개" />
-        <div className="space-y-7">
+        {/* ── ① 브랜드를 소개해주세요 ── */}
+        <GroupHeader n="①" title="브랜드를 소개해주세요." />
+        <div className="space-y-8">
           <Field label="상호 *" hint={hintFor("name")}>
             <input
               value={name}
@@ -407,7 +407,7 @@ export default function RegisterPage() {
               브랜드 사진 (선택)
             </label>
             <p className="mb-2.5 text-[15px] text-mute">
-              콜라보 카드에 담을 사진을 올려주세요.
+              콜라보 카드에 담을 사진을 올려주세요. 최대 10장
             </p>
             <div className="flex flex-wrap gap-2">
               {photos.map((p, i) => (
@@ -427,7 +427,7 @@ export default function RegisterPage() {
                   </button>
                 </div>
               ))}
-              {photos.length < 4 && (
+              {photos.length < 10 && (
                 <label className="flex h-20 w-20 cursor-pointer flex-col items-center justify-center rounded-md border border-dashed border-border-strong bg-surface text-mute">
                   <span className="text-xl leading-none">＋</span>
                   <span className="mt-1 text-[11px]">사진</span>
