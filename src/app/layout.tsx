@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { SiteHeader } from "@/components/SiteHeader";
 
 export const metadata: Metadata = {
   title: "collab5 — 마음 맞는 메이커들의 콜라보 카드",
@@ -20,23 +21,7 @@ export default function RootLayout({
         />
       </head>
       <body className="min-h-full flex flex-col">
-        <header className="sticky top-0 z-10 flex h-14 items-center justify-between border-b border-hairline bg-canvas px-4 sm:px-6">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <a href="/" className="flex items-center">
-            <img src="/logo-lockup.svg" alt="collab5" className="h-7 w-auto" />
-          </a>
-          <nav className="flex items-center gap-1 text-sm">
-            <a href="/search" className="rounded-md px-3 py-1.5 text-mute hover:text-ink">
-              찾기
-            </a>
-            <a
-              href="/register"
-              className="rounded-md border border-border-strong bg-surface px-3 py-1.5 font-medium text-ink"
-            >
-              콜라보 카드 만들기
-            </a>
-          </nav>
-        </header>
+        <SiteHeader />
         <div className="flex-1">{children}</div>
       </body>
     </html>
