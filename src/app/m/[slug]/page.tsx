@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { repo } from "@/lib/repo";
 import { instagramUrl, instagramHandle, normalizeUrl, prettyUrl } from "@/lib/links";
 import { PhotoSlider } from "@/components/PhotoSlider";
+import { CopyLinkButton } from "./CopyLinkButton";
 
 // 공개 업체 상세페이지 — 누구나 열람(MVP 검색 결과의 도착지). 검증 가능한 신뢰 시그널 노출.
 export default async function MakerPage({
@@ -65,7 +66,7 @@ export default async function MakerPage({
 
       {/* ② 우리의 시작 이야기 — story */}
       {maker.story && (
-        <Section title="우리의 시작 이야기">
+        <Section title="우리가 브랜드의 시작">
           <p className="whitespace-pre-line text-[17px] leading-relaxed text-body">
             {maker.story}
           </p>
@@ -189,14 +190,12 @@ export default async function MakerPage({
         </Section>
       )}
 
-      {/* 카드 만들기 */}
+      {/* 링크 복사 — 소개서 공유 */}
       <div className="mt-12">
-        <a
-          href={`/m/${maker.slug}/card`}
-          className="flex h-12 w-full items-center justify-center rounded-md bg-primary text-base font-medium text-primary-on"
-        >
-          이 프로필로 카드 만들기
-        </a>
+        <CopyLinkButton />
+        <p className="mt-2.5 text-center text-[13px] text-faint">
+          링크를 복사해 협업하고 싶은 곳에 보내보세요.
+        </p>
       </div>
     </main>
   );

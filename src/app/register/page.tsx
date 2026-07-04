@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createMakerAction } from "@/lib/actions";
 import type { CollabType } from "@/lib/types";
@@ -8,12 +8,6 @@ import { deriveRegion } from "@/lib/region";
 import { fileToResizedDataUrl } from "@/lib/image";
 import type { EnrichField } from "@/lib/enrich";
 import { EnrichWizard, type WizardFill } from "./EnrichWizard";
-import {
-  PortfolioCard,
-  downloadPortfolioPng,
-  downloadPortfolioPdf,
-  type PortfolioData,
-} from "./PortfolioCard";
 
 // 편집 중 콜라보 이력 — 활동(activities)과 동일한 인라인 카드 패턴.
 // photos는 {url,file?}로 다루고 제출 시 string[]로 리사이즈. typeInput은 커스텀 유형 입력(전송 제외).
@@ -383,23 +377,9 @@ export default function RegisterPage() {
 
   const canSubmit = name.trim().length > 0 && !pending;
 
-  // ── 소개서(포트폴리오) ──
-  const portfolioRef = useRef<HTMLDivElement>(null);
+  // ── 등록 완료 얼럿(소개서 페이지로 이동) ──
   const [portfolioOpen, setPortfolioOpen] = useState(false);
   const [createdSlug, setCreatedSlug] = useState("");
-  const portfolioData: PortfolioData = {
-    name,
-    oneLiner,
-    region,
-    address,
-    offers,
-    seeks,
-    values,
-    instagram,
-    homepage,
-    description,
-    photos,
-  };
 
   const submit = () => {
     startTransition(async () => {
@@ -1246,47 +1226,24 @@ export default function RegisterPage() {
         </div>
       )}
 
-      {/* 소개서 캡처용 — 화면 밖에서 렌더(다운로드 대상) */}
-      <div style={{ position: "fixed", left: -9999, top: 0 }} aria-hidden="true">
-        <PortfolioCard ref={portfolioRef} data={portfolioData} />
-      </div>
-
-      {/* 등록 완료 → 브랜드 소개서 얼럿 */}
+      {/* 등록 완료 → 브랜드 소개서 얼럿 (소개서 페이지에서 확인·링크 공유) */}
       {portfolioOpen && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 p-4 sm:items-center">
-          <div className="w-full max-w-md rounded-lg border border-hairline bg-surface p-5 text-center shadow-e2">
-            <p className="text-base font-bold text-ink">✨ 브랜드 소개서가 만들어졌어요</p>
-            <p className="mt-1 text-sm text-mute">
-              입력한 정보를 한 장으로 정리했어요. 바로 받아보세요.
+          <div className="w-full max-w-md rounded-lg border border-hairline bg-surface p-6 text-center shadow-e2">
+            <p className="text-lg font-bold text-ink">✨ 브랜드 소개서가 완성됐어요!</p>
+            <p className="mt-3 text-[15px] leading-relaxed text-body">
+              이제 브랜드 소개서 페이지에서 내용을 확인하고, 필요하면 수정해보세요.
             </p>
-            <div className="mt-4 flex flex-col gap-2">
-              <button
-                type="button"
-                onClick={() =>
-                  portfolioRef.current &&
-                  downloadPortfolioPng(portfolioRef.current, `${name.trim() || "브랜드"}_소개서`)
-                }
-                className="h-11 rounded-md bg-primary text-sm font-medium text-primary-on"
-              >
-                PNG 이미지로 다운로드
-              </button>
-              <button
-                type="button"
-                onClick={() =>
-                  portfolioRef.current &&
-                  downloadPortfolioPdf(portfolioRef.current, `${name.trim() || "브랜드"}_소개서`)
-                }
-                className="h-11 rounded-md border border-border-strong bg-surface text-sm font-medium text-ink"
-              >
-                PDF로 다운로드
-              </button>
-            </div>
-            <button type="button" onClick={goToPage} className="mt-3 text-sm font-medium text-mute">
-              닫고 내 페이지로 가기
+            <p className="mt-2 text-[15px] leading-relaxed text-body">
+              준비가 되면 링크를 복사해 협업을 제안할 수 있어요.
+            </p>
+            <button
+              type="button"
+              onClick={goToPage}
+              className="mt-6 h-12 w-full rounded-md bg-primary text-base font-medium text-primary-on"
+            >
+              소개서 확인하기
             </button>
-            <p className="mt-3 text-sm text-faint">
-              소개서는 내 프로필에서 언제든 다운로드할 수 있어요
-            </p>
           </div>
         </div>
       )}
