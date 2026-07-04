@@ -6,7 +6,7 @@
 //  ③ 한 줄 소개 5지선다(택1 + 직접 수정)
 //  ④ 브랜드 소개 5지선다(택1 + 직접 수정) → 폼 반영
 import { useEffect, useRef, useState } from "react";
-import type { EnrichOptions } from "@/lib/enrich";
+import type { ActivityHint, CollabHint, EnrichOptions } from "@/lib/enrich";
 import { josa } from "@/lib/josa";
 
 export type WizardFill = {
@@ -18,6 +18,8 @@ export type WizardFill = {
   homepage?: string;
   values?: string[];
   description?: string;
+  activityHints?: ActivityHint[]; // 크롤이 발견한 활동 흔적(참고용)
+  collabHints?: CollabHint[]; // 크롤이 발견한 콜라보 흔적(참고용)
 };
 
 const SUGGESTED_KEYWORDS = [
@@ -158,6 +160,8 @@ export function EnrichWizard({
       instagram: fInstagram.trim() || undefined,
       homepage: fHomepage.trim() || undefined,
       values: options?.values.length ? options.values : undefined,
+      activityHints: options?.activityHints?.length ? options.activityHints : undefined,
+      collabHints: options?.collabHints?.length ? options.collabHints : undefined,
     });
   };
 
