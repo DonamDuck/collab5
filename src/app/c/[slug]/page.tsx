@@ -164,7 +164,7 @@ export default async function CardPage({
                     )}
                     {h.year && <span className="text-mute"> · {h.year}</span>}
                   </p>
-                  {h.desc && <p className="mt-0.5 text-[13px] text-mute">{h.desc}</p>}
+                  {h.desc && <p className="mt-0.5 whitespace-pre-line text-[13px] leading-relaxed text-mute">{h.desc}</p>}
                   {h.photos.length > 0 && (
                     <div className="mt-1.5 flex gap-1.5">
                       {h.photos.map((src, k) => (

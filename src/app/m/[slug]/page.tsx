@@ -159,7 +159,7 @@ export default async function MakerPage({
                   {h.types.length > 0 && <span className="text-mute"> · {h.types.join("·")}</span>}
                   {h.year && <span className="text-mute"> · {h.year}</span>}
                 </p>
-                {h.desc && <p className="mt-0.5 text-[15px] leading-relaxed text-mute">{h.desc}</p>}
+                {h.desc && <p className="mt-0.5 whitespace-pre-line text-[15px] leading-relaxed text-mute">{h.desc}</p>}
                 {h.photos.length > 0 && (
                   <div className="mt-2 flex flex-wrap gap-1.5">
                     {h.photos.map((src, k) => (

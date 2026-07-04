@@ -937,17 +937,14 @@ export default function RegisterPage() {
           </Field>
         </div>
 
-        {/* ── 함께한 콜라보 (⑥과 ⑦ 사이) ── */}
+        {/* ── ⑦ 이런 콜라보 경험이 있어요 ── */}
+        <GroupHeader
+          n="⑦"
+          title="이런 콜라보 경험이 있어요."
+          sub="선택 · 최대 3개 · 지난 콜라보를 더하면 “검증된 파트너”라는 신호가 돼요."
+        />
         <div className="space-y-8">
-          {/* 함께한 콜라보 (이력) */}
           <div>
-            <label className="mb-1 flex items-center gap-2 text-base font-medium text-body">
-              <span>함께한 콜라보</span>
-              <span className="text-sm font-normal text-faint">선택 · 최대 3개</span>
-            </label>
-            <p className="mb-2.5 text-[15px] text-mute">
-              지난 콜라보를 더하면 “검증된 파트너”라는 신호가 돼요.
-            </p>
 
             {collabHints.length > 0 && (
               <div className="mb-3">
@@ -963,7 +960,7 @@ export default function RegisterPage() {
               {collabHistory.map((h, i) => (
                 <div
                   key={i}
-                  className="space-y-3 rounded-md border border-hairline bg-surface p-3"
+                  className="space-y-5 rounded-md border border-hairline bg-surface p-3"
                 >
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-semibold text-body">콜라보 {i + 1}</span>
@@ -1041,11 +1038,12 @@ export default function RegisterPage() {
                   </div>
                   <div>
                     <p className="mb-1.5 text-sm text-mute">콜라보 내용을 간단히 알려주세요.</p>
-                    <input
+                    <textarea
                       value={h.desc}
                       onChange={(e) => setHist(i, { desc: e.target.value })}
+                      rows={3}
                       placeholder="예: 업사이클링 파우치를 함께 만들어 팝업에서 선보였어요."
-                      className="h-10 w-full rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
+                      className="w-full rounded-sm border border-hairline bg-surface px-3 py-2.5 text-base leading-relaxed text-ink outline-none placeholder:text-faint focus:border-focus"
                     />
                   </div>
                   <div>
@@ -1113,8 +1111,8 @@ export default function RegisterPage() {
           </div>
         </div>
 
-        {/* ── ⑦ 저희는 주로 이런 고객과 함께하고 있어요 ── */}
-        <GroupHeader n="⑦" title="저희는 주로 이런 고객과 함께하고 있어요." />
+        {/* ── ⑧ 저희는 주로 이런 고객과 함께하고 있어요 ── */}
+        <GroupHeader n="⑧" title="저희는 주로 이런 고객과 함께하고 있어요." />
         <div className="space-y-8">
           {/* 이런 분들과 만나요 (타겟 고객) */}
           <div>
@@ -1174,8 +1172,8 @@ export default function RegisterPage() {
           </div>
         </div>
 
-        {/* ── ⑧ 브랜드 정보를 입력해주세요 ── */}
-        <GroupHeader n="⑧" title="브랜드 정보를 입력해주세요." />
+        {/* ── ⑨ 브랜드 정보를 입력해주세요 ── */}
+        <GroupHeader n="⑨" title="브랜드 정보를 입력해주세요." />
         <div className="space-y-8">
           <Field label="주소" hint={hintFor("address", "address")}>
             <input
@@ -1305,10 +1303,10 @@ export default function RegisterPage() {
           <div className="w-full max-w-md rounded-lg border border-hairline bg-surface p-6 text-center shadow-e2">
             <p className="text-lg font-bold text-ink">✨ 브랜드 소개서가 완성됐어요!</p>
             <p className="mt-3 text-[15px] leading-relaxed text-body">
-              이제 브랜드 소개서 페이지에서 내용을 확인하고, 필요하면 수정해보세요.
+              브랜드 소개서 페이지에서 내용을 확인해보세요
             </p>
             <p className="mt-2 text-[15px] leading-relaxed text-body">
-              이제 링크를 복사해 협업을 제안해 볼 수 있어요.
+              이제, 링크를 복사해 협업을 제안해 볼 수 있어요.
             </p>
             <button
               type="button"
