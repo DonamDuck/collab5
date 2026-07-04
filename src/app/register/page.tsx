@@ -388,6 +388,9 @@ export default function RegisterPage() {
           photos: [],
         }));
       }
+      // 사진 base64는 배열에 문자열로 담으면 React Flight 배열 한도(1e6)에 걸린다.
+      // → {u} 객체로 감싸 전송(actions.ts에서 되풂). @see PhotoWire
+      const wrap = (arr: string[]) => arr.map((u) => ({ u }));
       const { slug } = await createMakerAction({
         name,
         oneLiner,
@@ -395,12 +398,12 @@ export default function RegisterPage() {
         seeks,
         values,
         targetAudience,
-        collabHistory: historyOut,
+        collabHistory: historyOut.map((h) => ({ ...h, photos: wrap(h.photos) })),
         story,
-        activities: activityOut,
+        activities: activityOut.map((a) => ({ ...a, photos: wrap(a.photos) })),
         offersNote,
         seeksNote,
-        photos: photoUrls,
+        photos: wrap(photoUrls),
         collabOpen,
         instagram,
         homepage,

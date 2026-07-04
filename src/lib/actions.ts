@@ -2,7 +2,28 @@
 
 import { repo } from "./repo";
 import { deriveRegion } from "./region";
-import type { Activity, CollabHistory, CollabType, Maker } from "./types";
+import type { CollabType, Maker } from "./types";
+
+// 사진(리사이즈 data URL)은 개당 수십만~100만 자에 달해, 배열에 문자열로 담아
+// 서버액션으로 보내면 React Flight의 배열 누적 한도(1e6)에 걸려 터진다.
+// → base64를 객체로 한 겹 감싸 전송하면 디코딩 시 배열 카운트 체인이 끊겨 통과.
+//   (도메인 타입은 여전히 string[]; 이 경계에서만 감쌌다가 서버에서 되푼다.)
+export interface PhotoWire {
+  u: string; // data URL
+}
+export interface ActivityWire {
+  title: string;
+  desc: string;
+  photos: PhotoWire[];
+}
+export interface HistoryWire {
+  partner: string;
+  types: string[];
+  year?: string;
+  photos: PhotoWire[];
+}
+const unwrapPhotos = (photos?: PhotoWire[]): string[] =>
+  (photos ?? []).map((p) => p.u).filter(Boolean);
 
 export interface RegisterInput {
   name: string;
@@ -11,12 +32,12 @@ export interface RegisterInput {
   seeks: CollabType[];
   values: string[]; // 분위기칩(우리를 표현하는 말)
   targetAudience: string[]; // 이런 분들과 만나요
-  collabHistory: CollabHistory[]; // 함께한 콜라보
+  collabHistory: HistoryWire[]; // 함께한 콜라보
   story?: string;
-  activities?: Activity[];
+  activities?: ActivityWire[];
   offersNote?: string;
   seeksNote?: string;
-  photos?: string[]; // 브랜드 사진(리사이즈 data URL)
+  photos?: PhotoWire[]; // 브랜드 사진(리사이즈 data URL, 객체 래핑)
   collabOpen: boolean;
   instagram?: string;
   homepage?: string;
@@ -45,12 +66,21 @@ export async function createMakerAction(
     offers: input.offers,
     seeks: input.seeks,
     targetAudience: input.targetAudience,
-    collabHistory: input.collabHistory,
+    collabHistory: input.collabHistory.map((h) => ({
+      partner: h.partner,
+      types: h.types,
+      year: h.year,
+      photos: unwrapPhotos(h.photos),
+    })),
     story: input.story?.trim() ?? "",
-    activities: input.activities ?? [],
+    activities: (input.activities ?? []).map((a) => ({
+      title: a.title,
+      desc: a.desc,
+      photos: unwrapPhotos(a.photos),
+    })),
     offersNote: input.offersNote?.trim() ?? "",
     seeksNote: input.seeksNote?.trim() ?? "",
-    photos: input.photos ?? [],
+    photos: unwrapPhotos(input.photos),
     soul: { values: input.values, tone: "", trajectory: "" },
     trust: {
       instagram: input.instagram?.trim() || undefined,
