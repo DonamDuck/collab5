@@ -5,13 +5,13 @@ import { searchAction } from "@/lib/actions";
 import type { CollabType, Maker } from "@/lib/types";
 
 const COLLAB_TYPES: CollabType[] = [
-  "공간대여",
-  "제품컬래버",
-  "워크숍",
+  "제품콜라보",
   "팝업",
-  "굿즈",
-  "콘텐츠",
+  "워크숍",
+  "공동굿즈",
+  "공동콘텐츠",
   "행사참여",
+  "공간대여",
 ];
 
 export default function SearchPage() {

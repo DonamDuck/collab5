@@ -16,13 +16,13 @@ import {
 } from "./PortfolioCard";
 
 const COLLAB_TYPES: CollabType[] = [
-  "공간대여",
-  "제품컬래버",
-  "워크숍",
+  "제품콜라보",
   "팝업",
-  "굿즈",
-  "콘텐츠",
+  "워크숍",
+  "공동굿즈",
+  "공동콘텐츠",
   "행사참여",
+  "공간대여",
 ];
 
 // 브랜드 표현 어휘 — 4카테고리(감성·가치·스타일·성격). 직접 추가 가능, 최대 10개 선택.
@@ -140,6 +140,7 @@ export default function RegisterPage() {
           partner: histDraft.partner.trim(),
           types: histDraft.types,
           year: histDraft.year && histDraft.year !== "모름" ? histDraft.year : undefined,
+          photos: [],
         },
       ].slice(0, 3)
     );
