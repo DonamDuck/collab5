@@ -1170,7 +1170,7 @@ export default function RegisterPage() {
             {pending ? "만드는 중…" : "콜라보 카드 등록하기"}
           </button>
           <p className="text-center text-sm text-mute">
-            등록 후에는 콜라보 카드를 다운로드·공유할 수 있어요.
+            등록 후에는 언제든 콜라보 카드를 공유할 수 있어요.
           </p>
         </div>
       </div>
@@ -1235,7 +1235,7 @@ export default function RegisterPage() {
               이제 브랜드 소개서 페이지에서 내용을 확인하고, 필요하면 수정해보세요.
             </p>
             <p className="mt-2 text-[15px] leading-relaxed text-body">
-              준비가 되면 링크를 복사해 협업을 제안할 수 있어요.
+              이제 링크를 복사해 협업을 제안해 볼 수 있어요.
             </p>
             <button
               type="button"
