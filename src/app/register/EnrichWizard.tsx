@@ -47,6 +47,7 @@ export function EnrichWizard({
 }) {
   const [kind, setKind] = useState<Kind>("keywords");
   const [intro, setIntro] = useState(""); // 사장이 직접 쓴 한두 문장(생성의 중심축)
+  const [regionInput, setRegionInput] = useState(""); // 개략 지역(동명 업체 구분 + 검색 정확도)
   const [keywords, setKeywords] = useState<string[]>([]);
   const [kwInput, setKwInput] = useState("");
   const [options, setOptions] = useState<EnrichOptions | null>(null);
@@ -89,7 +90,18 @@ export function EnrichWizard({
   const runOptions = async () => {
     setKind("loading");
     try {
-      const research = (await researchRef.current) ?? "";
+      // 지역을 적었으면 그 지역 기준으로 다시 크롤(동명 업체 정확도↑). 없으면 백그라운드 pre-fetch 사용.
+      const region = regionInput.trim();
+      const research = region
+        ? await fetch("/api/enrich", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ mode: "research", name: query, region }),
+          })
+            .then((r) => r.json())
+            .then((d) => (typeof d.research === "string" ? d.research : ""))
+            .catch(() => "")
+        : (await researchRef.current) ?? "";
       const r = await fetch("/api/enrich", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -212,6 +224,22 @@ export function EnrichWizard({
               />
               <p className="mt-1.5 text-[13px] leading-relaxed text-mute">
                 한두 문장이면 충분해요. 적어주실수록 브랜드에 더 잘 맞는 소개를 만들어드릴 수 있어요.
+              </p>
+            </div>
+
+            {/* 개략 지역 — 동명 업체 구분 + 검색 정확도 */}
+            <div className="mt-5">
+              <label className="mb-2 block text-[15px] font-semibold text-body">
+                어떤 지역에 있으신가요? <span className="font-normal text-faint">· 선택</span>
+              </label>
+              <input
+                value={regionInput}
+                onChange={(e) => setRegionInput(e.target.value)}
+                placeholder="예: 서울 종로구"
+                className="h-11 w-full rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
+              />
+              <p className="mt-1.5 text-[13px] leading-relaxed text-mute">
+                대략만 알려주셔도 돼요. 같은 이름의 다른 곳과 헷갈리지 않게 더 정확히 찾아드려요.
               </p>
             </div>
 

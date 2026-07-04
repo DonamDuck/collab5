@@ -40,6 +40,7 @@ export async function POST(req: Request) {
     focusKeywords?: unknown;
     ownerNote?: unknown;
     research?: unknown;
+    region?: unknown;
     round?: unknown;
   };
   try {
@@ -77,8 +78,9 @@ export async function POST(req: Request) {
   if (body.mode === "research") {
     const name = typeof body.name === "string" ? body.name.trim() : "";
     if (!name) return NextResponse.json({ error: "브랜드 이름이 필요해요." }, { status: 400 });
+    const region = typeof body.region === "string" ? body.region.trim() || undefined : undefined;
     try {
-      const research = await enrichResearch(name);
+      const research = await enrichResearch(name, region);
       return NextResponse.json({ research });
     } catch (e) {
       console.error("[enrich] research failed:", e);

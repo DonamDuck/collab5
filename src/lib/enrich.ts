@@ -90,8 +90,8 @@ export interface SearchProvider {
   recrawl?(input: RecrawlInput): Promise<EnrichCandidate | null>;
   /** (선택) 폼 정보 기반 소개 글 5개 초안 — round로 다른 각도 변주 */
   draft?(input: DraftInput): Promise<string[]>;
-  /** (선택) 브랜드명으로 조사 메모만 생성(백그라운드 크롤 — 느린 단계) */
-  research?(name: string): Promise<string>;
+  /** (선택) 브랜드명(+지역)으로 조사 메모만 생성(백그라운드 크롤 — 느린 단계) */
+  research?(name: string, region?: string): Promise<string>;
   /** (선택) 조사 메모 + 키워드 → 한줄소개·브랜드소개 5지선다(빠른 생성 단계) */
   options?(input: OptionsInput): Promise<EnrichOptions>;
 }
@@ -244,9 +244,9 @@ export class MockSearchProvider implements SearchProvider {
   }
 
   // 조사 메모 mock
-  async research(name: string): Promise<string> {
+  async research(name: string, region?: string): Promise<string> {
     await new Promise((r) => setTimeout(r, 700));
-    return `[mock 조사] ${name} — 소규모 브랜드. 정성스러운 제작, 로컬 기반. (실제 크롤링은 키 설정 시)`;
+    return `[mock 조사] ${name}${region ? ` (${region})` : ""} — 소규모 브랜드. 정성스러운 제작, 로컬 기반. (실제 크롤링은 키 설정 시)`;
   }
 
   // 5지선다 mock
@@ -508,7 +508,11 @@ class NaverGeminiProvider implements SearchProvider {
   }
 
   /** 네이버 검색 API 1종 호출. 실패해도 throw 안 하고 빈 배열(graceful). */
-  private async naver(type: "local" | "webkr" | "blog", query: string, display: number): Promise<NaverItem[]> {
+  private async naver(
+    type: "local" | "webkr" | "blog" | "cafearticle" | "kin",
+    query: string,
+    display: number
+  ): Promise<NaverItem[]> {
     try {
       const url = `https://openapi.naver.com/v1/search/${type}.json?query=${encodeURIComponent(query)}&display=${display}`;
       const res = await fetch(url, {
@@ -572,12 +576,15 @@ class NaverGeminiProvider implements SearchProvider {
     }
   }
 
-  /** 지역+웹문서+블로그 병렬 검색 + 홈페이지 인스타 스니핑 → '조사 메모'로 조립 */
-  private async gather(query: string): Promise<string> {
-    const [local, web, blog] = await Promise.all([
-      this.naver("local", query, 3),
+  /** 지역+웹문서+블로그+카페 병렬 검색 + 홈페이지 인스타 스니핑 → '조사 메모'로 조립.
+   *  region이 있으면 지역검색 정확도↑(동명 업체 구분). 블로그·카페=소비자 후기 신호. */
+  private async gather(query: string, region?: string): Promise<string> {
+    const localQuery = region?.trim() ? `${query} ${region.trim()}` : query;
+    const [local, web, blog, cafe] = await Promise.all([
+      this.naver("local", localQuery, 4),
       this.naver("webkr", query, 3),
-      this.naver("blog", query, 2),
+      this.naver("blog", query, 4),
+      this.naver("cafearticle", query, 3),
     ]);
 
     // 홈페이지 정적 HTML에서 인스타 링크 직접 확인(가장 신뢰할 수 있는 신호)
@@ -609,8 +616,14 @@ class NaverGeminiProvider implements SearchProvider {
       }
     }
     if (blog.length) {
-      parts.push("\n[네이버 블로그 — 분위기·후기 단서]");
+      parts.push("\n[네이버 블로그 — 소비자 후기·분위기 단서]");
       for (const it of blog) {
+        parts.push(`· ${this.clean(it.title)} | ${this.clean(it.description)}`);
+      }
+    }
+    if (cafe.length) {
+      parts.push("\n[네이버 카페글 — 실사용 후기·평판 단서]");
+      for (const it of cafe) {
         parts.push(`· ${this.clean(it.title)} | ${this.clean(it.description)}`);
       }
     }
@@ -662,9 +675,10 @@ class NaverGeminiProvider implements SearchProvider {
   // 제미나이 자체 웹 검색(Google Search grounding). 네이버와 별개 소스로 조사.
   // ⚠️ grounding은 responseSchema와 동시 사용 불가 → 순수 텍스트 조사 단계로만.
   //    ENRICH_GEMINI_SEARCH=0 이면 비활성(네이버 단독). grounding은 유료 쿼터 소모.
-  private async geminiSearch(query: string): Promise<string> {
+  private async geminiSearch(query: string, region?: string): Promise<string> {
     if (process.env.ENRICH_GEMINI_SEARCH === "0") return "";
-    const prompt = `"${query}" 브랜드/업체를 웹에서 조사해줘. 무엇을 하는 곳인지, 시작·스토리, 특징·강점, 주요 고객, 분위기·평판, 홈페이지 URL을 사실 위주로 간결한 메모로 정리해줘.
+    const loc = region?.trim() ? `\n(위치 힌트: ${region.trim()} — 이 지역의 그 업체를 특정해줘. 동명 업체 주의.)` : "";
+    const prompt = `"${query}" 브랜드/업체를 웹에서 조사해줘.${loc} 무엇을 하는 곳인지, 시작·스토리, 특징·강점, 주요 고객, 분위기·평판, 홈페이지 URL, 그리고 블로그·카페 등의 실사용 후기·평판을 사실 위주로 간결한 메모로 정리해줘.
 ⭐인스타그램은 실제 instagram.com/○○ 페이지를 웹에서 확인한 경우에만 @핸들을 적어. 브랜드명이나 도메인으로 추측하지 마 — 도메인이 canvasgarden.shop이라도 instagram.com/canvasgarden이 실제 존재하는지 확인 안 되면 절대 적지 말고 "인스타: 확인 안 됨"이라고 해. 지어낸 핸들은 틀린 정보라 넣으면 안 돼.
 확실하지 않은 건 추측하지 말고 넘어가. 짧은 개조식으로.`;
     // 보조 소스라 실패 시 빠르게 포기(네이버 단독). 429는 쿼터/레이트리밋 → 모델 공유라 재시도 무의미.
@@ -749,8 +763,11 @@ class NaverGeminiProvider implements SearchProvider {
   }
 
   // 조사 메모(네이버+제미나이)만 생성 — 느린 크롤 단계(위저드가 백그라운드로 먼저 돌림).
-  async research(name: string): Promise<string> {
-    const [naver, gemini] = await Promise.all([this.gather(name), this.geminiSearch(name)]);
+  async research(name: string, region?: string): Promise<string> {
+    const [naver, gemini] = await Promise.all([
+      this.gather(name, region),
+      this.geminiSearch(name, region),
+    ]);
     return this.combineResearch(naver, gemini);
   }
 
@@ -884,8 +901,8 @@ export async function enrichDraft(input: DraftInput): Promise<string[]> {
 }
 
 /** 조사 메모 생성(백그라운드 크롤) — 위저드가 키워드 입력받는 동안 먼저 돌린다. */
-export async function enrichResearch(name: string): Promise<string> {
-  return provider.research ? provider.research(name) : "";
+export async function enrichResearch(name: string, region?: string): Promise<string> {
+  return provider.research ? provider.research(name, region) : "";
 }
 
 /** 조사 메모 + 가중 키워드 → 한줄소개·브랜드소개 5지선다. */
