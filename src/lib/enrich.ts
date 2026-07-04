@@ -67,6 +67,19 @@ export interface OptionsInput {
   ownerNote?: string; // 사장이 직접 쓴 한두 문장 — 생성의 최우선 중심축
 }
 
+/** 크롤이 발견한 활동 흔적 — 창작 아님, 조사 메모에 실제 등장한 것만 */
+export interface ActivityHint {
+  title: string; // 짧은 활동명 (예: "가방 만들기 워크숍")
+  desc: string; // 한두 문장 요약 (해요체)
+  source: string; // 출처 유형 라벨 (예: "네이버 블로그 후기")
+}
+/** 크롤이 발견한 콜라보 흔적 */
+export interface CollabHint {
+  partner: string; // 파트너/함께한 곳
+  desc: string; // 한두 문장 요약 (해요체)
+  source: string; // 출처 유형 라벨
+}
+
 /** 5지선다 결과 — 확인된 identity + 한줄소개/브랜드소개 후보 5개씩 + 결 단어 */
 export interface EnrichOptions {
   identity: {
@@ -81,6 +94,8 @@ export interface EnrichOptions {
   oneLiners: string[];
   descriptions: string[];
   values: string[];
+  activityHints: ActivityHint[]; // 발견된 활동 흔적 0~3건 (참고용)
+  collabHints: CollabHint[]; // 발견된 콜라보 흔적 0~3건 (참고용)
 }
 
 /** 검색 단계 추상화 — mock ↔ Claude/Gemini 교체 지점. */
@@ -267,6 +282,13 @@ export class MockSearchProvider implements SearchProvider {
       ],
       descriptions: (await this.draft({ name, values: input.focusKeywords })).slice(0, 5),
       values: input.focusKeywords?.slice(0, 4) ?? ["정성", "손맛", "로컬"],
+      activityHints: [
+        { title: "가방 만들기 워크숍", desc: "5주 과정 워크숍 후기가 여러 건 보여요.", source: "네이버 블로그 후기" },
+        { title: "온라인 스토어 운영", desc: "자체 제작 소품을 판매하는 스토어가 언급돼요.", source: "웹 검색" },
+      ],
+      collabHints: [
+        { partner: "오월의숲", desc: "함께 팝업을 열었다는 후기가 보여요.", source: "카페글" },
+      ],
     };
   }
 }
@@ -327,6 +349,24 @@ const OptionsResultSchema = z.object({
   oneLiners: z.array(z.string()).describe("한 줄 소개 후보 5개 — 서로 다른 앵글"),
   descriptions: z.array(z.string()).describe("브랜드 소개 후보 5개 — 서로 다른 앵글, 각 3~5문장 해요체"),
   values: z.array(z.string()).describe("브랜드 결 단어 2~4개"),
+  activityHints: z
+    .array(
+      z.object({
+        title: z.string().describe("짧은 활동명"),
+        desc: z.string().describe("한두 문장 요약, 해요체"),
+        source: z.string().describe("출처 유형: 네이버 블로그 후기/카페글/웹 검색/인스타그램 중 하나"),
+      })
+    )
+    .describe("조사 메모에 실제 언급된 활동 흔적 0~3건. 없으면 빈 배열"),
+  collabHints: z
+    .array(
+      z.object({
+        partner: z.string().describe("파트너/함께한 곳 이름"),
+        desc: z.string().describe("한두 문장 요약, 해요체"),
+        source: z.string().describe("출처 유형: 네이버 블로그 후기/카페글/웹 검색/인스타그램 중 하나"),
+      })
+    )
+    .describe("조사 메모에 실제 언급된 콜라보 흔적 0~3건. 없으면 빈 배열"),
 });
 
 const GEMINI_OPTIONS_SCHEMA = {
@@ -361,8 +401,34 @@ const GEMINI_OPTIONS_SCHEMA = {
       description: "브랜드 소개 후보 5개 — 서로 다른 앵글, 각 3~5문장 해요체",
     },
     values: { type: Type.ARRAY, items: { type: Type.STRING }, description: "브랜드 결 단어 2~4개" },
+    activityHints: {
+      type: Type.ARRAY,
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          title: { type: Type.STRING, description: "짧은 활동명" },
+          desc: { type: Type.STRING, description: "한두 문장 요약, 해요체" },
+          source: { type: Type.STRING, description: "출처 유형: 네이버 블로그 후기/카페글/웹 검색/인스타그램 중 하나" },
+        },
+        required: ["title", "desc", "source"],
+      },
+      description: "조사 메모에 실제 언급된 활동(워크숍·클래스·팝업·제품라인 등) 흔적 0~3건. 메모에 없으면 빈 배열 — 창작 금지",
+    },
+    collabHints: {
+      type: Type.ARRAY,
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          partner: { type: Type.STRING, description: "파트너/함께한 곳 이름" },
+          desc: { type: Type.STRING, description: "한두 문장 요약, 해요체" },
+          source: { type: Type.STRING, description: "출처 유형: 네이버 블로그 후기/카페글/웹 검색/인스타그램 중 하나" },
+        },
+        required: ["partner", "desc", "source"],
+      },
+      description: "조사 메모에 파트너명이 드러난 협업 소식 0~3건. 메모에 없으면 빈 배열 — 창작 금지",
+    },
   },
-  required: ["identity", "instagramCandidates", "oneLiners", "descriptions", "values"],
+  required: ["identity", "instagramCandidates", "oneLiners", "descriptions", "values", "activityHints", "collabHints"],
 };
 
 const OPTIONS_SYSTEM = `너는 콜라보 플랫폼 collab5의 브랜드 소개 카피라이터야. 웹 조사 메모를 바탕으로 브랜드가 고를 수 있는 '한 줄 소개'와 '브랜드 소개'를 각각 5개씩 서로 다른 앵글로 만든다.
@@ -374,7 +440,8 @@ ${BRAND_VOICE}
 - descriptions 5개: 각 3~5문장, 서로 다른 앵글. 모두 해요체. '~합니다/~습니다' 금지.
 - ⭐가중 키워드가 주어지면 그 방향을 최우선으로 반영해 모든 후보를 그 결에 맞춘다.
 - 조사 메모 안의 사실만 쓴다. 창작·과장 금지. identity(주소·홈피 등)는 확인된 것만, 없으면 빈 문자열.
-- 인스타: 실제 확인된 핸들만 identity.instagram에 넣는다(추측 금지). 확정 못 하면 identity.instagram은 빈 문자열로 두고, 대신 instagramCandidates에 도메인·브랜드명 기반 그럴듯한 추정 핸들 2~4개를 제시한다(사장이 직접 고를 후보용). 예: 도메인이 canvasgarden.shop이면 @canvasgarden, @canvasgarden_official, @canvasgarden.shop 등.`;
+- 인스타: 실제 확인된 핸들만 identity.instagram에 넣는다(추측 금지). 확정 못 하면 identity.instagram은 빈 문자열로 두고, 대신 instagramCandidates에 도메인·브랜드명 기반 그럴듯한 추정 핸들 2~4개를 제시한다(사장이 직접 고를 후보용). 예: 도메인이 canvasgarden.shop이면 @canvasgarden, @canvasgarden_official, @canvasgarden.shop 등.
+- activityHints: 조사 메모에 실제로 언급된 이 브랜드의 활동(워크숍·클래스·팝업·제품라인 등)만 0~3건. collabHints: 메모에 파트너명이 드러난 협업 소식만 0~3건. 각 항목의 source는 그 정보가 나온 출처 유형(네이버 블로그 후기/카페글/웹 검색/인스타그램)으로. ⚠️메모에 없으면 절대 만들지 말고 빈 배열로 둬라(참고용 힌트라 사실만).`;
 
 class ClaudeSearchProvider implements SearchProvider {
   private _client: Anthropic | null = null;
@@ -797,6 +864,12 @@ class NaverGeminiProvider implements SearchProvider {
       oneLiners: (o.oneLiners ?? []).filter(Boolean).slice(0, 5),
       descriptions: (o.descriptions ?? []).filter(Boolean).slice(0, 5),
       values: (o.values ?? []).filter(Boolean).slice(0, 4),
+      activityHints: (o.activityHints ?? [])
+        .filter((h) => h && h.title?.trim() && h.desc?.trim())
+        .slice(0, 3),
+      collabHints: (o.collabHints ?? [])
+        .filter((h) => h && h.partner?.trim() && h.desc?.trim())
+        .slice(0, 3),
     };
   }
 
@@ -831,7 +904,8 @@ class NaverGeminiProvider implements SearchProvider {
     const prompt = `브랜드명: "${input.name}"\n\n${note}${kw}[조사 자료 — 네이버 검색 + 제미나이 웹 조사]\n${input.research}\n\n위 정보로 한 줄 소개 5개, 브랜드 소개 5개(각 3~5문장, 모두 해요체), 브랜드 결 단어 2~4개, identity(지역·주소·인스타·홈피)를 뽑아줘.
 ⭐identity.homepage는 조사 자료에 URL이 있으면 채워줘. identity.instagram은 ⚠️'홈페이지 직접 확인' 항목에서 실제 확인된 핸들이 있을 때만 채워 — 그 외에는 추측하지 말고 빈 문자열로 둬(무관한 계정도 금지).
 ⭐단 instagram이 확정 안 됐으면 instagramCandidates에 도메인·브랜드명 기반 그럴듯한 추정 핸들 2~4개를 넣어줘(사장이 직접 고를 후보). 예: 도메인이 canvasgarden.shop이면 @canvasgarden, @canvasgarden_official, @canvasgarden.shop 등.
-나머지는 사실만 쓰고, 확인 안 된 필드는 빈 문자열. 모든 문장은 '해요체'로 끝내('~합니다/~습니다' 금지).`;
+나머지는 사실만 쓰고, 확인 안 된 필드는 빈 문자열. 모든 문장은 '해요체'로 끝내('~합니다/~습니다' 금지).
+⭐activityHints·collabHints는 조사 자료에 실제로 언급된 활동·협업만 0~3건씩(source=출처 유형). 자료에 없으면 빈 배열 — 지어내기 금지.`;
     return this.generateOptions(prompt, 0.9);
   }
 
