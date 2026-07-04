@@ -66,3 +66,19 @@ CREATE INDEX IF NOT EXISTS idx_cards_slug         ON collab_cards(slug);
 CREATE INDEX IF NOT EXISTS idx_cards_maker        ON collab_cards(from_maker_id);
 CREATE INDEX IF NOT EXISTS idx_views_card         ON view_events(card_id);
 CREATE INDEX IF NOT EXISTS idx_reactions_card     ON reactions(card_id);
+
+-- ── 2026-07-05 인증·소유권 ──────────────────────────────
+-- 소개서 소유권(플랜 B에서 사용): 소유 계정 + 익명 생성 관리 키(해시)
+ALTER TABLE makers ADD COLUMN IF NOT EXISTS owner_user_id UUID;
+ALTER TABLE makers ADD COLUMN IF NOT EXISTS claim_token_hash TEXT;
+CREATE INDEX IF NOT EXISTS idx_makers_owner ON makers(owner_user_id);
+
+-- 계정 프로필 (가입 시 생성) — 브랜드명·휴대폰·로고(리사이즈 base64, Storage 이전 전 MVP)
+CREATE TABLE IF NOT EXISTS profiles (
+  user_id       UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  brand_name    TEXT NOT NULL,
+  phone         TEXT NOT NULL DEFAULT '',
+  profile_image TEXT NOT NULL DEFAULT '',
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+ALTER TABLE profiles ENABLE ROW LEVEL SECURITY; -- 정책 없음 = anon 잠금(서버 service_role만)
