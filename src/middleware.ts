@@ -1,4 +1,4 @@
-// Supabase 세션 갱신 미들웨어 — 만료 토큰을 재발급해 쿠키에 반영.
+// Supabase 세션 갱신 미들웨어 — ⚠️ Next16에선 proxy 컨벤션 권장(경고만 뜸). dev 서버 재시작 가능할 때 proxy.ts로 리네임 — 만료 토큰을 재발급해 쿠키에 반영.
 // env 없으면(로컬 mock) 통과만.
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
