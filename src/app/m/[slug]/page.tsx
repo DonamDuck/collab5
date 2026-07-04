@@ -36,6 +36,36 @@ export default async function MakerPage({
         </div>
       )}
 
+      {/* 시작한 이야기 — 왜 이 브랜드를 시작했나 */}
+      {maker.story && (
+        <section className="mt-6">
+          <h2 className="mb-2 text-sm font-medium text-faint">시작한 이야기</h2>
+          <p className="whitespace-pre-line text-[16px] leading-relaxed text-body">
+            {maker.story}
+          </p>
+        </section>
+      )}
+
+      {/* 이런 활동을 해요 — 대표 활동 + 사진 */}
+      {maker.activities.length > 0 && (
+        <section className="mt-6">
+          <h2 className="mb-3 text-sm font-medium text-faint">이런 활동을 해요</h2>
+          <div className="space-y-5">
+            {maker.activities.map((a, i) => (
+              <div key={i}>
+                {a.title && <p className="text-[17px] font-medium leading-snug text-ink">{a.title}</p>}
+                {a.desc && <p className="mt-1 text-[15px] leading-relaxed text-mute">{a.desc}</p>}
+                {a.photos.length > 0 && (
+                  <div className="mt-2.5 max-w-[460px]">
+                    <PhotoSlider photos={a.photos} />
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
       {/* 결 — AI 보조층(파스텔, 검증처럼 강조하지 않음) */}
       {maker.soul.values.length > 0 && (
         <section className="mt-6">
@@ -54,36 +84,53 @@ export default async function MakerPage({
       )}
 
       {/* 콜라보 유형 */}
-      {(maker.offers.length > 0 || maker.seeks.length > 0) && (
+      {(maker.offers.length > 0 ||
+        maker.seeks.length > 0 ||
+        maker.offersNote ||
+        maker.seeksNote) && (
         <section className="mt-6 grid gap-4 sm:grid-cols-2">
-          {maker.offers.length > 0 && (
+          {(maker.offers.length > 0 || maker.offersNote) && (
             <div>
               <h2 className="mb-2 text-sm font-medium text-faint">제공할 수 있어요</h2>
-              <div className="flex flex-wrap gap-1.5">
-                {maker.offers.map((o) => (
-                  <span
-                    key={o}
-                    className="inline-flex h-8 items-center rounded-pill border border-hairline bg-surface px-3 text-[13px] text-body"
-                  >
-                    {o}
-                  </span>
-                ))}
-              </div>
+              {maker.offersNote && (
+                <p className="mb-2 whitespace-pre-line text-[15px] leading-relaxed text-body">
+                  {maker.offersNote}
+                </p>
+              )}
+              {maker.offers.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {maker.offers.map((o) => (
+                    <span
+                      key={o}
+                      className="inline-flex h-8 items-center rounded-pill border border-hairline bg-surface px-3 text-[13px] text-body"
+                    >
+                      {o}
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
           )}
-          {maker.seeks.length > 0 && (
+          {(maker.seeks.length > 0 || maker.seeksNote) && (
             <div>
               <h2 className="mb-2 text-sm font-medium text-faint">찾고 있어요</h2>
-              <div className="flex flex-wrap gap-1.5">
-                {maker.seeks.map((s) => (
-                  <span
-                    key={s}
-                    className="inline-flex h-8 items-center rounded-pill border border-hairline bg-surface px-3 text-[13px] text-body"
-                  >
-                    {s}
-                  </span>
-                ))}
-              </div>
+              {maker.seeksNote && (
+                <p className="mb-2 whitespace-pre-line text-[15px] leading-relaxed text-body">
+                  {maker.seeksNote}
+                </p>
+              )}
+              {maker.seeks.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {maker.seeks.map((s) => (
+                    <span
+                      key={s}
+                      className="inline-flex h-8 items-center rounded-pill border border-hairline bg-surface px-3 text-[13px] text-body"
+                    >
+                      {s}
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </section>
