@@ -458,7 +458,7 @@ export default function RegisterPage() {
         <div className="h-px flex-1 bg-hairline" />
       </div>
 
-      <div className="mt-8 space-y-[51px]">
+      <div className="mt-8 space-y-12">
         {/* 검수 게이트 배너 — AI가 채운 직후 */}
         {reviewMode && (
           <div className="rounded-lg border border-primary bg-surface px-4 py-3 shadow-e1">
