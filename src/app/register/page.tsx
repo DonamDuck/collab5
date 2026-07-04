@@ -463,7 +463,12 @@ export default function RegisterPage() {
       setPortfolioOpen(true); // redirect 대신 소개서 얼럿
     });
   };
-  const goToPage = () => router.push(`/m/${createdSlug}`);
+  // 소개서 페이지는 서버에서 데이터를 불러오는 동안 잠깐 멈춰 보임 → 버튼 로딩 표시.
+  const [goingToPage, setGoingToPage] = useState(false);
+  const goToPage = () => {
+    setGoingToPage(true);
+    router.push(`/m/${createdSlug}`);
+  };
 
   return (
     <main className="mx-auto w-full max-w-[640px] px-4 py-8 sm:px-6">
@@ -1240,9 +1245,13 @@ export default function RegisterPage() {
             <button
               type="button"
               onClick={goToPage}
-              className="mt-6 h-12 w-full rounded-md bg-primary text-base font-medium text-primary-on"
+              disabled={goingToPage}
+              className="mt-6 flex h-12 w-full items-center justify-center gap-2 rounded-md bg-primary text-base font-medium text-primary-on disabled:opacity-80"
             >
-              소개서 확인하기
+              {goingToPage && (
+                <span className="h-4 w-4 animate-spin rounded-full border-2 border-primary-on border-t-transparent" />
+              )}
+              {goingToPage ? "소개서를 여는 중…" : "소개서 확인하기"}
             </button>
           </div>
         </div>
