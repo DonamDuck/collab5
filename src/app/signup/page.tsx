@@ -1,0 +1,206 @@
+"use client";
+
+import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { signUpAction } from "@/lib/auth-actions";
+import { fileToResizedDataUrl } from "@/lib/image";
+import { Avatar } from "@/components/Avatar";
+
+export default function SignupPage() {
+  const router = useRouter();
+  const [pending, start] = useTransition();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [password2, setPassword2] = useState("");
+  const [phone, setPhone] = useState("");
+  const [brandName, setBrandName] = useState("");
+  const [image, setImage] = useState(""); // 리사이즈 base64
+  const [agree, setAgree] = useState(false);
+  const [err, setErr] = useState("");
+  const [done, setDone] = useState(false);
+
+  const onImage = async (files: FileList | null) => {
+    const f = files?.[0];
+    if (!f || !f.type.startsWith("image/")) return;
+    try {
+      setImage(await fileToResizedDataUrl(f, 400));
+    } catch {
+      setErr("이미지를 불러오지 못했어요. 다른 파일로 시도해주세요.");
+    }
+  };
+
+  const validate = (): string => {
+    if (!/^\S+@\S+\.\S+$/.test(email.trim())) return "이메일 형식을 확인해주세요.";
+    if (password.length < 6) return "비밀번호는 6자 이상이어야 해요.";
+    if (password !== password2) return "비밀번호가 서로 달라요.";
+    if (!phone.trim()) return "휴대폰번호를 입력해주세요.";
+    if (!brandName.trim()) return "브랜드명을 입력해주세요.";
+    if (!agree) return "개인정보 수집 및 이용에 동의해주세요.";
+    return "";
+  };
+
+  const submit = () =>
+    start(async () => {
+      const v = validate();
+      if (v) {
+        setErr(v);
+        return;
+      }
+      setErr("");
+      const r = await signUpAction({
+        email,
+        password,
+        phone,
+        brandName,
+        profileImage: image,
+      });
+      if (r.error) {
+        setErr(r.error);
+        return;
+      }
+      setDone(true); // 완료 얼럿 → 확인 시 /login
+    });
+
+  return (
+    <main className="mx-auto w-full max-w-[400px] px-4 py-14 sm:px-6">
+      <h1 className="text-2xl font-bold tracking-tight text-ink">회원가입</h1>
+      <p className="mt-2 text-[15px] text-mute">브랜드 계정을 만들고 소개서를 관리해보세요.</p>
+
+      <div className="mt-6 space-y-4">
+        <Field label="이메일">
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="you@brand.com"
+            className={inputCls}
+          />
+        </Field>
+        <Field label="비밀번호">
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="6자 이상"
+            className={inputCls}
+          />
+        </Field>
+        <Field label="비밀번호 확인">
+          <input
+            type="password"
+            value={password2}
+            onChange={(e) => setPassword2(e.target.value)}
+            placeholder="한 번 더 입력해주세요"
+            className={inputCls}
+          />
+        </Field>
+        <Field label="휴대폰번호">
+          <input
+            type="tel"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            placeholder="010-0000-0000"
+            className={inputCls}
+          />
+        </Field>
+        <Field label="브랜드명">
+          <input
+            value={brandName}
+            onChange={(e) => setBrandName(e.target.value)}
+            placeholder="예: 캔버스가든"
+            className={inputCls}
+          />
+        </Field>
+        <Field label="로고 또는 브랜드 사진" optional>
+          <div className="flex items-center gap-3">
+            <Avatar image={image || undefined} name={brandName || "?"} size={48} />
+            <label className="inline-flex h-9 cursor-pointer items-center rounded-md border border-border-strong bg-surface px-3 text-sm font-medium text-ink">
+              이미지 선택
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => onImage(e.target.files)}
+              />
+            </label>
+            {image && (
+              <button
+                type="button"
+                onClick={() => setImage("")}
+                className="text-sm text-faint hover:text-ink"
+              >
+                지우기
+              </button>
+            )}
+          </div>
+        </Field>
+        <label className="flex cursor-pointer items-start gap-2 text-sm text-body">
+          <input
+            type="checkbox"
+            checked={agree}
+            onChange={(e) => setAgree(e.target.checked)}
+            className="mt-0.5 h-4 w-4 accent-[var(--color-primary,theme(colors.lime.400))]"
+          />
+          <span>
+            개인정보 수집 및 이용에 동의합니다. <span className="text-faint">(필수)</span>
+          </span>
+        </label>
+      </div>
+
+      {err && <p className="mt-3 text-sm text-red-600">{err}</p>}
+      <button
+        type="button"
+        onClick={submit}
+        disabled={pending}
+        className="mt-5 h-12 w-full rounded-md bg-primary text-base font-medium text-primary-on disabled:opacity-50"
+      >
+        {pending ? "가입 중…" : "가입하기"}
+      </button>
+      <p className="mt-4 text-center text-sm text-mute">
+        이미 계정이 있나요?{" "}
+        <a href="/login" className="font-medium text-primary-on underline-offset-2 hover:underline">
+          로그인
+        </a>
+      </p>
+
+      {done && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 p-4 sm:items-center">
+          <div className="w-full max-w-sm rounded-lg border border-hairline bg-surface p-6 text-center shadow-e2">
+            <p className="text-lg font-bold text-ink">🎉 가입이 완료됐어요!</p>
+            <p className="mt-2 text-[15px] text-body">이제 로그인해서 시작해보세요.</p>
+            <button
+              type="button"
+              onClick={() => router.push("/login")}
+              className="mt-5 h-12 w-full rounded-md bg-primary text-base font-medium text-primary-on"
+            >
+              로그인하러 가기
+            </button>
+          </div>
+        </div>
+      )}
+    </main>
+  );
+}
+
+const inputCls =
+  "h-11 w-full rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus";
+
+function Field({
+  label,
+  optional,
+  children,
+}: {
+  label: string;
+  optional?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <label className="mb-1.5 block text-[15px] font-medium text-body">
+        {label}
+        {optional && <span className="ml-1 font-normal text-faint">· 선택</span>}
+      </label>
+      {children}
+    </div>
+  );
+}
