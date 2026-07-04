@@ -476,7 +476,7 @@ export default function RegisterPage() {
         브랜드 소개서, 생각보다 금방 완성돼요.
       </h1>
       <p className="mt-2 text-[17px] leading-relaxed text-body">
-        브랜드 이름만 입력하면 AI가 소개서 초안을 준비해드려요. 확인하고 다듬으면 1분 안에 완성할 수 있어요.
+        브랜드 이름 입력하면 AI가 소개서 초안을 준비해드려요. 확인하고 다듬으면 1~3분 안에 완성할 수 있어요.
       </p>
 
       {/* ✨ 딸깍 자동완성 — 이름만 알려주면 채워드릴게요 */}
