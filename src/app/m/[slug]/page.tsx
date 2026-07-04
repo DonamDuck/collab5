@@ -14,153 +14,183 @@ export default async function MakerPage({
   if (!maker) notFound();
 
   return (
-    <main className="mx-auto w-full max-w-[640px] px-4 py-8 sm:px-6">
-      {/* 히어로 — 주인공은 메이커 */}
-      <div className="flex items-center gap-2">
-        <h1 className="text-[32px] font-bold leading-tight tracking-tight text-ink">
-          {maker.name}
-        </h1>
-        {maker.collabOpen && (
-          <span className="inline-flex h-6 items-center rounded-sm bg-primary-pale px-2 text-xs font-medium text-primary-on">
-            콜라보 받는 중
-          </span>
+    <main className="mx-auto w-full max-w-[640px] px-4 py-10 sm:px-6">
+      {/* ── 헤더 — 브랜드명 + 요약(한 줄 소개) + 신뢰 뱃지(인스타·홈피·주소) ── */}
+      <header>
+        <div className="flex flex-wrap items-center gap-2">
+          <h1 className="text-[32px] font-bold leading-tight tracking-tight text-ink">
+            {maker.name}
+          </h1>
+          {maker.collabOpen && (
+            <span className="inline-flex h-6 items-center rounded-sm bg-primary-pale px-2 text-xs font-medium text-primary-on">
+              콜라보 받는 중
+            </span>
+          )}
+        </div>
+        {maker.oneLiner && (
+          <p className="mt-2.5 text-[18px] leading-relaxed text-body">{maker.oneLiner}</p>
         )}
-      </div>
-      {maker.oneLiner && <p className="mt-2 text-[17px] leading-relaxed text-body">{maker.oneLiner}</p>}
-      {maker.region && <p className="mt-1 text-[15px] text-mute">📍 {maker.region}</p>}
+        {(maker.trust.instagram || maker.trust.homepage || maker.trust.address) && (
+          <div className="mt-4 flex flex-wrap gap-2">
+            {maker.trust.instagram && (
+              <TrustLink href={instagramUrl(maker.trust.instagram)}>
+                📷 {instagramHandle(maker.trust.instagram)}
+              </TrustLink>
+            )}
+            {maker.trust.homepage && (
+              <TrustLink href={normalizeUrl(maker.trust.homepage)}>
+                🔗 {prettyUrl(maker.trust.homepage)}
+              </TrustLink>
+            )}
+            {maker.trust.address && <TrustTag>📍 {maker.trust.address}</TrustTag>}
+          </div>
+        )}
+      </header>
 
       {/* 브랜드 사진 — 스와이프 슬라이드 */}
       {maker.photos.length > 0 && (
-        <div className="mt-6 max-w-[460px]">
+        <div className="mt-7 max-w-[460px]">
           <PhotoSlider photos={maker.photos} />
         </div>
       )}
 
-      {/* 시작한 이야기 — 왜 이 브랜드를 시작했나 */}
-      {maker.story && (
-        <section className="mt-6">
-          <h2 className="mb-2 text-sm font-medium text-faint">시작한 이야기</h2>
-          <p className="whitespace-pre-line text-[16px] leading-relaxed text-body">
-            {maker.story}
+      {/* ① 우리는 이런 브랜드에요 — 자세히 소개 */}
+      {maker.trust.description && (
+        <Section title="우리는 이런 브랜드에요">
+          <p className="whitespace-pre-line text-[17px] leading-relaxed text-body">
+            {maker.trust.description}
           </p>
-        </section>
+        </Section>
       )}
 
-      {/* 이런 활동을 해요 — 대표 활동 + 사진 */}
+      {/* ② 우리의 시작 이야기 — story */}
+      {maker.story && (
+        <Section title="우리의 시작 이야기">
+          <p className="whitespace-pre-line text-[17px] leading-relaxed text-body">
+            {maker.story}
+          </p>
+        </Section>
+      )}
+
+      {/* ③ 우리를 표현하는 키워드에요 — values */}
+      {maker.soul.values.length > 0 && (
+        <Section title="우리를 표현하는 키워드에요">
+          <div className="flex flex-wrap gap-2">
+            {maker.soul.values.map((v) => (
+              <span
+                key={v}
+                className="inline-flex h-9 items-center rounded-sm bg-mint-pale px-3 text-[15px] font-medium text-mint-on"
+              >
+                {v}
+              </span>
+            ))}
+          </div>
+        </Section>
+      )}
+
+      {/* ④ 우리는 이런 일을 하고 있습니다 — activities */}
       {maker.activities.length > 0 && (
-        <section className="mt-6">
-          <h2 className="mb-3 text-sm font-medium text-faint">이런 활동을 해요</h2>
-          <div className="space-y-5">
+        <Section title="우리는 이런 일을 하고 있습니다">
+          <div className="space-y-6">
             {maker.activities.map((a, i) => (
               <div key={i}>
-                {a.title && <p className="text-[17px] font-medium leading-snug text-ink">{a.title}</p>}
-                {a.desc && <p className="mt-1 text-[15px] leading-relaxed text-mute">{a.desc}</p>}
+                {a.title && (
+                  <p className="text-[18px] font-semibold leading-snug text-ink">{a.title}</p>
+                )}
+                {a.desc && (
+                  <p className="mt-1 text-[16px] leading-relaxed text-mute">{a.desc}</p>
+                )}
                 {a.photos.length > 0 && (
-                  <div className="mt-2.5 max-w-[460px]">
+                  <div className="mt-3 max-w-[460px]">
                     <PhotoSlider photos={a.photos} />
                   </div>
                 )}
               </div>
             ))}
           </div>
-        </section>
+        </Section>
       )}
 
-      {/* 결 — AI 보조층(파스텔, 검증처럼 강조하지 않음) */}
-      {maker.soul.values.length > 0 && (
-        <section className="mt-6">
-          <h2 className="mb-2 text-sm font-medium text-faint">분위기</h2>
-          <div className="flex flex-wrap gap-1.5">
-            {maker.soul.values.map((v) => (
-              <span
-                key={v}
-                className="inline-flex h-8 items-center rounded-sm bg-mint-pale px-2.5 text-[13px] font-medium text-mint-on"
-              >
-                {v}
-              </span>
+      {/* ⑤ 이런 협업을 기대하고 있어요 — offers */}
+      {(maker.offers.length > 0 || maker.offersNote) && (
+        <Section title="이런 협업을 기대하고 있어요">
+          {maker.offersNote && (
+            <p className="mb-3 whitespace-pre-line text-[17px] leading-relaxed text-body">
+              {maker.offersNote}
+            </p>
+          )}
+          {maker.offers.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {maker.offers.map((o) => (
+                <TypeChip key={o}>{o}</TypeChip>
+              ))}
+            </div>
+          )}
+        </Section>
+      )}
+
+      {/* ⑥ 이런 분들과 함께하고 싶어요 — seeks */}
+      {(maker.seeks.length > 0 || maker.seeksNote) && (
+        <Section title="이런 분들과 함께하고 싶어요">
+          {maker.seeksNote && (
+            <p className="mb-3 whitespace-pre-line text-[17px] leading-relaxed text-body">
+              {maker.seeksNote}
+            </p>
+          )}
+          {maker.seeks.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {maker.seeks.map((s) => (
+                <TypeChip key={s}>{s}</TypeChip>
+              ))}
+            </div>
+          )}
+        </Section>
+      )}
+
+      {/* 함께한 콜라보 — collabHistory */}
+      {maker.collabHistory.length > 0 && (
+        <Section title="함께한 콜라보">
+          <div className="space-y-4">
+            {maker.collabHistory.map((h, i) => (
+              <div key={i}>
+                <p className="text-[16px] text-body">
+                  <span className="font-semibold text-ink">{h.partner}</span>
+                  {h.types.length > 0 && <span className="text-mute"> · {h.types.join("·")}</span>}
+                  {h.year && <span className="text-mute"> · {h.year}</span>}
+                </p>
+                {h.desc && <p className="mt-0.5 text-[15px] leading-relaxed text-mute">{h.desc}</p>}
+                {h.photos.length > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {h.photos.map((src, k) => (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        key={k}
+                        src={src}
+                        alt={`${h.partner} 콜라보 사진 ${k + 1}`}
+                        className="h-16 w-16 shrink-0 rounded-sm object-cover"
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
             ))}
           </div>
-        </section>
+        </Section>
       )}
 
-      {/* 콜라보 유형 */}
-      {(maker.offers.length > 0 ||
-        maker.seeks.length > 0 ||
-        maker.offersNote ||
-        maker.seeksNote) && (
-        <section className="mt-6 grid gap-4 sm:grid-cols-2">
-          {(maker.offers.length > 0 || maker.offersNote) && (
-            <div>
-              <h2 className="mb-2 text-sm font-medium text-faint">제공할 수 있어요</h2>
-              {maker.offersNote && (
-                <p className="mb-2 whitespace-pre-line text-[15px] leading-relaxed text-body">
-                  {maker.offersNote}
-                </p>
-              )}
-              {maker.offers.length > 0 && (
-                <div className="flex flex-wrap gap-1.5">
-                  {maker.offers.map((o) => (
-                    <span
-                      key={o}
-                      className="inline-flex h-8 items-center rounded-pill border border-hairline bg-surface px-3 text-[13px] text-body"
-                    >
-                      {o}
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-          {(maker.seeks.length > 0 || maker.seeksNote) && (
-            <div>
-              <h2 className="mb-2 text-sm font-medium text-faint">찾고 있어요</h2>
-              {maker.seeksNote && (
-                <p className="mb-2 whitespace-pre-line text-[15px] leading-relaxed text-body">
-                  {maker.seeksNote}
-                </p>
-              )}
-              {maker.seeks.length > 0 && (
-                <div className="flex flex-wrap gap-1.5">
-                  {maker.seeks.map((s) => (
-                    <span
-                      key={s}
-                      className="inline-flex h-8 items-center rounded-pill border border-hairline bg-surface px-3 text-[13px] text-body"
-                    >
-                      {s}
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-        </section>
+      {/* ⑦ 저희는 이런 고객들과 함께 하고 있어요 — targetAudience */}
+      {maker.targetAudience.length > 0 && (
+        <Section title="저희는 이런 고객들과 함께 하고 있어요">
+          <div className="flex flex-wrap gap-2">
+            {maker.targetAudience.map((t) => (
+              <TypeChip key={t}>{t}</TypeChip>
+            ))}
+          </div>
+        </Section>
       )}
-
-      {/* 신뢰 시그널 — 검증 가능한 것만 */}
-      <section className="mt-6">
-        <h2 className="mb-2 text-sm font-medium text-faint">더 알아보기</h2>
-        <div className="flex flex-wrap gap-2">
-          {maker.trust.instagram && (
-            <TrustLink href={instagramUrl(maker.trust.instagram)}>
-              📷 {instagramHandle(maker.trust.instagram)}
-            </TrustLink>
-          )}
-          {maker.trust.homepage && (
-            <TrustLink href={normalizeUrl(maker.trust.homepage)}>
-              🔗 {prettyUrl(maker.trust.homepage)}
-            </TrustLink>
-          )}
-          {maker.trust.address && <TrustTag>📍 {maker.trust.address}</TrustTag>}
-        </div>
-        {maker.trust.description && (
-          <p className="mt-3 text-[17px] leading-relaxed text-body">
-            {maker.trust.description}
-          </p>
-        )}
-      </section>
 
       {/* 카드 만들기 */}
-      <div className="mt-8">
+      <div className="mt-12">
         <a
           href={`/m/${maker.slug}/card`}
           className="flex h-12 w-full items-center justify-center rounded-md bg-primary text-base font-medium text-primary-on"
@@ -172,9 +202,27 @@ export default async function MakerPage({
   );
 }
 
+// 소개서 섹션 — 편집물처럼 큰 타이틀 + 상단 구분선 + 내용
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section className="mt-9 border-t border-hairline pt-8">
+      <h2 className="mb-4 text-[21px] font-bold leading-snug tracking-tight text-ink">{title}</h2>
+      {children}
+    </section>
+  );
+}
+
+function TypeChip({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="inline-flex h-9 items-center rounded-pill border border-hairline bg-surface px-3.5 text-[15px] text-body">
+      {children}
+    </span>
+  );
+}
+
 function TrustTag({ children }: { children: React.ReactNode }) {
   return (
-    <span className="inline-flex h-8 items-center gap-1 rounded-sm bg-surface-soft px-3 text-[13px] font-medium text-mute">
+    <span className="inline-flex h-9 items-center gap-1 rounded-sm bg-surface-soft px-3 text-[14px] font-medium text-mute">
       {children}
     </span>
   );
@@ -187,7 +235,7 @@ function TrustLink({ href, children }: { href: string; children: React.ReactNode
       href={href}
       target="_blank"
       rel="noopener noreferrer nofollow"
-      className="inline-flex h-8 items-center gap-1 rounded-sm bg-surface-soft px-3 text-[13px] font-medium text-body transition-colors hover:bg-primary-pale hover:text-primary-on"
+      className="inline-flex h-9 items-center gap-1 rounded-sm bg-surface-soft px-3 text-[14px] font-medium text-body transition-colors hover:bg-primary-pale hover:text-primary-on"
     >
       {children}
     </a>
