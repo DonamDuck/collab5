@@ -6,7 +6,7 @@ import { createMakerAction } from "@/lib/actions";
 import type { CollabType } from "@/lib/types";
 import { deriveRegion } from "@/lib/region";
 import { fileToResizedDataUrl } from "@/lib/image";
-import type { EnrichField } from "@/lib/enrich";
+import type { ActivityHint, CollabHint, EnrichField } from "@/lib/enrich";
 import { EnrichWizard, type WizardFill } from "./EnrichWizard";
 
 // 편집 중 콜라보 이력 — 활동(activities)과 동일한 인라인 카드 패턴.
@@ -129,6 +129,11 @@ export default function RegisterPage() {
   const [aiFilled, setAiFilled] = useState<Set<string>>(new Set()); // AI가 채운 필드
   const [missing, setMissing] = useState<EnrichField[]>([]); // 못 찾은 필드(직접 입력 노티)
   const [reviewMode, setReviewMode] = useState(false); // 검수 게이트 배너
+  // 크롤이 발견한 활동·콜라보 힌트(참고용, 세션 한정 — 저장 안 함)
+  const [actHints, setActHints] = useState<ActivityHint[]>([]);
+  const [collabHints, setCollabHints] = useState<CollabHint[]>([]);
+  const [usedActHints, setUsedActHints] = useState<Set<number>>(new Set());
+  const [usedCollabHints, setUsedCollabHints] = useState<Set<number>>(new Set());
 
   // ── 초안받기 상태 ──
   const [draftBusy, setDraftBusy] = useState(false);
@@ -362,11 +367,54 @@ export default function RegisterPage() {
       filled.add("description");
       setDraftGenerated(true); // 위저드가 이미 소개 초안을 채움 → 버튼은 '다시 받기'로
     }
+    if (fill.activityHints?.length) {
+      setActHints(fill.activityHints);
+      setUsedActHints(new Set());
+    }
+    if (fill.collabHints?.length) {
+      setCollabHints(fill.collabHints);
+      setUsedCollabHints(new Set());
+    }
     setAiFilled(filled);
     setMissing([]);
     setReviewMode(true);
     setWizardOpen(false);
   };
+
+  // 힌트 '이 내용으로 시작하기' — 빈 카드 우선 채움, 없으면 새 카드(최대 3), 꽉 차면 불가
+  const applyActHint = (i: number) => {
+    const h = actHints[i];
+    if (!h) return;
+    setActivities((p) => {
+      const empty = p.findIndex((a) => !a.title.trim() && !a.desc.trim() && !a.photos.length);
+      if (empty >= 0)
+        return p.map((a, j) => (j === empty ? { ...a, title: h.title, desc: h.desc } : a));
+      if (p.length < 3) return [...p, { title: h.title, desc: h.desc, photos: [] }];
+      return p;
+    });
+    setUsedActHints((s) => new Set(s).add(i));
+  };
+  const canApplyActHint =
+    activities.some((a) => !a.title.trim() && !a.desc.trim() && !a.photos.length) ||
+    activities.length < 3;
+  const applyCollabHint = (i: number) => {
+    const h = collabHints[i];
+    if (!h) return;
+    setCollabHistory((p) => {
+      const empty = p.findIndex(
+        (c) => !c.partner.trim() && !c.desc.trim() && !c.types.length && !c.photos.length
+      );
+      if (empty >= 0)
+        return p.map((c, j) => (j === empty ? { ...c, partner: h.partner, desc: h.desc } : c));
+      if (p.length < 3) return [...p, { ...emptyHist(), partner: h.partner, desc: h.desc }];
+      return p;
+    });
+    setUsedCollabHints((s) => new Set(s).add(i));
+  };
+  const canApplyCollabHint =
+    collabHistory.some(
+      (c) => !c.partner.trim() && !c.desc.trim() && !c.types.length && !c.photos.length
+    ) || collabHistory.length < 3;
 
   // 라벨 옆 표시: AI가 채운 필드면 ✨배지, 못 찾은 필드면 "직접 입력" 노티
   const hintFor = (key: string, miss?: EnrichField) => {
@@ -758,6 +806,16 @@ export default function RegisterPage() {
           title="주로 어떤 활동을 하나요?"
           sub="대표 활동을 최대 3가지 소개해주세요. 사진도 담을 수 있어요."
         />
+        {actHints.length > 0 && (
+          <div className="-mt-3 mb-6">
+            <HintBanner
+              items={actHints.map((h) => ({ heading: h.title, desc: h.desc, source: h.source }))}
+              used={usedActHints}
+              canApply={canApplyActHint}
+              onApply={applyActHint}
+            />
+          </div>
+        )}
         <div className="space-y-4">
           {activities.map((act, i) => (
             <div
@@ -891,6 +949,16 @@ export default function RegisterPage() {
               지난 콜라보를 더하면 “검증된 파트너”라는 신호가 돼요.
             </p>
 
+            {collabHints.length > 0 && (
+              <div className="mb-3">
+                <HintBanner
+                  items={collabHints.map((h) => ({ heading: h.partner, desc: h.desc, source: h.source }))}
+                  used={usedCollabHints}
+                  canApply={canApplyCollabHint}
+                  onApply={applyCollabHint}
+                />
+              </div>
+            )}
             <div className="space-y-4">
               {collabHistory.map((h, i) => (
                 <div
@@ -1324,6 +1392,59 @@ function DescPicker({
           </div>
         );
       })}
+    </div>
+  );
+}
+
+// 크롤이 발견한 참고 힌트 — 접힌 배너 → 펼침. 창작 아님(웹에서 찾은 내용만).
+function HintBanner({
+  items,
+  used,
+  canApply,
+  onApply,
+}: {
+  items: { heading: string; desc: string; source: string }[];
+  used: Set<number>;
+  canApply: boolean;
+  onApply: (i: number) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  if (!items.length) return null;
+  return (
+    <div className="rounded-md border border-hairline bg-primary-pale/60">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center justify-between px-3 py-2.5 text-left text-sm font-medium text-primary-on"
+      >
+        <span>✨ 웹에서 참고할 만한 정보를 찾았어요 ({items.length}건)</span>
+        <span className="text-mute">{open ? "∧" : "∨"}</span>
+      </button>
+      {open && (
+        <div className="space-y-3 border-t border-hairline px-3 py-3">
+          {items.map((it, i) => {
+            const isUsed = used.has(i);
+            return (
+              <div key={i}>
+                <span className="inline-flex h-6 items-center rounded-pill bg-surface px-2 text-[12px] text-mute">
+                  {it.source}
+                </span>
+                <p className="mt-1 text-sm font-semibold text-ink">{it.heading}</p>
+                <p className="mt-0.5 text-sm leading-relaxed text-body">{it.desc}</p>
+                <button
+                  type="button"
+                  onClick={() => onApply(i)}
+                  disabled={isUsed || !canApply}
+                  className="mt-1.5 text-[13px] font-medium text-primary-on underline-offset-2 hover:underline disabled:no-underline disabled:opacity-50"
+                >
+                  {isUsed ? "✓ 넣었어요" : "이 내용으로 시작하기"}
+                </button>
+              </div>
+            );
+          })}
+          <p className="text-[12px] text-faint">ⓘ 웹에서 찾은 내용이에요.</p>
+        </div>
+      )}
     </div>
   );
 }
