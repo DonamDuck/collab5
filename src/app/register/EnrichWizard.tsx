@@ -240,6 +240,9 @@ export function EnrichWizard({
                 <p className="pr-8 text-lg font-bold text-ink">
                   먼저, 브랜드를 한 문장으로 알려주세요.
                 </p>
+                <p className="mt-1.5 text-[15px] leading-relaxed text-mute">
+                  간단하게 적어주셔도 AI가 초안을 만드는 데 큰 도움이 돼요.
+                </p>
                 <textarea
                   value={intro}
                   onChange={(e) => setIntro(e.target.value)}
