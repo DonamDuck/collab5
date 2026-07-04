@@ -2,7 +2,7 @@
 
 import { repo } from "./repo";
 import { deriveRegion } from "./region";
-import type { CollabHistory, CollabType, Maker } from "./types";
+import type { Activity, CollabHistory, CollabType, Maker } from "./types";
 
 export interface RegisterInput {
   name: string;
@@ -12,6 +12,10 @@ export interface RegisterInput {
   values: string[]; // 분위기칩(우리를 표현하는 말)
   targetAudience: string[]; // 이런 분들과 만나요
   collabHistory: CollabHistory[]; // 함께한 콜라보
+  story?: string;
+  activities?: Activity[];
+  offersNote?: string;
+  seeksNote?: string;
   photos?: string[]; // 브랜드 사진(리사이즈 data URL)
   collabOpen: boolean;
   instagram?: string;
@@ -42,6 +46,10 @@ export async function createMakerAction(
     seeks: input.seeks,
     targetAudience: input.targetAudience,
     collabHistory: input.collabHistory,
+    story: input.story?.trim() ?? "",
+    activities: input.activities ?? [],
+    offersNote: input.offersNote?.trim() ?? "",
+    seeksNote: input.seeksNote?.trim() ?? "",
     photos: input.photos ?? [],
     soul: { values: input.values, tone: "", trajectory: "" },
     trust: {
