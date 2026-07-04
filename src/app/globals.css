@@ -75,7 +75,7 @@
   --font-sans: var(--font-sans);
 }
 
-html { background: var(--canvas); }
+html { background: var(--canvas); font-size: 17px; }
 body {
   background: var(--canvas);
   color: var(--ink);
