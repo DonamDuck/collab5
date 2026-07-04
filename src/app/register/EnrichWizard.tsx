@@ -52,6 +52,10 @@ export function EnrichWizard({
   const [kwInput, setKwInput] = useState("");
   const [options, setOptions] = useState<EnrichOptions | null>(null);
   const [errMsg, setErrMsg] = useState("");
+  const [interviewStep, setInterviewStep] = useState(0); // 0=소개 1=지역 2=키워드 3=이야기
+  const [storyNote, setStoryNote] = useState(""); // 꼭 담고 싶은 이야기(자유양식 장문)
+  const nextInterview = () => setInterviewStep((s) => s + 1);
+  const backInterview = () => setInterviewStep((s) => Math.max(0, s - 1));
 
   // 개별 필드(수정 가능)
   const [fName, setFName] = useState("");
@@ -102,6 +106,11 @@ export function EnrichWizard({
             .then((d) => (typeof d.research === "string" ? d.research : ""))
             .catch(() => "")
         : (await researchRef.current) ?? "";
+      const noteParts = [
+        intro.trim(),
+        storyNote.trim() && `꼭 담고 싶은 이야기: ${storyNote.trim()}`,
+      ].filter(Boolean);
+      const ownerNote = noteParts.length ? noteParts.join("\n\n") : undefined;
       const r = await fetch("/api/enrich", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -110,7 +119,7 @@ export function EnrichWizard({
           name: query,
           research,
           focusKeywords: keywords,
-          ownerNote: intro.trim() || undefined,
+          ownerNote,
         }),
       });
       const d = await r.json();
@@ -205,115 +214,178 @@ export function EnrichWizard({
 
         {kind === "keywords" && (
           <div>
-            <p className="pr-8 text-lg font-bold text-ink">소개의 방향을 함께 정해볼까요?</p>
-            <p className="mt-1.5 text-[15px] leading-relaxed text-mute">
-              몇 줄만 적어주시면, 그 내용을 바탕으로 브랜드 소개 초안을 만들어드려요.
-            </p>
-
-            {/* 사장 핵심 설명 — 생성의 중심축 */}
-            <div className="mt-5">
-              <label className="mb-2 block text-[15px] font-semibold text-body">
-                브랜드를 짧게 소개해주세요.
-              </label>
-              <textarea
-                value={intro}
-                onChange={(e) => setIntro(e.target.value)}
-                rows={3}
-                placeholder="예: 버려지는 천으로 가방을 만드는 업사이클링 브랜드예요. 직접 만드는 워크숍도 함께 운영하고 있어요."
-                className="w-full rounded-sm border border-hairline bg-surface px-3 py-2.5 text-base leading-relaxed text-ink outline-none placeholder:text-faint focus:border-focus"
-              />
-              <p className="mt-1.5 text-[13px] leading-relaxed text-mute">
-                한두 문장이면 충분해요. 적어주실수록 브랜드에 더 잘 맞는 소개를 만들어드릴 수 있어요.
-              </p>
+            {/* 인터뷰 진행 헤더 (n/4) — 결과 단계 헤더와 분리 */}
+            <div className="mb-3 flex items-center gap-2 pr-8">
+              {interviewStep > 0 && (
+                <button
+                  type="button"
+                  onClick={backInterview}
+                  className="-ml-1 inline-flex items-center gap-1 text-xs font-medium text-mute hover:text-ink"
+                >
+                  ← 뒤로
+                </button>
+              )}
+              <span className="ml-auto text-xs font-medium text-mute">
+                {interviewStep + 1} / 4
+              </span>
             </div>
 
-            {/* 개략 지역 — 동명 업체 구분 + 검색 정확도 */}
-            <div className="mt-5">
-              <label className="mb-2 block text-[15px] font-semibold text-body">
-                어떤 지역에 있으신가요? <span className="font-normal text-faint">· 선택</span>
-              </label>
-              <input
-                value={regionInput}
-                onChange={(e) => setRegionInput(e.target.value)}
-                placeholder="예: 서울 종로구"
-                className="h-11 w-full rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
-              />
-              <p className="mt-1.5 text-[13px] leading-relaxed text-mute">
-                대략만 알려주셔도 돼요. 같은 이름의 다른 곳과 헷갈리지 않게 더 정확히 찾아드려요.
-              </p>
-            </div>
+            {/* 1/4 — 짧은 소개 */}
+            {interviewStep === 0 && (
+              <div>
+                <p className="pr-8 text-lg font-bold text-ink">
+                  먼저, 브랜드를 한 문장으로 알려주세요.
+                </p>
+                <textarea
+                  value={intro}
+                  onChange={(e) => setIntro(e.target.value)}
+                  rows={3}
+                  placeholder="예: 버려지는 천으로 가방을 만드는 업사이클링 브랜드예요. 직접 만드는 워크숍도 함께 운영하고 있어요."
+                  className="mt-4 w-full rounded-sm border border-hairline bg-surface px-3 py-2.5 text-base leading-relaxed text-ink outline-none placeholder:text-faint focus:border-focus"
+                />
+                <p className="mt-1.5 text-[13px] leading-relaxed text-mute">
+                  한두 문장이면 충분해요. 적어주실수록 브랜드에 더 잘 맞는 소개를 만들어드릴 수 있어요.
+                </p>
+                <button
+                  onClick={nextInterview}
+                  className="mt-5 h-11 w-full rounded-md bg-primary text-sm font-medium text-primary-on"
+                >
+                  다음 (1/4)
+                </button>
+                <SkipLink onClick={nextInterview} />
+              </div>
+            )}
 
-            {/* 가중 키워드 */}
-            <label className="mb-2 mt-6 block text-[15px] font-semibold text-body">
-              강조할 키워드 <span className="font-normal text-faint">· 선택 · 최대 {MAX_KEYWORDS}개</span>
-            </label>
-            <div className="flex flex-wrap gap-2">
-              {SUGGESTED_KEYWORDS.map((k) => {
-                const on = keywords.includes(k);
-                const full = !on && keywords.length >= MAX_KEYWORDS;
-                return (
+            {/* 2/4 — 지역 */}
+            {interviewStep === 1 && (
+              <div>
+                <p className="pr-8 text-lg font-bold text-ink">
+                  좋아요. 어디에 있는 브랜드인가요?
+                </p>
+                <input
+                  value={regionInput}
+                  onChange={(e) => setRegionInput(e.target.value)}
+                  placeholder="예: 서울 종로구"
+                  className="mt-4 h-11 w-full rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
+                />
+                <p className="mt-1.5 text-[13px] leading-relaxed text-mute">
+                  대략만 알려주셔도 돼요. 같은 이름의 다른 곳과 헷갈리지 않게 더 정확히 찾아드려요.
+                </p>
+                <button
+                  onClick={nextInterview}
+                  className="mt-5 h-11 w-full rounded-md bg-primary text-sm font-medium text-primary-on"
+                >
+                  다음 (2/4)
+                </button>
+                <SkipLink onClick={nextInterview} />
+              </div>
+            )}
+
+            {/* 3/4 — 키워드 */}
+            {interviewStep === 2 && (
+              <div>
+                <p className="pr-8 text-lg font-bold text-ink">
+                  강조하고 싶은 키워드나 단어가 있나요?
+                </p>
+                <p className="mt-1.5 text-[15px] leading-relaxed text-mute">
+                  최대 {MAX_KEYWORDS}개까지 고를 수 있어요.
+                </p>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {SUGGESTED_KEYWORDS.map((k) => {
+                    const on = keywords.includes(k);
+                    const full = !on && keywords.length >= MAX_KEYWORDS;
+                    return (
+                      <button
+                        key={k}
+                        type="button"
+                        onClick={() => toggleKw(k)}
+                        disabled={full}
+                        className={`inline-flex h-9 items-center rounded-pill border px-3.5 text-sm transition-colors ${
+                          on
+                            ? "border-primary bg-primary-tint text-primary-on"
+                            : "border-hairline bg-surface text-mute"
+                        } ${full ? "cursor-not-allowed opacity-40" : ""}`}
+                      >
+                        {k}
+                        {on ? " ✓" : ""}
+                      </button>
+                    );
+                  })}
+                  {keywords
+                    .filter((k) => !SUGGESTED_KEYWORDS.includes(k))
+                    .map((k) => (
+                      <button
+                        key={k}
+                        type="button"
+                        onClick={() => toggleKw(k)}
+                        className="inline-flex h-9 items-center rounded-pill border border-primary bg-primary-tint px-3.5 text-sm text-primary-on"
+                      >
+                        {k} ✕
+                      </button>
+                    ))}
+                </div>
+                <div className="mt-3 flex gap-2">
+                  <input
+                    value={kwInput}
+                    onChange={(e) => setKwInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+                        e.preventDefault();
+                        addKw();
+                      }
+                    }}
+                    placeholder="직접 더하기 (예: 반려동물)"
+                    disabled={keywords.length >= MAX_KEYWORDS}
+                    className="h-11 flex-1 rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus disabled:opacity-40"
+                  />
                   <button
-                    key={k}
                     type="button"
-                    onClick={() => toggleKw(k)}
-                    disabled={full}
-                    className={`inline-flex h-9 items-center rounded-pill border px-3.5 text-sm transition-colors ${
-                      on
-                        ? "border-primary bg-primary-tint text-primary-on"
-                        : "border-hairline bg-surface text-mute"
-                    } ${full ? "cursor-not-allowed opacity-40" : ""}`}
+                    onClick={addKw}
+                    disabled={keywords.length >= MAX_KEYWORDS}
+                    className="h-11 shrink-0 rounded-md border border-border-strong bg-surface px-4 text-sm font-medium text-ink disabled:opacity-40"
                   >
-                    {k}
-                    {on ? " ✓" : ""}
+                    추가
                   </button>
-                );
-              })}
-              {keywords
-                .filter((k) => !SUGGESTED_KEYWORDS.includes(k))
-                .map((k) => (
-                  <button
-                    key={k}
-                    type="button"
-                    onClick={() => toggleKw(k)}
-                    className="inline-flex h-9 items-center rounded-pill border border-primary bg-primary-tint px-3.5 text-sm text-primary-on"
-                  >
-                    {k} ✕
-                  </button>
-                ))}
-            </div>
-            <div className="mt-3 flex gap-2">
-              <input
-                value={kwInput}
-                onChange={(e) => setKwInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.nativeEvent.isComposing) {
-                    e.preventDefault();
-                    addKw();
-                  }
-                }}
-                placeholder="직접 더하기 (예: 반려동물)"
-                disabled={keywords.length >= MAX_KEYWORDS}
-                className="h-11 flex-1 rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus disabled:opacity-40"
-              />
-              <button
-                type="button"
-                onClick={addKw}
-                disabled={keywords.length >= MAX_KEYWORDS}
-                className="h-11 shrink-0 rounded-md border border-border-strong bg-surface px-4 text-sm font-medium text-ink disabled:opacity-40"
-              >
-                추가
-              </button>
-            </div>
-            <p className="mt-2 text-xs text-mute">
-              {keywords.length} / {MAX_KEYWORDS} · 그동안 {query}
-              {josa(query, "을", "를")} 미리 찾고 있어요
-            </p>
-            <button
-              onClick={runOptions}
-              className="mt-4 h-11 w-full rounded-md bg-primary text-sm font-medium text-primary-on"
-            >
-              {intro.trim() || keywords.length ? "이 방향으로 찾기" : "그냥 찾아주세요"}
-            </button>
+                </div>
+                <p className="mt-2 text-xs text-mute">
+                  {keywords.length} / {MAX_KEYWORDS} · 그동안 {query}
+                  {josa(query, "을", "를")} 미리 찾고 있어요
+                </p>
+                <button
+                  onClick={nextInterview}
+                  className="mt-4 h-11 w-full rounded-md bg-primary text-sm font-medium text-primary-on"
+                >
+                  다음 (3/4)
+                </button>
+                <SkipLink onClick={nextInterview} />
+              </div>
+            )}
+
+            {/* 4/4 — 꼭 담고 싶은 이야기 */}
+            {interviewStep === 3 && (
+              <div>
+                <p className="pr-8 text-lg font-bold text-ink">
+                  마지막으로, 소개에 꼭 담고 싶은 이야기가 있나요?
+                </p>
+                <p className="mt-1.5 text-[15px] leading-relaxed text-mute">
+                  AI가 소개 초안을 만들 때 함께 참고할게요.
+                </p>
+                <textarea
+                  value={storyNote}
+                  onChange={(e) => setStoryNote(e.target.value)}
+                  rows={5}
+                  placeholder="예: 창업 계기, 꼭 알리고 싶은 특징, 강조하고 싶은 가치… 편하게 적어주세요."
+                  className="mt-4 w-full rounded-sm border border-hairline bg-surface px-3 py-2.5 text-base leading-relaxed text-ink outline-none placeholder:text-faint focus:border-focus"
+                />
+                <button
+                  onClick={runOptions}
+                  className="mt-5 h-11 w-full rounded-md bg-primary text-sm font-medium text-primary-on"
+                >
+                  ✨ 초안 받기 (4/4)
+                </button>
+                <SkipLink onClick={runOptions} />
+              </div>
+            )}
           </div>
         )}
 
@@ -390,6 +462,19 @@ export function EnrichWizard({
         )}
       </div>
     </div>
+  );
+}
+
+// 인터뷰 각 스텝 하단 '건너뛰기' — 값은 지우지 않고 다음 스텝으로 진행
+function SkipLink({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="mt-2 block w-full text-center text-sm text-mute hover:text-ink"
+    >
+      건너뛰기
+    </button>
   );
 }
 
