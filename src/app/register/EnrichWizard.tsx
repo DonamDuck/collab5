@@ -427,6 +427,10 @@ export function EnrichWizard({
                 sel={oneLinerSel}
                 onSelect={setOneLinerSel}
                 onEdit={(i, v) => setOneLinerList((p) => p.map((x, j) => (j === i ? v : x)))}
+                onAddCustom={() => {
+                  setOneLinerList((p) => [...p, ""]);
+                  setOneLinerSel(oneLinerList.length);
+                }}
               />
             </div>
             <button
@@ -449,6 +453,10 @@ export function EnrichWizard({
                 sel={descSel}
                 onSelect={setDescSel}
                 onEdit={(i, v) => setDescList((p) => p.map((x, j) => (j === i ? v : x)))}
+                onAddCustom={() => {
+                  setDescList((p) => [...p, ""]);
+                  setDescSel(descList.length);
+                }}
                 multiline
               />
             </div>
@@ -533,12 +541,14 @@ function OptionPicker({
   onSelect,
   onEdit,
   multiline,
+  onAddCustom,
 }: {
   list: string[];
   sel: number;
   onSelect: (i: number) => void;
   onEdit: (i: number, v: string) => void;
   multiline?: boolean;
+  onAddCustom?: () => void;
 }) {
   const [editing, setEditing] = useState<number | null>(null);
   const setSel = onSelect;
@@ -612,6 +622,18 @@ function OptionPicker({
           </div>
         );
       })}
+      {onAddCustom && (
+        <button
+          type="button"
+          onClick={() => {
+            onAddCustom();
+            setEditing(list.length);
+          }}
+          className="flex w-full items-center justify-center gap-1 rounded-md border border-dashed border-border-strong bg-surface py-2.5 text-sm text-mute transition-colors hover:border-primary hover:text-primary-on"
+        >
+          ＋ 직접 입력하기
+        </button>
+      )}
     </div>
   );
 }
