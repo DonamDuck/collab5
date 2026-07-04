@@ -19,6 +19,7 @@ export interface ActivityWire {
 export interface HistoryWire {
   partner: string;
   types: string[];
+  desc?: string;
   year?: string;
   photos: PhotoWire[];
 }
@@ -69,6 +70,7 @@ export async function createMakerAction(
     collabHistory: input.collabHistory.map((h) => ({
       partner: h.partner,
       types: h.types,
+      desc: h.desc?.trim() || undefined,
       year: h.year,
       photos: unwrapPhotos(h.photos),
     })),

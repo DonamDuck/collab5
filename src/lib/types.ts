@@ -32,6 +32,7 @@ export interface TrustSignals {
 export interface CollabHistory {
   partner: string; // 함께한 곳
   types: string[]; // 콜라보 유형 (CollabType 또는 자유 입력)
+  desc?: string; // 콜라보 내용 한 줄 소개
   year?: string; // 년도 (최신순 정렬용)
   photos: string[]; // 콜라보 사진 최대 3
 }
