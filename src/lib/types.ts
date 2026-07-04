@@ -3,13 +3,13 @@
 
 /** 하드 축 (클릭=필터). design.md 등록폼 / Notion §6-1 */
 export type CollabType =
-  | "공간대여"
-  | "제품컬래버"
-  | "워크숍"
+  | "제품콜라보"
   | "팝업"
-  | "굿즈"
-  | "콘텐츠"
-  | "행사참여";
+  | "워크숍"
+  | "공동굿즈"
+  | "공동콘텐츠"
+  | "행사참여"
+  | "공간대여";
 
 export type BusinessSize = "1인" | "소규모" | "중간" | "대형";
 
@@ -33,7 +33,11 @@ export interface CollabHistory {
   partner: string; // 함께한 곳
   types: string[]; // 콜라보 유형 (CollabType 또는 자유 입력)
   year?: string; // 년도 (최신순 정렬용)
+  photos: string[]; // 콜라보 사진 최대 3
 }
+
+/** 대표 활동 — 제목·설명·사진(최대 3) */
+export interface Activity { title: string; desc: string; photos: string[]; }
 
 /** 업체 프로필 = 콜라보 카드의 '집' + 공개 상세페이지(검색 대상) */
 export interface Maker {
@@ -49,6 +53,10 @@ export interface Maker {
   seeks: CollabType[]; // 희망
   targetAudience: string[];
   collabHistory: CollabHistory[]; // 함께한 콜라보 이력
+  story: string;          // 왜 시작했나
+  activities: Activity[];  // 대표 활동 최대 3
+  offersNote: string;      // 협업 직접 설명
+  seeksNote: string;       // 파트너 직접 설명
   photos: string[]; // 브랜드 사진(카드·프로필 슬라이드용). MVP=리사이즈 data URL
   soul: SoulLayer;
   trust: TrustSignals;
