@@ -120,19 +120,64 @@ export default async function CardPage({
           </div>
         )}
 
+        {/* 시작한 이야기 — 왜 이 브랜드를 시작했나 */}
+        {maker.story && (
+          <div className="mt-5">
+            <p className="text-[12px] font-medium tracking-wide text-faint">시작한 이야기</p>
+            <p className="mt-2 whitespace-pre-line text-[15px] leading-relaxed text-body">
+              {maker.story}
+            </p>
+          </div>
+        )}
+
+        {/* 이런 활동을 해요 — 대표 활동 + 사진 */}
+        {maker.activities.length > 0 && (
+          <div className="mt-5">
+            <p className="text-[12px] font-medium tracking-wide text-faint">이런 활동을 해요</p>
+            <div className="mt-2 space-y-3">
+              {maker.activities.map((a, i) => (
+                <div key={i}>
+                  {a.title && <p className="text-[15px] font-medium leading-snug text-ink">{a.title}</p>}
+                  {a.desc && <p className="mt-0.5 text-[14px] leading-relaxed text-mute">{a.desc}</p>}
+                  {a.photos.length > 0 && (
+                    <div className="mt-2">
+                      <PhotoSlider photos={a.photos} rounded="rounded-md" />
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* 함께한 콜라보 — 수신자 신뢰의 결정타 */}
         {maker.collabHistory.length > 0 ? (
           <div className="mt-5">
             <p className="text-[12px] font-medium tracking-wide text-faint">함께한 콜라보</p>
-            <div className="mt-2 space-y-1">
+            <div className="mt-2 space-y-2.5">
               {maker.collabHistory.map((h, i) => (
-                <p key={i} className="text-[14px] text-body">
-                  <span className="font-medium text-ink">{h.partner}</span>
-                  {h.types.length > 0 && (
-                    <span className="text-mute"> · {h.types.join("·")}</span>
+                <div key={i}>
+                  <p className="text-[14px] text-body">
+                    <span className="font-medium text-ink">{h.partner}</span>
+                    {h.types.length > 0 && (
+                      <span className="text-mute"> · {h.types.join("·")}</span>
+                    )}
+                    {h.year && <span className="text-mute"> · {h.year}</span>}
+                  </p>
+                  {h.photos.length > 0 && (
+                    <div className="mt-1.5 flex gap-1.5">
+                      {h.photos.map((src, k) => (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          key={k}
+                          src={src}
+                          alt={`${h.partner} 콜라보 사진 ${k + 1}`}
+                          className="h-14 w-14 shrink-0 rounded-sm object-cover"
+                        />
+                      ))}
+                    </div>
                   )}
-                  {h.year && <span className="text-mute"> · {h.year}</span>}
-                </p>
+                </div>
               ))}
             </div>
           </div>
@@ -181,6 +226,13 @@ export default async function CardPage({
             </p>
           )}
 
+          {/* 협업 직접 설명 — 제공 칩 위 문구 */}
+          {maker.offersNote && (
+            <p className="mt-4 whitespace-pre-line text-[15px] leading-relaxed text-body">
+              {maker.offersNote}
+            </p>
+          )}
+
           {/* 하드축 칩(키위틴트) + 결 칩(파스텔, 보조층) */}
           {(maker.offers.length > 0 || maker.soul.values.length > 0) && (
             <div className="mt-4 flex flex-wrap gap-1.5">
@@ -201,6 +253,13 @@ export default async function CardPage({
                 </span>
               ))}
             </div>
+          )}
+
+          {/* 파트너 직접 설명 — 찾는 콜라보 칩 위 문구 */}
+          {maker.seeksNote && (
+            <p className="mt-4 whitespace-pre-line text-[15px] leading-relaxed text-body">
+              {maker.seeksNote}
+            </p>
           )}
 
           {/* 찾는 콜라보 — 제안 접점 (수신자가 "내가 줄 수 있는 게 있나") */}
