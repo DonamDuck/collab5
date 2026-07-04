@@ -37,13 +37,17 @@ const seedMakers: Maker[] = [
     oneLiner: "패브릭으로 짓는 친환경 가방과 조각 워크숍",
     region: "서울",
     size: "소규모",
-    offers: ["워크숍", "제품컬래버", "팝업"],
-    seeks: ["공간대여", "행사참여", "콘텐츠"],
+    offers: ["워크숍", "제품콜라보", "팝업"],
+    seeks: ["공간대여", "행사참여", "공동콘텐츠"],
     targetAudience: ["20-30대 여성", "친환경 라이프스타일", "핸드메이드 애호가"],
     collabHistory: [
-      { partner: "오월의숲", types: ["팝업", "워크숍"], year: "2025" },
-      { partner: "스톤브루", types: ["제품컬래버"] },
+      { partner: "오월의숲", types: ["팝업", "워크숍"], year: "2025", photos: [] },
+      { partner: "스톤브루", types: ["제품콜라보"], photos: [] },
     ],
+    story: "",
+    activities: [],
+    offersNote: "",
+    seeksNote: "",
     photos: [
       "https://picsum.photos/seed/canvasgarden1/900/700",
       "https://picsum.photos/seed/canvasgarden2/900/700",
@@ -71,9 +75,13 @@ const seedMakers: Maker[] = [
     region: "서울 연남",
     size: "소규모",
     offers: ["공간대여", "팝업", "행사참여"],
-    seeks: ["워크숍", "제품컬래버"],
+    seeks: ["워크숍", "제품콜라보"],
     targetAudience: ["빈티지 애호가", "동네 단골", "감성 공간 탐방러"],
     collabHistory: [],
+    story: "",
+    activities: [],
+    offersNote: "",
+    seeksNote: "",
     photos: [],
     soul: {
       values: ["빈티지", "큐레이션", "계절감"],
@@ -95,10 +103,14 @@ const seedMakers: Maker[] = [
     oneLiner: "직접 로스팅하는 동네 스페셜티 카페",
     region: "부산 영도",
     size: "소규모",
-    offers: ["공간대여", "콘텐츠", "굿즈"],
-    seeks: ["제품컬래버", "팝업"],
+    offers: ["공간대여", "공동콘텐츠", "공동굿즈"],
+    seeks: ["제품콜라보", "팝업"],
     targetAudience: ["커피 애호가", "로컬 워커", "여행자"],
     collabHistory: [],
+    story: "",
+    activities: [],
+    offersNote: "",
+    seeksNote: "",
     photos: [],
     soul: {
       values: ["로컬", "정성", "느긋함"],
@@ -121,9 +133,13 @@ const seedMakers: Maker[] = [
     region: "제주",
     size: "1인",
     offers: ["워크숍", "행사참여", "공간대여"],
-    seeks: ["콘텐츠", "굿즈"],
+    seeks: ["공동콘텐츠", "공동굿즈"],
     targetAudience: ["그림책 애호가", "아이와 부모", "여행자"],
     collabHistory: [],
+    story: "",
+    activities: [],
+    offersNote: "",
+    seeksNote: "",
     photos: [],
     soul: {
       values: ["다정함", "느린 호흡", "손글씨"],
@@ -218,6 +234,7 @@ interface MakerRow {
   region: string | null; size: string | null;
   offers: string[]; seeks: string[]; target_audience: string[];
   collab_history: Maker["collabHistory"];
+  story: string; activities: Maker["activities"]; offers_note: string; seeks_note: string;
   photos: string[] | null;
   soul: Maker["soul"]; trust: Maker["trust"];
   collab_open: boolean; created_at: string;
@@ -238,7 +255,11 @@ function rowToMaker(r: MakerRow): Maker {
     size: (r.size as BusinessSize) ?? undefined,
     offers: r.offers as CollabType[], seeks: r.seeks as CollabType[],
     targetAudience: r.target_audience,
-    collabHistory: r.collab_history ?? [],
+    collabHistory: (r.collab_history ?? []).map((h) => ({ ...h, photos: h.photos ?? [] })),
+    story: r.story ?? "",
+    activities: r.activities ?? [],
+    offersNote: r.offers_note ?? "",
+    seeksNote: r.seeks_note ?? "",
     photos: r.photos ?? [],
     soul: r.soul, trust: r.trust,
     collabOpen: r.collab_open, createdAt: r.created_at,
@@ -259,6 +280,7 @@ class SupabaseRepo implements Repo {
       region: input.region ?? null, size: input.size ?? null,
       offers: input.offers, seeks: input.seeks, target_audience: input.targetAudience,
       collab_history: input.collabHistory,
+      story: input.story, activities: input.activities, offers_note: input.offersNote, seeks_note: input.seeksNote,
       photos: input.photos,
       soul: input.soul, trust: input.trust, collab_open: input.collabOpen, created_at: now(),
     };
