@@ -1255,7 +1255,7 @@ export default function RegisterPage() {
 
 function GroupHeader({ n, title, sub }: { n: string; title: string; sub?: string }) {
   return (
-    <div className="mb-[-28px] flex items-baseline gap-2 border-b border-hairline pb-2">
+    <div className="mb-[23px] flex items-baseline gap-2 border-b border-hairline pb-2">
       <span className="rounded-pill bg-primary-tint px-2 py-0.5 text-sm font-bold text-primary-on">
         {n}
       </span>
