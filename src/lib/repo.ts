@@ -341,8 +341,12 @@ class SupabaseRepo implements Repo {
   }
 }
 
-// SUPABASE_URL + SUPABASE_ANON_KEY 있으면 SupabaseRepo, 없으면 mock(로컬 개발용)
+// DB 접근은 전부 서버(server action/컴포넌트)에서만 일어남 → RLS를 켜고 서버는
+// service_role 키로 접근(RLS 우회)하는 게 정석. service_role 키가 없으면 anon으로 폴백.
+// ⚠️ service_role 키는 서버 전용 — 절대 NEXT_PUBLIC_로 노출 금지.
+const SUPABASE_KEY =
+  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
 export const repo: Repo =
-  process.env.SUPABASE_URL && process.env.SUPABASE_ANON_KEY
-    ? new SupabaseRepo(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY)
+  process.env.SUPABASE_URL && SUPABASE_KEY
+    ? new SupabaseRepo(process.env.SUPABASE_URL, SUPABASE_KEY)
     : new InMemoryRepo();
