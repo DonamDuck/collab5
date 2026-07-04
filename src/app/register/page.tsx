@@ -3,7 +3,7 @@
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createMakerAction } from "@/lib/actions";
-import type { CollabHistory, CollabType } from "@/lib/types";
+import type { CollabType } from "@/lib/types";
 import { deriveRegion } from "@/lib/region";
 import { fileToResizedDataUrl } from "@/lib/image";
 import type { EnrichField } from "@/lib/enrich";
@@ -14,6 +14,14 @@ import {
   downloadPortfolioPdf,
   type PortfolioData,
 } from "./PortfolioCard";
+
+// 편집 중 콜라보 이력 — photos는 {url,file?}로 다루고 제출 시 string[]로 리사이즈.
+type HistItem = {
+  partner: string;
+  types: string[];
+  year?: string;
+  photos: { url: string; file?: File }[];
+};
 
 const COLLAB_TYPES: CollabType[] = [
   "제품콜라보",
@@ -66,11 +74,12 @@ export default function RegisterPage() {
   const [customVibe, setCustomVibe] = useState("");
   const [targetAudience, setTargetAudience] = useState<string[]>([]);
   const [customAudience, setCustomAudience] = useState("");
-  const [collabHistory, setCollabHistory] = useState<CollabHistory[]>([]);
+  const [collabHistory, setCollabHistory] = useState<HistItem[]>([]);
   const [histDraft, setHistDraft] = useState<{
     partner: string;
     types: string[];
     year: string;
+    photos: { url: string; file?: File }[];
   } | null>(null);
   const [histCustomType, setHistCustomType] = useState("");
   const [collabOpen, setCollabOpen] = useState(true);
@@ -79,6 +88,13 @@ export default function RegisterPage() {
   const [description, setDescription] = useState("");
   const [address, setAddress] = useState("");
   const [photos, setPhotos] = useState<{ name: string; url: string; file: File }[]>([]);
+  // ── 소개서 개편 신규 필드 ──
+  const [story, setStory] = useState("");
+  const [activities, setActivities] = useState<
+    { title: string; desc: string; photos: { url: string; file?: File }[] }[]
+  >([{ title: "", desc: "", photos: [] }]);
+  const [offersNote, setOffersNote] = useState("");
+  const [seeksNote, setSeeksNote] = useState("");
   const region = deriveRegion(address); // 주소에서 자동 추출 (별도 입력 없음)
 
   // ── enrich(딸깍 자동완성) 상태 ──
@@ -140,7 +156,7 @@ export default function RegisterPage() {
           partner: histDraft.partner.trim(),
           types: histDraft.types,
           year: histDraft.year && histDraft.year !== "모름" ? histDraft.year : undefined,
-          photos: [],
+          photos: histDraft.photos,
         },
       ].slice(0, 3)
     );
@@ -149,6 +165,36 @@ export default function RegisterPage() {
   };
   const removeHistory = (i: number) =>
     setCollabHistory((p) => p.filter((_, j) => j !== i));
+  const addHistPhotos = (files: FileList | null) => {
+    if (!files) return;
+    const next = Array.from(files)
+      .filter((f) => f.type.startsWith("image/"))
+      .map((f) => ({ url: URL.createObjectURL(f), file: f }));
+    setHistDraft((d) => (d ? { ...d, photos: [...d.photos, ...next].slice(0, 3) } : d));
+  };
+  const removeHistPhoto = (k: number) =>
+    setHistDraft((d) => (d ? { ...d, photos: d.photos.filter((_, x) => x !== k) } : d));
+
+  // ── 대표 활동 (최대 3세트) ──
+  const addActivity = () =>
+    setActivities((p) => (p.length >= 3 ? p : [...p, { title: "", desc: "", photos: [] }]));
+  const setAct = (i: number, patch: Partial<{ title: string; desc: string }>) =>
+    setActivities((p) => p.map((a, j) => (j === i ? { ...a, ...patch } : a)));
+  const addActPhotos = (i: number, files: FileList | null) => {
+    if (!files) return;
+    const next = Array.from(files)
+      .filter((f) => f.type.startsWith("image/"))
+      .map((f) => ({ url: URL.createObjectURL(f), file: f }));
+    setActivities((p) =>
+      p.map((a, j) => (j === i ? { ...a, photos: [...a.photos, ...next].slice(0, 3) } : a))
+    );
+  };
+  const removeActPhoto = (i: number, k: number) =>
+    setActivities((p) =>
+      p.map((a, j) => (j === i ? { ...a, photos: a.photos.filter((_, x) => x !== k) } : a))
+    );
+  const removeActivity = (i: number) =>
+    setActivities((p) => p.filter((_, j) => j !== i));
 
   const onPhotos = (files: FileList | null) => {
     if (!files) return;
@@ -291,11 +337,51 @@ export default function RegisterPage() {
   const submit = () => {
     startTransition(async () => {
       // 사진은 리사이즈·압축해 data URL로 저장(카드·프로필 슬라이드용)
+      // 브랜드 사진 1000px, 활동·콜라보 사진 800px.
       let photoUrls: string[] = [];
+      let activityOut: { title: string; desc: string; photos: string[] }[] = [];
+      let historyOut: {
+        partner: string;
+        types: string[];
+        year?: string;
+        photos: string[];
+      }[] = [];
       try {
-        photoUrls = await Promise.all(photos.map((p) => fileToResizedDataUrl(p.file)));
+        photoUrls = await Promise.all(photos.map((p) => fileToResizedDataUrl(p.file, 1000)));
+        activityOut = await Promise.all(
+          activities
+            .filter((a) => a.title.trim() || a.desc.trim() || a.photos.length)
+            .map(async (a) => ({
+              title: a.title.trim(),
+              desc: a.desc.trim(),
+              photos: await Promise.all(
+                a.photos.map((p) =>
+                  p.file ? fileToResizedDataUrl(p.file, 800) : Promise.resolve(p.url)
+                )
+              ),
+            }))
+        );
+        historyOut = await Promise.all(
+          collabHistory.map(async (h) => ({
+            partner: h.partner,
+            types: h.types,
+            year: h.year,
+            photos: await Promise.all(
+              h.photos.map((p) =>
+                p.file ? fileToResizedDataUrl(p.file, 800) : Promise.resolve(p.url)
+              )
+            ),
+          }))
+        );
       } catch {
         photoUrls = [];
+        activityOut = [];
+        historyOut = collabHistory.map((h) => ({
+          partner: h.partner,
+          types: h.types,
+          year: h.year,
+          photos: [],
+        }));
       }
       const { slug } = await createMakerAction({
         name,
@@ -304,7 +390,11 @@ export default function RegisterPage() {
         seeks,
         values,
         targetAudience,
-        collabHistory,
+        collabHistory: historyOut,
+        story,
+        activities: activityOut,
+        offersNote,
+        seeksNote,
         photos: photoUrls,
         collabOpen,
         instagram,
@@ -368,7 +458,7 @@ export default function RegisterPage() {
         <div className="h-px flex-1 bg-hairline" />
       </div>
 
-      <div className="mt-8 space-y-8">
+      <div className="mt-8 space-y-12">
         {/* 검수 게이트 배너 — AI가 채운 직후 */}
         {reviewMode && (
           <div className="rounded-lg border border-primary bg-surface px-4 py-3 shadow-e1">
@@ -400,6 +490,51 @@ export default function RegisterPage() {
               className="h-11 w-full rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
             />
           </Field>
+
+          {/* 자세히 소개 — 브랜드를 소개해주세요 (초안 받기 유지) */}
+          <div>
+            <div className="mb-2 flex items-center justify-between">
+              <label className="flex items-center gap-2 text-base font-medium text-body">
+                <span>자세히 소개</span>
+                {aiFilled.has("description") && <AiBadge />}
+              </label>
+              <button
+                type="button"
+                onClick={draftDescription}
+                disabled={!canDraft || draftBusy}
+                className="inline-flex h-7 items-center gap-1 rounded-pill border border-primary bg-primary-pale px-2.5 text-sm font-medium text-primary-on disabled:opacity-40"
+              >
+                {draftBusy
+                  ? "쓰는 중…"
+                  : draftGenerated
+                    ? "✨ 초안 다시 받기"
+                    : "✨ 초안 받기"}
+              </button>
+            </div>
+            <div className="relative">
+              <textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                rows={3}
+                disabled={draftBusy}
+                placeholder="버려지는 천에 새 이야기를 입히는 패브릭 브랜드."
+                className="w-full rounded-sm border border-hairline bg-surface px-3 py-2 text-base text-ink outline-none placeholder:text-faint focus:border-focus disabled:opacity-60"
+              />
+              {draftBusy && (
+                <div className="absolute inset-0 flex items-center justify-center rounded-sm bg-surface/80 backdrop-blur-[1px]">
+                  <p className="flex items-center gap-2 text-sm font-medium text-primary-on">
+                    <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                    온라인 정보를 살펴 소개를 쓰고 있어요…
+                  </p>
+                </div>
+              )}
+            </div>
+            <p className="mt-1.5 text-sm text-mute">
+              {draftGenerated
+                ? "‘초안 다시 받기’를 누르면 다른 느낌의 소개로 새로 써드려요."
+                : "‘초안 받기’를 누르면 입력한 정보로 소개를 대신 써드려요. 그대로 써도, 더 다듬어도 좋아요."}
+            </p>
+          </div>
 
           {/* 브랜드 사진 (선택) */}
           <div>
@@ -443,17 +578,38 @@ export default function RegisterPage() {
             </div>
           </div>
 
+        </div>
+
+        {/* ── ② 왜 이 브랜드를 시작하셨나요 ── */}
+        <GroupHeader
+          n="②"
+          title="왜 이 브랜드를 시작하셨나요?"
+          sub="시작하게 된 계기를 편하게 적어주세요."
+        />
+        <div className="space-y-8">
+          <textarea
+            value={story}
+            onChange={(e) => setStory(e.target.value)}
+            rows={4}
+            placeholder="예: 좋은 소재가 버려지는 게 늘 아쉬웠어요. 이미 있는 것의 가치를 다시 발견하는 일이 더 의미 있다고 믿어요."
+            className="w-full rounded-sm border border-hairline bg-surface px-3 py-2.5 text-base leading-relaxed text-ink outline-none placeholder:text-faint focus:border-focus"
+          />
+        </div>
+
+        {/* ── ③ 우리 브랜드를 표현하는 키워드 ── */}
+        <GroupHeader n="③" title="우리 브랜드를 표현하는 키워드를 골라주세요." />
+        <div className="space-y-8">
           {/* 분위기칩 — 우리를 표현하는 말 */}
           <div>
-            <label className="mb-1 flex items-center gap-2 text-lg font-bold text-ink">
-              <span>우리 브랜드를 표현하는 말</span>
+            <label className="mb-1 flex items-center gap-2 text-base font-medium text-body">
+              <span>브랜드와 어울리는 단어를 선택해주세요.</span>
               {aiFilled.has("values") && <AiBadge />}
               <span className="ml-auto text-xs font-normal text-mute">
                 {values.length} / {MAX_VIBES}
               </span>
             </label>
             <p className="mb-4 text-[15px] text-mute">
-              브랜드와 어울리는 단어를 선택해주세요. 직접 추가도 가능해요. 최대 10개
+              직접 추가도 가능해요. 최대 10개
             </p>
             <div className="space-y-4">
               {VIBE_CATEGORIES.map((cat, i) => (
@@ -532,55 +688,103 @@ export default function RegisterPage() {
             </div>
           </div>
 
-          {/* 소개 — 브랜드를 소개해주세요 */}
-          <div>
-            <div className="mb-2 flex items-center justify-between">
-              <label className="flex items-center gap-2 text-base font-medium text-body">
-                <span>브랜드를 소개해주세요.</span>
-                {aiFilled.has("description") && <AiBadge />}
-              </label>
-              <button
-                type="button"
-                onClick={draftDescription}
-                disabled={!canDraft || draftBusy}
-                className="inline-flex h-7 items-center gap-1 rounded-pill border border-primary bg-primary-pale px-2.5 text-sm font-medium text-primary-on disabled:opacity-40"
-              >
-                {draftBusy
-                  ? "쓰는 중…"
-                  : draftGenerated
-                    ? "✨ 초안 다시 받기"
-                    : "✨ 초안 받기"}
-              </button>
-            </div>
-            <div className="relative">
-              <textarea
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                rows={3}
-                disabled={draftBusy}
-                placeholder="버려지는 천에 새 이야기를 입히는 패브릭 브랜드."
-                className="w-full rounded-sm border border-hairline bg-surface px-3 py-2 text-base text-ink outline-none placeholder:text-faint focus:border-focus disabled:opacity-60"
-              />
-              {draftBusy && (
-                <div className="absolute inset-0 flex items-center justify-center rounded-sm bg-surface/80 backdrop-blur-[1px]">
-                  <p className="flex items-center gap-2 text-sm font-medium text-primary-on">
-                    <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-                    온라인 정보를 살펴 소개를 쓰고 있어요…
-                  </p>
-                </div>
-              )}
-            </div>
-            <p className="mt-1.5 text-sm text-mute">
-              {draftGenerated
-                ? "‘초안 다시 받기’를 누르면 다른 느낌의 소개로 새로 써드려요."
-                : "‘초안 받기’를 누르면 입력한 정보로 소개를 대신 써드려요. 그대로 써도, 더 다듬어도 좋아요."}
-            </p>
-          </div>
         </div>
 
-        {/* ── 그룹 B. 콜라보 ── */}
-        <GroupHeader n="②" title="콜라보 정보" />
-        <div className="space-y-7">
+        {/* ── ④ 주로 어떤 활동을 하나요 ── */}
+        <GroupHeader
+          n="④"
+          title="주로 어떤 활동을 하나요?"
+          sub="대표 활동을 최대 3가지 소개해주세요. 사진도 담을 수 있어요."
+        />
+        <div className="space-y-4">
+          {activities.map((act, i) => (
+            <div
+              key={i}
+              className="space-y-3 rounded-md border border-hairline bg-surface p-3"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-semibold text-body">활동 {i + 1}</span>
+                {i > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => removeActivity(i)}
+                    className="text-sm text-faint hover:text-ink"
+                  >
+                    삭제
+                  </button>
+                )}
+              </div>
+              <input
+                value={act.title}
+                onChange={(e) => setAct(i, { title: e.target.value })}
+                placeholder="예: Fabric Bag"
+                className="h-10 w-full rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
+              />
+              <input
+                value={act.desc}
+                onChange={(e) => setAct(i, { desc: e.target.value })}
+                placeholder="예: 업사이클링 원단을 활용한 가방 제작"
+                className="h-10 w-full rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
+              />
+              <div className="flex flex-wrap gap-2">
+                {act.photos.map((p, k) => (
+                  <div
+                    key={k}
+                    className="relative h-20 w-20 overflow-hidden rounded-md border border-hairline"
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={p.url} alt="" className="h-full w-full object-cover" />
+                    <button
+                      type="button"
+                      onClick={() => removeActPhoto(i, k)}
+                      aria-label="사진 삭제"
+                      className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-pill bg-ink/60 text-[11px] text-white"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+                {act.photos.length < 3 && (
+                  <label className="flex h-20 w-20 cursor-pointer flex-col items-center justify-center rounded-md border border-dashed border-border-strong bg-surface text-mute">
+                    <span className="text-xl leading-none">＋</span>
+                    <span className="mt-1 text-[11px]">사진</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      className="hidden"
+                      onChange={(e) => addActPhotos(i, e.target.files)}
+                    />
+                  </label>
+                )}
+              </div>
+            </div>
+          ))}
+          {activities.length < 3 && (
+            <button
+              type="button"
+              onClick={addActivity}
+              className="flex w-full items-center justify-center gap-1.5 rounded-md border border-dashed border-border-strong bg-surface py-2.5 text-sm text-mute"
+            >
+              ＋ 활동 추가
+            </button>
+          )}
+        </div>
+
+        {/* ── ⑤ 어떤 협업을 할 수 있나요 ── */}
+        <GroupHeader
+          n="⑤"
+          title="어떤 협업을 할 수 있나요?"
+          sub="제공할 수 있는 협업을 자유롭게 작성해주세요."
+        />
+        <div className="space-y-8">
+          <textarea
+            value={offersNote}
+            onChange={(e) => setOffersNote(e.target.value)}
+            rows={3}
+            placeholder="예: 친환경 가방을 만들어요. 브랜드 제품 콜라보, 굿즈 제작을 기대하고 있어요."
+            className="w-full rounded-sm border border-hairline bg-surface px-3 py-2.5 text-base leading-relaxed text-ink outline-none placeholder:text-faint focus:border-focus"
+          />
           <Field label="이런 콜라보를 제공할 수 있어요">
             <ChipRow
               options={COLLAB_TYPES}
@@ -588,6 +792,22 @@ export default function RegisterPage() {
               onToggle={(t) => toggle(offers, setOffers, t)}
             />
           </Field>
+        </div>
+
+        {/* ── ⑥ 이런 파트너를 찾고 있어요 ── */}
+        <GroupHeader
+          n="⑥"
+          title="이런 파트너를 찾고 있어요."
+          sub="파트너와 꿈꾸는 협업 유형을 알려주세요."
+        />
+        <div className="space-y-8">
+          <textarea
+            value={seeksNote}
+            onChange={(e) => setSeeksNote(e.target.value)}
+            rows={3}
+            placeholder="예: 지속가능성을 이야기하는 브랜드, 라이프스타일 브랜드, 카페와 함께하고 싶어요."
+            className="w-full rounded-sm border border-hairline bg-surface px-3 py-2.5 text-base leading-relaxed text-ink outline-none placeholder:text-faint focus:border-focus"
+          />
           <Field label="이런 콜라보를 찾고 있어요">
             <ChipRow
               options={COLLAB_TYPES}
@@ -595,7 +815,10 @@ export default function RegisterPage() {
               onToggle={(t) => toggle(seeks, setSeeks, t)}
             />
           </Field>
+        </div>
 
+        {/* ── 함께한 콜라보 (⑥과 ⑦ 사이) ── */}
+        <div className="space-y-8">
           {/* 함께한 콜라보 (이력) */}
           <div>
             <label className="mb-1 flex items-center gap-2 text-base font-medium text-body">
@@ -609,25 +832,37 @@ export default function RegisterPage() {
             {collabHistory.length > 0 && (
               <div className="mb-2 space-y-2">
                 {collabHistory.map((h, i) => (
-                  <div
-                    key={i}
-                    className="flex items-center justify-between rounded-md bg-surface-soft px-3 py-2"
-                  >
-                    <span className="text-sm text-ink">
-                      <span className="font-medium">{h.partner}</span>
-                      {h.types.length > 0 && (
-                        <span className="text-mute"> · {h.types.join("·")}</span>
-                      )}
-                      {h.year && <span className="text-mute"> · {h.year}</span>}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => removeHistory(i)}
-                      aria-label="이력 삭제"
-                      className="text-faint hover:text-ink"
-                    >
-                      ✕
-                    </button>
+                  <div key={i} className="rounded-md bg-surface-soft px-3 py-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-ink">
+                        <span className="font-medium">{h.partner}</span>
+                        {h.types.length > 0 && (
+                          <span className="text-mute"> · {h.types.join("·")}</span>
+                        )}
+                        {h.year && <span className="text-mute"> · {h.year}</span>}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => removeHistory(i)}
+                        aria-label="이력 삭제"
+                        className="text-faint hover:text-ink"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                    {h.photos.length > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {h.photos.map((p, k) => (
+                          <div
+                            key={k}
+                            className="h-12 w-12 overflow-hidden rounded-sm border border-hairline"
+                          >
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={p.url} alt="" className="h-full w-full object-cover" />
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -714,6 +949,41 @@ export default function RegisterPage() {
                     </option>
                   ))}
                 </select>
+                <div>
+                  <p className="mb-1.5 text-sm text-mute">사진 (선택 · 최대 3장)</p>
+                  <div className="flex flex-wrap gap-2">
+                    {histDraft.photos.map((p, k) => (
+                      <div
+                        key={k}
+                        className="relative h-20 w-20 overflow-hidden rounded-md border border-hairline"
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={p.url} alt="" className="h-full w-full object-cover" />
+                        <button
+                          type="button"
+                          onClick={() => removeHistPhoto(k)}
+                          aria-label="사진 삭제"
+                          className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-pill bg-ink/60 text-[11px] text-white"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+                    {histDraft.photos.length < 3 && (
+                      <label className="flex h-20 w-20 cursor-pointer flex-col items-center justify-center rounded-md border border-dashed border-border-strong bg-surface text-mute">
+                        <span className="text-xl leading-none">＋</span>
+                        <span className="mt-1 text-[11px]">사진</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          multiple
+                          className="hidden"
+                          onChange={(e) => addHistPhotos(e.target.files)}
+                        />
+                      </label>
+                    )}
+                  </div>
+                </div>
                 <div className="flex gap-2">
                   <button
                     type="button"
@@ -738,7 +1008,7 @@ export default function RegisterPage() {
             ) : collabHistory.length < 3 ? (
               <button
                 type="button"
-                onClick={() => setHistDraft({ partner: "", types: [], year: "" })}
+                onClick={() => setHistDraft({ partner: "", types: [], year: "", photos: [] })}
                 className="flex w-full items-center justify-center gap-1.5 rounded-md border border-dashed border-border-strong bg-surface py-2.5 text-sm text-mute"
               >
                 ＋ {collabHistory.length === 0 ? "콜라보 경험이 있으신가요?" : "직접 입력하기"}
@@ -751,12 +1021,13 @@ export default function RegisterPage() {
               </p>
             )}
           </div>
+        </div>
 
+        {/* ── ⑦ 저희는 주로 이런 고객과 함께하고 있어요 ── */}
+        <GroupHeader n="⑦" title="저희는 주로 이런 고객과 함께하고 있어요." />
+        <div className="space-y-8">
           {/* 이런 분들과 만나요 (타겟 고객) */}
           <div>
-            <label className="mb-2.5 block text-base font-medium text-body">
-              이런 고객들과 함께하고 있어요
-            </label>
             <div className="flex flex-wrap gap-2">
               {SUGGESTED_AUDIENCE.map((a) => {
                 const on = targetAudience.includes(a);
@@ -813,9 +1084,9 @@ export default function RegisterPage() {
           </div>
         </div>
 
-        {/* ── 그룹 C. 신뢰·연결 ── */}
-        <GroupHeader n="③" title="브랜드 정보" />
-        <div className="space-y-7">
+        {/* ── ⑧ 브랜드 정보를 입력해주세요 ── */}
+        <GroupHeader n="⑧" title="브랜드 정보를 입력해주세요." />
+        <div className="space-y-8">
           <Field label="주소" hint={hintFor("address", "address")}>
             <input
               value={address}
