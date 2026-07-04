@@ -108,7 +108,8 @@ export default function RegisterPage() {
   const [draftBusy, setDraftBusy] = useState(false);
   const [draftGenerated, setDraftGenerated] = useState(false); // AI 초안을 한 번이라도 생성했나(버튼 분기 기준)
   const [draftRound, setDraftRound] = useState(0); // 다시 받기마다 다른 각도로 변주
-  const [descChoices, setDescChoices] = useState<string[]>([]); // 브랜드 소개 5지선다 후보
+  const [descChoices, setDescChoices] = useState<string[]>([]); // 브랜드 소개 5지선다 후보(각 항목 직접 수정 가능)
+  const [descSel, setDescSel] = useState(0); // 선택한 후보 인덱스
   const [descModalOpen, setDescModalOpen] = useState(false); // 5지선다 모달
 
   const toggle = (
@@ -243,6 +244,7 @@ export default function RegisterPage() {
         : [];
       if (choices.length > 1) {
         setDescChoices(choices);
+        setDescSel(0);
         setDescModalOpen(true);
       } else if (choices.length === 1) {
         setDescription(choices[0]);
@@ -257,8 +259,11 @@ export default function RegisterPage() {
       setDraftBusy(false);
     }
   };
-  const pickDesc = (v: string) => {
-    setDescription(v);
+  const editDescChoice = (i: number, v: string) =>
+    setDescChoices((p) => p.map((x, j) => (j === i ? v : x)));
+  const applyDesc = () => {
+    const v = (descChoices[descSel] ?? "").trim();
+    if (v) setDescription(v);
     setDescModalOpen(false);
   };
   const canDraft = !!(name.trim() || oneLiner.trim() || values.length);
@@ -1187,20 +1192,24 @@ export default function RegisterPage() {
             </button>
             <p className="pr-8 text-base font-bold text-ink">마음에 드는 소개를 골라주세요</p>
             <p className="mt-1 text-sm text-mute">
-              골라서 채우고, 폼에서 자유롭게 다듬을 수 있어요.
+              ‘수정’으로 다듬으며 비교하고, 마음에 드는 하나를 골라주세요.
             </p>
-            <div className="mt-4 max-h-[52vh] space-y-2 overflow-y-auto pr-0.5">
-              {descChoices.map((d, i) => (
-                <button
-                  key={i}
-                  type="button"
-                  onClick={() => pickDesc(d)}
-                  className="block w-full rounded-md border border-hairline bg-surface px-3 py-2.5 text-left text-sm leading-relaxed text-body transition-colors hover:border-primary hover:bg-primary-pale"
-                >
-                  {d}
-                </button>
-              ))}
+            <div className="mt-4 max-h-[52vh] overflow-y-auto pr-0.5">
+              <DescPicker
+                list={descChoices}
+                sel={descSel}
+                onSelect={setDescSel}
+                onEdit={editDescChoice}
+              />
             </div>
+            <button
+              type="button"
+              onClick={applyDesc}
+              className="mt-4 h-11 w-full rounded-md bg-primary text-sm font-medium text-primary-on disabled:opacity-50"
+              disabled={!(descChoices[descSel] ?? "").trim()}
+            >
+              이 소개로 채우기
+            </button>
           </div>
         </div>
       )}
@@ -1250,6 +1259,74 @@ export default function RegisterPage() {
         </div>
       )}
     </main>
+  );
+}
+
+// 브랜드 소개 5지선다 — 각 후보를 그 자리에서 수정 가능(controlled). 다듬으며 비교 → 하나 선택.
+function DescPicker({
+  list,
+  sel,
+  onSelect,
+  onEdit,
+}: {
+  list: string[];
+  sel: number;
+  onSelect: (i: number) => void;
+  onEdit: (i: number, v: string) => void;
+}) {
+  const [editing, setEditing] = useState<number | null>(null);
+  return (
+    <div className="space-y-2">
+      {list.map((it, i) => {
+        const on = sel === i;
+        const isEditing = editing === i;
+        return (
+          <div
+            key={i}
+            className={`rounded-md border transition-colors ${
+              on ? "border-primary bg-primary-pale" : "border-hairline bg-surface"
+            }`}
+          >
+            <div className="flex items-start gap-2.5 px-3 py-3">
+              <button
+                type="button"
+                onClick={() => onSelect(i)}
+                aria-label="이 소개 선택"
+                className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-pill border text-[10px] font-bold ${
+                  on ? "border-primary bg-primary text-primary-on" : "border-border-strong text-transparent"
+                }`}
+              >
+                ✓
+              </button>
+              {isEditing ? (
+                <textarea
+                  value={it}
+                  onChange={(e) => onEdit(i, e.target.value)}
+                  autoFocus
+                  rows={5}
+                  className="flex-1 rounded-sm border border-hairline bg-surface px-2.5 py-2 text-[15px] leading-relaxed text-ink outline-none focus:border-focus"
+                />
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => onSelect(i)}
+                  className={`flex-1 text-left text-[15px] leading-relaxed ${on ? "text-ink" : "text-body"}`}
+                >
+                  {it}
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setEditing(isEditing ? null : i)}
+                className="shrink-0 text-[13px] font-medium text-primary-on underline-offset-2 hover:underline"
+              >
+                {isEditing ? "완료" : "수정"}
+              </button>
+            </div>
+          </div>
+        );
+      })}
+    </div>
   );
 }
 
