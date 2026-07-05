@@ -1,12 +1,13 @@
 // 아바타 — image 있으면 사진, 없으면 name 첫 글자(예: 송영덕 → 송).
 // 헤더·/my·signup 미리보기·(추후) 찾기 카드에서 공용.
 // 디자인 확정(2026-07-05, design.md §Avatar):
-//  - 폴백 배경 = 파스텔 로테이션(mint/lemon/corn pale, 이름 해시 결정론 — 같은 브랜드는 항상 같은 색).
-//    Kiwi 틴트 고정이면 찾기 그리드에서 키위 도배 → 희소성 원칙 위반이라 파스텔로.
+//  - 폴백 배경 = 4색 로테이션(kiwi/mint/lemon/corn pale, 이름 해시 결정론 — 같은 브랜드는 항상 같은 색).
+//    Kiwi 틴트 "고정"이면 그리드 도배(희소성 위반)라, 4색 중 하나로만 등장(≈25%)해 브랜드색은 살리되 도배는 피함.
 //  - shape: circle(기본, 계정·프로필) / square(rounded-md, 브랜드 로고 맥락 — 로고는 원형 크롭하지 않는다).
 //  - 사이즈 표준 스텝: 24 / 32 / 40 / 48 / 56 / 64.
 
 const FALLBACK_PALETTES = [
+  { bg: "bg-primary-tint", text: "text-primary-on" },
   { bg: "bg-mint-pale", text: "text-mint-on" },
   { bg: "bg-lemon-pale", text: "text-lemon-on" },
   { bg: "bg-corn-pale", text: "text-corn-on" },
