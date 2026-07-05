@@ -438,6 +438,7 @@ export default function RegisterPage() {
   const [editPw, setEditPw] = useState("");
   const [savingPw, setSavingPw] = useState(false);
   const [editSlug, setEditSlug] = useState<string | null>(null);
+  const [editAuthPw, setEditAuthPw] = useState(""); // 수정 저장 재검증용(세션스토리지에서, 소유자는 빈 값)
 
   useEffect(() => {
     getAuthStateAction().then((s) => setLoggedIn(s.loggedIn)).catch(() => {});
@@ -448,8 +449,11 @@ export default function RegisterPage() {
     const slug = new URLSearchParams(window.location.search).get("edit");
     if (!slug) return;
     getEditDataAction(slug).then((m) => {
-      if (!m) return; // 권한 없음 — 일반 생성 폼으로 남음
+      if (!m) return; // 소개서 없음 — 일반 생성 폼으로 남음
       setEditSlug(slug);
+      try {
+        setEditAuthPw(sessionStorage.getItem(`edit_pw_${slug}`) ?? "");
+      } catch {}
       setName(m.name);
       setOneLiner(m.oneLiner);
       setDescription(m.trust.description ?? "");
@@ -563,8 +567,15 @@ export default function RegisterPage() {
         description,
       };
       if (editSlug) {
-        const r = await updateMakerAction(editSlug, payload);
-        if (!r.error) router.push(`/m/${editSlug}`);
+        const r = await updateMakerAction(editSlug, payload, editAuthPw || undefined);
+        if (r.error) {
+          alert(r.error);
+          return;
+        }
+        try {
+          sessionStorage.removeItem(`edit_pw_${editSlug}`);
+        } catch {}
+        router.push(`/m/${editSlug}`);
         return;
       }
       const { slug } = await createMakerAction(payload);
@@ -587,6 +598,17 @@ export default function RegisterPage() {
 
   return (
     <main className="mx-auto w-full max-w-[640px] px-4 py-8 sm:px-6">
+      {editSlug ? (
+        <>
+          <h1 className="text-[28px] font-bold tracking-tight text-ink sm:text-[32px]">
+            소개서 수정
+          </h1>
+          <p className="mt-2 text-[17px] leading-relaxed text-body">
+            내용을 고치고 맨 아래 ‘수정 완료’를 누르면 소개서에 바로 반영돼요.
+          </p>
+        </>
+      ) : (
+        <>
       <h1 className="text-[28px] font-bold tracking-tight text-ink sm:text-[32px]">
         브랜드 소개서, 생각보다 금방 완성돼요.
       </h1>
@@ -634,6 +656,8 @@ export default function RegisterPage() {
         </span>
         <div className="h-px flex-1 bg-hairline" />
       </div>
+        </>
+      )}
 
       <div className="mt-8 space-y-12">
         {/* 검수 게이트 배너 — AI가 채운 직후 */}

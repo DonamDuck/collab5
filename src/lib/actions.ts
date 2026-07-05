@@ -1,6 +1,5 @@
 "use server";
 
-import { cookies } from "next/headers";
 import { repo } from "./repo";
 import { deriveRegion } from "./region";
 import { getSessionUser } from "./supabase/server";
@@ -149,9 +148,6 @@ export async function searchAction(q: string): Promise<Maker[]> {
   return repo.searchMakers(q);
 }
 
-const GRANT_PREFIX = "edit_grant_";
-const GRANT_MAX_AGE = 60 * 30; // 30분
-
 /** 비회원이 완료 얼럿에서 뒤늦게 비번을 설정(소유자·기존 비번 없을 때만) */
 export async function setMakerPasswordAction(
   slug: string,
@@ -166,7 +162,7 @@ export async function setMakerPasswordAction(
   return {};
 }
 
-/** 수정 진입용 비번 검증 → 통과 시 edit_grant 쿠키 발급 */
+/** 수정 진입용 비번 검증 — 소유자 세션이거나 비번 일치면 ok (쿠키 없음, 클라가 pw를 세션스토리지 보관) */
 export async function verifyMakerPasswordAction(
   slug: string,
   password: string
@@ -174,33 +170,9 @@ export async function verifyMakerPasswordAction(
   const maker = await repo.getMakerBySlug(slug);
   if (!maker) return { ok: false };
   const user = await getSessionUser();
-  if (user && maker.ownerUserId === user.id) {
-    await grantEdit(slug);
-    return { ok: true };
-  }
-  if (maker.editPasswordHash && sha256(password.trim()) === maker.editPasswordHash) {
-    await grantEdit(slug);
-    return { ok: true };
-  }
+  if (user && maker.ownerUserId === user.id) return { ok: true };
+  if (maker.editPasswordHash && sha256(password.trim()) === maker.editPasswordHash) return { ok: true };
   return { ok: false };
-}
-
-async function grantEdit(slug: string): Promise<void> {
-  const store = await cookies();
-  store.set(GRANT_PREFIX + slug, "1", {
-    httpOnly: true,
-    sameSite: "lax",
-    path: "/",
-    maxAge: GRANT_MAX_AGE,
-  });
-}
-
-export async function hasEditGrant(slug: string): Promise<boolean> {
-  const maker = await repo.getMakerBySlug(slug);
-  const user = await getSessionUser();
-  if (user && maker?.ownerUserId === user.id) return true;
-  const store = await cookies();
-  return store.get(GRANT_PREFIX + slug)?.value === "1";
 }
 
 /** 로그인 상태에서 비번으로 진입한 소개서를 내 계정에 귀속 */
@@ -235,12 +207,19 @@ export async function claimBySlugAction(
   return { slug };
 }
 
-/** edit 모드 제출 → 권한 재검증 후 내용 업데이트 */
+/** edit 모드 제출 → 소유자 세션 또는 수정 비번 재검증 후 내용 업데이트 (쿠키 비의존) */
 export async function updateMakerAction(
   slug: string,
-  input: RegisterInput
+  input: RegisterInput,
+  password?: string
 ): Promise<{ error?: string; slug?: string }> {
-  if (!(await hasEditGrant(slug))) return { error: "수정 권한이 없어요." };
+  const maker = await repo.getMakerBySlug(slug);
+  if (!maker) return { error: "소개서를 찾을 수 없어요." };
+  const user = await getSessionUser();
+  const isOwner = !!user && maker.ownerUserId === user.id;
+  const pwOk =
+    !!maker.editPasswordHash && !!password && sha256(password.trim()) === maker.editPasswordHash;
+  if (!isOwner && !pwOk) return { error: "수정 권한이 없어요." };
   const updated = await repo.updateMakerContent(slug, {
     name: input.name.trim(),
     oneLiner: input.oneLiner.trim(),
@@ -278,8 +257,10 @@ export async function getAuthStateAction(): Promise<{ loggedIn: boolean }> {
   return { loggedIn: !!user };
 }
 
-/** edit 모드 프리필 데이터(권한 있을 때만) */
+/** edit 모드 프리필 데이터 — 공개 데이터(/m과 동일)라 게이트 없이 반환.
+ *  단 민감 필드(비번 해시·소유자 id)는 절대 클라로 내보내지 않음. 실제 저장은 updateMakerAction에서 재검증. */
 export async function getEditDataAction(slug: string): Promise<Maker | null> {
-  if (!(await hasEditGrant(slug))) return null;
-  return repo.getMakerBySlug(slug);
+  const maker = await repo.getMakerBySlug(slug);
+  if (!maker) return null;
+  return { ...maker, editPasswordHash: undefined, ownerUserId: undefined };
 }

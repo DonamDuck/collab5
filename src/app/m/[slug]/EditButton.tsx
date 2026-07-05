@@ -20,15 +20,16 @@ export function EditButton({ slug, isOwner }: { slug: string; isOwner: boolean }
         setErr("비밀번호가 일치하지 않아요.");
         return;
       }
+      // 저장 시 재검증에 쓸 비번을 같은 탭에만 임시 보관(URL 노출 X)
+      try {
+        sessionStorage.setItem(`edit_pw_${slug}`, pw);
+      } catch {}
       router.push(`/register?edit=${slug}`);
     });
 
   const onClick = () => {
     if (isOwner) {
-      start(async () => {
-        await verifyMakerPasswordAction(slug, ""); // 소유자면 빈 비번으로도 grant 발급
-        router.push(`/register?edit=${slug}`);
-      });
+      router.push(`/register?edit=${slug}`); // 소유자는 세션으로 저장 인증
       return;
     }
     setOpen(true);
