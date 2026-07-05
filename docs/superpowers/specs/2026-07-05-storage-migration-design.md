@@ -56,7 +56,7 @@ submit에서 리사이즈/`fileToResizedDataUrl`/`{u}` 래핑 제거 — 이미 
 프로필 이미지도 `uploadPhoto(file, 400)`으로 Storage 업로드 → `profileImage`에 URL 저장.
 
 ### `src/lib/actions.ts` 배선 정리
-`PhotoWire`/`{u}` 래핑·언랩 제거. `CardInput`/`RegisterInput`의 photos 타입을 `string[]`로 환원(URL은 짧아 Flight 한도 무관). repo·types는 이미 `string[]`이라 변경 최소.
+`PhotoWire`/`{u}` 래핑은 유지 — 로컬(mock) base64 폴백 경로가 Flight 배열 한도에 다시 걸리지 않도록. URL엔 무해. repo·types는 이미 `string[]`이라 변경 최소.
 
 ## 데이터 흐름
 1. 사용자가 PhotoGrid에서 파일 선택

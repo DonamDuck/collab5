@@ -35,3 +35,14 @@ export async function fileToResizedDataUrl(
   ctx.drawImage(img, 0, 0, width, height);
   return canvas.toDataURL("image/jpeg", quality);
 }
+
+// 리사이즈·압축 결과를 Blob으로 (Storage 업로드용)
+export async function fileToResizedBlob(
+  file: File,
+  maxDim = 1000,
+  quality = 0.78
+): Promise<Blob> {
+  const dataUrl = await fileToResizedDataUrl(file, maxDim, quality);
+  const res = await fetch(dataUrl);
+  return res.blob();
+}
