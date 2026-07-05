@@ -23,18 +23,20 @@ export default async function MakerPage({
     <main className="mx-auto w-full max-w-[640px] px-4 py-10 sm:px-6">
       {/* ── 헤더 — 브랜드명 + 요약(한 줄 소개) + 신뢰 뱃지(인스타·홈피·주소) ── */}
       <header>
-        <div className="mb-2 flex justify-end">
-          <EditButton slug={maker.slug} isOwner={isOwner} />
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <h1 className="text-[32px] font-bold leading-tight tracking-tight text-ink">
-            {maker.name}
-          </h1>
-          {maker.collabOpen && (
-            <span className="inline-flex h-6 items-center rounded-sm bg-primary-pale px-2 text-xs font-medium text-primary-on">
-              콜라보 받는 중
-            </span>
-          )}
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="text-[32px] font-bold leading-tight tracking-tight text-ink">
+              {maker.name}
+            </h1>
+            {maker.collabOpen && (
+              <span className="inline-flex h-6 items-center rounded-sm bg-primary-pale px-2 text-xs font-medium text-primary-on">
+                콜라보 받는 중
+              </span>
+            )}
+          </div>
+          <div className="shrink-0">
+            <EditButton slug={maker.slug} isOwner={isOwner} />
+          </div>
         </div>
         {maker.oneLiner && (
           <p className="mt-2.5 text-[18px] leading-relaxed text-body">{maker.oneLiner}</p>
@@ -56,9 +58,9 @@ export default async function MakerPage({
         )}
       </header>
 
-      {/* 브랜드 사진 — 스와이프 슬라이드 */}
+      {/* 브랜드 사진 — 스와이프 슬라이드 (텍스트 폭에 맞춤) */}
       {maker.photos.length > 0 && (
-        <div className="mt-7 max-w-[460px]">
+        <div className="mt-7">
           <PhotoSlider photos={maker.photos} />
         </div>
       )}
