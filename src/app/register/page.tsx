@@ -937,14 +937,15 @@ export default function RegisterPage() {
               <input
                 value={act.title}
                 onChange={(e) => setAct(i, { title: e.target.value })}
-                placeholder="예: Fabric Bag"
+                placeholder="예: 조형수선 워크숍"
                 className="h-10 w-full rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
               />
-              <input
+              <textarea
                 value={act.desc}
                 onChange={(e) => setAct(i, { desc: e.target.value })}
-                placeholder="예: 업사이클링 원단을 활용한 가방 제작"
-                className="h-10 w-full rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
+                rows={3}
+                placeholder="예: 이야기가 깃든 옷을 수선하고 업사이클링하는 워크숍을 진행해요."
+                className="w-full rounded-sm border border-hairline bg-surface px-3 py-2.5 text-base leading-relaxed text-ink outline-none placeholder:text-faint focus:border-focus"
               />
               <PhotoGrid
                 urls={act.photos.map((p) => p.url)}
