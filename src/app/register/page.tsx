@@ -622,9 +622,18 @@ function RegisterForm() {
     <main className="mx-auto w-full max-w-[640px] px-4 py-8 sm:px-6">
       {editSlug ? (
         <>
-          <h1 className="text-[28px] font-bold tracking-tight text-ink sm:text-[32px]">
-            소개서 수정
-          </h1>
+          <div className="flex items-start justify-between gap-3">
+            <h1 className="text-[28px] font-bold tracking-tight text-ink sm:text-[32px]">
+              소개서 수정
+            </h1>
+            <button
+              type="button"
+              onClick={() => router.push(`/m/${editSlug}`)}
+              className="mt-1.5 shrink-0 text-sm font-medium text-mute hover:text-ink"
+            >
+              취소
+            </button>
+          </div>
           <p className="mt-2 text-[17px] leading-relaxed text-body">
             내용을 고치고 맨 아래 ‘수정 완료’를 누르면 소개서에 바로 반영돼요.
           </p>
