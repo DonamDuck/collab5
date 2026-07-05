@@ -74,23 +74,7 @@ export default async function MakerPage({
         </Section>
       )}
 
-      {/* ② 우리를 표현하는 키워드에요 — values */}
-      {maker.soul.values.length > 0 && (
-        <Section title="우리를 표현하는 키워드에요">
-          <div className="flex flex-wrap gap-2">
-            {maker.soul.values.map((v) => (
-              <span
-                key={v}
-                className="inline-flex h-9 items-center rounded-sm bg-mint-pale px-3 text-[15px] font-medium text-mint-on"
-              >
-                {v}
-              </span>
-            ))}
-          </div>
-        </Section>
-      )}
-
-      {/* ③ 우리는 이런 일을 하고 있습니다 — activities */}
+      {/* ② 우리는 이런 일을 하고 있습니다 — activities */}
       {maker.activities.length > 0 && (
         <Section title="우리는 이런 일을 하고 있습니다">
           <div className="space-y-6">
@@ -113,10 +97,19 @@ export default async function MakerPage({
         </Section>
       )}
 
+      {/* ③ 우리 브랜드의 시작 — story */}
+      {maker.story && (
+        <Section title="우리 브랜드의 시작">
+          <p className="whitespace-pre-line text-[17px] leading-relaxed text-body">
+            {maker.story}
+          </p>
+        </Section>
+      )}
+
       {/* ④ 함께한 콜라보 — collabHistory */}
       {maker.collabHistory.length > 0 && (
         <Section title="함께한 콜라보">
-          <div className="space-y-4">
+          <div className="space-y-6">
             {maker.collabHistory.map((h, i) => (
               <div key={i}>
                 <p className="text-[16px] text-body">
@@ -126,16 +119,8 @@ export default async function MakerPage({
                 </p>
                 {h.desc && <p className="mt-0.5 whitespace-pre-line text-[15px] leading-relaxed text-mute">{h.desc}</p>}
                 {h.photos.length > 0 && (
-                  <div className="mt-2 flex flex-wrap gap-1.5">
-                    {h.photos.map((src, k) => (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        key={k}
-                        src={src}
-                        alt={`${h.partner} 콜라보 사진 ${k + 1}`}
-                        className="h-16 w-16 shrink-0 rounded-sm object-cover"
-                      />
-                    ))}
+                  <div className="mt-3 max-w-[460px]">
+                    <PhotoSlider photos={h.photos} />
                   </div>
                 )}
               </div>
@@ -162,16 +147,7 @@ export default async function MakerPage({
         </Section>
       )}
 
-      {/* ⑥ 우리가 브랜드의 시작 — story */}
-      {maker.story && (
-        <Section title="우리가 브랜드의 시작">
-          <p className="whitespace-pre-line text-[17px] leading-relaxed text-body">
-            {maker.story}
-          </p>
-        </Section>
-      )}
-
-      {/* ⑦ 이런 분들과 함께하고 싶어요 — seeks */}
+      {/* ⑥ 이런 분들과 함께하고 싶어요 — seeks */}
       {(maker.seeks.length > 0 || maker.seeksNote) && (
         <Section title="이런 분들과 함께하고 싶어요">
           {maker.seeksNote && (
@@ -189,12 +165,28 @@ export default async function MakerPage({
         </Section>
       )}
 
-      {/* ⑧ 저희는 이런 고객들과 함께 하고 있어요 — targetAudience */}
+      {/* ⑦ 저희는 이런 고객들과 함께 하고 있어요 — targetAudience */}
       {maker.targetAudience.length > 0 && (
         <Section title="저희는 이런 고객들과 함께 하고 있어요">
           <div className="flex flex-wrap gap-2">
             {maker.targetAudience.map((t) => (
               <TypeChip key={t}>{t}</TypeChip>
+            ))}
+          </div>
+        </Section>
+      )}
+
+      {/* ⑧ 우리를 표현하는 키워드에요 — values */}
+      {maker.soul.values.length > 0 && (
+        <Section title="우리를 표현하는 키워드에요">
+          <div className="flex flex-wrap gap-2">
+            {maker.soul.values.map((v) => (
+              <span
+                key={v}
+                className="inline-flex h-9 items-center rounded-sm bg-mint-pale px-3 text-[15px] font-medium text-mint-on"
+              >
+                {v}
+              </span>
             ))}
           </div>
         </Section>
