@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { signUpAction } from "@/lib/auth-actions";
-import { fileToResizedDataUrl } from "@/lib/image";
+import { uploadPhoto } from "@/lib/upload";
 import { Avatar } from "@/components/Avatar";
 import { validatePassword, formatPhone } from "@/lib/validation";
 
@@ -15,7 +15,8 @@ export default function SignupPage() {
   const [password2, setPassword2] = useState("");
   const [phone, setPhone] = useState("");
   const [brandName, setBrandName] = useState("");
-  const [image, setImage] = useState(""); // 리사이즈 base64
+  const [image, setImage] = useState(""); // Storage 업로드 URL
+  const [imgUploading, setImgUploading] = useState(false);
   const [agree, setAgree] = useState(false);
   const [err, setErr] = useState("");
   const [done, setDone] = useState(false);
@@ -23,10 +24,13 @@ export default function SignupPage() {
   const onImage = async (files: FileList | null) => {
     const f = files?.[0];
     if (!f || !f.type.startsWith("image/")) return;
+    setImgUploading(true);
     try {
-      setImage(await fileToResizedDataUrl(f, 400));
+      setImage(await uploadPhoto(f, 400));
     } catch {
-      setErr("이미지를 불러오지 못했어요. 다른 파일로 시도해주세요.");
+      alert("이미지 업로드에 실패했어요. 다시 시도해주세요.");
+    } finally {
+      setImgUploading(false);
     }
   };
 
@@ -119,7 +123,7 @@ export default function SignupPage() {
           <div className="flex items-center gap-3">
             <Avatar image={image || undefined} name={brandName || "?"} size={48} />
             <label className="inline-flex h-9 cursor-pointer items-center rounded-md border border-border-strong bg-surface px-3 text-sm font-medium text-ink">
-              이미지 선택
+              {imgUploading ? "업로드 중…" : "이미지 선택"}
               <input
                 type="file"
                 accept="image/*"
@@ -155,7 +159,7 @@ export default function SignupPage() {
       <button
         type="button"
         onClick={submit}
-        disabled={pending}
+        disabled={pending || imgUploading}
         className="mt-5 h-12 w-full rounded-md bg-primary text-base font-medium text-primary-on disabled:opacity-50"
       >
         {pending ? "가입 중…" : "가입하기"}
