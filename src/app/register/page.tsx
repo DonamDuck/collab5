@@ -1300,11 +1300,11 @@ export default function RegisterPage() {
                 ? "만드는 중…"
                 : "콜라보 카드 등록하기"}
           </button>
-          <p className="text-center text-sm text-mute">
-            {editSlug
-              ? "저장에는 몇 초 걸릴 수 있어요."
-              : "등록 후에는 언제든 콜라보 카드를 공유할 수 있어요."}
-          </p>
+          {!editSlug && (
+            <p className="text-center text-sm text-mute">
+              등록 후에는 언제든 콜라보 카드를 공유할 수 있어요.
+            </p>
+          )}
         </div>
       </div>
 
