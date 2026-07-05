@@ -1,7 +1,10 @@
 "use server";
 
+import { cookies } from "next/headers";
 import { repo } from "./repo";
 import { deriveRegion } from "./region";
+import { getSessionUser } from "./supabase/server";
+import { sha256 } from "./hash";
 import type { CollabType, Maker } from "./types";
 
 // 사진(리사이즈 data URL)은 개당 수십만~100만 자에 달해, 배열에 문자열로 담아
@@ -44,6 +47,7 @@ export interface RegisterInput {
   homepage?: string;
   address?: string; // 지역은 여기서 자동 추출
   description?: string;
+  editPassword?: string; // 비회원 수정 비밀번호(로그인 상태면 무시)
 }
 
 /** 이름 → slug. 한글 등 비ASCII면 랜덤 핸들로 폴백(mock 단계). */
@@ -59,6 +63,10 @@ function slugify(name: string): string {
 export async function createMakerAction(
   input: RegisterInput
 ): Promise<{ slug: string }> {
+  const user = await getSessionUser();
+  const ownerUserId = user?.id;
+  const editPasswordHash =
+    !user && input.editPassword?.trim() ? sha256(input.editPassword.trim()) : undefined;
   const maker = await repo.createMaker({
     slug: slugify(input.name),
     name: input.name.trim(),
@@ -91,6 +99,8 @@ export async function createMakerAction(
       description: input.description?.trim() || undefined,
     },
     collabOpen: input.collabOpen,
+    ownerUserId,
+    editPasswordHash,
   });
   return { slug: maker.slug };
 }
@@ -137,4 +147,139 @@ export async function recordReactionAction(
 /** 1차 검색 (MVP) — 등록 업체 공개 디렉토리. '전체 둘러보기' 벽은 절제. */
 export async function searchAction(q: string): Promise<Maker[]> {
   return repo.searchMakers(q);
+}
+
+const GRANT_PREFIX = "edit_grant_";
+const GRANT_MAX_AGE = 60 * 30; // 30분
+
+/** 비회원이 완료 얼럿에서 뒤늦게 비번을 설정(소유자·기존 비번 없을 때만) */
+export async function setMakerPasswordAction(
+  slug: string,
+  password: string
+): Promise<{ error?: string }> {
+  const pw = password.trim();
+  if (!pw) return { error: "비밀번호를 입력해주세요." };
+  const maker = await repo.getMakerBySlug(slug);
+  if (!maker) return { error: "소개서를 찾을 수 없어요." };
+  if (maker.ownerUserId || maker.editPasswordHash) return {}; // 이미 소유/비번 있음 — 무시
+  await repo.setMakerPasswordHash(slug, sha256(pw));
+  return {};
+}
+
+/** 수정 진입용 비번 검증 → 통과 시 edit_grant 쿠키 발급 */
+export async function verifyMakerPasswordAction(
+  slug: string,
+  password: string
+): Promise<{ ok: boolean }> {
+  const maker = await repo.getMakerBySlug(slug);
+  if (!maker) return { ok: false };
+  const user = await getSessionUser();
+  if (user && maker.ownerUserId === user.id) {
+    await grantEdit(slug);
+    return { ok: true };
+  }
+  if (maker.editPasswordHash && sha256(password.trim()) === maker.editPasswordHash) {
+    await grantEdit(slug);
+    return { ok: true };
+  }
+  return { ok: false };
+}
+
+async function grantEdit(slug: string): Promise<void> {
+  const store = await cookies();
+  store.set(GRANT_PREFIX + slug, "1", {
+    httpOnly: true,
+    sameSite: "lax",
+    path: "/",
+    maxAge: GRANT_MAX_AGE,
+  });
+}
+
+export async function hasEditGrant(slug: string): Promise<boolean> {
+  const maker = await repo.getMakerBySlug(slug);
+  const user = await getSessionUser();
+  if (user && maker?.ownerUserId === user.id) return true;
+  const store = await cookies();
+  return store.get(GRANT_PREFIX + slug)?.value === "1";
+}
+
+/** 로그인 상태에서 비번으로 진입한 소개서를 내 계정에 귀속 */
+export async function claimMakerAction(
+  slug: string,
+  password: string
+): Promise<{ error?: string }> {
+  const user = await getSessionUser();
+  if (!user) return { error: "로그인이 필요해요." };
+  const maker = await repo.getMakerBySlug(slug);
+  if (!maker) return { error: "소개서를 찾을 수 없어요." };
+  if (maker.ownerUserId && maker.ownerUserId !== user.id)
+    return { error: "이미 다른 계정에 연결된 소개서예요." };
+  if (!maker.ownerUserId) {
+    if (!maker.editPasswordHash || sha256(password.trim()) !== maker.editPasswordHash)
+      return { error: "비밀번호가 일치하지 않아요." };
+    await repo.setMakerOwner(slug, user.id);
+  }
+  return {};
+}
+
+/** /my에서 URL 또는 슬러그 + 비번으로 연결 */
+export async function claimBySlugAction(
+  slugOrUrl: string,
+  password: string
+): Promise<{ error?: string; slug?: string }> {
+  const m = slugOrUrl.trim().match(/([a-z0-9-]+)\/?$/i);
+  const slug = m?.[1] ?? "";
+  if (!slug) return { error: "소개서 링크를 확인해주세요." };
+  const r = await claimMakerAction(slug, password);
+  if (r.error) return r;
+  return { slug };
+}
+
+/** edit 모드 제출 → 권한 재검증 후 내용 업데이트 */
+export async function updateMakerAction(
+  slug: string,
+  input: RegisterInput
+): Promise<{ error?: string; slug?: string }> {
+  if (!(await hasEditGrant(slug))) return { error: "수정 권한이 없어요." };
+  const updated = await repo.updateMakerContent(slug, {
+    name: input.name.trim(),
+    oneLiner: input.oneLiner.trim(),
+    region: deriveRegion(input.address ?? "") || undefined,
+    offers: input.offers,
+    seeks: input.seeks,
+    targetAudience: input.targetAudience,
+    collabHistory: input.collabHistory.map((h) => ({
+      partner: h.partner, types: h.types,
+      desc: h.desc?.trim() || undefined, year: h.year, photos: unwrapPhotos(h.photos),
+    })),
+    story: input.story?.trim() ?? "",
+    activities: (input.activities ?? []).map((a) => ({
+      title: a.title, desc: a.desc, photos: unwrapPhotos(a.photos),
+    })),
+    offersNote: input.offersNote?.trim() ?? "",
+    seeksNote: input.seeksNote?.trim() ?? "",
+    photos: unwrapPhotos(input.photos),
+    soul: { values: input.values, tone: "", trajectory: "" },
+    trust: {
+      instagram: input.instagram?.trim() || undefined,
+      homepage: input.homepage?.trim() || undefined,
+      address: input.address?.trim() || undefined,
+      description: input.description?.trim() || undefined,
+    },
+    collabOpen: input.collabOpen,
+  });
+  if (!updated) return { error: "업데이트에 실패했어요." };
+  return { slug };
+}
+
+/** register 완료 얼럿 버전 분기용 */
+export async function getAuthStateAction(): Promise<{ loggedIn: boolean }> {
+  const user = await getSessionUser();
+  return { loggedIn: !!user };
+}
+
+/** edit 모드 프리필 데이터(권한 있을 때만) */
+export async function getEditDataAction(slug: string): Promise<Maker | null> {
+  if (!(await hasEditGrant(slug))) return null;
+  return repo.getMakerBySlug(slug);
 }
