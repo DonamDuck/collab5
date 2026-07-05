@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useState, useTransition } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   createMakerAction,
   setMakerPasswordAction,
@@ -111,7 +111,23 @@ const DEMO_PREFILL = {
 };
 
 export default function RegisterPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="mx-auto flex min-h-[60vh] w-full max-w-[640px] flex-col items-center justify-center px-4 text-center">
+          <span className="h-8 w-8 animate-spin rounded-full border-[3px] border-primary border-t-transparent" />
+        </main>
+      }
+    >
+      <RegisterForm />
+    </Suspense>
+  );
+}
+
+function RegisterForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const editParam = searchParams.get("edit");
   const [pending, startTransition] = useTransition();
 
   const [name, setName] = useState("");
@@ -466,17 +482,16 @@ export default function RegisterPage() {
   const [editSlug, setEditSlug] = useState<string | null>(null);
   const [editAuthPw, setEditAuthPw] = useState(""); // 수정 저장 재검증용(세션스토리지에서, 소유자는 빈 값)
   // ?edit로 진입 시 데이터 불러오는 동안 로딩 화면(빈 생성폼 깜빡임 방지)
-  const [editBooting, setEditBooting] = useState(
-    typeof window !== "undefined" && new URLSearchParams(window.location.search).has("edit")
-  );
+  // useSearchParams는 서버·클라 첫 렌더 모두 URL을 정확히 반영 — window.location 기반 초기화는
+  // 서버 렌더 시 window가 없어 항상 false로 시작해 빈 생성폼이 잠깐 보이는 원인이었다.
+  const [editBooting, setEditBooting] = useState(!!editParam);
 
   useEffect(() => {
     getAuthStateAction().then((s) => setLoggedIn(s.loggedIn)).catch(() => {});
   }, []);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    const slug = new URLSearchParams(window.location.search).get("edit");
+    const slug = editParam;
     if (!slug) return;
     getEditDataAction(slug).then((m) => {
       if (!m) {
