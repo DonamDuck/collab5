@@ -178,9 +178,10 @@ components:
     height: 24px
     note: "'콜라보 받는 중' 등. 실구현 h-6."
   avatar:
-    rounded: "{rounded.pill}"   # 브랜드 로고는 {rounded.md}
-    sizes: "24 / 32 / 40 / 48 / 64"
-    note: "메이커 로고 우선(우리 색 입히지 않음). 없으면 primary-tint 배경 + primary-on 이니셜. 컴포넌트 = src/components/Avatar.tsx"
+    rounded: "{rounded.pill}"   # shape=square(브랜드 로고 맥락)는 {rounded.md}
+    sizes: "24 / 32 / 40 / 48 / 56 / 64"
+    fallback: "파스텔 로테이션(mint/lemon/corn pale + 각 -on, 이름 해시 결정론) + 이니셜 1자"
+    note: "메이커 로고 우선(우리 색 입히지 않음). 폴백에 Kiwi 틴트 금지(그리드 도배 시 희소성 위반 — 2026-07-05 확정). 컴포넌트 = src/components/Avatar.tsx"
   card:
     backgroundColor: "{colors.surface}"
     textColor: "{colors.ink}"
@@ -417,12 +418,16 @@ html{font-size:17px} /* 루트 17px — rem 기준. 가독성 확대 확정 */
 
 ### Avatar
 
-원형 프로필을 보여줄 때 사용해요. 이미지가 있으면 이미지, 없으면 이니셜.
+프로필·브랜드 로고를 보여줄 때 사용해요. 이미지가 있으면 이미지, 없으면 이니셜. (2026-07-05 디자인 확정)
 
-- **이니셜 폴백 쓰기** — 이미지 없으면 `bg-primary-tint` + `text-primary-on` 이니셜 1자. 메이커 로고엔 우리 색을 입히지 않는다(무대 원칙).
-- **크기 정하기** — 24(리스트) / 32(헤더) / 48(가입 미리보기) / 64(프로필).
+- **모양 고르기** — `circle`(기본): 계정·프로필(헤더·/my·가입 미리보기) / `square`(rounded-md): **브랜드 로고 맥락**(찾기 카드 등) — 로고는 원형으로 크롭하지 않는다.
+- **이니셜 폴백 쓰기** — 이미지 없으면 **파스텔 로테이션**(mint/lemon/corn pale + 각 `-on` 글자색, **이름 해시 결정론** — 같은 브랜드는 항상 같은 색) + 이니셜 1자. ⚠️ Kiwi 틴트 고정 금지 — 찾기 그리드에 로고 없는 메이커가 여럿이면 키위 도배 = 희소성 원칙 위반.
+- **크기 정하기** — 표준 스텝 24(리스트) / 32(헤더) / 40 / 48(가입 미리보기) / 56(/my) / 64(프로필).
+- 이미지형은 `border-hairline`으로 배경과 분리.
 
-인터페이스: `src/components/Avatar.tsx` — props `image?, name, size?(기본 32)`. `rounded-pill`.
+접근성 — 기본: 폴백 `aria-label={name}`, 이미지 `alt={name}` 내장.
+
+인터페이스: `src/components/Avatar.tsx` — props `image?, name, size?(기본 32), shape?("circle"|"square", 기본 circle)`.
 
 ### Badge
 
