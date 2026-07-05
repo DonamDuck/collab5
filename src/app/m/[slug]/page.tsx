@@ -58,9 +58,9 @@ export default async function MakerPage({
         )}
       </header>
 
-      {/* 브랜드 사진 — 스와이프 슬라이드 (텍스트 폭에 맞춤) */}
+      {/* 브랜드 사진 — 스와이프 슬라이드 */}
       {maker.photos.length > 0 && (
-        <div className="mt-7">
+        <div className="mt-7 max-w-[460px]">
           <PhotoSlider photos={maker.photos} />
         </div>
       )}
