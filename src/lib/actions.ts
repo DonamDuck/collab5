@@ -105,7 +105,7 @@ export async function createMakerAction(
 }
 
 export interface CardInput {
-  fromMakerId: string;
+  fromMakerId: number;
   fromSlug: string;
   toName: string;
   why: string;
@@ -131,13 +131,13 @@ export async function createCardAction(
 }
 
 /** North Star: 카드 view 기록 (무계정 열람 시 client에서 1회 호출) */
-export async function recordViewAction(cardId: string): Promise<void> {
+export async function recordViewAction(cardId: number): Promise<void> {
   await repo.recordView(cardId, "share-link");
 }
 
 /** 보조 지표: RSVP 반응 */
 export async function recordReactionAction(
-  cardId: string,
+  cardId: number,
   type: "관심" | "패스"
 ): Promise<void> {
   await repo.recordReaction(cardId, type);

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { signUpAction } from "@/lib/auth-actions";
 import { fileToResizedDataUrl } from "@/lib/image";
 import { Avatar } from "@/components/Avatar";
+import { validatePassword, formatPhone } from "@/lib/validation";
 
 export default function SignupPage() {
   const router = useRouter();
@@ -31,7 +32,8 @@ export default function SignupPage() {
 
   const validate = (): string => {
     if (!/^\S+@\S+\.\S+$/.test(email.trim())) return "이메일 형식을 확인해주세요.";
-    if (password.length < 6) return "비밀번호는 6자 이상이어야 해요.";
+    const pwErr = validatePassword(password);
+    if (pwErr) return pwErr;
     if (password !== password2) return "비밀번호가 서로 달라요.";
     if (!phone.trim()) return "휴대폰번호를 입력해주세요.";
     if (!brandName.trim()) return "브랜드명을 입력해주세요.";
@@ -81,7 +83,7 @@ export default function SignupPage() {
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            placeholder="6자 이상"
+            placeholder="8자 이상, 특수문자 1개 이상"
             className={inputCls}
           />
         </Field>
@@ -97,9 +99,11 @@ export default function SignupPage() {
         <Field label="휴대폰번호">
           <input
             type="tel"
+            inputMode="numeric"
             value={phone}
-            onChange={(e) => setPhone(e.target.value)}
+            onChange={(e) => setPhone(formatPhone(e.target.value))}
             placeholder="010-0000-0000"
+            maxLength={13}
             className={inputCls}
           />
         </Field>

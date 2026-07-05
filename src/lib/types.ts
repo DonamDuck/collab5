@@ -42,7 +42,7 @@ export interface Activity { title: string; desc: string; photos: string[]; }
 
 /** 업체 프로필 = 콜라보 카드의 '집' + 공개 상세페이지(검색 대상) */
 export interface Maker {
-  id: string;
+  id: number; // 정수 시퀀스 PK (DB 자동)
   slug: string; // 공개 URL 용
   name: string;
   oneLiner: string; // 한 줄 정체성
@@ -62,9 +62,10 @@ export interface Maker {
   soul: SoulLayer;
   trust: TrustSignals;
   collabOpen: boolean; // 콜라보 열림/닫힘 토글
-  ownerUserId?: string; // 소유 계정(로그인 생성/연결 시)
+  ownerUserId?: string; // 소유 계정(로그인 생성/연결 시) — auth.users UUID
   editPasswordHash?: string; // 수정 비밀번호 해시(비회원 생성 시). DB=claim_token_hash
-  createdAt: string; // ISO
+  createdAt: string; // ISO (DB timestamptz)
+  updatedAt?: string; // ISO (수정 시 자동 갱신)
 }
 
 /** 상대별 맞춤 제안 본문 */
@@ -77,25 +78,25 @@ export interface Proposal {
 
 /** 청첩장형 콜라보 요청 카드 — 히어로 아티팩트. North Star=view */
 export interface CollabCard {
-  id: string;
+  id: number; // 정수 시퀀스 PK
   slug: string; // 공유 링크 경로
-  fromMakerId: string;
+  fromMakerId: number;
   proposal: Proposal;
   createdAt: string;
 }
 
 /** North Star: 카드 view (외부 공유링크 → 우리 도메인 오픈) */
 export interface ViewEvent {
-  id: string;
-  cardId: string;
-  at: string; // ISO
+  id: number;
+  cardId: number;
+  createdAt: string; // ISO (DB timestamptz)
   ref?: string; // 유입 출처 라벨
 }
 
 /** 보조 지표: 카드 내 RSVP 반응 */
 export interface Reaction {
-  id: string;
-  cardId: string;
+  id: number;
+  cardId: number;
   type: "관심" | "패스";
-  at: string;
+  createdAt: string;
 }

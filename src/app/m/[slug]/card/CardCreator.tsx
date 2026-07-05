@@ -11,7 +11,7 @@ export default function CardCreator({
   fromName,
   photos = [],
 }: {
-  makerId: string;
+  makerId: number;
   fromSlug: string;
   fromName: string;
   photos?: string[];

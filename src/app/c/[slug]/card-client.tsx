@@ -33,7 +33,7 @@ export function ShareBar() {
 }
 
 /** North Star: 무계정 열람 시 1회 view 기록 */
-export function ViewTracker({ cardId }: { cardId: string }) {
+export function ViewTracker({ cardId }: { cardId: number }) {
   const fired = useRef(false);
   useEffect(() => {
     if (fired.current) return;
@@ -44,7 +44,7 @@ export function ViewTracker({ cardId }: { cardId: string }) {
 }
 
 /** RSVP — 관심 있어요 / 다음에요. 부담 없이. */
-export function RsvpBar({ cardId }: { cardId: string }) {
+export function RsvpBar({ cardId }: { cardId: number }) {
   const [done, setDone] = useState<"관심" | "패스" | null>(null);
   const [pending, setPending] = useState(false);
 

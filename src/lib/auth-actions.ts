@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { authEnabled, createAuthClient } from "./supabase/server";
 import { upsertProfile } from "./profiles";
+import { validatePassword } from "./validation";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://collab5.vercel.app";
 const NO_AUTH_MSG = "로그인 설정이 아직 준비되지 않았어요. (환경변수 미설정)";
@@ -17,6 +18,8 @@ export interface SignUpInput {
 
 export async function signUpAction(input: SignUpInput): Promise<{ error?: string }> {
   if (!authEnabled()) return { error: NO_AUTH_MSG };
+  const pwErr = validatePassword(input.password);
+  if (pwErr) return { error: pwErr };
   const supabase = await createAuthClient();
   const { data, error } = await supabase.auth.signUp({
     email: input.email.trim(),
@@ -25,7 +28,7 @@ export async function signUpAction(input: SignUpInput): Promise<{ error?: string
   if (error || !data.user) return { error: friendly(error?.message) };
   try {
     await upsertProfile({
-      userId: data.user.id,
+      uuid: data.user.id,
       brandName: input.brandName.trim(),
       phone: input.phone.trim(),
       profileImage: input.profileImage,

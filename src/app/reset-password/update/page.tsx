@@ -4,6 +4,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserAuthClient } from "@/lib/supabase/client";
+import { validatePassword } from "@/lib/validation";
 
 export default function UpdatePasswordPage() {
   const router = useRouter();
@@ -14,8 +15,9 @@ export default function UpdatePasswordPage() {
 
   const submit = () =>
     start(async () => {
-      if (pw.length < 6) {
-        setErr("비밀번호는 6자 이상이어야 해요.");
+      const pwErr = validatePassword(pw);
+      if (pwErr) {
+        setErr(pwErr);
         return;
       }
       if (pw !== pw2) {
@@ -41,7 +43,7 @@ export default function UpdatePasswordPage() {
           type="password"
           value={pw}
           onChange={(e) => setPw(e.target.value)}
-          placeholder="새 비밀번호 (6자 이상)"
+          placeholder="새 비밀번호 (8자 이상, 특수문자 포함)"
           className="h-11 w-full rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
         />
         <input

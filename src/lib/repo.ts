@@ -9,7 +9,7 @@ export interface Repo {
   // 업체
   createMaker(input: Omit<Maker, "id" | "createdAt">): Promise<Maker>;
   getMakerBySlug(slug: string): Promise<Maker | null>;
-  getMakerById(id: string): Promise<Maker | null>;
+  getMakerById(id: number): Promise<Maker | null>;
   updateMakerContent(slug: string, content: Omit<Maker, "id" | "slug" | "createdAt" | "ownerUserId" | "editPasswordHash">): Promise<Maker | null>;
   setMakerOwner(slug: string, ownerUserId: string): Promise<void>;
   setMakerPasswordHash(slug: string, hash: string): Promise<void>;
@@ -20,22 +20,17 @@ export interface Repo {
   createCard(input: Omit<CollabCard, "id" | "createdAt">): Promise<CollabCard>;
   getCardBySlug(slug: string): Promise<CollabCard | null>;
   // 지표
-  recordView(cardId: string, ref?: string): Promise<ViewEvent>;
-  countViews(cardId: string): Promise<number>;
-  recordReaction(cardId: string, type: Reaction["type"]): Promise<Reaction>;
+  recordView(cardId: number, ref?: string): Promise<ViewEvent>;
+  countViews(cardId: number): Promise<number>;
+  recordReaction(cardId: number, type: Reaction["type"]): Promise<Reaction>;
 }
-
-const uid = () =>
-  typeof crypto !== "undefined" && "randomUUID" in crypto
-    ? crypto.randomUUID()
-    : Math.random().toString(36).slice(2);
 
 const now = () => new Date().toISOString();
 
 // ── 시드: 캔버스가든 = 1호 등록(테스트베드) ──
 const seedMakers: Maker[] = [
   {
-    id: "maker-canvasgarden",
+    id: 1,
     slug: "canvasgarden",
     name: "캔버스가든",
     oneLiner: "패브릭으로 짓는 친환경 가방과 조각 워크숍",
@@ -72,7 +67,7 @@ const seedMakers: Maker[] = [
     createdAt: now(),
   },
   {
-    id: "maker-owolforest",
+    id: 2,
     slug: "owolforest",
     name: "오월의숲",
     oneLiner: "계절을 담는 빈티지 편집숍 & 작은 전시 공간",
@@ -101,7 +96,7 @@ const seedMakers: Maker[] = [
     createdAt: now(),
   },
   {
-    id: "maker-stonebrew",
+    id: 3,
     slug: "stonebrew",
     name: "스톤브루",
     oneLiner: "직접 로스팅하는 동네 스페셜티 카페",
@@ -130,7 +125,7 @@ const seedMakers: Maker[] = [
     createdAt: now(),
   },
   {
-    id: "maker-hidanglib",
+    id: 4,
     slug: "hidanglib",
     name: "호락호락 도서관",
     oneLiner: "그림책과 손글씨가 머무는 작은 동네 책방",
@@ -163,9 +158,9 @@ const seedMakers: Maker[] = [
 // ── 시드 카드: 카드 렌더 확인/데모용 (캔가 → 오월의숲) ──
 const seedCards: CollabCard[] = [
   {
-    id: "card-seed-1",
+    id: 1,
     slug: "canvasgarden-demo",
-    fromMakerId: "maker-canvasgarden",
+    fromMakerId: 1,
     proposal: {
       toName: "오월의숲",
       why: "오월의숲의 빈티지 큐레이션이 저희 워크숍 무드와 정말 잘 맞아요. 결이 닿는 공간이라고 느꼈어요.",
@@ -181,16 +176,21 @@ class InMemoryRepo implements Repo {
   private cards: CollabCard[] = [...seedCards];
   private views: ViewEvent[] = [];
   private reactions: Reaction[] = [];
+  // 정수 시퀀스 카운터 (DB의 identity 흉내)
+  private nextMakerId = this.makers.length + 1;
+  private nextCardId = this.cards.length + 1;
+  private nextViewId = 1;
+  private nextReactionId = 1;
 
   async createMaker(input: Omit<Maker, "id" | "createdAt">): Promise<Maker> {
-    const maker: Maker = { ...input, id: uid(), createdAt: now() };
+    const maker: Maker = { ...input, id: this.nextMakerId++, createdAt: now(), updatedAt: now() };
     this.makers.push(maker);
     return maker;
   }
   async getMakerBySlug(slug: string) {
     return this.makers.find((m) => m.slug === slug) ?? null;
   }
-  async getMakerById(id: string) {
+  async getMakerById(id: number) {
     return this.makers.find((m) => m.id === id) ?? null;
   }
   async updateMakerContent(slug: string, c: Omit<Maker, "id" | "slug" | "createdAt" | "ownerUserId" | "editPasswordHash">): Promise<Maker | null> {
@@ -225,7 +225,7 @@ class InMemoryRepo implements Repo {
   }
 
   async createCard(input: Omit<CollabCard, "id" | "createdAt">): Promise<CollabCard> {
-    const card: CollabCard = { ...input, id: uid(), createdAt: now() };
+    const card: CollabCard = { ...input, id: this.nextCardId++, createdAt: now() };
     this.cards.push(card);
     return card;
   }
@@ -233,16 +233,16 @@ class InMemoryRepo implements Repo {
     return this.cards.find((c) => c.slug === slug) ?? null;
   }
 
-  async recordView(cardId: string, ref?: string): Promise<ViewEvent> {
-    const ev: ViewEvent = { id: uid(), cardId, at: now(), ref };
+  async recordView(cardId: number, ref?: string): Promise<ViewEvent> {
+    const ev: ViewEvent = { id: this.nextViewId++, cardId, createdAt: now(), ref };
     this.views.push(ev);
     return ev;
   }
-  async countViews(cardId: string) {
+  async countViews(cardId: number) {
     return this.views.filter((v) => v.cardId === cardId).length;
   }
-  async recordReaction(cardId: string, type: Reaction["type"]): Promise<Reaction> {
-    const r: Reaction = { id: uid(), cardId, type, at: now() };
+  async recordReaction(cardId: number, type: Reaction["type"]): Promise<Reaction> {
+    const r: Reaction = { id: this.nextReactionId++, cardId, type, createdAt: now() };
     this.reactions.push(r);
     return r;
   }
@@ -250,7 +250,7 @@ class InMemoryRepo implements Repo {
 
 // ── Supabase DB row shapes (snake_case → camelCase 매핑용) ──
 interface MakerRow {
-  id: string; slug: string; name: string; one_liner: string;
+  id: number; slug: string; name: string; one_liner: string;
   cover_image_url: string | null; logo_url: string | null;
   region: string | null; size: string | null;
   offers: string[]; seeks: string[]; target_audience: string[];
@@ -258,15 +258,15 @@ interface MakerRow {
   story: string; activities: Maker["activities"]; offers_note: string; seeks_note: string;
   photos: string[] | null;
   soul: Maker["soul"]; trust: Maker["trust"];
-  collab_open: boolean; created_at: string;
-  owner_user_id: string | null; claim_token_hash: string | null;
+  collab_open: boolean; created_at: string; updated_at: string | null;
+  owner_uuid: string | null; claim_token_hash: string | null;
 }
 interface CardRow {
-  id: string; slug: string; from_maker_id: string;
+  id: number; slug: string; from_maker_id: number;
   proposal: CollabCard["proposal"]; created_at: string;
 }
-interface ViewRow { id: string; card_id: string; at: string; ref: string | null; }
-interface ReactionRow { id: string; card_id: string; type: string; at: string; }
+interface ViewRow { id: number; card_id: number; created_at: string; ref: string | null; }
+interface ReactionRow { id: number; card_id: number; type: string; created_at: string; }
 
 function rowToMaker(r: MakerRow): Maker {
   return {
@@ -285,7 +285,8 @@ function rowToMaker(r: MakerRow): Maker {
     photos: r.photos ?? [],
     soul: r.soul, trust: r.trust,
     collabOpen: r.collab_open, createdAt: r.created_at,
-    ownerUserId: r.owner_user_id ?? undefined,
+    updatedAt: r.updated_at ?? undefined,
+    ownerUserId: r.owner_uuid ?? undefined,
     editPasswordHash: r.claim_token_hash ?? undefined,
   };
 }
@@ -298,16 +299,17 @@ class SupabaseRepo implements Repo {
   constructor(url: string, key: string) { this.db = createClient(url, key); }
 
   async createMaker(input: Omit<Maker, "id" | "createdAt">): Promise<Maker> {
+    // id·created_at·updated_at 은 DB가 자동 부여
     const row = {
-      id: uid(), slug: input.slug, name: input.name, one_liner: input.oneLiner,
+      slug: input.slug, name: input.name, one_liner: input.oneLiner,
       cover_image_url: input.coverImageUrl ?? null, logo_url: input.logoUrl ?? null,
       region: input.region ?? null, size: input.size ?? null,
       offers: input.offers, seeks: input.seeks, target_audience: input.targetAudience,
       collab_history: input.collabHistory,
       story: input.story, activities: input.activities, offers_note: input.offersNote, seeks_note: input.seeksNote,
       photos: input.photos,
-      soul: input.soul, trust: input.trust, collab_open: input.collabOpen, created_at: now(),
-      owner_user_id: input.ownerUserId ?? null, claim_token_hash: input.editPasswordHash ?? null,
+      soul: input.soul, trust: input.trust, collab_open: input.collabOpen,
+      owner_uuid: input.ownerUserId ?? null, claim_token_hash: input.editPasswordHash ?? null,
     };
     const { data, error } = await this.db.from("makers").insert(row).select().single();
     if (error) throw error;
@@ -317,7 +319,7 @@ class SupabaseRepo implements Repo {
     const { data } = await this.db.from("makers").select().eq("slug", slug).maybeSingle();
     return data ? rowToMaker(data as MakerRow) : null;
   }
-  async getMakerById(id: string) {
+  async getMakerById(id: number) {
     const { data } = await this.db.from("makers").select().eq("id", id).maybeSingle();
     return data ? rowToMaker(data as MakerRow) : null;
   }
@@ -336,13 +338,13 @@ class SupabaseRepo implements Repo {
     return data ? rowToMaker(data as MakerRow) : null;
   }
   async setMakerOwner(slug: string, ownerUserId: string): Promise<void> {
-    await this.db.from("makers").update({ owner_user_id: ownerUserId }).eq("slug", slug);
+    await this.db.from("makers").update({ owner_uuid: ownerUserId }).eq("slug", slug);
   }
   async setMakerPasswordHash(slug: string, hash: string): Promise<void> {
     await this.db.from("makers").update({ claim_token_hash: hash }).eq("slug", slug);
   }
   async listMakersByOwner(ownerUserId: string): Promise<Maker[]> {
-    const { data } = await this.db.from("makers").select().eq("owner_user_id", ownerUserId).order("created_at", { ascending: false });
+    const { data } = await this.db.from("makers").select().eq("owner_uuid", ownerUserId).order("created_at", { ascending: false });
     return (data ?? []).map((r) => rowToMaker(r as MakerRow));
   }
   async listMakers() {
@@ -360,7 +362,7 @@ class SupabaseRepo implements Repo {
   }
 
   async createCard(input: Omit<CollabCard, "id" | "createdAt">): Promise<CollabCard> {
-    const row = { id: uid(), slug: input.slug, from_maker_id: input.fromMakerId, proposal: input.proposal, created_at: now() };
+    const row = { slug: input.slug, from_maker_id: input.fromMakerId, proposal: input.proposal };
     const { data, error } = await this.db.from("collab_cards").insert(row).select().single();
     if (error) throw error;
     return rowToCard(data as CardRow);
@@ -370,23 +372,23 @@ class SupabaseRepo implements Repo {
     return data ? rowToCard(data as CardRow) : null;
   }
 
-  async recordView(cardId: string, ref?: string): Promise<ViewEvent> {
-    const row = { id: uid(), card_id: cardId, at: now(), ref: ref ?? null };
+  async recordView(cardId: number, ref?: string): Promise<ViewEvent> {
+    const row = { card_id: cardId, ref: ref ?? null };
     const { data, error } = await this.db.from("view_events").insert(row).select().single();
     if (error) throw error;
     const r = data as ViewRow;
-    return { id: r.id, cardId: r.card_id, at: r.at, ref: r.ref ?? undefined };
+    return { id: r.id, cardId: r.card_id, createdAt: r.created_at, ref: r.ref ?? undefined };
   }
-  async countViews(cardId: string) {
+  async countViews(cardId: number) {
     const { count } = await this.db.from("view_events").select("*", { count: "exact", head: true }).eq("card_id", cardId);
     return count ?? 0;
   }
-  async recordReaction(cardId: string, type: Reaction["type"]): Promise<Reaction> {
-    const row = { id: uid(), card_id: cardId, type, at: now() };
+  async recordReaction(cardId: number, type: Reaction["type"]): Promise<Reaction> {
+    const row = { card_id: cardId, type };
     const { data, error } = await this.db.from("reactions").insert(row).select().single();
     if (error) throw error;
     const r = data as ReactionRow;
-    return { id: r.id, cardId: r.card_id, type: r.type as Reaction["type"], at: r.at };
+    return { id: r.id, cardId: r.card_id, type: r.type as Reaction["type"], createdAt: r.created_at };
   }
 }
 
