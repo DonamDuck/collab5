@@ -2,7 +2,13 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { createMakerAction, setMakerPasswordAction, getAuthStateAction } from "@/lib/actions";
+import {
+  createMakerAction,
+  setMakerPasswordAction,
+  getAuthStateAction,
+  updateMakerAction,
+  getEditDataAction,
+} from "@/lib/actions";
 import type { CollabType } from "@/lib/types";
 import { deriveRegion } from "@/lib/region";
 import { fileToResizedDataUrl } from "@/lib/image";
@@ -431,9 +437,49 @@ export default function RegisterPage() {
   const [loggedIn, setLoggedIn] = useState(false);
   const [editPw, setEditPw] = useState("");
   const [savingPw, setSavingPw] = useState(false);
+  const [editSlug, setEditSlug] = useState<string | null>(null);
 
   useEffect(() => {
     getAuthStateAction().then((s) => setLoggedIn(s.loggedIn)).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const slug = new URLSearchParams(window.location.search).get("edit");
+    if (!slug) return;
+    getEditDataAction(slug).then((m) => {
+      if (!m) return; // 권한 없음 — 일반 생성 폼으로 남음
+      setEditSlug(slug);
+      setName(m.name);
+      setOneLiner(m.oneLiner);
+      setDescription(m.trust.description ?? "");
+      setStory(m.story ?? "");
+      setValues(m.soul.values ?? []);
+      setActivities(
+        (m.activities.length ? m.activities : [{ title: "", desc: "", photos: [] }]).map((a) => ({
+          title: a.title, desc: a.desc, photos: a.photos.map((u) => ({ url: u })),
+        }))
+      );
+      setOffers(m.offers);
+      setSeeks(m.seeks);
+      setOffersNote(m.offersNote ?? "");
+      setSeeksNote(m.seeksNote ?? "");
+      setTargetAudience(m.targetAudience ?? []);
+      setCollabHistory(
+        (m.collabHistory.length
+          ? m.collabHistory
+          : [{ partner: "", types: [], desc: "", year: "", photos: [] }]
+        ).map((h) => ({
+          partner: h.partner, types: h.types, desc: h.desc ?? "", year: h.year ?? "",
+          photos: h.photos.map((u) => ({ url: u })), typeInput: "",
+        }))
+      );
+      setInstagram(m.trust.instagram ?? "");
+      setHomepage(m.trust.homepage ?? "");
+      setAddress(m.trust.address ?? "");
+      setCollabOpen(m.collabOpen);
+      setPhotos(m.photos.map((u) => ({ name: "", url: u, file: undefined as unknown as File })));
+    }).catch(() => {});
   }, []);
 
   const submit = () => {
@@ -454,7 +500,9 @@ export default function RegisterPage() {
         (h) => h.partner.trim() || h.types.length || h.desc.trim() || h.photos.length
       );
       try {
-        photoUrls = await Promise.all(photos.map((p) => fileToResizedDataUrl(p.file, 1000)));
+        photoUrls = await Promise.all(
+          photos.map((p) => (p.file ? fileToResizedDataUrl(p.file, 1000) : Promise.resolve(p.url)))
+        );
         activityOut = await Promise.all(
           activities
             .filter((a) => a.title.trim() || a.desc.trim() || a.photos.length)
@@ -495,7 +543,7 @@ export default function RegisterPage() {
       // 사진 base64는 배열에 문자열로 담으면 React Flight 배열 한도(1e6)에 걸린다.
       // → {u} 객체로 감싸 전송(actions.ts에서 되풂). @see PhotoWire
       const wrap = (arr: string[]) => arr.map((u) => ({ u }));
-      const { slug } = await createMakerAction({
+      const payload = {
         name,
         oneLiner,
         offers,
@@ -513,7 +561,13 @@ export default function RegisterPage() {
         homepage,
         address,
         description,
-      });
+      };
+      if (editSlug) {
+        const r = await updateMakerAction(editSlug, payload);
+        if (!r.error) router.push(`/m/${editSlug}`);
+        return;
+      }
+      const { slug } = await createMakerAction(payload);
       setCreatedSlug(slug);
       setPortfolioOpen(true); // redirect 대신 소개서 얼럿
     });
@@ -1251,7 +1305,7 @@ export default function RegisterPage() {
             disabled={!canSubmit}
             className="h-12 w-full rounded-md bg-primary text-base font-medium text-primary-on disabled:opacity-40"
           >
-            {pending ? "만드는 중…" : "콜라보 카드 등록하기"}
+            {editSlug ? "수정 완료" : pending ? "만드는 중…" : "콜라보 카드 등록하기"}
           </button>
           <p className="text-center text-sm text-mute">
             등록 후에는 언제든 콜라보 카드를 공유할 수 있어요.
