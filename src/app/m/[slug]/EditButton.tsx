@@ -40,7 +40,7 @@ export function EditButton({ slug, isOwner }: { slug: string; isOwner: boolean }
       <button
         type="button"
         onClick={onClick}
-        className="inline-flex h-9 items-center gap-1 rounded-md border border-border-strong bg-surface px-3 text-sm font-medium text-ink hover:bg-surface-soft"
+        className="inline-flex h-7 items-center gap-1 rounded-md border border-hairline bg-surface px-2.5 text-xs font-medium text-mute hover:border-border-strong hover:text-ink"
       >
         수정
       </button>

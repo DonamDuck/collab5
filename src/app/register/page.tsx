@@ -439,6 +439,10 @@ export default function RegisterPage() {
   const [savingPw, setSavingPw] = useState(false);
   const [editSlug, setEditSlug] = useState<string | null>(null);
   const [editAuthPw, setEditAuthPw] = useState(""); // 수정 저장 재검증용(세션스토리지에서, 소유자는 빈 값)
+  // ?edit로 진입 시 데이터 불러오는 동안 로딩 화면(빈 생성폼 깜빡임 방지)
+  const [editBooting, setEditBooting] = useState(
+    typeof window !== "undefined" && new URLSearchParams(window.location.search).has("edit")
+  );
 
   useEffect(() => {
     getAuthStateAction().then((s) => setLoggedIn(s.loggedIn)).catch(() => {});
@@ -449,7 +453,10 @@ export default function RegisterPage() {
     const slug = new URLSearchParams(window.location.search).get("edit");
     if (!slug) return;
     getEditDataAction(slug).then((m) => {
-      if (!m) return; // 소개서 없음 — 일반 생성 폼으로 남음
+      if (!m) {
+        setEditBooting(false);
+        return; // 소개서 없음 — 일반 생성 폼으로 남음
+      }
       setEditSlug(slug);
       try {
         setEditAuthPw(sessionStorage.getItem(`edit_pw_${slug}`) ?? "");
@@ -483,7 +490,8 @@ export default function RegisterPage() {
       setAddress(m.trust.address ?? "");
       setCollabOpen(m.collabOpen);
       setPhotos(m.photos.map((u) => ({ name: "", url: u, file: undefined as unknown as File })));
-    }).catch(() => {});
+      setEditBooting(false);
+    }).catch(() => setEditBooting(false));
   }, []);
 
   const submit = () => {
@@ -595,6 +603,15 @@ export default function RegisterPage() {
     setGoingToPage(true);
     router.push(`/m/${createdSlug}`);
   };
+
+  if (editBooting) {
+    return (
+      <main className="mx-auto flex min-h-[60vh] w-full max-w-[640px] flex-col items-center justify-center px-4 text-center">
+        <span className="h-8 w-8 animate-spin rounded-full border-[3px] border-primary border-t-transparent" />
+        <p className="mt-4 text-[15px] text-mute">소개서를 불러오는 중이에요…</p>
+      </main>
+    );
+  }
 
   return (
     <main className="mx-auto w-full max-w-[640px] px-4 py-8 sm:px-6">
@@ -1327,12 +1344,23 @@ export default function RegisterPage() {
           <button
             onClick={submit}
             disabled={!canSubmit}
-            className="h-12 w-full rounded-md bg-primary text-base font-medium text-primary-on disabled:opacity-40"
+            className="flex h-12 w-full items-center justify-center gap-2 rounded-md bg-primary text-base font-medium text-primary-on disabled:opacity-40"
           >
-            {editSlug ? "수정 완료" : pending ? "만드는 중…" : "콜라보 카드 등록하기"}
+            {pending && (
+              <span className="h-4 w-4 animate-spin rounded-full border-2 border-primary-on border-t-transparent" />
+            )}
+            {editSlug
+              ? pending
+                ? "수정 중…"
+                : "수정 완료"
+              : pending
+                ? "만드는 중…"
+                : "콜라보 카드 등록하기"}
           </button>
           <p className="text-center text-sm text-mute">
-            등록 후에는 언제든 콜라보 카드를 공유할 수 있어요.
+            {editSlug
+              ? "저장에는 몇 초 걸릴 수 있어요."
+              : "등록 후에는 언제든 콜라보 카드를 공유할 수 있어요."}
           </p>
         </div>
       </div>

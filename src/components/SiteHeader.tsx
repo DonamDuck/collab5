@@ -16,34 +16,54 @@ export async function SiteHeader() {
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/logo-lockup.svg" alt="collab5" className="h-7 w-auto" />
       </a>
-      <nav className="flex items-center gap-1 text-sm">
-        <a href="/search" className="rounded-md px-3 py-1.5 text-mute hover:text-ink">
-          찾기
+      <nav className="flex items-center gap-1.5 text-sm sm:gap-2">
+        {/* 찾기 — 돋보기 아이콘 */}
+        <a
+          href="/search"
+          aria-label="찾기"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-mute hover:bg-surface-soft hover:text-ink"
+        >
+          <svg viewBox="0 0 20 20" className="h-[18px] w-[18px]" fill="none" stroke="currentColor" strokeWidth="1.8">
+            <circle cx="8.5" cy="8.5" r="5.5" />
+            <path d="m13 13 4 4" strokeLinecap="round" />
+          </svg>
         </a>
+        {/* 콜라보 카드 만들기 → 짧게 '콜라보 카드' */}
         <a
           href="/register"
-          className="rounded-md border border-border-strong bg-surface px-3 py-1.5 font-medium text-ink"
+          className="shrink-0 whitespace-nowrap rounded-md border border-border-strong bg-surface px-3 py-1.5 font-medium text-ink"
         >
-          콜라보 카드 만들기
+          콜라보 카드
         </a>
         {user ? (
           <>
+            {/* 프로필 원형(→ 내 소개서) */}
             <a
               href="/my"
-              className="ml-1 flex items-center gap-2 rounded-md px-2 py-1 hover:bg-surface-soft"
               aria-label="내 소개서"
+              className="ml-0.5 flex shrink-0 items-center rounded-pill hover:opacity-90"
             >
-              <Avatar image={profile?.profileImage || undefined} name={displayName || "?"} size={30} />
-              <span className="hidden font-medium text-ink sm:inline">{displayName}</span>
+              <Avatar image={profile?.profileImage || undefined} name={displayName || "?"} size={32} />
             </a>
-            <form action={signOutAction}>
-              <button type="submit" className="rounded-md px-2 py-1.5 text-mute hover:text-ink">
-                로그아웃
+            {/* 로그아웃 — 문 아이콘 */}
+            <form action={signOutAction} className="flex">
+              <button
+                type="submit"
+                aria-label="로그아웃"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-faint hover:bg-surface-soft hover:text-ink"
+              >
+                <svg viewBox="0 0 20 20" className="h-[18px] w-[18px]" fill="none" stroke="currentColor" strokeWidth="1.7">
+                  <path d="M8 4H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3" strokeLinecap="round" />
+                  <path d="M12 13.5 15.5 10 12 6.5M15 10H8" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
               </button>
             </form>
           </>
         ) : (
-          <a href="/login" className="ml-1 rounded-md px-3 py-1.5 font-medium text-mute hover:text-ink">
+          <a
+            href="/login"
+            className="ml-0.5 shrink-0 whitespace-nowrap rounded-md px-3 py-1.5 font-medium text-mute hover:text-ink"
+          >
             로그인
           </a>
         )}
