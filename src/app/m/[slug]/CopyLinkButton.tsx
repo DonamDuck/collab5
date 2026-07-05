@@ -30,12 +30,23 @@ export function CopyLinkButton() {
   };
 
   return (
-    <button
-      type="button"
-      onClick={copy}
-      className="flex h-12 w-full items-center justify-center gap-2 rounded-md bg-primary text-base font-medium text-primary-on transition-colors"
-    >
-      {copied ? "✓ 링크가 복사됐어요" : "🔗 링크 복사"}
-    </button>
+    <>
+      <button
+        type="button"
+        onClick={copy}
+        className="flex h-12 w-full items-center justify-center gap-2 rounded-md bg-primary text-base font-medium text-primary-on transition-colors"
+      >
+        {copied ? "✓ 링크가 복사됐어요" : "🔗 링크 복사"}
+      </button>
+      {/* 모바일 플로팅 — sm 미만에서만 */}
+      <button
+        type="button"
+        onClick={copy}
+        aria-label="링크 복사"
+        className="fixed bottom-4 right-4 z-40 flex h-12 items-center gap-1.5 rounded-pill bg-primary px-5 text-sm font-medium text-primary-on shadow-e2 sm:hidden"
+      >
+        {copied ? "✓ 복사됨" : "🔗 링크 복사"}
+      </button>
+    </>
   );
 }
