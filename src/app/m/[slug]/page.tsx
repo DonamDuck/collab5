@@ -1,8 +1,10 @@
 import { notFound } from "next/navigation";
 import { repo } from "@/lib/repo";
+import { getSessionUser } from "@/lib/supabase/server";
 import { instagramUrl, instagramHandle, normalizeUrl, prettyUrl } from "@/lib/links";
 import { PhotoSlider } from "@/components/PhotoSlider";
 import { CopyLinkButton } from "./CopyLinkButton";
+import { EditButton } from "./EditButton";
 
 // 공개 업체 상세페이지 — 누구나 열람(MVP 검색 결과의 도착지). 검증 가능한 신뢰 시그널 노출.
 export default async function MakerPage({
@@ -14,10 +16,16 @@ export default async function MakerPage({
   const maker = await repo.getMakerBySlug(slug);
   if (!maker) notFound();
 
+  const user = await getSessionUser();
+  const isOwner = !!user && maker.ownerUserId === user.id;
+
   return (
     <main className="mx-auto w-full max-w-[640px] px-4 py-10 sm:px-6">
       {/* ── 헤더 — 브랜드명 + 요약(한 줄 소개) + 신뢰 뱃지(인스타·홈피·주소) ── */}
       <header>
+        <div className="mb-2 flex justify-end">
+          <EditButton slug={maker.slug} isOwner={isOwner} />
+        </div>
         <div className="flex flex-wrap items-center gap-2">
           <h1 className="text-[32px] font-bold leading-tight tracking-tight text-ink">
             {maker.name}
