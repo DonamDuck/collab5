@@ -1,5 +1,6 @@
 "use server";
 
+import { createClient } from "@supabase/supabase-js";
 import { repo } from "./repo";
 import { deriveRegion } from "./region";
 import { getSessionUser } from "./supabase/server";
@@ -263,4 +264,23 @@ export async function getEditDataAction(slug: string): Promise<Maker | null> {
   const maker = await repo.getMakerBySlug(slug);
   if (!maker) return null;
   return { ...maker, editPasswordHash: undefined, ownerUserId: undefined };
+}
+
+const PHOTO_BUCKET = "maker-photos";
+
+/** Storage 서명 업로드 URL 발급. env 미설정 시 error(클라는 base64 폴백). */
+export async function createUploadUrlAction(): Promise<
+  { path: string; token: string; publicUrl: string } | { error: string }
+> {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return { error: "storage-disabled" };
+  const admin = createClient(url, key);
+  const path = `p/${crypto.randomUUID()}.jpg`;
+  const { data, error } = await admin.storage
+    .from(PHOTO_BUCKET)
+    .createSignedUploadUrl(path);
+  if (error || !data) return { error: "sign-failed" };
+  const { data: pub } = admin.storage.from(PHOTO_BUCKET).getPublicUrl(path);
+  return { path, token: data.token, publicUrl: pub.publicUrl };
 }
