@@ -41,7 +41,7 @@ export default function LoginPage() {
   return (
     <main className="mx-auto w-full max-w-[400px] px-4 py-14 sm:px-6">
       <h1 className="text-2xl font-bold tracking-tight text-ink">로그인</h1>
-      <p className="mt-2 text-[15px] text-mute">콜라보 카드를 계정으로 관리해보세요.</p>
+      <p className="mt-2 text-[15px] text-mute">브랜드를 소개하고 새로운 콜라보를 시작해보세요.</p>
       {!authEnvReady && (
         <p className="mt-4 rounded-md bg-surface-soft px-3 py-2.5 text-sm text-mute">
           로그인 설정이 아직 준비되지 않았어요. (로컬 환경)
