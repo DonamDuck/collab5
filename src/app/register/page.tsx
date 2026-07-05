@@ -453,6 +453,7 @@ export default function RegisterPage() {
   const [createdSlug, setCreatedSlug] = useState("");
   const [loggedIn, setLoggedIn] = useState(false);
   const [editPw, setEditPw] = useState("");
+  const [showEditPw, setShowEditPw] = useState(false);
   const [savingPw, setSavingPw] = useState(false);
   const [editSlug, setEditSlug] = useState<string | null>(null);
   const [editAuthPw, setEditAuthPw] = useState(""); // 수정 저장 재검증용(세션스토리지에서, 소유자는 빈 값)
@@ -1378,18 +1379,39 @@ export default function RegisterPage() {
                 <p className="mt-3 text-[15px] leading-relaxed text-body">
                   이제 링크를 복사해 협업을 제안해 볼 수 있어요! 비회원 상태라 관리용 비밀번호를 입력해주세요.
                 </p>
-                <div className="mt-4 text-left">
+                <div className="mt-7 text-left">
                   <label className="mb-1.5 block text-sm font-medium text-body">
                     소개서 관리 비밀번호 <span className="text-red-500">*</span>{" "}
                     <span className="font-normal text-faint">(입력 규칙 없음)</span>
                   </label>
-                  <input
-                    type="password"
-                    value={editPw}
-                    onChange={(e) => setEditPw(e.target.value)}
-                    placeholder="비밀번호를 입력해주세요"
-                    className="h-11 w-full rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
-                  />
+                  <div className="relative">
+                    <input
+                      type={showEditPw ? "text" : "password"}
+                      value={editPw}
+                      onChange={(e) => setEditPw(e.target.value)}
+                      placeholder="비밀번호를 입력해주세요"
+                      className="h-11 w-full rounded-sm border border-hairline bg-surface px-3 pr-11 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowEditPw((v) => !v)}
+                      aria-label={showEditPw ? "비밀번호 숨기기" : "비밀번호 보기"}
+                      className="absolute inset-y-0 right-0 flex w-11 items-center justify-center text-faint hover:text-body"
+                    >
+                      {showEditPw ? (
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 10 8 10 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+                          <path d="M6.61 6.61A18.5 18.5 0 0 0 2 12s3 8 10 8a9.12 9.12 0 0 0 5.39-1.61" />
+                          <line x1="2" y1="2" x2="22" y2="22" />
+                        </svg>
+                      ) : (
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M2 12s3-8 10-8 10 8 10 8-3 8-10 8-10-8-10-8Z" />
+                          <circle cx="12" cy="12" r="3" />
+                        </svg>
+                      )}
+                    </button>
+                  </div>
                   <p className="mt-2 text-[13px] leading-relaxed text-faint">
                     잊어버리면 고객센터를 통해서만 찾을 수 있으니 기억해주세요.
                   </p>
