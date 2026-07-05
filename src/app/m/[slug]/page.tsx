@@ -74,16 +74,7 @@ export default async function MakerPage({
         </Section>
       )}
 
-      {/* ② 우리의 시작 이야기 — story */}
-      {maker.story && (
-        <Section title="우리가 브랜드의 시작">
-          <p className="whitespace-pre-line text-[17px] leading-relaxed text-body">
-            {maker.story}
-          </p>
-        </Section>
-      )}
-
-      {/* ③ 우리를 표현하는 키워드에요 — values */}
+      {/* ② 우리를 표현하는 키워드에요 — values */}
       {maker.soul.values.length > 0 && (
         <Section title="우리를 표현하는 키워드에요">
           <div className="flex flex-wrap gap-2">
@@ -99,7 +90,7 @@ export default async function MakerPage({
         </Section>
       )}
 
-      {/* ④ 우리는 이런 일을 하고 있습니다 — activities */}
+      {/* ③ 우리는 이런 일을 하고 있습니다 — activities */}
       {maker.activities.length > 0 && (
         <Section title="우리는 이런 일을 하고 있습니다">
           <div className="space-y-6">
@@ -122,43 +113,7 @@ export default async function MakerPage({
         </Section>
       )}
 
-      {/* ⑤ 이런 협업을 기대하고 있어요 — offers */}
-      {(maker.offers.length > 0 || maker.offersNote) && (
-        <Section title="이런 협업을 기대하고 있어요">
-          {maker.offersNote && (
-            <p className="mb-3 whitespace-pre-line text-[17px] leading-relaxed text-body">
-              {maker.offersNote}
-            </p>
-          )}
-          {maker.offers.length > 0 && (
-            <div className="flex flex-wrap gap-2">
-              {maker.offers.map((o) => (
-                <TypeChip key={o}>{o}</TypeChip>
-              ))}
-            </div>
-          )}
-        </Section>
-      )}
-
-      {/* ⑥ 이런 분들과 함께하고 싶어요 — seeks */}
-      {(maker.seeks.length > 0 || maker.seeksNote) && (
-        <Section title="이런 분들과 함께하고 싶어요">
-          {maker.seeksNote && (
-            <p className="mb-3 whitespace-pre-line text-[17px] leading-relaxed text-body">
-              {maker.seeksNote}
-            </p>
-          )}
-          {maker.seeks.length > 0 && (
-            <div className="flex flex-wrap gap-2">
-              {maker.seeks.map((s) => (
-                <TypeChip key={s}>{s}</TypeChip>
-              ))}
-            </div>
-          )}
-        </Section>
-      )}
-
-      {/* 함께한 콜라보 — collabHistory */}
+      {/* ④ 함께한 콜라보 — collabHistory */}
       {maker.collabHistory.length > 0 && (
         <Section title="함께한 콜라보">
           <div className="space-y-4">
@@ -189,7 +144,52 @@ export default async function MakerPage({
         </Section>
       )}
 
-      {/* ⑦ 저희는 이런 고객들과 함께 하고 있어요 — targetAudience */}
+      {/* ⑤ 이런 협업을 기대하고 있어요 — offers */}
+      {(maker.offers.length > 0 || maker.offersNote) && (
+        <Section title="이런 협업을 기대하고 있어요">
+          {maker.offersNote && (
+            <p className="mb-3 whitespace-pre-line text-[17px] leading-relaxed text-body">
+              {maker.offersNote}
+            </p>
+          )}
+          {maker.offers.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {maker.offers.map((o) => (
+                <TypeChip key={o}>{o}</TypeChip>
+              ))}
+            </div>
+          )}
+        </Section>
+      )}
+
+      {/* ⑥ 우리가 브랜드의 시작 — story */}
+      {maker.story && (
+        <Section title="우리가 브랜드의 시작">
+          <p className="whitespace-pre-line text-[17px] leading-relaxed text-body">
+            {maker.story}
+          </p>
+        </Section>
+      )}
+
+      {/* ⑦ 이런 분들과 함께하고 싶어요 — seeks */}
+      {(maker.seeks.length > 0 || maker.seeksNote) && (
+        <Section title="이런 분들과 함께하고 싶어요">
+          {maker.seeksNote && (
+            <p className="mb-3 whitespace-pre-line text-[17px] leading-relaxed text-body">
+              {maker.seeksNote}
+            </p>
+          )}
+          {maker.seeks.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {maker.seeks.map((s) => (
+                <TypeChip key={s}>{s}</TypeChip>
+              ))}
+            </div>
+          )}
+        </Section>
+      )}
+
+      {/* ⑧ 저희는 이런 고객들과 함께 하고 있어요 — targetAudience */}
       {maker.targetAudience.length > 0 && (
         <Section title="저희는 이런 고객들과 함께 하고 있어요">
           <div className="flex flex-wrap gap-2">
