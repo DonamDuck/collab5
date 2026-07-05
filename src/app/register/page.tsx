@@ -11,7 +11,7 @@ import {
 } from "@/lib/actions";
 import type { CollabType } from "@/lib/types";
 import { deriveRegion } from "@/lib/region";
-import { fileToResizedDataUrl } from "@/lib/image";
+import { uploadPhoto } from "@/lib/upload";
 import type { ActivityHint, CollabHint, EnrichField } from "@/lib/enrich";
 import { EnrichWizard, type WizardFill } from "./EnrichWizard";
 import { PhotoGrid } from "./PhotoGrid";
@@ -25,13 +25,13 @@ function reorder<T>(arr: T[], from: number, to: number): T[] {
 }
 
 // 편집 중 콜라보 이력 — 활동(activities)과 동일한 인라인 카드 패턴.
-// photos는 {url,file?}로 다루고 제출 시 string[]로 리사이즈. typeInput은 커스텀 유형 입력(전송 제외).
+// photos는 {url,uploading?} — 선택 즉시 Storage 업로드, 제출 시 URL만 전송. typeInput은 커스텀 유형 입력(전송 제외).
 type HistItem = {
   partner: string;
   types: string[];
   desc: string;
   year: string;
-  photos: { url: string; file?: File }[];
+  photos: { url: string; uploading?: boolean }[];
   typeInput: string;
 };
 const emptyHist = (): HistItem => ({
@@ -128,11 +128,11 @@ export default function RegisterPage() {
   const [homepage, setHomepage] = useState("");
   const [description, setDescription] = useState("");
   const [address, setAddress] = useState("");
-  const [photos, setPhotos] = useState<{ name: string; url: string; file: File }[]>([]);
+  const [photos, setPhotos] = useState<{ url: string; uploading?: boolean }[]>([]);
   // ── 소개서 개편 신규 필드 ──
   const [story, setStory] = useState("");
   const [activities, setActivities] = useState<
-    { title: string; desc: string; photos: { url: string; file?: File }[] }[]
+    { title: string; desc: string; photos: { url: string; uploading?: boolean }[] }[]
   >([{ title: "", desc: "", photos: [] }]);
   const [offersNote, setOffersNote] = useState("");
   const [seeksNote, setSeeksNote] = useState("");
@@ -238,15 +238,33 @@ export default function RegisterPage() {
           : { ...h, typeInput: "" };
       })
     );
-  const addHistPhotos = (i: number, files: FileList | null) => {
-    if (!files) return;
-    const next = Array.from(files)
+  // 선택 즉시 업로드: objectURL 프리뷰+스피너 → 완료 시 publicUrl로 교체, 실패 시 제거
+  type Ph = { url: string; uploading?: boolean };
+  const uploadInto = (
+    files: FileList | null,
+    room: number,
+    maxDim: number,
+    update: (f: (p: Ph[]) => Ph[]) => void
+  ) => {
+    Array.from(files ?? [])
       .filter((f) => f.type.startsWith("image/"))
-      .map((f) => ({ url: URL.createObjectURL(f), file: f }));
-    setCollabHistory((p) =>
-      p.map((h, j) => (j === i ? { ...h, photos: [...h.photos, ...next].slice(0, 3) } : h))
-    );
+      .slice(0, Math.max(0, room))
+      .forEach((f) => {
+        const preview = URL.createObjectURL(f);
+        update((p) => [...p, { url: preview, uploading: true }]);
+        uploadPhoto(f, maxDim)
+          .then((url) => update((p) => p.map((x) => (x.url === preview ? { url } : x))))
+          .catch(() => {
+            update((p) => p.filter((x) => x.url !== preview));
+            alert("사진 업로드에 실패했어요. 다시 시도해주세요.");
+          });
+      });
   };
+
+  const addHistPhotos = (i: number, files: FileList | null) =>
+    uploadInto(files, 3 - (collabHistory[i]?.photos.length ?? 0), 800, (f) =>
+      setCollabHistory((p) => p.map((h, j) => (j === i ? { ...h, photos: f(h.photos) } : h)))
+    );
   const removeHistPhoto = (i: number, k: number) =>
     setCollabHistory((p) =>
       p.map((h, j) => (j === i ? { ...h, photos: h.photos.filter((_, x) => x !== k) } : h))
@@ -261,15 +279,10 @@ export default function RegisterPage() {
     setActivities((p) => (p.length >= 3 ? p : [...p, { title: "", desc: "", photos: [] }]));
   const setAct = (i: number, patch: Partial<{ title: string; desc: string }>) =>
     setActivities((p) => p.map((a, j) => (j === i ? { ...a, ...patch } : a)));
-  const addActPhotos = (i: number, files: FileList | null) => {
-    if (!files) return;
-    const next = Array.from(files)
-      .filter((f) => f.type.startsWith("image/"))
-      .map((f) => ({ url: URL.createObjectURL(f), file: f }));
-    setActivities((p) =>
-      p.map((a, j) => (j === i ? { ...a, photos: [...a.photos, ...next].slice(0, 3) } : a))
+  const addActPhotos = (i: number, files: FileList | null) =>
+    uploadInto(files, 3 - (activities[i]?.photos.length ?? 0), 800, (f) =>
+      setActivities((p) => p.map((a, j) => (j === i ? { ...a, photos: f(a.photos) } : a)))
     );
-  };
   const removeActPhoto = (i: number, k: number) =>
     setActivities((p) =>
       p.map((a, j) => (j === i ? { ...a, photos: a.photos.filter((_, x) => x !== k) } : a))
@@ -281,13 +294,8 @@ export default function RegisterPage() {
   const removeActivity = (i: number) =>
     setActivities((p) => p.filter((_, j) => j !== i));
 
-  const onPhotos = (files: FileList | null) => {
-    if (!files) return;
-    const next = Array.from(files)
-      .filter((f) => f.type.startsWith("image/"))
-      .map((f) => ({ name: f.name, url: URL.createObjectURL(f), file: f }));
-    setPhotos((p) => [...p, ...next].slice(0, 10));
-  };
+  const onPhotos = (files: FileList | null) =>
+    uploadInto(files, 10 - photos.length, 1000, setPhotos);
 
   // 규칙 기반 소개 초안 폴백 (AI 실패 시 — 입력값 조합)
   const ruleDraft = () => {
@@ -507,69 +515,33 @@ export default function RegisterPage() {
       setHomepage(m.trust.homepage ?? "");
       setAddress(m.trust.address ?? "");
       setCollabOpen(m.collabOpen);
-      setPhotos(m.photos.map((u) => ({ name: "", url: u, file: undefined as unknown as File })));
+      setPhotos(m.photos.map((u) => ({ url: u })));
       setEditBooting(false);
     }).catch(() => setEditBooting(false));
   }, []);
 
   const submit = () => {
     startTransition(async () => {
-      // 사진은 리사이즈·압축해 data URL로 저장(카드·프로필 슬라이드용)
-      // 브랜드 사진 1000px, 활동·콜라보 사진 800px.
-      let photoUrls: string[] = [];
-      let activityOut: { title: string; desc: string; photos: string[] }[] = [];
-      let historyOut: {
-        partner: string;
-        types: string[];
-        desc: string;
-        year?: string;
-        photos: string[];
-      }[] = [];
+      // 사진은 선택 즉시 Storage 업로드됨 → 여기선 URL만 수집(업로드중 항목 제외)
       // 내용이 있는 카드만(빈 카드는 제외) — 활동과 동일 규칙
       const filledHist = collabHistory.filter(
         (h) => h.partner.trim() || h.types.length || h.desc.trim() || h.photos.length
       );
-      try {
-        photoUrls = await Promise.all(
-          photos.map((p) => (p.file ? fileToResizedDataUrl(p.file, 1000) : Promise.resolve(p.url)))
-        );
-        activityOut = await Promise.all(
-          activities
-            .filter((a) => a.title.trim() || a.desc.trim() || a.photos.length)
-            .map(async (a) => ({
-              title: a.title.trim(),
-              desc: a.desc.trim(),
-              photos: await Promise.all(
-                a.photos.map((p) =>
-                  p.file ? fileToResizedDataUrl(p.file, 800) : Promise.resolve(p.url)
-                )
-              ),
-            }))
-        );
-        historyOut = await Promise.all(
-          filledHist.map(async (h) => ({
-            partner: h.partner.trim(),
-            types: h.types,
-            desc: h.desc.trim(),
-            year: h.year || undefined,
-            photos: await Promise.all(
-              h.photos.map((p) =>
-                p.file ? fileToResizedDataUrl(p.file, 800) : Promise.resolve(p.url)
-              )
-            ),
-          }))
-        );
-      } catch {
-        photoUrls = [];
-        activityOut = [];
-        historyOut = filledHist.map((h) => ({
-          partner: h.partner.trim(),
-          types: h.types,
-          desc: h.desc.trim(),
-          year: h.year || undefined,
-          photos: [],
+      const photoUrls = photos.filter((p) => !p.uploading).map((p) => p.url);
+      const activityOut = activities
+        .filter((a) => a.title.trim() || a.desc.trim() || a.photos.length)
+        .map((a) => ({
+          title: a.title.trim(),
+          desc: a.desc.trim(),
+          photos: a.photos.filter((p) => !p.uploading).map((p) => p.url),
         }));
-      }
+      const historyOut = filledHist.map((h) => ({
+        partner: h.partner.trim(),
+        types: h.types,
+        desc: h.desc.trim(),
+        year: h.year || undefined,
+        photos: h.photos.filter((p) => !p.uploading).map((p) => p.url),
+      }));
       // 사진 base64는 배열에 문자열로 담으면 React Flight 배열 한도(1e6)에 걸린다.
       // → {u} 객체로 감싸 전송(actions.ts에서 되풂). @see PhotoWire
       const wrap = (arr: string[]) => arr.map((u) => ({ u }));
@@ -781,7 +753,7 @@ export default function RegisterPage() {
               콜라보 카드에 담을 사진을 올려주세요. 최대 10장
             </p>
             <PhotoGrid
-              urls={photos.map((p) => p.url)}
+              items={photos}
               max={10}
               onAdd={onPhotos}
               onRemove={(i) => setPhotos((ps) => ps.filter((_, j) => j !== i))}
@@ -949,7 +921,7 @@ export default function RegisterPage() {
                 className="w-full rounded-sm border border-hairline bg-surface px-3 py-2.5 text-base leading-relaxed text-ink outline-none placeholder:text-faint focus:border-focus"
               />
               <PhotoGrid
-                urls={act.photos.map((p) => p.url)}
+                items={act.photos}
                 max={3}
                 onAdd={(files) => addActPhotos(i, files)}
                 onRemove={(k) => removeActPhoto(i, k)}
@@ -1141,7 +1113,7 @@ export default function RegisterPage() {
                   <div>
                     <p className="mb-1.5 text-sm text-mute">사진 (선택 · 최대 3장)</p>
                     <PhotoGrid
-                      urls={h.photos.map((p) => p.url)}
+                      items={h.photos}
                       max={3}
                       onAdd={(files) => addHistPhotos(i, files)}
                       onRemove={(k) => removeHistPhoto(i, k)}
@@ -1287,7 +1259,12 @@ export default function RegisterPage() {
         <div className="space-y-2">
           <button
             onClick={submit}
-            disabled={!canSubmit}
+            disabled={
+              !canSubmit ||
+              [...photos, ...activities.flatMap((a) => a.photos), ...collabHistory.flatMap((h) => h.photos)].some(
+                (p) => p.uploading
+              )
+            }
             className="flex h-12 w-full items-center justify-center gap-2 rounded-md bg-primary text-base font-medium text-primary-on disabled:opacity-40"
           >
             {pending && (
