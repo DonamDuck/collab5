@@ -17,6 +17,10 @@ export default function LoginPage() {
   const submit = () =>
     start(async () => {
       setErr("");
+      if (!email.trim() || !password) {
+        setErr("이메일과 비밀번호를 입력해주세요.");
+        return;
+      }
       const r = await signInAction(email, password);
       if (r.error) {
         setErr(r.error);
@@ -66,7 +70,7 @@ export default function LoginPage() {
       <button
         type="button"
         onClick={submit}
-        disabled={pending || !email.trim() || !password}
+        disabled={pending}
         className="mt-4 h-12 w-full rounded-md bg-primary text-base font-medium text-primary-on disabled:opacity-50"
       >
         {pending ? "로그인 중…" : "로그인"}

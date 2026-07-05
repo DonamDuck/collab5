@@ -14,6 +14,15 @@ import { deriveRegion } from "@/lib/region";
 import { fileToResizedDataUrl } from "@/lib/image";
 import type { ActivityHint, CollabHint, EnrichField } from "@/lib/enrich";
 import { EnrichWizard, type WizardFill } from "./EnrichWizard";
+import { PhotoGrid } from "./PhotoGrid";
+
+// 배열 내 순서 이동 (드래그 재정렬용)
+function reorder<T>(arr: T[], from: number, to: number): T[] {
+  const c = [...arr];
+  const [x] = c.splice(from, 1);
+  c.splice(to, 0, x);
+  return c;
+}
 
 // 편집 중 콜라보 이력 — 활동(activities)과 동일한 인라인 카드 패턴.
 // photos는 {url,file?}로 다루고 제출 시 string[]로 리사이즈. typeInput은 커스텀 유형 입력(전송 제외).
@@ -242,6 +251,10 @@ export default function RegisterPage() {
     setCollabHistory((p) =>
       p.map((h, j) => (j === i ? { ...h, photos: h.photos.filter((_, x) => x !== k) } : h))
     );
+  const moveHistPhoto = (i: number, from: number, to: number) =>
+    setCollabHistory((p) =>
+      p.map((h, j) => (j === i ? { ...h, photos: reorder(h.photos, from, to) } : h))
+    );
 
   // ── 대표 활동 (최대 3세트) ──
   const addActivity = () =>
@@ -260,6 +273,10 @@ export default function RegisterPage() {
   const removeActPhoto = (i: number, k: number) =>
     setActivities((p) =>
       p.map((a, j) => (j === i ? { ...a, photos: a.photos.filter((_, x) => x !== k) } : a))
+    );
+  const moveActPhoto = (i: number, from: number, to: number) =>
+    setActivities((p) =>
+      p.map((a, j) => (j === i ? { ...a, photos: reorder(a.photos, from, to) } : a))
     );
   const removeActivity = (i: number) =>
     setActivities((p) => p.filter((_, j) => j !== i));
@@ -762,38 +779,13 @@ export default function RegisterPage() {
             <p className="mb-2.5 text-[15px] text-mute">
               콜라보 카드에 담을 사진을 올려주세요. 최대 10장
             </p>
-            <div className="flex flex-wrap gap-2">
-              {photos.map((p, i) => (
-                <div
-                  key={i}
-                  className="relative h-20 w-20 overflow-hidden rounded-md border border-hairline"
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={p.url} alt={p.name} className="h-full w-full object-cover" />
-                  <button
-                    type="button"
-                    onClick={() => setPhotos((ps) => ps.filter((_, j) => j !== i))}
-                    aria-label="사진 삭제"
-                    className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-pill bg-ink/60 text-[11px] text-white"
-                  >
-                    ✕
-                  </button>
-                </div>
-              ))}
-              {photos.length < 10 && (
-                <label className="flex h-20 w-20 cursor-pointer flex-col items-center justify-center rounded-md border border-dashed border-border-strong bg-surface text-mute">
-                  <span className="text-xl leading-none">＋</span>
-                  <span className="mt-1 text-[11px]">사진</span>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    multiple
-                    className="hidden"
-                    onChange={(e) => onPhotos(e.target.files)}
-                  />
-                </label>
-              )}
-            </div>
+            <PhotoGrid
+              urls={photos.map((p) => p.url)}
+              max={10}
+              onAdd={onPhotos}
+              onRemove={(i) => setPhotos((ps) => ps.filter((_, j) => j !== i))}
+              onReorder={(from, to) => setPhotos((ps) => reorder(ps, from, to))}
+            />
           </div>
 
         </div>
@@ -954,38 +946,13 @@ export default function RegisterPage() {
                 placeholder="예: 업사이클링 원단을 활용한 가방 제작"
                 className="h-10 w-full rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
               />
-              <div className="flex flex-wrap gap-2">
-                {act.photos.map((p, k) => (
-                  <div
-                    key={k}
-                    className="relative h-20 w-20 overflow-hidden rounded-md border border-hairline"
-                  >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={p.url} alt="" className="h-full w-full object-cover" />
-                    <button
-                      type="button"
-                      onClick={() => removeActPhoto(i, k)}
-                      aria-label="사진 삭제"
-                      className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-pill bg-ink/60 text-[11px] text-white"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                ))}
-                {act.photos.length < 3 && (
-                  <label className="flex h-20 w-20 cursor-pointer flex-col items-center justify-center rounded-md border border-dashed border-border-strong bg-surface text-mute">
-                    <span className="text-xl leading-none">＋</span>
-                    <span className="mt-1 text-[11px]">사진</span>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      multiple
-                      className="hidden"
-                      onChange={(e) => addActPhotos(i, e.target.files)}
-                    />
-                  </label>
-                )}
-              </div>
+              <PhotoGrid
+                urls={act.photos.map((p) => p.url)}
+                max={3}
+                onAdd={(files) => addActPhotos(i, files)}
+                onRemove={(k) => removeActPhoto(i, k)}
+                onReorder={(from, to) => moveActPhoto(i, from, to)}
+              />
             </div>
           ))}
           {activities.length < 3 && (
@@ -1171,38 +1138,13 @@ export default function RegisterPage() {
                   </div>
                   <div>
                     <p className="mb-1.5 text-sm text-mute">사진 (선택 · 최대 3장)</p>
-                    <div className="flex flex-wrap gap-2">
-                      {h.photos.map((p, k) => (
-                        <div
-                          key={k}
-                          className="relative h-20 w-20 overflow-hidden rounded-md border border-hairline"
-                        >
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={p.url} alt="" className="h-full w-full object-cover" />
-                          <button
-                            type="button"
-                            onClick={() => removeHistPhoto(i, k)}
-                            aria-label="사진 삭제"
-                            className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-pill bg-ink/60 text-[11px] text-white"
-                          >
-                            ✕
-                          </button>
-                        </div>
-                      ))}
-                      {h.photos.length < 3 && (
-                        <label className="flex h-20 w-20 cursor-pointer flex-col items-center justify-center rounded-md border border-dashed border-border-strong bg-surface text-mute">
-                          <span className="text-xl leading-none">＋</span>
-                          <span className="mt-1 text-[11px]">사진</span>
-                          <input
-                            type="file"
-                            accept="image/*"
-                            multiple
-                            className="hidden"
-                            onChange={(e) => addHistPhotos(i, e.target.files)}
-                          />
-                        </label>
-                      )}
-                    </div>
+                    <PhotoGrid
+                      urls={h.photos.map((p) => p.url)}
+                      max={3}
+                      onAdd={(files) => addHistPhotos(i, files)}
+                      onRemove={(k) => removeHistPhoto(i, k)}
+                      onReorder={(from, to) => moveHistPhoto(i, from, to)}
+                    />
                   </div>
                 </div>
               ))}
