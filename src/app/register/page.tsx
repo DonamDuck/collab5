@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { createMakerAction } from "@/lib/actions";
+import { createMakerAction, setMakerPasswordAction, getAuthStateAction } from "@/lib/actions";
 import type { CollabType } from "@/lib/types";
 import { deriveRegion } from "@/lib/region";
 import { fileToResizedDataUrl } from "@/lib/image";
@@ -428,6 +428,13 @@ export default function RegisterPage() {
   // ── 등록 완료 얼럿(소개서 페이지로 이동) ──
   const [portfolioOpen, setPortfolioOpen] = useState(false);
   const [createdSlug, setCreatedSlug] = useState("");
+  const [loggedIn, setLoggedIn] = useState(false);
+  const [editPw, setEditPw] = useState("");
+  const [savingPw, setSavingPw] = useState(false);
+
+  useEffect(() => {
+    getAuthStateAction().then((s) => setLoggedIn(s.loggedIn)).catch(() => {});
+  }, []);
 
   const submit = () => {
     startTransition(async () => {
@@ -513,7 +520,13 @@ export default function RegisterPage() {
   };
   // 소개서 페이지는 서버에서 데이터를 불러오는 동안 잠깐 멈춰 보임 → 버튼 로딩 표시.
   const [goingToPage, setGoingToPage] = useState(false);
-  const goToPage = () => {
+  const goToPage = async () => {
+    if (!loggedIn) {
+      if (!editPw.trim()) return;
+      setSavingPw(true);
+      await setMakerPasswordAction(createdSlug, editPw.trim()).catch(() => {});
+      setSavingPw(false);
+    }
     setGoingToPage(true);
     router.push(`/m/${createdSlug}`);
   };
@@ -1302,23 +1315,47 @@ export default function RegisterPage() {
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 p-4 sm:items-center">
           <div className="w-full max-w-md rounded-lg border border-hairline bg-surface p-6 text-center shadow-e2">
             <p className="text-lg font-bold text-ink">✨ 브랜드 소개서가 완성됐어요!</p>
-            <p className="mt-3 text-[15px] leading-relaxed text-body">
-              브랜드 소개서 페이지에서 내용을 확인해보세요.
-            </p>
-            <p className="mt-2 text-[15px] leading-relaxed text-body">
-              이제, 링크를 복사해 협업을 제안해 볼 수 있어요.
-            </p>
+            {loggedIn ? (
+              <>
+                <p className="mt-3 text-[15px] leading-relaxed text-body">
+                  브랜드 소개서 페이지에서 내용을 확인해보세요.
+                </p>
+                <p className="mt-2 text-[15px] leading-relaxed text-body">
+                  이제, 링크를 복사해 협업을 제안할 수 있어요.
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="mt-3 text-[15px] leading-relaxed text-body">
+                  이제 링크를 복사해 협업을 제안해 볼 수 있어요! 비회원 상태라 관리용 비밀번호를 입력해주세요.
+                </p>
+                <div className="mt-4 text-left">
+                  <label className="mb-1.5 block text-sm font-medium text-body">
+                    소개서 관리 비밀번호 <span className="text-red-500">*</span>{" "}
+                    <span className="font-normal text-faint">(입력 규칙 없음)</span>
+                  </label>
+                  <input
+                    type="password"
+                    value={editPw}
+                    onChange={(e) => setEditPw(e.target.value)}
+                    placeholder="비밀번호를 입력해주세요"
+                    className="h-11 w-full rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
+                  />
+                  <p className="mt-2 text-[13px] leading-relaxed text-faint">
+                    잊어버리면 고객센터를 통해서만 찾을 수 있으니 기억해주세요.
+                  </p>
+                </div>
+              </>
+            )}
             <button
               type="button"
               onClick={goToPage}
-              disabled={goingToPage}
-              className="mt-6 flex h-12 w-full items-center justify-center gap-2 rounded-md bg-primary text-base font-medium text-primary-on disabled:opacity-80"
+              disabled={goingToPage || savingPw || (!loggedIn && !editPw.trim())}
+              className="mt-6 flex h-12 w-full items-center justify-center gap-2 rounded-md bg-primary text-base font-medium text-primary-on disabled:opacity-50"
             >
-              {goingToPage && (
-                <span className="h-4 w-4 animate-spin rounded-full border-2 border-primary-on border-t-transparent" />
-              )}
-              {goingToPage ? "소개서를 여는 중…" : "소개서 확인하기"}
+              {goingToPage || savingPw ? "이동 중…" : "소개서 확인하러 가기"}
             </button>
+            <p className="mt-3 text-[13px] text-faint">언제든 ‘내 소개서’에서 수정할 수 있어요.</p>
           </div>
         </div>
       )}
