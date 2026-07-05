@@ -10,6 +10,10 @@ export interface Repo {
   createMaker(input: Omit<Maker, "id" | "createdAt">): Promise<Maker>;
   getMakerBySlug(slug: string): Promise<Maker | null>;
   getMakerById(id: string): Promise<Maker | null>;
+  updateMakerContent(slug: string, content: Omit<Maker, "id" | "slug" | "createdAt" | "ownerUserId" | "editPasswordHash">): Promise<Maker | null>;
+  setMakerOwner(slug: string, ownerUserId: string): Promise<void>;
+  setMakerPasswordHash(slug: string, hash: string): Promise<void>;
+  listMakersByOwner(ownerUserId: string): Promise<Maker[]>;
   listMakers(): Promise<Maker[]>;
   searchMakers(q: string): Promise<Maker[]>;
   // 카드
@@ -189,6 +193,23 @@ class InMemoryRepo implements Repo {
   async getMakerById(id: string) {
     return this.makers.find((m) => m.id === id) ?? null;
   }
+  async updateMakerContent(slug: string, c: Omit<Maker, "id" | "slug" | "createdAt" | "ownerUserId" | "editPasswordHash">): Promise<Maker | null> {
+    const m = this.makers.find((x) => x.slug === slug);
+    if (!m) return null;
+    Object.assign(m, c);
+    return m;
+  }
+  async setMakerOwner(slug: string, ownerUserId: string): Promise<void> {
+    const m = this.makers.find((x) => x.slug === slug);
+    if (m) m.ownerUserId = ownerUserId;
+  }
+  async setMakerPasswordHash(slug: string, hash: string): Promise<void> {
+    const m = this.makers.find((x) => x.slug === slug);
+    if (m) m.editPasswordHash = hash;
+  }
+  async listMakersByOwner(ownerUserId: string): Promise<Maker[]> {
+    return this.makers.filter((x) => x.ownerUserId === ownerUserId);
+  }
   async listMakers() {
     return [...this.makers];
   }
@@ -238,6 +259,7 @@ interface MakerRow {
   photos: string[] | null;
   soul: Maker["soul"]; trust: Maker["trust"];
   collab_open: boolean; created_at: string;
+  owner_user_id: string | null; claim_token_hash: string | null;
 }
 interface CardRow {
   id: string; slug: string; from_maker_id: string;
@@ -263,6 +285,8 @@ function rowToMaker(r: MakerRow): Maker {
     photos: r.photos ?? [],
     soul: r.soul, trust: r.trust,
     collabOpen: r.collab_open, createdAt: r.created_at,
+    ownerUserId: r.owner_user_id ?? undefined,
+    editPasswordHash: r.claim_token_hash ?? undefined,
   };
 }
 function rowToCard(r: CardRow): CollabCard {
@@ -283,6 +307,7 @@ class SupabaseRepo implements Repo {
       story: input.story, activities: input.activities, offers_note: input.offersNote, seeks_note: input.seeksNote,
       photos: input.photos,
       soul: input.soul, trust: input.trust, collab_open: input.collabOpen, created_at: now(),
+      owner_user_id: input.ownerUserId ?? null, claim_token_hash: input.editPasswordHash ?? null,
     };
     const { data, error } = await this.db.from("makers").insert(row).select().single();
     if (error) throw error;
@@ -295,6 +320,30 @@ class SupabaseRepo implements Repo {
   async getMakerById(id: string) {
     const { data } = await this.db.from("makers").select().eq("id", id).maybeSingle();
     return data ? rowToMaker(data as MakerRow) : null;
+  }
+  async updateMakerContent(
+    slug: string,
+    c: Omit<Maker, "id" | "slug" | "createdAt" | "ownerUserId" | "editPasswordHash">
+  ): Promise<Maker | null> {
+    const patch = {
+      name: c.name, one_liner: c.oneLiner,
+      region: c.region ?? null, offers: c.offers, seeks: c.seeks,
+      target_audience: c.targetAudience, collab_history: c.collabHistory,
+      story: c.story, activities: c.activities, offers_note: c.offersNote, seeks_note: c.seeksNote,
+      photos: c.photos, soul: c.soul, trust: c.trust, collab_open: c.collabOpen,
+    };
+    const { data } = await this.db.from("makers").update(patch).eq("slug", slug).select().maybeSingle();
+    return data ? rowToMaker(data as MakerRow) : null;
+  }
+  async setMakerOwner(slug: string, ownerUserId: string): Promise<void> {
+    await this.db.from("makers").update({ owner_user_id: ownerUserId }).eq("slug", slug);
+  }
+  async setMakerPasswordHash(slug: string, hash: string): Promise<void> {
+    await this.db.from("makers").update({ claim_token_hash: hash }).eq("slug", slug);
+  }
+  async listMakersByOwner(ownerUserId: string): Promise<Maker[]> {
+    const { data } = await this.db.from("makers").select().eq("owner_user_id", ownerUserId).order("created_at", { ascending: false });
+    return (data ?? []).map((r) => rowToMaker(r as MakerRow));
   }
   async listMakers() {
     const { data } = await this.db.from("makers").select().order("created_at", { ascending: false });
