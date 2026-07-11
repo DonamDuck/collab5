@@ -1,14 +1,24 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useState, useTransition } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { signInAction } from "@/lib/auth-actions";
 import { authEnvReady, createBrowserAuthClient } from "@/lib/supabase/client";
 
 const KAKAO_ON = process.env.NEXT_PUBLIC_KAKAO_ENABLED === "1";
 
 export default function LoginPage() {
+  return (
+    <Suspense fallback={<main className="mx-auto w-full max-w-[400px] px-4 py-14 sm:px-6" />}>
+      <LoginForm />
+    </Suspense>
+  );
+}
+
+function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const [welcome, setWelcome] = useState(searchParams.get("welcome") === "1");
   const [pending, start] = useTransition();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -93,6 +103,22 @@ export default function LoginPage() {
           비밀번호 찾기
         </a>
       </div>
+
+      {welcome && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 p-4 sm:items-center">
+          <div className="w-full max-w-sm rounded-lg border border-hairline bg-surface p-6 text-center shadow-e2">
+            <p className="text-lg font-bold text-ink">🎉 가입이 완료됐어요!</p>
+            <p className="mt-2 text-[15px] text-body">이제 로그인해서 시작해보세요.</p>
+            <button
+              type="button"
+              onClick={() => setWelcome(false)}
+              className="mt-5 h-12 w-full rounded-md bg-primary text-base font-medium text-primary-on"
+            >
+              로그인하러 가기
+            </button>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

@@ -19,7 +19,6 @@ export default function SignupPage() {
   const [imgUploading, setImgUploading] = useState(false);
   const [agree, setAgree] = useState(false);
   const [err, setErr] = useState("");
-  const [done, setDone] = useState(false);
   const [dup, setDup] = useState({ email: false, phone: false, brandName: false });
 
   // 입력 완료 ~1초 후 이메일·휴대폰·브랜드명 중복검사 (마지막 타이핑 기준 디바운스)
@@ -38,7 +37,7 @@ export default function SignupPage() {
         brandName: brandReady ? brandName.trim() : undefined,
       });
       setDup(r);
-    }, 1000);
+    }, 500);
     return () => clearTimeout(t);
   }, [email, phone, brandName]);
 
@@ -92,7 +91,8 @@ export default function SignupPage() {
         setErr(r.error);
         return;
       }
-      setDone(true); // 완료 얼럿 → 확인 시 /login
+      // 완료 얼럿은 로그인 페이지에서 표시(가입 페이지 모달은 서버액션 리렌더에 취약)
+      router.replace("/login?welcome=1");
     });
 
   return (
@@ -202,19 +202,10 @@ export default function SignupPage() {
         </a>
       </p>
 
-      {done && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 p-4 sm:items-center">
-          <div className="w-full max-w-sm rounded-lg border border-hairline bg-surface p-6 text-center shadow-e2">
-            <p className="text-lg font-bold text-ink">🎉 가입이 완료됐어요!</p>
-            <p className="mt-2 text-[15px] text-body">이제 로그인해서 시작해보세요.</p>
-            <button
-              type="button"
-              onClick={() => router.push("/login")}
-              className="mt-5 h-12 w-full rounded-md bg-primary text-base font-medium text-primary-on"
-            >
-              로그인하러 가기
-            </button>
-          </div>
+      {pending && (
+        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-surface/80 backdrop-blur-sm">
+          <span className="h-9 w-9 animate-spin rounded-full border-[3px] border-primary border-t-transparent" />
+          <p className="mt-4 text-[15px] text-mute">계정을 만들고 있어요…</p>
         </div>
       )}
     </main>
