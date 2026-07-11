@@ -2,6 +2,7 @@
 import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/supabase/server";
 import { getProfile } from "@/lib/profiles";
+import { signOutAction } from "@/lib/auth-actions";
 import { Avatar } from "@/components/Avatar";
 import { repo } from "@/lib/repo";
 import { ConnectMaker } from "./ConnectMaker";
@@ -17,10 +18,22 @@ export default async function MyPage() {
     <main className="mx-auto w-full max-w-[640px] px-4 py-10 sm:px-6">
       <div className="flex items-center gap-3">
         <Avatar image={profile?.profileImage || undefined} name={displayName} size={56} />
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-ink">{displayName}</h1>
-          <p className="text-sm text-mute">{user.email}</p>
+        <div className="min-w-0">
+          <h1 className="truncate text-2xl font-bold tracking-tight text-ink">{displayName}</h1>
+          <p className="truncate text-sm text-mute">{user.email}</p>
         </div>
+        <form action={signOutAction} className="ml-auto shrink-0">
+          <button
+            type="submit"
+            className="inline-flex h-9 items-center gap-1.5 rounded-md border border-hairline bg-surface px-3 text-sm font-medium text-mute hover:border-border-strong hover:text-ink"
+          >
+            <svg viewBox="0 0 20 20" className="h-[16px] w-[16px]" fill="none" stroke="currentColor" strokeWidth="1.7">
+              <path d="M8 4H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3" strokeLinecap="round" />
+              <path d="M12 13.5 15.5 10 12 6.5M15 10H8" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            로그아웃
+          </button>
+        </form>
       </div>
 
       <section className="mt-9 border-t border-hairline pt-8">
