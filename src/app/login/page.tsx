@@ -37,8 +37,7 @@ function LoginForm() {
         setErr(r.error);
         return;
       }
-      router.push("/");
-      router.refresh(); // 헤더 세션 반영
+      router.replace("/"); // push+refresh 중복 제거 — 서버 렌더가 새 세션 헤더 반영
     });
 
   const kakao = async () => {

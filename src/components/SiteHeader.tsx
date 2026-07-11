@@ -1,10 +1,10 @@
 // 전 페이지 공용 헤더 — 서버 컴포넌트. 세션 유무로 우측 영역 분기.
-import { getSessionUser } from "@/lib/supabase/server";
+import { getSessionUserLight } from "@/lib/supabase/server";
 import { getProfile } from "@/lib/profiles";
 import { Avatar } from "./Avatar";
 
 export async function SiteHeader() {
-  const user = await getSessionUser();
+  const user = await getSessionUserLight();
   const profile = user ? await getProfile(user.id) : null;
   const displayName = profile?.brandName || user?.email?.split("@")[0] || "";
 

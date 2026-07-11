@@ -32,13 +32,26 @@ export async function createAuthClient() {
   );
 }
 
-/** 현재 로그인 유저 (없거나 auth 미설정이면 null) */
+/** 현재 로그인 유저 — getUser()로 서버 검증(네트워크 왕복). 보안 게이트(예: /my 리다이렉트)에 사용. */
 export async function getSessionUser(): Promise<User | null> {
   if (!authEnabled()) return null;
   try {
     const supabase = await createAuthClient();
     const { data } = await supabase.auth.getUser();
     return data.user ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** 현재 로그인 유저 — 쿠키의 세션만 읽음(네트워크 없음). 미들웨어가 매 요청 getUser로 이미 검증·갱신하므로
+ *  헤더 등 표시용 조회는 이걸로 왕복을 아낀다. (보안 게이트에는 getSessionUser 사용) */
+export async function getSessionUserLight(): Promise<User | null> {
+  if (!authEnabled()) return null;
+  try {
+    const supabase = await createAuthClient();
+    const { data } = await supabase.auth.getSession();
+    return data.session?.user ?? null;
   } catch {
     return null;
   }
