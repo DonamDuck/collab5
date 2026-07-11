@@ -23,6 +23,7 @@ export async function upsertProfile(p: {
   uuid: string;
   brandName: string;
   phone: string;
+  email: string;
   profileImage: string;
 }): Promise<void> {
   const client = db();
@@ -32,11 +33,54 @@ export async function upsertProfile(p: {
       uuid: p.uuid,
       brand_name: p.brandName,
       phone: p.phone,
+      email: p.email,
       profile_image: p.profileImage,
     },
     { onConflict: "uuid" }
   );
   if (error) throw new Error(error.message);
+}
+
+export interface DuplicateFlags {
+  email: boolean;
+  phone: boolean;
+  brandName: boolean;
+}
+
+/** 가입 중복검사 — 비어있지 않은 필드만 profiles에서 조회. excludeUuid는 본인 제외(수정 대비). */
+export async function findDuplicates(p: {
+  email?: string;
+  phone?: string;
+  brandName?: string;
+  excludeUuid?: string;
+}): Promise<DuplicateFlags> {
+  const flags: DuplicateFlags = { email: false, phone: false, brandName: false };
+  const client = db();
+  if (!client) return flags; // 로컬 mock — 중복 없음 취급
+
+  const exists = async (column: string, value: string, ci = false): Promise<boolean> => {
+    let q = client
+      .from("profiles")
+      .select("user_id", { count: "exact", head: true });
+    q = ci ? q.ilike(column, value) : q.eq(column, value);
+    if (p.excludeUuid) q = q.neq("uuid", p.excludeUuid);
+    const { count } = await q;
+    return (count ?? 0) > 0;
+  };
+
+  const email = p.email?.trim();
+  const phone = p.phone?.trim();
+  const brandName = p.brandName?.trim();
+
+  const [e, ph, b] = await Promise.all([
+    email ? exists("email", email, true) : Promise.resolve(false),
+    phone ? exists("phone", phone) : Promise.resolve(false),
+    brandName ? exists("brand_name", brandName) : Promise.resolve(false),
+  ]);
+  flags.email = e;
+  flags.phone = ph;
+  flags.brandName = b;
+  return flags;
 }
 
 export async function getProfile(authUuid: string): Promise<Profile | null> {

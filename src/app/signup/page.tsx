@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { signUpAction } from "@/lib/auth-actions";
+import { signUpAction, checkSignupDuplicatesAction } from "@/lib/auth-actions";
 import { uploadPhoto } from "@/lib/upload";
 import { Avatar } from "@/components/Avatar";
 import { validatePassword, formatPhone } from "@/lib/validation";
@@ -20,6 +20,34 @@ export default function SignupPage() {
   const [agree, setAgree] = useState(false);
   const [err, setErr] = useState("");
   const [done, setDone] = useState(false);
+  const [dup, setDup] = useState({ email: false, phone: false, brandName: false });
+
+  // 입력 완료 ~1초 후 이메일·휴대폰·브랜드명 중복검사 (마지막 타이핑 기준 디바운스)
+  useEffect(() => {
+    const emailOk = /^\S+@\S+\.\S+$/.test(email.trim());
+    const phoneReady = phone.replace(/\D/g, "").length >= 10;
+    const brandReady = brandName.trim().length > 0;
+    if (!emailOk && !phoneReady && !brandReady) {
+      setDup({ email: false, phone: false, brandName: false });
+      return;
+    }
+    const t = setTimeout(async () => {
+      const r = await checkSignupDuplicatesAction({
+        email: emailOk ? email.trim() : undefined,
+        phone: phoneReady ? phone.trim() : undefined,
+        brandName: brandReady ? brandName.trim() : undefined,
+      });
+      setDup(r);
+    }, 1000);
+    return () => clearTimeout(t);
+  }, [email, phone, brandName]);
+
+  const DUP_MSG = {
+    email: "동일한 이메일로 가입된 계정이 있습니다.",
+    phone: "같은 휴대폰 번호로 가입된 계정이 있습니다.",
+    brandName: "동일한 이름으로 가입한 계정이 있습니다.",
+  };
+  const hasDup = dup.email || dup.phone || dup.brandName;
 
   const onImage = async (files: FileList | null) => {
     const f = files?.[0];
@@ -81,6 +109,7 @@ export default function SignupPage() {
             placeholder="you@brand.com"
             className={inputCls}
           />
+          {dup.email && <p className="mt-1.5 text-sm text-red-600">{DUP_MSG.email}</p>}
         </Field>
         <Field label="비밀번호">
           <input
@@ -110,6 +139,7 @@ export default function SignupPage() {
             maxLength={13}
             className={inputCls}
           />
+          {dup.phone && <p className="mt-1.5 text-sm text-red-600">{DUP_MSG.phone}</p>}
         </Field>
         <Field label="브랜드명">
           <input
@@ -118,6 +148,7 @@ export default function SignupPage() {
             placeholder="예: 캔버스가든"
             className={inputCls}
           />
+          {dup.brandName && <p className="mt-1.5 text-sm text-red-600">{DUP_MSG.brandName}</p>}
         </Field>
         <Field label="로고 또는 브랜드 사진" optional>
           <div className="flex items-center gap-3">
@@ -159,7 +190,7 @@ export default function SignupPage() {
       <button
         type="button"
         onClick={submit}
-        disabled={pending || imgUploading}
+        disabled={pending || imgUploading || hasDup}
         className="mt-5 h-12 w-full rounded-md bg-primary text-base font-medium text-primary-on disabled:opacity-50"
       >
         {pending ? "가입 중…" : "가입하기"}

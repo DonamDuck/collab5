@@ -94,11 +94,15 @@ create table profiles (
   uuid          uuid not null unique references auth.users(id) on delete cascade,
   brand_name    text not null,
   phone         text not null default '',
+  email         text not null default '',   -- 가입 중복검사용(대소문자 무시 조회). auth.users는 직접 SELECT 불가라 여기 보관.
   profile_image text not null default '',
   created_at    timestamptz not null default now(),
   updated_at    timestamptz not null default now()
 );
 create index idx_profiles_uuid on profiles(uuid);
+create index idx_profiles_email on profiles(lower(email));
+create index idx_profiles_phone on profiles(phone);
+create index idx_profiles_brand on profiles(brand_name);
 drop trigger if exists trg_profiles_updated on profiles;
 create trigger trg_profiles_updated before update on profiles
   for each row execute function set_updated_at();

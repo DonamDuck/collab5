@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { authEnabled, createAuthClient } from "./supabase/server";
-import { upsertProfile } from "./profiles";
+import { upsertProfile, findDuplicates, type DuplicateFlags } from "./profiles";
 import { validatePassword } from "./validation";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://collab5.vercel.app";
@@ -16,10 +16,36 @@ export interface SignUpInput {
   profileImage: string; // base64 data URL 또는 ''
 }
 
+/** 가입 폼 실시간 중복검사(이메일·휴대폰·브랜드명). 비어있지 않은 필드만 검사. */
+export async function checkSignupDuplicatesAction(p: {
+  email?: string;
+  phone?: string;
+  brandName?: string;
+}): Promise<DuplicateFlags> {
+  if (!authEnabled()) return { email: false, phone: false, brandName: false };
+  return findDuplicates(p);
+}
+
+// 중복검사 메시지(클라·서버 동일 문구)
+const DUP_MSG = {
+  email: "동일한 이메일로 가입된 계정이 있습니다.",
+  phone: "같은 휴대폰 번호로 가입된 계정이 있습니다.",
+  brandName: "동일한 이름으로 가입한 계정이 있습니다.",
+} as const;
+
 export async function signUpAction(input: SignUpInput): Promise<{ error?: string }> {
   if (!authEnabled()) return { error: NO_AUTH_MSG };
   const pwErr = validatePassword(input.password);
   if (pwErr) return { error: pwErr };
+  // 서버측 방어: 클라 실시간 검사를 우회한 경우에도 중복 가입 차단
+  const dup = await findDuplicates({
+    email: input.email,
+    phone: input.phone,
+    brandName: input.brandName,
+  });
+  if (dup.email) return { error: DUP_MSG.email };
+  if (dup.phone) return { error: DUP_MSG.phone };
+  if (dup.brandName) return { error: DUP_MSG.brandName };
   const supabase = await createAuthClient();
   const { data, error } = await supabase.auth.signUp({
     email: input.email.trim(),
@@ -31,6 +57,7 @@ export async function signUpAction(input: SignUpInput): Promise<{ error?: string
       uuid: data.user.id,
       brandName: input.brandName.trim(),
       phone: input.phone.trim(),
+      email: input.email.trim(),
       profileImage: input.profileImage,
     });
   } catch {
