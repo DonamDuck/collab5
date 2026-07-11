@@ -4,6 +4,7 @@ import { Suspense, useState, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signInAction } from "@/lib/auth-actions";
 import { authEnvReady, createBrowserAuthClient } from "@/lib/supabase/client";
+import { LoadingOverlay } from "@/components/LoadingOverlay";
 
 const KAKAO_ON = process.env.NEXT_PUBLIC_KAKAO_ENABLED === "1";
 
@@ -103,6 +104,8 @@ function LoginForm() {
           비밀번호 찾기
         </a>
       </div>
+
+      {pending && <LoadingOverlay label="로그인 중이에요…" />}
 
       {welcome && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 p-4 sm:items-center">

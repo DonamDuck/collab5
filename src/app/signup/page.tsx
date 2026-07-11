@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { signUpAction, checkSignupDuplicatesAction } from "@/lib/auth-actions";
 import { uploadPhoto } from "@/lib/upload";
 import { Avatar } from "@/components/Avatar";
+import { LoadingOverlay } from "@/components/LoadingOverlay";
 import { validatePassword, formatPhone } from "@/lib/validation";
 
 export default function SignupPage() {
@@ -202,12 +203,7 @@ export default function SignupPage() {
         </a>
       </p>
 
-      {pending && (
-        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-surface/80 backdrop-blur-sm">
-          <span className="h-9 w-9 animate-spin rounded-full border-[3px] border-primary border-t-transparent" />
-          <p className="mt-4 text-[15px] text-mute">계정을 만들고 있어요…</p>
-        </div>
-      )}
+      {pending && <LoadingOverlay label="계정을 만들고 있어요…" />}
     </main>
   );
 }
