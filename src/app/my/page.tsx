@@ -6,6 +6,7 @@ import { Avatar } from "@/components/Avatar";
 import { repo } from "@/lib/repo";
 import { ConnectMaker } from "./ConnectMaker";
 import { LogoutButton } from "./LogoutButton";
+import { ChangePasswordButton } from "./ChangePasswordButton";
 
 export default async function MyPage() {
   const user = await getSessionUser();
@@ -64,11 +65,16 @@ export default async function MyPage() {
                 </div>
               </div>
             ))}
-            <div className="pt-2">
-              <ConnectMaker />
+            <div className="flex justify-center pt-2">
+              <ConnectMaker label="+ 소개서 추가 연결" />
             </div>
           </div>
         )}
+      </section>
+
+      {/* 계정 설정 */}
+      <section className="mt-10 border-t border-hairline pt-6">
+        <ChangePasswordButton email={user.email ?? ""} />
       </section>
     </main>
   );

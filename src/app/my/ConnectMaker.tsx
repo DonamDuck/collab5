@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import { claimBySlugAction } from "@/lib/actions";
 
 // 기존 소개서 연결 — URL/슬러그 + 비번. 성공 시 /my 새로고침.
-export function ConnectMaker() {
+// label: 트리거 버튼 문구(추가 연결 시 "+ 소개서 추가 연결").
+export function ConnectMaker({ label = "기존 소개서 연결하기" }: { label?: string }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [link, setLink] = useState("");
@@ -32,7 +33,7 @@ export function ConnectMaker() {
         onClick={() => setOpen(true)}
         className="inline-flex h-11 items-center justify-center rounded-md border border-border-strong bg-surface px-5 text-sm font-medium text-ink"
       >
-        기존 소개서 연결하기
+        {label}
       </button>
     );
 
