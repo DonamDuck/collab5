@@ -14,11 +14,14 @@ const COLLAB_TYPES: CollabType[] = [
   "공간대여",
 ];
 
+const PAGE_SIZE = 12; // 페이지당 카드 수
+
 export default function SearchPage() {
   const [all, setAll] = useState<Maker[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [q, setQ] = useState("");
   const [types, setTypes] = useState<CollabType[]>([]);
+  const [page, setPage] = useState(1);
 
   useEffect(() => {
     searchAction("").then((r) => {
@@ -26,8 +29,6 @@ export default function SearchPage() {
       setLoaded(true);
     });
   }, []);
-
-  const active = q.trim() !== "" || types.length > 0;
 
   const results = useMemo(() => {
     let r = all;
@@ -48,8 +49,14 @@ export default function SearchPage() {
     return r;
   }, [all, q, types]);
 
-  // MVP: 업체 리스트 노출 X (등록 업체 적음·cold-start). 검색/필터 시에만 결과.
-  const shown = active ? results : [];
+  // 기본 = 등록된 전체 카드 노출. 검색/필터는 그 위에서 좁힘.
+  const shown = results;
+
+  // 검색어·필터 바뀌면 1페이지로
+  useEffect(() => setPage(1), [q, types]);
+
+  const totalPages = Math.max(1, Math.ceil(shown.length / PAGE_SIZE));
+  const pageItems = shown.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const toggleType = (t: CollabType) =>
     setTypes((p) => (p.includes(t) ? p.filter((x) => x !== t) : [...p, t]));
@@ -94,17 +101,14 @@ export default function SearchPage() {
 
       {/* 결과 */}
       <div className="mt-6">
-        {!active && (
-          <div className="rounded-lg border border-hairline bg-surface px-4 py-10 text-center">
-            <p className="text-base text-body">찾는 메이커가 있나요?</p>
-            <p className="mt-1 text-sm text-mute">
-              상호·분위기·콜라보 유형으로 검색해보세요.
-            </p>
-          </div>
+        {loaded && (
+          <p className="mb-3 text-sm text-mute">
+            {shown.length > 0 ? `총 ${shown.length}곳` : ""}
+          </p>
         )}
 
-        {/* §9.5 Empty State — 검색 무결과 */}
-        {loaded && active && shown.length === 0 && (
+        {/* Empty State — 등록 0건 또는 검색 무결과 공용 */}
+        {loaded && shown.length === 0 && (
           <div className="rounded-lg border border-hairline bg-surface px-4 py-10 text-center">
             <p className="text-base font-medium text-ink">
               잘 맞는 곳을 아직 못 찾았어요
@@ -121,41 +125,97 @@ export default function SearchPage() {
           </div>
         )}
 
-        <ul className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
-          {shown.map((m) => (
+        <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {pageItems.map((m) => (
             <li key={m.id}>
               <a
                 href={`/m/${m.slug}`}
-                className="block rounded-lg border border-hairline bg-surface px-4 py-3 transition-colors hover:bg-surface-soft"
+                className="block overflow-hidden rounded-lg border border-hairline bg-surface transition-colors hover:bg-surface-soft"
               >
-                <div className="flex items-center gap-2">
-                  <span className="text-base font-medium text-ink">{m.name}</span>
-                  {m.collabOpen && (
-                    <span className="inline-flex h-5 items-center rounded-sm bg-primary-pale px-1.5 text-[11px] font-medium text-primary-on">
-                      콜라보 받는 중
-                    </span>
+                {/* 썸네일 — 브랜드 1번 사진, 없으면 collab5 로고 */}
+                <div className="aspect-[3/2] w-full overflow-hidden bg-surface-soft">
+                  {m.photos[0] ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={m.photos[0]}
+                      alt=""
+                      loading="lazy"
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center bg-primary-pale">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src="/logo-mark.svg" alt="collab5" className="h-10 w-10 opacity-70" />
+                    </div>
                   )}
-                  {m.region && <span className="text-xs text-mute">· {m.region}</span>}
                 </div>
-                {m.oneLiner && (
-                  <p className="mt-0.5 line-clamp-1 text-sm text-body">{m.oneLiner}</p>
-                )}
-                {m.soul.values.length > 0 && (
-                  <div className="mt-2 flex flex-wrap gap-1.5">
-                    {m.soul.values.slice(0, 3).map((v) => (
-                      <span
-                        key={v}
-                        className="rounded-sm bg-mint-pale px-1.5 py-0.5 text-[11px] font-medium text-mint-on"
-                      >
-                        {v}
+                <div className="px-4 py-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-base font-medium text-ink">{m.name}</span>
+                    {m.collabOpen && (
+                      <span className="inline-flex h-5 items-center rounded-sm bg-primary-pale px-1.5 text-[11px] font-medium text-primary-on">
+                        콜라보 받는 중
                       </span>
-                    ))}
+                    )}
+                    {m.region && <span className="text-xs text-mute">· {m.region}</span>}
                   </div>
-                )}
+                  {m.oneLiner && (
+                    <p className="mt-0.5 line-clamp-1 text-sm text-body">{m.oneLiner}</p>
+                  )}
+                  {m.soul.values.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {m.soul.values.slice(0, 3).map((v) => (
+                        <span
+                          key={v}
+                          className="rounded-sm bg-mint-pale px-1.5 py-0.5 text-[11px] font-medium text-mint-on"
+                        >
+                          {v}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </a>
             </li>
           ))}
         </ul>
+
+        {/* 페이지네이션 — 카드가 한 페이지를 넘을 때만 */}
+        {totalPages > 1 && (
+          <nav className="mt-6 flex items-center justify-center gap-1.5" aria-label="페이지">
+            <button
+              type="button"
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page === 1}
+              className="flex h-9 items-center rounded-md border border-hairline bg-surface px-3 text-sm text-mute disabled:opacity-40"
+            >
+              이전
+            </button>
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map((n) => (
+              <button
+                key={n}
+                type="button"
+                onClick={() => setPage(n)}
+                aria-current={n === page ? "page" : undefined}
+                className={`h-9 min-w-9 rounded-md border px-2.5 text-sm ${
+                  n === page
+                    ? "border-primary bg-primary-tint font-medium text-primary-on"
+                    : "border-hairline bg-surface text-mute hover:text-ink"
+                }`}
+              >
+                {n}
+              </button>
+            ))}
+            <button
+              type="button"
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={page === totalPages}
+              className="flex h-9 items-center rounded-md border border-hairline bg-surface px-3 text-sm text-mute disabled:opacity-40"
+            >
+              다음
+            </button>
+          </nav>
+        )}
       </div>
     </main>
   );
