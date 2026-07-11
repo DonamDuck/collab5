@@ -101,6 +101,13 @@ function friendly(msg?: string): string {
   if (!msg) return "요청에 실패했어요. 잠시 후 다시 시도해주세요.";
   if (/already registered/i.test(msg)) return "이미 가입된 이메일이에요.";
   if (/at least 6/i.test(msg)) return "비밀번호는 6자 이상이어야 해요.";
-  if (/rate limit/i.test(msg)) return "요청이 많아요. 잠시 후 다시 시도해주세요.";
+  // 같은 이메일 재발송 쿨다운(보안) — "you can only request this after N seconds"
+  if (/security purposes|only request this after|after \d+ seconds/i.test(msg)) {
+    const m = msg.match(/after (\d+) seconds/i);
+    return m
+      ? `방금 메일을 보냈어요. 약 ${m[1]}초 뒤에 다시 시도할 수 있어요.`
+      : "방금 메일을 보냈어요. 잠시 후 다시 시도할 수 있어요.";
+  }
+  if (/rate limit|too many/i.test(msg)) return "메일 발송이 잠시 제한됐어요. 잠시 후 다시 시도해주세요.";
   return "요청에 실패했어요. 잠시 후 다시 시도해주세요.";
 }
