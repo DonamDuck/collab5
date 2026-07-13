@@ -918,7 +918,7 @@ function RegisterForm() {
                 type="button"
                 onClick={addCustomVibe}
                 disabled={values.length >= MAX_VIBES}
-                className="h-10 rounded-sm border border-border-strong bg-surface px-4 text-sm font-medium text-ink disabled:opacity-40"
+                className="h-10 shrink-0 whitespace-nowrap rounded-sm border border-border-strong bg-surface px-4 text-sm font-medium text-ink disabled:opacity-40"
               >
                 추가
               </button>
@@ -1133,11 +1133,21 @@ function RegisterForm() {
                       <button
                         type="button"
                         onClick={() => addHistCustomType(i)}
-                        className="h-9 rounded-sm border border-border-strong bg-surface px-3 text-sm font-medium text-ink"
+                        className="h-9 shrink-0 whitespace-nowrap rounded-sm border border-border-strong bg-surface px-4 text-sm font-medium text-ink"
                       >
                         추가
                       </button>
                     </div>
+                  </div>
+                  <div>
+                    <p className="mb-1.5 text-sm text-mute">사진 (선택 · 최대 3장)</p>
+                    <PhotoGrid
+                      items={h.photos}
+                      max={3}
+                      onAdd={(files) => addHistPhotos(i, files)}
+                      onRemove={(k) => removeHistPhoto(i, k)}
+                      onReorder={(from, to) => moveHistPhoto(i, from, to)}
+                    />
                   </div>
                   <div>
                     <p className="mb-1.5 text-sm text-mute">콜라보 내용을 간단히 알려주세요.</p>
@@ -1163,16 +1173,6 @@ function RegisterForm() {
                         </option>
                       ))}
                     </select>
-                  </div>
-                  <div>
-                    <p className="mb-1.5 text-sm text-mute">사진 (선택 · 최대 3장)</p>
-                    <PhotoGrid
-                      items={h.photos}
-                      max={3}
-                      onAdd={(files) => addHistPhotos(i, files)}
-                      onRemove={(k) => removeHistPhoto(i, k)}
-                      onReorder={(from, to) => moveHistPhoto(i, from, to)}
-                    />
                   </div>
                 </div>
               ))}
@@ -1245,7 +1245,7 @@ function RegisterForm() {
               <button
                 type="button"
                 onClick={addCustomAudience}
-                className="h-10 rounded-sm border border-border-strong bg-surface px-4 text-sm font-medium text-ink"
+                className="h-10 shrink-0 whitespace-nowrap rounded-sm border border-border-strong bg-surface px-4 text-sm font-medium text-ink"
               >
                 추가
               </button>
@@ -1623,12 +1623,14 @@ function HintBanner({
 
 function GroupHeader({ n, title, sub }: { n: string; title: string; sub?: string }) {
   return (
-    <div className="mb-[23px] flex items-baseline gap-2 border-b border-hairline pb-2">
-      <span className="rounded-pill bg-primary-tint px-2 py-0.5 text-sm font-bold text-primary-on">
-        {n}
-      </span>
-      <span className="text-[17px] font-bold text-ink">{title}</span>
-      {sub && <span className="text-sm text-mute">{sub}</span>}
+    <div className="mb-[23px] border-b border-hairline pb-2">
+      <div className="flex items-baseline gap-2">
+        <span className="rounded-pill bg-primary-tint px-2 py-0.5 text-sm font-bold text-primary-on">
+          {n}
+        </span>
+        <span className="text-[17px] font-bold text-ink">{title}</span>
+      </div>
+      {sub && <p className="mt-1.5 text-sm leading-relaxed text-mute">{sub}</p>}
     </div>
   );
 }

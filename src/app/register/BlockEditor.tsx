@@ -47,7 +47,15 @@ export function BlockEditor({ blocks, onChange, onUploadingChange }: {
   const canAdd = (t: BlockType) =>
     t === "custom" ? blocks.filter((b) => b.type === "custom").length < MAX_CUSTOM
                    : !blocks.some((b) => b.type === t);
-  const add = (t: BlockType) => { onChange([...blocks, emptyBlock(t)]); setOpen(false); };
+  const add = (t: BlockType) => {
+    const nb = emptyBlock(t);
+    onChange([...blocks, nb]);
+    setOpen(false);
+    // 생성한 블록으로 부드럽게 스크롤(다음 페인트 후)
+    setTimeout(() => {
+      document.getElementById(`block-${nb.uid}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 60);
+  };
   const remove = (i: number) => onChange(blocks.filter((_, k) => k !== i));
   const move = (i: number, dir: -1 | 1) => {
     const j = i + dir;
@@ -94,7 +102,7 @@ export function BlockEditor({ blocks, onChange, onUploadingChange }: {
       {blocks.map((b, i) => {
         const cat = CATALOG.find((c) => c.type === b.type)!;
         return (
-          <div key={b.uid ?? i} className="space-y-4 rounded-md border border-hairline bg-surface p-3">
+          <div key={b.uid ?? i} id={b.uid ? `block-${b.uid}` : undefined} className="space-y-4 rounded-md border border-hairline bg-surface p-3 scroll-mt-4">
             {/* 공통 헤더 — 라벨 + ↑ ↓ 삭제 */}
             <div className="flex items-center justify-between">
               <span className="text-sm font-semibold text-body">{cat.label}</span>
@@ -316,7 +324,7 @@ export function BlockEditor({ blocks, onChange, onUploadingChange }: {
                   {b.photos.length < 3 && (
                     <label className="flex h-20 w-20 shrink-0 cursor-pointer flex-col items-center justify-center rounded-md border border-dashed border-border-strong bg-surface text-mute">
                       <span className="text-xl leading-none">＋</span>
-                      <span className="mt-1 text-[11px]">사진</span>
+                      <span className="mt-1 text-[11px]">사진(선택)</span>
                       <input
                         type="file"
                         accept="image/*"
@@ -499,7 +507,7 @@ function FeatureChips({ features, onChange }: { features: string[]; onChange: (f
         <button
           type="button"
           onClick={addCustom}
-          className="h-9 rounded-sm border border-border-strong bg-surface px-4 text-sm font-medium text-ink"
+          className="h-9 shrink-0 whitespace-nowrap rounded-sm border border-border-strong bg-surface px-4 text-sm font-medium text-ink"
         >
           추가
         </button>
