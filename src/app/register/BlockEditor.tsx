@@ -368,42 +368,71 @@ export function BlockEditor({ blocks, onChange, onUploadingChange }: {
         );
       })}
 
-      {/* ── 진입 한 줄 → 카탈로그 카드 그리드 ── */}
-      {!open ? (
-        <div className="rounded-md border-2 border-primary bg-surface p-5 text-center">
-          <p className="text-[18px] font-bold text-ink">브랜드의 이야기를 더 담아볼까요?</p>
-          <p className="mx-auto mt-1.5 max-w-[320px] text-[14px] leading-relaxed text-mute">
-            숫자, 고객 후기, 공간 소개처럼 우리만의 섹션을 더할 수 있어요. <span className="text-faint">(선택)</span>
-          </p>
-          <button
-            type="button"
-            onClick={() => setOpen(true)}
-            className="mt-4 inline-flex h-11 items-center rounded-md bg-primary px-6 text-[15px] font-semibold text-primary-on"
-          >
-            + 섹션 더하기
-          </button>
-        </div>
-      ) : (
-        <div className="space-y-2 rounded-md border border-hairline p-3">
-          {CATALOG.map((c) => (
-            <button
-              key={c.type}
-              type="button"
-              disabled={!canAdd(c.type)}
-              onClick={() => add(c.type)}
-              className="w-full rounded-md px-3 py-2.5 text-left hover:bg-surface-soft disabled:opacity-40 disabled:hover:bg-transparent"
-            >
-              <p className="text-[15px] font-semibold text-ink">{c.label}</p>
-              <p className="mt-0.5 text-[13px] text-mute">{c.hint}</p>
-            </button>
-          ))}
-          <button
-            type="button"
-            onClick={() => setOpen(false)}
-            className="w-full py-1.5 text-center text-sm text-faint"
-          >
-            접기
-          </button>
+      {/* ── 인라인 강조 카드 (항상 표시) ── */}
+      <div className="rounded-md border-2 border-primary bg-surface p-5 text-center">
+        <p className="text-[18px] font-bold text-ink">브랜드의 이야기를 더 담아볼까요?</p>
+        <p className="mx-auto mt-1.5 max-w-[320px] text-[14px] leading-relaxed text-mute">
+          숫자, 고객 후기, 공간 소개처럼 우리만의 섹션을 더할 수 있어요. <span className="text-faint">(선택)</span>
+        </p>
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="mt-4 inline-flex h-11 items-center rounded-md bg-primary px-6 text-[15px] font-semibold text-primary-on"
+        >
+          + 섹션 더하기
+        </button>
+      </div>
+
+      {/* ── 우측 하단 플로팅 버튼 (폼 어디서나 접근) ── */}
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        aria-label="섹션 더하기"
+        className="fixed bottom-6 right-4 z-40 inline-flex h-12 items-center gap-1 rounded-pill bg-primary px-5 text-[14px] font-semibold text-primary-on shadow-lg sm:right-6"
+      >
+        + 섹션 더하기
+      </button>
+
+      {/* ── 바텀시트 — 카탈로그 ── */}
+      {open && (
+        <div className="fixed inset-0 z-50" role="dialog" aria-modal="true">
+          <div className="absolute inset-0 bg-ink/40" onClick={() => setOpen(false)} />
+          <div className="absolute inset-x-0 bottom-0 mx-auto max-h-[82vh] max-w-[640px] overflow-y-auto rounded-t-2xl bg-surface p-4 pb-8 shadow-xl">
+            <div className="mb-3 flex items-center justify-between">
+              <p className="text-[16px] font-bold text-ink">브랜드의 이야기 더하기</p>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => setOpen(false)}
+                  className="inline-flex h-8 items-center rounded-sm px-2 text-[14px] text-mute hover:bg-surface-soft hover:text-ink"
+                >
+                  뒤로
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setOpen(false)}
+                  aria-label="닫기"
+                  className="flex h-8 w-8 items-center justify-center rounded-pill text-mute hover:bg-surface-soft hover:text-ink"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+            <div className="space-y-2">
+              {CATALOG.map((c) => (
+                <button
+                  key={c.type}
+                  type="button"
+                  disabled={!canAdd(c.type)}
+                  onClick={() => add(c.type)}
+                  className="w-full rounded-md border border-hairline px-3.5 py-3 text-left hover:bg-surface-soft disabled:opacity-40 disabled:hover:bg-transparent"
+                >
+                  <p className="text-[15px] font-semibold text-ink">{c.label}</p>
+                  <p className="mt-0.5 text-[13px] text-mute">{c.hint}</p>
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
       )}
     </div>
