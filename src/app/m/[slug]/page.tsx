@@ -173,6 +173,12 @@ export default async function MakerPage({
         <p className="mt-2.5 text-center text-[13px] text-faint">
           링크를 복사해 협업하고 싶은 곳에 보내보세요.
         </p>
+        {maker.introFileUrl && (
+          <a href={maker.introFileUrl} target="_blank" rel="noopener noreferrer"
+            className="mt-3 flex h-12 w-full items-center justify-center rounded-md border border-border-strong bg-surface text-base font-medium text-ink">
+            소개 자료 받기
+          </a>
+        )}
       </div>
     </main>
   );
