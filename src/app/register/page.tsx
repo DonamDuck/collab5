@@ -16,6 +16,7 @@ import type { ActivityHint, CollabHint, EnrichField } from "@/lib/enrich";
 import { EnrichWizard, type WizardFill } from "./EnrichWizard";
 import { BlockEditor } from "./BlockEditor";
 import { PhotoGrid } from "./PhotoGrid";
+import { StubSection } from "./StubSection";
 
 // 배열 내 순서 이동 (드래그 재정렬용)
 function reorder<T>(arr: T[], from: number, to: number): T[] {
@@ -874,13 +875,16 @@ function RegisterForm() {
 
         </div>
 
-        {/* ── ② 왜 이 브랜드를 시작하셨나요 ── */}
-        <GroupHeader
-          n="②"
-          title="왜 이 브랜드를 시작하셨나요?"
-          sub="시작하게 된 계기를 편하게 적어주세요."
-        />
-        <div className="space-y-8">
+        {/* ── 스텁 A — 왜 이 브랜드를 시작하셨나요 (구②) ── */}
+        <StubSection
+          id="stub-story"
+          label="왜 이 브랜드를 시작하셨나요?"
+          expanded={openSections.has("story")}
+          hasData={hasStory}
+          onExpand={() => openSection("story")}
+          onCollapse={() => closeSection("story")}
+        >
+          <p className="mb-4 -mt-4 text-sm text-mute">시작하게 된 계기를 편하게 적어주세요.</p>
           <textarea
             value={story}
             onChange={(e) => setStory(e.target.value)}
@@ -888,7 +892,7 @@ function RegisterForm() {
             placeholder="예: 좋은 소재가 버려지는 게 늘 아쉬웠어요. 이미 있는 것의 가치를 다시 발견하는 일이 더 의미 있다고 믿어요."
             className="w-full rounded-sm border border-hairline bg-surface px-3 py-2.5 text-base leading-relaxed text-ink outline-none placeholder:text-faint focus:border-focus"
           />
-        </div>
+        </StubSection>
 
         {/* ── ③ 우리 브랜드를 표현하는 키워드 ── */}
         <GroupHeader n="③" title="우리 브랜드를 표현하는 키워드를 골라주세요." />
@@ -984,23 +988,27 @@ function RegisterForm() {
 
         </div>
 
-        {/* ── ④ 주로 어떤 활동을 하나요 ── */}
-        <GroupHeader
-          n="④"
-          title="주로 어떤 활동을 하나요?"
-          sub="대표 활동을 최대 3가지 소개해주세요. 사진도 담을 수 있어요."
-        />
-        {actHints.length > 0 && (
-          <div className="-mt-3 mb-6">
-            <HintBanner
-              items={actHints.map((h) => ({ heading: h.title, desc: h.desc, source: h.source }))}
-              used={usedActHints}
-              canApply={canApplyActHint}
-              onApply={applyActHint}
-            />
-          </div>
-        )}
-        <div className="space-y-4">
+        {/* ── 스텁 B — 주로 어떤 활동을 하나요 (구④) ── */}
+        <StubSection
+          id="stub-activities"
+          label="주로 어떤 활동을 하나요?"
+          expanded={openSections.has("activities")}
+          hasData={hasActivities}
+          onExpand={() => openSection("activities")}
+          onCollapse={() => closeSection("activities")}
+        >
+          <p className="mb-4 -mt-4 text-sm text-mute">대표 활동을 최대 3가지 소개해주세요. 사진도 담을 수 있어요.</p>
+          {actHints.length > 0 && (
+            <div className="mb-6">
+              <HintBanner
+                items={actHints.map((h) => ({ heading: h.title, desc: h.desc, source: h.source }))}
+                used={usedActHints}
+                canApply={canApplyActHint}
+                onApply={applyActHint}
+              />
+            </div>
+          )}
+          <div className="space-y-4">
           {activities.map((act, i) => (
             <div
               key={i}
@@ -1049,19 +1057,23 @@ function RegisterForm() {
               ＋ 활동 추가
             </button>
           )}
-        </div>
+          </div>
+        </StubSection>
 
         {/* 구⑤(협업 서술 offersNote)·구⑥(찾는 파트너 seeks/seeksNote) 섹션은 해체 —
             offers 칩은 ①로 이사(필수), offersNote·seeks·seeksNote는 상태·payload 유지 후
             시트 '브랜드 이야기' 그룹으로 재배치 예정(Task 6). */}
 
-        {/* ── ⑦ 이런 콜라보 경험이 있어요 ── */}
-        <GroupHeader
-          n="⑦"
-          title="이런 콜라보 경험이 있어요."
-          sub="선택 · 최대 3개 · 지난 콜라보를 더하면 “검증된 파트너”라는 신호가 돼요."
-        />
-        <div className="space-y-8">
+        {/* ── 스텁 C — 이런 콜라보 경험이 있어요 (구⑦) ── */}
+        <StubSection
+          id="stub-collabs"
+          label="이런 콜라보 경험이 있어요."
+          expanded={openSections.has("collabs")}
+          hasData={hasCollabs}
+          onExpand={() => openSection("collabs")}
+          onCollapse={() => closeSection("collabs")}
+        >
+          <p className="mb-4 -mt-4 text-sm text-mute">선택 · 최대 3개 · 지난 콜라보를 더하면 “검증된 파트너”라는 신호가 돼요.</p>
           <div>
 
             {collabHints.length > 0 && (
@@ -1202,7 +1214,7 @@ function RegisterForm() {
               )}
             </div>
           </div>
-        </div>
+        </StubSection>
 
         {/* ── 선택 블록(코어 ⑦과 ⑧ 사이) ── */}
         <BlockEditor blocks={blocks} onChange={setBlocks} onUploadingChange={setBlocksUploading} />
@@ -1268,8 +1280,8 @@ function RegisterForm() {
           </div>
         </div>
 
-        {/* ── ⑨ 브랜드 정보를 입력해주세요 ── */}
-        <GroupHeader n="⑨" title="브랜드 정보를 입력해주세요." />
+        {/* ── ② 브랜드 정보를 입력해주세요 (구⑨ — 번호 섹션은 ①·②만 남음) ── */}
+        <GroupHeader n="②" title="브랜드 정보를 입력해주세요." />
         <div className="space-y-8">
           <Field label="주소" hint={hintFor("address", "address")}>
             <input
