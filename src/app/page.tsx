@@ -1,5 +1,7 @@
 // 홈 랜딩 — 발신자(보내는 쪽) 여정 중심. MVP: 업체 리스트 노출 X (cold-start).
 // 등록 → 카드 만들기 → 공유. design.md §9.6 온보딩 3스텝.
+import Link from "next/link";
+
 export default function Home() {
   return (
     <main className="mx-auto w-full max-w-[960px] px-4 py-12 sm:px-6">
@@ -25,18 +27,18 @@ export default function Home() {
           길게 설명하지 않아도 당신다운 첫인상을 전할 수 있어요.
         </p>
         <div className="mt-7 flex flex-col items-center justify-center gap-2.5 sm:flex-row">
-          <a
+          <Link
             href="/register"
             className="flex h-12 w-full items-center justify-center rounded-md bg-primary px-6 text-base font-medium text-primary-on sm:w-auto"
           >
             브랜드 카드 만들기
-          </a>
-          <a
+          </Link>
+          <Link
             href="/c/canvasgarden-demo"
             className="flex h-12 w-full items-center justify-center rounded-md border border-border-strong bg-surface px-6 text-base font-medium text-ink sm:w-auto"
           >
             예시 카드 보기
-          </a>
+          </Link>
         </div>
       </section>
 
@@ -113,12 +115,12 @@ export default function Home() {
 
       {/* 마무리 CTA */}
       <section className="mt-12 text-center">
-        <a
+        <Link
           href="/register"
           className="inline-flex h-12 items-center justify-center rounded-md bg-primary px-7 text-base font-medium text-primary-on"
         >
           30초 만에 시작하기
-        </a>
+        </Link>
       </section>
     </main>
   );

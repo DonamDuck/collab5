@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { claimBySlugAction } from "@/lib/actions";
 
@@ -55,7 +56,7 @@ export function ConnectMaker({ label = "기존 소개서 연결하기" }: { labe
       />
       {err && <p className="mt-2 text-sm text-red-600">{err}</p>}
       <p className="mt-2 text-[13px] text-faint">
-        링크를 모르겠다면 <a href="/search" className="underline">찾기</a>에서 내 브랜드를 검색해 링크를 확인해보세요.
+        링크를 모르겠다면 <Link href="/search" className="underline">찾기</Link>에서 내 브랜드를 검색해 링크를 확인해보세요.
       </p>
       <div className="mt-3 flex gap-2">
         <button

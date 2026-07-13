@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { searchAction } from "@/lib/actions";
 import type { CollabType, Maker } from "@/lib/types";
@@ -116,19 +117,19 @@ export default function SearchPage() {
             <p className="mt-1 text-sm text-mute">
               검색어·필터를 바꿔보거나 직접 등록해도 좋아요.
             </p>
-            <a
+            <Link
               href="/register"
               className="mt-4 inline-flex h-10 items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-on"
             >
               메이커 등록하기
-            </a>
+            </Link>
           </div>
         )}
 
         <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {pageItems.map((m) => (
             <li key={m.id}>
-              <a
+              <Link
                 href={`/m/${m.slug}`}
                 className="block overflow-hidden rounded-lg border border-hairline bg-surface transition-colors hover:bg-surface-soft"
               >
@@ -175,7 +176,7 @@ export default function SearchPage() {
                     </div>
                   )}
                 </div>
-              </a>
+              </Link>
             </li>
           ))}
         </ul>

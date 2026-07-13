@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signInAction } from "@/lib/auth-actions";
 import { authEnvReady, createBrowserAuthClient } from "@/lib/supabase/client";
@@ -95,13 +96,13 @@ function LoginForm() {
         </button>
       )}
       <div className="mt-5 flex items-center justify-center gap-3 text-sm">
-        <a href="/signup" className="font-medium text-primary-on underline-offset-2 hover:underline">
+        <Link href="/signup" className="font-medium text-primary-on underline-offset-2 hover:underline">
           회원가입
-        </a>
+        </Link>
         <span className="text-faint">·</span>
-        <a href="/reset-password" className="text-mute underline-offset-2 hover:underline">
+        <Link href="/reset-password" className="text-mute underline-offset-2 hover:underline">
           비밀번호 찾기
-        </a>
+        </Link>
       </div>
 
       {pending && <LoadingOverlay label="로그인 중이에요…" />}
