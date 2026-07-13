@@ -169,6 +169,13 @@ function RegisterForm() {
     setOpenSections((s) => new Set(s).add(k));
   const closeSection = (k: SectionKey) =>
     setOpenSections((s) => { const n = new Set(s); n.delete(k); return n; });
+  // 시트 '브랜드 이야기' 그룹에서 추가 → 정본 위치에 펼치고 스크롤(블록 add 앵커 패턴 재사용)
+  const addStorySection = (k: SectionKey) => {
+    openSection(k);
+    setTimeout(() => {
+      document.getElementById(`sec-${k}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 60);
+  };
 
   // 데이터 존재 판정 — 제출 payload 단일 관문·완성도·스텁 hasData 공용.
   const hasStory = !!story.trim();
@@ -875,27 +882,16 @@ function RegisterForm() {
 
         </div>
 
-        {/* ── 스텁 A — 왜 이 브랜드를 시작하셨나요 (구②) ── */}
+        {/* ── 시트 출신 — 우리 브랜드를 표현하는 키워드 (구③ · 정본 위치 = ① 뒤) ── */}
         <StubSection
-          id="stub-story"
-          label="왜 이 브랜드를 시작하셨나요?"
-          expanded={openSections.has("story")}
-          hasData={hasStory}
-          onExpand={() => openSection("story")}
-          onCollapse={() => closeSection("story")}
+          id="sec-keywords"
+          label="우리 브랜드를 표현하는 키워드를 골라주세요."
+          hiddenWhenCollapsed
+          expanded={openSections.has("keywords")}
+          hasData={hasKeywords}
+          onExpand={() => openSection("keywords")}
+          onCollapse={() => closeSection("keywords")}
         >
-          <p className="mb-4 -mt-4 text-sm text-mute">시작하게 된 계기를 편하게 적어주세요.</p>
-          <textarea
-            value={story}
-            onChange={(e) => setStory(e.target.value)}
-            rows={4}
-            placeholder="예: 좋은 소재가 버려지는 게 늘 아쉬웠어요. 이미 있는 것의 가치를 다시 발견하는 일이 더 의미 있다고 믿어요."
-            className="w-full rounded-sm border border-hairline bg-surface px-3 py-2.5 text-base leading-relaxed text-ink outline-none placeholder:text-faint focus:border-focus"
-          />
-        </StubSection>
-
-        {/* ── ③ 우리 브랜드를 표현하는 키워드 ── */}
-        <GroupHeader n="③" title="우리 브랜드를 표현하는 키워드를 골라주세요." />
         <div className="space-y-8">
           {/* 분위기칩 — 우리를 표현하는 말 */}
           <div>
@@ -987,6 +983,26 @@ function RegisterForm() {
           </div>
 
         </div>
+        </StubSection>
+
+        {/* ── 스텁 A — 왜 이 브랜드를 시작하셨나요 (구②) ── */}
+        <StubSection
+          id="stub-story"
+          label="왜 이 브랜드를 시작하셨나요?"
+          expanded={openSections.has("story")}
+          hasData={hasStory}
+          onExpand={() => openSection("story")}
+          onCollapse={() => closeSection("story")}
+        >
+          <p className="mb-4 -mt-4 text-sm text-mute">시작하게 된 계기를 편하게 적어주세요.</p>
+          <textarea
+            value={story}
+            onChange={(e) => setStory(e.target.value)}
+            rows={4}
+            placeholder="예: 좋은 소재가 버려지는 게 늘 아쉬웠어요. 이미 있는 것의 가치를 다시 발견하는 일이 더 의미 있다고 믿어요."
+            className="w-full rounded-sm border border-hairline bg-surface px-3 py-2.5 text-base leading-relaxed text-ink outline-none placeholder:text-faint focus:border-focus"
+          />
+        </StubSection>
 
         {/* ── 스텁 B — 주로 어떤 활동을 하나요 (구④) ── */}
         <StubSection
@@ -1060,9 +1076,52 @@ function RegisterForm() {
           </div>
         </StubSection>
 
-        {/* 구⑤(협업 서술 offersNote)·구⑥(찾는 파트너 seeks/seeksNote) 섹션은 해체 —
-            offers 칩은 ①로 이사(필수), offersNote·seeks·seeksNote는 상태·payload 유지 후
-            시트 '브랜드 이야기' 그룹으로 재배치 예정(Task 6). */}
+        {/* ── 시트 출신 — 어떤 협업을 할 수 있나요? — 자세히 (구⑤ 서술 offersNote) ── */}
+        <StubSection
+          id="sec-offersNote"
+          label="어떤 협업을 할 수 있나요? — 자세히"
+          hiddenWhenCollapsed
+          expanded={openSections.has("offersNote")}
+          hasData={hasOffersNote}
+          onExpand={() => openSection("offersNote")}
+          onCollapse={() => closeSection("offersNote")}
+        >
+          <textarea
+            value={offersNote}
+            onChange={(e) => setOffersNote(e.target.value)}
+            rows={3}
+            placeholder="예: 친환경 가방을 만들어요. 브랜드 제품 콜라보, 굿즈 제작을 기대하고 있어요."
+            className="w-full rounded-sm border border-hairline bg-surface px-3 py-2.5 text-base leading-relaxed text-ink outline-none placeholder:text-faint focus:border-focus"
+          />
+        </StubSection>
+
+        {/* ── 시트 출신 — 이런 파트너를 찾고 있어요 (구⑥ 칩+서술) ── */}
+        <StubSection
+          id="sec-seeks"
+          label="이런 파트너를 찾고 있어요."
+          hiddenWhenCollapsed
+          expanded={openSections.has("seeks")}
+          hasData={hasSeeks}
+          onExpand={() => openSection("seeks")}
+          onCollapse={() => closeSection("seeks")}
+        >
+          <div className="space-y-8">
+            <textarea
+              value={seeksNote}
+              onChange={(e) => setSeeksNote(e.target.value)}
+              rows={3}
+              placeholder="예: 지속가능성을 이야기하는 브랜드, 라이프스타일 브랜드, 카페와 함께하고 싶어요."
+              className="w-full rounded-sm border border-hairline bg-surface px-3 py-2.5 text-base leading-relaxed text-ink outline-none placeholder:text-faint focus:border-focus"
+            />
+            <Field label="이런 콜라보를 찾고 있어요">
+              <ChipRow
+                options={COLLAB_TYPES}
+                selected={seeks}
+                onToggle={(t) => toggle(seeks, setSeeks, t)}
+              />
+            </Field>
+          </div>
+        </StubSection>
 
         {/* ── 스텁 C — 이런 콜라보 경험이 있어요 (구⑦) ── */}
         <StubSection
@@ -1217,10 +1276,28 @@ function RegisterForm() {
         </StubSection>
 
         {/* ── 선택 블록(코어 ⑦과 ⑧ 사이) ── */}
-        <BlockEditor blocks={blocks} onChange={setBlocks} onUploadingChange={setBlocksUploading} />
+        <BlockEditor
+          blocks={blocks}
+          onChange={setBlocks}
+          onUploadingChange={setBlocksUploading}
+          storyItems={[
+            { key: "seeks", label: "이런 파트너를 찾고 있어요.", hint: "파트너와 꿈꾸는 협업 유형을 알려주세요.", added: openSections.has("seeks") || hasSeeks, onAdd: () => addStorySection("seeks") },
+            { key: "keywords", label: "우리 브랜드를 표현하는 키워드를 골라주세요.", hint: "분위기를 칩으로 골라요.", added: openSections.has("keywords") || hasKeywords, onAdd: () => addStorySection("keywords") },
+            { key: "customers", label: "저희는 주로 이런 고객과 함께하고 있어요.", hint: "주요 고객을 알려주세요.", added: openSections.has("customers") || hasCustomers, onAdd: () => addStorySection("customers") },
+            { key: "offersNote", label: "어떤 협업을 할 수 있나요? — 자세히", hint: "제공할 수 있는 협업을 편하게 들려주세요.", added: openSections.has("offersNote") || hasOffersNote, onAdd: () => addStorySection("offersNote") },
+          ]}
+        />
 
-        {/* ── ⑧ 저희는 주로 이런 고객과 함께하고 있어요 ── */}
-        <GroupHeader n="⑧" title="저희는 주로 이런 고객과 함께하고 있어요." />
+        {/* ── 시트 출신 — 저희는 주로 이런 고객과 함께하고 있어요 (구⑧) ── */}
+        <StubSection
+          id="sec-customers"
+          label="저희는 주로 이런 고객과 함께하고 있어요."
+          hiddenWhenCollapsed
+          expanded={openSections.has("customers")}
+          hasData={hasCustomers}
+          onExpand={() => openSection("customers")}
+          onCollapse={() => closeSection("customers")}
+        >
         <div className="space-y-8">
           {/* 이런 분들과 만나요 (타겟 고객) */}
           <div>
@@ -1279,6 +1356,7 @@ function RegisterForm() {
             </div>
           </div>
         </div>
+        </StubSection>
 
         {/* ── ② 브랜드 정보를 입력해주세요 (구⑨ — 번호 섹션은 ①·②만 남음) ── */}
         <GroupHeader n="②" title="브랜드 정보를 입력해주세요." />

@@ -36,11 +36,14 @@ export function emptyBlock(type: BlockType): Block {
   }
 }
 
-export function BlockEditor({ blocks, onChange, onUploadingChange }: {
+export function BlockEditor({ blocks, onChange, onUploadingChange, storyItems }: {
   blocks: Block[];
   // 값 또는 업데이터 함수 모두 허용(React setState 호환) — 비동기 병합 시 최신 상태 사용.
   onChange: (b: Block[] | ((prev: Block[]) => Block[])) => void;
   onUploadingChange?: (uploading: boolean) => void;
+  // 시트 '브랜드 이야기' 그룹 — 시트 출신 폼 섹션(구③⑤⑥⑧)을 정본 위치에 펼치는 버튼들.
+  // 미전달 시 기존 카탈로그 단독 렌더(하위호환).
+  storyItems?: { key: string; label: string; hint: string; added: boolean; onAdd: () => void }[];
 }) {
   const [open, setOpen] = useState(false);
   const [, setUploading] = useState(0);
@@ -441,6 +444,30 @@ export function BlockEditor({ blocks, onChange, onUploadingChange }: {
                 </button>
               </div>
             </div>
+            {/* 두 그룹 — '브랜드 이야기'(폼 섹션) + '더 보여주기'(블록 카탈로그). storyItems 없으면 기존 렌더. */}
+            {storyItems && storyItems.length > 0 && (
+              <>
+                <p className="mb-2 text-[13px] font-semibold text-primary-on">브랜드 이야기</p>
+                <div className="mb-4 space-y-2">
+                  {storyItems.map((s) => (
+                    <button
+                      key={s.key}
+                      type="button"
+                      disabled={s.added}
+                      onClick={() => {
+                        setOpen(false);
+                        s.onAdd();
+                      }}
+                      className="w-full rounded-md border border-hairline px-3.5 py-3 text-left hover:bg-surface-soft disabled:opacity-40 disabled:hover:bg-transparent"
+                    >
+                      <p className="text-[15px] font-semibold text-ink">{s.label}</p>
+                      <p className="mt-0.5 text-[13px] text-mute">{s.hint}</p>
+                    </button>
+                  ))}
+                </div>
+                <p className="mb-2 text-[13px] font-semibold text-primary-on">더 보여주기</p>
+              </>
+            )}
             <div className="space-y-2">
               {CATALOG.map((c) => (
                 <button
