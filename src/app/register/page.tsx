@@ -83,6 +83,9 @@ const SUGGESTED_AUDIENCE = [
 // 콜라보 이력 년도 선택지 — 1991~2030 (최신순 정렬)
 const HISTORY_YEARS = Array.from({ length: 2030 - 1991 + 1 }, (_, i) => String(2030 - i));
 
+// 접힘/펼침 가능한 옵션 섹션 키 — openSections(Set)로 어떤 섹션이 펼쳐져 있는지 단일 관리.
+type SectionKey = "story" | "activities" | "collabs" | "keywords" | "customers" | "offersNote" | "seeks";
+
 // 데모 프리필(캔버스가든) — `/register?demo=1`로 열면 텍스트가 채워진 상태로 시작(사진은 직접 첨부).
 const DEMO_PREFILL = {
   name: "캔버스가든",
@@ -159,6 +162,22 @@ function RegisterForm() {
   const [pdfUploading, setPdfUploading] = useState(false);
   const region = deriveRegion(address); // 주소에서 자동 추출 (별도 입력 없음)
 
+  // ── 섹션 펼침 상태 (스텁·시트 섹션 공용 단일 상태) ──
+  const [openSections, setOpenSections] = useState<Set<SectionKey>>(new Set());
+  const openSection = (k: SectionKey) =>
+    setOpenSections((s) => new Set(s).add(k));
+  const closeSection = (k: SectionKey) =>
+    setOpenSections((s) => { const n = new Set(s); n.delete(k); return n; });
+
+  // 데이터 존재 판정 — 제출 payload 단일 관문·완성도·스텁 hasData 공용.
+  const hasStory = !!story.trim();
+  const hasActivities = activities.some((a) => a.title.trim() || a.desc.trim() || a.photos.length > 0);
+  const hasCollabs = collabHistory.some((h) => h.partner.trim() || h.desc.trim() || h.photos.length > 0);
+  const hasKeywords = values.length > 0;
+  const hasCustomers = targetAudience.length > 0;
+  const hasOffersNote = !!offersNote.trim();
+  const hasSeeks = seeks.length > 0 || !!seeksNote.trim();
+
   // ── enrich(딸깍 자동완성) 상태 ──
   const [query, setQuery] = useState(""); // 불러오기 검색어(업체명만)
   const [wizardOpen, setWizardOpen] = useState(false); // 딸깍 자동완성 위저드
@@ -208,6 +227,8 @@ function RegisterForm() {
     ]);
     setAiFilled(new Set(["name", "oneLiner", "description", "values", "address", "instagram", "homepage"]));
     setDraftGenerated(true);
+    // 데모 = 대표 시연 도구 — 채워진 서사 섹션이 펼쳐진 채 시작(의도된 동작)
+    setOpenSections(new Set<SectionKey>(["story", "activities", "collabs"]));
   }, []);
   /* eslint-enable react-hooks/set-state-in-effect */
 
@@ -559,11 +580,34 @@ function RegisterForm() {
       setPhotos(m.photos.map((u) => ({ url: u })));
       setBlocks((m.blocks ?? []).map((b) => ({ ...b, uid: crypto.randomUUID() })));
       setIntroFileUrl(m.introFileUrl ?? "");
+      // 수정모드 규칙: 데이터 있는 섹션은 펼쳐진 채 복귀(빈 섹션은 접힌 스텁/시트 잔류)
+      const open = new Set<SectionKey>();
+      if ((m.story ?? "").trim()) open.add("story");
+      if (m.activities.length) open.add("activities");
+      if (m.collabHistory.length) open.add("collabs");
+      if ((m.soul.values ?? []).length) open.add("keywords");
+      if ((m.targetAudience ?? []).length) open.add("customers");
+      if ((m.offersNote ?? "").trim()) open.add("offersNote");
+      if (m.seeks.length || (m.seeksNote ?? "").trim()) open.add("seeks");
+      setOpenSections(open);
       setEditBooting(false);
     }).catch(() => setEditBooting(false));
   }, []);
 
+  // 제출 전 클라이언트 검증 — 에러 문구 반환(통과 시 null)
+  const validate = (): string | null => {
+    if (!offers.length) return "제공할 수 있는 협업을 1개 이상 골라주세요.";
+    return null;
+  };
+
   const submit = () => {
+    const err = validate();
+    if (err) {
+      alert(err);
+      // 협업 칩(①로 이사)으로 스크롤 — 현재 유일한 검증 항목
+      document.getElementById("offers-chips")?.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
     startTransition(async () => {
       // 사진은 선택 즉시 Storage 업로드됨 → 여기선 URL만 수집(업로드중 항목 제외)
       // 내용이 있는 카드만(빈 카드는 제외) — 활동과 동일 규칙
@@ -588,18 +632,20 @@ function RegisterForm() {
       // 사진 base64는 배열에 문자열로 담으면 React Flight 배열 한도(1e6)에 걸린다.
       // → {u} 객체로 감싸 전송(actions.ts에서 되풂). @see PhotoWire
       const wrap = (arr: string[]) => arr.map((u) => ({ u }));
+      // 빈 섹션 강제 차단 — has*가 false인 섹션은 빈 값으로 전송(단일 관문, 레드팀 CONFIRMED).
+      // 펼쳤지만 빈 채로 둔 섹션이 저장·노출되지 않는 유일한 보증 지점. (블록은 서버 sanitizeBlocks가 담당)
       const payload = {
         name,
         oneLiner,
         offers,
-        seeks,
-        values,
-        targetAudience,
-        collabHistory: historyOut.map((h) => ({ ...h, photos: wrap(h.photos) })),
-        story,
-        activities: activityOut.map((a) => ({ ...a, photos: wrap(a.photos) })),
-        offersNote,
-        seeksNote,
+        seeks: hasSeeks ? seeks : [],
+        values: hasKeywords ? values : [],
+        targetAudience: hasCustomers ? targetAudience : [],
+        collabHistory: hasCollabs ? historyOut.map((h) => ({ ...h, photos: wrap(h.photos) })) : [],
+        story: hasStory ? story.trim() : "",
+        activities: hasActivities ? activityOut.map((a) => ({ ...a, photos: wrap(a.photos) })) : [],
+        offersNote: hasOffersNote ? offersNote : "",
+        seeksNote: hasSeeks ? seeksNote : "",
         blocks,
         introFileUrl: introFileUrl || undefined,
         photos: wrap(photoUrls),
@@ -815,6 +861,17 @@ function RegisterForm() {
             />
           </div>
 
+          {/* 협업 유형 칩 — 구⑤에서 ①로 이사(필수 유지, 검색·매칭 하드축). 라벨은 구⑤ 제목 승계 */}
+          <div id="offers-chips" className="scroll-mt-4">
+            <Field label="어떤 협업을 할 수 있나요? *">
+              <ChipRow
+                options={COLLAB_TYPES}
+                selected={offers}
+                onToggle={(t) => toggle(offers, setOffers, t)}
+              />
+            </Field>
+          </div>
+
         </div>
 
         {/* ── ② 왜 이 브랜드를 시작하셨나요 ── */}
@@ -994,51 +1051,9 @@ function RegisterForm() {
           )}
         </div>
 
-        {/* ── ⑤ 어떤 협업을 할 수 있나요 ── */}
-        <GroupHeader
-          n="⑤"
-          title="어떤 협업을 할 수 있나요?"
-          sub="파트너가 우리와 함께하면 뭐가 좋을지, 편하게 들려주세요."
-        />
-        <div className="space-y-8">
-          <textarea
-            value={offersNote}
-            onChange={(e) => setOffersNote(e.target.value)}
-            rows={3}
-            placeholder="예: 친환경 가방을 만들어요. 브랜드 제품 콜라보, 굿즈 제작을 기대하고 있어요."
-            className="w-full rounded-sm border border-hairline bg-surface px-3 py-2.5 text-base leading-relaxed text-ink outline-none placeholder:text-faint focus:border-focus"
-          />
-          <Field label="이런 콜라보를 제공할 수 있어요">
-            <ChipRow
-              options={COLLAB_TYPES}
-              selected={offers}
-              onToggle={(t) => toggle(offers, setOffers, t)}
-            />
-          </Field>
-        </div>
-
-        {/* ── ⑥ 이런 파트너를 찾고 있어요 ── */}
-        <GroupHeader
-          n="⑥"
-          title="이런 파트너를 찾고 있어요."
-          sub="파트너와 꿈꾸는 협업 유형을 알려주세요."
-        />
-        <div className="space-y-8">
-          <textarea
-            value={seeksNote}
-            onChange={(e) => setSeeksNote(e.target.value)}
-            rows={3}
-            placeholder="예: 지속가능성을 이야기하는 브랜드, 라이프스타일 브랜드, 카페와 함께하고 싶어요."
-            className="w-full rounded-sm border border-hairline bg-surface px-3 py-2.5 text-base leading-relaxed text-ink outline-none placeholder:text-faint focus:border-focus"
-          />
-          <Field label="이런 콜라보를 찾고 있어요">
-            <ChipRow
-              options={COLLAB_TYPES}
-              selected={seeks}
-              onToggle={(t) => toggle(seeks, setSeeks, t)}
-            />
-          </Field>
-        </div>
+        {/* 구⑤(협업 서술 offersNote)·구⑥(찾는 파트너 seeks/seeksNote) 섹션은 해체 —
+            offers 칩은 ①로 이사(필수), offersNote·seeks·seeksNote는 상태·payload 유지 후
+            시트 '브랜드 이야기' 그룹으로 재배치 예정(Task 6). */}
 
         {/* ── ⑦ 이런 콜라보 경험이 있어요 ── */}
         <GroupHeader
