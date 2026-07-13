@@ -696,7 +696,7 @@ function RegisterForm() {
               }
             }}
             placeholder="예: 캔버스가든"
-            className="h-11 flex-1 rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
+            className="h-11 min-w-0 flex-1 rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
           />
           <button
             type="button"
@@ -912,7 +912,7 @@ function RegisterForm() {
                 }}
                 placeholder="직접 더하기 (예: 아날로그)"
                 disabled={values.length >= MAX_VIBES}
-                className="h-10 flex-1 rounded-sm border border-hairline bg-surface px-3 text-sm text-ink outline-none placeholder:text-faint focus:border-focus disabled:opacity-40"
+                className="h-10 min-w-0 flex-1 rounded-sm border border-hairline bg-surface px-3 text-sm text-ink outline-none placeholder:text-faint focus:border-focus disabled:opacity-40"
               />
               <button
                 type="button"
@@ -1128,7 +1128,7 @@ function RegisterForm() {
                           }
                         }}
                         placeholder="유형 직접 더하기"
-                        className="h-9 flex-1 rounded-sm border border-hairline bg-surface px-3 text-sm text-ink outline-none placeholder:text-faint focus:border-focus"
+                        className="h-9 min-w-0 flex-1 rounded-sm border border-hairline bg-surface px-3 text-sm text-ink outline-none placeholder:text-faint focus:border-focus"
                       />
                       <button
                         type="button"
@@ -1240,7 +1240,7 @@ function RegisterForm() {
                   }
                 }}
                 placeholder="직접 더하기 (예: 신혼부부)"
-                className="h-10 flex-1 rounded-sm border border-hairline bg-surface px-3 text-sm text-ink outline-none placeholder:text-faint focus:border-focus"
+                className="h-10 min-w-0 flex-1 rounded-sm border border-hairline bg-surface px-3 text-sm text-ink outline-none placeholder:text-faint focus:border-focus"
               />
               <button
                 type="button"
