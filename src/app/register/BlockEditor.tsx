@@ -401,16 +401,15 @@ export function BlockEditor({ blocks, onChange, onUploadingChange }: {
         </button>
       </div>
 
-      {/* ── 우측 하단 플로팅 버튼 (컴팩트 원형 · 강조 카드 보이면 숨김 · safe-area) ── */}
+      {/* ── 우측 하단 플로팅 버튼 (텍스트형 · 강조 카드 보이면 숨김 · safe-area) ── */}
       {!cardVisible && !open && (
         <button
           type="button"
           onClick={() => setOpen(true)}
-          aria-label="섹션 더하기"
           style={{ bottom: "calc(1.25rem + env(safe-area-inset-bottom))" }}
-          className="fixed right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-[26px] font-light leading-none text-primary-on shadow-lg sm:right-6"
+          className="fixed right-4 z-40 inline-flex h-12 items-center gap-1 rounded-pill bg-primary px-5 text-[14px] font-semibold text-primary-on shadow-xl ring-1 ring-black/5 sm:right-6"
         >
-          +
+          + 섹션 더하기
         </button>
       )}
 
