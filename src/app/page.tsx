@@ -34,7 +34,7 @@ export default function Home() {
             브랜드 카드 만들기
           </Link>
           <Link
-            href="/c/canvasgarden-demo"
+            href="/search"
             className="flex h-12 w-full items-center justify-center rounded-md border border-border-strong bg-surface px-6 text-base font-medium text-ink sm:w-auto"
           >
             예시 카드 보기
