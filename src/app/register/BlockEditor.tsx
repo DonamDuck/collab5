@@ -370,13 +370,19 @@ export function BlockEditor({ blocks, onChange, onUploadingChange }: {
 
       {/* ── 진입 한 줄 → 카탈로그 카드 그리드 ── */}
       {!open ? (
-        <button
-          type="button"
-          onClick={() => setOpen(true)}
-          className="w-full rounded-md border border-dashed border-border-strong px-4 py-3 text-left text-[15px] font-medium text-body"
-        >
-          + 브랜드의 이야기를 더 담아볼까요? <span className="text-faint">(선택)</span>
-        </button>
+        <div className="rounded-md border-2 border-primary bg-surface p-5 text-center">
+          <p className="text-[18px] font-bold text-ink">브랜드의 이야기를 더 담아볼까요?</p>
+          <p className="mx-auto mt-1.5 max-w-[320px] text-[14px] leading-relaxed text-mute">
+            숫자, 고객 후기, 공간 소개처럼 우리만의 섹션을 더할 수 있어요. <span className="text-faint">(선택)</span>
+          </p>
+          <button
+            type="button"
+            onClick={() => setOpen(true)}
+            className="mt-4 inline-flex h-11 items-center rounded-md bg-primary px-6 text-[15px] font-semibold text-primary-on"
+          >
+            + 섹션 더하기
+          </button>
+        </div>
       ) : (
         <div className="space-y-2 rounded-md border border-hairline p-3">
           {CATALOG.map((c) => (
