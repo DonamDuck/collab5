@@ -1,5 +1,8 @@
 @AGENTS.md
 
+## 작업 방식·제약 (모든 세션 공통)
+새 세션은 **`docs/세션-온보딩.md`를 읽고** 그 작업방식·커밋규율·제약·병렬세션(worktree) 셋업을 따른다. (커밋은 만진 파일만 `git add`, 배포=`git push`, tsc+build 통과 후, API키 대신입력 금지 등)
+
 ## Brain (Obsidian Vault — PARA)
 세션 시작 시 반드시 먼저 실행:
 ```
