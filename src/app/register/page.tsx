@@ -11,7 +11,7 @@ import {
 } from "@/lib/actions";
 import type { CollabType, Block } from "@/lib/types";
 import { deriveRegion } from "@/lib/region";
-import { uploadPhoto } from "@/lib/upload";
+import { uploadPhoto, uploadPdf } from "@/lib/upload";
 import type { ActivityHint, CollabHint, EnrichField } from "@/lib/enrich";
 import { EnrichWizard, type WizardFill } from "./EnrichWizard";
 import { BlockEditor } from "./BlockEditor";
@@ -155,6 +155,8 @@ function RegisterForm() {
   const [seeksNote, setSeeksNote] = useState("");
   const [blocks, setBlocks] = useState<Block[]>([]);
   const [blocksUploading, setBlocksUploading] = useState(false);
+  const [introFileUrl, setIntroFileUrl] = useState("");
+  const [pdfUploading, setPdfUploading] = useState(false);
   const region = deriveRegion(address); // 주소에서 자동 추출 (별도 입력 없음)
 
   // ── enrich(딸깍 자동완성) 상태 ──
@@ -318,6 +320,24 @@ function RegisterForm() {
 
   const onPhotos = (files: FileList | null) =>
     uploadInto(files, 10 - photos.length, 1000, setPhotos);
+
+  // 소개자료 PDF 첨부 (선택 · 10MB 이하)
+  const onIntroPdf = async (files: FileList | null) => {
+    const f = files?.[0];
+    if (!f) return;
+    setPdfUploading(true);
+    try {
+      setIntroFileUrl(await uploadPdf(f));
+    } catch (e) {
+      alert(
+        e instanceof Error && e.message === "too-large"
+          ? "10MB 이하 PDF만 담을 수 있어요."
+          : "업로드에 실패했어요. 다시 시도해주세요."
+      );
+    } finally {
+      setPdfUploading(false);
+    }
+  };
 
   // 규칙 기반 소개 초안 폴백 (AI 실패 시 — 입력값 조합)
   const ruleDraft = () => {
@@ -538,6 +558,7 @@ function RegisterForm() {
       setCollabOpen(m.collabOpen);
       setPhotos(m.photos.map((u) => ({ url: u })));
       setBlocks(m.blocks ?? []);
+      setIntroFileUrl(m.introFileUrl ?? "");
       setEditBooting(false);
     }).catch(() => setEditBooting(false));
   }, []);
@@ -580,6 +601,7 @@ function RegisterForm() {
         offersNote,
         seeksNote,
         blocks,
+        introFileUrl: introFileUrl || undefined,
         photos: wrap(photoUrls),
         collabOpen,
         instagram,
@@ -1263,6 +1285,36 @@ function RegisterForm() {
               className="h-11 w-full rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
             />
           </Field>
+
+          {/* 소개자료 PDF 첨부 (선택) */}
+          <div>
+            <label className="mb-2 block text-base font-medium text-body">
+              (선택) 이미 만든 소개 자료가 있다면 함께 담아드릴게요.
+            </label>
+            <div className="flex items-center gap-3">
+              <label className="inline-flex h-9 cursor-pointer items-center rounded-md border border-border-strong bg-surface px-3 text-sm font-medium text-ink">
+                {pdfUploading ? "올리는 중…" : "PDF 올리기"}
+                <input
+                  type="file"
+                  accept="application/pdf"
+                  hidden
+                  onChange={(e) => onIntroPdf(e.target.files)}
+                />
+              </label>
+              {introFileUrl && (
+                <>
+                  <span className="text-sm text-body">소개 자료 담김</span>
+                  <button
+                    type="button"
+                    onClick={() => setIntroFileUrl("")}
+                    className="text-sm text-faint hover:text-ink"
+                  >
+                    지우기
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
         </div>
 
         {/* 콜라보 열림/닫힘 */}
@@ -1297,6 +1349,7 @@ function RegisterForm() {
             disabled={
               !canSubmit ||
               blocksUploading ||
+              pdfUploading ||
               [...photos, ...activities.flatMap((a) => a.photos), ...collabHistory.flatMap((h) => h.photos)].some(
                 (p) => p.uploading
               )
