@@ -285,14 +285,19 @@ export async function getEditDataAction(slug: string): Promise<Maker | null> {
 const PHOTO_BUCKET = "maker-photos";
 
 /** Storage 서명 업로드 URL 발급. env 미설정 시 error(클라는 base64 폴백). */
-export async function createUploadUrlAction(): Promise<
+export async function createUploadUrlAction(
+  kind: "photo" | "pdf" = "photo"
+): Promise<
   { path: string; token: string; publicUrl: string } | { error: string }
 > {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) return { error: "storage-disabled" };
   const admin = createClient(url, key);
-  const path = `p/${crypto.randomUUID()}.jpg`;
+  const path =
+    kind === "pdf"
+      ? `d/${crypto.randomUUID()}.pdf`
+      : `p/${crypto.randomUUID()}.jpg`;
   const { data, error } = await admin.storage
     .from(PHOTO_BUCKET)
     .createSignedUploadUrl(path);
