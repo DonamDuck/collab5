@@ -7,6 +7,7 @@ import { repo } from "@/lib/repo";
 import { ConnectMaker } from "./ConnectMaker";
 import { LogoutButton } from "./LogoutButton";
 import { ChangePasswordButton } from "./ChangePasswordButton";
+import { MakerRow } from "./MakerRow";
 
 export default async function MyPage() {
   const user = await getSessionUser();
@@ -44,26 +45,7 @@ export default async function MyPage() {
         ) : (
           <div className="mt-4 space-y-2">
             {makers.map((m) => (
-              <div
-                key={m.slug}
-                className="flex items-center justify-between rounded-md border border-hairline bg-surface px-4 py-3"
-              >
-                <div className="min-w-0">
-                  <p className="truncate text-[15px] font-medium text-ink">{m.name}</p>
-                  {m.oneLiner && <p className="truncate text-sm text-mute">{m.oneLiner}</p>}
-                </div>
-                <div className="flex shrink-0 gap-2">
-                  <a href={`/m/${m.slug}`} className="rounded-md px-3 py-1.5 text-sm text-mute hover:text-ink">
-                    보기
-                  </a>
-                  <a
-                    href={`/register?edit=${m.slug}`}
-                    className="rounded-md border border-border-strong bg-surface px-3 py-1.5 text-sm font-medium text-ink"
-                  >
-                    수정
-                  </a>
-                </div>
-              </div>
+              <MakerRow key={m.slug} slug={m.slug} name={m.name} oneLiner={m.oneLiner} />
             ))}
             <div className="flex justify-center pt-2">
               <ConnectMaker label="+ 소개서 추가 연결" />

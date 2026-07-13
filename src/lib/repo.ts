@@ -13,6 +13,7 @@ export interface Repo {
   updateMakerContent(slug: string, content: Omit<Maker, "id" | "slug" | "createdAt" | "ownerUserId" | "editPasswordHash">): Promise<Maker | null>;
   setMakerOwner(slug: string, ownerUserId: string): Promise<void>;
   setMakerPasswordHash(slug: string, hash: string): Promise<void>;
+  deleteMaker(slug: string): Promise<void>;
   listMakersByOwner(ownerUserId: string): Promise<Maker[]>;
   listMakers(): Promise<Maker[]>;
   searchMakers(q: string): Promise<Maker[]>;
@@ -207,6 +208,10 @@ class InMemoryRepo implements Repo {
     const m = this.makers.find((x) => x.slug === slug);
     if (m) m.editPasswordHash = hash;
   }
+  async deleteMaker(slug: string): Promise<void> {
+    const i = this.makers.findIndex((x) => x.slug === slug);
+    if (i >= 0) this.makers.splice(i, 1);
+  }
   async listMakersByOwner(ownerUserId: string): Promise<Maker[]> {
     return this.makers.filter((x) => x.ownerUserId === ownerUserId);
   }
@@ -342,6 +347,10 @@ class SupabaseRepo implements Repo {
   }
   async setMakerPasswordHash(slug: string, hash: string): Promise<void> {
     await this.db.from("makers").update({ claim_token_hash: hash }).eq("slug", slug);
+  }
+  async deleteMaker(slug: string): Promise<void> {
+    // collab_cards·view_events·reactions는 FK ON DELETE CASCADE로 함께 삭제됨.
+    await this.db.from("makers").delete().eq("slug", slug);
   }
   async listMakersByOwner(ownerUserId: string): Promise<Maker[]> {
     const { data } = await this.db.from("makers").select().eq("owner_uuid", ownerUserId).order("created_at", { ascending: false });

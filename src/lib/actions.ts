@@ -252,6 +252,16 @@ export async function updateMakerAction(
   return { slug };
 }
 
+/** 소개서 삭제 — 로그인 소유자만. /my에서 사용. 카드·지표는 FK CASCADE로 함께 삭제. */
+export async function deleteMakerAction(slug: string): Promise<{ error?: string }> {
+  const maker = await repo.getMakerBySlug(slug);
+  if (!maker) return { error: "소개서를 찾을 수 없어요." };
+  const user = await getSessionUser();
+  if (!user || maker.ownerUserId !== user.id) return { error: "삭제 권한이 없어요." };
+  await repo.deleteMaker(slug);
+  return {};
+}
+
 /** register 완료 얼럿 버전 분기용 */
 export async function getAuthStateAction(): Promise<{ loggedIn: boolean }> {
   const user = await getSessionUser();
