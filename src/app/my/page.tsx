@@ -13,8 +13,11 @@ import { MakerRow } from "./MakerRow";
 export default async function MyPage() {
   const user = await getSessionUser();
   if (!user) redirect("/login");
-  const profile = await getProfile(user.id);
-  const makers = await repo.listMakersByOwner(user.id);
+  // 프로필·소개서 목록은 서로 독립 조회 — 병렬로 가져와 왕복 1회분 단축
+  const [profile, makers] = await Promise.all([
+    getProfile(user.id),
+    repo.listMakersByOwner(user.id),
+  ]);
   const displayName = profile?.brandName || user.email?.split("@")[0] || "내 브랜드";
 
   return (
