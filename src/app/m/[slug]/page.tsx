@@ -76,7 +76,7 @@ export default async function MakerPage({
 
       {/* ② 우리는 이런 일을 하고 있습니다 — activities */}
       {maker.activities.length > 0 && (
-        <Section title="우리는 이런 일을 하고 있습니다">
+        <Section title="우리는 이런 일을 하고 있어요">
           <div className="space-y-6">
             {maker.activities.map((a, i) => (
               <div key={i}>
