@@ -5,6 +5,7 @@ import { getProfile } from "@/lib/profiles";
 import { PhotoSlider } from "@/components/PhotoSlider";
 import { CopyLinkButton } from "./CopyLinkButton";
 import { BrandSummaryCard } from "./BrandSummaryCard";
+import { BlockSections } from "./BlockSections";
 
 // 공개 업체 상세페이지 — 누구나 열람(MVP 검색 결과의 도착지). 검증 가능한 신뢰 시그널 노출.
 export default async function MakerPage({
@@ -99,6 +100,9 @@ export default async function MakerPage({
           </div>
         </Section>
       )}
+
+      {/* 선택 블록 — 배열 순서대로 렌더 */}
+      {maker.blocks.length > 0 && <BlockSections blocks={maker.blocks} Section={Section} />}
 
       {/* ⑤ 이런 협업을 기대하고 있어요 — offers */}
       {(maker.offers.length > 0 || maker.offersNote) && (
