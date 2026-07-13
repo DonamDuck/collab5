@@ -39,12 +39,12 @@ export function MakerRow({
       </Link>
 
       <div className="flex shrink-0 items-center gap-1">
-        <a
+        <Link
           href={`/register?edit=${slug}`}
           className="rounded-md border border-border-strong bg-surface px-3 py-1.5 text-sm font-medium text-ink"
         >
           수정
-        </a>
+        </Link>
         <button
           type="button"
           onClick={() => setConfirming(true)}

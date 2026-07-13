@@ -1,4 +1,5 @@
 // 내 소개서 — 로그인 필수. 목록은 플랜 B(소유권)에서 채움.
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/supabase/server";
 import { getProfile } from "@/lib/profiles";
@@ -33,12 +34,12 @@ export default async function MyPage() {
           <div className="mt-4 rounded-md border border-dashed border-border-strong bg-surface px-4 py-8 text-center">
             <p className="text-[15px] text-mute">아직 연결된 소개서가 없어요.</p>
             <div className="mt-4 flex flex-col items-center gap-2">
-              <a
+              <Link
                 href="/register"
                 className="inline-flex h-11 items-center justify-center rounded-md bg-primary px-5 text-sm font-medium text-primary-on"
               >
                 소개서 만들기
-              </a>
+              </Link>
               <ConnectMaker />
             </div>
           </div>

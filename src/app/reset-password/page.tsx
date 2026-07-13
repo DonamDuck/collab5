@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import Link from "next/link";
 import { requestPasswordResetAction } from "@/lib/auth-actions";
 
 export default function ResetPasswordPage() {
@@ -54,9 +55,9 @@ export default function ResetPasswordPage() {
         </>
       )}
       <p className="mt-4 text-center text-sm">
-        <a href="/login" className="text-mute underline-offset-2 hover:underline">
+        <Link href="/login" className="text-mute underline-offset-2 hover:underline">
           로그인으로 돌아가기
-        </a>
+        </Link>
       </p>
     </main>
   );

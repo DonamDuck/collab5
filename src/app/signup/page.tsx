@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { signUpAction, checkSignupDuplicatesAction } from "@/lib/auth-actions";
 import { uploadPhoto } from "@/lib/upload";
@@ -198,9 +199,9 @@ export default function SignupPage() {
       </button>
       <p className="mt-4 text-center text-sm text-mute">
         이미 계정이 있나요?{" "}
-        <a href="/login" className="font-medium text-primary-on underline-offset-2 hover:underline">
+        <Link href="/login" className="font-medium text-primary-on underline-offset-2 hover:underline">
           로그인
-        </a>
+        </Link>
       </p>
 
       {pending && <LoadingOverlay label="계정을 만들고 있어요…" />}
