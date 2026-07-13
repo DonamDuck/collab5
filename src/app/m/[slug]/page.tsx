@@ -1,10 +1,10 @@
 import { notFound } from "next/navigation";
 import { repo } from "@/lib/repo";
 import { getSessionUser } from "@/lib/supabase/server";
-import { instagramUrl, instagramHandle, normalizeUrl, prettyUrl } from "@/lib/links";
+import { getProfile } from "@/lib/profiles";
 import { PhotoSlider } from "@/components/PhotoSlider";
 import { CopyLinkButton } from "./CopyLinkButton";
-import { EditButton } from "./EditButton";
+import { BrandSummaryCard } from "./BrandSummaryCard";
 
 // 공개 업체 상세페이지 — 누구나 열람(MVP 검색 결과의 도착지). 검증 가능한 신뢰 시그널 노출.
 export default async function MakerPage({
@@ -16,47 +16,18 @@ export default async function MakerPage({
   const maker = await repo.getMakerBySlug(slug);
   if (!maker) notFound();
 
-  const user = await getSessionUser();
+  // 세션 유저 + 소유 계정 프로필(로고용)을 병렬 조회 — 왕복 안 늘림
+  const [user, ownerProfile] = await Promise.all([
+    getSessionUser(),
+    maker.ownerUserId ? getProfile(maker.ownerUserId) : Promise.resolve(null),
+  ]);
   const isOwner = !!user && maker.ownerUserId === user.id;
+  const logoUrl = ownerProfile?.profileImage || undefined;
 
   return (
     <main className="mx-auto w-full max-w-[640px] px-4 py-10 sm:px-6">
-      {/* ── 헤더 — 브랜드명 + 요약(한 줄 소개) + 신뢰 뱃지(인스타·홈피·주소) ── */}
-      <header>
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-[32px] font-bold leading-tight tracking-tight text-ink">
-              {maker.name}
-            </h1>
-            {maker.collabOpen && (
-              <span className="inline-flex h-6 items-center rounded-sm bg-primary-pale px-2 text-xs font-medium text-primary-on">
-                콜라보 받는 중
-              </span>
-            )}
-          </div>
-          <div className="shrink-0">
-            <EditButton slug={maker.slug} isOwner={isOwner} />
-          </div>
-        </div>
-        {maker.oneLiner && (
-          <p className="mt-2.5 text-[18px] leading-relaxed text-body">{maker.oneLiner}</p>
-        )}
-        {(maker.trust.instagram || maker.trust.homepage || maker.trust.address) && (
-          <div className="mt-4 flex flex-wrap gap-2">
-            {maker.trust.instagram && (
-              <TrustLink href={instagramUrl(maker.trust.instagram)}>
-                📷 {instagramHandle(maker.trust.instagram)}
-              </TrustLink>
-            )}
-            {maker.trust.homepage && (
-              <TrustLink href={normalizeUrl(maker.trust.homepage)}>
-                🔗 {prettyUrl(maker.trust.homepage)}
-              </TrustLink>
-            )}
-            {maker.trust.address && <TrustTag>📍 {maker.trust.address}</TrustTag>}
-          </div>
-        )}
-      </header>
+      {/* ── 상단 요약 카드 — 로고+정체성 + 신뢰정보 박스 ── */}
+      <BrandSummaryCard maker={maker} isOwner={isOwner} logoUrl={logoUrl} />
 
       {/* 브랜드 사진 — 스와이프 슬라이드 */}
       {maker.photos.length > 0 && (
@@ -218,27 +189,5 @@ function TypeChip({ children }: { children: React.ReactNode }) {
     <span className="inline-flex h-9 items-center rounded-pill border border-hairline bg-surface px-3.5 text-[15px] text-body">
       {children}
     </span>
-  );
-}
-
-function TrustTag({ children }: { children: React.ReactNode }) {
-  return (
-    <span className="inline-flex h-9 items-center gap-1 rounded-sm bg-surface-soft px-3 text-[14px] font-medium text-mute">
-      {children}
-    </span>
-  );
-}
-
-// 클릭하면 새 탭으로 링크 열림(인스타·홈피)
-function TrustLink({ href, children }: { href: string; children: React.ReactNode }) {
-  return (
-    <a
-      href={href}
-      target="_blank"
-      rel="noopener noreferrer nofollow"
-      className="inline-flex h-9 items-center gap-1 rounded-sm bg-surface-soft px-3 text-[14px] font-medium text-body transition-colors hover:bg-primary-pale hover:text-primary-on"
-    >
-      {children}
-    </a>
   );
 }
