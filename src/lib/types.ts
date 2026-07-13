@@ -40,6 +40,19 @@ export interface CollabHistory {
 /** 대표 활동 — 제목·설명·사진(최대 3) */
 export interface Activity { title: string; desc: string; photos: string[]; }
 
+/** 선택 블록 — 공통 photos(최대3)·links(최대3) + 타입별 고유 필드. 배열 순서 = 소개서 노출 순서 */
+export interface BlockLink { label?: string; url: string }
+interface BlockBase { photos: string[]; links: BlockLink[] }
+export type Block = BlockBase & (
+  | { type: "metrics"; items: { label: string; value: string }[] }
+  | { type: "reviews"; items: { quote: string; source?: string }[] }
+  | { type: "team"; intro: string }
+  | { type: "press"; items: { title: string; year?: string }[] }
+  | { type: "space"; desc: string; features: string[] }
+  | { type: "custom"; title: string; body: string }
+);
+export type BlockType = Block["type"];
+
 /** 업체 프로필 = 콜라보 카드의 '집' + 공개 상세페이지(검색 대상) */
 export interface Maker {
   id: number; // 정수 시퀀스 PK (DB 자동)
@@ -59,6 +72,8 @@ export interface Maker {
   offersNote: string;      // 협업 직접 설명
   seeksNote: string;       // 파트너 직접 설명
   photos: string[]; // 브랜드 사진(카드·프로필 슬라이드용). MVP=리사이즈 data URL
+  blocks: Block[]; // 선택 블록(순서 보존)
+  introFileUrl?: string; // 소개자료 PDF(코어 위계)
   soul: SoulLayer;
   trust: TrustSignals;
   collabOpen: boolean; // 콜라보 열림/닫힘 토글

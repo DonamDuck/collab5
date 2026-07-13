@@ -9,11 +9,12 @@ import {
   updateMakerAction,
   getEditDataAction,
 } from "@/lib/actions";
-import type { CollabType } from "@/lib/types";
+import type { CollabType, Block } from "@/lib/types";
 import { deriveRegion } from "@/lib/region";
-import { uploadPhoto } from "@/lib/upload";
+import { uploadPhoto, uploadPdf } from "@/lib/upload";
 import type { ActivityHint, CollabHint, EnrichField } from "@/lib/enrich";
 import { EnrichWizard, type WizardFill } from "./EnrichWizard";
+import { BlockEditor } from "./BlockEditor";
 import { PhotoGrid } from "./PhotoGrid";
 
 // 배열 내 순서 이동 (드래그 재정렬용)
@@ -152,6 +153,10 @@ function RegisterForm() {
   >([{ title: "", desc: "", photos: [] }]);
   const [offersNote, setOffersNote] = useState("");
   const [seeksNote, setSeeksNote] = useState("");
+  const [blocks, setBlocks] = useState<Block[]>([]);
+  const [blocksUploading, setBlocksUploading] = useState(false);
+  const [introFileUrl, setIntroFileUrl] = useState("");
+  const [pdfUploading, setPdfUploading] = useState(false);
   const region = deriveRegion(address); // 주소에서 자동 추출 (별도 입력 없음)
 
   // ── enrich(딸깍 자동완성) 상태 ──
@@ -197,6 +202,9 @@ function RegisterForm() {
     setHomepage(d.homepage);
     setCollabHistory([
       { partner: d.history.partner, types: d.history.types, desc: "", year: d.history.year, photos: [], typeInput: "" },
+    ]);
+    setBlocks([
+      { type: "metrics", photos: [], links: [], items: [{ label: "인스타 팔로워", value: "1.2만" }, { label: "누적 워크숍", value: "48회" }] },
     ]);
     setAiFilled(new Set(["name", "oneLiner", "description", "values", "address", "instagram", "homepage"]));
     setDraftGenerated(true);
@@ -312,6 +320,24 @@ function RegisterForm() {
 
   const onPhotos = (files: FileList | null) =>
     uploadInto(files, 10 - photos.length, 1000, setPhotos);
+
+  // 소개자료 PDF 첨부 (선택 · 10MB 이하)
+  const onIntroPdf = async (files: FileList | null) => {
+    const f = files?.[0];
+    if (!f) return;
+    setPdfUploading(true);
+    try {
+      setIntroFileUrl(await uploadPdf(f));
+    } catch (e) {
+      alert(
+        e instanceof Error && e.message === "too-large"
+          ? "10MB 이하 PDF만 담을 수 있어요."
+          : "업로드에 실패했어요. 다시 시도해주세요."
+      );
+    } finally {
+      setPdfUploading(false);
+    }
+  };
 
   // 규칙 기반 소개 초안 폴백 (AI 실패 시 — 입력값 조합)
   const ruleDraft = () => {
@@ -531,6 +557,8 @@ function RegisterForm() {
       setAddress(m.trust.address ?? "");
       setCollabOpen(m.collabOpen);
       setPhotos(m.photos.map((u) => ({ url: u })));
+      setBlocks(m.blocks ?? []);
+      setIntroFileUrl(m.introFileUrl ?? "");
       setEditBooting(false);
     }).catch(() => setEditBooting(false));
   }, []);
@@ -572,6 +600,8 @@ function RegisterForm() {
         activities: activityOut.map((a) => ({ ...a, photos: wrap(a.photos) })),
         offersNote,
         seeksNote,
+        blocks,
+        introFileUrl: introFileUrl || undefined,
         photos: wrap(photoUrls),
         collabOpen,
         instagram,
@@ -968,7 +998,7 @@ function RegisterForm() {
         <GroupHeader
           n="⑤"
           title="어떤 협업을 할 수 있나요?"
-          sub="제공할 수 있는 협업을 자유롭게 작성해주세요."
+          sub="파트너가 우리와 함께하면 뭐가 좋을지, 편하게 들려주세요."
         />
         <div className="space-y-8">
           <textarea
@@ -1159,6 +1189,9 @@ function RegisterForm() {
           </div>
         </div>
 
+        {/* ── 선택 블록(코어 ⑦과 ⑧ 사이) ── */}
+        <BlockEditor blocks={blocks} onChange={setBlocks} onUploadingChange={setBlocksUploading} />
+
         {/* ── ⑧ 저희는 주로 이런 고객과 함께하고 있어요 ── */}
         <GroupHeader n="⑧" title="저희는 주로 이런 고객과 함께하고 있어요." />
         <div className="space-y-8">
@@ -1252,6 +1285,36 @@ function RegisterForm() {
               className="h-11 w-full rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
             />
           </Field>
+
+          {/* 소개자료 PDF 첨부 (선택) */}
+          <div>
+            <label className="mb-2 block text-base font-medium text-body">
+              (선택) 이미 만든 소개 자료가 있다면 함께 담아드릴게요.
+            </label>
+            <div className="flex items-center gap-3">
+              <label className="inline-flex h-9 cursor-pointer items-center rounded-md border border-border-strong bg-surface px-3 text-sm font-medium text-ink">
+                {pdfUploading ? "올리는 중…" : "PDF 올리기"}
+                <input
+                  type="file"
+                  accept="application/pdf"
+                  hidden
+                  onChange={(e) => onIntroPdf(e.target.files)}
+                />
+              </label>
+              {introFileUrl && (
+                <>
+                  <span className="text-sm text-body">소개 자료 담김</span>
+                  <button
+                    type="button"
+                    onClick={() => setIntroFileUrl("")}
+                    className="text-sm text-faint hover:text-ink"
+                  >
+                    지우기
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
         </div>
 
         {/* 콜라보 열림/닫힘 */}
@@ -1285,6 +1348,8 @@ function RegisterForm() {
             onClick={submit}
             disabled={
               !canSubmit ||
+              blocksUploading ||
+              pdfUploading ||
               [...photos, ...activities.flatMap((a) => a.photos), ...collabHistory.flatMap((h) => h.photos)].some(
                 (p) => p.uploading
               )

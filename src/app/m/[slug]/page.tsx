@@ -5,6 +5,7 @@ import { getProfile } from "@/lib/profiles";
 import { PhotoSlider } from "@/components/PhotoSlider";
 import { CopyLinkButton } from "./CopyLinkButton";
 import { BrandSummaryCard } from "./BrandSummaryCard";
+import { BlockSections } from "./BlockSections";
 
 // 공개 업체 상세페이지 — 누구나 열람(MVP 검색 결과의 도착지). 검증 가능한 신뢰 시그널 노출.
 export default async function MakerPage({
@@ -100,6 +101,9 @@ export default async function MakerPage({
         </Section>
       )}
 
+      {/* 선택 블록 — 배열 순서대로 렌더 */}
+      {maker.blocks.length > 0 && <BlockSections blocks={maker.blocks} Section={Section} />}
+
       {/* ⑤ 이런 협업을 기대하고 있어요 — offers */}
       {(maker.offers.length > 0 || maker.offersNote) && (
         <Section title="이런 협업을 기대하고 있어요">
@@ -169,6 +173,12 @@ export default async function MakerPage({
         <p className="mt-2.5 text-center text-[13px] text-faint">
           링크를 복사해 협업하고 싶은 곳에 보내보세요.
         </p>
+        {maker.introFileUrl && (
+          <a href={maker.introFileUrl} target="_blank" rel="noopener noreferrer"
+            className="mt-3 flex h-12 w-full items-center justify-center rounded-md border border-border-strong bg-surface text-base font-medium text-ink">
+            소개 자료 받기
+          </a>
+        )}
       </div>
     </main>
   );

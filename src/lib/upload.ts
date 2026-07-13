@@ -22,3 +22,18 @@ export async function uploadPhoto(file: File, maxDim: number): Promise<string> {
   if (error) throw new Error("upload-failed");
   return signed.publicUrl;
 }
+
+/** 소개자료 PDF 업로드(리사이즈 없음, 10MB 제한). Storage 미설정이면 에러. */
+export async function uploadPdf(file: File): Promise<string> {
+  if (file.type !== "application/pdf") throw new Error("pdf-only");
+  if (file.size > 10 * 1024 * 1024) throw new Error("too-large");
+  if (!authEnvReady) throw new Error("storage-required");
+  const signed = await createUploadUrlAction("pdf");
+  if ("error" in signed) throw new Error(signed.error);
+  const supabase = createBrowserAuthClient();
+  const { error } = await supabase.storage
+    .from(PHOTO_BUCKET)
+    .uploadToSignedUrl(signed.path, signed.token, file, { contentType: "application/pdf" });
+  if (error) throw new Error("upload-failed");
+  return signed.publicUrl;
+}

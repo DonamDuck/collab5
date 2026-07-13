@@ -5,7 +5,7 @@ import { repo } from "./repo";
 import { deriveRegion } from "./region";
 import { getSessionUser } from "./supabase/server";
 import { sha256 } from "./hash";
-import type { CollabType, Maker } from "./types";
+import type { Block, CollabType, Maker } from "./types";
 
 // 사진(리사이즈 data URL)은 개당 수십만~100만 자에 달해, 배열에 문자열로 담아
 // 서버액션으로 보내면 React Flight의 배열 누적 한도(1e6)에 걸려 터진다.
@@ -42,6 +42,8 @@ export interface RegisterInput {
   offersNote?: string;
   seeksNote?: string;
   photos?: PhotoWire[]; // 브랜드 사진(리사이즈 data URL, 객체 래핑)
+  blocks?: Block[]; // 선택 블록(사진=Storage URL이라 그대로 전송)
+  introFileUrl?: string; // 소개자료 PDF URL
   collabOpen: boolean;
   instagram?: string;
   homepage?: string;
@@ -91,6 +93,8 @@ export async function createMakerAction(
     offersNote: input.offersNote?.trim() ?? "",
     seeksNote: input.seeksNote?.trim() ?? "",
     photos: unwrapPhotos(input.photos),
+    blocks: sanitizeBlocks(input.blocks),
+    introFileUrl: input.introFileUrl?.trim() || undefined,
     soul: { values: input.values, tone: "", trajectory: "" },
     trust: {
       instagram: input.instagram?.trim() || undefined,
@@ -239,6 +243,8 @@ export async function updateMakerAction(
     offersNote: input.offersNote?.trim() ?? "",
     seeksNote: input.seeksNote?.trim() ?? "",
     photos: unwrapPhotos(input.photos),
+    blocks: sanitizeBlocks(input.blocks),
+    introFileUrl: input.introFileUrl?.trim() || undefined,
     soul: { values: input.values, tone: "", trajectory: "" },
     trust: {
       instagram: input.instagram?.trim() || undefined,
@@ -279,18 +285,39 @@ export async function getEditDataAction(slug: string): Promise<Maker | null> {
 const PHOTO_BUCKET = "maker-photos";
 
 /** Storage 서명 업로드 URL 발급. env 미설정 시 error(클라는 base64 폴백). */
-export async function createUploadUrlAction(): Promise<
+export async function createUploadUrlAction(
+  kind: "photo" | "pdf" = "photo"
+): Promise<
   { path: string; token: string; publicUrl: string } | { error: string }
 > {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) return { error: "storage-disabled" };
   const admin = createClient(url, key);
-  const path = `p/${crypto.randomUUID()}.jpg`;
+  const path =
+    kind === "pdf"
+      ? `d/${crypto.randomUUID()}.pdf`
+      : `p/${crypto.randomUUID()}.jpg`;
   const { data, error } = await admin.storage
     .from(PHOTO_BUCKET)
     .createSignedUploadUrl(path);
   if (error || !data) return { error: "sign-failed" };
   const { data: pub } = admin.storage.from(PHOTO_BUCKET).getPublicUrl(path);
   return { path, token: data.token, publicUrl: pub.publicUrl };
+}
+
+/** 내용이 빈 블록은 저장 제외(⑦ 콜라보 빈 카드 제외 패턴) */
+function sanitizeBlocks(blocks?: Block[]): Block[] {
+  return (blocks ?? [])
+    .filter((b) => {
+      if (b.type === "metrics")
+        return b.items.some((i) => i.label.trim() || i.value.trim());
+      if (b.type === "press") return b.items.some((i) => i.title.trim());
+      if (b.type === "reviews") return b.items.some((i) => i.quote.trim());
+      if (b.type === "team") return b.intro.trim() || b.photos.length > 0;
+      if (b.type === "space")
+        return b.desc.trim() || b.features.length > 0 || b.photos.length > 0;
+      return b.title.trim() || b.body.trim() || b.photos.length > 0;
+    })
+    .map((b) => ({ ...b, links: b.links.filter((l) => l.url.trim()) }));
 }

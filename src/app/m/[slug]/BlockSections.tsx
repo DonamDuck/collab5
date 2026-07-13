@@ -1,0 +1,117 @@
+import type { Block } from "@/lib/types";
+import { PhotoSlider } from "@/components/PhotoSlider";
+import { normalizeUrl, prettyUrl } from "@/lib/links";
+
+const TITLES: Record<Block["type"], string> = {
+  metrics: "우리의 숫자 지표에요",
+  reviews: "이런 이야기를 들었어요",
+  team: "이런 사람들이 만들고 있어요",
+  press: "이런 곳에 소개됐어요",
+  space: "우리의 공간을 소개해요",
+  custom: "",
+};
+
+export function BlockSections({
+  blocks,
+  Section,
+}: {
+  blocks: Block[];
+  Section: React.ComponentType<{ title: string; children: React.ReactNode }>;
+}) {
+  return (
+    <>
+      {blocks.map((b, i) => (
+        <Section key={i} title={b.type === "custom" ? b.title : TITLES[b.type]}>
+          <BlockBody b={b} />
+          {b.photos.length > 0 && (
+            <div className="mt-3 max-w-[460px]">
+              <PhotoSlider photos={b.photos} />
+            </div>
+          )}
+          {b.links.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {b.links.map((l, k) => (
+                <a
+                  key={k}
+                  href={normalizeUrl(l.url)}
+                  target="_blank"
+                  rel="noopener noreferrer nofollow"
+                  className="inline-flex h-9 items-center gap-1 rounded-sm bg-surface-soft px-3 text-[14px] font-medium text-body hover:bg-primary-pale hover:text-primary-on"
+                >
+                  🔗 {l.label?.trim() || prettyUrl(l.url)}
+                </a>
+              ))}
+            </div>
+          )}
+        </Section>
+      ))}
+    </>
+  );
+}
+
+// 블록 타입별 본문 — 유니온을 type으로 좁힌 뒤 고유 필드 접근
+function BlockBody({ b }: { b: Block }) {
+  switch (b.type) {
+    case "metrics":
+      return (
+        <div className="grid grid-cols-2 gap-3">
+          {b.items.map((it, i) => (
+            <div key={i}>
+              <p className="text-[26px] font-bold text-ink">{it.value}</p>
+              <p className="text-[14px] text-mute">{it.label}</p>
+            </div>
+          ))}
+        </div>
+      );
+    case "reviews":
+      return (
+        <div className="space-y-3">
+          {b.items.map((it, i) => (
+            <div key={i} className="rounded-md bg-surface-soft p-4">
+              <p className="text-[16px] leading-relaxed text-body">{it.quote}</p>
+              {it.source && <p className="mt-1 text-[13px] text-faint">{it.source}</p>}
+            </div>
+          ))}
+        </div>
+      );
+    case "press":
+      return (
+        <div className="space-y-1.5">
+          {b.items.map((it, i) => (
+            <p key={i} className="text-[16px] text-body">
+              <span className="font-medium text-ink">{it.title}</span>
+              {it.year && <span className="text-mute"> · {it.year}</span>}
+            </p>
+          ))}
+        </div>
+      );
+    case "space":
+      return (
+        <>
+          {b.desc && (
+            <p className="whitespace-pre-line text-[17px] leading-relaxed text-body">{b.desc}</p>
+          )}
+          {b.features.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {b.features.map((f) => (
+                <span
+                  key={f}
+                  className="inline-flex h-9 items-center rounded-pill border border-hairline bg-surface px-3.5 text-[15px] text-body"
+                >
+                  {f}
+                </span>
+              ))}
+            </div>
+          )}
+        </>
+      );
+    case "team":
+      return (
+        <p className="whitespace-pre-line text-[17px] leading-relaxed text-body">{b.intro}</p>
+      );
+    case "custom":
+      return (
+        <p className="whitespace-pre-line text-[17px] leading-relaxed text-body">{b.body}</p>
+      );
+  }
+}

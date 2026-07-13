@@ -53,6 +53,7 @@ const seedMakers: Maker[] = [
       "https://picsum.photos/seed/canvasgarden2/900/700",
       "https://picsum.photos/seed/canvasgarden3/900/700",
     ],
+    blocks: [],
     soul: {
       values: ["친환경", "손맛", "느린 호흡"],
       tone: "단단하지만 다정한, 정성스러운",
@@ -83,6 +84,7 @@ const seedMakers: Maker[] = [
     offersNote: "",
     seeksNote: "",
     photos: [],
+    blocks: [],
     soul: {
       values: ["빈티지", "큐레이션", "계절감"],
       tone: "조용하고 단정한, 취향이 또렷한",
@@ -112,6 +114,7 @@ const seedMakers: Maker[] = [
     offersNote: "",
     seeksNote: "",
     photos: [],
+    blocks: [],
     soul: {
       values: ["로컬", "정성", "느긋함"],
       tone: "투박하지만 따뜻한",
@@ -141,6 +144,7 @@ const seedMakers: Maker[] = [
     offersNote: "",
     seeksNote: "",
     photos: [],
+    blocks: [],
     soul: {
       values: ["다정함", "느린 호흡", "손글씨"],
       tone: "포근하고 말랑한",
@@ -262,6 +266,7 @@ interface MakerRow {
   collab_history: Maker["collabHistory"];
   story: string; activities: Maker["activities"]; offers_note: string; seeks_note: string;
   photos: string[] | null;
+  blocks: Maker["blocks"] | null; intro_file_url: string | null;
   soul: Maker["soul"]; trust: Maker["trust"];
   collab_open: boolean; created_at: string; updated_at: string | null;
   owner_uuid: string | null; claim_token_hash: string | null;
@@ -288,6 +293,8 @@ function rowToMaker(r: MakerRow): Maker {
     offersNote: r.offers_note ?? "",
     seeksNote: r.seeks_note ?? "",
     photos: r.photos ?? [],
+    blocks: (r.blocks ?? []).map((b) => ({ ...b, photos: b.photos ?? [], links: b.links ?? [] })),
+    introFileUrl: r.intro_file_url ?? undefined,
     soul: r.soul, trust: r.trust,
     collabOpen: r.collab_open, createdAt: r.created_at,
     updatedAt: r.updated_at ?? undefined,
@@ -313,6 +320,7 @@ class SupabaseRepo implements Repo {
       collab_history: input.collabHistory,
       story: input.story, activities: input.activities, offers_note: input.offersNote, seeks_note: input.seeksNote,
       photos: input.photos,
+      blocks: input.blocks, intro_file_url: input.introFileUrl ?? null,
       soul: input.soul, trust: input.trust, collab_open: input.collabOpen,
       owner_uuid: input.ownerUserId ?? null, claim_token_hash: input.editPasswordHash ?? null,
     };
@@ -337,7 +345,8 @@ class SupabaseRepo implements Repo {
       region: c.region ?? null, offers: c.offers, seeks: c.seeks,
       target_audience: c.targetAudience, collab_history: c.collabHistory,
       story: c.story, activities: c.activities, offers_note: c.offersNote, seeks_note: c.seeksNote,
-      photos: c.photos, soul: c.soul, trust: c.trust, collab_open: c.collabOpen,
+      photos: c.photos, blocks: c.blocks, intro_file_url: c.introFileUrl ?? null,
+      soul: c.soul, trust: c.trust, collab_open: c.collabOpen,
     };
     const { data } = await this.db.from("makers").update(patch).eq("slug", slug).select().maybeSingle();
     return data ? rowToMaker(data as MakerRow) : null;
