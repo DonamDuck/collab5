@@ -154,8 +154,9 @@ if (m.offersNote.trim()) open.add("offersNote");
 if (m.seeks.length || m.seeksNote.trim()) open.add("seeks");
 setOpenSections(open);
 ```
-4. `?demo=1` 프리필도 동일하게 채운 섹션 펼침(`new Set(["story","activities","collabs"] as SectionKey[])` — 데모 데이터 기준).
-5. Run: `npx tsc --noEmit` / Commit: `git commit -m "feat(minimal-form): 섹션 펼침 상태 모델·수정모드 규칙"`
+4. `?demo=1` 프리필도 동일하게 채운 섹션 펼침(`new Set(["story","activities","collabs"] as SectionKey[])` — 데모 데이터 기준). ※데모는 대표 시연 도구 — 완성도 라인이 충족 상태로 보이는 것도 시연의 일부(의도된 동작으로 기록).
+5. **빈 섹션 강제 차단(레드팀 CONFIRMED — 단일 관문)**: 제출 payload 조립에서 `has*`가 false인 섹션은 **아예 안 보냄**(빈 문자열/빈 배열도 전송 금지: `story: hasStory ? story.trim() : ""`, `seeks: hasSeeks ? seeks : []` 식). 클라 has* + 서버 sanitize 이중 반쪽 의존 금지 — 관문은 payload 조립 한 곳.
+6. Run: `npx tsc --noEmit` / Commit: `git commit -m "feat(minimal-form): 섹션 펼침 상태 모델·수정모드 규칙"`
 
 ### Task 4: ① 협업 칩 이사 + ⑤⑥ 섹션 해체
 
@@ -169,9 +170,11 @@ setOpenSections(open);
 </Field>
 ```
 2. 기존 ⑤ 섹션(GroupHeader+textarea+ChipRow)과 ⑥ 섹션 전체 JSX **삭제** — offersNote·seeks·seeksNote의 state·제출 payload는 그대로 유지(옵션 섹션으로 재배치는 Task 6).
-3. 제출 검증에 offers 최소 1개 추가(기존 validate 위치): `if (!offers.length) return "제공할 수 있는 협업을 1개 이상 골라주세요.";`
-4. Run: `npx tsc --noEmit` (offersNote 등 미사용 경고 나오면 Task 6까지 임시 — eslint-disable 말고 Task 6에서 소비되므로 빌드만 통과 확인)
-5. Commit: `git commit -m "feat(minimal-form): 협업 칩 ① 이사·⑤⑥ 섹션 해체"`
+3. 제출 검증에 offers 최소 1개 추가(기존 validate 위치): `if (!offers.length) return "제공할 수 있는 협업을 1개 이상 골라주세요.";` — **검증 실패 시 ①의 칩 행으로 scroll+focus**.
+4. **⚠️ 레거시 수정 회귀 방지(레드팀 CONFIRMED)**: 구⑤ offers → ① 칩 행은 **동일 필드(identity 매핑)** — edit 프리필이 기존 offers를 그대로 ① 칩에 채우는지 확인. offers가 빈 옛 소개서는 다음 수정 때 칩 1개 선택이 강제됨 — **의도된 원탭 마이그레이션**으로 기록(QA에서 발견할 일 아님).
+5. **데이터 무손실 인바리언트**: 이 태스크 직후 확인 — 풍부한 기존 소개서 edit 로드 → 무변경 저장 → payload에 offersNote·seeks·seeksNote·keywords·customers 전부 유지(UI 없어도 상태·payload 보존). T4~T6 구간은 **배포 금지 창**(페이즈 끝 배포 규칙 재확인).
+6. Run: `npx tsc --noEmit` (offersNote 등 미사용 경고 나오면 Task 6까지 임시 — eslint-disable 말고 Task 6에서 소비되므로 빌드만 통과 확인)
+7. Commit: `git commit -m "feat(minimal-form): 협업 칩 ① 이사·⑤⑥ 섹션 해체"`
 
 ### Task 5: ②④⑦을 StubSection으로 감싸기
 
@@ -253,6 +256,7 @@ storyItems={[
 
 **Steps:**
 1. `npx tsc --noEmit && npm run build` → dev에서: 신규 등록 최소 경로(①+칩+⑨만) 제출 → /m 확인 / 스텁 3종 펼침·접기 / 시트 4종 추가 / 수정모드 재진입 시 펼침 복귀 / `?demo=1`.
+1-b. **빈 섹션 누수 테스트(레드팀 CONFIRMED)**: 모든 섹션 유형(스텁 3종 + 시트 4종 + 블록 1종)을 "펼치고 → 아무것도 안 쓰고 → 제출". /m에 그 어떤 빈 섹션도 렌더되지 않아야 함. + 레거시 수정 왕복(무변경 저장 → 데이터 무손실) 재확인.
 2. **대표 QA(실기기 모바일 우선)** → OK 시 push(prod).
 3. vault [[소개서-폼-구조]] §신규 추가 + INDEX 갱신.
 
