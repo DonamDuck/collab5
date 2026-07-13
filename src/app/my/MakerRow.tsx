@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { deleteMakerAction } from "@/lib/actions";
 
@@ -31,15 +32,11 @@ export function MakerRow({
 
   return (
     <div className="flex items-center gap-2 rounded-md border border-hairline bg-surface px-4 py-3 transition-colors hover:bg-surface-soft">
-      {/* 카드 본문 클릭 → 소개서 */}
-      <button
-        type="button"
-        onClick={() => router.push(`/m/${slug}`)}
-        className="min-w-0 flex-1 text-left"
-      >
+      {/* 카드 본문 클릭 → 소개서 (Link=prefetch로 전환 빠름) */}
+      <Link href={`/m/${slug}`} className="min-w-0 flex-1 text-left">
         <p className="truncate text-[15px] font-medium text-ink">{name}</p>
         {oneLiner && <p className="truncate text-sm text-mute">{oneLiner}</p>}
-      </button>
+      </Link>
 
       <div className="flex shrink-0 items-center gap-1">
         <a
