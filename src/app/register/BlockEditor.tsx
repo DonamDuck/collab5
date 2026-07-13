@@ -11,7 +11,7 @@ const CATALOG: { type: BlockType; label: string; hint: string }[] = [
   { type: "team", label: "만드는 사람들", hint: "콜라버 정보를 등록하면 더 가깝게 느껴질 수 있어요." },
   { type: "press", label: "소개된 곳들", hint: "수상이나 언론, 방송에 나온 적이 있다면요." },
   { type: "space", label: "우리의 공간", hint: "공간이 있다면, 그 자체가 매력이 돼요." },
-  { type: "custom", label: "직접 만들기", hint: "하고 싶은 이야기로 섹션을 직접 만들어보세요." },
+  { type: "custom", label: "직접 만들기", hint: "소개 영역을 직접 구성해보세요." },
 ];
 const MAX_CUSTOM = 2;
 
@@ -127,7 +127,7 @@ export function BlockEditor({ blocks, onChange, onUploadingChange }: {
                 <input
                   value={b.title}
                   onChange={(e) => setBlock(i, { ...b, title: e.target.value })}
-                  placeholder="섹션 제목 (예: 우리가 지키는 약속)"
+                  placeholder="제목 (예: 우리가 지키는 약속)"
                   className={inputCls}
                 />
                 <textarea
