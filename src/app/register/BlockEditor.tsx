@@ -25,7 +25,7 @@ const taCls =
   "w-full rounded-sm border border-hairline bg-surface px-3 py-2.5 text-base leading-relaxed text-ink outline-none placeholder:text-faint focus:border-focus";
 
 export function emptyBlock(type: BlockType): Block {
-  const base = { photos: [] as string[], links: [] as BlockLink[] };
+  const base = { uid: crypto.randomUUID(), photos: [] as string[], links: [] as BlockLink[] };
   switch (type) {
     case "metrics": return { ...base, type, items: [{ label: "", value: "" }] };
     case "reviews": return { ...base, type, items: [{ quote: "", source: "" }] };
@@ -38,7 +38,8 @@ export function emptyBlock(type: BlockType): Block {
 
 export function BlockEditor({ blocks, onChange, onUploadingChange }: {
   blocks: Block[];
-  onChange: (b: Block[]) => void;
+  // 값 또는 업데이터 함수 모두 허용(React setState 호환) — 비동기 병합 시 최신 상태 사용.
+  onChange: (b: Block[] | ((prev: Block[]) => Block[])) => void;
   onUploadingChange?: (uploading: boolean) => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -61,13 +62,18 @@ export function BlockEditor({ blocks, onChange, onUploadingChange }: {
   const setBlock = (i: number, nb: Block) =>
     onChange(blocks.map((b, k) => (k === i ? nb : b)));
   const addPhotos = async (i: number, files: FileList | null) => {
+    const uid = blocks[i].uid; // await 후 배열이 바뀌어도 이 블록을 정확히 찾도록 캡처
     const room = 3 - blocks[i].photos.length;
     const list = Array.from(files ?? []).filter((f) => f.type.startsWith("image/")).slice(0, room);
     if (!list.length) return;
     setUploading((n) => { const v = n + 1; onUploadingChange?.(v > 0); return v; });
     try {
       const urls = await Promise.all(list.map((f) => uploadPhoto(f, 800)));
-      onChange(blocks.map((b, k) => (k === i ? { ...b, photos: [...b.photos, ...urls] } : b)));
+      onChange((prev) =>
+        prev.map((b, k) =>
+          (uid ? b.uid === uid : k === i) ? { ...b, photos: [...b.photos, ...urls] } : b
+        )
+      );
     } catch { alert("사진 업로드에 실패했어요. 다시 시도해주세요."); }
     finally { setUploading((n) => { const v = n - 1; onUploadingChange?.(v > 0); return v; }); }
   };
@@ -88,7 +94,7 @@ export function BlockEditor({ blocks, onChange, onUploadingChange }: {
       {blocks.map((b, i) => {
         const cat = CATALOG.find((c) => c.type === b.type)!;
         return (
-          <div key={i} className="space-y-4 rounded-md border border-hairline bg-surface p-3">
+          <div key={b.uid ?? i} className="space-y-4 rounded-md border border-hairline bg-surface p-3">
             {/* 공통 헤더 — 라벨 + ↑ ↓ 삭제 */}
             <div className="flex items-center justify-between">
               <span className="text-sm font-semibold text-body">{cat.label}</span>
