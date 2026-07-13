@@ -42,7 +42,8 @@ export interface Activity { title: string; desc: string; photos: string[]; }
 
 /** 선택 블록 — 공통 photos(최대3)·links(최대3) + 타입별 고유 필드. 배열 순서 = 소개서 노출 순서 */
 export interface BlockLink { label?: string; url: string }
-interface BlockBase { photos: string[]; links: BlockLink[] }
+// uid = 편집기 전용 안정 키(재정렬·비동기 업로드 병합용). 저장 시 sanitizeBlocks가 제거.
+interface BlockBase { uid?: string; photos: string[]; links: BlockLink[] }
 export type Block = BlockBase & (
   | { type: "metrics"; items: { label: string; value: string }[] }
   | { type: "reviews"; items: { quote: string; source?: string }[] }

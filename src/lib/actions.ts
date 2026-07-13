@@ -306,18 +306,32 @@ export async function createUploadUrlAction(
   return { path, token: data.token, publicUrl: pub.publicUrl };
 }
 
-/** 내용이 빈 블록은 저장 제외(⑦ 콜라보 빈 카드 제외 패턴) */
+/** 저장 정리: 빈 링크·빈 아이템 제거 + 편집기 전용 uid 제거 → 내용이 빈 블록은 저장 제외.
+ *  (⑦ 콜라보 빈 카드 제외 패턴. 사진/링크만 있어도 유의미하므로 보존.) */
 function sanitizeBlocks(blocks?: Block[]): Block[] {
   return (blocks ?? [])
-    .filter((b) => {
+    .map((b) => {
+      const links = b.links.filter((l) => l.url.trim());
+      // 타입별로 재구성하며 uid를 떨궈 저장 데이터를 깨끗이 유지.
       if (b.type === "metrics")
-        return b.items.some((i) => i.label.trim() || i.value.trim());
-      if (b.type === "press") return b.items.some((i) => i.title.trim());
-      if (b.type === "reviews") return b.items.some((i) => i.quote.trim());
-      if (b.type === "team") return b.intro.trim() || b.photos.length > 0;
+        return { type: b.type, photos: b.photos, links, items: b.items.filter((i) => i.label.trim() || i.value.trim()) };
+      if (b.type === "press")
+        return { type: b.type, photos: b.photos, links, items: b.items.filter((i) => i.title.trim()) };
+      if (b.type === "reviews")
+        return { type: b.type, photos: b.photos, links, items: b.items.filter((i) => i.quote.trim()) };
+      if (b.type === "team")
+        return { type: b.type, photos: b.photos, links, intro: b.intro };
       if (b.type === "space")
-        return b.desc.trim() || b.features.length > 0 || b.photos.length > 0;
-      return b.title.trim() || b.body.trim() || b.photos.length > 0;
+        return { type: b.type, photos: b.photos, links, desc: b.desc, features: b.features };
+      return { type: b.type, photos: b.photos, links, title: b.title, body: b.body };
     })
-    .map((b) => ({ ...b, links: b.links.filter((l) => l.url.trim()) }));
+    .filter((b) => {
+      const extra = b.photos.length > 0 || b.links.length > 0;
+      if (b.type === "metrics" || b.type === "press" || b.type === "reviews")
+        return b.items.length > 0 || extra;
+      if (b.type === "team") return b.intro.trim().length > 0 || extra;
+      if (b.type === "space")
+        return b.desc.trim().length > 0 || b.features.length > 0 || extra;
+      return b.title.trim().length > 0 || b.body.trim().length > 0 || extra;
+    });
 }

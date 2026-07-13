@@ -204,7 +204,7 @@ function RegisterForm() {
       { partner: d.history.partner, types: d.history.types, desc: "", year: d.history.year, photos: [], typeInput: "" },
     ]);
     setBlocks([
-      { type: "metrics", photos: [], links: [], items: [{ label: "인스타 팔로워", value: "1.2만" }, { label: "누적 워크숍", value: "48회" }] },
+      { type: "metrics", uid: crypto.randomUUID(), photos: [], links: [], items: [{ label: "인스타 팔로워", value: "1.2만" }, { label: "누적 워크숍", value: "48회" }] },
     ]);
     setAiFilled(new Set(["name", "oneLiner", "description", "values", "address", "instagram", "homepage"]));
     setDraftGenerated(true);
@@ -557,7 +557,7 @@ function RegisterForm() {
       setAddress(m.trust.address ?? "");
       setCollabOpen(m.collabOpen);
       setPhotos(m.photos.map((u) => ({ url: u })));
-      setBlocks(m.blocks ?? []);
+      setBlocks((m.blocks ?? []).map((b) => ({ ...b, uid: crypto.randomUUID() })));
       setIntroFileUrl(m.introFileUrl ?? "");
       setEditBooting(false);
     }).catch(() => setEditBooting(false));
