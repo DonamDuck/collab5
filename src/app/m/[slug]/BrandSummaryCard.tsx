@@ -51,12 +51,10 @@ export function BrandSummaryCard({
       {hasTrust && (
         <div className="mt-4 flex flex-wrap gap-2">
           {instagram && (
-            <TrustChip href={instagramUrl(instagram)}>
-              인스타그램 · {instagramHandle(instagram)}
-            </TrustChip>
+            <TrustChip href={instagramUrl(instagram)}>{instagramHandle(instagram)}</TrustChip>
           )}
           {homepage && (
-            <TrustChip href={normalizeUrl(homepage)}>홈페이지 · {prettyUrl(homepage)}</TrustChip>
+            <TrustChip href={normalizeUrl(homepage)}>{prettyUrl(homepage)}</TrustChip>
           )}
           {address && <TrustChip>{address}</TrustChip>}
         </div>
