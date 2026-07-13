@@ -11,6 +11,7 @@ import {
 } from "@/lib/actions";
 import type { CollabType, Block } from "@/lib/types";
 import { deriveRegion } from "@/lib/region";
+import { isRichIntro } from "@/lib/completeness";
 import { uploadPhoto, uploadPdf } from "@/lib/upload";
 import type { ActivityHint, CollabHint, EnrichField } from "@/lib/enrich";
 import { EnrichWizard, type WizardFill } from "./EnrichWizard";
@@ -235,8 +236,10 @@ function RegisterForm() {
     ]);
     setAiFilled(new Set(["name", "oneLiner", "description", "values", "address", "instagram", "homepage"]));
     setDraftGenerated(true);
-    // 데모 = 대표 시연 도구 — 채워진 서사 섹션이 펼쳐진 채 시작(의도된 동작)
-    setOpenSections(new Set<SectionKey>(["story", "activities", "collabs"]));
+    // 데모 = 대표 시연 도구 — 데모가 채우는 섹션 전부 펼쳐진 채 시작(안 보이는 채 제출되는 상태 방지)
+    setOpenSections(
+      new Set<SectionKey>(["story", "activities", "collabs", "keywords", "customers", "offersNote", "seeks"])
+    );
   }, []);
   /* eslint-enable react-hooks/set-state-in-effect */
 
@@ -1449,6 +1452,34 @@ function RegisterForm() {
         </div>
 
         <div className="space-y-2">
+          {/* 완성도 안내 한 줄 — 어드바이저리 전용(제출을 막지 않음). 미달이면 데이터 없는 서사 스텁 칩 최대 2개. */}
+          {(() => {
+            const p = { required: !!name.trim() && offers.length > 0, story: hasStory, activities: hasActivities, collabs: hasCollabs, keywords: hasKeywords, customers: hasCustomers, offersNote: hasOffersNote, seeks: hasSeeks, blocks: blocks.length };
+            if (isRichIntro(p))
+              return <p className="mb-3 text-center text-sm text-primary-on">✓ 충분히 멋진 소개서예요. 언제든 더 담을 수 있어요.</p>;
+            const closed = ([["story", "시작 이야기"], ["activities", "주요 활동"], ["collabs", "콜라보 경험"]] as const)
+              .filter(([k]) => !p[k]).slice(0, 2);
+            return (
+              <div className="mb-3 text-center">
+                <p className="text-sm text-mute">이야기를 하나만 더 담으면, 소개서가 한층 단단해져요.</p>
+                <div className="mt-2 flex justify-center gap-2">
+                  {closed.map(([k, label]) => (
+                    <button
+                      key={k}
+                      type="button"
+                      onClick={() => {
+                        openSection(k); // 이미 펼쳐져 있으면 no-op(Set add) → 스크롤만
+                        setTimeout(() => document.getElementById("stub-" + k)?.scrollIntoView({ behavior: "smooth", block: "center" }), 60);
+                      }}
+                      className="inline-flex h-8 items-center rounded-pill border border-primary bg-primary-tint px-3 text-sm text-primary-on"
+                    >
+                      + {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
           <button
             onClick={submit}
             disabled={
