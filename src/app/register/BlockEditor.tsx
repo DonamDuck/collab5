@@ -1,7 +1,7 @@
 "use client";
 // 선택 블록 편집기 — 코어 ⑦과 ⑧ 사이. 카탈로그에서 골라 인라인 카드로 편집.
 // 카드 = 공통 헤더(라벨 + ↑ ↓ 삭제) + 타입별 편집 UI + 공통 첨부(사진 최대3·링크 최대3).
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import type { Block, BlockType, BlockLink } from "@/lib/types";
 import { uploadPhoto } from "@/lib/upload";
 
@@ -44,6 +44,16 @@ export function BlockEditor({ blocks, onChange, onUploadingChange }: {
 }) {
   const [open, setOpen] = useState(false);
   const [, setUploading] = useState(0);
+  // 강조 카드가 화면에 보이면 FAB 숨김(중복·하단 겹침 방지)
+  const cardRef = useRef<HTMLDivElement>(null);
+  const [cardVisible, setCardVisible] = useState(true);
+  useEffect(() => {
+    const el = cardRef.current;
+    if (!el) return;
+    const io = new IntersectionObserver(([e]) => setCardVisible(e.isIntersecting));
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
   const canAdd = (t: BlockType) =>
     t === "custom" ? blocks.filter((b) => b.type === "custom").length < MAX_CUSTOM
                    : !blocks.some((b) => b.type === t);
@@ -377,7 +387,7 @@ export function BlockEditor({ blocks, onChange, onUploadingChange }: {
       })}
 
       {/* ── 인라인 강조 카드 (항상 표시) ── */}
-      <div className="rounded-md border-2 border-primary bg-surface p-5 text-center">
+      <div ref={cardRef} className="rounded-md border-2 border-primary bg-surface p-5 text-center">
         <p className="text-[18px] font-bold text-ink">브랜드의 이야기를 더 담아볼까요?</p>
         <p className="mx-auto mt-1.5 max-w-[320px] text-[14px] leading-relaxed text-mute">
           숫자, 고객 후기, 공간 소개처럼 우리만의 섹션을 더할 수 있어요. <span className="text-faint">(선택)</span>
@@ -391,21 +401,27 @@ export function BlockEditor({ blocks, onChange, onUploadingChange }: {
         </button>
       </div>
 
-      {/* ── 우측 하단 플로팅 버튼 (폼 어디서나 접근) ── */}
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        aria-label="섹션 더하기"
-        className="fixed bottom-6 right-4 z-40 inline-flex h-12 items-center gap-1 rounded-pill bg-primary px-5 text-[14px] font-semibold text-primary-on shadow-lg sm:right-6"
-      >
-        + 섹션 더하기
-      </button>
+      {/* ── 우측 하단 플로팅 버튼 (컴팩트 원형 · 강조 카드 보이면 숨김 · safe-area) ── */}
+      {!cardVisible && !open && (
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          aria-label="섹션 더하기"
+          style={{ bottom: "calc(1.25rem + env(safe-area-inset-bottom))" }}
+          className="fixed right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-[26px] font-light leading-none text-primary-on shadow-lg sm:right-6"
+        >
+          +
+        </button>
+      )}
 
       {/* ── 바텀시트 — 카탈로그 ── */}
       {open && (
         <div className="fixed inset-0 z-50" role="dialog" aria-modal="true">
           <div className="absolute inset-0 bg-ink/40" onClick={() => setOpen(false)} />
-          <div className="absolute inset-x-0 bottom-0 mx-auto max-h-[82vh] max-w-[640px] overflow-y-auto rounded-t-2xl bg-surface p-4 pb-8 shadow-xl">
+          <div
+            style={{ paddingBottom: "calc(1.5rem + env(safe-area-inset-bottom))" }}
+            className="absolute inset-x-0 bottom-0 mx-auto max-h-[82vh] max-w-[640px] overflow-y-auto rounded-t-2xl bg-surface p-4 shadow-xl"
+          >
             <div className="mb-3 flex items-center justify-between">
               <p className="text-[16px] font-bold text-ink">브랜드의 이야기 더하기</p>
               <div className="flex items-center gap-1">
