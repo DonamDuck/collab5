@@ -9,11 +9,12 @@ import {
   updateMakerAction,
   getEditDataAction,
 } from "@/lib/actions";
-import type { CollabType } from "@/lib/types";
+import type { CollabType, Block } from "@/lib/types";
 import { deriveRegion } from "@/lib/region";
 import { uploadPhoto } from "@/lib/upload";
 import type { ActivityHint, CollabHint, EnrichField } from "@/lib/enrich";
 import { EnrichWizard, type WizardFill } from "./EnrichWizard";
+import { BlockEditor } from "./BlockEditor";
 import { PhotoGrid } from "./PhotoGrid";
 
 // 배열 내 순서 이동 (드래그 재정렬용)
@@ -152,6 +153,8 @@ function RegisterForm() {
   >([{ title: "", desc: "", photos: [] }]);
   const [offersNote, setOffersNote] = useState("");
   const [seeksNote, setSeeksNote] = useState("");
+  const [blocks, setBlocks] = useState<Block[]>([]);
+  const [blocksUploading, setBlocksUploading] = useState(false);
   const region = deriveRegion(address); // 주소에서 자동 추출 (별도 입력 없음)
 
   // ── enrich(딸깍 자동완성) 상태 ──
@@ -197,6 +200,9 @@ function RegisterForm() {
     setHomepage(d.homepage);
     setCollabHistory([
       { partner: d.history.partner, types: d.history.types, desc: "", year: d.history.year, photos: [], typeInput: "" },
+    ]);
+    setBlocks([
+      { type: "metrics", photos: [], links: [], items: [{ label: "인스타 팔로워", value: "1.2만" }, { label: "누적 워크숍", value: "48회" }] },
     ]);
     setAiFilled(new Set(["name", "oneLiner", "description", "values", "address", "instagram", "homepage"]));
     setDraftGenerated(true);
@@ -531,6 +537,7 @@ function RegisterForm() {
       setAddress(m.trust.address ?? "");
       setCollabOpen(m.collabOpen);
       setPhotos(m.photos.map((u) => ({ url: u })));
+      setBlocks(m.blocks ?? []);
       setEditBooting(false);
     }).catch(() => setEditBooting(false));
   }, []);
@@ -572,6 +579,7 @@ function RegisterForm() {
         activities: activityOut.map((a) => ({ ...a, photos: wrap(a.photos) })),
         offersNote,
         seeksNote,
+        blocks,
         photos: wrap(photoUrls),
         collabOpen,
         instagram,
@@ -968,7 +976,7 @@ function RegisterForm() {
         <GroupHeader
           n="⑤"
           title="어떤 협업을 할 수 있나요?"
-          sub="제공할 수 있는 협업을 자유롭게 작성해주세요."
+          sub="파트너가 우리와 함께하면 뭐가 좋을지, 편하게 들려주세요."
         />
         <div className="space-y-8">
           <textarea
@@ -1159,6 +1167,9 @@ function RegisterForm() {
           </div>
         </div>
 
+        {/* ── 선택 블록(코어 ⑦과 ⑧ 사이) ── */}
+        <BlockEditor blocks={blocks} onChange={setBlocks} onUploadingChange={setBlocksUploading} />
+
         {/* ── ⑧ 저희는 주로 이런 고객과 함께하고 있어요 ── */}
         <GroupHeader n="⑧" title="저희는 주로 이런 고객과 함께하고 있어요." />
         <div className="space-y-8">
@@ -1285,6 +1296,7 @@ function RegisterForm() {
             onClick={submit}
             disabled={
               !canSubmit ||
+              blocksUploading ||
               [...photos, ...activities.flatMap((a) => a.photos), ...collabHistory.flatMap((h) => h.photos)].some(
                 (p) => p.uploading
               )
