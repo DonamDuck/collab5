@@ -205,7 +205,7 @@ export function EnrichWizard({
 
         {kind === "error" && (
           <div className="pt-4 text-center">
-            <p className="text-lg font-bold text-ink">앗, 자동으로 못 채웠어요</p>
+            <p className="text-lg font-bold text-ink">앗, 정보를 못 찾았어요</p>
             <p className="mt-1.5 text-[15px] leading-relaxed text-mute">{errMsg}</p>
             <button
               onClick={onClose}

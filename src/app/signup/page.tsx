@@ -44,9 +44,9 @@ export default function SignupPage() {
   }, [email, phone, brandName]);
 
   const DUP_MSG = {
-    email: "동일한 이메일로 가입된 계정이 있습니다.",
-    phone: "같은 휴대폰 번호로 가입된 계정이 있습니다.",
-    brandName: "동일한 이름으로 가입한 계정이 있습니다.",
+    email: "이미 이 이메일로 가입한 계정이 있어요.",
+    phone: "이미 이 번호로 가입한 계정이 있어요.",
+    brandName: "이미 같은 이름으로 가입한 계정이 있어요.",
   };
   const hasDup = dup.email || dup.phone || dup.brandName;
 
