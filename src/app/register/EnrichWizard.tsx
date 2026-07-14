@@ -6,7 +6,7 @@
 //  ③ 한 줄 소개 5지선다(택1 + 직접 수정)
 //  ④ 브랜드 소개 5지선다(택1 + 직접 수정) → 폼 반영
 import { useEffect, useRef, useState } from "react";
-import type { ActivityHint, CollabHint, EnrichOptions } from "@/lib/enrich";
+import type { ActivityHint, BlockHint, CollabHint, EnrichOptions, SeeksHint } from "@/lib/enrich";
 import { josa } from "@/lib/josa";
 
 export type WizardFill = {
@@ -20,6 +20,8 @@ export type WizardFill = {
   description?: string;
   activityHints?: ActivityHint[]; // 크롤이 발견한 활동 흔적(참고용)
   collabHints?: CollabHint[]; // 크롤이 발견한 콜라보 흔적(참고용)
+  blockHints?: BlockHint[]; // 크롤 근거 기반 추천 블록(리빌 카드 소스)
+  seeksHint?: SeeksHint; // 원하는 파트너·협업 단서(리빌 최우선 카드 소스)
 };
 
 const SUGGESTED_KEYWORDS = [
@@ -162,6 +164,8 @@ export function EnrichWizard({
       values: options?.values.length ? options.values : undefined,
       activityHints: options?.activityHints?.length ? options.activityHints : undefined,
       collabHints: options?.collabHints?.length ? options.collabHints : undefined,
+      blockHints: options?.blockHints?.length ? options.blockHints : undefined,
+      seeksHint: options?.seeksHint ?? undefined,
     });
   };
 

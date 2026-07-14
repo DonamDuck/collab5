@@ -13,9 +13,10 @@ import type { CollabType, Block } from "@/lib/types";
 import { deriveRegion } from "@/lib/region";
 import { isRichIntro } from "@/lib/completeness";
 import { uploadPhoto, uploadPdf } from "@/lib/upload";
-import type { ActivityHint, CollabHint, EnrichField } from "@/lib/enrich";
+import type { ActivityHint, BlockHint, CollabHint, EnrichField, SeeksHint } from "@/lib/enrich";
 import { EnrichWizard, type WizardFill } from "./EnrichWizard";
-import { BlockEditor } from "./BlockEditor";
+import { RevealStep, type RevealCard } from "./RevealStep";
+import { BlockEditor, emptyBlock } from "./BlockEditor";
 import { PhotoGrid } from "./PhotoGrid";
 import { StubSection } from "./StubSection";
 
@@ -55,6 +56,14 @@ const COLLAB_TYPES: CollabType[] = [
   "행사참여",
   "공간대여",
 ];
+
+// 리빌 블록 카드 라벨 — BlockEditor CATALOG 라벨 승계(카탈로그와 문장 일치 유지)
+const BLOCK_HINT_LABELS: Record<BlockHint["type"], string> = {
+  metrics: "우리를 보여주는 숫자",
+  press: "소개된 곳들",
+  space: "우리의 공간",
+  reviews: "고객들의 이야기",
+};
 
 // 브랜드 표현 어휘 — 4카테고리(감성·가치·스타일·성격). 직접 추가 가능, 최대 10개 선택.
 const VIBE_CATEGORIES: { label: string; words: string[] }[] = [
@@ -198,6 +207,11 @@ function RegisterForm() {
   const [collabHints, setCollabHints] = useState<CollabHint[]>([]);
   const [usedActHints, setUsedActHints] = useState<Set<number>>(new Set());
   const [usedCollabHints, setUsedCollabHints] = useState<Set<number>>(new Set());
+  // ── AI 리빌("이런 이야기들을 찾았어요") — 위저드 완료 → 폼 진입 직전 카드 스택 ──
+  const [revealCards, setRevealCards] = useState<RevealCard[] | null>(null);
+  // 카드 원본 힌트 보관 — 카드에는 프리뷰 문자열만 실리므로 [담기] 시 실제 값 주입용
+  const [revealSeeksHint, setRevealSeeksHint] = useState<SeeksHint | null>(null);
+  const [revealBlockHints, setRevealBlockHints] = useState<BlockHint[]>([]);
 
   // ── 초안받기 상태 ──
   const [draftBusy, setDraftBusy] = useState(false);
@@ -484,6 +498,59 @@ function RegisterForm() {
     setMissing([]);
     setReviewMode(true);
     setWizardOpen(false);
+
+    // ── 리빌 카드 조립 — 순서 = seeks 최우선(스펙 §매칭 완화책) → 소개 초안 → 활동 → 콜라보 → 블록 ──
+    setRevealSeeksHint(fill.seeksHint ?? null);
+    setRevealBlockHints(fill.blockHints ?? []);
+    const cards: RevealCard[] = [];
+    if (fill.seeksHint) {
+      const types = fill.seeksHint.types.filter((t): t is CollabType =>
+        (COLLAB_TYPES as string[]).includes(t)
+      );
+      cards.push({
+        key: "seeks",
+        sectionLabel: "이런 파트너를 찾고 있어요.",
+        preview: types.length ? `${fill.seeksHint.note} — ${types.join(" · ")}` : fill.seeksHint.note,
+        reason: fill.seeksHint.reason,
+      });
+    }
+    // 소개글 후보 카드 — 위저드가 이미 소개를 채웠으면 생략(위저드 스텝에서 소비됨, 이중 제안 방지)
+    if (!fill.description && descChoices.length) {
+      cards.push({
+        key: "description",
+        sectionLabel: "브랜드를 소개해주세요.",
+        preview: descChoices[0],
+        reason: "웹에서 찾은 정보로 쓴 초안이에요",
+      });
+    }
+    (fill.activityHints ?? []).forEach((h, i) =>
+      cards.push({
+        key: `activity-${i}`,
+        sectionLabel: "주로 어떤 활동을 하나요?",
+        preview: [h.title, h.desc].filter(Boolean).join(" — "),
+        reason: h.source || "웹에서 봤어요",
+      })
+    );
+    (fill.collabHints ?? []).forEach((h, i) =>
+      cards.push({
+        key: `collab-${i}`,
+        sectionLabel: "이런 콜라보 경험이 있어요.",
+        preview: [h.partner, h.desc].filter(Boolean).join(" — "),
+        reason: h.source || "웹에서 봤어요",
+      })
+    );
+    (fill.blockHints ?? []).forEach((b) =>
+      cards.push({
+        key: `block-${b.type}`,
+        sectionLabel: BLOCK_HINT_LABELS[b.type],
+        preview: b.items?.length
+          ? b.items.map((it) => [it.label, it.value ?? it.year].filter(Boolean).join(" ")).join(" · ")
+          : b.reason,
+        reason: b.reason,
+      })
+    );
+    // 빈손 리빌 금지 — 찾은 카드가 없으면 리빌 스텝 자체를 건너뜀(지어내기 없음 정책)
+    setRevealCards(cards.length ? cards : null);
   };
 
   // 힌트 '이 내용으로 시작하기' — 빈 카드 우선 채움, 없으면 새 카드(최대 3), 꽉 차면 불가
@@ -520,6 +587,59 @@ function RegisterForm() {
     collabHistory.some(
       (c) => !c.partner.trim() && !c.desc.trim() && !c.types.length && !c.photos.length
     ) || collabHistory.length < 3;
+
+  // 리빌 [이 내용으로 담기] — never-overwrite: 사용자가 이미 만진 필드는 절대 덮지 않는다.
+  // 건너뛴 카드는 여기 안 옴 — 원본 힌트(actHints 등)가 살아 있어 섹션 안 인라인 힌트로 재등장.
+  const acceptReveal = (key: string) => {
+    if (key === "seeks") {
+      const h = revealSeeksHint;
+      if (!h) return;
+      const types = h.types.filter((t): t is CollabType => (COLLAB_TYPES as string[]).includes(t));
+      if (!seeks.length && types.length) setSeeks(types);
+      if (!seeksNote.trim() && h.note.trim()) setSeeksNote(h.note);
+      openSection("seeks");
+      setAiFilled((s) => new Set(s).add("seeks"));
+      return;
+    }
+    if (key === "description") {
+      const v = (descChoices[0] ?? "").trim();
+      if (v && !description.trim()) {
+        setDescription(v);
+        setDraftGenerated(true);
+        setAiFilled((s) => new Set(s).add("description"));
+      }
+      return;
+    }
+    if (key.startsWith("activity-")) {
+      applyActHint(Number(key.slice("activity-".length)));
+      openSection("activities");
+      return;
+    }
+    if (key.startsWith("collab-")) {
+      applyCollabHint(Number(key.slice("collab-".length)));
+      openSection("collabs");
+      return;
+    }
+    if (key.startsWith("block-")) {
+      const h = revealBlockHints.find((b) => `block-${b.type}` === key);
+      if (!h || blocks.some((b) => b.type === h.type)) return; // 이미 담긴 블록은 덮지 않음
+      const nb = emptyBlock(h.type);
+      // metrics·press는 힌트 items를 밑그림으로 주입(빈 밑그림이면 빈 블록 그대로)
+      if (nb.type === "metrics") {
+        const items = (h.items ?? [])
+          .filter((it) => it.label.trim())
+          .map((it) => ({ label: it.label, value: it.value ?? "" }));
+        if (items.length) nb.items = items;
+      }
+      if (nb.type === "press") {
+        const items = (h.items ?? [])
+          .filter((it) => it.label.trim())
+          .map((it) => ({ title: it.label, year: it.year || undefined }));
+        if (items.length) nb.items = items;
+      }
+      setBlocks((p) => [...p, nb]);
+    }
+  };
 
   // 라벨 옆 표시: AI가 채운 필드면 ✨배지, 못 찾은 필드면 "직접 입력" 노티
   const hintFor = (key: string, miss?: EnrichField) => {
@@ -1071,14 +1191,26 @@ function RegisterForm() {
           onCollapse={() => closeSection("activities")}
         >
           <p className="mb-4 -mt-4 text-sm text-mute">대표 활동을 최대 3가지 소개해주세요. 사진도 담을 수 있어요.</p>
-          {actHints.length > 0 && (
-            <div className="mb-6">
-              <HintBanner
-                items={actHints.map((h) => ({ heading: h.title, desc: h.desc, source: h.source }))}
-                used={usedActHints}
-                canApply={canApplyActHint}
-                onApply={applyActHint}
-              />
+          {/* 리빌에서 건너뛴(미사용) 힌트 — 섹션 안 소형 인라인 힌트로 영속(구 HintBanner 은퇴) */}
+          {actHints.some((_, i) => !usedActHints.has(i)) && (
+            <div className="mb-6 space-y-2">
+              {actHints.map((h, i) =>
+                usedActHints.has(i) ? null : (
+                  <div key={i} className="rounded-md bg-primary-pale/60 px-3 py-2.5">
+                    <p className="text-sm text-mute">
+                      웹에서 찾은 내용이에요 — <span className="font-medium text-ink">{h.title}</span>
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => applyActHint(i)}
+                      disabled={!canApplyActHint}
+                      className="mt-1 text-[13px] font-medium text-primary-on underline-offset-2 hover:underline disabled:no-underline disabled:opacity-50"
+                    >
+                      이 내용으로 시작하기
+                    </button>
+                  </div>
+                )
+              )}
             </div>
           )}
           <div className="space-y-4">
@@ -1174,14 +1306,26 @@ function RegisterForm() {
           <p className="mb-4 -mt-4 text-sm text-mute">선택 · 최대 3개 · 지난 콜라보를 더하면 “검증된 파트너”라는 신호가 돼요.</p>
           <div>
 
-            {collabHints.length > 0 && (
-              <div className="mb-3">
-                <HintBanner
-                  items={collabHints.map((h) => ({ heading: h.partner, desc: h.desc, source: h.source }))}
-                  used={usedCollabHints}
-                  canApply={canApplyCollabHint}
-                  onApply={applyCollabHint}
-                />
+            {/* 리빌에서 건너뛴(미사용) 힌트 — 섹션 안 소형 인라인 힌트로 영속(구 HintBanner 은퇴) */}
+            {collabHints.some((_, i) => !usedCollabHints.has(i)) && (
+              <div className="mb-3 space-y-2">
+                {collabHints.map((h, i) =>
+                  usedCollabHints.has(i) ? null : (
+                    <div key={i} className="rounded-md bg-primary-pale/60 px-3 py-2.5">
+                      <p className="text-sm text-mute">
+                        웹에서 찾은 내용이에요 — <span className="font-medium text-ink">{h.partner}</span>
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => applyCollabHint(i)}
+                        disabled={!canApplyCollabHint}
+                        className="mt-1 text-[13px] font-medium text-primary-on underline-offset-2 hover:underline disabled:no-underline disabled:opacity-50"
+                      >
+                        이 내용으로 시작하기
+                      </button>
+                    </div>
+                  )
+                )}
               </div>
             )}
             <div className="space-y-4">
@@ -1501,6 +1645,17 @@ function RegisterForm() {
         />
       )}
 
+      {/* AI 리빌 — 위저드가 찾은 이야기 카드 스택(빈손이면 렌더 자체를 안 함) */}
+      {revealCards && revealCards.length > 0 && (
+        <RevealStep
+          cards={revealCards}
+          onAccept={acceptReveal}
+          // 건너뛰기 = 카드만 처리 — 원본 힌트(actHints 등)는 유지되어 섹션 안 인라인 힌트로 재등장
+          onSkip={() => {}}
+          onDone={() => setRevealCards(null)}
+        />
+      )}
+
       {/* 브랜드 소개 5지선다 — '초안 받기' 결과 */}
       {descModalOpen && (
         <div
@@ -1751,59 +1906,6 @@ function DescPicker({
           </div>
         );
       })}
-    </div>
-  );
-}
-
-// 크롤이 발견한 참고 힌트 — 접힌 배너 → 펼침. 창작 아님(웹에서 찾은 내용만).
-function HintBanner({
-  items,
-  used,
-  canApply,
-  onApply,
-}: {
-  items: { heading: string; desc: string; source: string }[];
-  used: Set<number>;
-  canApply: boolean;
-  onApply: (i: number) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  if (!items.length) return null;
-  return (
-    <div className="rounded-md border border-hairline bg-primary-pale/60">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center justify-between px-3 py-2.5 text-left text-sm font-medium text-primary-on"
-      >
-        <span>✨ 웹에서 참고할 만한 정보를 찾았어요 ({items.length}건)</span>
-        <span className="text-mute">{open ? "∧" : "∨"}</span>
-      </button>
-      {open && (
-        <div className="space-y-3 border-t border-hairline px-3 py-3">
-          {items.map((it, i) => {
-            const isUsed = used.has(i);
-            return (
-              <div key={i}>
-                <span className="inline-flex h-6 items-center rounded-pill bg-surface px-2 text-[12px] text-mute">
-                  {it.source}
-                </span>
-                <p className="mt-1 text-sm font-semibold text-ink">{it.heading}</p>
-                <p className="mt-0.5 text-sm leading-relaxed text-body">{it.desc}</p>
-                <button
-                  type="button"
-                  onClick={() => onApply(i)}
-                  disabled={isUsed || !canApply}
-                  className="mt-1.5 text-[13px] font-medium text-primary-on underline-offset-2 hover:underline disabled:no-underline disabled:opacity-50"
-                >
-                  {isUsed ? "✓ 넣었어요" : "이 내용으로 시작하기"}
-                </button>
-              </div>
-            );
-          })}
-          <p className="text-[12px] text-faint">ⓘ 웹에서 찾은 내용이에요.</p>
-        </div>
-      )}
     </div>
   );
 }
