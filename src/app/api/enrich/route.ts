@@ -114,9 +114,11 @@ export async function POST(req: Request) {
     try {
       const memo = await enrichResearch(name, region);
       const chips = extractChipsFromResearch(memo);
-      const tier = researchTier(memo, chips.length);
+      // 칩이 없으면 유저 관점에선 빈손(thin) — 홈피 메타가 있어도 고를 게 없으면
+      // 솔직 배너 + 업종 스타터로 안내한다(제미나이 degrade·레이트리밋 시에도 빈 화면 방지).
+      const tier = chips.length === 0 ? "thin" : researchTier(memo, chips.length);
       const links = extractLinksFromResearch(memo);
-      const starter = tier === "thin" ? starterChipsForType(businessType) : [];
+      const starter = tier === "thin" || chips.length < 3 ? starterChipsForType(businessType) : [];
       return NextResponse.json({ chips, starter, tier, links, research: memo });
     } catch (e) {
       console.error("[enrich] keywords failed:", e);
