@@ -6,6 +6,7 @@
 //  ③ 한 줄 소개 5지선다(택1 + 직접 수정)
 //  ④ 브랜드 소개 5지선다(택1 + 직접 수정) → 폼 반영
 import { useEffect, useRef, useState } from "react";
+import { ScrollLock } from "@/components/ScrollLock";
 import type { ActivityHint, BlockHint, CollabHint, EnrichOptions, SeeksHint } from "@/lib/enrich";
 import { josa } from "@/lib/josa";
 
@@ -174,6 +175,7 @@ export function EnrichWizard({
       className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 p-4 sm:items-center"
       onClick={onClose}
     >
+      <ScrollLock />
       <div
         className="relative w-full max-w-md rounded-lg border border-hairline bg-surface p-5 shadow-e2"
         onClick={(e) => e.stopPropagation()}
@@ -432,7 +434,7 @@ export function EnrichWizard({
           <div>
             <p className="pr-8 text-lg font-bold text-ink">한 줄 소개를 골라주세요</p>
             <p className="mt-1.5 text-[15px] leading-relaxed text-mute">‘수정’으로 다듬으며 비교하고, 마음에 드는 하나를 골라주세요.</p>
-            <div className="mt-4 max-h-[42vh] overflow-y-auto pr-0.5">
+            <div className="mt-4 max-h-[42vh] overflow-y-auto slim-scrollbar pr-0.5">
               <OptionPicker
                 list={oneLinerList}
                 sel={oneLinerSel}
@@ -458,7 +460,7 @@ export function EnrichWizard({
           <div>
             <p className="pr-8 text-lg font-bold text-ink">브랜드 소개를 골라주세요</p>
             <p className="mt-1.5 text-[15px] leading-relaxed text-mute">‘수정’으로 다듬으며 비교하고, 마음에 드는 하나를 골라주세요.</p>
-            <div className="mt-4 max-h-[42vh] overflow-y-auto pr-0.5">
+            <div className="mt-4 max-h-[42vh] overflow-y-auto slim-scrollbar pr-0.5">
               <OptionPicker
                 list={descList}
                 sel={descSel}
