@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState, useTransition } from "react";
+import { Suspense, useEffect, useRef, useState, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   createMakerAction,
@@ -666,7 +666,20 @@ function RegisterForm() {
     return undefined;
   };
 
-  const canSubmit = name.trim().length > 0 && !pending;
+  // 필수 미입력 안내 토스트 (같은 메시지 재클릭 시에도 재표시되도록 타이머 리셋)
+  const [toast, setToast] = useState("");
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const showToast = (msg: string) => {
+    setToast(msg);
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToast(""), 2500);
+  };
+  // 첫 미입력 필수 항목 앵커(상호→name-field, 협업칩→offers-chips) — 다 채웠으면 null
+  const firstMissingRequired = (): string | null => {
+    if (!name.trim()) return "name-field";
+    if (!offers.length) return "offers-chips";
+    return null;
+  };
 
   // ── 제출 인터셉트 추천 모달(등록 직전 1회) ──
   const [nudgeShown, setNudgeShown] = useState(false); // 한 번 뜨면 다음 등록엔 안 뜸
@@ -747,23 +760,18 @@ function RegisterForm() {
     }).catch(() => setEditBooting(false));
   }, []);
 
-  // 제출 전 클라이언트 검증 — 에러 문구 반환(통과 시 null)
-  const validate = (): string | null => {
-    if (!offers.length) return "제공할 수 있는 협업을 1개 이상 골라주세요.";
-    return null;
-  };
-
   const submit = () => {
-    const err = validate();
-    if (err) {
-      alert(err);
-      // 실패 항목으로 스크롤 — 협업 칩(미선택)만 남음
-      document.getElementById("offers-chips")?.scrollIntoView({ behavior: "smooth", block: "center" });
+    // 1) 필수(상호·협업칩) 미입력 → 토스트 + 첫 미입력 항목으로 스크롤. 버튼은 항상 활성.
+    const missing = firstMissingRequired();
+    if (missing) {
+      showToast("필수 정보 작성이 필요해요!");
+      document.getElementById(missing)?.scrollIntoView({ behavior: "smooth", block: "center" });
       return;
     }
-    // 등록 직전 1회 인터셉트 — 소개가 얇으면 추천 모달로 이야기 더하기 제안
+    // 2) 등록 직전 1회 인터셉트 — 소개가 얇으면 추천 모달로 이야기 더하기 제안
     const p = { required: !!name.trim() && offers.length > 0, story: hasStory, activities: hasActivities, collabs: hasCollabs, keywords: hasKeywords, customers: hasCustomers, offersNote: hasOffersNote, seeks: hasSeeks, blocks: blocks.length };
     if (!nudgeShown && !isRichIntro(p)) { setShowNudge(true); return; }
+    // 3) 실제 등록
     doSubmit();
   };
 
@@ -961,13 +969,14 @@ function RegisterForm() {
             }
           >
             <input
+              id="name-field"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="예: 캔버스가든"
-              className="h-11 w-full rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
+              className="h-11 w-full scroll-mt-20 rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
             />
           </Field>
-          <Field label="한 줄 소개" hint={hintFor("oneLiner")}>
+          <Field label="한 줄 소개 (선택)" hint={hintFor("oneLiner")}>
             <input
               value={oneLiner}
               onChange={(e) => setOneLiner(e.target.value)}
@@ -979,7 +988,7 @@ function RegisterForm() {
           {/* 자세히 소개 — 브랜드를 소개해주세요 (초안 받기 버튼은 ① 상호 옆으로 이사) */}
           <div>
             <label className="mb-2 flex items-center gap-2 text-base font-medium text-body">
-              <span>자세히 소개</span>
+              <span>자세히 소개 (선택)</span>
               {aiFilled.has("description") && <AiBadge />}
             </label>
             <textarea
@@ -1618,7 +1627,7 @@ function RegisterForm() {
           <button
             onClick={submit}
             disabled={
-              !canSubmit ||
+              pending ||
               blocksUploading ||
               pdfUploading ||
               [...photos, ...activities.flatMap((a) => a.photos), ...collabHistory.flatMap((h) => h.photos)].some(
@@ -1645,6 +1654,18 @@ function RegisterForm() {
           )}
         </div>
       </div>
+
+      {/* 필수 미입력 토스트 — 화면 하단 중앙, 2.5초 후 자동 사라짐 */}
+      {toast && (
+        <div className="pointer-events-none fixed inset-x-0 bottom-6 z-[60] flex justify-center px-4">
+          <div
+            role="status"
+            className="max-w-[90%] rounded-pill bg-ink px-4 py-2.5 text-center text-sm font-medium text-on-dark shadow-e2"
+          >
+            {toast}
+          </div>
+        </div>
+      )}
 
       {/* 딸깍 자동완성 위저드 — 가중 키워드 → 백그라운드 크롤 → 한줄/소개 5지선다 */}
       {wizardOpen && (
