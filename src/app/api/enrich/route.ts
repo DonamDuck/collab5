@@ -7,6 +7,7 @@ import {
   enrichLookup,
   enrichRecrawl,
   enrichDraft,
+  enrichDraftBoth,
   enrichOneLiners,
   enrichResearch,
   enrichOptions,
@@ -137,6 +138,36 @@ export async function POST(req: Request) {
       console.error("[enrich] draft failed:", e);
       return NextResponse.json(
         { descriptions: [], error: "지금은 초안 작성이 어려워요. 잠시 후 다시 시도하거나 직접 입력해 주세요." },
+        { status: 200 }
+      );
+    }
+  }
+
+  // ── draft2 모드: 한 줄 소개 3개 + 브랜드 소개 5개를 크롤 1회로 한 번에(초안받기 이중 크롤 제거) ──
+  if (body.mode === "draft2") {
+    const name = typeof body.name === "string" ? body.name.trim() : "";
+    if (!name) {
+      return NextResponse.json({ error: "브랜드 이름이 필요해요." }, { status: 400 });
+    }
+    try {
+      const { oneLiners, descriptions } = await enrichDraftBoth({
+        name,
+        oneLiner: typeof body.oneLiner === "string" ? body.oneLiner : undefined,
+        values: strArr(body.values),
+        offers: strArr(body.offers),
+        targetAudience: strArr(body.targetAudience),
+        focusKeywords: strArr(body.focusKeywords),
+        round: typeof body.round === "number" ? body.round : 0,
+      });
+      return NextResponse.json({ oneLiners, descriptions });
+    } catch (e) {
+      console.error("[enrich] draft2 failed:", e);
+      return NextResponse.json(
+        {
+          oneLiners: [],
+          descriptions: [],
+          error: "지금은 초안 작성이 어려워요. 잠시 후 다시 시도하거나 직접 입력해 주세요.",
+        },
         { status: 200 }
       );
     }

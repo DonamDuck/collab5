@@ -402,20 +402,21 @@ function RegisterForm() {
       targetAudience,
       round: draftRound,
     };
-    const post = (mode: "oneLiners" | "draft") =>
-      fetch("/api/enrich", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mode, ...payload }),
-      }).then((r) => r.json());
     const strs = (v: unknown): string[] =>
       Array.isArray(v)
         ? v.filter((s): s is string => typeof s === "string" && !!s.trim())
         : [];
     try {
-      const [ol, dr] = await Promise.allSettled([post("oneLiners"), post("draft")]);
-      const ols = ol.status === "fulfilled" ? strs(ol.value.oneLiners) : [];
-      let descs = dr.status === "fulfilled" ? strs(dr.value.descriptions) : [];
+      // draft2 = 한 줄 3개 + 자세히 5개를 크롤 1회로 한 번에(이중 크롤 제거)
+      const res = await fetch("/api/enrich", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ mode: "draft2", ...payload }),
+      })
+        .then((r) => r.json())
+        .catch(() => ({}));
+      const ols = strs(res.oneLiners);
+      let descs = strs(res.descriptions);
       if (!descs.length) {
         const fallback = ruleDraftText(); // AI 실패 → 규칙 기반 폴백 후보 1개
         if (fallback) descs = [fallback];

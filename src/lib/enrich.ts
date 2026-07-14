@@ -121,6 +121,8 @@ export interface SearchProvider {
   draft?(input: DraftInput): Promise<string[]>;
   /** (선택) 폼 정보 기반 한 줄 소개 후보 3개 — 초안받기 2스텝용. 각 40자 이내 */
   oneLiners?(input: DraftInput): Promise<string[]>;
+  /** (선택) 한 줄 소개 3개 + 브랜드 소개 5개를 한 번에 — 초안받기 이중 크롤 제거(research 1회+생성 1회) */
+  draftBoth?(input: DraftInput): Promise<{ oneLiners: string[]; descriptions: string[] }>;
   /** (선택) 브랜드명(+지역)으로 조사 메모만 생성(백그라운드 크롤 — 느린 단계) */
   research?(name: string, region?: string): Promise<string>;
   /** (선택) 조사 메모 + 키워드 → 한줄소개·브랜드소개 5지선다(빠른 생성 단계) */
@@ -288,6 +290,15 @@ export class MockSearchProvider implements SearchProvider {
     ];
     const r = input.round ?? 0;
     return r === 0 ? variants : [...variants.slice(1), variants[0]];
+  }
+
+  // 한 줄 소개 + 브랜드 소개 통합 mock — draft2(이중 크롤 제거) 데모용
+  async draftBoth(input: DraftInput): Promise<{ oneLiners: string[]; descriptions: string[] }> {
+    const [oneLiners, descriptions] = await Promise.all([
+      this.oneLiners(input),
+      this.draft(input),
+    ]);
+    return { oneLiners, descriptions };
   }
 
   // 조사 메모 mock
@@ -553,7 +564,17 @@ ${BRAND_VOICE}
   언론·수상·방송 → press(items에 label=제목, year) /
   공간 운영 흔적 → space(items 없음) / 고객 후기 풍부 → reviews(items 없음 — 인용문을 지어내지 않는다).
   reason은 반드시 "~에서 …을 봤어요" 형태의 근거 한 줄. 근거 없으면 빈 배열.
-- seeksHint: 조사에서 이 브랜드가 어떤 파트너·협업을 원하는지 근거가 보이면 제안(없으면 null). 지어내지 않는다. types는 콜라보 유형(제품콜라보·팝업·워크숍·공동굿즈·공동콘텐츠·행사참여·공간대여 중), note는 해요체 한두 문장, reason은 '~에서 봤어요' 근거.`;
+- seeksHint: 조사에서 이 브랜드가 어떤 파트너·협업을 원하는지 근거가 보이면 제안(없으면 null). 지어내지 않는다. types는 콜라보 유형(제품콜라보·팝업·워크숍·공동굿즈·공동콘텐츠·행사참여·공간대여 중), note는 해요체 한두 문장, reason은 '~에서 봤어요' 근거.
+
+조사 메모 → 출력 매핑(각 항목의 근거 섹션. 해당 섹션이 없거나 "확인 안 됨"이면 그 출력은 빈 값/빈 배열/null로 둔다):
+- [브랜드가 직접 쓴 소개] 메타 → oneLiners·descriptions의 사실 근거(사장 직접 설명 다음 순위)
+- [정체]의 창업 배경·철학 → descriptions의 스토리 앵글 근거
+- [활동] + [네이버 표적검색] + 블로그·카페 후기 → activityHints
+- [콜라보] + [네이버 표적검색]의 콜라보 흔적 → collabHints (파트너명 명시된 것만)
+- [원하는 협업] → seeksHint
+- [숫자] → blockHints(metrics) / [알려짐] → blockHints(press) / [공간] → blockHints(space) / 후기가 여러 건 보이면 → blockHints(reviews)
+- [고객] → descriptions에서 고객 맥락으로 활용
+시간 감각: 연도가 보이면 최근 정보 우선. 오래된 활동은 과거형("~했어요")으로 쓰고, 지금도 하는지 불확실하면 단정하지 마라.`;
 
 class ClaudeSearchProvider implements SearchProvider {
   private _client: Anthropic | null = null;
@@ -734,43 +755,103 @@ class NaverGeminiProvider implements SearchProvider {
     return undefined;
   }
 
-  /** 홈페이지 정적 HTML에서 실제 instagram.com/핸들 링크만 추출(확실한 신호 — 추측 아님) */
-  private async sniffInstagram(homepage: string): Promise<string | undefined> {
-    const SKIP = new Set(["p", "reel", "reels", "explore", "accounts", "about", "developer", "legal", "tv", "stories"]);
+  /** 홈페이지 정적 HTML 1회 fetch — 인스타 스니핑 + 메타 수확이 같은 html을 재사용(fetch 1회 유지) */
+  private async fetchHomepage(homepage: string): Promise<{ html: string } | undefined> {
     try {
       const res = await fetch(homepage, {
         headers: { "User-Agent": "Mozilla/5.0 (compatible; collab5bot/1.0)" },
         signal: AbortSignal.timeout(4500),
       });
       if (!res.ok) return undefined;
-      const html = await res.text();
-      // instagram.com/handle (이메일·문구가 아닌 실제 링크만)
-      for (const m of html.matchAll(/instagram\.com\/([A-Za-z0-9_.]{2,30})/g)) {
-        const handle = m[1].replace(/\.$/, "");
-        if (!SKIP.has(handle.toLowerCase())) return "@" + handle;
-      }
-      return undefined;
+      return { html: await res.text() };
     } catch {
       return undefined;
     }
   }
 
-  /** 지역+웹문서+블로그+카페 병렬 검색 + 홈페이지 인스타 스니핑 → '조사 메모'로 조립.
-   *  region이 있으면 지역검색 정확도↑(동명 업체 구분). 블로그·카페=소비자 후기 신호. */
+  /** 홈페이지 HTML에서 실제 instagram.com/핸들 링크만 추출(확실한 신호 — 추측 아님) */
+  private sniffInstagramFromHtml(html: string): string | undefined {
+    const SKIP = new Set(["p", "reel", "reels", "explore", "accounts", "about", "developer", "legal", "tv", "stories"]);
+    // instagram.com/handle (이메일·문구가 아닌 실제 링크만)
+    for (const m of html.matchAll(/instagram\.com\/([A-Za-z0-9_.]{2,30})/g)) {
+      const handle = m[1].replace(/\.$/, "");
+      if (!SKIP.has(handle.toLowerCase())) return "@" + handle;
+    }
+    return undefined;
+  }
+
+  /** 홈페이지 HTML에서 브랜드가 직접 쓴 메타(title·description·og:*) 수확 — 신뢰도 최상 소스.
+   *  이미 fetch한 html 재활용(추가 비용 0). 각 값은 clean(엔티티 제거)·trim 후 최대 300자. */
+  private extractHomepageMeta(html: string): { title?: string; desc?: string } {
+    const head = html.slice(0, 200_000);
+    const cap = (s?: string): string | undefined => {
+      const v = this.clean(s);
+      return v ? v.slice(0, 300) : undefined;
+    };
+    // <meta ... name|property="key" ... content="..."> — 속성 순서 양방향 대응
+    const meta = (attr: "name" | "property", key: string): string | undefined => {
+      const re = new RegExp(
+        `<meta[^>]*${attr}=["']${key}["'][^>]*content=["']([^"']*)["']|<meta[^>]*content=["']([^"']*)["'][^>]*${attr}=["']${key}["']`,
+        "i"
+      );
+      const m = head.match(re);
+      return cap(m?.[1] ?? m?.[2]);
+    };
+    const titleTag = cap(head.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1]);
+    const title = meta("property", "og:title") ?? titleTag ?? meta("property", "og:site_name");
+    const desc = meta("property", "og:description") ?? meta("name", "description");
+    return { title, desc };
+  }
+
+  /** 홈페이지 fetch 1회 → 인스타 스니핑 + 브랜드가 직접 쓴 메타(title·description) 동시 수확 */
+  private async fetchHomepageSignals(
+    homepage: string
+  ): Promise<{ instagram?: string; title?: string; desc?: string }> {
+    const page = await this.fetchHomepage(homepage);
+    if (!page) return {};
+    const meta = this.extractHomepageMeta(page.html);
+    return { instagram: this.sniffInstagramFromHtml(page.html), ...meta };
+  }
+
+  /** 지역+웹문서+블로그+카페+표적쿼리 병렬 검색 + 홈페이지 인스타·메타 수확 → '조사 메모'로 조립.
+   *  region이 있으면 지역검색 정확도↑(동명 업체 구분). 블로그·카페=소비자 후기 신호.
+   *  표적쿼리(콜라보·팝업·워크숍)=activityHints·collabHints의 근거가 될 흔적 채굴. */
   private async gather(query: string, region?: string): Promise<string> {
     const localQuery = region?.trim() ? `${query} ${region.trim()}` : query;
-    const [local, web, blog, cafe] = await Promise.all([
-      this.naver("local", localQuery, 4),
+    const [local, web, blog, cafe, collabBlog, popupBlog, workshopBlog] = await Promise.all([
+      this.naver("local", localQuery, 5),
       this.naver("webkr", query, 3),
-      this.naver("blog", query, 4),
+      this.naver("blog", query, 5),
       this.naver("cafearticle", query, 3),
+      this.naver("blog", `${query} 콜라보`, 3),
+      this.naver("blog", `${query} 팝업`, 3),
+      this.naver("blog", `${query} 워크숍 클래스`, 3),
     ]);
 
-    // 홈페이지 정적 HTML에서 인스타 링크 직접 확인(가장 신뢰할 수 있는 신호)
+    // 홈페이지 정적 HTML 1회 fetch — 인스타 링크 확인 + 메타(브랜드가 직접 쓴 소개) 수확
     const homepage = this.pickHomepage([...local, ...web]);
-    const sniffedIg = homepage ? await this.sniffInstagram(homepage) : undefined;
+    const signals = homepage ? await this.fetchHomepageSignals(homepage) : {};
+    const sniffedIg = signals.instagram;
+
+    // 동명 노이즈 필터 — 블로그·카페·표적검색은 제목+설명에 브랜드명이 통째로(공백 무시) 들어간 것만.
+    // (예: "캔버스가든" 검색이 "에르메스 가든파티 캔버스"·"스누피가든"에 분리 매칭되는 오염 차단)
+    const brandKey = query.replace(/\s/g, "");
+    const mentionsBrand = (it: NaverItem) =>
+      (this.clean(it.title) + this.clean(it.description)).replace(/\s/g, "").includes(brandKey);
+    const blogF = blog.filter(mentionsBrand);
+    const cafeF = cafe.filter(mentionsBrand);
+    const collabF = collabBlog.filter(mentionsBrand);
+    const popupF = popupBlog.filter(mentionsBrand);
+    const workshopF = workshopBlog.filter(mentionsBrand);
 
     const parts: string[] = [];
+    // 메모 최상단 — 브랜드가 직접 쓴 소개(홈페이지 메타)가 있으면 가장 먼저
+    if (signals.title || signals.desc) {
+      parts.push("[브랜드가 직접 쓴 소개 — 홈페이지 메타 · 신뢰도 최상]");
+      if (signals.title) parts.push(`· 제목: ${signals.title}`);
+      if (signals.desc) parts.push(`· 소개: ${signals.desc}`);
+      parts.push("");
+    }
     if (sniffedIg || homepage) {
       parts.push("[홈페이지 직접 확인 — 신뢰도 높음]");
       if (homepage) parts.push(`· 홈페이지: ${homepage}`);
@@ -794,16 +875,30 @@ class NaverGeminiProvider implements SearchProvider {
         parts.push(`· ${this.clean(it.title)} | ${this.clean(it.description)} | 링크:${it.link ?? ""}`);
       }
     }
-    if (blog.length) {
+    if (blogF.length) {
       parts.push("\n[네이버 블로그 — 소비자 후기·분위기 단서]");
-      for (const it of blog) {
+      for (const it of blogF) {
         parts.push(`· ${this.clean(it.title)} | ${this.clean(it.description)}`);
       }
     }
-    if (cafe.length) {
+    if (cafeF.length) {
       parts.push("\n[네이버 카페글 — 실사용 후기·평판 단서]");
-      for (const it of cafe) {
+      for (const it of cafeF) {
         parts.push(`· ${this.clean(it.title)} | ${this.clean(it.description)}`);
+      }
+    }
+    // 표적검색 — 콜라보·팝업·워크숍 흔적(쿼리 종류 표기). 0건이면 섹션 생략.
+    const targeted: [string, NaverItem[]][] = [
+      ["콜라보", collabF],
+      ["팝업", popupF],
+      ["워크숍", workshopF],
+    ];
+    if (targeted.some(([, items]) => items.length)) {
+      parts.push("\n[네이버 표적검색 — 콜라보·팝업·워크숍 흔적]");
+      for (const [label, items] of targeted) {
+        for (const it of items) {
+          parts.push(`· (${label}) ${this.clean(it.title)} | ${this.clean(it.description)}`);
+        }
       }
     }
     return parts.join("\n") || "(검색 결과 없음)";
@@ -857,9 +952,23 @@ class NaverGeminiProvider implements SearchProvider {
   private async geminiSearch(query: string, region?: string): Promise<string> {
     if (process.env.ENRICH_GEMINI_SEARCH === "0") return "";
     const loc = region?.trim() ? `\n(위치 힌트: ${region.trim()} — 이 지역의 그 업체를 특정해줘. 동명 업체 주의.)` : "";
-    const prompt = `"${query}" 브랜드/업체를 웹에서 조사해줘.${loc} 무엇을 하는 곳인지, 시작·스토리, 특징·강점, 주요 고객, 분위기·평판, 홈페이지 URL, 그리고 블로그·카페 등의 실사용 후기·평판을 사실 위주로 간결한 메모로 정리해줘.
-⭐인스타그램은 실제 instagram.com/○○ 페이지를 웹에서 확인한 경우에만 @핸들을 적어. 브랜드명이나 도메인으로 추측하지 마 — 도메인이 canvasgarden.shop이라도 instagram.com/canvasgarden이 실제 존재하는지 확인 안 되면 절대 적지 말고 "인스타: 확인 안 됨"이라고 해. 지어낸 핸들은 틀린 정보라 넣으면 안 돼.
-확실하지 않은 건 추측하지 말고 넘어가. 짧은 개조식으로.`;
+    const prompt = `절대 추측하거나 사실이 아닌 정보를 지어내지 마. 웹에서 확인된 것만 적는다.
+"${query}" 브랜드/업체를 웹에서 조사해줘.${loc}
+아래 소제목 순서 그대로, 확인된 사실만 개조식으로 정리해줘. 전체 1500자 이내. 해당 정보가 없으면 그 소제목에 "확인 안 됨" 한 줄만.
+
+[정체] 무엇을 만들고/하는 곳인지 한두 줄 + 창업 배경·브랜드 철학·시작 이야기가 있으면 두세 줄
+[제품/특징] 주력 제품·서비스와 그 특징·차별점 (재료·방식 등, 각 한 줄)
+[활동] 워크숍·클래스·팝업·제품 라인 등 실제로 한 활동 (각각 무엇이었는지)
+[콜라보] 다른 브랜드·공간·작가와 함께한 협업 이력 (파트너 이름이 확인된 것만)
+[원하는 협업] 이 브랜드가 찾는 파트너·하고 싶다고 밝힌 협업 (모집글·인터뷰 발언 등 근거 필수)
+[고객] 주요 고객층·타겟 (연령·관심사 등, 확인된 것만)
+[숫자] 팔로워·후기 개수·방문·판매량 등 공개 수치 (어디서 봤는지 함께)
+[알려짐] 언론·매거진·방송·수상 노출 (매체명·연도)
+[공간] 오프라인 매장·쇼룸·작업실·카페 운영 여부와 위치
+[신뢰정보] 홈페이지 URL · 주소
+공식 홈페이지·언론 보도 등 신뢰할 수 있는 출처를 우선해. 연도·날짜가 보이면 함께 적어줘(오래된 정보 구분용).
+⭐인스타그램은 실제 instagram.com/○○ 페이지를 확인한 경우에만 @핸들. 브랜드명·도메인으로 추측 금지 — 확인 안 되면 "인스타: 확인 안 됨".
+확실하지 않으면 적지 말고 넘어가. 과장·추측 금지.`;
     // 보조 소스라 실패 시 빠르게 포기(네이버 단독). 429는 쿼터/레이트리밋 → 모델 공유라 재시도 무의미.
     for (const model of NaverGeminiProvider.GEMINI_MODELS) {
       try {
@@ -1093,6 +1202,25 @@ class NaverGeminiProvider implements SearchProvider {
     return opts.oneLiners.filter((s) => s.trim()).slice(0, 3);
   }
 
+  // 한 줄 소개 + 브랜드 소개를 한 번에 — 초안받기 이중 크롤 제거(research 1회 + 생성 1회).
+  // generateOptions 응답이 oneLiners·descriptions를 둘 다 담는 것을 그대로 활용한다.
+  async draftBoth(input: DraftInput): Promise<{ oneLiners: string[]; descriptions: string[] }> {
+    const research = await this.research(input.name);
+    const info = this.draftInfo(input);
+    const kw = (input.focusKeywords?.length ? input.focusKeywords : input.values) ?? [];
+    const round = input.round ?? 0;
+    const prompt = `브랜드명: "${input.name}"\n\n[사용자 입력]\n${
+      info || "(입력이 적어요 — 조사 자료 위주로)"
+    }\n\n${kw.length ? `⭐가중 키워드(가장 중요하게 반영): ${kw.join(", ")}\n\n` : ""}[조사 자료]\n${research}\n\n위 자료로 '한 줄 소개' 후보 3개(각 40자 이내 — 브랜드 정체성이 무엇을·어떻게·누구에게 한 줄에 드러나게, 과장·오글거리는 표현 금지)와 '브랜드 소개' 후보 5개(서로 다른 앵글, 각 3~5문장 해요체)를 함께 만들어줘. values·identity도 형식에 맞게 채워줘.${
+      round > 0 ? " 이전과는 다른 표현·각도로 새롭게 써줘." : ""
+    }`;
+    const opts = await this.generateOptions(prompt, round > 0 ? 1.0 : 0.9);
+    return {
+      oneLiners: opts.oneLiners.filter((s) => s.trim()).slice(0, 3),
+      descriptions: opts.descriptions,
+    };
+  }
+
   async recrawl(input: RecrawlInput): Promise<EnrichCandidate | null> {
     // 인스타 핸들·홈피 도메인까지 검색어에 섞어 네이버+제미나이 둘 다 더 깊이 조사
     const terms = [input.name, input.homepage, input.instagram?.replace(/^@/, "")].filter(Boolean).join(" ");
@@ -1148,6 +1276,17 @@ export async function enrichOneLiners(input: DraftInput): Promise<string[]> {
     `결이 맞는 분들과 함께하는 ${name}`,
   ].filter((s): s is string => !!s);
   return Array.from(new Set(out)).slice(0, 3);
+}
+
+/** 한 줄 소개 3개 + 브랜드 소개 5개를 한 번에(draft2) — provider가 지원하면 크롤 1회로 통합,
+ *  미지원이면 기존 enrichOneLiners + enrichDraft 순차 폴백(하위호환). */
+export async function enrichDraftBoth(
+  input: DraftInput
+): Promise<{ oneLiners: string[]; descriptions: string[] }> {
+  if (provider.draftBoth) return provider.draftBoth(input);
+  const oneLiners = await enrichOneLiners(input);
+  const descriptions = await enrichDraft(input);
+  return { oneLiners, descriptions };
 }
 
 /** 조사 메모 생성(백그라운드 크롤) — 위저드가 키워드 입력받는 동안 먼저 돌린다. */
