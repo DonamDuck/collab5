@@ -608,6 +608,7 @@ function RegisterForm() {
   // 제출 전 클라이언트 검증 — 에러 문구 반환(통과 시 null)
   const validate = (): string | null => {
     if (!offers.length) return "제공할 수 있는 협업을 1개 이상 골라주세요.";
+    if (!address.trim()) return "상세주소를 입력해주세요.";
     return null;
   };
 
@@ -615,8 +616,9 @@ function RegisterForm() {
     const err = validate();
     if (err) {
       alert(err);
-      // 협업 칩(①로 이사)으로 스크롤 — 현재 유일한 검증 항목
-      document.getElementById("offers-chips")?.scrollIntoView({ behavior: "smooth", block: "center" });
+      // 실패 항목으로 스크롤 — 협업 칩(미선택) 우선, 그다음 상세주소
+      const target = !offers.length ? "offers-chips" : "detail-address";
+      document.getElementById(target)?.scrollIntoView({ behavior: "smooth", block: "center" });
       return;
     }
     startTransition(async () => {
@@ -872,6 +874,36 @@ function RegisterForm() {
             />
           </div>
 
+          {/* 소개자료 PDF 첨부 (선택) — 구⑨에서 ① 브랜드 사진 아래로 이사 */}
+          <div>
+            <label className="mb-2 block text-base font-medium text-body">
+              이미 소개서가 있나요? (선택)
+            </label>
+            <div className="flex items-center gap-3">
+              <label className="inline-flex h-9 cursor-pointer items-center rounded-md border border-border-strong bg-surface px-3 text-sm font-medium text-ink">
+                {pdfUploading ? "올리는 중…" : "파일 업로드"}
+                <input
+                  type="file"
+                  accept="application/pdf"
+                  hidden
+                  onChange={(e) => onIntroPdf(e.target.files)}
+                />
+              </label>
+              {introFileUrl && (
+                <>
+                  <span className="text-sm text-body">소개 자료 담김</span>
+                  <button
+                    type="button"
+                    onClick={() => setIntroFileUrl("")}
+                    className="text-sm text-faint hover:text-ink"
+                  >
+                    지우기
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+
           {/* 협업 유형 칩 — 구⑤에서 ①로 이사(필수 유지, 검색·매칭 하드축). 라벨은 구⑤ 제목 승계 */}
           <div id="offers-chips" className="scroll-mt-4">
             <Field label="어떤 협업을 할 수 있나요? *">
@@ -990,8 +1022,9 @@ function RegisterForm() {
 
         {/* ── 스텁 A — 왜 이 브랜드를 시작하셨나요 (구②) ── */}
         <StubSection
-          id="stub-story"
+          id="sec-story"
           label="왜 이 브랜드를 시작하셨나요?"
+          hiddenWhenCollapsed
           expanded={openSections.has("story")}
           hasData={hasStory}
           onExpand={() => openSection("story")}
@@ -1009,8 +1042,9 @@ function RegisterForm() {
 
         {/* ── 스텁 B — 주로 어떤 활동을 하나요 (구④) ── */}
         <StubSection
-          id="stub-activities"
+          id="sec-activities"
           label="주로 어떤 활동을 하나요?"
+          hiddenWhenCollapsed
           expanded={openSections.has("activities")}
           hasData={hasActivities}
           onExpand={() => openSection("activities")}
@@ -1128,8 +1162,9 @@ function RegisterForm() {
 
         {/* ── 스텁 C — 이런 콜라보 경험이 있어요 (구⑦) ── */}
         <StubSection
-          id="stub-collabs"
+          id="sec-collabs"
           label="이런 콜라보 경험이 있어요."
+          hiddenWhenCollapsed
           expanded={openSections.has("collabs")}
           hasData={hasCollabs}
           onExpand={() => openSection("collabs")}
@@ -1284,10 +1319,13 @@ function RegisterForm() {
           onChange={setBlocks}
           onUploadingChange={setBlocksUploading}
           storyItems={[
-            { key: "seeks", label: "이런 파트너를 찾고 있어요.", hint: "파트너와 꿈꾸는 협업 유형을 알려주세요.", added: openSections.has("seeks") || hasSeeks, onAdd: () => addStorySection("seeks") },
-            { key: "keywords", label: "우리 브랜드를 표현하는 키워드를 골라주세요.", hint: "분위기를 칩으로 골라요.", added: openSections.has("keywords") || hasKeywords, onAdd: () => addStorySection("keywords") },
-            { key: "customers", label: "저희는 주로 이런 고객과 함께하고 있어요.", hint: "주요 고객을 알려주세요.", added: openSections.has("customers") || hasCustomers, onAdd: () => addStorySection("customers") },
-            { key: "offersNote", label: "어떤 협업을 할 수 있나요? — 자세히", hint: "제공할 수 있는 협업을 편하게 들려주세요.", added: openSections.has("offersNote") || hasOffersNote, onAdd: () => addStorySection("offersNote") },
+            { key: "activities", label: "주로 어떤 활동을 하나요?", hint: "대표 활동을 소개해주세요.", added: openSections.has("activities") || hasActivities, onAdd: () => addStorySection("activities"), group: "recommend" },
+            { key: "seeks", label: "이런 파트너를 찾고 있어요.", hint: "파트너와 꿈꾸는 협업 유형을 알려주세요.", added: openSections.has("seeks") || hasSeeks, onAdd: () => addStorySection("seeks"), group: "recommend" },
+            { key: "collabs", label: "이런 콜라보 경험이 있어요.", hint: "지난 콜라보를 더하면 검증된 파트너 신호가 돼요.", added: openSections.has("collabs") || hasCollabs, onAdd: () => addStorySection("collabs"), group: "recommend" },
+            { key: "customers", label: "저희는 주로 이런 고객과 함께하고 있어요.", hint: "주요 고객을 알려주세요.", added: openSections.has("customers") || hasCustomers, onAdd: () => addStorySection("customers"), group: "recommend" },
+            { key: "story", label: "왜 이 브랜드를 시작하셨나요?", hint: "시작하게 된 계기를 편하게 적어주세요.", added: openSections.has("story") || hasStory, onAdd: () => addStorySection("story"), group: "story" },
+            { key: "keywords", label: "우리 브랜드를 표현하는 키워드를 골라주세요.", hint: "분위기를 칩으로 골라요.", added: openSections.has("keywords") || hasKeywords, onAdd: () => addStorySection("keywords"), group: "story" },
+            { key: "offersNote", label: "어떤 협업을 할 수 있나요? — 자세히", hint: "제공할 수 있는 협업을 편하게 들려주세요.", added: openSections.has("offersNote") || hasOffersNote, onAdd: () => addStorySection("offersNote"), group: "story" },
           ]}
         />
 
@@ -1364,11 +1402,12 @@ function RegisterForm() {
         {/* ── ② 브랜드 정보를 입력해주세요 (구⑨ — 번호 섹션은 ①·②만 남음) ── */}
         <GroupHeader n="②" title="브랜드 정보를 입력해주세요." />
         <div className="space-y-8">
-          <Field label="주소" hint={hintFor("address", "address")}>
+          <Field label="상세주소 *" hint={hintFor("address", "address")}>
             <input
+              id="detail-address"
               value={address}
               onChange={(e) => setAddress(e.target.value)}
-              placeholder="예: 서울 성동구 성수동"
+              placeholder="서울 성북구 보문로 56, 5층"
               className="h-11 w-full rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
             />
             {region && (
@@ -1377,7 +1416,7 @@ function RegisterForm() {
               </p>
             )}
           </Field>
-          <Field label="인스타그램" hint={hintFor("instagram", "instagram")}>
+          <Field label="인스타그램 (선택)" hint={hintFor("instagram", "instagram")}>
             <input
               value={instagram}
               onChange={(e) => setInstagram(e.target.value)}
@@ -1385,7 +1424,7 @@ function RegisterForm() {
               className="h-11 w-full rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
             />
           </Field>
-          <Field label="홈페이지" hint={hintFor("homepage", "homepage")}>
+          <Field label="홈페이지 (선택)" hint={hintFor("homepage", "homepage")}>
             <input
               value={homepage}
               onChange={(e) => setHomepage(e.target.value)}
@@ -1393,36 +1432,6 @@ function RegisterForm() {
               className="h-11 w-full rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
             />
           </Field>
-
-          {/* 소개자료 PDF 첨부 (선택) */}
-          <div>
-            <label className="mb-2 block text-base font-medium text-body">
-              (선택) 이미 만든 소개 자료가 있다면 함께 담아드릴게요.
-            </label>
-            <div className="flex items-center gap-3">
-              <label className="inline-flex h-9 cursor-pointer items-center rounded-md border border-border-strong bg-surface px-3 text-sm font-medium text-ink">
-                {pdfUploading ? "올리는 중…" : "PDF 올리기"}
-                <input
-                  type="file"
-                  accept="application/pdf"
-                  hidden
-                  onChange={(e) => onIntroPdf(e.target.files)}
-                />
-              </label>
-              {introFileUrl && (
-                <>
-                  <span className="text-sm text-body">소개 자료 담김</span>
-                  <button
-                    type="button"
-                    onClick={() => setIntroFileUrl("")}
-                    className="text-sm text-faint hover:text-ink"
-                  >
-                    지우기
-                  </button>
-                </>
-              )}
-            </div>
-          </div>
         </div>
 
         {/* 콜라보 열림/닫힘 */}
@@ -1469,7 +1478,7 @@ function RegisterForm() {
                       type="button"
                       onClick={() => {
                         openSection(k); // 이미 펼쳐져 있으면 no-op(Set add) → 스크롤만
-                        setTimeout(() => document.getElementById("stub-" + k)?.scrollIntoView({ behavior: "smooth", block: "center" }), 60);
+                        setTimeout(() => document.getElementById("sec-" + k)?.scrollIntoView({ behavior: "smooth", block: "center" }), 60);
                       }}
                       className="inline-flex h-8 items-center rounded-pill border border-primary bg-primary-tint px-3 text-sm text-primary-on"
                     >

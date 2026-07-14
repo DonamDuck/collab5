@@ -41,9 +41,9 @@ export function BlockEditor({ blocks, onChange, onUploadingChange, storyItems }:
   // 값 또는 업데이터 함수 모두 허용(React setState 호환) — 비동기 병합 시 최신 상태 사용.
   onChange: (b: Block[] | ((prev: Block[]) => Block[])) => void;
   onUploadingChange?: (uploading: boolean) => void;
-  // 시트 '브랜드 이야기' 그룹 — 시트 출신 폼 섹션(구③⑤⑥⑧)을 정본 위치에 펼치는 버튼들.
+  // 시트 폼 섹션 버튼들 — group으로 '작성 추천 ⭐'·'브랜드 이야기' 두 묶음으로 렌더.
   // 미전달 시 기존 카탈로그 단독 렌더(하위호환).
-  storyItems?: { key: string; label: string; hint: string; added: boolean; onAdd: () => void }[];
+  storyItems?: { key: string; label: string; hint: string; added: boolean; onAdd: () => void; group: "recommend" | "story" }[];
 }) {
   const [open, setOpen] = useState(false);
   const [, setUploading] = useState(0);
@@ -400,87 +400,98 @@ export function BlockEditor({ blocks, onChange, onUploadingChange, storyItems }:
           onClick={() => setOpen(true)}
           className="mt-4 inline-flex h-11 items-center rounded-md bg-primary px-6 text-[15px] font-semibold text-primary-on"
         >
-          + 섹션 더하기
+          + 브랜드 이야기 더하기
         </button>
       </div>
 
-      {/* ── 우측 하단 플로팅 버튼 (텍스트형 · 강조 카드 보이면 숨김 · safe-area) ── */}
-      {!cardVisible && !open && (
-        <button
-          type="button"
-          onClick={() => setOpen(true)}
-          style={{ bottom: "calc(1.25rem + env(safe-area-inset-bottom))" }}
-          className="fixed right-4 z-40 inline-flex h-12 items-center gap-1 rounded-pill bg-primary px-5 text-[14px] font-semibold text-primary-on shadow-xl ring-1 ring-black/5 sm:right-6"
-        >
-          + 섹션 더하기
-        </button>
-      )}
+      {/* ── 우측 하단 플로팅 버튼 (텍스트형 · 항상 마운트 · 표시/숨김은 슬라이드 애니 · safe-area) ── */}
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        style={{ bottom: "calc(1.25rem + env(safe-area-inset-bottom))" }}
+        className={`fixed right-4 z-40 inline-flex h-12 items-center gap-1 rounded-pill bg-primary px-5 text-[14px] font-semibold text-primary-on shadow-xl ring-1 ring-black/5 transition-all duration-300 ease-out sm:right-6 ${
+          !cardVisible && !open
+            ? "translate-y-0 opacity-100"
+            : "translate-y-24 opacity-0 pointer-events-none"
+        }`}
+      >
+        + 브랜드 정보 추가
+      </button>
 
       {/* ── 바텀시트 — 카탈로그 ── */}
       {open && (
         <div className="fixed inset-0 z-50" role="dialog" aria-modal="true">
           <div className="absolute inset-0 bg-ink/40" onClick={() => setOpen(false)} />
-          <div
-            style={{ paddingBottom: "calc(1.5rem + env(safe-area-inset-bottom))" }}
-            className="absolute inset-x-0 bottom-0 mx-auto max-h-[82vh] max-w-[640px] overflow-y-auto rounded-t-2xl bg-surface p-4 shadow-xl"
-          >
+          <div className="absolute inset-x-0 bottom-0 mx-auto max-w-[640px] overflow-hidden rounded-t-2xl bg-surface shadow-xl">
+            <div
+              style={{ paddingBottom: "calc(1.5rem + env(safe-area-inset-bottom))" }}
+              className="max-h-[82vh] overflow-y-auto p-4"
+            >
             <div className="mb-3 flex items-center justify-between">
               <p className="text-[16px] font-bold text-ink">브랜드의 이야기 더하기</p>
-              <div className="flex items-center gap-1">
-                <button
-                  type="button"
-                  onClick={() => setOpen(false)}
-                  className="inline-flex h-8 items-center rounded-sm px-2 text-[14px] text-mute hover:bg-surface-soft hover:text-ink"
-                >
-                  뒤로
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setOpen(false)}
-                  aria-label="닫기"
-                  className="flex h-8 w-8 items-center justify-center rounded-pill text-mute hover:bg-surface-soft hover:text-ink"
-                >
-                  ✕
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                aria-label="닫기"
+                className="flex h-8 w-8 items-center justify-center rounded-pill text-mute hover:bg-surface-soft hover:text-ink"
+              >
+                ✕
+              </button>
             </div>
-            {/* 두 그룹 — '브랜드 이야기'(폼 섹션) + '더 보여주기'(블록 카탈로그). storyItems 없으면 기존 렌더. */}
-            {storyItems && storyItems.length > 0 && (
-              <>
-                <p className="mb-2 text-[13px] font-semibold text-primary-on">브랜드 이야기</p>
-                <div className="mb-4 space-y-2">
-                  {storyItems.map((s) => (
-                    <button
-                      key={s.key}
-                      type="button"
-                      disabled={s.added}
-                      onClick={() => {
-                        setOpen(false);
-                        s.onAdd();
-                      }}
-                      className="w-full rounded-md border border-hairline px-3.5 py-3 text-left hover:bg-surface-soft disabled:opacity-40 disabled:hover:bg-transparent"
-                    >
-                      <p className="text-[15px] font-semibold text-ink">{s.label}</p>
-                      <p className="mt-0.5 text-[13px] text-mute">{s.hint}</p>
-                    </button>
-                  ))}
-                </div>
-                <p className="mb-2 text-[13px] font-semibold text-primary-on">더 보여주기</p>
-              </>
-            )}
-            <div className="space-y-2">
-              {CATALOG.map((c) => (
-                <button
-                  key={c.type}
-                  type="button"
-                  disabled={!canAdd(c.type)}
-                  onClick={() => add(c.type)}
-                  className="w-full rounded-md border border-hairline px-3.5 py-3 text-left hover:bg-surface-soft disabled:opacity-40 disabled:hover:bg-transparent"
-                >
-                  <p className="text-[15px] font-semibold text-ink">{c.label}</p>
-                  <p className="mt-0.5 text-[13px] text-mute">{c.hint}</p>
-                </button>
-              ))}
+            {/* 3그룹 — '작성 추천 ⭐'·'브랜드 이야기'(폼 섹션) + '더 보여주기'(블록 카탈로그). 항목 0개 그룹은 헤더째 스킵. storyItems 없으면 카탈로그만. */}
+            {(() => {
+              const recommend = (storyItems ?? []).filter((s) => s.group === "recommend");
+              const story = (storyItems ?? []).filter((s) => s.group === "story");
+              const renderStory = (items: NonNullable<typeof storyItems>) =>
+                items.map((s) => (
+                  <button
+                    key={s.key}
+                    type="button"
+                    disabled={s.added}
+                    onClick={() => {
+                      setOpen(false);
+                      s.onAdd();
+                    }}
+                    className="w-full rounded-md border border-hairline px-3.5 py-3 text-left hover:bg-surface-soft disabled:opacity-40 disabled:hover:bg-transparent"
+                  >
+                    <p className="text-[15px] font-semibold text-ink">{s.label}</p>
+                    <p className="mt-0.5 text-[13px] text-mute">{s.hint}</p>
+                  </button>
+                ));
+              return (
+                <>
+                  {recommend.length > 0 && (
+                    <>
+                      <p className="mb-2 text-[13px] font-semibold text-primary-on">작성 추천 ⭐</p>
+                      <div className="mb-4 space-y-2">{renderStory(recommend)}</div>
+                    </>
+                  )}
+                  {story.length > 0 && (
+                    <>
+                      <p className="mb-2 text-[13px] font-semibold text-primary-on">브랜드 이야기</p>
+                      <div className="mb-4 space-y-2">{renderStory(story)}</div>
+                    </>
+                  )}
+                  {storyItems && storyItems.length > 0 && (
+                    <p className="mb-2 text-[13px] font-semibold text-primary-on">더 보여주기</p>
+                  )}
+                  <div className="space-y-2">
+                    {CATALOG.map((c) => (
+                      <button
+                        key={c.type}
+                        type="button"
+                        disabled={!canAdd(c.type)}
+                        onClick={() => add(c.type)}
+                        className="w-full rounded-md border border-hairline px-3.5 py-3 text-left hover:bg-surface-soft disabled:opacity-40 disabled:hover:bg-transparent"
+                      >
+                        <p className="text-[15px] font-semibold text-ink">{c.label}</p>
+                        <p className="mt-0.5 text-[13px] text-mute">{c.hint}</p>
+                      </button>
+                    ))}
+                  </div>
+                </>
+              );
+            })()}
             </div>
           </div>
         </div>
