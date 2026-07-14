@@ -1387,9 +1387,12 @@ export function extractChipsFromResearch(research: string): KeywordChip[] {
   const parts = body.split(/\n?\s*\[([^\]\n]+)\]\s*/); // [pre, header, body, header, body, ...]
   const chips: KeywordChip[] = [];
   const seen = new Set<string>();
-  const STOPWORDS = /^(또한|그리고|하지만|특히|및|기타|등|이\s*외|그\s*외)$/;
+  const STOPWORDS = /^(또한|그리고|하지만|특히|및|기타|등|다만|그러나|이\s*외|그\s*외)$/;
   const push = (raw: string, sec: { label: string; factual: boolean }) => {
-    const text = raw.trim();
+    const text = raw
+      .replace(/^(이\s*외에도|그\s*외에도|이외에도)\s*/, "")
+      .replace(/[.。]\s*$/, "")
+      .trim();
     if (text.length < 2 || text.length > 28) return false;
     if (/확인\s*안\s*됨|해당\s*없음|없습니다/.test(text)) return false;
     if (STOPWORDS.test(text)) return false;
