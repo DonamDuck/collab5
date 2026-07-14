@@ -79,6 +79,18 @@ export interface CollabHint {
   desc: string; // 한두 문장 요약 (해요체)
   source: string; // 출처 유형 라벨
 }
+/** 크롤 근거 기반 추천 블록 — 리빌 카드 "이런 이야기도 담아보세요" 소스 */
+export interface BlockHint {
+  type: "metrics" | "press" | "space" | "reviews";
+  reason: string; // "인스타그램에서 팔로워 1.2만을 봤어요" 형태 근거 한 줄
+  items?: { label: string; value?: string; year?: string }[]; // metrics·press 밑그림
+}
+/** 크롤이 발견한 '원하는 파트너·협업' 단서 — 리빌 seeks 카드 소스 */
+export interface SeeksHint {
+  types: string[]; // 콜라보 유형 최대 3 (제품콜라보·팝업·워크숍·공동굿즈·공동콘텐츠·행사참여·공간대여 중)
+  note: string; // 해요체 한두 문장
+  reason: string; // "~에서 봤어요" 근거 한 줄
+}
 
 /** 5지선다 결과 — 확인된 identity + 한줄소개/브랜드소개 후보 5개씩 + 결 단어 */
 export interface EnrichOptions {
@@ -96,6 +108,8 @@ export interface EnrichOptions {
   values: string[];
   activityHints: ActivityHint[]; // 발견된 활동 흔적 0~3건 (참고용)
   collabHints: CollabHint[]; // 발견된 콜라보 흔적 0~3건 (참고용)
+  blockHints: BlockHint[]; // 근거 기반 추천 블록 0~2건 (근거 없으면 빈 배열)
+  seeksHint: SeeksHint | null; // 원하는 파트너·협업 단서 (근거 없으면 null)
 }
 
 /** 검색 단계 추상화 — mock ↔ Claude/Gemini 교체 지점. */
@@ -105,6 +119,8 @@ export interface SearchProvider {
   recrawl?(input: RecrawlInput): Promise<EnrichCandidate | null>;
   /** (선택) 폼 정보 기반 소개 글 5개 초안 — round로 다른 각도 변주 */
   draft?(input: DraftInput): Promise<string[]>;
+  /** (선택) 폼 정보 기반 한 줄 소개 후보 3개 — 초안받기 2스텝용. 각 40자 이내 */
+  oneLiners?(input: DraftInput): Promise<string[]>;
   /** (선택) 브랜드명(+지역)으로 조사 메모만 생성(백그라운드 크롤 — 느린 단계) */
   research?(name: string, region?: string): Promise<string>;
   /** (선택) 조사 메모 + 키워드 → 한줄소개·브랜드소개 5지선다(빠른 생성 단계) */
@@ -258,6 +274,22 @@ export class MockSearchProvider implements SearchProvider {
     return r === 0 ? variants : [...variants.slice(1), variants[0]];
   }
 
+  // 한 줄 소개 후보 mock — 3개, 각 40자 이내(다시 받기 시 round로 순서 변주)
+  async oneLiners(input: DraftInput): Promise<string[]> {
+    await new Promise((r) => setTimeout(r, 500));
+    const name = input.name.trim() || "우리 브랜드";
+    const v = input.values?.[0];
+    const variants = [
+      v
+        ? `${v}${josa(v, "을", "를")} 담아 만드는 ${name}${josa(name, "이에요", "예요")}`
+        : `정성을 담아 만드는 ${name}${josa(name, "이에요", "예요")}`,
+      `일상에 스며드는 ${name}의 이야기예요`,
+      `결이 맞는 분들과 함께 자라는 ${name}${josa(name, "이에요", "예요")}`,
+    ];
+    const r = input.round ?? 0;
+    return r === 0 ? variants : [...variants.slice(1), variants[0]];
+  }
+
   // 조사 메모 mock
   async research(name: string, region?: string): Promise<string> {
     await new Promise((r) => setTimeout(r, 700));
@@ -289,6 +321,8 @@ export class MockSearchProvider implements SearchProvider {
       collabHints: [
         { partner: "오월의숲", desc: "함께 팝업을 열었다는 후기가 보여요.", source: "카페글" },
       ],
+      blockHints: [],
+      seeksHint: null,
     };
   }
 }
@@ -367,6 +401,35 @@ const OptionsResultSchema = z.object({
       })
     )
     .describe("조사 메모에 실제 언급된 콜라보 흔적 0~3건. 없으면 빈 배열"),
+  blockHints: z
+    .array(
+      z.object({
+        type: z.enum(["metrics", "press", "space", "reviews"]),
+        reason: z.string().describe('"인스타그램에서 팔로워 1.2만을 봤어요" 형태 근거 한 줄'),
+        items: z
+          .array(
+            z.object({
+              label: z.string(),
+              value: z.string().optional(),
+              year: z.string().optional(),
+            })
+          )
+          .optional()
+          .describe("metrics·press 밑그림. space·reviews는 생략"),
+      })
+    )
+    .max(2)
+    .default([])
+    .describe("조사 근거가 뚜렷할 때만 추천 블록 최대 2개. 없으면 빈 배열"),
+  seeksHint: z
+    .object({
+      types: z.array(z.string()).max(3).describe("콜라보 유형 최대 3개(제품콜라보·팝업·워크숍·공동굿즈·공동콘텐츠·행사참여·공간대여 중)"),
+      note: z.string().describe("해요체 한두 문장"),
+      reason: z.string().describe("'~에서 봤어요' 근거 한 줄"),
+    })
+    .nullable()
+    .default(null)
+    .describe("이 브랜드가 원하는 파트너·협업 근거가 보일 때만. 없으면 null"),
 });
 
 const GEMINI_OPTIONS_SCHEMA = {
@@ -427,8 +490,51 @@ const GEMINI_OPTIONS_SCHEMA = {
       },
       description: "조사 메모에 파트너명이 드러난 협업 소식 0~3건. 메모에 없으면 빈 배열 — 창작 금지",
     },
+    blockHints: {
+      type: Type.ARRAY,
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          type: { type: Type.STRING, description: "metrics|press|space|reviews 중 하나" },
+          reason: {
+            type: Type.STRING,
+            description: '"인스타그램에서 팔로워 1.2만을 봤어요" 형태의 근거 한 줄',
+          },
+          items: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                label: { type: Type.STRING },
+                value: { type: Type.STRING, description: "없으면 빈 문자열" },
+                year: { type: Type.STRING, description: "없으면 빈 문자열" },
+              },
+              required: ["label"],
+            },
+            description: "metrics·press 밑그림(label·value·year). space·reviews는 빈 배열",
+          },
+        },
+        required: ["type", "reason"],
+      },
+      description: "조사 근거가 뚜렷할 때만 추천 블록 최대 2개. 근거 없으면 빈 배열 — 창작 금지",
+    },
+    seeksHint: {
+      type: Type.OBJECT,
+      nullable: true,
+      properties: {
+        types: {
+          type: Type.ARRAY,
+          items: { type: Type.STRING },
+          description: "콜라보 유형 최대 3개(제품콜라보·팝업·워크숍·공동굿즈·공동콘텐츠·행사참여·공간대여 중)",
+        },
+        note: { type: Type.STRING, description: "해요체 한두 문장" },
+        reason: { type: Type.STRING, description: "'~에서 봤어요' 근거 한 줄" },
+      },
+      required: ["types", "note", "reason"],
+      description: "조사에서 이 브랜드가 원하는 파트너·협업 근거가 보일 때만. 없으면 null — 창작 금지",
+    },
   },
-  required: ["identity", "instagramCandidates", "oneLiners", "descriptions", "values", "activityHints", "collabHints"],
+  required: ["identity", "instagramCandidates", "oneLiners", "descriptions", "values", "activityHints", "collabHints", "blockHints", "seeksHint"],
 };
 
 const OPTIONS_SYSTEM = `너는 콜라보 플랫폼 collab5의 브랜드 소개 카피라이터야. 웹 조사 메모를 바탕으로 브랜드가 고를 수 있는 '한 줄 소개'와 '브랜드 소개'를 각각 5개씩 서로 다른 앵글로 만든다.
@@ -441,7 +547,13 @@ ${BRAND_VOICE}
 - ⭐가중 키워드가 주어지면 그 방향을 최우선으로 반영해 모든 후보를 그 결에 맞춘다.
 - 조사 메모 안의 사실만 쓴다. 창작·과장 금지. identity(주소·홈피 등)는 확인된 것만, 없으면 빈 문자열.
 - 인스타: 실제 확인된 핸들만 identity.instagram에 넣는다(추측 금지). 확정 못 하면 identity.instagram은 빈 문자열로 두고, 대신 instagramCandidates에 도메인·브랜드명 기반 그럴듯한 추정 핸들 2~4개를 제시한다(사장이 직접 고를 후보용). 예: 도메인이 canvasgarden.shop이면 @canvasgarden, @canvasgarden_official, @canvasgarden.shop 등.
-- activityHints: 조사 메모에 실제로 언급된 이 브랜드의 활동(워크숍·클래스·팝업·제품라인 등)만 0~3건. collabHints: 메모에 파트너명이 드러난 협업 소식만 0~3건. 각 항목의 source는 그 정보가 나온 출처 유형(네이버 블로그 후기/카페글/웹 검색/인스타그램)으로. ⚠️메모에 없으면 절대 만들지 말고 빈 배열로 둬라(참고용 힌트라 사실만).`;
+- activityHints: 조사 메모에 실제로 언급된 이 브랜드의 활동(워크숍·클래스·팝업·제품라인 등)만 0~3건. collabHints: 메모에 파트너명이 드러난 협업 소식만 0~3건. 각 항목의 source는 그 정보가 나온 출처 유형(네이버 블로그 후기/카페글/웹 검색/인스타그램)으로. ⚠️메모에 없으면 절대 만들지 말고 빈 배열로 둬라(참고용 힌트라 사실만).
+- blockHints: 조사에서 근거가 뚜렷할 때만 추천 블록 최대 2개.
+  팔로워·리뷰수 등 공개 수치 발견 → metrics(items에 label·value 밑그림) /
+  언론·수상·방송 → press(items에 label=제목, year) /
+  공간 운영 흔적 → space(items 없음) / 고객 후기 풍부 → reviews(items 없음 — 인용문을 지어내지 않는다).
+  reason은 반드시 "~에서 …을 봤어요" 형태의 근거 한 줄. 근거 없으면 빈 배열.
+- seeksHint: 조사에서 이 브랜드가 어떤 파트너·협업을 원하는지 근거가 보이면 제안(없으면 null). 지어내지 않는다. types는 콜라보 유형(제품콜라보·팝업·워크숍·공동굿즈·공동콘텐츠·행사참여·공간대여 중), note는 해요체 한두 문장, reason은 '~에서 봤어요' 근거.`;
 
 class ClaudeSearchProvider implements SearchProvider {
   private _client: Anthropic | null = null;
@@ -870,6 +982,36 @@ class NaverGeminiProvider implements SearchProvider {
       collabHints: (o.collabHints ?? [])
         .filter((h) => h && h.partner?.trim() && h.desc?.trim())
         .slice(0, 3),
+      blockHints: (o.blockHints ?? [])
+        .filter(
+          (h) =>
+            h &&
+            ["metrics", "press", "space", "reviews"].includes(h.type) &&
+            !!h.reason?.trim()
+        )
+        .slice(0, 2)
+        .map((h) => {
+          const items = (h.items ?? []).filter((it) => it && !!it.label?.trim());
+          return {
+            type: h.type,
+            reason: h.reason.trim(),
+            items: items.length
+              ? items.map((it) => ({
+                  label: it.label.trim(),
+                  value: it.value || undefined,
+                  year: it.year || undefined,
+                }))
+              : undefined,
+          };
+        }),
+      seeksHint:
+        o.seeksHint && o.seeksHint.note?.trim() && o.seeksHint.reason?.trim()
+          ? {
+              types: (o.seeksHint.types ?? []).filter(Boolean).slice(0, 3),
+              note: o.seeksHint.note.trim(),
+              reason: o.seeksHint.reason.trim(),
+            }
+          : null,
     };
   }
 
@@ -909,10 +1051,9 @@ class NaverGeminiProvider implements SearchProvider {
     return this.generateOptions(prompt, 0.9);
   }
 
-  // 폼 정보 + (네이버 + 제미나이) → 브랜드 소개 5지선다. round마다 변주(다시 받기).
-  async draft(input: DraftInput): Promise<string[]> {
-    const research = await this.research(input.name);
-    const info = [
+  // draft·oneLiners 공용 — 폼 입력을 프롬프트용 메모로 조립
+  private draftInfo(input: DraftInput): string {
+    return [
       input.oneLiner?.trim() && `한 줄 소개: ${input.oneLiner.trim()}`,
       input.values?.length && `브랜드를 표현하는 말: ${input.values.join(", ")}`,
       input.offers?.length && `제공 가능한 콜라보: ${input.offers.join(", ")}`,
@@ -920,6 +1061,12 @@ class NaverGeminiProvider implements SearchProvider {
     ]
       .filter(Boolean)
       .join("\n");
+  }
+
+  // 폼 정보 + (네이버 + 제미나이) → 브랜드 소개 5지선다. round마다 변주(다시 받기).
+  async draft(input: DraftInput): Promise<string[]> {
+    const research = await this.research(input.name);
+    const info = this.draftInfo(input);
     const kw = (input.focusKeywords?.length ? input.focusKeywords : input.values) ?? [];
     const round = input.round ?? 0;
     const prompt = `브랜드명: "${input.name}"\n\n[사용자 입력]\n${
@@ -929,6 +1076,21 @@ class NaverGeminiProvider implements SearchProvider {
     }`;
     const opts = await this.generateOptions(prompt, round > 0 ? 1.0 : 0.9);
     return opts.descriptions;
+  }
+
+  // 폼 정보 + (네이버 + 제미나이) → 한 줄 소개 후보 3개(초안받기 2스텝용). draft와 같은 파이프라인.
+  async oneLiners(input: DraftInput): Promise<string[]> {
+    const research = await this.research(input.name);
+    const info = this.draftInfo(input);
+    const kw = (input.focusKeywords?.length ? input.focusKeywords : input.values) ?? [];
+    const round = input.round ?? 0;
+    const prompt = `브랜드명: "${input.name}"\n\n[사용자 입력]\n${
+      info || "(입력이 적어요 — 조사 자료 위주로)"
+    }\n\n${kw.length ? `⭐가중 키워드(가장 중요하게 반영): ${kw.join(", ")}\n\n` : ""}[조사 자료]\n${research}\n\n위 자료로 '한 줄 소개' 후보를 서로 다른 앵글로 뽑아줘. ⭐각 후보는 40자 이내로, 브랜드 정체성(무엇을·어떻게·누구에게)이 한 줄에 드러나게. 과장·오글거리는 표현 금지. descriptions·values·identity도 형식에 맞게 채워줘.${
+      round > 0 ? " 이전과는 다른 표현·각도로 새롭게 써줘." : ""
+    }`;
+    const opts = await this.generateOptions(prompt, round > 0 ? 1.0 : 0.9);
+    return opts.oneLiners.filter((s) => s.trim()).slice(0, 3);
   }
 
   async recrawl(input: RecrawlInput): Promise<EnrichCandidate | null> {
@@ -972,6 +1134,20 @@ export async function enrichDraft(input: DraftInput): Promise<string[]> {
     bits.push(`${input.values.slice(0, 3).join(", ")} — 우리를 잘 보여주는 말이에요.`);
   if (input.name.trim()) bits.push(`${input.name.trim()}의 이야기를 카드에 담았어요.`);
   return bits.length ? [bits.join(" ")] : [];
+}
+
+/** 한 줄 소개 후보 3개(초안받기 2스텝용) — provider가 지원하면 AI 생성, 아니면 규칙 기반. 각 40자 이내. */
+export async function enrichOneLiners(input: DraftInput): Promise<string[]> {
+  if (provider.oneLiners) return provider.oneLiners(input);
+  // 규칙 기반 폴백 — ruleDraft 스타일 후보
+  const name = input.name.trim() || "우리 브랜드";
+  const vibe = input.values?.slice(0, 2).join("·");
+  const out = [
+    input.oneLiner?.trim(),
+    vibe ? `${vibe}${josa(vibe, "을", "를")} 담아 만드는 ${name}` : `정성으로 만드는 ${name}`,
+    `결이 맞는 분들과 함께하는 ${name}`,
+  ].filter((s): s is string => !!s);
+  return Array.from(new Set(out)).slice(0, 3);
 }
 
 /** 조사 메모 생성(백그라운드 크롤) — 위저드가 키워드 입력받는 동안 먼저 돌린다. */
