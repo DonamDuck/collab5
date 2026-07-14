@@ -1,14 +1,23 @@
 "use client";
 
-// 딸깍 자동완성 위저드 (2026-07-01 재설계 v2):
-//  ① 가중 키워드 입력(뱃지 max 4) — 동시에 백그라운드로 브랜드명 크롤링 시작(#3 로딩 체감↓)
-//  ② 개별 필드 확인·수정(상호·주소·인스타·홈피)
-//  ③ 한 줄 소개 5지선다(택1 + 직접 수정)
-//  ④ 브랜드 소개 5지선다(택1 + 직접 수정)
-//  ⑤ "이런 이야기도 찾았어요" — 크롤 힌트(활동·콜라보·파트너·블록) 체크리스트(기본 전부 체크) → 폼 반영
-import { useEffect, useRef, useState } from "react";
+// 딸깍 자동완성 위저드 (2026-07-15 크롤→키워드 재설계 v3):
+//  ⓪ 씨앗: 지역·업종 필수 입력(동명 구분 + 크롤 정확도) — 자유문장 씨앗 폐기(블랭크 페이지 제거)
+//  ① 키워드 선택(넓게): 크롤이 캐온 키워드 칩을 "최대한 많이" 고르게 + 직접 추가
+//     · 빈손이면 업종 스타터 칩 + 솔직 배너 (막다른 길 없음)
+//  ② 확인·강조(좁게): 고른 것만 다시 보며 ⭐최대 3개 + 사실 게이트(숫자·이력 = 탭 확인)
+//     · 인스타/홈피는 아무리 확실해도 자동첨부 없이 "맞나요?" 제안 → 유저가 선택
+//  ③ 생성(options 1콜 — 키워드 재료·별표 가중치·조사메모 재사용, 재크롤 없음)
+//  ④~ 기존 결과 스텝 승계: 정보 확인 → 한 줄 소개 → 브랜드 소개 → 찾은 이야기 체크리스트
+import { useEffect, useState } from "react";
 import { ScrollLock } from "@/components/ScrollLock";
-import type { ActivityHint, BlockHint, CollabHint, EnrichOptions, SeeksHint } from "@/lib/enrich";
+import type {
+  ActivityHint,
+  BlockHint,
+  CollabHint,
+  EnrichOptions,
+  KeywordChip,
+  SeeksHint,
+} from "@/lib/enrich";
 import { josa } from "@/lib/josa";
 
 export type WizardFill = {
@@ -24,27 +33,45 @@ export type WizardFill = {
   collabHints?: CollabHint[]; // 크롤이 발견한 콜라보 흔적(참고용)
   blockHints?: BlockHint[]; // 크롤 근거 기반 추천 블록(전체 — 폼 인라인 힌트 영속용)
   seeksHint?: SeeksHint; // 원하는 파트너·협업 단서(전체)
-  // ⑤스텝에서 체크한 것 — 인덱스/타입 기반. 있으면 page가 즉시 폼에 주입.
+  // 이야기 스텝에서 체크한 것 — 인덱스/타입 기반. 있으면 page가 즉시 폼에 주입.
   selectedHints?: { activities: number[]; collabs: number[]; blocks: string[]; seeks: boolean };
 };
 
-const SUGGESTED_KEYWORDS = [
-  "친환경",
-  "핸드메이드",
-  "로컬",
-  "감성",
-  "프리미엄",
-  "스토리",
-  "실용성",
-  "지속가능",
-];
-const MAX_KEYWORDS = 4;
+const MAX_STARS = 3;
 
-// 진행 단계: 키워드 → (로딩) → 필드 → 한줄소개 → 브랜드소개 → 찾은 이야기(힌트 있을 때만)
-type Kind = "keywords" | "loading" | "fields" | "oneLiner" | "desc" | "story" | "error";
-const BASE_STEPS: Kind[] = ["fields", "oneLiner", "desc"];
+// 진행 단계: 씨앗 → (크롤) → 키워드 선택 → 확인·강조 → (생성) → 정보 → 한줄 → 소개 → 이야기
+type Kind =
+  | "seed"
+  | "loading"
+  | "chips"
+  | "confirm"
+  | "generating"
+  | "fields"
+  | "oneLiner"
+  | "desc"
+  | "story"
+  | "error";
 
-// ⑤스텝 체크 항목 — 크롤 힌트를 섹션 라벨+미리보기+근거로 평탄화(한 줄/자세히 소개는 앞 스텝이 처리).
+// 칩 섹션 표시 순서 + 사람이 읽는 라벨
+const SECTION_ORDER = ["정체", "제품", "활동", "콜라보", "원하는협업", "고객", "숫자", "알려짐", "공간", "추천", "직접"];
+const SECTION_LABELS: Record<string, string> = {
+  정체: "우리는",
+  제품: "만드는 것",
+  활동: "하는 일",
+  콜라보: "함께한 곳",
+  원하는협업: "원하는 협업",
+  고객: "고객",
+  숫자: "숫자로 보면",
+  알려짐: "알려진 곳",
+  공간: "공간",
+  추천: "혹시 해당되나요?",
+  직접: "직접 적은 것",
+};
+
+// 크롤 응답 링크 후보
+type LinkFinds = { instagram?: string; instagramConfirmed?: boolean; homepage?: string };
+
+// 이야기 스텝 체크 항목 — 크롤 힌트를 섹션 라벨+미리보기+근거로 평탄화(한 줄/자세히 소개는 앞 스텝이 처리).
 type StoryItem = { key: string; sectionLabel: string; preview: string; reason: string };
 
 // 블록 힌트 라벨 — BlockEditor CATALOG 라벨 승계(카탈로그와 문장 일치 유지)
@@ -104,17 +131,33 @@ export function EnrichWizard({
   onClose: () => void;
   onApply: (fill: WizardFill) => void;
 }) {
-  const [kind, setKind] = useState<Kind>("keywords");
-  const [intro, setIntro] = useState(""); // 사장이 직접 쓴 한두 문장(생성의 중심축)
-  const [regionInput, setRegionInput] = useState(""); // 개략 지역(동명 업체 구분 + 검색 정확도)
-  const [keywords, setKeywords] = useState<string[]>([]);
-  const [kwInput, setKwInput] = useState("");
-  const [options, setOptions] = useState<EnrichOptions | null>(null);
+  const [kind, setKind] = useState<Kind>("seed");
   const [errMsg, setErrMsg] = useState("");
-  const [interviewStep, setInterviewStep] = useState(0); // 0=소개 1=지역 2=키워드 3=이야기
-  const [storyNote, setStoryNote] = useState(""); // 꼭 담고 싶은 이야기(자유양식 장문)
-  const nextInterview = () => setInterviewStep((s) => s + 1);
-  const backInterview = () => setInterviewStep((s) => Math.max(0, s - 1));
+
+  // ⓪ 씨앗 — 지역·업종 둘 다 필수(동명 구분 검증자 + 크롤 정확도)
+  const [regionInput, setRegionInput] = useState("");
+  const [btype, setBtype] = useState("");
+  const seedReady = !!regionInput.trim() && !!btype.trim();
+
+  // 크롤 결과
+  const [crawlChips, setCrawlChips] = useState<KeywordChip[]>([]);
+  const [starterChips, setStarterChips] = useState<KeywordChip[]>([]);
+  const [customChips, setCustomChips] = useState<KeywordChip[]>([]);
+  const [tier, setTier] = useState<"rich" | "thin">("rich");
+  const [links, setLinks] = useState<LinkFinds>({});
+  const [research, setResearch] = useState("");
+
+  // ① 선택(순서 유지) / ② 별표(탭 순서=우선순위, 캡 3) + 사실 확인 + 링크 답변
+  const [selected, setSelected] = useState<string[]>([]);
+  const [starred, setStarred] = useState<string[]>([]);
+  const [factualOk, setFactualOk] = useState<Set<string>>(new Set());
+  const [igAnswer, setIgAnswer] = useState<"yes" | "no" | null>(null);
+  const [hpAnswer, setHpAnswer] = useState<"yes" | "no" | null>(null);
+  const [customInput, setCustomInput] = useState("");
+
+  const [options, setOptions] = useState<EnrichOptions | null>(null);
+  // 마지막 생성 입력 스냅샷 — 뒤로 갔다가 그대로 다음 누르면 재생성 스킵(콜 절약)
+  const [lastGenKey, setLastGenKey] = useState("");
 
   // 개별 필드(수정 가능)
   const [fName, setFName] = useState("");
@@ -126,7 +169,7 @@ export function EnrichWizard({
   const [oneLinerSel, setOneLinerSel] = useState(0);
   const [descList, setDescList] = useState<string[]>([]);
   const [descSel, setDescSel] = useState(0);
-  // ⑤ 찾은 이야기 체크 상태 — 기본 전부 체크(옵션 도착 시 초기화)
+  // 이야기 체크 상태 — 기본 전부 체크(옵션 도착 시 초기화)
   const [storyChecked, setStoryChecked] = useState<Set<string>>(new Set());
   const toggleStoryItem = (key: string) =>
     setStoryChecked((p) => {
@@ -136,49 +179,111 @@ export function EnrichWizard({
       return n;
     });
 
-  // 백그라운드 크롤: 열리자마자 브랜드명으로 조사 시작(사용자가 키워드 고르는 동안 진행 → 체감 속도↑)
-  const researchRef = useRef<Promise<string> | null>(null);
-  useEffect(() => {
-    researchRef.current = fetch("/api/enrich", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ mode: "research", name: query }),
-    })
-      .then((r) => r.json())
-      .then((d) => (typeof d.research === "string" ? d.research : ""))
-      .catch(() => "");
-  }, [query]);
+  // 전체 칩(선택 화면 표시용) — 크롤 + (빈손이면 스타터) + 직접 추가. 텍스트로 dedupe.
+  const allChips: KeywordChip[] = (() => {
+    const seen = new Set<string>();
+    const out: KeywordChip[] = [];
+    for (const c of [...crawlChips, ...(tier === "thin" ? starterChips : []), ...customChips]) {
+      const k = c.text.replace(/\s/g, "");
+      if (seen.has(k)) continue;
+      seen.add(k);
+      out.push(c);
+    }
+    return out;
+  })();
+  const chipOf = (text: string) => allChips.find((c) => c.text === text);
+  const isFactual = (text: string) => !!chipOf(text)?.factual;
 
-  const toggleKw = (k: string) =>
-    setKeywords((p) =>
-      p.includes(k) ? p.filter((x) => x !== k) : p.length >= MAX_KEYWORDS ? p : [...p, k]
-    );
-  const addKw = () => {
-    const v = kwInput.trim();
-    if (v && !keywords.includes(v) && keywords.length < MAX_KEYWORDS) setKeywords((p) => [...p, v]);
-    setKwInput("");
+  const toggleChip = (text: string) => {
+    setSelected((p) => {
+      if (p.includes(text)) {
+        setStarred((s) => s.filter((t) => t !== text));
+        setFactualOk((f) => {
+          const n = new Set(f);
+          n.delete(text);
+          return n;
+        });
+        return p.filter((t) => t !== text);
+      }
+      return [...p, text];
+    });
   };
 
-  const runOptions = async () => {
+  const toggleStar = (text: string) =>
+    setStarred((p) => (p.includes(text) ? p.filter((t) => t !== text) : p.length >= MAX_STARS ? p : [...p, text]));
+
+  const confirmFactual = (text: string) =>
+    setFactualOk((p) => {
+      const n = new Set(p);
+      if (n.has(text)) {
+        n.delete(text);
+        setStarred((s) => s.filter((t) => t !== text)); // 확인 해제 시 별표도 해제
+      } else n.add(text);
+      return n;
+    });
+
+  const addCustom = () => {
+    const v = customInput.trim();
+    if (!v) return;
+    if (!allChips.some((c) => c.text.replace(/\s/g, "") === v.replace(/\s/g, ""))) {
+      setCustomChips((p) => [...p, { text: v, section: "직접", factual: false }]);
+    }
+    setSelected((p) => (p.includes(v) ? p : [...p, v]));
+    setCustomInput("");
+  };
+
+  // ⓪→① 크롤 실행 — 상호+지역+업종으로 1회(negative-region·지도 교차검증은 서버가 수행)
+  const runCrawl = async () => {
     setKind("loading");
     try {
-      // 지역을 적었으면 그 지역 기준으로 다시 크롤(동명 업체 정확도↑). 없으면 백그라운드 pre-fetch 사용.
-      const region = regionInput.trim();
-      const research = region
-        ? await fetch("/api/enrich", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ mode: "research", name: query, region }),
-          })
-            .then((r) => r.json())
-            .then((d) => (typeof d.research === "string" ? d.research : ""))
-            .catch(() => "")
-        : (await researchRef.current) ?? "";
-      const noteParts = [
-        intro.trim(),
-        storyNote.trim() && `꼭 담고 싶은 이야기: ${storyNote.trim()}`,
-      ].filter(Boolean);
-      const ownerNote = noteParts.length ? noteParts.join("\n\n") : undefined;
+      const r = await fetch("/api/enrich", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mode: "keywords",
+          name: query,
+          region: regionInput.trim(),
+          businessType: btype.trim(),
+        }),
+      });
+      const d = await r.json();
+      setCrawlChips(Array.isArray(d.chips) ? d.chips : []);
+      setStarterChips(Array.isArray(d.starter) ? d.starter : []);
+      setTier(d.tier === "thin" ? "thin" : "rich");
+      setLinks(d.links && typeof d.links === "object" ? d.links : {});
+      setResearch(typeof d.research === "string" ? d.research : "");
+      // 재크롤 시 이전 선택 초기화(칩 구성이 달라짐)
+      setSelected([]);
+      setStarred([]);
+      setFactualOk(new Set());
+      setIgAnswer(null);
+      setHpAnswer(null);
+      setKind("chips");
+    } catch {
+      // 크롤 실패여도 막다른 길 없음 — 스타터 칩 + 직접 추가로 진행
+      setCrawlChips([]);
+      setStarterChips([]);
+      setTier("thin");
+      setLinks({});
+      setResearch("");
+      setKind("chips");
+    }
+  };
+
+  // ②→③ 생성 — 확인된 재료만. 조사메모 재사용(재크롤 없음).
+  const generate = async () => {
+    // 사실 게이트: factual인데 확인 안 한 칩은 재료에서 제외
+    const ingredients = selected.filter((t) => !isFactual(t) || factualOk.has(t));
+    const stars = starred.filter((t) => ingredients.includes(t)).slice(0, MAX_STARS);
+    // 직접 쓴 문구에 별표 = 그대로 넣기(유저의 표현을 의역하지 않는다)
+    const verbatim = stars.filter((t) => customChips.some((c) => c.text === t));
+    const genKey = JSON.stringify({ ingredients, stars, igAnswer, hpAnswer });
+    if (genKey === lastGenKey && options) {
+      setKind("fields"); // 입력 그대로면 재생성 스킵(콜 절약)
+      return;
+    }
+    setKind("generating");
+    try {
       const r = await fetch("/api/enrich", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -186,22 +291,25 @@ export function EnrichWizard({
           mode: "options",
           name: query,
           research,
-          focusKeywords: keywords,
-          ownerNote,
+          focusKeywords: ingredients,
+          starredKeywords: stars,
+          verbatimKeywords: verbatim,
         }),
       });
       const d = await r.json();
       const o: EnrichOptions | null = d.options ?? null;
       if (!o || (!o.oneLiners.length && !o.descriptions.length)) {
-        setErrMsg(d.error || "정보를 충분히 못 찾았어요. 직접 입력해 주세요.");
+        setErrMsg(d.error || "소개 후보를 만들지 못했어요. 직접 입력해 주세요.");
         setKind("error");
         return;
       }
       setOptions(o);
+      setLastGenKey(genKey);
       setFName(o.identity.name || query);
       setFAddress(o.identity.address || "");
-      setFInstagram(o.identity.instagram || "");
-      setFHomepage(o.identity.homepage || "");
+      // 링크는 유저가 "맞아요" 한 것만 — 크롤이 찾았어도 자동첨부 금지(오귀속 방지)
+      setFInstagram(igAnswer === "yes" && links.instagram ? links.instagram : "");
+      setFHomepage(hpAnswer === "yes" && links.homepage ? links.homepage : "");
       setOneLinerList(o.oneLiners);
       setOneLinerSel(0);
       setDescList(o.descriptions);
@@ -214,15 +322,19 @@ export function EnrichWizard({
     }
   };
 
-  // 힌트가 하나라도 있으면 마지막에 "이런 이야기도 찾았어요" 스텝 추가 — 0개면 desc에서 바로 apply
+  // 진행 스텝(칩 이후) — 이야기 스텝은 힌트가 있을 때만
   const storyItems = options ? storyItemsOf(options) : [];
-  const steps: Kind[] = storyItems.length ? [...BASE_STEPS, "story"] : BASE_STEPS;
+  const steps: Kind[] = storyItems.length
+    ? ["chips", "confirm", "fields", "oneLiner", "desc", "story"]
+    : ["chips", "confirm", "fields", "oneLiner", "desc"];
   const stepIdx = steps.indexOf(kind);
   const goNext = () => stepIdx >= 0 && stepIdx < steps.length - 1 && setKind(steps[stepIdx + 1]);
-  const goBack = () => stepIdx > 0 && setKind(steps[stepIdx - 1]);
+  const goBack = () => {
+    if (kind === "chips") setKind("seed");
+    else if (stepIdx > 0) setKind(steps[stepIdx - 1]);
+  };
 
   const apply = () => {
-    // ⑤스텝 체크 결과 → 인덱스/타입 기반 선택 목록(힌트 자체는 전체 전달 — 폼 인라인 힌트 영속)
     const selectedHints = storyItems.length
       ? {
           activities: (options?.activityHints ?? [])
@@ -253,6 +365,10 @@ export function EnrichWizard({
     });
   };
 
+  // 확인 화면에 보여줄 선택 칩(선택 순서 유지)
+  const confirmList = selected.map((t) => chipOf(t)).filter((c): c is KeywordChip => !!c);
+  const unconfirmedFactual = confirmList.filter((c) => c.factual && !factualOk.has(c.text));
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 p-4 sm:items-center"
@@ -275,26 +391,26 @@ export function EnrichWizard({
         {/* 진행 단계 표시 + 뒤로 */}
         {stepIdx >= 0 && (
           <div className="mb-3 flex items-center gap-2 pr-8">
-            {stepIdx > 0 && (
-              <button
-                type="button"
-                onClick={goBack}
-                className="-ml-1 inline-flex items-center gap-1 text-xs font-medium text-mute hover:text-ink"
-              >
-                ← 뒤로
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={goBack}
+              className="-ml-1 inline-flex items-center gap-1 text-xs font-medium text-mute hover:text-ink"
+            >
+              ← 뒤로
+            </button>
             <span className="ml-auto text-xs font-medium text-mute">
               {stepIdx + 1} / {steps.length}
             </span>
           </div>
         )}
 
-        {kind === "loading" && <LoadingView name={query} />}
+        {(kind === "loading" || kind === "generating") && (
+          <LoadingView name={query} generating={kind === "generating"} />
+        )}
 
         {kind === "error" && (
           <div className="pt-4 text-center">
-            <p className="text-lg font-bold text-ink">앗, 정보를 못 찾았어요</p>
+            <p className="text-lg font-bold text-ink">앗, 문제가 생겼어요</p>
             <p className="mt-1.5 text-[15px] leading-relaxed text-mute">{errMsg}</p>
             <button
               onClick={onClose}
@@ -305,187 +421,250 @@ export function EnrichWizard({
           </div>
         )}
 
-        {kind === "keywords" && (
+        {/* ⓪ 씨앗 — 지역·업종 필수 */}
+        {kind === "seed" && (
           <div>
-            {/* 인터뷰 진행 헤더 (n/4) — 결과 단계 헤더와 분리 */}
-            <div className="mb-3 flex items-center gap-2 pr-8">
-              {interviewStep > 0 && (
-                <button
-                  type="button"
-                  onClick={backInterview}
-                  className="-ml-1 inline-flex items-center gap-1 text-xs font-medium text-mute hover:text-ink"
-                >
-                  ← 뒤로
-                </button>
-              )}
-              <span className="ml-auto text-xs font-medium text-mute">
-                {interviewStep + 1} / 4
-              </span>
-            </div>
-
-            {/* 1/4 — 짧은 소개 */}
-            {interviewStep === 0 && (
+            <p className="pr-8 text-lg font-bold text-ink">어디에 있는, 어떤 브랜드인가요?</p>
+            <p className="mt-1.5 text-[15px] leading-relaxed text-mute">
+              같은 이름의 다른 곳과 헷갈리지 않게, 딱 두 가지만 알려주세요.
+            </p>
+            <div className="mt-4 space-y-3">
               <div>
-                <p className="pr-8 text-lg font-bold text-ink">
-                  먼저, 브랜드를 한 문장으로 알려주세요.
-                </p>
-                <p className="mt-1.5 text-[15px] leading-relaxed text-mute">
-                  간단하게 적어주셔도 AI가 초안을 만드는 데 큰 도움이 돼요.
-                </p>
-                <textarea
-                  value={intro}
-                  onChange={(e) => setIntro(e.target.value)}
-                  rows={3}
-                  placeholder="예: 버려지는 천으로 가방을 만드는 업사이클링 브랜드예요. 직접 만드는 워크숍도 함께 운영하고 있어요."
-                  className="mt-4 w-full rounded-sm border border-hairline bg-surface px-3 py-2.5 text-base leading-relaxed text-ink outline-none placeholder:text-faint focus:border-focus"
-                />
-                <p className="mt-1.5 text-[13px] leading-relaxed text-mute">
-                  한두 문장이면 충분해요. 적어주실수록 브랜드에 더 잘 맞는 소개를 만들어드릴 수 있어요.
-                </p>
-                <button
-                  onClick={nextInterview}
-                  className="mt-5 h-11 w-full rounded-md bg-primary text-sm font-medium text-primary-on"
-                >
-                  다음 (1/4)
-                </button>
-                <SkipLink onClick={nextInterview} />
-              </div>
-            )}
-
-            {/* 2/4 — 지역 */}
-            {interviewStep === 1 && (
-              <div>
-                <p className="pr-8 text-lg font-bold text-ink">
-                  좋아요. 어디에 있는 브랜드인가요?
-                </p>
+                <label className="mb-1.5 block text-[15px] font-medium text-body">
+                  지역 <span className="text-primary-on">*</span>
+                </label>
                 <input
                   value={regionInput}
                   onChange={(e) => setRegionInput(e.target.value)}
-                  placeholder="예: 서울 종로구"
-                  className="mt-4 h-11 w-full rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
+                  placeholder="예: 성수동, 홍대"
+                  className="h-11 w-full rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
                 />
-                <p className="mt-1.5 text-[13px] leading-relaxed text-mute">
-                  대략만 알려주셔도 돼요. 같은 이름의 다른 곳과 헷갈리지 않게 더 정확히 찾아드려요.
-                </p>
-                <button
-                  onClick={nextInterview}
-                  className="mt-5 h-11 w-full rounded-md bg-primary text-sm font-medium text-primary-on"
-                >
-                  다음 (2/4)
-                </button>
-                <SkipLink onClick={nextInterview} />
               </div>
-            )}
-
-            {/* 3/4 — 키워드 */}
-            {interviewStep === 2 && (
               <div>
-                <p className="pr-8 text-lg font-bold text-ink">
-                  강조하고 싶은 키워드나 단어가 있나요?
-                </p>
-                <p className="mt-1.5 text-[15px] leading-relaxed text-mute">
-                  최대 {MAX_KEYWORDS}개까지 고를 수 있어요.
-                </p>
-                <div className="mt-4 flex flex-wrap gap-2">
-                  {SUGGESTED_KEYWORDS.map((k) => {
-                    const on = keywords.includes(k);
-                    const full = !on && keywords.length >= MAX_KEYWORDS;
-                    return (
-                      <button
-                        key={k}
-                        type="button"
-                        onClick={() => toggleKw(k)}
-                        disabled={full}
-                        className={`inline-flex h-9 items-center rounded-pill border px-3.5 text-sm transition-colors ${
-                          on
-                            ? "border-primary bg-primary-tint text-primary-on"
-                            : "border-hairline bg-surface text-mute"
-                        } ${full ? "cursor-not-allowed opacity-40" : ""}`}
-                      >
-                        {k}
-                        {on ? " ✓" : ""}
-                      </button>
-                    );
-                  })}
-                  {keywords
-                    .filter((k) => !SUGGESTED_KEYWORDS.includes(k))
-                    .map((k) => (
-                      <button
-                        key={k}
-                        type="button"
-                        onClick={() => toggleKw(k)}
-                        className="inline-flex h-9 items-center rounded-pill border border-primary bg-primary-tint px-3.5 text-sm text-primary-on"
-                      >
-                        {k} ✕
-                      </button>
-                    ))}
-                </div>
-                <div className="mt-3 flex gap-2">
-                  <input
-                    value={kwInput}
-                    onChange={(e) => setKwInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && !e.nativeEvent.isComposing) {
-                        e.preventDefault();
-                        addKw();
-                      }
-                    }}
-                    placeholder="직접 더하기 (예: 반려동물)"
-                    disabled={keywords.length >= MAX_KEYWORDS}
-                    className="h-11 flex-1 rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus disabled:opacity-40"
-                  />
-                  <button
-                    type="button"
-                    onClick={addKw}
-                    disabled={keywords.length >= MAX_KEYWORDS}
-                    className="h-11 shrink-0 rounded-md border border-border-strong bg-surface px-4 text-sm font-medium text-ink disabled:opacity-40"
-                  >
-                    추가
-                  </button>
-                </div>
-                <p className="mt-2 text-xs text-mute">
-                  {keywords.length} / {MAX_KEYWORDS} · 그동안 {query}
-                  {josa(query, "을", "를")} 미리 찾고 있어요
-                </p>
-                <button
-                  onClick={nextInterview}
-                  className="mt-4 h-11 w-full rounded-md bg-primary text-sm font-medium text-primary-on"
-                >
-                  다음 (3/4)
-                </button>
-                <SkipLink onClick={nextInterview} />
-              </div>
-            )}
-
-            {/* 4/4 — 꼭 담고 싶은 이야기 */}
-            {interviewStep === 3 && (
-              <div>
-                <p className="pr-8 text-lg font-bold text-ink">
-                  마지막으로, 소개에 꼭 담고 싶은 이야기가 있나요?
-                </p>
-                <p className="mt-1.5 text-[15px] leading-relaxed text-mute">
-                  AI가 소개 초안을 만들 때 함께 참고할게요.
-                </p>
-                <textarea
-                  value={storyNote}
-                  onChange={(e) => setStoryNote(e.target.value)}
-                  rows={5}
-                  placeholder="예: 창업 계기, 꼭 알리고 싶은 특징, 강조하고 싶은 가치… 편하게 적어주세요."
-                  className="mt-4 w-full rounded-sm border border-hairline bg-surface px-3 py-2.5 text-base leading-relaxed text-ink outline-none placeholder:text-faint focus:border-focus"
+                <label className="mb-1.5 block text-[15px] font-medium text-body">
+                  업종 <span className="text-primary-on">*</span>
+                </label>
+                <input
+                  value={btype}
+                  onChange={(e) => setBtype(e.target.value)}
+                  placeholder="예: 빈티지 샵, 카페"
+                  className="h-11 w-full rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
                 />
-                <button
-                  onClick={runOptions}
-                  className="mt-5 h-11 w-full rounded-md bg-primary text-sm font-medium text-primary-on"
-                >
-                  ✨ 초안 받기 (4/4)
-                </button>
-                <SkipLink onClick={runOptions} />
               </div>
+            </div>
+            {/* 에코백 — 무엇으로 검색하는지 그대로 보여준다(잘못 겨냥 방지) */}
+            {seedReady && (
+              <p className="mt-3 rounded-md bg-surface-soft px-3 py-2 text-[13px] leading-relaxed text-mute">
+                「{query} · {regionInput.trim()} · {btype.trim()}」(으)로 웹에서 찾아볼게요.
+              </p>
             )}
+            <button
+              onClick={runCrawl}
+              disabled={!seedReady}
+              className="mt-5 h-11 w-full rounded-md bg-primary text-sm font-medium text-primary-on disabled:opacity-40"
+            >
+              ✨ 이 정보로 찾아보기
+            </button>
           </div>
         )}
 
-        {/* 스텝 1 — 개별 필드 확인·수정 */}
+        {/* ① 키워드 선택(넓게) */}
+        {kind === "chips" && (
+          <div>
+            <p className="pr-8 text-lg font-bold text-ink">
+              {tier === "thin" ? "찾은 건 적지만, 함께 채워봐요" : "이런 모습들을 찾았어요"}
+            </p>
+            {tier === "thin" && (
+              <p className="mt-2 rounded-md border border-hairline bg-surface-soft px-3 py-2.5 text-[13px] leading-relaxed text-mute">
+                온라인에서 확인 가능한 정보를 최대한 찾아봤지만, 기본 정보만 수집할 수
+                있었어요. 나머지는 직접 작성해 주세요.
+              </p>
+            )}
+            <p className="mt-1.5 text-[15px] leading-relaxed text-mute">
+              내 브랜드를 나타내는 게 보이면 <b className="text-body">최대한 많이</b> 골라주세요.
+              많이 고를수록 더 정확한 소개서가 작성돼요.
+            </p>
+            <div className="mt-1 flex items-center justify-between">
+              <button
+                type="button"
+                onClick={() => setKind("seed")}
+                className="text-[13px] text-faint underline-offset-2 hover:text-mute hover:underline"
+              >
+                「{regionInput.trim()} · {btype.trim()}」 수정
+              </button>
+              <span className="text-[13px] text-faint">{selected.length}개 선택</span>
+            </div>
+
+            <div className="mt-2 max-h-[42vh] space-y-3 overflow-y-auto slim-scrollbar pr-0.5">
+              {SECTION_ORDER.filter((s) => allChips.some((c) => c.section === s)).map((s) => (
+                <div key={s}>
+                  <p className="mb-1.5 text-[13px] font-medium text-faint">{SECTION_LABELS[s] ?? s}</p>
+                  <div className="flex flex-wrap gap-2">
+                    {allChips
+                      .filter((c) => c.section === s)
+                      .map((c) => {
+                        const on = selected.includes(c.text);
+                        return (
+                          <button
+                            key={c.text}
+                            type="button"
+                            onClick={() => toggleChip(c.text)}
+                            className={`inline-flex min-h-9 items-center rounded-pill border px-3.5 py-1.5 text-left text-sm leading-snug transition-colors ${
+                              on
+                                ? "border-primary bg-primary-tint text-primary-on"
+                                : "border-hairline bg-surface text-body"
+                            }`}
+                          >
+                            {c.text}
+                            {on ? " ✓" : ""}
+                          </button>
+                        );
+                      })}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* 직접 추가 — 크롤 구멍 메움 + 문장으로 쓰고 싶은 사람의 출구 */}
+            <div className="mt-3 flex gap-2">
+              <input
+                value={customInput}
+                onChange={(e) => setCustomInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+                    e.preventDefault();
+                    addCustom();
+                  }
+                }}
+                placeholder="직접 추가 (예: 수제, 비건, 반려동물 동반)"
+                className="h-11 min-w-0 flex-1 rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
+              />
+              <button
+                type="button"
+                onClick={addCustom}
+                className="h-11 shrink-0 rounded-md border border-border-strong bg-surface px-4 text-sm font-medium text-ink"
+              >
+                추가
+              </button>
+            </div>
+            <p className="mt-1.5 text-[13px] leading-relaxed text-faint">
+              문장으로 적어주셔도 좋아요. 적은 그대로 소개에 담아드려요.
+            </p>
+
+            <button
+              onClick={() => (selected.length ? setKind("confirm") : generate())}
+              className="mt-4 h-11 w-full rounded-md bg-primary text-sm font-medium text-primary-on"
+            >
+              {selected.length ? `고른 ${selected.length}개로 다음` : "키워드 없이 초안 받기"}
+            </button>
+          </div>
+        )}
+
+        {/* ② 확인·강조(좁게) — ⭐캡3 + 사실 게이트 + 링크 확인 */}
+        {kind === "confirm" && (
+          <div>
+            <p className="pr-8 text-lg font-bold text-ink">이게 맞나요?</p>
+            <p className="mt-1.5 text-[15px] leading-relaxed text-mute">
+              제일 중요한 것에 별표를 눌러주세요(최대 {MAX_STARS}개). 별표한 건 한 줄 소개에 꼭
+              담고, 나머지도 상세 소개에 담아드려요.
+            </p>
+            <div className="mt-4 max-h-[38vh] space-y-2 overflow-y-auto slim-scrollbar pr-0.5">
+              {confirmList.map((c) => {
+                const star = starred.includes(c.text);
+                const needsConfirm = c.factual && !factualOk.has(c.text);
+                return (
+                  <div
+                    key={c.text}
+                    className={`rounded-md border px-3 py-2.5 ${
+                      needsConfirm ? "border-border-strong bg-surface-soft" : "border-hairline bg-surface"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <span className="min-w-0 flex-1 text-[15px] leading-snug text-ink">{c.text}</span>
+                      {c.factual && !needsConfirm && (
+                        <button
+                          type="button"
+                          onClick={() => confirmFactual(c.text)}
+                          className="shrink-0 text-[12px] text-faint underline-offset-2 hover:underline"
+                        >
+                          확인 취소
+                        </button>
+                      )}
+                      {!needsConfirm && (
+                        <button
+                          type="button"
+                          onClick={() => toggleStar(c.text)}
+                          disabled={!star && starred.length >= MAX_STARS}
+                          aria-label={star ? "별표 해제" : "별표"}
+                          className={`shrink-0 text-xl leading-none ${
+                            star ? "" : "opacity-35"
+                          } disabled:opacity-15`}
+                        >
+                          {star ? "⭐" : "☆"}
+                        </button>
+                      )}
+                    </div>
+                    {needsConfirm && (
+                      <div className="mt-2">
+                        <p className="text-[13px] leading-relaxed text-mute">
+                          숫자·이력 정보예요. 다른 곳의 정보가 섞였을 수 있으니, 사실이 맞는지
+                          확인해 주세요.
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => confirmFactual(c.text)}
+                          className="mt-1.5 h-8 rounded-pill border border-border-strong bg-surface px-3 text-[13px] font-medium text-ink hover:border-primary"
+                        >
+                          맞아요, 우리 이야기예요
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            {unconfirmedFactual.length > 0 && (
+              <p className="mt-2 text-[13px] leading-relaxed text-faint">
+                확인하지 않은 숫자·이력 항목은 소개에 담지 않아요.
+              </p>
+            )}
+
+            {/* 링크 확인 — 자동첨부 금지. 기본 미선택, "맞아요"를 눌러야만 담긴다. */}
+            {(links.instagram || links.homepage) && (
+              <div className="mt-3 space-y-2">
+                {links.instagram && (
+                  <LinkConfirmCard
+                    label="인스타그램"
+                    value={links.instagram}
+                    note={links.instagramConfirmed ? "홈페이지에서 발견했어요" : "웹 검색에서 발견했어요"}
+                    question={`이 계정이 ${query}${josa(query, "이", "가")} 맞나요?`}
+                    answer={igAnswer}
+                    onAnswer={setIgAnswer}
+                  />
+                )}
+                {links.homepage && (
+                  <LinkConfirmCard
+                    label="홈페이지"
+                    value={links.homepage}
+                    note="웹 검색에서 발견했어요"
+                    question={`이 홈페이지가 ${query}${josa(query, "이", "가")} 맞나요?`}
+                    answer={hpAnswer}
+                    onAnswer={setHpAnswer}
+                  />
+                )}
+              </div>
+            )}
+
+            <button
+              onClick={generate}
+              className="mt-4 h-11 w-full rounded-md bg-primary text-sm font-medium text-primary-on"
+            >
+              ✨ 이 내용으로 소개 만들기
+            </button>
+          </div>
+        )}
+
+        {/* 정보 확인·수정 */}
         {kind === "fields" && (
           <div>
             <p className="pr-8 text-lg font-bold text-ink">찾은 정보가 맞나요?</p>
@@ -512,7 +691,7 @@ export function EnrichWizard({
           </div>
         )}
 
-        {/* 스텝 2 — 한 줄 소개 5지선다 */}
+        {/* 한 줄 소개 5지선다 */}
         {kind === "oneLiner" && options && (
           <div>
             <p className="pr-8 text-lg font-bold text-ink">한 줄 소개를 골라주세요</p>
@@ -538,7 +717,7 @@ export function EnrichWizard({
           </div>
         )}
 
-        {/* 스텝 3 — 브랜드 소개 5지선다 */}
+        {/* 브랜드 소개 5지선다 */}
         {kind === "desc" && options && (
           <div>
             <p className="pr-8 text-lg font-bold text-ink">브랜드 소개를 골라주세요</p>
@@ -565,7 +744,7 @@ export function EnrichWizard({
           </div>
         )}
 
-        {/* 스텝 4 — 찾은 이야기 체크리스트(힌트 있을 때만) */}
+        {/* 찾은 이야기 체크리스트(힌트 있을 때만) */}
         {kind === "story" && (
           <div>
             <p className="pr-8 text-lg font-bold text-ink">이런 이야기도 찾았어요</p>
@@ -612,16 +791,54 @@ export function EnrichWizard({
   );
 }
 
-// 인터뷰 각 스텝 하단 '건너뛰기' — 값은 지우지 않고 다음 스텝으로 진행
-function SkipLink({ onClick }: { onClick: () => void }) {
+// 링크 확인 카드 — 기본 미선택. "맞아요"를 눌러야만 폼에 담긴다(오귀속 방지).
+function LinkConfirmCard({
+  label,
+  value,
+  note,
+  question,
+  answer,
+  onAnswer,
+}: {
+  label: string;
+  value: string;
+  note: string;
+  question: string;
+  answer: "yes" | "no" | null;
+  onAnswer: (a: "yes" | "no") => void;
+}) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="mt-2 block w-full text-center text-sm text-mute hover:text-ink"
-    >
-      건너뛰기
-    </button>
+    <div className="rounded-md border border-hairline bg-surface px-3 py-2.5">
+      <p className="text-[13px] text-faint">
+        {label} · {note}
+      </p>
+      <p className="mt-0.5 break-all text-[15px] font-medium text-ink">{value}</p>
+      <p className="mt-1 text-[13px] leading-relaxed text-mute">{question}</p>
+      <div className="mt-2 flex gap-2">
+        <button
+          type="button"
+          onClick={() => onAnswer("yes")}
+          className={`h-8 rounded-pill border px-3.5 text-[13px] font-medium transition-colors ${
+            answer === "yes"
+              ? "border-primary bg-primary-tint text-primary-on"
+              : "border-border-strong bg-surface text-ink"
+          }`}
+        >
+          맞아요
+        </button>
+        <button
+          type="button"
+          onClick={() => onAnswer("no")}
+          className={`h-8 rounded-pill border px-3.5 text-[13px] font-medium transition-colors ${
+            answer === "no"
+              ? "border-ink bg-surface-soft text-ink"
+              : "border-border-strong bg-surface text-mute"
+          }`}
+        >
+          아니에요
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -778,18 +995,23 @@ function OptionPicker({
 }
 
 // 아톰 마크 + 순환 메시지 로딩 (회전 X = 어지럼 방지)
-const LOADING_STEPS = [
+const CRAWL_STEPS = [
   "웹에서 정보를 모으는 중…",
-  "인스타·홈페이지를 살펴보는 중…",
+  "같은 이름의 다른 곳을 걸러내는 중…",
+  "브랜드의 모습을 키워드로 정리하는 중…",
+];
+const GEN_STEPS = [
+  "고른 키워드를 살펴보는 중…",
   "브랜드의 분위기를 읽는 중…",
   "소개 후보를 다듬는 중…",
 ];
-function LoadingView({ name }: { name: string }) {
+function LoadingView({ name, generating }: { name: string; generating?: boolean }) {
+  const msgs = generating ? GEN_STEPS : CRAWL_STEPS;
   const [i, setI] = useState(0);
   useEffect(() => {
-    const t = setInterval(() => setI((p) => (p + 1) % LOADING_STEPS.length), 2000);
+    const t = setInterval(() => setI((p) => (p + 1) % msgs.length), 2000);
     return () => clearInterval(t);
-  }, []);
+  }, [msgs.length]);
   return (
     <div className="flex flex-col items-center py-6 text-center" role="status" aria-live="polite">
       <svg viewBox="0 0 56 56" className="h-11 w-11 text-ink" fill="none" aria-hidden="true">
@@ -803,9 +1025,13 @@ function LoadingView({ name }: { name: string }) {
         <circle cx="28" cy="28" r="7" fill="var(--primary)" stroke="currentColor" strokeWidth="2" />
       </svg>
       <p className="mt-5 text-base font-bold text-ink">
-        {name ? `${name}${josa(name, "을", "를")} 살펴보는 중이에요` : "브랜드를 살펴보는 중이에요"}
+        {generating
+          ? "소개를 만드는 중이에요"
+          : name
+            ? `${name}${josa(name, "을", "를")} 살펴보는 중이에요`
+            : "브랜드를 살펴보는 중이에요"}
       </p>
-      <p className="mt-1.5 text-sm text-mute">{LOADING_STEPS[i]}</p>
+      <p className="mt-1.5 text-sm text-mute">{msgs[i]}</p>
     </div>
   );
 }

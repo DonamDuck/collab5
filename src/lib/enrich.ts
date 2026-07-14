@@ -67,7 +67,9 @@ export interface DraftInput {
 export interface OptionsInput {
   name: string;
   research: string; // enrichResearch()가 만든 조사 메모(네이버+제미나이)
-  focusKeywords?: string[];
+  focusKeywords?: string[]; // 유저가 고른 키워드 = 생성 재료(안 고른 건 버림)
+  starredKeywords?: string[]; // ⭐ 한 줄 소개에 반드시 반영(캡 3, 순서=우선순위)
+  verbatimKeywords?: string[]; // 그대로 넣기 — 유저가 직접 쓴 문구(의역 금지)
   ownerNote?: string; // 사장이 직접 쓴 한두 문장 — 생성의 최우선 중심축
 }
 
@@ -1186,9 +1188,18 @@ class NaverGeminiProvider implements SearchProvider {
       ? `⭐⭐가장 중요 — 사장이 직접 쓴 브랜드 핵심 설명이야. 이 내용·관점·강조점을 모든 후보의 최우선 중심으로 삼아줘(조사 자료보다 이걸 우선):\n"${input.ownerNote.trim()}"\n\n`
       : "";
     const kw = input.focusKeywords?.length
-      ? `⭐가중 키워드(중요하게 반영): ${input.focusKeywords.join(", ")}\n\n`
+      ? `⭐사장이 직접 고른 키워드(이것들이 곧 이 브랜드다 — 모든 후보의 재료로 최우선 사용. 단, 나열하지 말고 자연스러운 문장으로 녹여라): ${input.focusKeywords.join(", ")}\n\n`
       : "";
-    const prompt = `브랜드명: "${input.name}"\n\n${note}${kw}[조사 자료 — 네이버 검색 + 제미나이 웹 조사]\n${input.research}\n\n위 정보로 한 줄 소개 5개, 브랜드 소개 5개(각 3~5문장, 모두 해요체), 브랜드 결 단어 2~4개, identity(지역·주소·인스타·홈피)를 뽑아줘.
+    // ⭐ 별표 = 한 줄 소개에 반드시 반영(캡 3, 순서=우선). 40자 안에 다 못 담으면 뒤 순위는 장문으로.
+    const starred = (input.starredKeywords ?? []).filter((s) => s?.trim()).slice(0, 3);
+    const star = starred.length
+      ? `⭐⭐한 줄 소개(oneLiners)에 반드시 반영할 핵심(우선순위 순): ${starred.join(" > ")}. 1순위는 모든 한 줄 후보에 꼭 담고, 자리가 부족하면 뒤 순위는 descriptions(장문)에서 비중 있게 다뤄.\n\n`
+      : "";
+    const verbatim = (input.verbatimKeywords ?? []).filter((s) => s?.trim());
+    const verb = verbatim.length
+      ? `⭐그대로 쓸 문구(사장이 직접 쓴 표현 — 의역·바꿔쓰기 금지, 원문 그대로 등장시켜): ${verbatim.map((v) => `"${v}"`).join(", ")}\n\n`
+      : "";
+    const prompt = `브랜드명: "${input.name}"\n\n${note}${kw}${star}${verb}[조사 자료 — 네이버 검색 + 제미나이 웹 조사]\n${input.research}\n\n위 정보로 한 줄 소개 5개, 브랜드 소개 5개(각 3~5문장, 모두 해요체), 브랜드 결 단어 2~4개, identity(지역·주소·인스타·홈피)를 뽑아줘.
 ⭐identity.homepage는 조사 자료에 URL이 있으면 채워줘. identity.instagram은 ⚠️'홈페이지 직접 확인' 항목에서 실제 확인된 핸들이 있을 때만 채워 — 그 외에는 추측하지 말고 빈 문자열로 둬(무관한 계정도 금지).
 ⭐단 instagram이 확정 안 됐으면 instagramCandidates에 도메인·브랜드명 기반 그럴듯한 추정 핸들 2~4개를 넣어줘(사장이 직접 고를 후보). 예: 도메인이 canvasgarden.shop이면 @canvasgarden, @canvasgarden_official, @canvasgarden.shop 등.
 나머지는 사실만 쓰고, 확인 안 된 필드는 빈 문자열. 모든 문장은 '해요체'로 끝내('~합니다/~습니다' 금지).

@@ -143,6 +143,8 @@ export async function POST(req: Request) {
         name,
         research: typeof body.research === "string" ? body.research : "",
         focusKeywords: strArr(body.focusKeywords),
+        starredKeywords: strArr(body.starredKeywords),
+        verbatimKeywords: strArr(body.verbatimKeywords),
         ownerNote: typeof body.ownerNote === "string" ? body.ownerNote : undefined,
       });
       return NextResponse.json({ options });
