@@ -14,9 +14,8 @@ import { deriveRegion } from "@/lib/region";
 import { isRichIntro } from "@/lib/completeness";
 import { uploadPhoto, uploadPdf } from "@/lib/upload";
 import { ScrollLock } from "@/components/ScrollLock";
-import type { ActivityHint, BlockHint, CollabHint, EnrichField, SeeksHint } from "@/lib/enrich";
+import type { ActivityHint, CollabHint, EnrichField } from "@/lib/enrich";
 import { EnrichWizard, type WizardFill } from "./EnrichWizard";
-import { RevealStep, type RevealCard } from "./RevealStep";
 import { BlockEditor, emptyBlock } from "./BlockEditor";
 import { PhotoGrid } from "./PhotoGrid";
 import { StubSection } from "./StubSection";
@@ -57,14 +56,6 @@ const COLLAB_TYPES: CollabType[] = [
   "행사참여",
   "공간대여",
 ];
-
-// 리빌 블록 카드 라벨 — BlockEditor CATALOG 라벨 승계(카탈로그와 문장 일치 유지)
-const BLOCK_HINT_LABELS: Record<BlockHint["type"], string> = {
-  metrics: "우리를 보여주는 숫자",
-  press: "소개된 곳들",
-  space: "우리의 공간",
-  reviews: "고객들의 이야기",
-};
 
 // 브랜드 표현 어휘 — 4카테고리(감성·가치·스타일·성격). 직접 추가 가능, 최대 10개 선택.
 const VIBE_CATEGORIES: { label: string; words: string[] }[] = [
@@ -208,11 +199,6 @@ function RegisterForm() {
   const [collabHints, setCollabHints] = useState<CollabHint[]>([]);
   const [usedActHints, setUsedActHints] = useState<Set<number>>(new Set());
   const [usedCollabHints, setUsedCollabHints] = useState<Set<number>>(new Set());
-  // ── AI 리빌("이런 이야기들을 찾았어요") — 위저드 완료 → 폼 진입 직전 카드 스택 ──
-  const [revealCards, setRevealCards] = useState<RevealCard[] | null>(null);
-  // 카드 원본 힌트 보관 — 카드에는 프리뷰 문자열만 실리므로 [담기] 시 실제 값 주입용
-  const [revealSeeksHint, setRevealSeeksHint] = useState<SeeksHint | null>(null);
-  const [revealBlockHints, setRevealBlockHints] = useState<BlockHint[]>([]);
 
   // ── 초안받기 상태 ──
   const [draftBusy, setDraftBusy] = useState(false);
@@ -472,7 +458,53 @@ function RegisterForm() {
     setWizardOpen(true);
   };
 
+  // 힌트 '이 내용으로 시작하기' — 빈 카드 우선 채움, 없으면 새 카드(최대 3), 꽉 차면 불가.
+  // inject* = 힌트 값 직접 주입: 위저드 ⑤스텝 즉시 적용은 setActHints 직후라 state 힌트를
+  // 못 읽는 타이밍이므로 값 기반으로 분리(functional setState라 연속 주입도 안전).
+  const injectActHint = (h: ActivityHint) => {
+    setActivities((p) => {
+      const empty = p.findIndex((a) => !a.title.trim() && !a.desc.trim() && !a.photos.length);
+      if (empty >= 0)
+        return p.map((a, j) => (j === empty ? { ...a, title: h.title, desc: h.desc } : a));
+      if (p.length < 3) return [...p, { title: h.title, desc: h.desc, photos: [] }];
+      return p;
+    });
+  };
+  const applyActHint = (i: number) => {
+    const h = actHints[i];
+    if (!h) return;
+    injectActHint(h);
+    setUsedActHints((s) => new Set(s).add(i));
+  };
+  const canApplyActHint =
+    activities.some((a) => !a.title.trim() && !a.desc.trim() && !a.photos.length) ||
+    activities.length < 3;
+  const injectCollabHint = (h: CollabHint) => {
+    setCollabHistory((p) => {
+      const empty = p.findIndex(
+        (c) => !c.partner.trim() && !c.desc.trim() && !c.types.length && !c.photos.length
+      );
+      if (empty >= 0)
+        return p.map((c, j) => (j === empty ? { ...c, partner: h.partner, desc: h.desc } : c));
+      if (p.length < 3) return [...p, { ...emptyHist(), partner: h.partner, desc: h.desc }];
+      return p;
+    });
+  };
+  const applyCollabHint = (i: number) => {
+    const h = collabHints[i];
+    if (!h) return;
+    injectCollabHint(h);
+    setUsedCollabHints((s) => new Set(s).add(i));
+  };
+  const canApplyCollabHint =
+    collabHistory.some(
+      (c) => !c.partner.trim() && !c.desc.trim() && !c.types.length && !c.photos.length
+    ) || collabHistory.length < 3;
+
   // 위저드가 고른 항목만 폼에 반영(검수 게이트). AI는 '초안'만 — 사용자가 확인·수정 후 저장.
+  // ⑤스텝(찾은 이야기)에서 체크한 힌트(fill.selectedHints)는 즉시 적용 — never-overwrite:
+  // 사용자가 이미 만진 필드는 덮지 않는다. 미선택 활동·콜라보 힌트는 actHints/collabHints에
+  // 남아 섹션 안 인라인 힌트로 재등장하고, 미선택 seeks·블록 힌트는 적용 없이 소멸.
   const applyWizard = (fill: WizardFill) => {
     const filled = new Set<string>();
     if (fill.name !== undefined) {
@@ -504,159 +536,70 @@ function RegisterForm() {
       filled.add("description");
       setDraftGenerated(true); // 위저드가 이미 소개 초안을 채움 → 버튼은 '다시 받기'로
     }
+    // 힌트는 전체 보관(인라인 힌트 영속) — 선택돼 즉시 적용된 인덱스는 used 처리해 중복 노출 방지
     if (fill.activityHints?.length) {
       setActHints(fill.activityHints);
-      setUsedActHints(new Set());
+      setUsedActHints(new Set(fill.selectedHints?.activities ?? []));
     }
     if (fill.collabHints?.length) {
       setCollabHints(fill.collabHints);
-      setUsedCollabHints(new Set());
+      setUsedCollabHints(new Set(fill.selectedHints?.collabs ?? []));
     }
+
+    // ── ⑤스텝 체크 결과 즉시 적용 ──
+    const sel = fill.selectedHints;
+    if (sel) {
+      if (sel.activities.length) {
+        sel.activities.forEach((i) => {
+          const h = fill.activityHints?.[i];
+          if (h) injectActHint(h);
+        });
+        openSection("activities");
+      }
+      if (sel.collabs.length) {
+        sel.collabs.forEach((i) => {
+          const h = fill.collabHints?.[i];
+          if (h) injectCollabHint(h);
+        });
+        openSection("collabs");
+      }
+      if (sel.seeks && fill.seeksHint) {
+        const types = fill.seeksHint.types.filter((t): t is CollabType =>
+          (COLLAB_TYPES as string[]).includes(t)
+        );
+        if (!seeks.length && types.length) setSeeks(types);
+        if (!seeksNote.trim() && fill.seeksHint.note.trim()) setSeeksNote(fill.seeksHint.note);
+        openSection("seeks");
+        filled.add("seeks");
+      }
+      (fill.blockHints ?? [])
+        .filter((b) => sel.blocks.includes(b.type))
+        .forEach((h) => {
+          setBlocks((p) => {
+            if (p.some((b) => b.type === h.type)) return p; // 이미 담긴 블록은 덮지 않음
+            const nb = emptyBlock(h.type);
+            // metrics·press는 힌트 items를 밑그림으로 주입(빈 밑그림이면 빈 블록 그대로)
+            if (nb.type === "metrics") {
+              const items = (h.items ?? [])
+                .filter((it) => it.label.trim())
+                .map((it) => ({ label: it.label, value: it.value ?? "" }));
+              if (items.length) nb.items = items;
+            }
+            if (nb.type === "press") {
+              const items = (h.items ?? [])
+                .filter((it) => it.label.trim())
+                .map((it) => ({ title: it.label, year: it.year || undefined }));
+              if (items.length) nb.items = items;
+            }
+            return [...p, nb];
+          });
+        });
+    }
+
     setAiFilled(filled);
     setMissing([]);
     setReviewMode(true);
     setWizardOpen(false);
-
-    // ── 리빌 카드 조립 — 순서 = seeks 최우선(스펙 §매칭 완화책) → 소개 초안 → 활동 → 콜라보 → 블록 ──
-    setRevealSeeksHint(fill.seeksHint ?? null);
-    setRevealBlockHints(fill.blockHints ?? []);
-    const cards: RevealCard[] = [];
-    if (fill.seeksHint) {
-      const types = fill.seeksHint.types.filter((t): t is CollabType =>
-        (COLLAB_TYPES as string[]).includes(t)
-      );
-      cards.push({
-        key: "seeks",
-        sectionLabel: "이런 파트너를 찾고 있어요.",
-        preview: types.length ? `${fill.seeksHint.note} — ${types.join(" · ")}` : fill.seeksHint.note,
-        reason: fill.seeksHint.reason,
-      });
-    }
-    // 소개글 후보 카드 — 위저드가 이미 소개를 채웠으면 생략(위저드 스텝에서 소비됨, 이중 제안 방지)
-    if (!fill.description && descChoices.length) {
-      cards.push({
-        key: "description",
-        sectionLabel: "브랜드를 소개해주세요.",
-        preview: descChoices[0],
-        reason: "웹에서 찾은 정보로 쓴 초안이에요",
-      });
-    }
-    (fill.activityHints ?? []).forEach((h, i) =>
-      cards.push({
-        key: `activity-${i}`,
-        sectionLabel: "주로 어떤 활동을 하나요?",
-        preview: [h.title, h.desc].filter(Boolean).join(" — "),
-        reason: h.source || "웹에서 봤어요",
-      })
-    );
-    (fill.collabHints ?? []).forEach((h, i) =>
-      cards.push({
-        key: `collab-${i}`,
-        sectionLabel: "이런 콜라보 경험이 있어요.",
-        preview: [h.partner, h.desc].filter(Boolean).join(" — "),
-        reason: h.source || "웹에서 봤어요",
-      })
-    );
-    (fill.blockHints ?? []).forEach((b) =>
-      cards.push({
-        key: `block-${b.type}`,
-        sectionLabel: BLOCK_HINT_LABELS[b.type],
-        preview: b.items?.length
-          ? b.items.map((it) => [it.label, it.value ?? it.year].filter(Boolean).join(" ")).join(" · ")
-          : b.reason,
-        reason: b.reason,
-      })
-    );
-    // 빈손 리빌 금지 — 찾은 카드가 없으면 리빌 스텝 자체를 건너뜀(지어내기 없음 정책)
-    setRevealCards(cards.length ? cards : null);
-  };
-
-  // 힌트 '이 내용으로 시작하기' — 빈 카드 우선 채움, 없으면 새 카드(최대 3), 꽉 차면 불가
-  const applyActHint = (i: number) => {
-    const h = actHints[i];
-    if (!h) return;
-    setActivities((p) => {
-      const empty = p.findIndex((a) => !a.title.trim() && !a.desc.trim() && !a.photos.length);
-      if (empty >= 0)
-        return p.map((a, j) => (j === empty ? { ...a, title: h.title, desc: h.desc } : a));
-      if (p.length < 3) return [...p, { title: h.title, desc: h.desc, photos: [] }];
-      return p;
-    });
-    setUsedActHints((s) => new Set(s).add(i));
-  };
-  const canApplyActHint =
-    activities.some((a) => !a.title.trim() && !a.desc.trim() && !a.photos.length) ||
-    activities.length < 3;
-  const applyCollabHint = (i: number) => {
-    const h = collabHints[i];
-    if (!h) return;
-    setCollabHistory((p) => {
-      const empty = p.findIndex(
-        (c) => !c.partner.trim() && !c.desc.trim() && !c.types.length && !c.photos.length
-      );
-      if (empty >= 0)
-        return p.map((c, j) => (j === empty ? { ...c, partner: h.partner, desc: h.desc } : c));
-      if (p.length < 3) return [...p, { ...emptyHist(), partner: h.partner, desc: h.desc }];
-      return p;
-    });
-    setUsedCollabHints((s) => new Set(s).add(i));
-  };
-  const canApplyCollabHint =
-    collabHistory.some(
-      (c) => !c.partner.trim() && !c.desc.trim() && !c.types.length && !c.photos.length
-    ) || collabHistory.length < 3;
-
-  // 리빌 [이 내용으로 담기] — never-overwrite: 사용자가 이미 만진 필드는 절대 덮지 않는다.
-  // 건너뛴 카드는 여기 안 옴 — 원본 힌트(actHints 등)가 살아 있어 섹션 안 인라인 힌트로 재등장.
-  const acceptReveal = (key: string) => {
-    if (key === "seeks") {
-      const h = revealSeeksHint;
-      if (!h) return;
-      const types = h.types.filter((t): t is CollabType => (COLLAB_TYPES as string[]).includes(t));
-      if (!seeks.length && types.length) setSeeks(types);
-      if (!seeksNote.trim() && h.note.trim()) setSeeksNote(h.note);
-      openSection("seeks");
-      setAiFilled((s) => new Set(s).add("seeks"));
-      return;
-    }
-    if (key === "description") {
-      const v = (descChoices[0] ?? "").trim();
-      if (v && !description.trim()) {
-        setDescription(v);
-        setDraftGenerated(true);
-        setAiFilled((s) => new Set(s).add("description"));
-      }
-      return;
-    }
-    if (key.startsWith("activity-")) {
-      applyActHint(Number(key.slice("activity-".length)));
-      openSection("activities");
-      return;
-    }
-    if (key.startsWith("collab-")) {
-      applyCollabHint(Number(key.slice("collab-".length)));
-      openSection("collabs");
-      return;
-    }
-    if (key.startsWith("block-")) {
-      const h = revealBlockHints.find((b) => `block-${b.type}` === key);
-      if (!h || blocks.some((b) => b.type === h.type)) return; // 이미 담긴 블록은 덮지 않음
-      const nb = emptyBlock(h.type);
-      // metrics·press는 힌트 items를 밑그림으로 주입(빈 밑그림이면 빈 블록 그대로)
-      if (nb.type === "metrics") {
-        const items = (h.items ?? [])
-          .filter((it) => it.label.trim())
-          .map((it) => ({ label: it.label, value: it.value ?? "" }));
-        if (items.length) nb.items = items;
-      }
-      if (nb.type === "press") {
-        const items = (h.items ?? [])
-          .filter((it) => it.label.trim())
-          .map((it) => ({ title: it.label, year: it.year || undefined }));
-        if (items.length) nb.items = items;
-      }
-      setBlocks((p) => [...p, nb]);
-    }
   };
 
   // 라벨 옆 표시: AI가 채운 필드면 ✨배지, 못 찾은 필드면 "직접 입력" 노티
@@ -1652,17 +1595,6 @@ function RegisterForm() {
           query={query.trim()}
           onClose={() => setWizardOpen(false)}
           onApply={applyWizard}
-        />
-      )}
-
-      {/* AI 리빌 — 위저드가 찾은 이야기 카드 스택(빈손이면 렌더 자체를 안 함) */}
-      {revealCards && revealCards.length > 0 && (
-        <RevealStep
-          cards={revealCards}
-          onAccept={acceptReveal}
-          // 건너뛰기 = 카드만 처리 — 원본 힌트(actHints 등)는 유지되어 섹션 안 인라인 힌트로 재등장
-          onSkip={() => {}}
-          onDone={() => setRevealCards(null)}
         />
       )}
 

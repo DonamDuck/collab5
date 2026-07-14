@@ -4,7 +4,8 @@
 //  ① 가중 키워드 입력(뱃지 max 4) — 동시에 백그라운드로 브랜드명 크롤링 시작(#3 로딩 체감↓)
 //  ② 개별 필드 확인·수정(상호·주소·인스타·홈피)
 //  ③ 한 줄 소개 5지선다(택1 + 직접 수정)
-//  ④ 브랜드 소개 5지선다(택1 + 직접 수정) → 폼 반영
+//  ④ 브랜드 소개 5지선다(택1 + 직접 수정)
+//  ⑤ "이런 이야기도 찾았어요" — 크롤 힌트(활동·콜라보·파트너·블록) 체크리스트(기본 전부 체크) → 폼 반영
 import { useEffect, useRef, useState } from "react";
 import { ScrollLock } from "@/components/ScrollLock";
 import type { ActivityHint, BlockHint, CollabHint, EnrichOptions, SeeksHint } from "@/lib/enrich";
@@ -21,8 +22,10 @@ export type WizardFill = {
   description?: string;
   activityHints?: ActivityHint[]; // 크롤이 발견한 활동 흔적(참고용)
   collabHints?: CollabHint[]; // 크롤이 발견한 콜라보 흔적(참고용)
-  blockHints?: BlockHint[]; // 크롤 근거 기반 추천 블록(리빌 카드 소스)
-  seeksHint?: SeeksHint; // 원하는 파트너·협업 단서(리빌 최우선 카드 소스)
+  blockHints?: BlockHint[]; // 크롤 근거 기반 추천 블록(전체 — 폼 인라인 힌트 영속용)
+  seeksHint?: SeeksHint; // 원하는 파트너·협업 단서(전체)
+  // ⑤스텝에서 체크한 것 — 인덱스/타입 기반. 있으면 page가 즉시 폼에 주입.
+  selectedHints?: { activities: number[]; collabs: number[]; blocks: string[]; seeks: boolean };
 };
 
 const SUGGESTED_KEYWORDS = [
@@ -37,9 +40,60 @@ const SUGGESTED_KEYWORDS = [
 ];
 const MAX_KEYWORDS = 4;
 
-// 진행 단계: 키워드 → (로딩) → 필드 → 한줄소개 → 브랜드소개
-type Kind = "keywords" | "loading" | "fields" | "oneLiner" | "desc" | "error";
-const STEP_ORDER: Kind[] = ["fields", "oneLiner", "desc"];
+// 진행 단계: 키워드 → (로딩) → 필드 → 한줄소개 → 브랜드소개 → 찾은 이야기(힌트 있을 때만)
+type Kind = "keywords" | "loading" | "fields" | "oneLiner" | "desc" | "story" | "error";
+const BASE_STEPS: Kind[] = ["fields", "oneLiner", "desc"];
+
+// ⑤스텝 체크 항목 — 크롤 힌트를 섹션 라벨+미리보기+근거로 평탄화(한 줄/자세히 소개는 앞 스텝이 처리).
+type StoryItem = { key: string; sectionLabel: string; preview: string; reason: string };
+
+// 블록 힌트 라벨 — BlockEditor CATALOG 라벨 승계(카탈로그와 문장 일치 유지)
+const BLOCK_HINT_LABELS: Record<BlockHint["type"], string> = {
+  metrics: "우리를 보여주는 숫자",
+  press: "소개된 곳들",
+  space: "우리의 공간",
+  reviews: "고객들의 이야기",
+};
+
+function storyItemsOf(o: EnrichOptions): StoryItem[] {
+  const items: StoryItem[] = [];
+  (o.activityHints ?? []).forEach((h, i) =>
+    items.push({
+      key: `activity-${i}`,
+      sectionLabel: "주로 어떤 활동을 하나요?",
+      preview: [h.title, h.desc].filter(Boolean).join(" — "),
+      reason: h.source || "웹에서 봤어요",
+    })
+  );
+  (o.collabHints ?? []).forEach((h, i) =>
+    items.push({
+      key: `collab-${i}`,
+      sectionLabel: "이런 콜라보 경험이 있어요.",
+      preview: [h.partner, h.desc].filter(Boolean).join(" — "),
+      reason: h.source || "웹에서 봤어요",
+    })
+  );
+  if (o.seeksHint) {
+    const types = o.seeksHint.types ?? [];
+    items.push({
+      key: "seeks",
+      sectionLabel: "이런 파트너를 찾고 있어요.",
+      preview: types.length ? `${o.seeksHint.note} — ${types.join(" · ")}` : o.seeksHint.note,
+      reason: o.seeksHint.reason || "웹에서 봤어요",
+    });
+  }
+  (o.blockHints ?? []).forEach((b) =>
+    items.push({
+      key: `block-${b.type}`,
+      sectionLabel: BLOCK_HINT_LABELS[b.type],
+      preview: b.items?.length
+        ? b.items.map((it) => [it.label, it.value ?? it.year].filter(Boolean).join(" ")).join(" · ")
+        : b.reason,
+      reason: b.reason || "웹에서 봤어요",
+    })
+  );
+  return items;
+}
 
 export function EnrichWizard({
   query,
@@ -72,6 +126,15 @@ export function EnrichWizard({
   const [oneLinerSel, setOneLinerSel] = useState(0);
   const [descList, setDescList] = useState<string[]>([]);
   const [descSel, setDescSel] = useState(0);
+  // ⑤ 찾은 이야기 체크 상태 — 기본 전부 체크(옵션 도착 시 초기화)
+  const [storyChecked, setStoryChecked] = useState<Set<string>>(new Set());
+  const toggleStoryItem = (key: string) =>
+    setStoryChecked((p) => {
+      const n = new Set(p);
+      if (n.has(key)) n.delete(key);
+      else n.add(key);
+      return n;
+    });
 
   // 백그라운드 크롤: 열리자마자 브랜드명으로 조사 시작(사용자가 키워드 고르는 동안 진행 → 체감 속도↑)
   const researchRef = useRef<Promise<string> | null>(null);
@@ -143,6 +206,7 @@ export function EnrichWizard({
       setOneLinerSel(0);
       setDescList(o.descriptions);
       setDescSel(0);
+      setStoryChecked(new Set(storyItemsOf(o).map((it) => it.key))); // 기본 전부 체크
       setKind("fields");
     } catch {
       setErrMsg("불러오기에 실패했어요. 잠시 후 다시 시도해 주세요.");
@@ -150,11 +214,29 @@ export function EnrichWizard({
     }
   };
 
-  const stepIdx = STEP_ORDER.indexOf(kind);
-  const goNext = () => stepIdx >= 0 && stepIdx < STEP_ORDER.length - 1 && setKind(STEP_ORDER[stepIdx + 1]);
-  const goBack = () => stepIdx > 0 && setKind(STEP_ORDER[stepIdx - 1]);
+  // 힌트가 하나라도 있으면 마지막에 "이런 이야기도 찾았어요" 스텝 추가 — 0개면 desc에서 바로 apply
+  const storyItems = options ? storyItemsOf(options) : [];
+  const steps: Kind[] = storyItems.length ? [...BASE_STEPS, "story"] : BASE_STEPS;
+  const stepIdx = steps.indexOf(kind);
+  const goNext = () => stepIdx >= 0 && stepIdx < steps.length - 1 && setKind(steps[stepIdx + 1]);
+  const goBack = () => stepIdx > 0 && setKind(steps[stepIdx - 1]);
 
   const apply = () => {
+    // ⑤스텝 체크 결과 → 인덱스/타입 기반 선택 목록(힌트 자체는 전체 전달 — 폼 인라인 힌트 영속)
+    const selectedHints = storyItems.length
+      ? {
+          activities: (options?.activityHints ?? [])
+            .map((_, i) => i)
+            .filter((i) => storyChecked.has(`activity-${i}`)),
+          collabs: (options?.collabHints ?? [])
+            .map((_, i) => i)
+            .filter((i) => storyChecked.has(`collab-${i}`)),
+          blocks: (options?.blockHints ?? [])
+            .filter((b) => storyChecked.has(`block-${b.type}`))
+            .map((b) => b.type as string),
+          seeks: !!options?.seeksHint && storyChecked.has("seeks"),
+        }
+      : undefined;
     onApply({
       name: fName.trim() || query || undefined,
       oneLiner: oneLinerList[oneLinerSel]?.trim() || undefined,
@@ -167,6 +249,7 @@ export function EnrichWizard({
       collabHints: options?.collabHints?.length ? options.collabHints : undefined,
       blockHints: options?.blockHints?.length ? options.blockHints : undefined,
       seeksHint: options?.seeksHint ?? undefined,
+      selectedHints,
     });
   };
 
@@ -202,7 +285,7 @@ export function EnrichWizard({
               </button>
             )}
             <span className="ml-auto text-xs font-medium text-mute">
-              {stepIdx + 1} / {STEP_ORDER.length}
+              {stepIdx + 1} / {steps.length}
             </span>
           </div>
         )}
@@ -474,10 +557,53 @@ export function EnrichWizard({
               />
             </div>
             <button
+              onClick={storyItems.length ? goNext : apply}
+              className="mt-4 h-11 w-full rounded-md bg-primary text-sm font-medium text-primary-on"
+            >
+              {storyItems.length ? "다음 · 찾은 이야기 고르기" : "선택한 내용으로 채우기"}
+            </button>
+          </div>
+        )}
+
+        {/* 스텝 4 — 찾은 이야기 체크리스트(힌트 있을 때만) */}
+        {kind === "story" && (
+          <div>
+            <p className="pr-8 text-lg font-bold text-ink">이런 이야기도 찾았어요</p>
+            <p className="mt-1.5 text-[15px] leading-relaxed text-mute">
+              웹에서 찾은 내용이에요. 담을 것만 골라주세요.
+            </p>
+            <div className="mt-4 max-h-[46vh] space-y-2 overflow-y-auto pr-0.5">
+              {storyItems.map((it) => {
+                const on = storyChecked.has(it.key);
+                return (
+                  <label
+                    key={it.key}
+                    className={`flex cursor-pointer items-start gap-2.5 rounded-md border px-3 py-3 transition-colors ${
+                      on ? "border-primary bg-primary-pale" : "border-hairline bg-surface"
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={on}
+                      onChange={() => toggleStoryItem(it.key)}
+                      className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--color-primary,theme(colors.lime.400))]"
+                    />
+                    <span className="min-w-0">
+                      <span className="block text-[15px] font-bold text-ink">{it.sectionLabel}</span>
+                      <span className="mt-1 block line-clamp-2 text-[14px] leading-relaxed text-mute">
+                        {it.preview}
+                      </span>
+                      <span className="mt-1 block text-[13px] text-faint">{it.reason}</span>
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+            <button
               onClick={apply}
               className="mt-4 h-11 w-full rounded-md bg-primary text-sm font-medium text-primary-on"
             >
-              선택한 내용으로 채우기
+              선택한 내용 담고 시작하기
             </button>
           </div>
         )}
