@@ -1004,6 +1004,7 @@ class NaverGeminiProvider implements SearchProvider {
 [알려짐] 언론·매거진·방송·수상 노출 (매체명·연도)
 [공간] 오프라인 매장·쇼룸·작업실·카페 운영 여부와 위치
 [신뢰정보] 홈페이지 URL · 주소
+[키워드] 위 조사에서 이 브랜드를 나타내는 짧은 키워드 8~15개, 쉼표로 구분 (각 2~15자 명사구 — 제품·소재·활동·분위기·강점 위주. 문장 금지, 다른 브랜드 것 섞지 말 것)
 공식 홈페이지·언론 보도 등 신뢰할 수 있는 출처를 우선해. 연도·날짜가 보이면 함께 적어줘(오래된 정보 구분용).
 ⭐인스타그램은 실제 instagram.com/○○ 페이지를 확인한 경우에만 @핸들. 브랜드명·도메인으로 추측 금지 — 확인 안 되면 "인스타: 확인 안 됨".
 확실하지 않으면 적지 말고 넘어가. 과장·추측 금지.`;
@@ -1369,6 +1370,7 @@ const CHIP_SECTIONS: Record<string, { label: string; factual: boolean }> = {
   숫자: { label: "숫자", factual: true }, // 사실 게이트
   알려짐: { label: "알려짐", factual: true }, // 사실 게이트(방송·수상·언론)
   공간: { label: "공간", factual: false },
+  키워드: { label: "키워드", factual: false }, // 제미나이가 스스로 증류한 짧은 명사구 모음
 };
 // 섹션과 무관하게 사실 게이트로 승격시키는 단서(오귀속 시 거짓말이 될 고유명사·수치).
 const FACTUAL_RE = /방송|수상|대상|선정|일보|매거진|언론|미쉐린|빕구르망|백종원|출연|인증|팔로워/;
@@ -1385,25 +1387,58 @@ export function extractChipsFromResearch(research: string): KeywordChip[] {
   const parts = body.split(/\n?\s*\[([^\]\n]+)\]\s*/); // [pre, header, body, header, body, ...]
   const chips: KeywordChip[] = [];
   const seen = new Set<string>();
+  const STOPWORDS = /^(또한|그리고|하지만|특히|및|기타|등|이\s*외|그\s*외)$/;
+  const push = (raw: string, sec: { label: string; factual: boolean }) => {
+    const text = raw.trim();
+    if (text.length < 2 || text.length > 28) return false;
+    if (/확인\s*안\s*됨|해당\s*없음|없습니다/.test(text)) return false;
+    if (STOPWORDS.test(text)) return false;
+    // 동사형 문장·접속 조각 배제(키워드는 명사구) — "~탐구합니다"·"~배우고"·"~짜거나" 등
+    if (/(다|요|죠|고|며|나|서)\.?$/.test(text)) return false;
+    const key = text.replace(/\s/g, "");
+    if (seen.has(key)) return false;
+    seen.add(key);
+    chips.push({
+      text,
+      section: sec.label,
+      factual: sec.factual || /\d/.test(text) || FACTUAL_RE.test(text),
+    });
+    return true;
+  };
   for (let i = 1; i < parts.length; i += 2) {
     const sec = CHIP_SECTIONS[parts[i].trim()];
     if (!sec) continue;
+    // [키워드]는 콤마 나열 전체를 받는다(캡 넉넉히). 서사 섹션은 조각 남발 방지 캡.
+    const isKwSec = sec.label === "키워드";
+    const maxPerSection = isKwSec ? 15 : 6;
+    const maxFragsPerLine = isKwSec ? 20 : 3;
     let count = 0;
     for (const rawLine of (parts[i + 1] ?? "").split(/\n/)) {
-      let line = rawLine.replace(/^[\s·•\-*]+/, "").trim();
-      if (!line || /확인\s*안\s*됨|해당\s*없음|없음$/.test(line)) continue;
-      line = line.replace(/\s*[（(][^)）]*[)）]\s*$/g, "").trim(); // 뒤쪽 출처 괄호 제거
-      if (line.length > 28) line = line.split(/[.。·/|—–]/)[0].trim(); // 너무 길면 첫 구절
-      if (line.length < 2 || line.length > 28) continue;
-      const key = line.replace(/\s/g, "");
-      if (seen.has(key)) continue;
-      seen.add(key);
-      chips.push({
-        text: line,
-        section: sec.label,
-        factual: sec.factual || /\d/.test(line) || FACTUAL_RE.test(line),
-      });
-      if (++count >= 6) break;
+      // 실메모 정리: 마크다운 볼드·불릿·"라벨:" 접두·끝 괄호 제거
+      const line = rawLine
+        .replace(/\*\*/g, "")
+        .replace(/^[\s·•\-*]+/, "")
+        .replace(/^[\w가-힣/ ]{1,8}:\s*/, "")
+        .replace(/\s*[（(][^)）]*[)）]\s*$/g, "")
+        .trim();
+      if (!line || /확인\s*안\s*됨|해당\s*없음/.test(line)) continue;
+      if (!isKwSec && line.length <= 28) {
+        if (push(line, sec)) count++;
+      } else {
+        // 긴 문장·콤마 나열 → 조각 단위(실메모는 문단·나열형이 흔함)
+        let sub = 0;
+        for (const frag of line.split(/[,，;·、]|(?<=[다요음])\.\s*/)) {
+          const f = frag
+            .replace(/^(그리고|또한|하지만|특히|및)\s+/, "")
+            .replace(/\s*(등|등을|등이)$/, "")
+            .trim();
+          if (push(f, sec)) {
+            count++;
+            if (++sub >= maxFragsPerLine) break;
+          }
+        }
+      }
+      if (count >= maxPerSection) break;
     }
   }
   return chips.slice(0, 28);
