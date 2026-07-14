@@ -3,7 +3,14 @@
 // 이 라우트는 그대로 동작한다(응답 스키마 동일).
 import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
-import { enrichLookup, enrichRecrawl, enrichDraft, enrichResearch, enrichOptions } from "@/lib/enrich";
+import {
+  enrichLookup,
+  enrichRecrawl,
+  enrichDraft,
+  enrichOneLiners,
+  enrichResearch,
+  enrichOptions,
+} from "@/lib/enrich";
 
 // 임시 진단: web_search 없는 최소 호출 — 전반 과부하 vs web_search 특정 구분용.
 export async function GET() {
@@ -130,6 +137,32 @@ export async function POST(req: Request) {
       console.error("[enrich] draft failed:", e);
       return NextResponse.json(
         { descriptions: [], error: "지금은 초안 작성이 어려워요. 잠시 후 다시 시도하거나 직접 입력해 주세요." },
+        { status: 200 }
+      );
+    }
+  }
+
+  // ── 한 줄 소개 모드: 폼 정보 기반 한 줄 소개 후보 3개(초안받기 2스텝 스텝1용) ──
+  if (body.mode === "oneLiners") {
+    const name = typeof body.name === "string" ? body.name.trim() : "";
+    if (!name) {
+      return NextResponse.json({ error: "브랜드 이름이 필요해요." }, { status: 400 });
+    }
+    try {
+      const oneLiners = await enrichOneLiners({
+        name,
+        oneLiner: typeof body.oneLiner === "string" ? body.oneLiner : undefined,
+        values: strArr(body.values),
+        offers: strArr(body.offers),
+        targetAudience: strArr(body.targetAudience),
+        focusKeywords: strArr(body.focusKeywords),
+        round: typeof body.round === "number" ? body.round : 0,
+      });
+      return NextResponse.json({ oneLiners });
+    } catch (e) {
+      console.error("[enrich] oneLiners failed:", e);
+      return NextResponse.json(
+        { oneLiners: [], error: "지금은 초안 작성이 어려워요. 잠시 후 다시 시도하거나 직접 입력해 주세요." },
         { status: 200 }
       );
     }

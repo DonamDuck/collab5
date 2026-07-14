@@ -217,9 +217,14 @@ function RegisterForm() {
   const [draftBusy, setDraftBusy] = useState(false);
   const [draftGenerated, setDraftGenerated] = useState(false); // AI 초안을 한 번이라도 생성했나(버튼 분기 기준)
   const [draftRound, setDraftRound] = useState(0); // 다시 받기마다 다른 각도로 변주
-  const [descChoices, setDescChoices] = useState<string[]>([]); // 브랜드 소개 5지선다 후보(각 항목 직접 수정 가능)
-  const [descSel, setDescSel] = useState(0); // 선택한 후보 인덱스
-  const [descModalOpen, setDescModalOpen] = useState(false); // 5지선다 모달
+  const [descChoices, setDescChoices] = useState<string[]>([]); // 자세히 소개 후보(각 항목 직접 수정 가능)
+  const [descSel, setDescSel] = useState(0); // 선택한 후보 인덱스 (-1 = 직접 입력)
+  const [descModalOpen, setDescModalOpen] = useState(false); // 초안받기 2스텝 모달
+  const [draftStep, setDraftStep] = useState<1 | 2>(1); // 1=한 줄 소개, 2=자세히 소개
+  const [olChoices, setOlChoices] = useState<string[]>([]); // 한 줄 소개 후보
+  const [olSel, setOlSel] = useState(0); // 선택한 한 줄 후보 인덱스 (-1 = 직접 입력)
+  const [olCustom, setOlCustom] = useState(""); // 한 줄 소개 직접 입력값
+  const [descCustom, setDescCustom] = useState(""); // 자세히 소개 직접 입력값
 
   // 데모 프리필: `/register?demo=1` 진입 시 캔버스가든 예시로 텍스트를 채워 시작(사진은 직접).
   // URL 파라미터 기반 1회성 초기화 — 지연 초기값을 쓰면 SSR(window 부재)과 하이드레이션 불일치가 나므로 effect로 처리.
@@ -385,54 +390,55 @@ function RegisterForm() {
     }
   };
 
-  // 규칙 기반 소개 초안 폴백 (AI 실패 시 — 입력값 조합)
-  const ruleDraft = () => {
+  // 규칙 기반 소개 초안 폴백 텍스트 (AI 실패 시 — 입력값 조합)
+  const ruleDraftText = () => {
     const parts: string[] = [];
     if (oneLiner.trim()) parts.push(oneLiner.trim().replace(/[.\s]*$/, "."));
     if (values.length)
       parts.push(`${values.slice(0, 3).join(", ")} — 우리를 잘 보여주는 말이에요.`);
     if (name.trim()) parts.push(`${name.trim()}의 이야기를 카드에 담았어요.`);
-    if (parts.length) setDescription(parts.join(" "));
+    return parts.join(" ");
   };
 
-  // 초안받기: 폼 정보 기준으로 백엔드 AI 크롤링 → 소개 후보 5개 생성 → 5지선다 모달.
+  // 초안받기: 상호 옆 버튼 → 모달 즉시 오픈(로딩) → 한 줄/자세히 후보 병렬 생성 → 2스텝 선택.
   // 첫 클릭='초안 받기', 이후='초안 다시 받기'(round 증가 → 다른 각도의 후보들).
   const draftDescription = async () => {
-    if (!name.trim()) {
-      ruleDraft();
-      setDraftGenerated(true);
-      return;
-    }
+    if (!name.trim() || draftBusy) return;
     setDraftBusy(true);
-    try {
-      const res = await fetch("/api/enrich", {
+    setDraftStep(1);
+    setDescModalOpen(true);
+    const payload = {
+      name: name.trim(),
+      oneLiner,
+      values,
+      offers,
+      targetAudience,
+      round: draftRound,
+    };
+    const post = (mode: "oneLiners" | "draft") =>
+      fetch("/api/enrich", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          mode: "draft",
-          name: name.trim(),
-          oneLiner,
-          values,
-          offers,
-          targetAudience,
-          round: draftRound,
-        }),
-      });
-      const data = await res.json();
-      const choices: string[] = Array.isArray(data.descriptions)
-        ? data.descriptions.filter((s: unknown): s is string => typeof s === "string" && !!s.trim())
+        body: JSON.stringify({ mode, ...payload }),
+      }).then((r) => r.json());
+    const strs = (v: unknown): string[] =>
+      Array.isArray(v)
+        ? v.filter((s): s is string => typeof s === "string" && !!s.trim())
         : [];
-      if (choices.length > 1) {
-        setDescChoices(choices);
-        setDescSel(0);
-        setDescModalOpen(true);
-      } else if (choices.length === 1) {
-        setDescription(choices[0]);
-      } else {
-        ruleDraft();
+    try {
+      const [ol, dr] = await Promise.allSettled([post("oneLiners"), post("draft")]);
+      const ols = ol.status === "fulfilled" ? strs(ol.value.oneLiners) : [];
+      let descs = dr.status === "fulfilled" ? strs(dr.value.descriptions) : [];
+      if (!descs.length) {
+        const fallback = ruleDraftText(); // AI 실패 → 규칙 기반 폴백 후보 1개
+        if (fallback) descs = [fallback];
       }
-    } catch {
-      ruleDraft();
+      setOlChoices(ols);
+      setOlSel(ols.length ? 0 : -1);
+      setOlCustom("");
+      setDescChoices(descs);
+      setDescSel(descs.length ? 0 : -1);
+      setDescCustom("");
     } finally {
       setDraftGenerated(true);
       setDraftRound((r) => r + 1);
@@ -441,12 +447,23 @@ function RegisterForm() {
   };
   const editDescChoice = (i: number, v: string) =>
     setDescChoices((p) => p.map((x, j) => (j === i ? v : x)));
-  const applyDesc = () => {
-    const v = (descChoices[descSel] ?? "").trim();
-    if (v) setDescription(v);
+  const editOlChoice = (i: number, v: string) =>
+    setOlChoices((p) => p.map((x, j) => (j === i ? v : x)));
+  // [확인] — 한 줄·자세히 선택값을 둘 다 채움. 빈 선택이면 해당 필드는 유지(덮지 않음).
+  const applyDraft = () => {
+    const ol = (olSel === -1 ? olCustom : olChoices[olSel] ?? "").trim();
+    const d = (descSel === -1 ? descCustom : descChoices[descSel] ?? "").trim();
+    if (ol) setOneLiner(ol);
+    if (d) setDescription(d);
+    if (ol || d)
+      setAiFilled((s) => {
+        const n = new Set(s);
+        if (ol) n.add("oneLiner");
+        if (d) n.add("description");
+        return n;
+      });
     setDescModalOpen(false);
   };
-  const canDraft = !!(name.trim() || oneLiner.trim() || values.length);
 
   // ── enrich: 업체명 → 위저드 오픈(불러오기) ──
   const openWizard = () => {
@@ -924,7 +941,24 @@ function RegisterForm() {
         {/* ── ① 브랜드를 소개해주세요 ── */}
         <GroupHeader n="①" title="브랜드를 소개해주세요." />
         <div className="space-y-8">
-          <Field label="상호 *" hint={hintFor("name")}>
+          <Field
+            label="상호 *"
+            hint={hintFor("name")}
+            action={
+              <button
+                type="button"
+                onClick={draftDescription}
+                disabled={!name.trim() || draftBusy}
+                className="inline-flex h-7 shrink-0 items-center gap-1 rounded-pill border border-primary bg-primary-pale px-2.5 text-sm font-medium text-primary-on disabled:opacity-40"
+              >
+                {draftBusy
+                  ? "쓰는 중…"
+                  : draftGenerated
+                    ? "✨ 초안 다시 받기"
+                    : "✨ 초안 받기"}
+              </button>
+            }
+          >
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -941,44 +975,19 @@ function RegisterForm() {
             />
           </Field>
 
-          {/* 자세히 소개 — 브랜드를 소개해주세요 (초안 받기 유지) */}
+          {/* 자세히 소개 — 브랜드를 소개해주세요 (초안 받기 버튼은 ① 상호 옆으로 이사) */}
           <div>
-            <div className="mb-2 flex items-center justify-between">
-              <label className="flex items-center gap-2 text-base font-medium text-body">
-                <span>자세히 소개</span>
-                {aiFilled.has("description") && <AiBadge />}
-              </label>
-              <button
-                type="button"
-                onClick={draftDescription}
-                disabled={!canDraft || draftBusy}
-                className="inline-flex h-7 items-center gap-1 rounded-pill border border-primary bg-primary-pale px-2.5 text-sm font-medium text-primary-on disabled:opacity-40"
-              >
-                {draftBusy
-                  ? "쓰는 중…"
-                  : draftGenerated
-                    ? "✨ 초안 다시 받기"
-                    : "✨ 초안 받기"}
-              </button>
-            </div>
-            <div className="relative">
-              <textarea
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                rows={3}
-                disabled={draftBusy}
-                placeholder="버려지는 천에 새 이야기를 입히는 패브릭 브랜드."
-                className="w-full rounded-sm border border-hairline bg-surface px-3 py-2 text-base text-ink outline-none placeholder:text-faint focus:border-focus disabled:opacity-60"
-              />
-              {draftBusy && (
-                <div className="absolute inset-0 flex items-center justify-center rounded-sm bg-surface/80 backdrop-blur-[1px]">
-                  <p className="flex items-center gap-2 text-sm font-medium text-primary-on">
-                    <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-                    온라인 정보를 살펴 소개를 쓰고 있어요…
-                  </p>
-                </div>
-              )}
-            </div>
+            <label className="mb-2 flex items-center gap-2 text-base font-medium text-body">
+              <span>자세히 소개</span>
+              {aiFilled.has("description") && <AiBadge />}
+            </label>
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={3}
+              placeholder="버려지는 천에 새 이야기를 입히는 패브릭 브랜드."
+              className="w-full rounded-sm border border-hairline bg-surface px-3 py-2 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
+            />
             <p className="mt-1.5 text-sm text-mute">
               {draftGenerated
                 ? "‘초안 다시 받기’를 누르면 다른 느낌의 소개로 새로 써드려요."
@@ -1656,11 +1665,11 @@ function RegisterForm() {
         />
       )}
 
-      {/* 브랜드 소개 5지선다 — '초안 받기' 결과 */}
+      {/* 초안받기 2스텝 모달 — 스텝1 한 줄 소개 → 스텝2 자세히 소개 → [확인] 시 둘 다 채움 */}
       {descModalOpen && (
         <div
           className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 p-4 sm:items-center"
-          onClick={() => setDescModalOpen(false)}
+          onClick={() => !draftBusy && setDescModalOpen(false)}
         >
           <div
             className="relative w-full max-w-md rounded-lg border border-hairline bg-surface p-5 shadow-e2"
@@ -1674,26 +1683,87 @@ function RegisterForm() {
             >
               ✕
             </button>
-            <p className="pr-8 text-base font-bold text-ink">마음에 드는 소개를 골라주세요</p>
-            <p className="mt-1 text-sm text-mute">
-              ‘수정’으로 다듬으며 비교하고, 마음에 드는 하나를 골라주세요.
-            </p>
-            <div className="mt-4 max-h-[52vh] overflow-y-auto pr-0.5">
-              <DescPicker
-                list={descChoices}
-                sel={descSel}
-                onSelect={setDescSel}
-                onEdit={editDescChoice}
-              />
-            </div>
-            <button
-              type="button"
-              onClick={applyDesc}
-              className="mt-4 h-11 w-full rounded-md bg-primary text-sm font-medium text-primary-on disabled:opacity-50"
-              disabled={!(descChoices[descSel] ?? "").trim()}
-            >
-              이 소개로 채우기
-            </button>
+            {draftBusy ? (
+              /* 로딩 — 기존 초안받기 로딩 문구·스피너 그대로 */
+              <div className="flex min-h-[180px] items-center justify-center">
+                <p className="flex items-center gap-2 text-sm font-medium text-primary-on">
+                  <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                  온라인 정보를 살펴 소개를 쓰고 있어요…
+                </p>
+              </div>
+            ) : draftStep === 1 ? (
+              <>
+                <p className="pr-8 text-base font-bold text-ink">
+                  마음에 드는 한 줄 소개를 골라주세요{" "}
+                  <span className="text-sm font-medium text-mute">1/2</span>
+                </p>
+                <p className="mt-1 text-sm text-mute">
+                  ‘수정’으로 다듬어도 되고, 맨 아래에 직접 입력해도 좋아요.
+                </p>
+                <div className="mt-4 max-h-[52vh] overflow-y-auto pr-0.5">
+                  <DescPicker
+                    list={olChoices}
+                    sel={olSel}
+                    onSelect={setOlSel}
+                    onEdit={editOlChoice}
+                    rows={2}
+                    custom={olCustom}
+                    onCustom={(v) => {
+                      setOlCustom(v);
+                      setOlSel(-1);
+                    }}
+                    customRows={2}
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setDraftStep(2)}
+                  className="mt-4 h-11 w-full rounded-md bg-primary text-sm font-medium text-primary-on"
+                >
+                  다음
+                </button>
+              </>
+            ) : (
+              <>
+                <p className="pr-8 text-base font-bold text-ink">
+                  마음에 드는 자세히 소개를 골라주세요{" "}
+                  <span className="text-sm font-medium text-mute">2/2</span>
+                </p>
+                <p className="mt-1 text-sm text-mute">
+                  ‘수정’으로 다듬어도 되고, 맨 아래에 직접 입력해도 좋아요.
+                </p>
+                <div className="mt-4 max-h-[52vh] overflow-y-auto pr-0.5">
+                  <DescPicker
+                    list={descChoices}
+                    sel={descSel}
+                    onSelect={setDescSel}
+                    onEdit={editDescChoice}
+                    custom={descCustom}
+                    onCustom={(v) => {
+                      setDescCustom(v);
+                      setDescSel(-1);
+                    }}
+                    customRows={4}
+                  />
+                </div>
+                <div className="mt-4 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setDraftStep(1)}
+                    className="h-11 shrink-0 rounded-md border border-border-strong bg-surface px-4 text-sm font-medium text-ink"
+                  >
+                    ← 뒤로
+                  </button>
+                  <button
+                    type="button"
+                    onClick={applyDraft}
+                    className="h-11 flex-1 rounded-md bg-primary text-sm font-medium text-primary-on"
+                  >
+                    확인
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
@@ -1848,11 +1918,19 @@ function DescPicker({
   sel,
   onSelect,
   onEdit,
+  rows = 5,
+  custom,
+  onCustom,
+  customRows = 4,
 }: {
   list: string[];
-  sel: number;
+  sel: number; // -1 = 직접 입력
   onSelect: (i: number) => void;
   onEdit: (i: number, v: string) => void;
+  rows?: number; // 후보 인라인 수정 textarea 높이
+  custom?: string; // 직접 입력값 — onCustom과 함께 주면 최하단에 직접 입력 옵션 렌더
+  onCustom?: (v: string) => void;
+  customRows?: number;
 }) {
   const [editing, setEditing] = useState<number | null>(null);
   return (
@@ -1883,7 +1961,7 @@ function DescPicker({
                   value={it}
                   onChange={(e) => onEdit(i, e.target.value)}
                   autoFocus
-                  rows={5}
+                  rows={rows}
                   className="flex-1 rounded-sm border border-hairline bg-surface px-2.5 py-2 text-[15px] leading-relaxed text-ink outline-none focus:border-focus"
                 />
               ) : (
@@ -1906,6 +1984,42 @@ function DescPicker({
           </div>
         );
       })}
+      {onCustom !== undefined && (
+        /* 최하단 직접 입력 옵션 — 선택(sel=-1) + 텍스트 입력 */
+        <div
+          className={`rounded-md border transition-colors ${
+            sel === -1 ? "border-primary bg-primary-pale" : "border-hairline bg-surface"
+          }`}
+        >
+          <div className="flex items-start gap-2.5 px-3 py-3">
+            <button
+              type="button"
+              onClick={() => onSelect(-1)}
+              aria-label="직접 입력 선택"
+              className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-pill border text-[10px] font-bold ${
+                sel === -1
+                  ? "border-primary bg-primary text-primary-on"
+                  : "border-border-strong text-transparent"
+              }`}
+            >
+              ✓
+            </button>
+            <div className="min-w-0 flex-1">
+              <p className={`text-[13px] font-medium ${sel === -1 ? "text-ink" : "text-mute"}`}>
+                직접 입력
+              </p>
+              <textarea
+                value={custom ?? ""}
+                onChange={(e) => onCustom(e.target.value)}
+                onFocus={() => onSelect(-1)}
+                rows={customRows}
+                placeholder="원하는 소개를 직접 써주세요."
+                className="mt-1.5 w-full rounded-sm border border-hairline bg-surface px-2.5 py-2 text-[15px] leading-relaxed text-ink outline-none placeholder:text-faint focus:border-focus"
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1927,18 +2041,23 @@ function GroupHeader({ n, title, sub }: { n: string; title: string; sub?: string
 function Field({
   label,
   hint,
+  action,
   children,
 }: {
   label: string;
   hint?: React.ReactNode;
+  action?: React.ReactNode; // 라벨 행 우측 액션 (예: ✨ 초안 받기)
   children: React.ReactNode;
 }) {
   return (
     <div>
-      <label className="mb-2 flex items-center gap-2 text-base font-medium text-body">
-        <span>{label}</span>
-        {hint}
-      </label>
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <label className="flex items-center gap-2 text-base font-medium text-body">
+          <span>{label}</span>
+          {hint}
+        </label>
+        {action}
+      </div>
       {children}
     </div>
   );
