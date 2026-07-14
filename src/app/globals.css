@@ -93,3 +93,10 @@ body {
 /* 스와이프 슬라이드용 — 스크롤바 숨김(넘김 제스처만) */
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 .no-scrollbar::-webkit-scrollbar { display: none; }
+
+/* 모달·바텀시트 스크롤 컨테이너용 — 얇고 은은한 스크롤바(데스크탑 기본 스크롤바가 투박한 문제 해소) */
+.slim-scrollbar { scrollbar-width: thin; scrollbar-color: var(--border-strong) transparent; }
+.slim-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+.slim-scrollbar::-webkit-scrollbar-track { background: transparent; }
+.slim-scrollbar::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 9999px; }
+.slim-scrollbar::-webkit-scrollbar-thumb:hover { background: var(--faint); }

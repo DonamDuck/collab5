@@ -4,6 +4,7 @@
 import { useState, useRef, useEffect } from "react";
 import type { Block, BlockType, BlockLink } from "@/lib/types";
 import { uploadPhoto } from "@/lib/upload";
+import { ScrollLock } from "@/components/ScrollLock";
 
 const CATALOG: { type: BlockType; label: string; hint: string }[] = [
   { type: "metrics", label: "우리를 보여주는 숫자", hint: "팔로워, 월 방문, 누적 판매 등의 지표도 콜라보에 도움을 줄 수 있어요." },
@@ -421,11 +422,12 @@ export function BlockEditor({ blocks, onChange, onUploadingChange, storyItems }:
       {/* ── 바텀시트 — 카탈로그 ── */}
       {open && (
         <div className="fixed inset-0 z-50" role="dialog" aria-modal="true">
+          <ScrollLock />
           <div className="absolute inset-0 bg-ink/40" onClick={() => setOpen(false)} />
           <div className="absolute inset-x-0 bottom-0 mx-auto max-w-[640px] overflow-hidden rounded-t-2xl bg-surface shadow-xl">
             <div
               style={{ paddingBottom: "calc(1.5rem + env(safe-area-inset-bottom))" }}
-              className="max-h-[82vh] overflow-y-auto p-4"
+              className="max-h-[60vh] overflow-y-auto slim-scrollbar p-4 sm:max-h-[70vh]"
             >
             <div className="mb-3 flex items-center justify-between">
               <p className="text-[16px] font-bold text-ink">브랜드의 이야기 더하기</p>

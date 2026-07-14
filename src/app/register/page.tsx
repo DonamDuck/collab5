@@ -13,6 +13,7 @@ import type { CollabType, Block } from "@/lib/types";
 import { deriveRegion } from "@/lib/region";
 import { isRichIntro } from "@/lib/completeness";
 import { uploadPhoto, uploadPdf } from "@/lib/upload";
+import { ScrollLock } from "@/components/ScrollLock";
 import type { ActivityHint, BlockHint, CollabHint, EnrichField, SeeksHint } from "@/lib/enrich";
 import { EnrichWizard, type WizardFill } from "./EnrichWizard";
 import { RevealStep, type RevealCard } from "./RevealStep";
@@ -1671,6 +1672,7 @@ function RegisterForm() {
           className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 p-4 sm:items-center"
           onClick={() => !draftBusy && setDescModalOpen(false)}
         >
+          <ScrollLock />
           <div
             className="relative w-full max-w-md rounded-lg border border-hairline bg-surface p-5 shadow-e2"
             onClick={(e) => e.stopPropagation()}
@@ -1700,7 +1702,7 @@ function RegisterForm() {
                 <p className="mt-1 text-sm text-mute">
                   ‘수정’으로 다듬어도 되고, 맨 아래에 직접 입력해도 좋아요.
                 </p>
-                <div className="mt-4 max-h-[52vh] overflow-y-auto pr-0.5">
+                <div className="mt-4 max-h-[52vh] overflow-y-auto slim-scrollbar pr-0.5">
                   <DescPicker
                     list={olChoices}
                     sel={olSel}
@@ -1732,7 +1734,7 @@ function RegisterForm() {
                 <p className="mt-1 text-sm text-mute">
                   ‘수정’으로 다듬어도 되고, 맨 아래에 직접 입력해도 좋아요.
                 </p>
-                <div className="mt-4 max-h-[52vh] overflow-y-auto pr-0.5">
+                <div className="mt-4 max-h-[52vh] overflow-y-auto slim-scrollbar pr-0.5">
                   <DescPicker
                     list={descChoices}
                     sel={descSel}
@@ -1779,11 +1781,12 @@ function RegisterForm() {
         ] as const).filter(([key, , , has]) => !has && !openSections.has(key));
         return (
           <div className="fixed inset-0 z-50" role="dialog" aria-modal="true">
+            <ScrollLock />
             <div className="absolute inset-0 bg-ink/40" onClick={dismissNudge} />
             <div className="absolute inset-x-0 bottom-0 mx-auto max-w-[640px] overflow-hidden rounded-t-2xl bg-surface shadow-xl">
               <div
                 style={{ paddingBottom: "calc(1.5rem + env(safe-area-inset-bottom))" }}
-                className="max-h-[82vh] overflow-y-auto p-4"
+                className="max-h-[60vh] overflow-y-auto slim-scrollbar p-4 sm:max-h-[70vh]"
               >
                 <div className="mb-3 flex items-start justify-between">
                   <div className="pr-8">
@@ -1841,6 +1844,7 @@ function RegisterForm() {
       {/* 등록 완료 → 브랜드 소개서 얼럿 (소개서 페이지에서 확인·링크 공유) */}
       {portfolioOpen && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 p-4 sm:items-center">
+          <ScrollLock />
           <div className="w-full max-w-md rounded-lg border border-hairline bg-surface p-6 text-center shadow-e2">
             <p className="text-lg font-bold text-ink">✨ 브랜드 소개서가 완성됐어요!</p>
             {loggedIn ? (

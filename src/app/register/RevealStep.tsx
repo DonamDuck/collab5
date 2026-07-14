@@ -3,6 +3,7 @@
 // 카드별 [이 내용으로 담기]/[건너뛰기]. 빈손이면 부모가 아예 렌더 안 함.
 // 처리된 카드는 내부 Set으로 렌더 제외 — 전 카드 처리 시 자동 onDone.
 import { useState } from "react";
+import { ScrollLock } from "@/components/ScrollLock";
 
 export interface RevealCard {
   key: string;            // "seeks" | "story" | "activity-0" | "collab-0" | "block-metrics" ...
@@ -32,9 +33,10 @@ export function RevealStep({ cards, onAccept, onSkip, onDone }: {
 
   return (
     <div className="fixed inset-0 z-50" role="dialog" aria-modal="true">
+      <ScrollLock />
       <div className="absolute inset-0 bg-ink/40" onClick={onDone} />
       <div className="absolute inset-x-0 bottom-0 mx-auto max-w-[640px] overflow-hidden rounded-t-2xl bg-surface shadow-xl">
-        <div className="flex max-h-[82vh] flex-col">
+        <div className="flex max-h-[60vh] flex-col sm:max-h-[70vh]">
           {/* ── 헤더 ── */}
           <div className="flex items-start justify-between p-4 pb-3">
             <div>
@@ -52,7 +54,7 @@ export function RevealStep({ cards, onAccept, onSkip, onDone }: {
           </div>
 
           {/* ── 카드 스택(스크롤) ── */}
-          <div className="flex-1 space-y-3 overflow-y-auto px-4 pb-2">
+          <div className="flex-1 space-y-3 overflow-y-auto slim-scrollbar px-4 pb-2">
             {visible.map((c) => (
               <div key={c.key} className="rounded-md border-2 border-primary p-4">
                 <p className="text-[15px] font-bold text-ink">{c.sectionLabel}</p>
