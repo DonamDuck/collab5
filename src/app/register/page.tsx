@@ -530,6 +530,10 @@ function RegisterForm() {
 
   const canSubmit = name.trim().length > 0 && !pending;
 
+  // ── 제출 인터셉트 추천 모달(등록 직전 1회) ──
+  const [nudgeShown, setNudgeShown] = useState(false); // 한 번 뜨면 다음 등록엔 안 뜸
+  const [showNudge, setShowNudge] = useState(false);
+
   // ── 등록 완료 얼럿(소개서 페이지로 이동) ──
   const [portfolioOpen, setPortfolioOpen] = useState(false);
   const [createdSlug, setCreatedSlug] = useState("");
@@ -608,7 +612,6 @@ function RegisterForm() {
   // 제출 전 클라이언트 검증 — 에러 문구 반환(통과 시 null)
   const validate = (): string | null => {
     if (!offers.length) return "제공할 수 있는 협업을 1개 이상 골라주세요.";
-    if (!address.trim()) return "상세주소를 입력해주세요.";
     return null;
   };
 
@@ -616,11 +619,17 @@ function RegisterForm() {
     const err = validate();
     if (err) {
       alert(err);
-      // 실패 항목으로 스크롤 — 협업 칩(미선택) 우선, 그다음 상세주소
-      const target = !offers.length ? "offers-chips" : "detail-address";
-      document.getElementById(target)?.scrollIntoView({ behavior: "smooth", block: "center" });
+      // 실패 항목으로 스크롤 — 협업 칩(미선택)만 남음
+      document.getElementById("offers-chips")?.scrollIntoView({ behavior: "smooth", block: "center" });
       return;
     }
+    // 등록 직전 1회 인터셉트 — 소개가 얇으면 추천 모달로 이야기 더하기 제안
+    const p = { required: !!name.trim() && offers.length > 0, story: hasStory, activities: hasActivities, collabs: hasCollabs, keywords: hasKeywords, customers: hasCustomers, offersNote: hasOffersNote, seeks: hasSeeks, blocks: blocks.length };
+    if (!nudgeShown && !isRichIntro(p)) { setShowNudge(true); return; }
+    doSubmit();
+  };
+
+  const doSubmit = () => {
     startTransition(async () => {
       // 사진은 선택 즉시 Storage 업로드됨 → 여기선 URL만 수집(업로드중 항목 제외)
       // 내용이 있는 카드만(빈 카드는 제외) — 활동과 동일 규칙
@@ -912,6 +921,17 @@ function RegisterForm() {
                 selected={offers}
                 onToggle={(t) => toggle(offers, setOffers, t)}
               />
+              {/* 구 sec-offersNote(시트) → ① 칩 하단 상시 노출로 이사. 칩과 한 세트 */}
+              <div className="mt-4">
+                <p className="mb-1.5 text-sm text-mute">콜라보를 조금 더 소개해주세요.</p>
+                <textarea
+                  value={offersNote}
+                  onChange={(e) => setOffersNote(e.target.value)}
+                  rows={3}
+                  placeholder="예: 친환경 가방을 만들어요. 브랜드 제품 콜라보, 굿즈 제작을 기대하고 있어요."
+                  className="w-full rounded-sm border border-hairline bg-surface px-3 py-2.5 text-base leading-relaxed text-ink outline-none placeholder:text-faint focus:border-focus"
+                />
+              </div>
             </Field>
           </div>
 
@@ -1113,25 +1133,6 @@ function RegisterForm() {
           </div>
         </StubSection>
 
-        {/* ── 시트 출신 — 어떤 협업을 할 수 있나요? — 자세히 (구⑤ 서술 offersNote) ── */}
-        <StubSection
-          id="sec-offersNote"
-          label="어떤 협업을 할 수 있나요? — 자세히"
-          hiddenWhenCollapsed
-          expanded={openSections.has("offersNote")}
-          hasData={hasOffersNote}
-          onExpand={() => openSection("offersNote")}
-          onCollapse={() => closeSection("offersNote")}
-        >
-          <textarea
-            value={offersNote}
-            onChange={(e) => setOffersNote(e.target.value)}
-            rows={3}
-            placeholder="예: 친환경 가방을 만들어요. 브랜드 제품 콜라보, 굿즈 제작을 기대하고 있어요."
-            className="w-full rounded-sm border border-hairline bg-surface px-3 py-2.5 text-base leading-relaxed text-ink outline-none placeholder:text-faint focus:border-focus"
-          />
-        </StubSection>
-
         {/* ── 시트 출신 — 이런 파트너를 찾고 있어요 (구⑥ 칩+서술) ── */}
         <StubSection
           id="sec-seeks"
@@ -1325,7 +1326,6 @@ function RegisterForm() {
             { key: "customers", label: "저희는 주로 이런 고객과 함께하고 있어요.", hint: "주요 고객을 알려주세요.", added: openSections.has("customers") || hasCustomers, onAdd: () => addStorySection("customers"), group: "recommend" },
             { key: "story", label: "왜 이 브랜드를 시작하셨나요?", hint: "시작하게 된 계기를 편하게 적어주세요.", added: openSections.has("story") || hasStory, onAdd: () => addStorySection("story"), group: "story" },
             { key: "keywords", label: "우리 브랜드를 표현하는 키워드를 골라주세요.", hint: "분위기를 칩으로 골라요.", added: openSections.has("keywords") || hasKeywords, onAdd: () => addStorySection("keywords"), group: "story" },
-            { key: "offersNote", label: "어떤 협업을 할 수 있나요? — 자세히", hint: "제공할 수 있는 협업을 편하게 들려주세요.", added: openSections.has("offersNote") || hasOffersNote, onAdd: () => addStorySection("offersNote"), group: "story" },
           ]}
         />
 
@@ -1402,7 +1402,7 @@ function RegisterForm() {
         {/* ── ② 브랜드 정보를 입력해주세요 (구⑨ — 번호 섹션은 ①·②만 남음) ── */}
         <GroupHeader n="②" title="브랜드 정보를 입력해주세요." />
         <div className="space-y-8">
-          <Field label="상세주소 *" hint={hintFor("address", "address")}>
+          <Field label="상세주소 (선택)" hint={hintFor("address", "address")}>
             <input
               id="detail-address"
               value={address}
@@ -1461,34 +1461,6 @@ function RegisterForm() {
         </div>
 
         <div className="space-y-2">
-          {/* 완성도 안내 한 줄 — 어드바이저리 전용(제출을 막지 않음). 미달이면 데이터 없는 서사 스텁 칩 최대 2개. */}
-          {(() => {
-            const p = { required: !!name.trim() && offers.length > 0, story: hasStory, activities: hasActivities, collabs: hasCollabs, keywords: hasKeywords, customers: hasCustomers, offersNote: hasOffersNote, seeks: hasSeeks, blocks: blocks.length };
-            if (isRichIntro(p))
-              return <p className="mb-3 text-center text-sm text-primary-on">✓ 충분히 멋진 소개서예요. 언제든 더 담을 수 있어요.</p>;
-            const closed = ([["story", "시작 이야기"], ["activities", "주요 활동"], ["collabs", "콜라보 경험"]] as const)
-              .filter(([k]) => !p[k]).slice(0, 2);
-            return (
-              <div className="mb-3 text-center">
-                <p className="text-sm text-mute">이야기를 하나만 더 담으면, 소개서가 한층 단단해져요.</p>
-                <div className="mt-2 flex justify-center gap-2">
-                  {closed.map(([k, label]) => (
-                    <button
-                      key={k}
-                      type="button"
-                      onClick={() => {
-                        openSection(k); // 이미 펼쳐져 있으면 no-op(Set add) → 스크롤만
-                        setTimeout(() => document.getElementById("sec-" + k)?.scrollIntoView({ behavior: "smooth", block: "center" }), 60);
-                      }}
-                      className="inline-flex h-8 items-center rounded-pill border border-primary bg-primary-tint px-3 text-sm text-primary-on"
-                    >
-                      + {label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            );
-          })()}
           <button
             onClick={submit}
             disabled={
@@ -1570,6 +1542,76 @@ function RegisterForm() {
           </div>
         </div>
       )}
+
+      {/* 제출 인터셉트 추천 모달 — 소개가 얇을 때 이야기 더하기 제안(바텀시트 스타일 재활용) */}
+      {showNudge && (() => {
+        const dismissNudge = () => { setNudgeShown(true); setShowNudge(false); };
+        const items = ([
+          ["activities", "주로 어떤 활동을 하나요?", "대표 활동을 소개해주세요.", hasActivities],
+          ["seeks", "이런 파트너를 찾고 있어요.", "파트너와 꿈꾸는 협업 유형을 알려주세요.", hasSeeks],
+          ["collabs", "이런 콜라보 경험이 있어요.", "지난 콜라보를 더하면 검증된 파트너 신호가 돼요.", hasCollabs],
+          ["customers", "저희는 주로 이런 고객과 함께하고 있어요.", "주요 고객을 알려주세요.", hasCustomers],
+        ] as const).filter(([key, , , has]) => !has && !openSections.has(key));
+        return (
+          <div className="fixed inset-0 z-50" role="dialog" aria-modal="true">
+            <div className="absolute inset-0 bg-ink/40" onClick={dismissNudge} />
+            <div className="absolute inset-x-0 bottom-0 mx-auto max-w-[640px] overflow-hidden rounded-t-2xl bg-surface shadow-xl">
+              <div
+                style={{ paddingBottom: "calc(1.5rem + env(safe-area-inset-bottom))" }}
+                className="max-h-[82vh] overflow-y-auto p-4"
+              >
+                <div className="mb-3 flex items-start justify-between">
+                  <div className="pr-8">
+                    <p className="text-[16px] font-bold text-ink">잠깐, 이런 소개를 더해보는 건 어때요?</p>
+                    <p className="mt-1 text-[13px] leading-relaxed text-mute">이야기를 조금만 더하면 훨씬 단단한 소개서가 돼요.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={dismissNudge}
+                    aria-label="닫기"
+                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-pill text-mute hover:bg-surface-soft hover:text-ink"
+                  >
+                    ✕
+                  </button>
+                </div>
+                <div className="space-y-2">
+                  {items.map(([key, label, hint]) => (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => {
+                        openSection(key);
+                        setShowNudge(false);
+                        setTimeout(() => document.getElementById("sec-" + key)?.scrollIntoView({ behavior: "smooth", block: "center" }), 60);
+                      }}
+                      className="w-full rounded-md border border-hairline px-3.5 py-3 text-left hover:bg-surface-soft"
+                    >
+                      <p className="text-[15px] font-semibold text-ink">{label}</p>
+                      <p className="mt-0.5 text-[13px] text-mute">{hint}</p>
+                    </button>
+                  ))}
+                </div>
+                <div className="mt-4 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={dismissNudge}
+                    className="h-11 flex-1 rounded-md border border-border-strong bg-surface text-sm font-medium text-ink"
+                  >
+                    다음에 하기
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setNudgeShown(true); setShowNudge(false); doSubmit(); }}
+                    className="h-11 flex-1 rounded-md bg-primary text-sm font-medium text-primary-on"
+                  >
+                    콜라보 카드 등록하기
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* 등록 완료 → 브랜드 소개서 얼럿 (소개서 페이지에서 확인·링크 공유) */}
       {portfolioOpen && (
