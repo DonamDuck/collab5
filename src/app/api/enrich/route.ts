@@ -11,6 +11,10 @@ import {
   enrichOneLiners,
   enrichResearch,
   enrichOptions,
+  extractChipsFromResearch,
+  starterChipsForType,
+  extractLinksFromResearch,
+  researchTier,
 } from "@/lib/enrich";
 
 // 임시 진단: web_search 없는 최소 호출 — 전반 과부하 vs web_search 특정 구분용.
@@ -46,6 +50,10 @@ export async function POST(req: Request) {
     offers?: unknown;
     targetAudience?: unknown;
     focusKeywords?: unknown;
+    starredKeywords?: unknown;
+    verbatimKeywords?: unknown;
+    researchMemo?: unknown;
+    businessType?: unknown;
     ownerNote?: unknown;
     research?: unknown;
     region?: unknown;
@@ -93,6 +101,36 @@ export async function POST(req: Request) {
     } catch (e) {
       console.error("[enrich] research failed:", e);
       return NextResponse.json({ research: "", error: "조사에 실패했어요." }, { status: 200 });
+    }
+  }
+
+  // ── 키워드 모드(크롤→키워드 재설계): 상호+지역+업종 → 크롤 1회 → 선택용 칩 + 링크 후보 + 티어.
+  //    research 메모를 함께 반환해 이후 생성(draft2)에서 재사용 → 재크롤 방지(콜 절감). ──
+  if (body.mode === "keywords") {
+    const name = typeof body.name === "string" ? body.name.trim() : "";
+    if (!name) return NextResponse.json({ error: "브랜드 이름이 필요해요." }, { status: 400 });
+    const region = typeof body.region === "string" ? body.region.trim() || undefined : undefined;
+    const businessType = typeof body.businessType === "string" ? body.businessType.trim() : "";
+    try {
+      const memo = await enrichResearch(name, region);
+      const chips = extractChipsFromResearch(memo);
+      const tier = researchTier(memo, chips.length);
+      const links = extractLinksFromResearch(memo);
+      const starter = tier === "thin" ? starterChipsForType(businessType) : [];
+      return NextResponse.json({ chips, starter, tier, links, research: memo });
+    } catch (e) {
+      console.error("[enrich] keywords failed:", e);
+      return NextResponse.json(
+        {
+          chips: [],
+          starter: starterChipsForType(businessType),
+          tier: "thin",
+          links: {},
+          research: "",
+          error: "조사에 실패했어요. 직접 골라주시거나 작성해 주세요.",
+        },
+        { status: 200 }
+      );
     }
   }
 
@@ -157,6 +195,9 @@ export async function POST(req: Request) {
         offers: strArr(body.offers),
         targetAudience: strArr(body.targetAudience),
         focusKeywords: strArr(body.focusKeywords),
+        starredKeywords: strArr(body.starredKeywords),
+        verbatimKeywords: strArr(body.verbatimKeywords),
+        researchMemo: typeof body.researchMemo === "string" ? body.researchMemo : undefined,
         round: typeof body.round === "number" ? body.round : 0,
       });
       return NextResponse.json({ oneLiners, descriptions });

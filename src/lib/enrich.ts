@@ -56,7 +56,10 @@ export interface DraftInput {
   values?: string[];
   offers?: string[];
   targetAudience?: string[];
-  focusKeywords?: string[]; // 가중 키워드 — 생성 방향을 잡는다
+  focusKeywords?: string[]; // 가중 키워드 — 생성 방향을 잡는다(선택한 키워드 = 재료)
+  starredKeywords?: string[]; // ⭐ 한 줄 소개에 반드시 반영(캡 3, 배열 순서 = 우선순위)
+  verbatimKeywords?: string[]; // '그대로 넣기' — 슬로건·인증·상표. 표현 변형 금지
+  researchMemo?: string; // 이미 크롤한 조사메모 재사용(키워드 추출 때 쓴 것) — 재크롤 방지(콜 절감)
   round?: number; // 0=첫 초안, 1+=다시 받기(다른 맥락)
 }
 
@@ -91,6 +94,14 @@ export interface SeeksHint {
   types: string[]; // 콜라보 유형 최대 3 (제품콜라보·팝업·워크숍·공동굿즈·공동콘텐츠·행사참여·공간대여 중)
   note: string; // 해요체 한두 문장
   reason: string; // "~에서 봤어요" 근거 한 줄
+}
+
+/** 크롤 조사메모에서 오프라인 파싱한 선택용 키워드 칩(LLM 없음 — 콜 0).
+ *  크롤→키워드 재설계: 유저가 '나를 나타내는 것'을 골라 생성 재료로 삼는다. */
+export interface KeywordChip {
+  text: string; // 짧은 키워드/구 (선택 단위)
+  section: string; // 출처 소제목 (정체·제품·활동·콜라보·고객·숫자·알려짐·공간·신뢰정보)
+  factual: boolean; // 사실 게이트 대상(숫자·방송·수상·대표명 등 — 오귀속 시 거짓말이 됨). 기본 OFF·탭 확인
 }
 
 /** 5지선다 결과 — 확인된 identity + 한줄소개/브랜드소개 후보 5개씩 + 결 단어 */
@@ -1230,13 +1241,22 @@ class NaverGeminiProvider implements SearchProvider {
   // 한 줄 소개 + 브랜드 소개를 한 번에 — 초안받기 이중 크롤 제거(research 1회 + 생성 1회).
   // generateOptions 응답이 oneLiners·descriptions를 둘 다 담는 것을 그대로 활용한다.
   async draftBoth(input: DraftInput): Promise<{ oneLiners: string[]; descriptions: string[] }> {
-    const research = await this.research(input.name);
+    const research = input.researchMemo ?? (await this.research(input.name));
     const info = this.draftInfo(input);
     const kw = (input.focusKeywords?.length ? input.focusKeywords : input.values) ?? [];
     const round = input.round ?? 0;
+    // ⭐ 별표 = 한 줄 소개 반드시 반영(캡 3, 순서=우선순위). 자리 부족하면 뒤 순위는 장문으로.
+    const starred = (input.starredKeywords ?? []).filter((s) => s?.trim()).slice(0, 3);
+    const verbatim = (input.verbatimKeywords ?? []).filter((s) => s?.trim());
+    const starLine = starred.length
+      ? `⭐⭐한 줄 소개에 반드시 반영할 핵심(우선순위 순, 최대 3개): ${starred.join(" > ")}. 1순위는 모든 한 줄 후보에 꼭 담고, 40자 안에 다 못 담으면 뒤 순위는 '브랜드 소개'(장문)로 넘겨.\n`
+      : "";
+    const verbatimLine = verbatim.length
+      ? `⭐그대로 넣을 문구(의역·표현 변형 절대 금지, 원문 그대로 등장시켜): ${verbatim.join(", ")}.\n`
+      : "";
     const prompt = `브랜드명: "${input.name}"\n\n[사용자 입력]\n${
       info || "(입력이 적어요 — 조사 자료 위주로)"
-    }\n\n${kw.length ? `⭐가중 키워드(가장 중요하게 반영): ${kw.join(", ")}\n\n` : ""}[조사 자료]\n${research}\n\n위 자료로 '한 줄 소개' 후보 3개(각 40자 이내 — 브랜드 정체성이 무엇을·어떻게·누구에게 한 줄에 드러나게, 과장·오글거리는 표현 금지)와 '브랜드 소개' 후보 5개(서로 다른 앵글, 각 3~5문장 해요체)를 함께 만들어줘. values·identity도 형식에 맞게 채워줘.${
+    }\n\n${kw.length ? `⭐가중 키워드(가장 중요하게 반영): ${kw.join(", ")}\n` : ""}${starLine}${verbatimLine}\n[조사 자료]\n${research}\n\n위 자료로 '한 줄 소개' 후보 3개(각 40자 이내 — 브랜드 정체성이 무엇을·어떻게·누구에게 한 줄에 드러나게, 과장·오글거리는 표현 금지)와 '브랜드 소개' 후보 5개(서로 다른 앵글, 각 3~5문장 해요체)를 함께 만들어줘. values·identity도 형식에 맞게 채워줘.${
       round > 0 ? " 이전과는 다른 표현·각도로 새롭게 써줘." : ""
     }`;
     const opts = await this.generateOptions(prompt, round > 0 ? 1.0 : 0.9);
@@ -1322,4 +1342,105 @@ export async function enrichResearch(name: string, region?: string): Promise<str
 /** 조사 메모 + 가중 키워드 → 한줄소개·브랜드소개 5지선다. */
 export async function enrichOptions(input: OptionsInput): Promise<EnrichOptions | null> {
   return provider.options ? provider.options(input) : null;
+}
+
+// ── 크롤→키워드 재설계: 조사메모 오프라인 파싱(LLM 없음, 콜 0) ──
+// 제미나이 조사메모의 [소제목] 구조를 선택용 키워드 칩으로 변환.
+// 신뢰정보(홈피·주소)는 칩 제외 — 링크 확인 게이트에서 별도 처리.
+const CHIP_SECTIONS: Record<string, { label: string; factual: boolean }> = {
+  정체: { label: "정체", factual: false },
+  "제품/특징": { label: "제품", factual: false },
+  제품: { label: "제품", factual: false },
+  활동: { label: "활동", factual: false },
+  콜라보: { label: "콜라보", factual: false },
+  "원하는 협업": { label: "원하는협업", factual: false },
+  고객: { label: "고객", factual: false },
+  숫자: { label: "숫자", factual: true }, // 사실 게이트
+  알려짐: { label: "알려짐", factual: true }, // 사실 게이트(방송·수상·언론)
+  공간: { label: "공간", factual: false },
+};
+// 섹션과 무관하게 사실 게이트로 승격시키는 단서(오귀속 시 거짓말이 될 고유명사·수치).
+const FACTUAL_RE = /방송|수상|대상|선정|일보|매거진|언론|미쉐린|빕구르망|백종원|출연|인증|팔로워/;
+
+/**
+ * 크롤 조사메모 → 선택용 키워드 칩(오프라인, 콜 0).
+ * 유저가 '나를 나타내는 것'을 고르면 그게 생성 재료가 된다. 사실 게이트(factual)는
+ * 기본 OFF·탭 확인 대상. 메모가 비었거나 구조가 없으면 빈 배열(→ thin 폴백).
+ */
+export function extractChipsFromResearch(research: string): KeywordChip[] {
+  if (!research) return [];
+  const gi = research.indexOf("[출처 2"); // 제미나이 조사부분(구조 깔끔) 우선
+  const body = gi >= 0 ? research.slice(gi) : research;
+  const parts = body.split(/\n?\s*\[([^\]\n]+)\]\s*/); // [pre, header, body, header, body, ...]
+  const chips: KeywordChip[] = [];
+  const seen = new Set<string>();
+  for (let i = 1; i < parts.length; i += 2) {
+    const sec = CHIP_SECTIONS[parts[i].trim()];
+    if (!sec) continue;
+    let count = 0;
+    for (const rawLine of (parts[i + 1] ?? "").split(/\n/)) {
+      let line = rawLine.replace(/^[\s·•\-*]+/, "").trim();
+      if (!line || /확인\s*안\s*됨|해당\s*없음|없음$/.test(line)) continue;
+      line = line.replace(/\s*[（(][^)）]*[)）]\s*$/g, "").trim(); // 뒤쪽 출처 괄호 제거
+      if (line.length > 28) line = line.split(/[.。·/|—–]/)[0].trim(); // 너무 길면 첫 구절
+      if (line.length < 2 || line.length > 28) continue;
+      const key = line.replace(/\s/g, "");
+      if (seen.has(key)) continue;
+      seen.add(key);
+      chips.push({
+        text: line,
+        section: sec.label,
+        factual: sec.factual || /\d/.test(line) || FACTUAL_RE.test(line),
+      });
+      if (++count >= 6) break;
+    }
+  }
+  return chips.slice(0, 28);
+}
+
+/** 업종 스타터 키워드 — 크롤 빈손 폴백용 '혹시 해당되나요?' 추측 칩(정적, 콜 0). */
+const TYPE_STARTERS: { match: RegExp; chips: string[] }[] = [
+  { match: /카페|커피|로스터/, chips: ["직접 로스팅", "디저트", "브런치", "테이크아웃", "반려동물 동반", "원데이 클래스"] },
+  { match: /반찬|밀키트|delicatessen|반찬가게|밑반찬/, chips: ["매일 조리", "국내산 재료", "택배 배송", "정기 구독", "당일 생산"] },
+  { match: /빈티지|편집|셀렉트|소품|편집숍/, chips: ["빈티지 셀렉트", "핸드픽", "일상 소품", "시즌 컬렉션", "입고 알림"] },
+  { match: /공방|클래스|워크숍|핸드메이드|수제/, chips: ["원데이 클래스", "수제 제작", "소량 생산", "주문 제작", "체험 프로그램"] },
+  { match: /베이커리|빵|디저트|케이크/, chips: ["당일 생산", "천연 발효", "예약 케이크", "비건 옵션", "제철 재료"] },
+  { match: /꽃|플라워|플로리스트/, chips: ["제철 꽃", "주문 제작", "구독 배송", "클래스 운영", "행사 장식"] },
+  { match: /의류|패션|브랜드|디자이너/, chips: ["자체 제작", "소량 생산", "시즌 컬렉션", "지속가능 소재", "팝업 참여"] },
+];
+export function starterChipsForType(businessType: string): KeywordChip[] {
+  const t = (businessType || "").trim();
+  const hit = TYPE_STARTERS.find((s) => s.match.test(t));
+  const base = hit?.chips ?? ["직접 제작", "소량 생산", "정성", "단골 많음", "주문 제작"];
+  return base.map((text) => ({ text, section: "추천", factual: false }));
+}
+
+/** 조사메모에서 인스타/홈피 후보를 오프라인 추출(콜 0). 확인 게이트에서 유저가 '맞나요?' 판정.
+ *  confirmed=크롤이 홈페이지 링크로 실제 확인함(그래도 자동첨부 금지 — 제안만). */
+export function extractLinksFromResearch(
+  research: string
+): { instagram?: string; instagramConfirmed: boolean; homepage?: string } {
+  if (!research) return { instagramConfirmed: false };
+  const homepage = research.match(/홈페이지:\s*(https?:\/\/\S+|[\w.-]+\.[a-z]{2,}\S*)/i)?.[1]?.trim();
+  const igLine = research.match(/인스타그램:\s*(@?[\w.]+)([^\n]*)/);
+  let instagram: string | undefined;
+  let instagramConfirmed = false;
+  if (igLine && !/확인\s*안\s*됨|추측/.test(igLine[1])) {
+    instagram = igLine[1].trim().replace(/^@?/, "@");
+    instagramConfirmed = /실제 확인됨|링크에서/.test(igLine[2] ?? "");
+  }
+  return {
+    instagram,
+    instagramConfirmed,
+    homepage: homepage && !/확인\s*안\s*됨/.test(homepage) ? homepage : undefined,
+  };
+}
+
+/** 크롤 신호 티어 — thin(빈손 뼈대) 판정. rich=홈피메타·지도일치·칩 충분 / thin=그 외. */
+export function researchTier(research: string, chipCount: number): "rich" | "thin" {
+  if (!research) return "thin";
+  const hasOwnerMeta = research.includes("[브랜드가 직접 쓴 소개");
+  const mapMatched = research.includes("[지도 교차검증] ✅");
+  if (hasOwnerMeta || mapMatched || chipCount >= 3) return "rich";
+  return "thin";
 }
