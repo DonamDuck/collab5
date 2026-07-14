@@ -11,6 +11,7 @@ import { GoogleGenAI, Type } from "@google/genai";
 import { z } from "zod";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { josa } from "./josa";
+import { regionConflict, regionMatches } from "./regionSynonyms";
 
 /** 검증가능 신뢰 시그널 필드 — 못 찾으면 missing, 찾으면 sources에 출처 */
 export type EnrichField = "instagram" | "homepage" | "address";
@@ -838,11 +839,25 @@ class NaverGeminiProvider implements SearchProvider {
     const brandKey = query.replace(/\s/g, "");
     const mentionsBrand = (it: NaverItem) =>
       (this.clean(it.title) + this.clean(it.description)).replace(/\s/g, "").includes(brandKey);
-    const blogF = blog.filter(mentionsBrand);
-    const cafeF = cafe.filter(mentionsBrand);
-    const collabF = collabBlog.filter(mentionsBrand);
-    const popupF = popupBlog.filter(mentionsBrand);
-    const workshopF = workshopBlog.filter(mentionsBrand);
+    // negative-region 재랭킹 — 사용자 지역이 있으면, '다른 광역을 명시한' 문서(=동명 타지역 업체)를
+    //   추가로 드롭. 지역 언급이 없는 문서는 안 건드린다(본인 후기가 동네명 생략하는 경우 보호).
+    const rgn = region?.trim() ?? "";
+    const docText = (it: NaverItem) => `${this.clean(it.title)} ${this.clean(it.description)}`;
+    const keep = rgn
+      ? (it: NaverItem) => mentionsBrand(it) && !regionConflict(rgn, docText(it))
+      : mentionsBrand;
+    const blogF = blog.filter(keep);
+    const cafeF = cafe.filter(keep);
+    const collabF = collabBlog.filter(keep);
+    const popupF = popupBlog.filter(keep);
+    const workshopF = workshopBlog.filter(keep);
+
+    // 지도 교차검증 — local(지도) 결과 주소가 사용자 지역과 같은 광역인가.
+    //   일치=지도가 이 브랜드를 맞게 특정(앵커 신뢰) / 불일치=동명 타지역 업체 오매칭 의심 / 0건=미등록.
+    const localAddr = (it: NaverItem) =>
+      `${this.clean(it.roadAddress)} ${this.clean(it.address)} ${this.clean(it.title)}`;
+    const mapMatched = !!rgn && local.some((it) => regionMatches(rgn, localAddr(it)));
+    const mapCollided = !!rgn && local.length > 0 && !mapMatched;
 
     const parts: string[] = [];
     // 메모 최상단 — 브랜드가 직접 쓴 소개(홈페이지 메타)가 있으면 가장 먼저
@@ -859,6 +874,16 @@ class NaverGeminiProvider implements SearchProvider {
         sniffedIg
           ? `· 인스타그램: ${sniffedIg} (홈페이지 링크에서 실제 확인됨 — 이 값을 신뢰해서 채워)`
           : `· 인스타그램: 홈페이지 정적 HTML에서 링크 확인 안 됨(추측하지 말 것)`
+      );
+    }
+    // 지도 교차검증 결과를 메모 상단에 명시 — 구조화 모델이 지역 안 맞는 정보를 거르게.
+    if (mapMatched) {
+      parts.push(
+        `\n[지도 교차검증] ✅ 네이버 지도 주소가 입력 지역(${rgn})과 일치 — 이 업체가 맞아요. 주소·업종은 신뢰.`
+      );
+    } else if (mapCollided) {
+      parts.push(
+        `\n[지도 교차검증] ⚠️ 네이버 지도 결과가 입력 지역(${rgn})과 불일치 — 동명의 다른 지역 업체가 섞였을 수 있어요. 지역이 안 맞는 정보는 이 브랜드 것으로 단정하지 마세요.`
       );
     }
     if (local.length) {
