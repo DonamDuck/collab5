@@ -242,7 +242,11 @@ function RegisterForm() {
     setBlocks([
       { type: "metrics", uid: crypto.randomUUID(), photos: [], links: [], items: [{ label: "인스타 팔로워", value: "1.2만" }, { label: "누적 워크숍", value: "48회" }] },
     ]);
-    setAiFilled(new Set(["name", "oneLiner", "description", "values", "address", "instagram", "homepage"]));
+    setAiFilled(new Set([
+      "name", "oneLiner", "description", "values", "address", "instagram", "homepage",
+      // 섹션 헤더 배지용 — 데모가 채우는 섹션들
+      "keywords", "story", "activities", "seeks", "collabs", "customers",
+    ]));
     setDraftGenerated(true);
     // 데모 = 대표 시연 도구 — 데모가 채우는 섹션 전부 펼쳐진 채 시작(안 보이는 채 제출되는 상태 방지)
     setOpenSections(
@@ -533,6 +537,7 @@ function RegisterForm() {
     if (fill.values !== undefined) {
       setValues(fill.values);
       filled.add("values");
+      filled.add("keywords"); // 키워드 섹션 헤더 배지용
     }
     if (fill.description !== undefined) {
       setDescription(fill.description);
@@ -558,6 +563,7 @@ function RegisterForm() {
           if (h) injectActHint(h);
         });
         openSection("activities");
+        filled.add("activities");
       }
       if (sel.collabs.length) {
         sel.collabs.forEach((i) => {
@@ -565,6 +571,7 @@ function RegisterForm() {
           if (h) injectCollabHint(h);
         });
         openSection("collabs");
+        filled.add("collabs");
       }
       if (sel.seeks && fill.seeksHint) {
         const types = fill.seeksHint.types.filter((t): t is CollabType =>
@@ -1025,6 +1032,7 @@ function RegisterForm() {
         {/* ── 시트 출신 — 우리 브랜드를 표현하는 키워드 (구③ · 정본 위치 = ① 뒤) ── */}
         <StubSection
           id="sec-keywords"
+          badge={aiFilled.has("keywords") ? <AiBadge /> : null}
           label="우리 브랜드를 표현하는 키워드를 골라주세요."
           hiddenWhenCollapsed
           expanded={openSections.has("keywords")}
@@ -1128,6 +1136,7 @@ function RegisterForm() {
         {/* ── 스텁 A — 왜 이 브랜드를 시작하셨나요 (구②) ── */}
         <StubSection
           id="sec-story"
+          badge={aiFilled.has("story") ? <AiBadge /> : null}
           label="왜 이 브랜드를 시작하셨나요?"
           hiddenWhenCollapsed
           expanded={openSections.has("story")}
@@ -1148,6 +1157,7 @@ function RegisterForm() {
         {/* ── 스텁 B — 주로 어떤 활동을 하나요 (구④) ── */}
         <StubSection
           id="sec-activities"
+          badge={aiFilled.has("activities") ? <AiBadge /> : null}
           label="주로 어떤 활동을 하나요?"
           hiddenWhenCollapsed
           expanded={openSections.has("activities")}
@@ -1233,6 +1243,7 @@ function RegisterForm() {
         {/* ── 시트 출신 — 이런 파트너를 찾고 있어요 (구⑥ 칩+서술) ── */}
         <StubSection
           id="sec-seeks"
+          badge={aiFilled.has("seeks") ? <AiBadge /> : null}
           label="이런 파트너를 찾고 있어요."
           hiddenWhenCollapsed
           expanded={openSections.has("seeks")}
@@ -1261,6 +1272,7 @@ function RegisterForm() {
         {/* ── 스텁 C — 이런 콜라보 경험이 있어요 (구⑦) ── */}
         <StubSection
           id="sec-collabs"
+          badge={aiFilled.has("collabs") ? <AiBadge /> : null}
           label="이런 콜라보 경험이 있어요."
           hiddenWhenCollapsed
           expanded={openSections.has("collabs")}
@@ -1464,6 +1476,7 @@ function RegisterForm() {
         {/* ── 시트 출신 — 저희는 주로 이런 고객과 함께하고 있어요 (구⑧) ── */}
         <StubSection
           id="sec-customers"
+          badge={aiFilled.has("customers") ? <AiBadge /> : null}
           label="저희는 주로 이런 고객과 함께하고 있어요."
           hiddenWhenCollapsed
           expanded={openSections.has("customers")}
