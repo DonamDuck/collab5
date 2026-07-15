@@ -110,15 +110,7 @@ function storyItemsOf(o: EnrichOptions, values: string[]): StoryItem[] {
       reason: h.source || "웹에서 봤어요",
     })
   );
-  (o.collabHints ?? []).forEach((h, i) =>
-    items.push({
-      key: `collab-${i}`,
-      group: "이런 콜라보 경험이 있어요.",
-      title: h.partner || "",
-      detail: h.desc || "",
-      reason: h.source || "웹에서 봤어요",
-    })
-  );
+  // 바텀시트 순서: 활동 → 파트너(seeks) → 콜라보 → 블록 → 키워드. 시트와 노출 순서 일치.
   if (o.seeksHint) {
     const types = o.seeksHint.types ?? [];
     items.push({
@@ -129,6 +121,15 @@ function storyItemsOf(o: EnrichOptions, values: string[]): StoryItem[] {
       reason: o.seeksHint.reason || "웹에서 봤어요",
     });
   }
+  (o.collabHints ?? []).forEach((h, i) =>
+    items.push({
+      key: `collab-${i}`,
+      group: "이런 콜라보 경험이 있어요.",
+      title: h.partner || "",
+      detail: h.desc || "",
+      reason: h.source || "웹에서 봤어요",
+    })
+  );
   (o.blockHints ?? []).forEach((b) =>
     items.push({
       key: `block-${b.type}`,

@@ -1017,7 +1017,7 @@ function RegisterForm() {
               />
               {/* 구 sec-offersNote(시트) → ① 칩 하단 상시 노출로 이사. 칩과 한 세트 */}
               <div className="mt-4">
-                <p className="mb-1.5 text-sm text-mute">콜라보를 조금 더 소개해주세요.</p>
+                <p className="mb-1.5 text-sm text-mute">제공 가능한 콜라보를 조금 더 소개해주세요.(선택)</p>
                 <textarea
                   value={offersNote}
                   onChange={(e) => setOffersNote(e.target.value)}
@@ -1041,20 +1041,37 @@ function RegisterForm() {
           hasData={hasKeywords}
           onExpand={() => openSection("keywords")}
           onCollapse={() => closeSection("keywords")}
+          onDelete={() => {
+            setValues([]);
+            closeSection("keywords");
+          }}
         >
         <div className="space-y-8">
           {/* 분위기칩 — 우리를 표현하는 말 */}
           <div>
-            <label className="mb-1 flex items-center gap-2 text-base font-medium text-body">
-              <span>브랜드와 어울리는 단어를 선택해주세요.</span>
-              {aiFilled.has("values") && <AiBadge />}
-              <span className="ml-auto text-xs font-normal text-mute">
+            <div className="mb-4 flex items-center justify-between gap-2">
+              <p className="text-[15px] text-mute">직접 추가도 가능해요. 최대 10개</p>
+              <span className="shrink-0 text-xs text-mute">
                 {values.length} / {MAX_VIBES}
               </span>
-            </label>
-            <p className="mb-4 text-[15px] text-mute">
-              직접 추가도 가능해요. 최대 10개
-            </p>
+            </div>
+            {/* 선택·직접추가한 칩 — 최상단(선택한 게 위에 보이게) */}
+            {values.some((v) => !ALL_VIBES.includes(v)) && (
+              <div className="mb-4 flex flex-wrap gap-2">
+                {values
+                  .filter((v) => !ALL_VIBES.includes(v))
+                  .map((v) => (
+                    <button
+                      key={v}
+                      type="button"
+                      onClick={() => toggleVibe(v)}
+                      className="inline-flex h-8 items-center rounded-pill border border-primary bg-primary-tint px-3 text-sm text-primary-on"
+                    >
+                      {v} ✕
+                    </button>
+                  ))}
+              </div>
+            )}
             <div className="space-y-4">
               {VIBE_CATEGORIES.map((cat, i) => (
                 <div
@@ -1090,23 +1107,6 @@ function RegisterForm() {
                 </div>
               ))}
             </div>
-            {/* 직접 추가한 칩 (추천 목록에 없는 것) */}
-            {values.some((v) => !ALL_VIBES.includes(v)) && (
-              <div className="mt-3 flex flex-wrap gap-2">
-                {values
-                  .filter((v) => !ALL_VIBES.includes(v))
-                  .map((v) => (
-                    <button
-                      key={v}
-                      type="button"
-                      onClick={() => toggleVibe(v)}
-                      className="inline-flex h-8 items-center rounded-pill border border-primary bg-primary-tint px-3 text-sm text-primary-on"
-                    >
-                      {v} ✕
-                    </button>
-                  ))}
-              </div>
-            )}
             <div className="mt-3 flex gap-2">
               <input
                 value={customVibe}
