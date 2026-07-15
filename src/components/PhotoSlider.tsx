@@ -1,7 +1,7 @@
 "use client";
 
-// 브랜드 사진 스와이프 슬라이드 — 자동재생 없음. 손가락 스와이프(스크롤스냅)로 한 장씩.
-// 넘김 제스처를 유도: 인디케이터 점 + "밀어서 넘겨보세요" 힌트 + 데스크탑 화살표.
+// 브랜드 사진 스와이프 슬라이드 — 자동재생 없음. 모바일=손가락 스와이프(스크롤스냅),
+// 데스크탑=마우스 드래그(잡고 끌기) + 화살표. 인디케이터 점으로 위치 표시.
 import { useRef, useState } from "react";
 
 export function PhotoSlider({
@@ -13,8 +13,8 @@ export function PhotoSlider({
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const [idx, setIdx] = useState(0);
-  if (!photos.length) return null;
-  const multi = photos.length > 1;
+  const [dragging, setDragging] = useState(false);
+  const drag = useRef({ active: false, startX: 0, startLeft: 0 });
 
   const onScroll = () => {
     const el = ref.current;
@@ -27,14 +27,48 @@ export function PhotoSlider({
     el.scrollTo({ left: i * el.clientWidth, behavior: "smooth" });
   };
 
+  // 데스크탑 마우스 드래그(잡고 끌기). 터치는 네이티브 스크롤스냅에 맡김(pointerType 분기).
+  const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    const el = ref.current;
+    if (photos.length <= 1 || e.pointerType !== "mouse" || !el) return;
+    drag.current = { active: true, startX: e.clientX, startLeft: el.scrollLeft };
+    setDragging(true);
+    el.setPointerCapture(e.pointerId);
+  };
+  const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    const el = ref.current;
+    if (!drag.current.active || !el) return;
+    el.scrollLeft = drag.current.startLeft - (e.clientX - drag.current.startX);
+  };
+  const onPointerEnd = (e: React.PointerEvent<HTMLDivElement>) => {
+    const el = ref.current;
+    if (!drag.current.active) return;
+    drag.current.active = false;
+    setDragging(false);
+    if (!el) return;
+    try {
+      el.releasePointerCapture(e.pointerId);
+    } catch {}
+    goTo(Math.round(el.scrollLeft / el.clientWidth)); // 가까운 장으로 스냅
+  };
+
+  if (!photos.length) return null;
+  const multi = photos.length > 1;
+
   return (
     <div className="select-none">
       <div className={`relative overflow-hidden ${rounded}`}>
         <div
           ref={ref}
           onScroll={onScroll}
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerEnd}
+          onPointerCancel={onPointerEnd}
           className={`no-scrollbar flex ${
-            multi ? "snap-x snap-mandatory overflow-x-auto" : "overflow-hidden"
+            multi ? "overflow-x-auto" : "overflow-hidden"
+          } ${multi && !dragging ? "snap-x snap-mandatory" : ""} ${
+            multi ? (dragging ? "cursor-grabbing" : "cursor-grab") : ""
           }`}
         >
           {photos.map((src, i) => (
@@ -80,24 +114,21 @@ export function PhotoSlider({
         )}
       </div>
 
-      {/* 인디케이터 점 + 스와이프 힌트 */}
+      {/* 인디케이터 점 */}
       {multi && (
-        <>
-          <div className="mt-2.5 flex items-center justify-center gap-1.5">
-            {photos.map((_, i) => (
-              <button
-                key={i}
-                type="button"
-                onClick={() => goTo(i)}
-                aria-label={`${i + 1}번째 사진`}
-                className={`h-1.5 rounded-pill transition-all ${
-                  i === idx ? "w-4 bg-primary" : "w-1.5 bg-border-strong"
-                }`}
-              />
-            ))}
-          </div>
-          <p className="mt-1.5 text-center text-[12px] text-faint">← 밀어서 넘겨보세요 →</p>
-        </>
+        <div className="mt-2.5 flex items-center justify-center gap-1.5">
+          {photos.map((_, i) => (
+            <button
+              key={i}
+              type="button"
+              onClick={() => goTo(i)}
+              aria-label={`${i + 1}번째 사진`}
+              className={`h-1.5 rounded-pill transition-all ${
+                i === idx ? "w-4 bg-primary" : "w-1.5 bg-border-strong"
+              }`}
+            />
+          ))}
+        </div>
       )}
     </div>
   );

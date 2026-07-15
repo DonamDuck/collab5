@@ -32,6 +32,9 @@ export async function fileToResizedDataUrl(
   canvas.height = height;
   const ctx = canvas.getContext("2d");
   if (!ctx) return dataUrl;
+  // 투명 PNG를 JPEG로 저장하면 투명 픽셀이 검정이 됨 → 흰 배경을 먼저 깔아 검정 배경 방지.
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, width, height);
   ctx.drawImage(img, 0, 0, width, height);
   return canvas.toDataURL("image/jpeg", quality);
 }
