@@ -139,8 +139,8 @@ export interface SearchProvider {
   oneLiners?(input: DraftInput): Promise<string[]>;
   /** (선택) 한 줄 소개 3개 + 브랜드 소개 5개를 한 번에 — 초안받기 이중 크롤 제거(research 1회+생성 1회) */
   draftBoth?(input: DraftInput): Promise<{ oneLiners: string[]; descriptions: string[] }>;
-  /** (선택) 브랜드명(+지역)으로 조사 메모만 생성(백그라운드 크롤 — 느린 단계) */
-  research?(name: string, region?: string): Promise<string>;
+  /** (선택) 브랜드명(+지역·업종)으로 조사 메모만 생성(백그라운드 크롤 — 느린 단계) */
+  research?(name: string, region?: string, businessType?: string): Promise<string>;
   /** (선택) 조사 메모 + 키워드 → 한줄소개·브랜드소개 5지선다(빠른 생성 단계) */
   options?(input: OptionsInput): Promise<EnrichOptions>;
 }
@@ -1004,9 +1004,16 @@ class NaverGeminiProvider implements SearchProvider {
   // 제미나이 자체 웹 검색(Google Search grounding). 네이버와 별개 소스로 조사.
   // ⚠️ grounding은 responseSchema와 동시 사용 불가 → 순수 텍스트 조사 단계로만.
   //    ENRICH_GEMINI_SEARCH=0 이면 비활성(네이버 단독). grounding은 유료 쿼터 소모.
-  private async geminiSearch(query: string, region?: string): Promise<string> {
+  private async geminiSearch(query: string, region?: string, businessType?: string): Promise<string> {
     if (process.env.ENRICH_GEMINI_SEARCH === "0") return "";
-    const loc = region?.trim() ? `\n(위치 힌트: ${region.trim()} — 이 지역의 그 업체를 특정해줘. 동명 업체 주의.)` : "";
+    // 지역+업종 = 동명 업체 판별 신호. 틀린 업체 정보를 채우느니 빈손이 낫다(솔직 배너가 받아줌).
+    const hintBits = [
+      region?.trim() && `위치: ${region.trim()}`,
+      businessType?.trim() && `업종: ${businessType.trim()}`,
+    ].filter(Boolean);
+    const loc = hintBits.length
+      ? `\n(⭐브랜드 특정 힌트 → ${hintBits.join(" · ")}. ⚠️같은 이름이라도 위치·업종이 이 힌트와 명백히 다르면 동명의 남의 업체다 — 그 업체 정보는 한 줄도 섞지 마. 힌트와 맞는 업체를 못 찾았으면 지어내지 말고 모든 소제목에 "확인 안 됨"이라고 써.)`
+      : "";
     const prompt = `절대 추측하거나 사실이 아닌 정보를 지어내지 마. 웹에서 확인된 것만 적는다.
 "${query}" 브랜드/업체를 웹에서 조사해줘.${loc}
 아래 소제목 순서 그대로, 확인된 사실만 개조식으로 정리해줘. 전체 1500자 이내. 해당 정보가 없으면 그 소제목에 "확인 안 됨" 한 줄만.
@@ -1107,10 +1114,10 @@ class NaverGeminiProvider implements SearchProvider {
   }
 
   // 조사 메모(네이버+제미나이)만 생성 — 느린 크롤 단계(위저드가 백그라운드로 먼저 돌림).
-  async research(name: string, region?: string): Promise<string> {
+  async research(name: string, region?: string, businessType?: string): Promise<string> {
     const [naver, gemini] = await Promise.all([
       this.gather(name, region),
-      this.geminiSearch(name, region),
+      this.geminiSearch(name, region, businessType),
     ]);
     return this.combineResearch(naver, gemini);
   }
@@ -1374,8 +1381,12 @@ export async function enrichDraftBoth(
 }
 
 /** 조사 메모 생성(백그라운드 크롤) — 위저드가 키워드 입력받는 동안 먼저 돌린다. */
-export async function enrichResearch(name: string, region?: string): Promise<string> {
-  return provider.research ? provider.research(name, region) : "";
+export async function enrichResearch(
+  name: string,
+  region?: string,
+  businessType?: string
+): Promise<string> {
+  return provider.research ? provider.research(name, region, businessType) : "";
 }
 
 /** 조사 메모 + 가중 키워드 → 한줄소개·브랜드소개 5지선다. */
@@ -1431,8 +1442,9 @@ function unguardParenCommas(s: string): string {
  * 유저가 '나를 나타내는 것'을 고르면 그게 생성 재료가 된다. 사실 게이트(factual)는
  * 기본 OFF·탭 확인 대상. 메모가 비었거나 구조가 없으면 빈 배열(→ thin 폴백).
  */
-export function extractChipsFromResearch(research: string): KeywordChip[] {
+export function extractChipsFromResearch(research: string, brandName?: string): KeywordChip[] {
   if (!research) return [];
+  const brand = brandName?.trim();
   const gi = research.indexOf("[출처 2"); // 제미나이 조사부분(구조 깔끔) 우선
   const body = gi >= 0 ? research.slice(gi) : research;
   const parts = body.split(/\n?\s*\[([^\]\n]+)\]\s*/); // [pre, header, body, header, body, ...]
@@ -1460,6 +1472,11 @@ export function extractChipsFromResearch(research: string): KeywordChip[] {
     if (/(다|요|죠|고|며|나|서)\.?$/.test(text)) return false;
     // 미완결 조각 배제(접속·비교·관형 어미로 끝) — "'호락호락'이라는 이름처럼", "~을 위한" 등
     if (/(처럼|같은|같이|위한|위해|통한|통해|관한|관련|대한|이라는|라는|든지|거나|면서|로서|로써|등의|에서|으로|에게|까지|부터|보다)$/.test(text))
+      return false;
+    // 소개문 조각 배제 — "○○은 서울 보문동에 위치한 워크숍" 같은 문장형(키워드 아님)
+    if (/(에|에서)\s*(위치|자리|소재)/.test(text)) return false;
+    // 브랜드명 자체·브랜드명 주어 문장은 칩이 아니다 ("캔버스가든", "캔버스가든은 ~")
+    if (brand && (text === brand || new RegExp(`^${brand.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*(은|는|이|가|의)?(\\s|$)`).test(text)))
       return false;
     const key = text.replace(/\s/g, "");
     if (seen.has(key)) return false;
@@ -1493,7 +1510,7 @@ export function extractChipsFromResearch(research: string): KeywordChip[] {
       // 숫자·이력은 라벨을 살린다("팔로워 1.5만") — 시점 클로즈만 제거. 그 외 섹션은 "라벨:" 접두 제거.
       if (isNumSec) {
         line = line
-          .replace(/\s*\d{4}년\s*\d{0,2}월?\s*기준\s*/g, " ")
+          .replace(/\s*\d{4}년\s*(?:\d{1,2}월\s*)?(?:\d{1,2}일\s*)?기준\s*/g, " ")
           .replace(/:\s*/g, " ")
           .replace(/\s+/g, " ")
           .trim();
@@ -1640,6 +1657,35 @@ export function extractLinksFromResearch(research: string): LinkFinds {
 }
 
 /** 크롤 신호 티어 — thin(빈손 뼈대) 판정. rich=홈피메타·지도일치·칩 충분 / thin=그 외. */
+// 지명이 아닌데 '동'으로 끝나는 일반어 — 오탐 방지
+const DONG_BLOCKLIST =
+  /^(활동|운동|이동|자동|행동|감동|공동|협동|합동|노동|아동|부동|작동|출동|생동|변동|유동|파동|맥동|진동|약동|박동|소동|폭동|선동|가동|기동|구동|시동|수동|능동|충동|율동|연동|동동)$/;
+const METRO_ONLY =
+  /^(서울|부산|대구|인천|광주|대전|울산|세종|경기|강원|충북|충남|전북|전남|경북|경남|제주)$/;
+
+/** 동명 타지역 업체 감지(동 단위) — 크롤 메모가 입력 지역과 다른 동네 업체로 보이면 충돌 지명을 반환.
+ *  광역(regionConflict)은 '서울 보문동 vs 서울 성수동'을 못 잡아서(둘 다 서울) 동 스템으로 보완.
+ *  판단 불가(사용자 지역에 세부 지명 없음·메모에 지명 없음)면 null — 안전 쪽으로 미적용. */
+export function detectRegionMismatch(research: string, region?: string): string | null {
+  const r = region?.trim();
+  if (!r || !research) return null;
+  // 광역 자체가 충돌하면 바로 (기존 인프라 재사용)
+  if (regionConflict(r, research)) return "다른 지역";
+  // 사용자 지역의 세부 지명 스템 — "서울 보문동" → "보문" ('보문로' 표기 변형도 매칭되게 접미 제거)
+  const userStems = [...r.matchAll(/([가-힣]{2,7})(동|구|로|가|읍|면|리)(?=\s|$)/g)]
+    .map((m) => m[1])
+    .filter((s) => s.length >= 2 && !METRO_ONLY.test(s));
+  if (!userStems.length) return null;
+  if (userStems.some((s) => research.includes(s))) return null; // 스템이 메모 어디든 등장 → 본인 가능성
+  // 메모에서 장소성 '○○동' 토큰 수집 — 사용자 동네는 없는데 다른 동네만 있으면 충돌
+  const found = new Set<string>();
+  for (const m of research.matchAll(/(?:^|[\s(·,])([가-힣]{2,7}동)(?=[\s,).·]|$)/gm)) {
+    if (!DONG_BLOCKLIST.test(m[1])) found.add(m[1]);
+  }
+  if (!found.size) return null; // 메모에 지명 자체가 없음 → 판단 보류
+  return [...found].slice(0, 2).join("·");
+}
+
 export function researchTier(research: string, chipCount: number): "rich" | "thin" {
   if (!research) return "thin";
   const hasOwnerMeta = research.includes("[브랜드가 직접 쓴 소개");

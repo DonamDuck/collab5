@@ -15,6 +15,7 @@ import {
   starterChipsForType,
   extractLinksFromResearch,
   researchTier,
+  detectRegionMismatch,
 } from "@/lib/enrich";
 import { fetchHomepageDigest } from "@/lib/homepage";
 
@@ -130,8 +131,22 @@ export async function POST(req: Request) {
     const region = typeof body.region === "string" ? body.region.trim() || undefined : undefined;
     const businessType = typeof body.businessType === "string" ? body.businessType.trim() : "";
     try {
-      const memo = await enrichResearch(name, region);
-      const chips = extractChipsFromResearch(memo);
+      const memo = await enrichResearch(name, region, businessType || undefined);
+      // 동명 타지역 업체 감지 — 틀린 브랜드의 칩·링크·메모를 통째로 버린다(오귀속 사고 방지).
+      // 솔직 배너 + 업종 스타터로 진행하고, 메모는 생성 단계가 헷갈리지 않게 짧은 사실 노트로 대체.
+      const mismatch = detectRegionMismatch(memo, region);
+      if (mismatch) {
+        console.log("[enrich] region-mismatch", JSON.stringify({ name, region, found: mismatch }));
+        return NextResponse.json({
+          chips: [],
+          starter: starterChipsForType(businessType),
+          tier: "thin",
+          links: {},
+          research: `[동명 업체 제외] 웹 검색에서는 '${mismatch}' 쪽의 동명 업체만 확인돼, 입력하신 지역(${region})의 '${name}' 정보는 반영하지 않았어요. 아래 사용자가 고른 키워드와 직접 입력한 정보만으로 작성해 주세요.`,
+          mismatch: true,
+        });
+      }
+      const chips = extractChipsFromResearch(memo, name);
       // 칩이 없으면 유저 관점에선 빈손(thin) — 홈피 메타가 있어도 고를 게 없으면
       // 솔직 배너 + 업종 스타터로 안내한다(제미나이 degrade·레이트리밋 시에도 빈 화면 방지).
       const tier = chips.length === 0 ? "thin" : researchTier(memo, chips.length);
