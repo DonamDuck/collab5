@@ -586,9 +586,10 @@ ${BRAND_VOICE}
 - 인스타: 실제 확인된 핸들만 identity.instagram에 넣는다(추측 금지). 확정 못 하면 identity.instagram은 빈 문자열로 두고, 대신 instagramCandidates에 도메인·브랜드명 기반 그럴듯한 추정 핸들 2~4개를 제시한다(사장이 직접 고를 후보용). 예: 도메인이 canvasgarden.shop이면 @canvasgarden, @canvasgarden_official, @canvasgarden.shop 등.
 - activityHints: 조사 메모에 실제로 언급된 이 브랜드의 활동(워크숍·클래스·팝업·제품라인 등)만 0~3건. collabHints: 메모에 파트너명이 드러난 협업 소식만 0~3건. 각 항목의 source는 그 정보가 나온 출처 유형(네이버 블로그 후기/카페글/웹 검색/인스타그램)으로. ⚠️메모에 없으면 절대 만들지 말고 빈 배열로 둬라(참고용 힌트라 사실만).
 - blockHints: 조사에서 근거가 뚜렷할 때만 추천 블록 최대 2개.
-  팔로워·리뷰수 등 공개 수치 발견 → metrics(items에 label·value 밑그림) /
+  공개 수치 발견(팔로워·서포터·펀딩액·판매량·매출·운영 연차·직원 규모·입점처 수 등, ⚠️후기 수·별점은 제외) → metrics(items에 label·value 밑그림) /
   언론·수상·방송 → press(items에 label=제목, year) /
-  공간 운영 흔적 → space(items 없음) / 고객 후기 풍부 → reviews(items 없음 — 인용문을 지어내지 않는다).
+  공간 운영 흔적 → space(items 없음).
+  ⚠️reviews(고객 후기) 블록은 지금은 추천하지 마라 — 후기 표현은 별도 재설계 예정이라 blockHints에 reviews를 넣지 않는다.
   reason은 반드시 "~에서 …을 봤어요" 형태의 근거 한 줄. 근거 없으면 빈 배열.
 - seeksHint: 조사에서 이 브랜드가 어떤 파트너·협업을 원하는지 근거가 보이면 제안(없으면 null). 지어내지 않는다. types는 콜라보 유형(제품콜라보·팝업·워크숍·공동굿즈·공동콘텐츠·행사참여·공간대여 중), note는 해요체 한두 문장, reason은 '~에서 봤어요' 근거.
 
@@ -598,7 +599,7 @@ ${BRAND_VOICE}
 - [활동] + [네이버 표적검색] + 블로그·카페 후기 → activityHints
 - [콜라보] + [네이버 표적검색]의 콜라보 흔적 → collabHints (파트너명 명시된 것만)
 - [원하는 협업] → seeksHint
-- [숫자] → blockHints(metrics) / [알려짐] → blockHints(press) / [공간] → blockHints(space) / 후기가 여러 건 보이면 → blockHints(reviews)
+- [숫자] → blockHints(metrics) / [알려짐] → blockHints(press) / [공간] → blockHints(space) (⚠️후기는 지금 다루지 않음 — reviews 블록 생성 금지)
 - [고객] → descriptions에서 고객 맥락으로 활용
 시간 감각: 연도가 보이면 최근 정보 우선. 오래된 활동은 과거형("~했어요")으로 쓰고, 지금도 하는지 불확실하면 단정하지 마라. 연도 정보가 아예 없으면 현재 진행형 단정을 피하고 "~해왔어요" 같은 완곡한 표현을 써라.`;
 
@@ -1012,7 +1013,7 @@ class NaverGeminiProvider implements SearchProvider {
 [콜라보] 다른 브랜드·공간·작가와 함께한 협업 이력 (파트너 이름이 확인된 것만)
 [원하는 협업] 이 브랜드가 찾는 파트너·하고 싶다고 밝힌 협업 (모집글·인터뷰 발언 등 근거 필수)
 [고객] 주요 고객층·타겟 (연령·관심사 등, 확인된 것만)
-[숫자] 팔로워·후기 개수·방문·판매량 등 공개 수치 (어디서 봤는지 함께)
+[숫자] 이 브랜드의 공개된 수치를 종류를 가리지 말고 최대한 많이 — 팔로워·구독자, 서포터·후원자 수, 펀딩 달성액·달성률, 누적 판매량·생산량, 매출·거래액, 운영 연차(설립연도), 직원·팀 규모, 입점처·팝업·매장 수, 회원·고객 수, 제품/굿즈 종류 수 등 (각 항목 어디서 봤는지 함께). ⚠️후기 개수·리뷰 수·별점·평점은 제외.
 [알려짐] 언론·매거진·방송·수상 노출 (매체명·연도)
 [공간] 오프라인 매장·쇼룸·작업실·카페 운영 여부와 위치
 [신뢰정보] 홈페이지 URL · 주소
@@ -1406,9 +1407,12 @@ export function extractChipsFromResearch(research: string): KeywordChip[] {
       .replace(/^(이\s*외에도|그\s*외에도|이외에도)\s*/, "")
       .replace(/[.。]\s*$/, "")
       .trim();
-    if (text.length < 2 || text.length > 28) return false;
+    const maxLen = /숫자|알려짐/.test(sec.label) ? 40 : 28;
+    if (text.length < 2 || text.length > maxLen) return false;
     if (/확인\s*안\s*됨|해당\s*없음|없습니다/.test(text)) return false;
     if (STOPWORDS.test(text)) return false;
+    // 후기·리뷰 관련은 지금 제외(별도 재설계 예정 — 백로그). 방어적 필터.
+    if (/후기|리뷰|별점|평점/.test(text)) return false;
     // 동사형 문장·접속 조각 배제(키워드는 명사구) — "~탐구합니다"·"~배우고"·"~짜거나" 등
     if (/(다|요|죠|고|며|나|서)\.?$/.test(text)) return false;
     const key = text.replace(/\s/g, "");
@@ -1426,19 +1430,30 @@ export function extractChipsFromResearch(research: string): KeywordChip[] {
     if (!sec) continue;
     // [키워드]는 콤마 나열 전체를 받는다(캡 넉넉히). 서사 섹션은 조각 남발 방지 캡.
     const isKwSec = sec.label === "키워드";
+    const isNumSec = /숫자|알려짐/.test(sec.label);
     const maxPerSection = isKwSec ? 15 : 6;
     const maxFragsPerLine = isKwSec ? 20 : 3;
+    const lineMax = isNumSec ? 40 : 28;
     let count = 0;
     for (const rawLine of (parts[i + 1] ?? "").split(/\n/)) {
-      // 실메모 정리: 마크다운 볼드·불릿·"라벨:" 접두·끝 괄호 제거
-      const line = rawLine
+      // 실메모 정리: 볼드·불릿·끝 괄호(출처) 제거
+      let line = rawLine
         .replace(/\*\*/g, "")
         .replace(/^[\s·•\-*]+/, "")
-        .replace(/^[\w가-힣/ ]{1,8}:\s*/, "")
         .replace(/\s*[（(][^)）]*[)）]\s*$/g, "")
         .trim();
+      // 숫자·이력은 라벨을 살린다("팔로워 1.5만") — 시점 클로즈만 제거. 그 외 섹션은 "라벨:" 접두 제거.
+      if (isNumSec) {
+        line = line
+          .replace(/\s*\d{4}년\s*\d{0,2}월?\s*기준\s*/g, " ")
+          .replace(/:\s*/g, " ")
+          .replace(/\s+/g, " ")
+          .trim();
+      } else {
+        line = line.replace(/^[\w가-힣/ ]{1,8}:\s*/, "").trim();
+      }
       if (!line || /확인\s*안\s*됨|해당\s*없음/.test(line)) continue;
-      if (!isKwSec && line.length <= 28) {
+      if (!isKwSec && line.length <= lineMax) {
         if (push(line, sec)) count++;
       } else {
         // 긴 문장·콤마 나열 → 조각 단위(실메모는 문단·나열형이 흔함)
