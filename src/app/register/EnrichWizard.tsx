@@ -70,8 +70,18 @@ const SECTION_LABELS: Record<string, string> = {
   직접: "직접 적은 것",
 };
 
-// 크롤 응답 링크 후보
-type LinkFinds = { instagram?: string; instagramConfirmed?: boolean; homepage?: string };
+// 크롤 응답 링크 후보(다중 후보 지원)
+type LinkFinds = {
+  instagram?: string;
+  instagramConfirmed?: boolean;
+  instagramCandidates?: string[];
+  homepage?: string;
+  homepageCandidates?: string[];
+};
+// 링크 선택 상태 — sel=고른 후보, customOn=직접입력 활성, customText=직접입력 값
+type LinkPick = { sel: string | null; customOn: boolean; customText: string };
+const EMPTY_PICK: LinkPick = { sel: null, customOn: false, customText: "" };
+const resolvePick = (p: LinkPick) => (p.customOn ? p.customText.trim() : p.sel ?? "");
 
 // 이야기 스텝 체크 항목 — 크롤 힌트를 섹션 라벨+미리보기+근거로 평탄화(한 줄/자세히 소개는 앞 스텝이 처리).
 type StoryItem = { key: string; sectionLabel: string; preview: string; reason: string };
@@ -153,8 +163,8 @@ export function EnrichWizard({
   const [selected, setSelected] = useState<string[]>([]);
   const [starred, setStarred] = useState<string[]>([]);
   const [factualOk, setFactualOk] = useState<Set<string>>(new Set());
-  const [igAnswer, setIgAnswer] = useState<"yes" | "no" | null>(null);
-  const [hpAnswer, setHpAnswer] = useState<"yes" | "no" | null>(null);
+  const [igPick, setIgPick] = useState<LinkPick>(EMPTY_PICK);
+  const [hpPick, setHpPick] = useState<LinkPick>(EMPTY_PICK);
   const [customInput, setCustomInput] = useState("");
 
   const [options, setOptions] = useState<EnrichOptions | null>(null);
@@ -269,8 +279,8 @@ export function EnrichWizard({
       setSelected([]);
       setStarred([]);
       setFactualOk(new Set());
-      setIgAnswer(null);
-      setHpAnswer(null);
+      setIgPick(EMPTY_PICK);
+      setHpPick(EMPTY_PICK);
       setKind("chips");
     } catch {
       // 크롤 실패여도 막다른 길 없음 — 스타터 칩 + 직접 추가로 진행
@@ -290,7 +300,9 @@ export function EnrichWizard({
     const stars = starred.filter((t) => ingredients.includes(t)).slice(0, MAX_STARS);
     // 직접 쓴 문구에 별표 = 그대로 넣기(유저의 표현을 의역하지 않는다)
     const verbatim = stars.filter((t) => customChips.some((c) => c.text === t));
-    const genKey = JSON.stringify({ ingredients, stars, igAnswer, hpAnswer });
+    const igChosen = resolvePick(igPick);
+    const hpChosen = resolvePick(hpPick);
+    const genKey = JSON.stringify({ ingredients, stars, igChosen, hpChosen });
     if (genKey === lastGenKey && options) {
       setKind("fields"); // 입력 그대로면 재생성 스킵(콜 절약)
       return;
@@ -320,9 +332,9 @@ export function EnrichWizard({
       setLastGenKey(genKey);
       setFName(o.identity.name || query);
       setFAddress(o.identity.address || "");
-      // 링크는 유저가 "맞아요" 한 것만 — 크롤이 찾았어도 자동첨부 금지(오귀속 방지)
-      setFInstagram(igAnswer === "yes" && links.instagram ? links.instagram : "");
-      setFHomepage(hpAnswer === "yes" && links.homepage ? links.homepage : "");
+      // 링크는 유저가 링크 스텝에서 확정한 것만 — 크롤이 찾았어도 자동첨부 금지(오귀속 방지)
+      setFInstagram(igChosen ? igChosen.replace(/^@?/, "@") : "");
+      setFHomepage(hpChosen);
       setOneLinerList(o.oneLiners);
       setOneLinerSel(0);
       setDescList(o.descriptions);
@@ -335,9 +347,21 @@ export function EnrichWizard({
     }
   };
 
+  // 링크 후보 목록(다중 후보 우선, 없으면 대표값 단일). 링크 스텝에서 확정.
+  const igCandidates = links.instagramCandidates?.length
+    ? links.instagramCandidates
+    : links.instagram
+      ? [links.instagram]
+      : [];
+  const hpCandidates = links.homepageCandidates?.length
+    ? links.homepageCandidates
+    : links.homepage
+      ? [links.homepage]
+      : [];
+
   // 진행 스텝(칩 이후) — 이야기 스텝은 힌트가 있을 때만
   const storyItems = options ? storyItemsOf(options) : [];
-  const hasLinks = !!(links.instagram || links.homepage);
+  const hasLinks = igCandidates.length > 0 || hpCandidates.length > 0;
   const steps: Kind[] = [
     "chips",
     "confirm",
@@ -661,32 +685,34 @@ export function EnrichWizard({
           </div>
         )}
 
-        {/* ②-B 링크 확인(별도 스텝) — 자동첨부 금지. 기본 미선택, "맞아요"를 눌러야만 담긴다. */}
+        {/* ②-B 링크 확정(별도 스텝) — 자동첨부 금지. 여러 개면 리스트 선택, 단일이면 맞아요/아니에요. */}
         {kind === "links" && (
           <div>
             <p className="pr-8 text-lg font-bold text-ink">이 링크가 맞나요?</p>
             <p className="mt-1.5 text-[15px] leading-relaxed text-mute">
-              확인한 것만 소개에 담아요. 아니면 그냥 두셔도 돼요.
+              확인해주신 SNS, 홈페이지 정보를 소개서에 담아드릴게요.
             </p>
             <div className="mt-4 space-y-2">
-              {links.instagram && (
-                <LinkConfirmCard
+              {igCandidates.length > 0 && (
+                <LinkPicker
                   label="인스타그램"
-                  value={links.instagram}
-                  note={links.instagramConfirmed ? "홈페이지에서 발견했어요" : "웹 검색에서 발견했어요"}
-                  question={`이 계정이 ${query}${josa(query, "이", "가")} 맞나요?`}
-                  answer={igAnswer}
-                  onAnswer={setIgAnswer}
+                  note={links.instagramConfirmed ? "홈페이지에서 발견했어요" : "웹에서 발견했어요"}
+                  question="이 계정이 맞나요?"
+                  candidates={igCandidates}
+                  placeholder="@handle"
+                  pick={igPick}
+                  onPick={setIgPick}
                 />
               )}
-              {links.homepage && (
-                <LinkConfirmCard
+              {hpCandidates.length > 0 && (
+                <LinkPicker
                   label="홈페이지"
-                  value={links.homepage}
-                  note="웹 검색에서 발견했어요"
-                  question={`이 홈페이지가 ${query}${josa(query, "이", "가")} 맞나요?`}
-                  answer={hpAnswer}
-                  onAnswer={setHpAnswer}
+                  note="웹에서 발견했어요"
+                  question="이 홈페이지가 맞나요?"
+                  candidates={hpCandidates}
+                  placeholder="https://"
+                  pick={hpPick}
+                  onPick={setHpPick}
                 />
               )}
             </div>
@@ -707,14 +733,7 @@ export function EnrichWizard({
             <div className="mt-4 space-y-3">
               <FieldEdit label="상호" value={fName} onChange={setFName} placeholder="예: 캔버스가든" />
               <FieldEdit label="주소" value={fAddress} onChange={setFAddress} placeholder="예: 서울 성동구 성수동" />
-              <FieldEdit
-                label="인스타그램"
-                value={fInstagram}
-                onChange={setFInstagram}
-                placeholder="@handle"
-                candidates={options?.instagramCandidates}
-                candidateHint="정확한 계정을 못 찾았어요. 아래 후보 중 맞는 걸 고르거나 직접 입력해주세요."
-              />
+              <FieldEdit label="인스타그램" value={fInstagram} onChange={setFInstagram} placeholder="@handle" />
               <FieldEdit label="홈페이지" value={fHomepage} onChange={setFHomepage} placeholder="https://" />
             </div>
             <button
@@ -826,53 +845,108 @@ export function EnrichWizard({
   );
 }
 
-// 링크 확인 카드 — 기본 미선택. "맞아요"를 눌러야만 폼에 담긴다(오귀속 방지).
-function LinkConfirmCard({
+// 링크 선택 카드 — 자동첨부 금지.
+//  · 후보 여러 개: 리스트에서 선택 + '직접 입력' 옵션.
+//  · 후보 1개: 맞아요/아니에요 → '아니에요' 시 직접 입력창 노출.
+// 아무것도 안 고르면 담기지 않음(선택 = 명시적 확정).
+function LinkPicker({
   label,
-  value,
   note,
   question,
-  answer,
-  onAnswer,
+  candidates,
+  placeholder,
+  pick,
+  onPick,
 }: {
   label: string;
-  value: string;
   note: string;
   question: string;
-  answer: "yes" | "no" | null;
-  onAnswer: (a: "yes" | "no") => void;
+  candidates: string[];
+  placeholder: string;
+  pick: LinkPick;
+  onPick: (p: LinkPick) => void;
 }) {
+  const multi = candidates.length >= 2;
+  const customInput = pick.customOn && (
+    <input
+      autoFocus
+      value={pick.customText}
+      onChange={(e) => onPick({ sel: null, customOn: true, customText: e.target.value })}
+      placeholder={placeholder}
+      className="mt-1.5 h-11 w-full rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
+    />
+  );
+
   return (
-    <div className="rounded-md border border-hairline bg-surface px-3 py-2.5">
+    <div className="rounded-md border border-hairline bg-surface px-3 py-3">
       <p className="text-[13px] text-faint">
         {label} · {note}
       </p>
-      <p className="mt-0.5 break-all text-[15px] font-medium text-ink">{value}</p>
-      <p className="mt-1 text-[13px] leading-relaxed text-mute">{question}</p>
-      <div className="mt-2 flex gap-2">
-        <button
-          type="button"
-          onClick={() => onAnswer("yes")}
-          className={`h-8 rounded-pill border px-3.5 text-[13px] font-medium transition-colors ${
-            answer === "yes"
-              ? "border-primary bg-primary-tint text-primary-on"
-              : "border-border-strong bg-surface text-ink"
-          }`}
-        >
-          맞아요
-        </button>
-        <button
-          type="button"
-          onClick={() => onAnswer("no")}
-          className={`h-8 rounded-pill border px-3.5 text-[13px] font-medium transition-colors ${
-            answer === "no"
-              ? "border-ink bg-surface-soft text-ink"
-              : "border-border-strong bg-surface text-mute"
-          }`}
-        >
-          아니에요
-        </button>
-      </div>
+
+      {multi ? (
+        <div className="mt-2">
+          <p className="mb-1.5 text-[13px] leading-relaxed text-mute">
+            여러 개가 검색됐어요. 맞는 걸 골라주세요.
+          </p>
+          <div className="space-y-1.5">
+            {candidates.map((c) => {
+              const on = !pick.customOn && pick.sel === c;
+              return (
+                <button
+                  key={c}
+                  type="button"
+                  onClick={() => onPick({ sel: c, customOn: false, customText: pick.customText })}
+                  className={`flex w-full items-center gap-2 rounded-sm border px-3 py-2 text-left text-[15px] transition-colors ${
+                    on ? "border-primary bg-primary-tint text-primary-on" : "border-hairline bg-surface text-ink"
+                  }`}
+                >
+                  <span className="shrink-0 text-[13px]">{on ? "◉" : "○"}</span>
+                  <span className="min-w-0 break-all">{c}</span>
+                </button>
+              );
+            })}
+            <button
+              type="button"
+              onClick={() => onPick({ sel: null, customOn: true, customText: pick.customText })}
+              className={`flex w-full items-center gap-2 rounded-sm border px-3 py-2 text-left text-[15px] transition-colors ${
+                pick.customOn ? "border-primary bg-primary-tint text-primary-on" : "border-hairline bg-surface text-mute"
+              }`}
+            >
+              <span className="shrink-0 text-[13px]">{pick.customOn ? "◉" : "○"}</span>
+              직접 입력할게요
+            </button>
+          </div>
+          {customInput}
+        </div>
+      ) : (
+        <>
+          <p className="mt-0.5 break-all text-[15px] font-medium text-ink">{candidates[0]}</p>
+          <p className="mt-1 text-[13px] leading-relaxed text-mute">{question}</p>
+          <div className="mt-2 flex gap-2">
+            <button
+              type="button"
+              onClick={() => onPick({ sel: candidates[0], customOn: false, customText: "" })}
+              className={`h-8 rounded-pill border px-3.5 text-[13px] font-medium transition-colors ${
+                !pick.customOn && pick.sel === candidates[0]
+                  ? "border-primary bg-primary-tint text-primary-on"
+                  : "border-border-strong bg-surface text-ink"
+              }`}
+            >
+              맞아요
+            </button>
+            <button
+              type="button"
+              onClick={() => onPick({ sel: null, customOn: true, customText: pick.customText })}
+              className={`h-8 rounded-pill border px-3.5 text-[13px] font-medium transition-colors ${
+                pick.customOn ? "border-ink bg-surface-soft text-ink" : "border-border-strong bg-surface text-mute"
+              }`}
+            >
+              아니에요
+            </button>
+          </div>
+          {customInput}
+        </>
+      )}
     </div>
   );
 }

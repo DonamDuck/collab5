@@ -1517,24 +1517,79 @@ export function starterChipsForType(businessType: string): KeywordChip[] {
   return base.map((text) => ({ text, section: "추천", factual: false }));
 }
 
-/** 조사메모에서 인스타/홈피 후보를 오프라인 추출(콜 0). 확인 게이트에서 유저가 '맞나요?' 판정.
- *  confirmed=크롤이 홈페이지 링크로 실제 확인함(그래도 자동첨부 금지 — 제안만). */
-export function extractLinksFromResearch(
-  research: string
-): { instagram?: string; instagramConfirmed: boolean; homepage?: string } {
-  if (!research) return { instagramConfirmed: false };
-  const homepage = research.match(/홈페이지:\s*(https?:\/\/\S+|[\w.-]+\.[a-z]{2,}\S*)/i)?.[1]?.trim();
+export interface LinkFinds {
+  instagram?: string; // 대표 후보(첫 번째)
+  instagramConfirmed: boolean; // 홈페이지 링크로 실제 확인됨(그래도 자동첨부 금지 — 제안만)
+  instagramCandidates: string[]; // 의심되는 인스타 후보들(여러 개면 유저가 리스트에서 선택)
+  homepage?: string;
+  homepageCandidates: string[]; // 홈페이지 후보들
+}
+
+// 홈페이지가 아님 — 포털·SNS·오픈마켓 도메인.
+const NOT_HOMEPAGE =
+  /(naver|blog|instagram|facebook|youtube|tistory|kakao|band|twitter|x\.com|threads|wadiz|coupang|smartstore|11st|gmarket|linktr|notion|google|daum)/i;
+
+/** 조사메모에서 인스타/홈피 '후보들'을 오프라인 추출(콜 0, 창작 없음 — 메모에 실제 등장한 것만).
+ *  여러 개면 유저가 리스트에서 선택, 단일이면 맞아요/아니에요. 자동첨부 금지. */
+export function extractLinksFromResearch(research: string): LinkFinds {
+  const empty: LinkFinds = { instagramConfirmed: false, instagramCandidates: [], homepageCandidates: [] };
+  if (!research) return empty;
+
+  // ── 홈페이지 후보: 메모 내 URL 수집(포털·SNS·오픈마켓 제외), 호스트로 dedupe ──
+  const hostSeen = new Set<string>();
+  const homepageCandidates: string[] = [];
+  const addHp = (raw: string, front = false) => {
+    const clean = raw.replace(/[.,)\]|]+$/, "").trim();
+    const norm = /^https?:\/\//i.test(clean) ? clean : `https://${clean}`;
+    let host: string;
+    try {
+      host = new URL(norm).hostname.replace(/^www\./, "");
+    } catch {
+      return;
+    }
+    if (NOT_HOMEPAGE.test(host) || hostSeen.has(host)) return;
+    hostSeen.add(host);
+    if (front) homepageCandidates.unshift(norm);
+    else homepageCandidates.push(norm);
+  };
+  // "홈페이지: domain.com" 라인(스킴 없어도) 우선
+  const hpLine = research.match(/홈페이지[^\n:]*:\s*([^\s)|]+\.[a-z]{2,}[^\s)|]*)/i)?.[1];
+  if (hpLine && !/확인\s*안\s*됨/.test(hpLine)) addHp(hpLine, true);
+  for (const m of research.matchAll(/https?:\/\/[^\s)"'|]+/g)) addHp(m[0]);
+  const homepage = homepageCandidates[0];
+
+  // ── 인스타 후보: 확인된 핸들 + 메모 내 instagram.com/xxx + 홈피 도메인 기반 추측 1개 ──
+  const igSeen = new Set<string>();
+  const instagramCandidates: string[] = [];
+  const addIg = (h: string) => {
+    const handle = "@" + h.replace(/^@/, "").replace(/\/+$/, "").toLowerCase();
+    if (!/^@[a-z0-9._]{2,30}$/.test(handle)) return; // 한글·잡값 배제
+    if (igSeen.has(handle)) return;
+    igSeen.add(handle);
+    instagramCandidates.push(handle);
+  };
   const igLine = research.match(/인스타그램:\s*(@?[\w.]+)([^\n]*)/);
-  let instagram: string | undefined;
   let instagramConfirmed = false;
   if (igLine && !/확인\s*안\s*됨|추측/.test(igLine[1])) {
-    instagram = igLine[1].trim().replace(/^@?/, "@");
+    addIg(igLine[1]);
     instagramConfirmed = /실제 확인됨|링크에서/.test(igLine[2] ?? "");
   }
+  for (const m of research.matchAll(/instagram\.com\/([a-zA-Z0-9._]+)/g)) addIg(m[1]);
+  if (homepage) {
+    try {
+      const base = new URL(homepage).hostname.replace(/^www\./, "").split(".")[0];
+      if (/^[a-z0-9]{2,}$/i.test(base)) addIg(base);
+    } catch {
+      /* noop */
+    }
+  }
+
   return {
-    instagram,
+    instagram: instagramCandidates[0],
     instagramConfirmed,
-    homepage: homepage && !/확인\s*안\s*됨/.test(homepage) ? homepage : undefined,
+    instagramCandidates: instagramCandidates.slice(0, 4),
+    homepage,
+    homepageCandidates: homepageCandidates.slice(0, 4),
   };
 }
 
