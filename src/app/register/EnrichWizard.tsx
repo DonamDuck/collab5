@@ -78,10 +78,12 @@ type LinkFinds = {
   homepage?: string;
   homepageCandidates?: string[];
 };
-// 링크 선택 상태 — sel=고른 후보, customOn=직접입력 활성, customText=직접입력 값
-type LinkPick = { sel: string | null; customOn: boolean; customText: string };
-const EMPTY_PICK: LinkPick = { sel: null, customOn: false, customText: "" };
-const resolvePick = (p: LinkPick) => (p.customOn ? p.customText.trim() : p.sel ?? "");
+// 링크 선택 상태 — sel=고른 후보, customOn=직접입력 활성, customText=직접입력 값, none=운영 안 함
+type LinkPick = { sel: string | null; customOn: boolean; customText: string; none: boolean };
+const EMPTY_PICK: LinkPick = { sel: null, customOn: false, customText: "", none: false };
+const resolvePick = (p: LinkPick) => (p.none ? "" : p.customOn ? p.customText.trim() : p.sel ?? "");
+// 답변 완료 판정 — 후보 선택 / 직접입력 / '운영하지 않아요' 중 하나라도 명시했으면 완료
+const isPickAnswered = (p: LinkPick) => p.none || p.customOn || p.sel !== null;
 
 // 이야기 스텝 체크 항목 — 크롤 힌트를 섹션 라벨+미리보기+근거로 평탄화(한 줄/자세히 소개는 앞 스텝이 처리).
 type StoryItem = { key: string; sectionLabel: string; preview: string; reason: string };
@@ -359,13 +361,13 @@ export function EnrichWizard({
       ? [links.homepage]
       : [];
 
-  // 진행 스텝(칩 이후) — 이야기 스텝은 힌트가 있을 때만
+  // 진행 스텝(칩 이후) — 링크 스텝은 항상(SNS·홈페이지 정보 필수 수집), 이야기 스텝은 힌트가 있을 때만
   const storyItems = options ? storyItemsOf(options) : [];
-  const hasLinks = igCandidates.length > 0 || hpCandidates.length > 0;
+  const linksReady = isPickAnswered(igPick) && isPickAnswered(hpPick);
   const steps: Kind[] = [
     "chips",
     "confirm",
-    ...(hasLinks ? (["links"] as Kind[]) : []),
+    "links",
     "fields",
     "oneLiner",
     "desc",
@@ -466,7 +468,8 @@ export function EnrichWizard({
         {/* ⓪ 씨앗 — 지역·업종 필수 */}
         {kind === "seed" && (
           <div>
-            <p className="pr-8 text-lg font-bold text-ink">어디에 있는, 어떤 브랜드인가요?</p>
+            <p className="pr-8 text-[13px] font-medium text-primary-on">AI 소개서 작성을 위해 정보가 필요해요.</p>
+            <p className="mt-1 pr-8 text-lg font-bold text-ink">어디에 있는, 어떤 브랜드인가요?</p>
             <p className="mt-1.5 text-[15px] leading-relaxed text-mute">
               같은 이름의 다른 곳과 헷갈리지 않게, 딱 두 가지만 알려주세요.
             </p>
@@ -677,59 +680,70 @@ export function EnrichWizard({
             )}
 
             <button
-              onClick={hasLinks ? goNext : generate}
+              onClick={goNext}
               className="mt-4 h-11 w-full rounded-md bg-primary text-sm font-medium text-primary-on"
             >
-              {hasLinks ? "다음" : "✨ 이 내용으로 소개 만들기"}
+              다음
             </button>
           </div>
         )}
 
-        {/* ②-B 링크 확정(별도 스텝) — 자동첨부 금지. 여러 개면 리스트 선택, 단일이면 맞아요/아니에요. */}
+        {/* ②-B 링크 확정(별도 스텝) — 자동첨부 금지. SNS·홈페이지 둘 다 답해야 다음. */}
         {kind === "links" && (
           <div>
-            <p className="pr-8 text-lg font-bold text-ink">이 링크가 맞나요?</p>
+            <p className="pr-8 text-[13px] font-medium text-primary-on">사전 정보 마지막 확인!</p>
+            <p className="mt-1 pr-8 text-lg font-bold text-ink">이 링크가 맞나요?</p>
             <p className="mt-1.5 text-[15px] leading-relaxed text-mute">
               확인해주신 SNS, 홈페이지 정보를 소개서에 담아드릴게요.
             </p>
             <div className="mt-4 space-y-2">
-              {igCandidates.length > 0 && (
-                <LinkPicker
-                  label="인스타그램"
-                  note={links.instagramConfirmed ? "홈페이지에서 발견했어요" : "웹에서 발견했어요"}
-                  question="이 계정이 맞나요?"
-                  candidates={igCandidates}
-                  placeholder="@handle"
-                  pick={igPick}
-                  onPick={setIgPick}
-                />
-              )}
-              {hpCandidates.length > 0 && (
-                <LinkPicker
-                  label="홈페이지"
-                  note="웹에서 발견했어요"
-                  question="이 홈페이지가 맞나요?"
-                  candidates={hpCandidates}
-                  placeholder="https://"
-                  pick={hpPick}
-                  onPick={setHpPick}
-                />
-              )}
+              <LinkPicker
+                label="인스타그램"
+                note={
+                  igCandidates.length === 0
+                    ? "웹에서 못 찾았어요"
+                    : links.instagramConfirmed
+                      ? "홈페이지에서 발견했어요"
+                      : "웹에서 발견했어요"
+                }
+                question="이 계정이 맞나요?"
+                emptyPrompt="인스타그램 계정이 있으신가요?"
+                candidates={igCandidates}
+                placeholder="@handle"
+                pick={igPick}
+                onPick={setIgPick}
+              />
+              <LinkPicker
+                label="홈페이지"
+                note={hpCandidates.length === 0 ? "웹에서 못 찾았어요" : "웹에서 발견했어요"}
+                question="이 홈페이지가 맞나요?"
+                emptyPrompt="홈페이지가 있으신가요?"
+                candidates={hpCandidates}
+                placeholder="https://"
+                pick={hpPick}
+                onPick={setHpPick}
+              />
             </div>
             <button
               onClick={generate}
-              className="mt-4 h-11 w-full rounded-md bg-primary text-sm font-medium text-primary-on"
+              disabled={!linksReady}
+              className="mt-4 h-11 w-full rounded-md bg-primary text-sm font-medium text-primary-on disabled:opacity-40"
             >
-              ✨ 이 내용으로 소개 만들기
+              ✨ 작성한 정보들로 소개서 작성 시작
             </button>
+            {!linksReady && (
+              <p className="mt-1.5 text-center text-[13px] text-faint">
+                SNS와 홈페이지 모두 답해주시면 시작할 수 있어요.
+              </p>
+            )}
           </div>
         )}
 
         {/* 정보 확인·수정 */}
         {kind === "fields" && (
           <div>
-            <p className="pr-8 text-lg font-bold text-ink">찾은 정보가 맞나요?</p>
-            <p className="mt-1.5 text-[15px] leading-relaxed text-mute">틀리면 바로 고쳐주세요. 빈 칸은 건너뛰어도 돼요.</p>
+            <p className="pr-8 text-lg font-bold text-ink">소개서 작성 시작!</p>
+            <p className="mt-1.5 text-[15px] leading-relaxed text-mute">정보가 틀렸다면 수정해주세요. 빈칸으로 건너뛰어도 돼요.</p>
             <div className="mt-4 space-y-3">
               <FieldEdit label="상호" value={fName} onChange={setFName} placeholder="예: 캔버스가든" />
               <FieldEdit label="주소" value={fAddress} onChange={setFAddress} placeholder="예: 서울 성동구 성수동" />
@@ -845,14 +859,15 @@ export function EnrichWizard({
   );
 }
 
-// 링크 선택 카드 — 자동첨부 금지.
-//  · 후보 여러 개: 리스트에서 선택 + '직접 입력' 옵션.
-//  · 후보 1개: 맞아요/아니에요 → '아니에요' 시 직접 입력창 노출.
-// 아무것도 안 고르면 담기지 않음(선택 = 명시적 확정).
+// 링크 선택 카드 — 자동첨부 금지. SNS·홈페이지 각각 명시적으로 답해야 다음 진행.
+//  · 후보 여러 개: 리스트에서 선택 + '직접 입력' + '운영하지 않아요'.
+//  · 후보 1개: 맞아요 / 아니에요(→직접입력) / 운영하지 않아요.
+//  · 후보 0개: 직접 입력 / 운영하지 않아요.
 function LinkPicker({
   label,
   note,
   question,
+  emptyPrompt,
   candidates,
   placeholder,
   pick,
@@ -861,20 +876,40 @@ function LinkPicker({
   label: string;
   note: string;
   question: string;
+  emptyPrompt: string;
   candidates: string[];
   placeholder: string;
   pick: LinkPick;
   onPick: (p: LinkPick) => void;
 }) {
   const multi = candidates.length >= 2;
+  const single = candidates.length === 1;
+  const pickCandidate = (c: string) => onPick({ sel: c, customOn: false, customText: pick.customText, none: false });
+  const pickCustom = () => onPick({ sel: null, customOn: true, customText: pick.customText, none: false });
+  const pickNone = () => onPick({ sel: null, customOn: false, customText: pick.customText, none: true });
   const customInput = pick.customOn && (
     <input
       autoFocus
       value={pick.customText}
-      onChange={(e) => onPick({ sel: null, customOn: true, customText: e.target.value })}
+      onChange={(e) => onPick({ sel: null, customOn: true, customText: e.target.value, none: false })}
       placeholder={placeholder}
       className="mt-1.5 h-11 w-full rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
     />
+  );
+  // 라디오 행(리스트·0후보 공용)
+  const radioRow = (on: boolean, onClick: () => void, text: string, muted = false) => (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`flex w-full items-center gap-2 rounded-sm border px-3 py-2 text-left text-[15px] transition-colors ${
+        on
+          ? "border-primary bg-primary-tint text-primary-on"
+          : `border-hairline bg-surface ${muted ? "text-mute" : "text-ink"}`
+      }`}
+    >
+      <span className="shrink-0 text-[13px]">{on ? "◉" : "○"}</span>
+      <span className="min-w-0 break-all">{text}</span>
+    </button>
   );
 
   return (
@@ -883,51 +918,16 @@ function LinkPicker({
         {label} · {note}
       </p>
 
-      {multi ? (
-        <div className="mt-2">
-          <p className="mb-1.5 text-[13px] leading-relaxed text-mute">
-            여러 개가 검색됐어요. 맞는 걸 골라주세요.
-          </p>
-          <div className="space-y-1.5">
-            {candidates.map((c) => {
-              const on = !pick.customOn && pick.sel === c;
-              return (
-                <button
-                  key={c}
-                  type="button"
-                  onClick={() => onPick({ sel: c, customOn: false, customText: pick.customText })}
-                  className={`flex w-full items-center gap-2 rounded-sm border px-3 py-2 text-left text-[15px] transition-colors ${
-                    on ? "border-primary bg-primary-tint text-primary-on" : "border-hairline bg-surface text-ink"
-                  }`}
-                >
-                  <span className="shrink-0 text-[13px]">{on ? "◉" : "○"}</span>
-                  <span className="min-w-0 break-all">{c}</span>
-                </button>
-              );
-            })}
-            <button
-              type="button"
-              onClick={() => onPick({ sel: null, customOn: true, customText: pick.customText })}
-              className={`flex w-full items-center gap-2 rounded-sm border px-3 py-2 text-left text-[15px] transition-colors ${
-                pick.customOn ? "border-primary bg-primary-tint text-primary-on" : "border-hairline bg-surface text-mute"
-              }`}
-            >
-              <span className="shrink-0 text-[13px]">{pick.customOn ? "◉" : "○"}</span>
-              직접 입력할게요
-            </button>
-          </div>
-          {customInput}
-        </div>
-      ) : (
+      {single ? (
         <>
           <p className="mt-0.5 break-all text-[15px] font-medium text-ink">{candidates[0]}</p>
           <p className="mt-1 text-[13px] leading-relaxed text-mute">{question}</p>
-          <div className="mt-2 flex gap-2">
+          <div className="mt-2 flex flex-wrap gap-2">
             <button
               type="button"
-              onClick={() => onPick({ sel: candidates[0], customOn: false, customText: "" })}
+              onClick={() => pickCandidate(candidates[0])}
               className={`h-8 rounded-pill border px-3.5 text-[13px] font-medium transition-colors ${
-                !pick.customOn && pick.sel === candidates[0]
+                !pick.customOn && !pick.none && pick.sel === candidates[0]
                   ? "border-primary bg-primary-tint text-primary-on"
                   : "border-border-strong bg-surface text-ink"
               }`}
@@ -936,16 +936,37 @@ function LinkPicker({
             </button>
             <button
               type="button"
-              onClick={() => onPick({ sel: null, customOn: true, customText: pick.customText })}
+              onClick={pickCustom}
               className={`h-8 rounded-pill border px-3.5 text-[13px] font-medium transition-colors ${
                 pick.customOn ? "border-ink bg-surface-soft text-ink" : "border-border-strong bg-surface text-mute"
               }`}
             >
               아니에요
             </button>
+            <button
+              type="button"
+              onClick={pickNone}
+              className={`h-8 rounded-pill border px-3.5 text-[13px] font-medium transition-colors ${
+                pick.none ? "border-ink bg-surface-soft text-ink" : "border-border-strong bg-surface text-mute"
+              }`}
+            >
+              운영하지 않아요
+            </button>
           </div>
           {customInput}
         </>
+      ) : (
+        <div className="mt-2">
+          <p className="mb-1.5 text-[13px] leading-relaxed text-mute">
+            {multi ? "여러 개가 검색됐어요. 맞는 걸 골라주세요." : emptyPrompt}
+          </p>
+          <div className="space-y-1.5">
+            {candidates.map((c) => radioRow(!pick.customOn && !pick.none && pick.sel === c, () => pickCandidate(c), c))}
+            {radioRow(pick.customOn, pickCustom, "직접 입력할게요", true)}
+            {radioRow(pick.none, pickNone, "운영하지 않아요", true)}
+          </div>
+          {customInput}
+        </div>
       )}
     </div>
   );

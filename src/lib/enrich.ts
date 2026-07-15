@@ -1118,7 +1118,7 @@ class NaverGeminiProvider implements SearchProvider {
       identity: {
         name: id.name || "",
         region: id.region || undefined,
-        address: id.address || undefined,
+        address: cleanAddress(id.address),
         instagram: id.instagram || undefined,
         homepage: id.homepage || undefined,
         hint: id.hint || undefined,
@@ -1214,6 +1214,7 @@ class NaverGeminiProvider implements SearchProvider {
       ? `⭐그대로 쓸 문구(사장이 직접 쓴 표현 — 의역·바꿔쓰기 금지, 원문 그대로 등장시켜): ${verbatim.map((v) => `"${v}"`).join(", ")}\n\n`
       : "";
     const prompt = `브랜드명: "${input.name}"\n\n${note}${kw}${star}${verb}[조사 자료 — 네이버 검색 + 제미나이 웹 조사]\n${input.research}\n\n위 정보로 한 줄 소개 5개, 브랜드 소개 5개(각 3~5문장, 모두 해요체), 브랜드 결 단어 2~4개, identity(지역·주소·인스타·홈피)를 뽑아줘.
+⭐identity.address는 도로명/지번 주소만(예: "서울 성동구 금호로 66 402호"). ⚠️전화번호·사업자등록번호·통신판매업신고번호·이메일은 절대 넣지 마라(그건 주소가 아니야).
 ⭐identity.homepage는 조사 자료에 URL이 있으면 채워줘. identity.instagram은 ⚠️'홈페이지 직접 확인' 항목에서 실제 확인된 핸들이 있을 때만 채워 — 그 외에는 추측하지 말고 빈 문자열로 둬(무관한 계정도 금지).
 ⭐단 instagram이 확정 안 됐으면 instagramCandidates에 도메인·브랜드명 기반 그럴듯한 추정 핸들 2~4개를 넣어줘(사장이 직접 고를 후보). 예: 도메인이 canvasgarden.shop이면 @canvasgarden, @canvasgarden_official, @canvasgarden.shop 등.
 나머지는 사실만 쓰고, 확인 안 된 필드는 빈 문자열. 모든 문장은 '해요체'로 끝내('~합니다/~습니다' 금지).
@@ -1528,6 +1529,28 @@ export interface LinkFinds {
 // 홈페이지가 아님 — 포털·SNS·오픈마켓 도메인.
 const NOT_HOMEPAGE =
   /(naver|blog|instagram|facebook|youtube|tistory|kakao|band|twitter|x\.com|threads|wadiz|coupang|smartstore|11st|gmarket|linktr|notion|google|daum)/i;
+
+/** 주소 필드 정화 — 전화·사업자등록번호·통신판매업신고·이메일이 섞여 들어오는 경우 제거.
+ *  주소 고유의 숫자(도로명 66·402호·413-111번지)는 보존한다. */
+function cleanAddress(raw?: string): string | undefined {
+  if (!raw) return undefined;
+  let a = raw.trim();
+  a = a.replace(/(사업자\s*등록\s*번호|사업자번호)\s*[:：]?\s*[\d-]+/g, "");
+  a = a.replace(/통신판매업\s*신고\s*번호?\s*[:：]?\s*\S+/g, "");
+  a = a.replace(/제?\s*\d{4}-[가-힣]+-\d+\s*호?/g, ""); // 통신판매 신고번호 형태 (제2022-서울성동-01605)
+  a = a.replace(/\b\d{3}-\d{2}-\d{5}\b/g, ""); // 사업자등록번호 형태
+  a = a.replace(/(전화|연락처|문의|대표번호|tel|phone)\s*[:：]?\s*[\d-]+/gi, "");
+  a = a.replace(/\b0\d{1,2}-\d{3,4}-\d{4}\b/g, ""); // 지역/휴대 전화
+  a = a.replace(/\b(1[0-9]{3})-\d{4}\b/g, ""); // 대표번호 15xx-xxxx
+  a = a.replace(/[\w.+-]+@[\w.-]+\.\w+/g, ""); // 이메일
+  a = a.replace(/(이메일|메일|email|팩스|fax)\s*[:：]?\s*/gi, "");
+  // 남은 라벨·구분자 정리
+  a = a
+    .replace(/\s{2,}/g, " ")
+    .replace(/^[\s,·|/]+|[\s,·|/]+$/g, "")
+    .trim();
+  return a || undefined;
+}
 
 /** 조사메모에서 인스타/홈피 '후보들'을 오프라인 추출(콜 0, 창작 없음 — 메모에 실제 등장한 것만).
  *  여러 개면 유저가 리스트에서 선택, 단일이면 맞아요/아니에요. 자동첨부 금지. */
