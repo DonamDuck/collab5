@@ -304,7 +304,14 @@ export function EnrichWizard({
     const verbatim = stars.filter((t) => customChips.some((c) => c.text === t));
     const igChosen = resolvePick(igPick);
     const hpChosen = resolvePick(hpPick);
-    const genKey = JSON.stringify({ ingredients, stars, igChosen, hpChosen });
+    // '운영하지 않아요' → 생성에도 반영: 조사메모에 해당 채널 언급·링크 금지를 명시(AI가 소개에 안 끌어오게).
+    const optOut: string[] = [];
+    if (igPick.none) optOut.push("인스타그램");
+    if (hpPick.none) optOut.push("홈페이지");
+    const optOutNote = optOut.length
+      ? `\n\n[사장 확인 — 반드시 반영] 이 브랜드는 ${optOut.join("·")}을(를) 운영하지 않아요. 소개 문구와 identity에 ${optOut.join("·")} 관련 언급·링크를 절대 넣지 마세요.`
+      : "";
+    const genKey = JSON.stringify({ ingredients, stars, igChosen, hpChosen, optOut });
     if (genKey === lastGenKey && options) {
       setKind("fields"); // 입력 그대로면 재생성 스킵(콜 절약)
       return;
@@ -317,7 +324,7 @@ export function EnrichWizard({
         body: JSON.stringify({
           mode: "options",
           name: query,
-          research,
+          research: research + optOutNote,
           focusKeywords: ingredients,
           starredKeywords: stars,
           verbatimKeywords: verbatim,
