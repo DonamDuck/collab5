@@ -129,7 +129,7 @@ export function decodeHtml(buf: Buffer, contentType: string): string {
 const PATH_SCORES: Array<[RegExp, number]> = [
   [/about|intro(?!uce)|company|story|brand|philosophy|소개|스토리|이야기|철학|미션|비전/i, 100],
   [/program|activit|market|class|service|menu|project|활동|프로그램|사업|서비스|메뉴|클래스|프로젝트|공간/i, 60],
-  [/partner|collab|together|coop|파트너|협업|협력|콜라보|함께/i, 55],
+  [/partner|collab|together|coop|파트너|협업|협력|콜라보|함께/i, 65], // 콜라보 서비스 — 파트너 정보가 핵심 재료
   [/news|notice|press|event|history|소식|뉴스|언론|보도|이벤트|연혁/i, 30],
   [/team|people|member|팀|사람|멤버|사장|대표/i, 25],
 ];
@@ -195,16 +195,26 @@ export function harvestLinks(html: string, base: URL): PageCandidate[] {
 
 // ── 본문 추출 — script/nav류 제거 → 블록 태그를 개행으로 → 텍스트화 ──
 
+// 쇼핑몰·플랫폼 공통 UI 문구 — 정보가 아니라 캡 낭비 (다이제스트에서 제외)
+const JUNK_LINES =
+  /^(로그인|로그아웃|회원가입|닫기|메뉴|검색|더보기|목록|이전|다음|공유하기|장바구니|바로구매|구매하기|찜하기|등록순|인기순|이름순|이름역순|낮은가격순|높은가격순|상품평 많은순|AI 추천순|신상품순|판매량순|리뷰|상품 요약설명|옵션 선택|수량|배송비|배송조회|로그인이 필요합니다\.?|TOP|맨위로)$/;
+
 export function extractMainText(html: string): string {
   const cleaned = html
     .replace(/<!--[\s\S]*?-->/g, " ")
     .replace(/<(script|style|noscript|svg|iframe|template)\b[\s\S]*?<\/\1>/gi, " ")
     .replace(/<(nav|header|footer|aside)\b[\s\S]*?<\/\1>/gi, " ")
     .replace(/<(br|\/p|\/div|\/li|\/h[1-6]|\/tr|\/section|\/article)\b[^>]*>/gi, "\n");
+  const seen = new Set<string>(); // 페이지 내 완전 중복 라인 제거(반복 nav·상품명 2중 노출)
   const text = decodeEntities(stripTags(cleaned))
     .split("\n")
     .map((l) => l.replace(/\s+/g, " ").trim())
-    .filter((l) => l.length > 1)
+    .filter((l) => {
+      if (l.length <= 1 || JUNK_LINES.test(l)) return false;
+      if (seen.has(l)) return false;
+      seen.add(l);
+      return true;
+    })
     .join("\n")
     .replace(/\n{3,}/g, "\n\n");
   return text.slice(0, PER_PAGE_CHARS); // 추출 "후" 자름
