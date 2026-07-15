@@ -139,7 +139,21 @@ function storyItemsOf(o: EnrichOptions): StoryItem[] {
       reason: b.reason || "웹에서 봤어요",
     })
   );
-  return items;
+  // 표시 보장 — 크롤 결과가 비어도 항상 헤드라인이 있게:
+  //  ① title·detail 둘 다 없으면 근거를 헤드라인으로 승격("…(에서) 봤어요" 꼬리 제거)
+  //  ② 그래도 일반 출처어(웹·홈페이지 등)만 남으면 제외 → 빈/무의미 체크리스트 행 방지
+  const GENERIC_SOURCE = /^(웹|웹\s?검색|검색|홈페이지|인스타그램|블로그|카페|네이버)$/;
+  return items
+    .map((it) => {
+      if (it.title.trim() || it.detail.trim()) return it;
+      const head = it.reason.replace(/(에서|에)?\s*봤어요[.!]?\s*$/, "").trim();
+      return { ...it, title: head, reason: "" };
+    })
+    .filter((it) => {
+      if (it.detail.trim()) return true; // 상세가 있으면 표시(렌더가 detail 노출)
+      const t = it.title.trim();
+      return t.length >= 2 && !GENERIC_SOURCE.test(t);
+    });
 }
 
 // 같은 group끼리 묶기(첫 등장 순서 유지) — 섹션 라벨 반복 노출 방지.
