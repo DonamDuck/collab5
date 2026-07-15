@@ -100,6 +100,16 @@ const BLOCK_HINT_LABELS: Record<BlockHint["type"], string> = {
 
 function storyItemsOf(o: EnrichOptions): StoryItem[] {
   const items: StoryItem[] = [];
+  // 우리를 표현하는 키워드(결 단어) — 자동주입 대신 추천 항목으로. 선택 시에만 폼에 반영.
+  if ((o.values ?? []).length) {
+    items.push({
+      key: "values",
+      group: "우리를 표현하는 키워드",
+      title: "",
+      detail: (o.values ?? []).join(" · "),
+      reason: "브랜드의 분위기·가치를 나타내는 단어예요",
+    });
+  }
   (o.activityHints ?? []).forEach((h, i) =>
     items.push({
       key: `activity-${i}`,
@@ -446,7 +456,8 @@ export function EnrichWizard({
       address: fAddress.trim() || undefined,
       instagram: fInstagram.trim() || undefined,
       homepage: fHomepage.trim() || undefined,
-      values: options?.values.length ? options.values : undefined,
+      // 결 단어(values)도 이제 추천 선택 대상 — 'values' 항목을 체크했을 때만 폼에 반영.
+      values: options?.values.length && storyChecked.has("values") ? options.values : undefined,
       activityHints: options?.activityHints?.length ? options.activityHints : undefined,
       collabHints: options?.collabHints?.length ? options.collabHints : undefined,
       blockHints: options?.blockHints?.length ? options.blockHints : undefined,

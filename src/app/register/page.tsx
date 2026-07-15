@@ -538,6 +538,8 @@ function RegisterForm() {
       setValues(fill.values);
       filled.add("values");
       filled.add("keywords"); // 키워드 섹션 헤더 배지용
+      // 위저드에서 '우리를 표현하는 키워드'를 선택했을 때만 옴 → 섹션 펼쳐 노출(자동 채움 + 보이게)
+      if (fill.values.length) openSection("keywords");
     }
     if (fill.description !== undefined) {
       setDescription(fill.description);
