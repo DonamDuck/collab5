@@ -37,7 +37,7 @@ export type WizardFill = {
   selectedHints?: { activities: number[]; collabs: number[]; blocks: string[]; seeks: boolean };
 };
 
-const MAX_STARS = 3;
+const MAX_STARS = 4;
 
 // 진행 단계: 씨앗 → (크롤) → 키워드 선택 → 확인·강조 → (생성) → 정보 → 한줄 → 소개 → 이야기
 type Kind =
@@ -45,6 +45,7 @@ type Kind =
   | "loading"
   | "chips"
   | "confirm"
+  | "links"
   | "generating"
   | "fields"
   | "oneLiner"
@@ -325,9 +326,16 @@ export function EnrichWizard({
 
   // 진행 스텝(칩 이후) — 이야기 스텝은 힌트가 있을 때만
   const storyItems = options ? storyItemsOf(options) : [];
-  const steps: Kind[] = storyItems.length
-    ? ["chips", "confirm", "fields", "oneLiner", "desc", "story"]
-    : ["chips", "confirm", "fields", "oneLiner", "desc"];
+  const hasLinks = !!(links.instagram || links.homepage);
+  const steps: Kind[] = [
+    "chips",
+    "confirm",
+    ...(hasLinks ? (["links"] as Kind[]) : []),
+    "fields",
+    "oneLiner",
+    "desc",
+    ...(storyItems.length ? (["story"] as Kind[]) : []),
+  ];
   const stepIdx = steps.indexOf(kind);
   const goNext = () => stepIdx >= 0 && stepIdx < steps.length - 1 && setKind(steps[stepIdx + 1]);
   const goBack = () => {
@@ -564,7 +572,7 @@ export function EnrichWizard({
         {/* ② 확인·강조(좁게) — ⭐캡3 + 사실 게이트 + 링크 확인 */}
         {kind === "confirm" && (
           <div>
-            <p className="pr-8 text-lg font-bold text-ink">이게 맞나요?</p>
+            <p className="pr-8 text-lg font-bold text-ink">선택한 정보를 확인해주세요.</p>
             <p className="mt-1.5 text-[15px] leading-relaxed text-mute">
               제일 중요한 것에 별표를 눌러주세요(최대 {MAX_STARS}개). 별표한 건 한 줄 소개에 꼭
               담고, 나머지도 상세 소개에 담아드려요.
@@ -630,32 +638,44 @@ export function EnrichWizard({
               </p>
             )}
 
-            {/* 링크 확인 — 자동첨부 금지. 기본 미선택, "맞아요"를 눌러야만 담긴다. */}
-            {(links.instagram || links.homepage) && (
-              <div className="mt-3 space-y-2">
-                {links.instagram && (
-                  <LinkConfirmCard
-                    label="인스타그램"
-                    value={links.instagram}
-                    note={links.instagramConfirmed ? "홈페이지에서 발견했어요" : "웹 검색에서 발견했어요"}
-                    question={`이 계정이 ${query}${josa(query, "이", "가")} 맞나요?`}
-                    answer={igAnswer}
-                    onAnswer={setIgAnswer}
-                  />
-                )}
-                {links.homepage && (
-                  <LinkConfirmCard
-                    label="홈페이지"
-                    value={links.homepage}
-                    note="웹 검색에서 발견했어요"
-                    question={`이 홈페이지가 ${query}${josa(query, "이", "가")} 맞나요?`}
-                    answer={hpAnswer}
-                    onAnswer={setHpAnswer}
-                  />
-                )}
-              </div>
-            )}
+            <button
+              onClick={hasLinks ? goNext : generate}
+              className="mt-4 h-11 w-full rounded-md bg-primary text-sm font-medium text-primary-on"
+            >
+              {hasLinks ? "다음" : "✨ 이 내용으로 소개 만들기"}
+            </button>
+          </div>
+        )}
 
+        {/* ②-B 링크 확인(별도 스텝) — 자동첨부 금지. 기본 미선택, "맞아요"를 눌러야만 담긴다. */}
+        {kind === "links" && (
+          <div>
+            <p className="pr-8 text-lg font-bold text-ink">이 링크가 맞나요?</p>
+            <p className="mt-1.5 text-[15px] leading-relaxed text-mute">
+              확인한 것만 소개에 담아요. 아니면 그냥 두셔도 돼요.
+            </p>
+            <div className="mt-4 space-y-2">
+              {links.instagram && (
+                <LinkConfirmCard
+                  label="인스타그램"
+                  value={links.instagram}
+                  note={links.instagramConfirmed ? "홈페이지에서 발견했어요" : "웹 검색에서 발견했어요"}
+                  question={`이 계정이 ${query}${josa(query, "이", "가")} 맞나요?`}
+                  answer={igAnswer}
+                  onAnswer={setIgAnswer}
+                />
+              )}
+              {links.homepage && (
+                <LinkConfirmCard
+                  label="홈페이지"
+                  value={links.homepage}
+                  note="웹 검색에서 발견했어요"
+                  question={`이 홈페이지가 ${query}${josa(query, "이", "가")} 맞나요?`}
+                  answer={hpAnswer}
+                  onAnswer={setHpAnswer}
+                />
+              )}
+            </div>
             <button
               onClick={generate}
               className="mt-4 h-11 w-full rounded-md bg-primary text-sm font-medium text-primary-on"
