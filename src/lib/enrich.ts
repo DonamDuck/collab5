@@ -1389,6 +1389,30 @@ const CHIP_SECTIONS: Record<string, { label: string; factual: boolean }> = {
 // 섹션과 무관하게 사실 게이트로 승격시키는 단서(오귀속 시 거짓말이 될 고유명사·수치).
 const FACTUAL_RE = /방송|수상|대상|선정|일보|매거진|언론|미쉐린|빕구르망|백종원|출연|인증|팔로워/;
 
+// 콤마 조각화 전에 "쪼개면 안 되는 콤마"를 보호 표시(제어문자)로 치환.
+// 대상: ①숫자 사이 천 단위 구분자(예: "12,345명") ②괄호 안 콤마(예: "(3,000m²)").
+// 둘 다 안 막으면 "최대 규모 (3" / "000m²)"·"12" / "345명"처럼 숫자가 쪼개진다.
+function guardParenCommas(s: string): string {
+  const arr = Array.from(s);
+  let depth = 0;
+  let out = "";
+  for (let i = 0; i < arr.length; i++) {
+    const ch = arr[i];
+    if (ch === "(" || ch === "\uFF08") depth++;
+    else if (ch === ")" || ch === "\uFF09") depth = Math.max(0, depth - 1);
+    const isDigitComma = /\d/.test(arr[i - 1] ?? "") && /\d/.test(arr[i + 1] ?? "");
+    if ((ch === "," || ch === "\uFF0C") && (depth > 0 || isDigitComma)) {
+      out += ch === "," ? "\u0000" : "\u0001";
+    } else {
+      out += ch;
+    }
+  }
+  return out;
+}
+function unguardParenCommas(s: string): string {
+  return s.split("\u0000").join(",").split("\u0001").join("\uFF0C");
+}
+
 /**
  * 크롤 조사메모 → 선택용 키워드 칩(오프라인, 콜 0).
  * 유저가 '나를 나타내는 것'을 고르면 그게 생성 재료가 된다. 사실 게이트(factual)는
@@ -1456,10 +1480,11 @@ export function extractChipsFromResearch(research: string): KeywordChip[] {
       if (!isKwSec && line.length <= lineMax) {
         if (push(line, sec)) count++;
       } else {
-        // 긴 문장·콤마 나열 → 조각 단위(실메모는 문단·나열형이 흔함)
+        // 긴 문장·콤마 나열 → 조각 단위(실메모는 문단·나열형이 흔함).
+        // 괄호 안 콤마("(3,000m²)")는 보호 후 분리 — 숫자가 쪼개지지 않게.
         let sub = 0;
-        for (const frag of line.split(/[,，;·、]|(?<=[다요음])\.\s*/)) {
-          const f = frag
+        for (const rawFrag of guardParenCommas(line).split(/[,，;·、]|(?<=[다요음])\.\s*/)) {
+          const f = unguardParenCommas(rawFrag)
             .replace(/^(그리고|또한|하지만|특히|및)\s+/, "")
             .replace(/\s*(등|등을|등이)$/, "")
             .trim();

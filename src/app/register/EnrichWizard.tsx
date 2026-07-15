@@ -224,6 +224,17 @@ export function EnrichWizard({
       return n;
     });
 
+  // "아니에요, 삭제해주세요" — 이 화면에서 즉시 제외 + 이전(선택) 화면에서도 미선택 상태로 복귀.
+  const rejectFactual = (text: string) => {
+    setSelected((p) => p.filter((t) => t !== text));
+    setStarred((p) => p.filter((t) => t !== text));
+    setFactualOk((p) => {
+      const n = new Set(p);
+      n.delete(text);
+      return n;
+    });
+  };
+
   const addCustom = () => {
     const v = customInput.trim();
     if (!v) return;
@@ -568,8 +579,8 @@ export function EnrichWizard({
           <div>
             <p className="pr-8 text-lg font-bold text-ink">선택한 정보를 확인해주세요.</p>
             <p className="mt-1.5 text-[15px] leading-relaxed text-mute">
-              제일 중요한 것에 별표를 눌러주세요(최대 {MAX_STARS}개). 별표한 건 한 줄 소개에 꼭
-              담고, 나머지도 상세 소개에 담아드려요.
+              제일 중요한 것에 별표를 눌러주세요(최대 {MAX_STARS}개). 별표된 정보는 소개서
+              작성에 더 중요한 정보로 사용돼요.
             </p>
             <div className="mt-4 max-h-[38vh] space-y-2 overflow-y-auto slim-scrollbar pr-0.5">
               {confirmList.map((c) => {
@@ -613,13 +624,22 @@ export function EnrichWizard({
                           숫자·이력 정보예요. 다른 곳의 정보가 섞였을 수 있으니, 사실이 맞는지
                           확인해 주세요.
                         </p>
-                        <button
-                          type="button"
-                          onClick={() => confirmFactual(c.text)}
-                          className="mt-1.5 h-8 rounded-pill border border-border-strong bg-surface px-3 text-[13px] font-medium text-ink hover:border-primary"
-                        >
-                          맞아요, 우리 이야기예요
-                        </button>
+                        <div className="mt-1.5 flex gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => confirmFactual(c.text)}
+                            className="h-8 rounded-pill border border-border-strong bg-surface px-3 text-[13px] font-medium text-ink hover:border-primary"
+                          >
+                            맞는 정보에요.
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => rejectFactual(c.text)}
+                            className="h-8 rounded-pill border border-hairline bg-surface px-3 text-[13px] text-mute hover:border-border-strong hover:text-ink"
+                          >
+                            아니에요, 삭제해주세요.
+                          </button>
+                        </div>
                       </div>
                     )}
                   </div>
