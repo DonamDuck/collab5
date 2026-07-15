@@ -379,10 +379,8 @@ export function EnrichWizard({
   const unconfirmedFactual = confirmList.filter((c) => c.factual && !factualOk.has(c.text));
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 p-4 sm:items-center"
-      onClick={onClose}
-    >
+    // 딤(바깥) 클릭으로는 닫지 않는다 — 작성 내용 유실 방지. 닫기는 X 버튼으로만.
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 p-4 sm:items-center">
       <ScrollLock />
       <div
         className="relative w-full max-w-md rounded-lg border border-hairline bg-surface p-5 shadow-e2"
