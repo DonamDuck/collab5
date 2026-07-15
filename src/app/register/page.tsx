@@ -29,7 +29,7 @@ function reorder<T>(arr: T[], from: number, to: number): T[] {
 }
 
 // 편집 중 콜라보 이력 — 활동(activities)과 동일한 인라인 카드 패턴.
-// photos는 {url,uploading?} — 선택 즉시 Storage 업로드, 제출 시 URL만 전송. typeInput은 커스텀 유형 입력(전송 제외).
+// photos는 {url,uploading?} — 선택 즉시 Storage 업로드, 제출 시 URL만 전송. typeInput·typeInputOpen은 UI 로컬 상태(전송 제외).
 type HistItem = {
   partner: string;
   types: string[];
@@ -37,6 +37,7 @@ type HistItem = {
   year: string;
   photos: { url: string; uploading?: boolean }[];
   typeInput: string;
+  typeInputOpen: boolean; // '+ 유형 직접 추가' 토글(입력창 노출 여부)
 };
 const emptyHist = (): HistItem => ({
   partner: "",
@@ -45,6 +46,7 @@ const emptyHist = (): HistItem => ({
   year: "",
   photos: [],
   typeInput: "",
+  typeInputOpen: false,
 });
 
 const COLLAB_TYPES: CollabType[] = [
@@ -235,7 +237,7 @@ function RegisterForm() {
     setInstagram(d.instagram);
     setHomepage(d.homepage);
     setCollabHistory([
-      { partner: d.history.partner, types: d.history.types, desc: "", year: d.history.year, photos: [], typeInput: "" },
+      { partner: d.history.partner, types: d.history.types, desc: "", year: d.history.year, photos: [], typeInput: "", typeInputOpen: false },
     ]);
     setBlocks([
       { type: "metrics", uid: crypto.randomUUID(), photos: [], links: [], items: [{ label: "인스타 팔로워", value: "1.2만" }, { label: "누적 워크숍", value: "48회" }] },
@@ -680,7 +682,7 @@ function RegisterForm() {
           : [{ partner: "", types: [], desc: "", year: "", photos: [] }]
         ).map((h) => ({
           partner: h.partner, types: h.types, desc: h.desc ?? "", year: h.year ?? "",
-          photos: h.photos.map((u) => ({ url: u })), typeInput: "",
+          photos: h.photos.map((u) => ({ url: u })), typeInput: "", typeInputOpen: false,
         }))
       );
       setInstagram(m.trust.instagram ?? "");
@@ -938,7 +940,7 @@ function RegisterForm() {
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              rows={3}
+              rows={4}
               placeholder="버려지는 천에 새 이야기를 입히는 패브릭 브랜드."
               className="w-full rounded-sm border border-hairline bg-surface px-3 py-2 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
             />
@@ -1010,7 +1012,7 @@ function RegisterForm() {
                 <textarea
                   value={offersNote}
                   onChange={(e) => setOffersNote(e.target.value)}
-                  rows={3}
+                  rows={4}
                   placeholder="예: 친환경 가방을 만들어요. 브랜드 제품 콜라보, 굿즈 제작을 기대하고 있어요."
                   className="w-full rounded-sm border border-hairline bg-surface px-3 py-2.5 text-base leading-relaxed text-ink outline-none placeholder:text-faint focus:border-focus"
                 />
@@ -1137,7 +1139,7 @@ function RegisterForm() {
           <textarea
             value={story}
             onChange={(e) => setStory(e.target.value)}
-            rows={4}
+            rows={5}
             placeholder="예: 좋은 소재가 버려지는 게 늘 아쉬웠어요. 이미 있는 것의 가치를 다시 발견하는 일이 더 의미 있다고 믿어요."
             className="w-full rounded-sm border border-hairline bg-surface px-3 py-2.5 text-base leading-relaxed text-ink outline-none placeholder:text-faint focus:border-focus"
           />
@@ -1203,7 +1205,7 @@ function RegisterForm() {
               <textarea
                 value={act.desc}
                 onChange={(e) => setAct(i, { desc: e.target.value })}
-                rows={3}
+                rows={4}
                 placeholder="예: 이야기가 깃든 옷을 수선하고 업사이클링하는 워크숍을 진행해요."
                 className="w-full rounded-sm border border-hairline bg-surface px-3 py-2.5 text-base leading-relaxed text-ink outline-none placeholder:text-faint focus:border-focus"
               />
@@ -1242,7 +1244,7 @@ function RegisterForm() {
             <textarea
               value={seeksNote}
               onChange={(e) => setSeeksNote(e.target.value)}
-              rows={3}
+              rows={4}
               placeholder="예: 지속가능성을 이야기하는 브랜드, 라이프스타일 브랜드, 카페와 함께하고 싶어요."
               className="w-full rounded-sm border border-hairline bg-surface px-3 py-2.5 text-base leading-relaxed text-ink outline-none placeholder:text-faint focus:border-focus"
             />
@@ -1309,12 +1311,38 @@ function RegisterForm() {
                       </button>
                     )}
                   </div>
-                  <input
-                    value={h.partner}
-                    onChange={(e) => setHist(i, { partner: e.target.value })}
-                    placeholder="함께한 곳 (예: 오월의숲)"
-                    className="h-10 w-full rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
-                  />
+                  {/* 타이틀 + 시기 — 한 행(타이틀 몇년, 어떤 콜라보 타입? 순서로 읽히게) */}
+                  <div className="flex gap-2">
+                    <input
+                      value={h.partner}
+                      onChange={(e) => setHist(i, { partner: e.target.value })}
+                      placeholder="함께한 곳 (예: 오월의숲)"
+                      className="h-10 min-w-0 flex-1 rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
+                    />
+                    <div className="relative w-28 shrink-0">
+                      <select
+                        value={h.year}
+                        onChange={(e) => setHist(i, { year: e.target.value })}
+                        className="h-10 w-full appearance-none rounded-sm border border-hairline bg-surface py-2 pl-3 pr-8 text-sm text-ink outline-none focus:border-focus"
+                      >
+                        <option value="">시기</option>
+                        {HISTORY_YEARS.map((y) => (
+                          <option key={y} value={y}>
+                            {y}
+                          </option>
+                        ))}
+                      </select>
+                      <svg
+                        viewBox="0 0 20 20"
+                        className="pointer-events-none absolute right-3 top-1/2 h-[14px] w-[14px] -translate-y-1/2 text-faint"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.8"
+                      >
+                        <path d="m5 7.5 5 5 5-5" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </div>
+                  </div>
                   <div>
                     <p className="mb-1.5 text-sm text-mute">어떤 타입의 콜라보였나요?</p>
                     <div className="flex flex-wrap gap-1.5">
@@ -1349,28 +1377,50 @@ function RegisterForm() {
                           </button>
                         ))}
                     </div>
-                    <div className="mt-2 flex gap-2">
-                      <input
-                        value={h.typeInput}
-                        onChange={(e) => setHist(i, { typeInput: e.target.value })}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" && !e.nativeEvent.isComposing) {
-                            e.preventDefault();
-                            addHistCustomType(i);
-                          }
-                        }}
-                        placeholder="유형 직접 더하기"
-                        className="h-9 min-w-0 flex-1 rounded-sm border border-hairline bg-surface px-3 text-sm text-ink outline-none placeholder:text-faint focus:border-focus"
-                      />
+                    {h.typeInputOpen ? (
+                      <div className="mt-2 flex gap-2">
+                        <input
+                          autoFocus
+                          value={h.typeInput}
+                          onChange={(e) => setHist(i, { typeInput: e.target.value })}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+                              e.preventDefault();
+                              addHistCustomType(i);
+                            }
+                          }}
+                          placeholder="유형 직접 더하기"
+                          className="h-9 min-w-0 flex-1 rounded-sm border border-hairline bg-surface px-3 text-sm text-ink outline-none placeholder:text-faint focus:border-focus"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => addHistCustomType(i)}
+                          className="h-9 shrink-0 whitespace-nowrap rounded-sm border border-border-strong bg-surface px-4 text-sm font-medium text-ink"
+                        >
+                          추가
+                        </button>
+                      </div>
+                    ) : (
                       <button
                         type="button"
-                        onClick={() => addHistCustomType(i)}
-                        className="h-9 shrink-0 whitespace-nowrap rounded-sm border border-border-strong bg-surface px-4 text-sm font-medium text-ink"
+                        onClick={() => setHist(i, { typeInputOpen: true })}
+                        className="mt-2 text-sm font-medium text-mute hover:text-ink"
                       >
-                        추가
+                        + 유형 직접 추가
                       </button>
-                    </div>
+                    )}
                   </div>
+                  <div>
+                    <p className="mb-1.5 text-sm text-mute">콜라보 내용을 간단히 알려주세요.</p>
+                    <textarea
+                      value={h.desc}
+                      onChange={(e) => setHist(i, { desc: e.target.value })}
+                      rows={4}
+                      placeholder="예: 업사이클링 파우치를 함께 만들어 팝업에서 선보였어요."
+                      className="w-full rounded-sm border border-hairline bg-surface px-3 py-2.5 text-base leading-relaxed text-ink outline-none placeholder:text-faint focus:border-focus"
+                    />
+                  </div>
+                  {/* 사진 첨부 — 카드 최하단으로 이동 */}
                   <div>
                     <p className="mb-1.5 text-sm text-mute">사진 (선택 · 최대 3장)</p>
                     <PhotoGrid
@@ -1380,31 +1430,6 @@ function RegisterForm() {
                       onRemove={(k) => removeHistPhoto(i, k)}
                       onReorder={(from, to) => moveHistPhoto(i, from, to)}
                     />
-                  </div>
-                  <div>
-                    <p className="mb-1.5 text-sm text-mute">콜라보 내용을 간단히 알려주세요.</p>
-                    <textarea
-                      value={h.desc}
-                      onChange={(e) => setHist(i, { desc: e.target.value })}
-                      rows={3}
-                      placeholder="예: 업사이클링 파우치를 함께 만들어 팝업에서 선보였어요."
-                      className="w-full rounded-sm border border-hairline bg-surface px-3 py-2.5 text-base leading-relaxed text-ink outline-none placeholder:text-faint focus:border-focus"
-                    />
-                  </div>
-                  <div>
-                    <p className="mb-1.5 text-sm text-mute">시기</p>
-                    <select
-                      value={h.year}
-                      onChange={(e) => setHist(i, { year: e.target.value })}
-                      className="h-10 w-full rounded-sm border border-hairline bg-surface px-3 text-sm text-ink outline-none focus:border-focus"
-                    >
-                      <option value="">시기 (선택)</option>
-                      {HISTORY_YEARS.map((y) => (
-                        <option key={y} value={y}>
-                          {y}
-                        </option>
-                      ))}
-                    </select>
                   </div>
                 </div>
               ))}
