@@ -98,18 +98,9 @@ const BLOCK_HINT_LABELS: Record<BlockHint["type"], string> = {
   reviews: "고객들의 이야기",
 };
 
-function storyItemsOf(o: EnrichOptions): StoryItem[] {
+// values = 유저가 별표한 키워드(N) + AI 추천 결 단어 조합. 순서는 바텀시트 순서 따라 끝쪽에 노출.
+function storyItemsOf(o: EnrichOptions, values: string[]): StoryItem[] {
   const items: StoryItem[] = [];
-  // 우리를 표현하는 키워드(결 단어) — 자동주입 대신 추천 항목으로. 선택 시에만 폼에 반영.
-  if ((o.values ?? []).length) {
-    items.push({
-      key: "values",
-      group: "우리를 표현하는 키워드",
-      title: "",
-      detail: (o.values ?? []).join(" · "),
-      reason: "브랜드의 분위기·가치를 나타내는 단어예요",
-    });
-  }
   (o.activityHints ?? []).forEach((h, i) =>
     items.push({
       key: `activity-${i}`,
@@ -149,6 +140,16 @@ function storyItemsOf(o: EnrichOptions): StoryItem[] {
       reason: b.reason || "웹에서 봤어요",
     })
   );
+  // 우리를 표현하는 키워드(별표 + AI 결 단어) — 끝쪽 노출, 선택 시에만 폼 반영.
+  if (values.length) {
+    items.push({
+      key: "values",
+      group: "우리를 표현하는 키워드",
+      title: "",
+      detail: values.join(" · "),
+      reason: "브랜드의 분위기·가치를 나타내는 단어를 골라봤어요.",
+    });
+  }
   // 표시 보장 — 크롤 결과가 비어도 항상 헤드라인이 있게:
   //  ① title·detail 둘 다 없으면 근거를 헤드라인으로 승격("…(에서) 봤어요" 꼬리 제거)
   //  ② 그래도 일반 출처어(웹·홈페이지 등)만 남으면 제외 → 빈/무의미 체크리스트 행 방지
@@ -394,7 +395,9 @@ export function EnrichWizard({
       setOneLinerSel(0);
       setDescList(o.descriptions);
       setDescSel(0);
-      setStoryChecked(new Set(storyItemsOf(o).map((it) => it.key))); // 기본 전부 체크
+      // 기본 전부 체크 — values 항목 키 포함 위해 별표+AI 결 단어 조합을 동일하게 넘긴다.
+      const recVals = Array.from(new Set([...starred, ...(o.values ?? [])])).slice(0, 8);
+      setStoryChecked(new Set(storyItemsOf(o, recVals).map((it) => it.key)));
       setKind("fields");
     } catch {
       setErrMsg("불러오기에 실패했어요. 잠시 후 다시 시도해 주세요.");
@@ -415,7 +418,11 @@ export function EnrichWizard({
       : [];
 
   // 진행 스텝(칩 이후) — 링크 스텝은 항상(SNS·홈페이지 정보 필수 수집), 이야기 스텝은 힌트가 있을 때만
-  const storyItems = options ? storyItemsOf(options) : [];
+  // 우리를 표현하는 키워드 = 유저가 별표한 키워드(N) + AI 추천 결 단어. dedupe 후 캡.
+  const recommendedValues = options
+    ? Array.from(new Set([...starred, ...(options.values ?? [])])).slice(0, 8)
+    : [];
+  const storyItems = options ? storyItemsOf(options, recommendedValues) : [];
   const storyGroups = groupStoryItems(storyItems);
   const linksReady = isPickAnswered(igPick) && isPickAnswered(hpPick);
   const steps: Kind[] = [
@@ -457,7 +464,7 @@ export function EnrichWizard({
       instagram: fInstagram.trim() || undefined,
       homepage: fHomepage.trim() || undefined,
       // 결 단어(values)도 이제 추천 선택 대상 — 'values' 항목을 체크했을 때만 폼에 반영.
-      values: options?.values.length && storyChecked.has("values") ? options.values : undefined,
+      values: recommendedValues.length && storyChecked.has("values") ? recommendedValues : undefined,
       activityHints: options?.activityHints?.length ? options.activityHints : undefined,
       collabHints: options?.collabHints?.length ? options.collabHints : undefined,
       blockHints: options?.blockHints?.length ? options.blockHints : undefined,

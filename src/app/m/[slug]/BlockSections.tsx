@@ -3,7 +3,7 @@ import { PhotoSlider } from "@/components/PhotoSlider";
 import { normalizeUrl, prettyUrl } from "@/lib/links";
 
 const TITLES: Record<Block["type"], string> = {
-  metrics: "우리의 숫자 지표에요",
+  metrics: "우리의 숫자 지표",
   reviews: "이런 이야기를 들었어요",
   team: "이런 사람들이 만들고 있어요",
   press: "이런 곳에 소개됐어요",
@@ -57,8 +57,8 @@ function BlockBody({ b }: { b: Block }) {
         <div className="grid grid-cols-2 gap-3">
           {b.items.map((it, i) => (
             <div key={i}>
-              <p className="text-[26px] font-bold text-ink">{it.value}</p>
-              <p className="text-[14px] text-mute">{it.label}</p>
+              <p className="text-[18px] font-bold leading-snug text-ink">{it.value}</p>
+              <p className="mt-0.5 text-[14px] text-mute">{it.label}</p>
             </div>
           ))}
         </div>
