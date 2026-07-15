@@ -1005,8 +1005,17 @@ class NaverGeminiProvider implements SearchProvider {
   // 제미나이 자체 웹 검색(Google Search grounding). 네이버와 별개 소스로 조사.
   // ⚠️ grounding은 responseSchema와 동시 사용 불가 → 순수 텍스트 조사 단계로만.
   //    ENRICH_GEMINI_SEARCH=0 이면 비활성(네이버 단독). grounding은 유료 쿼터 소모.
-  private async geminiSearch(query: string, region?: string, businessType?: string): Promise<string> {
+  private async geminiSearch(
+    query: string,
+    region?: string,
+    businessType?: string,
+    anchor?: string
+  ): Promise<string> {
     if (process.env.ENRICH_GEMINI_SEARCH === "0") return "";
+    // 네이버 검증 앵커 — '어느 업체인지' 조준용(대표 아이디어 2026-07-15). 내용 받아쓰기 금지로 바이어스 방어.
+    const anchorBlock = anchor
+      ? `\n[업체 특정 앵커 — 네이버 실측 데이터로 이미 확인된 이 업체의 신원]\n${anchor}\n(⚠️이 앵커는 '어느 업체인지' 특정하는 용도로만 써라. 조사 내용은 앵커를 받아쓰지 말고 네가 웹에서 직접 확인한 것만 적어라. 공식 홈페이지 도메인이 있으면 그 사이트 내용을 우선 검색해라. 앵커와 다른 업체의 정보는 절대 섞지 마라.)\n`
+      : "";
     // 지역+업종 = 동명 업체 판별 신호. 틀린 업체 정보를 채우느니 빈손이 낫다(솔직 배너가 받아줌).
     const hintBits = [
       region?.trim() && `위치: ${region.trim()}`,
@@ -1016,7 +1025,7 @@ class NaverGeminiProvider implements SearchProvider {
       ? `\n(⭐브랜드 특정 힌트 → ${hintBits.join(" · ")}. ⚠️같은 이름이라도 위치·업종이 이 힌트와 명백히 다르면 동명의 남의 업체다 — 그 업체 정보는 한 줄도 섞지 마. 힌트와 맞는 업체를 못 찾았으면 지어내지 말고 모든 소제목에 "확인 안 됨"이라고 써.)`
       : "";
     const prompt = `절대 추측하거나 사실이 아닌 정보를 지어내지 마. 웹에서 확인된 것만 적는다.
-"${query}" 브랜드/업체를 웹에서 조사해줘.${loc}
+"${query}" 브랜드/업체를 웹에서 조사해줘.${loc}${anchorBlock}
 아래 소제목 순서 그대로, 확인된 사실만 개조식으로 정리해줘. 전체 1500자 이내. 해당 정보가 없으면 그 소제목에 "확인 안 됨" 한 줄만.
 
 [정체] 무엇을 만들고/하는 곳인지 한두 줄 + 창업 배경·브랜드 철학·시작 이야기가 있으면 두세 줄
@@ -1131,11 +1140,12 @@ class NaverGeminiProvider implements SearchProvider {
   }
 
   // 조사 메모(네이버+제미나이)만 생성 — 느린 크롤 단계(위저드가 백그라운드로 먼저 돌림).
+  // ⭐네이버 선행(+~1초) → 검증 앵커를 제미나이에 전달해 업체를 조준(동명 업체 오인·상상 원천 차단).
+  //   앵커는 검증 블록(지도✅·홈피메타)이 있을 때만 — 없으면 기존과 동일(바이어스 방지). 콜 수 불변.
   async research(name: string, region?: string, businessType?: string): Promise<string> {
-    const [naver, gemini] = await Promise.all([
-      this.gather(name, region),
-      this.geminiSearch(name, region, businessType),
-    ]);
+    const naver = await this.gather(name, region);
+    const anchor = extractNaverAnchor(naver);
+    const gemini = await this.geminiSearch(name, region, businessType, anchor ?? undefined);
     return this.combineResearch(naver, gemini);
   }
 
@@ -1699,6 +1709,30 @@ export function extractLinksFromResearch(research: string): LinkFinds {
 }
 
 /** 크롤 신호 티어 — thin(빈손 뼈대) 판정. rich=홈피메타·지도일치·칩 충분 / thin=그 외. */
+/** 네이버 메모에서 '검증된 신원 앵커'만 추출 — 제미나이 검색 조준용(대표 아이디어 2026-07-15).
+ *  검증 블록(지도 교차검증 ✅ 또는 홈페이지 메타)이 없으면 null — 불확실한 정보로 바이어스 만들지 않는다.
+ *  주소·업종은 지도 ✅일 때만(지도 없이 지역검색만 있으면 동명 업체일 수 있음). */
+export function extractNaverAnchor(naverMemo: string): string | null {
+  if (!naverMemo) return null;
+  const mapOk = naverMemo.includes("[지도 교차검증] ✅");
+  const hasMeta = naverMemo.includes("[브랜드가 직접 쓴 소개");
+  if (!mapOk && !hasMeta) return null;
+  const bits: string[] = [];
+  const hp = /^\s*·\s*홈페이지:\s*(https?:\/\/\S+)/m.exec(naverMemo)?.[1];
+  if (hp) bits.push(`공식 홈페이지: ${hp}`);
+  const title = /^\s*·\s*제목:\s*(.+)$/m.exec(naverMemo)?.[1]?.trim();
+  if (title) bits.push(`홈페이지 제목: ${title}`);
+  const desc = /^\s*·\s*소개:\s*(.+)$/m.exec(naverMemo)?.[1]?.trim();
+  if (desc) bits.push(`브랜드가 직접 쓴 소개: ${desc}`);
+  if (mapOk) {
+    const road = /도로명:\s*([^|\n]+)/.exec(naverMemo)?.[1]?.trim();
+    if (road) bits.push(`주소(지도 확인됨): ${road}`);
+    const cat = /업종:\s*([^|\n]+)/.exec(naverMemo)?.[1]?.trim();
+    if (cat) bits.push(`업종(지도 확인됨): ${cat}`);
+  }
+  return bits.length ? bits.join("\n") : null;
+}
+
 // 지명이 아닌데 '동'으로 끝나는 일반어 — 오탐 방지
 const DONG_BLOCKLIST =
   /^(활동|운동|이동|자동|행동|감동|공동|협동|합동|노동|아동|부동|작동|출동|생동|변동|유동|파동|맥동|진동|약동|박동|소동|폭동|선동|가동|기동|구동|시동|수동|능동|충동|율동|연동|동동)$/;
