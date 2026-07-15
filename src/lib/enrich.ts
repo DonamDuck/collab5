@@ -1548,8 +1548,13 @@ export function extractChipsFromResearch(research: string, brandName?: string): 
       if (isNumSec) {
         line = line
           .replace(/\s*\d{4}년\s*(?:\d{1,2}월\s*)?(?:\d{1,2}일\s*)?기준\s*/g, " ")
+          // 위에서 괄호 안 '기준' 문구만 빠지면 "( )" 껍데기가 남는다(끝마침표 등으로 끝괄호 제거를 못 탄 경우) → 청소
+          .replace(/[（(]\s*[)）]/g, " ")
           .replace(/:\s*/g, " ")
+          .replace(/\s*[,，]\s*(?=[,，)．.]|$)/g, "") // 빈 괄호 제거로 뜬 외톨이 콤마 정리
+          .replace(/\s+([,，])/g, "$1") // 콤마 앞 공백(빈 괄호 자리) 제거
           .replace(/\s+/g, " ")
+          .replace(/[\s,，·]+$/g, "") // 끝에 남은 구분자
           .trim();
       } else {
         line = line.replace(/^[\w가-힣/ ]{1,8}:\s*/, "").trim();
