@@ -862,7 +862,7 @@ function RegisterForm() {
             disabled={!query.trim()}
             className="h-11 shrink-0 rounded-md bg-primary px-4 text-sm font-medium text-primary-on disabled:opacity-40"
           >
-            ✨ 불러오기
+            ✨ 시작하기
           </button>
         </div>
       </div>

@@ -488,8 +488,8 @@ export function EnrichWizard({
               </p>
             )}
             <p className="mt-1.5 text-[15px] leading-relaxed text-mute">
-              내 브랜드를 나타내는 게 보이면 <b className="text-body">최대한 많이</b> 골라주세요.
-              많이 고를수록 더 정확한 소개서가 작성돼요.
+              브랜드를 표현하는 모습들을 <b className="text-body">최대한 많이</b> 골라주세요. 직접
+              추가하셔도 좋아요. 많이 고를수록 더 정확한 소개서가 작성돼요.
             </p>
             <div className="mt-1 flex items-center justify-between">
               <button
@@ -554,10 +554,6 @@ export function EnrichWizard({
                 추가
               </button>
             </div>
-            <p className="mt-1.5 text-[13px] leading-relaxed text-faint">
-              문장으로 적어주셔도 좋아요. 적은 그대로 소개에 담아드려요.
-            </p>
-
             <button
               onClick={() => (selected.length ? setKind("confirm") : generate())}
               className="mt-4 h-11 w-full rounded-md bg-primary text-sm font-medium text-primary-on"
