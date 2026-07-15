@@ -963,7 +963,8 @@ class NaverGeminiProvider implements SearchProvider {
   // ⚡ 2.5-flash-lite 1순위(2026-07-01 가성비 최적화): 토큰 $0.10/$0.40 + grounding 무료 1,500건/일.
   //   3.1-flash-lite 대비 토큰 2.5배↓ & grounding 무료 9배↑(일1500 vs 월5000). 구조화·검색엔 이 품질로 충분.
   //   폴백 2.0-flash-lite(토큰 최저 $0.075/$0.30) → 2.5-flash(더 똑똑, 안전망).
-  private static readonly GEMINI_MODELS = ["gemini-2.5-flash-lite", "gemini-2.0-flash-lite", "gemini-2.5-flash"];
+  // ⚠️gemini-2.0-flash-lite는 2026-07 기준 404(서비스 종료) — 제거함
+  private static readonly GEMINI_MODELS = ["gemini-2.5-flash-lite", "gemini-2.5-flash"];
 
   // 모델당 1회 시도(무료 티어 RPM 절약) → 503/429면 즉시 다음 모델로. 전부 실패하면 throw.
   // schema/system을 인자로 받아 구조화 호출을 재사용(구조화·5지선다 공용).
@@ -1040,12 +1041,21 @@ class NaverGeminiProvider implements SearchProvider {
           contents: prompt,
           config: { tools: [{ googleSearch: {} }], temperature: 0.2 },
         });
+        // ⭐그라운딩 근거 체크 — 검색 근거(chunks/supports)가 없으면 웹을 안 보고 지어낸 답변이다.
+        // 상상의 업체를 만들어낸 사고(캔버스가든→가짜 식물 스튜디오) 이후 도입: 근거 없으면 메모 폐기.
+        const gm = response.candidates?.[0]?.groundingMetadata;
+        const grounded = !!(gm?.groundingChunks?.length || gm?.groundingSupports?.length);
+        if (!grounded) {
+          // 비접지 응답은 검색 과금이 없음 → 다음 모델 재시도는 토큰 비용뿐(호출 수 원칙 무관).
+          console.warn(`[enrich] gemini ${model} 검색 근거 없음(비접지 생성) → 폐기, 다음 모델`);
+          continue;
+        }
         return (response.text ?? "").trim();
       } catch (e) {
         const status = (e as { status?: number; code?: number })?.status ?? (e as { code?: number })?.code;
-        if (status === 503) {
-          console.warn(`[enrich] gemini search ${model} 503 → 다음 모델 폴백`);
-          continue; // 일시 과부하만 다음 모델 시도
+        if (status === 503 || status === 404) {
+          console.warn(`[enrich] gemini search ${model} ${status} → 다음 모델 폴백`);
+          continue; // 일시 과부하(503)·모델 없음(404)은 다음 모델 시도
         }
         // 429(쿼터)·grounding 미지원·기타 → 즉시 네이버 단독으로 degrade(지연 최소화)
         console.warn(`[enrich] gemini search ${model} 실패(${status ?? "?"}) → 네이버 단독`);
@@ -1447,6 +1457,13 @@ export function extractChipsFromResearch(research: string, brandName?: string): 
   const brand = brandName?.trim();
   const gi = research.indexOf("[출처 2"); // 제미나이 조사부분(구조 깔끔) 우선
   const body = gi >= 0 ? research.slice(gi) : research;
+  // 네이버 파트의 '브랜드가 직접 쓴 소개'(홈페이지 메타 = 신뢰도 최상)도 칩 소스로 —
+  // 제미나이가 폐기/실패해도 네이버가 본인을 찾았으면 빈손이 아니게(캔버스가든 사건 보강).
+  const naverPart = gi >= 0 ? research.slice(0, gi) : research;
+  const metaDesc = /^\s*·\s*소개:\s*(.+)$/m
+    .exec(naverPart)?.[1]
+    ?.replace(/[.…]+\s*$/, "") // 메타 잘림 말줄임(…/..) 제거
+    .trim();
   const parts = body.split(/\n?\s*\[([^\]\n]+)\]\s*/); // [pre, header, body, header, body, ...]
   const chips: KeywordChip[] = [];
   const seen = new Set<string>();
@@ -1462,6 +1479,8 @@ export function extractChipsFromResearch(research: string, brandName?: string): 
     if (STOPWORDS.test(text)) return false;
     // 후기·리뷰 관련은 지금 제외(별도 재설계 예정 — 백로그). 방어적 필터.
     if (/후기|리뷰|별점|평점/.test(text)) return false;
+    // 행정 정보는 키워드가 아니다 — 사업자·신고번호·주소(주소는 identity로 이미 감)
+    if (/사업자|통신판매|신고번호|등록번호|고유번호|^주소/.test(text)) return false;
     // 실질 내용(한글·영문·숫자)이 없으면 배제 — "###", "()", "···", "-" 같은 기호 잔재 차단.
     if (!/[가-힣a-zA-Z0-9]/.test(text)) return false;
     // 메타·잡음 단어 단독은 배제 — "결과", "검색결과", "정보 없음" 등.
@@ -1471,7 +1490,7 @@ export function extractChipsFromResearch(research: string, brandName?: string): 
     // 동사형 문장·접속 조각 배제(키워드는 명사구) — "~탐구합니다"·"~배우고"·"~짜거나" 등
     if (/(다|요|죠|고|며|나|서)\.?$/.test(text)) return false;
     // 미완결 조각 배제(접속·비교·관형 어미로 끝) — "'호락호락'이라는 이름처럼", "~을 위한" 등
-    if (/(처럼|같은|같이|위한|위해|통한|통해|관한|관련|대한|이라는|라는|든지|거나|면서|로서|로써|등의|에서|으로|에게|까지|부터|보다)$/.test(text))
+    if (/(처럼|같은|같이|위한|위해|통한|통해|관한|관련|대한|이라는|라는|든지|거나|면서|로서|로써|등의|에서|으로|에게|까지|부터|보다|브랜드로|곳으로)$/.test(text))
       return false;
     // 소개문 조각 배제 — "○○은 서울 보문동에 위치한 워크숍" 같은 문장형(키워드 아님)
     if (/(에|에서)\s*(위치|자리|소재)/.test(text)) return false;
@@ -1537,6 +1556,21 @@ export function extractChipsFromResearch(research: string, brandName?: string): 
       }
       if (count >= maxPerSection) break;
     }
+  }
+  // 홈페이지 메타 소개(신뢰도 최상) → 칩. 통짜가 짧으면 그대로, 길면 조각 분리.
+  // 제미나이 칩과는 push의 seen으로 자동 중복 제거. 맨 앞에 두어 우선 노출.
+  if (metaDesc) {
+    const metaSec = { label: "우리 소개(홈페이지)", factual: false };
+    const before = chips.length;
+    if (metaDesc.length <= 28) push(metaDesc, metaSec);
+    else
+      for (const frag of metaDesc.split(/[,，;·、]|\s+(?:그리고|및)\s+/)) {
+        const f = frag.replace(/\.{2,}$|…$/g, "").trim();
+        if (push(f, metaSec)) {
+          if (chips.length - before >= 4) break;
+        }
+      }
+    if (chips.length > before) chips.unshift(...chips.splice(before)); // 메타 칩을 맨 앞으로
   }
   return chips.slice(0, 28);
 }
