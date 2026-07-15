@@ -60,6 +60,7 @@ export interface DraftInput {
   starredKeywords?: string[]; // ⭐ 한 줄 소개에 반드시 반영(캡 3, 배열 순서 = 우선순위)
   verbatimKeywords?: string[]; // '그대로 넣기' — 슬로건·인증·상표. 표현 변형 금지
   researchMemo?: string; // 이미 크롤한 조사메모 재사용(키워드 추출 때 쓴 것) — 재크롤 방지(콜 절감)
+  homepageDigest?: string; // 홈페이지 딥리드 발췌 — 서버(fetchHomepageDigest)에서만 생성, 클라이언트 텍스트 금지
   round?: number; // 0=첫 초안, 1+=다시 받기(다른 맥락)
 }
 
@@ -71,6 +72,7 @@ export interface OptionsInput {
   starredKeywords?: string[]; // ⭐ 한 줄 소개에 반드시 반영(캡 3, 순서=우선순위)
   verbatimKeywords?: string[]; // 그대로 넣기 — 유저가 직접 쓴 문구(의역 금지)
   ownerNote?: string; // 사장이 직접 쓴 한두 문장 — 생성의 최우선 중심축
+  homepageDigest?: string; // 홈페이지 딥리드 발췌 — 서버(fetchHomepageDigest)에서만 생성, 클라이언트 텍스트 금지
 }
 
 /** 크롤이 발견한 활동 흔적 — 창작 아님, 조사 메모에 실제 등장한 것만 */
@@ -1178,6 +1180,14 @@ class NaverGeminiProvider implements SearchProvider {
     };
   }
 
+  // 홈페이지 딥리드 발췌 → 프롬프트 블록. 1차 자료 우선·베끼기 금지 규칙 포함.
+  // digest가 비면 빈 헤더도 넣지 않는다(thin 오판 방지 관례와 동일).
+  private digestBlock(d?: string): string {
+    return d?.trim()
+      ? `[홈페이지 직접 읽기 — 사장이 확인한 공식 홈페이지에서 발췌]\n${d.trim()}\n\n⭐⭐홈페이지 발췌는 가장 신뢰할 1차 자료야. 숫자·미션·활동명·파트너명·연혁이 조사 자료와 다르면 홈페이지 쪽을 우선해서 반영해. 단, 홈페이지 문장을 그대로 베끼지 말고 새로 써. "[홈페이지—라벨]"은 어느 메뉴에서 가져왔는지 참고용 힌트야.\n\n`
+      : "";
+  }
+
   // 5지선다 생성 공용 — Gemini 우선, 전멸 시 Haiku.
   private async generateOptions(prompt: string, temperature: number): Promise<EnrichOptions> {
     try {
@@ -1215,13 +1225,13 @@ class NaverGeminiProvider implements SearchProvider {
     const verb = verbatim.length
       ? `⭐그대로 쓸 문구(사장이 직접 쓴 표현 — 의역·바꿔쓰기 금지, 원문 그대로 등장시켜): ${verbatim.map((v) => `"${v}"`).join(", ")}\n\n`
       : "";
-    const prompt = `브랜드명: "${input.name}"\n\n${note}${kw}${star}${verb}[조사 자료 — 네이버 검색 + 제미나이 웹 조사]\n${input.research}\n\n위 정보로 한 줄 소개 5개, 브랜드 소개 5개(각 3~5문장, 모두 해요체), 브랜드 결 단어 2~4개, identity(지역·주소·인스타·홈피)를 뽑아줘.
+    const prompt = `브랜드명: "${input.name}"\n\n${note}${kw}${star}${verb}${this.digestBlock(input.homepageDigest)}[조사 자료 — 네이버 검색 + 제미나이 웹 조사]\n${input.research}\n\n위 정보로 한 줄 소개 5개, 브랜드 소개 5개(각 3~5문장, 모두 해요체), 브랜드 결 단어 2~4개, identity(지역·주소·인스타·홈피)를 뽑아줘.
 ⭐identity.address는 도로명/지번 주소만(예: "서울 성동구 금호로 66 402호"). ⚠️전화번호·사업자등록번호·통신판매업신고번호·이메일은 절대 넣지 마라(그건 주소가 아니야).
 ⭐identity.homepage는 조사 자료에 URL이 있으면 채워줘. identity.instagram은 ⚠️'홈페이지 직접 확인' 항목에서 실제 확인된 핸들이 있을 때만 채워 — 그 외에는 추측하지 말고 빈 문자열로 둬(무관한 계정도 금지).
 ⭐단 instagram이 확정 안 됐으면 instagramCandidates에 도메인·브랜드명 기반 그럴듯한 추정 핸들 2~4개를 넣어줘(사장이 직접 고를 후보). 예: 도메인이 canvasgarden.shop이면 @canvasgarden, @canvasgarden_official, @canvasgarden.shop 등.
 나머지는 사실만 쓰고, 확인 안 된 필드는 빈 문자열. 모든 문장은 '해요체'로 끝내('~합니다/~습니다' 금지).
 ⭐⭐oneLiners 필수 점검: 브랜드명(상호)을 문장 안에 절대 넣지 마라. 서술어는 행위 사실("~을 만들어요/운영해요")로 — "만나보세요·함께해요" 같은 권유형, "선물해요·선사해요" 같은 감성형 금지.
-⭐activityHints·collabHints는 조사 자료에 실제로 언급된 활동·협업만 0~3건씩(source=출처 유형). 자료에 없으면 빈 배열 — 지어내기 금지.`;
+⭐activityHints·collabHints는 조사 자료·홈페이지 발췌에 실제로 언급된 활동·협업만 0~3건씩(source=출처 유형, 홈페이지 발췌면 "홈페이지"). 자료에 없으면 빈 배열 — 지어내기 금지.`;
     return this.generateOptions(prompt, 0.9);
   }
 
@@ -1285,7 +1295,7 @@ class NaverGeminiProvider implements SearchProvider {
       : "";
     const prompt = `브랜드명: "${input.name}"\n\n[사용자 입력]\n${
       info || "(입력이 적어요 — 조사 자료 위주로)"
-    }\n\n${kw.length ? `⭐가중 키워드(가장 중요하게 반영): ${kw.join(", ")}\n` : ""}${starLine}${verbatimLine}\n[조사 자료]\n${research}\n\n위 자료로 '한 줄 소개' 후보 3개(각 40자 이내 — 브랜드 정체성이 무엇을·어떻게·누구에게 한 줄에 드러나게, 과장·오글거리는 표현 금지)와 '브랜드 소개' 후보 5개(서로 다른 앵글, 각 3~5문장 해요체)를 함께 만들어줘. values·identity도 형식에 맞게 채워줘.${
+    }\n\n${kw.length ? `⭐가중 키워드(가장 중요하게 반영): ${kw.join(", ")}\n` : ""}${starLine}${verbatimLine}\n${this.digestBlock(input.homepageDigest)}[조사 자료]\n${research}\n\n위 자료로 '한 줄 소개' 후보 3개(각 40자 이내 — 브랜드 정체성이 무엇을·어떻게·누구에게 한 줄에 드러나게, 과장·오글거리는 표현 금지)와 '브랜드 소개' 후보 5개(서로 다른 앵글, 각 3~5문장 해요체)를 함께 만들어줘. values·identity도 형식에 맞게 채워줘.${
       round > 0 ? " 이전과는 다른 표현·각도로 새롭게 써줘." : ""
     }`;
     const opts = await this.generateOptions(prompt, round > 0 ? 1.0 : 0.9);

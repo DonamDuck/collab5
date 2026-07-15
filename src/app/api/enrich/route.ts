@@ -16,6 +16,24 @@ import {
   extractLinksFromResearch,
   researchTier,
 } from "@/lib/enrich";
+import { fetchHomepageDigest } from "@/lib/homepage";
+
+// 홈페이지 딥리드(예산 8초) + Gemini 생성 여유 — Vercel 기본값(짧음) 대신 명시
+export const maxDuration = 60;
+
+// 확정 홈페이지 URL → 서버에서 딥리드 발췌 생성. 실패는 전부 조용한 저하(undefined → 기존 동작).
+// digest 텍스트는 서버에서만 만든다 — 클라이언트가 보낸 텍스트를 프롬프트에 넣지 않는다(주입 차단).
+async function digestOf(homepage: unknown): Promise<string | undefined> {
+  const hp = typeof homepage === "string" ? homepage.trim() : "";
+  if (!hp) return undefined;
+  try {
+    const d = await fetchHomepageDigest(hp);
+    return d.ok ? d.digest : undefined;
+  } catch (e) {
+    console.warn("[enrich] homepage digest failed:", e);
+    return undefined;
+  }
+}
 
 // 임시 진단: web_search 없는 최소 호출 — 전반 과부하 vs web_search 특정 구분용.
 export async function GET() {
@@ -148,6 +166,7 @@ export async function POST(req: Request) {
         starredKeywords: strArr(body.starredKeywords),
         verbatimKeywords: strArr(body.verbatimKeywords),
         ownerNote: typeof body.ownerNote === "string" ? body.ownerNote : undefined,
+        homepageDigest: await digestOf(body.homepage), // 확정 홈페이지 딥리드(실패 시 undefined)
       });
       return NextResponse.json({ options });
     } catch (e) {
@@ -202,6 +221,7 @@ export async function POST(req: Request) {
         starredKeywords: strArr(body.starredKeywords),
         verbatimKeywords: strArr(body.verbatimKeywords),
         researchMemo: typeof body.researchMemo === "string" ? body.researchMemo : undefined,
+        homepageDigest: await digestOf(body.homepage), // 확정 홈페이지 딥리드(실패 시 undefined)
         round: typeof body.round === "number" ? body.round : 0,
       });
       return NextResponse.json({ oneLiners, descriptions });
