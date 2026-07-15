@@ -1066,9 +1066,16 @@ class NaverGeminiProvider implements SearchProvider {
   }
 
   // 네이버 메모 + 제미나이 웹 조사 메모를 라벨 붙여 합침(구조화 단계 입력용).
+  // ⭐신뢰 서열을 라벨에 박음(대표 지시 2026-07-15): 네이버 = 실측 API 데이터(할루시네이션 없음) → 우선.
+  //   제미나이 = 생성 기반(접지 확인은 했지만 여전히 보조). 모든 하위 소비자(구조화·options·draft)가 이 라벨을 본다.
   private combineResearch(naver: string, gemini: string): string {
-    const parts = [`[출처 1 · 네이버 검색]\n${naver || "(결과 없음)"}`];
-    if (gemini) parts.push(`[출처 2 · 제미나이 웹 조사]\n${gemini}`);
+    const parts = [
+      `[출처 1 · 네이버 검색 API — 실측 데이터라 사실성 최상. 단 무관한 업체의 문서가 섞일 수 있으니 브랜드 일치 확인 후 사용. 특히 [브랜드가 직접 쓴 소개]·[지도 교차검증]·[네이버 지역검색] 블록은 최상위 신뢰]\n${naver || "(결과 없음)"}`,
+    ];
+    if (gemini)
+      parts.push(
+        `[출처 2 · 제미나이 웹 조사 — 보조 자료. 출처 1과 충돌하는 내용은 무조건 출처 1을 따를 것]\n${gemini}`
+      );
     return parts.join("\n\n");
   }
 
@@ -1103,7 +1110,7 @@ class NaverGeminiProvider implements SearchProvider {
 
   /** 조사 메모 → 등록 폼 후보. Gemini 우선, 전멸 시 Haiku 폴백. */
   private async structure(query: string, research: string, extra = ""): Promise<EnrichCandidate[]> {
-    const prompt = `원래 검색어: "${query}"\n\n[조사 자료 — 네이버 검색 + 제미나이 웹 조사]\n${research}${extra}\n\n두 출처를 비교·종합해서 등록 폼 후보로 정리해줘. 서로 보완되는 정보는 합치고, 확실한 것만 채워. 빈 문자열 필드는 missing 처리하거나 생략해. description은 모든 문장을 '해요체'로 끝내(~해요/~예요/~있어요). '~합니다/~습니다' 금지.`;
+    const prompt = `원래 검색어: "${query}"\n\n[조사 자료 — 네이버 검색 + 제미나이 웹 조사]\n${research}${extra}\n\n두 출처를 비교·종합해서 등록 폼 후보로 정리해줘. ⭐충돌하면 출처 1(네이버 — 실측 데이터)을 우선하고, 그 안에서도 [브랜드가 직접 쓴 소개]·[지도 교차검증]·[네이버 지역검색]이 최상위. 서로 보완되는 정보는 합치고, 확실한 것만 채워. 빈 문자열 필드는 missing 처리하거나 생략해. description은 모든 문장을 '해요체'로 끝내(~해요/~예요/~있어요). '~합니다/~습니다' 금지.`;
     try {
       const text = await this.generate(prompt);
       const parsed = JSON.parse(text) as EnrichResult;
@@ -1243,7 +1250,8 @@ class NaverGeminiProvider implements SearchProvider {
       ? `⭐그대로 쓸 문구(사장이 직접 쓴 표현 — 의역·바꿔쓰기 금지, 원문 그대로 등장시켜): ${verbatim.map((v) => `"${v}"`).join(", ")}\n\n`
       : "";
     const prompt = `브랜드명: "${input.name}"\n\n${note}${kw}${star}${verb}${this.digestBlock(input.homepageDigest)}[조사 자료 — 네이버 검색 + 제미나이 웹 조사]\n${input.research}\n\n위 정보로 한 줄 소개 5개, 브랜드 소개 5개(각 3~5문장, 모두 해요체), 브랜드 결 단어 2~4개, identity(지역·주소·인스타·홈피)를 뽑아줘.
-⭐identity.address는 도로명/지번 주소만(예: "서울 성동구 금호로 66 402호"). ⚠️전화번호·사업자등록번호·통신판매업신고번호·이메일은 절대 넣지 마라(그건 주소가 아니야).
+⭐⭐자료 신뢰 순서(충돌 시 위가 이긴다): ①홈페이지 발췌(있으면) ②네이버의 [브랜드가 직접 쓴 소개]·[지도 교차검증]·[네이버 지역검색] ③기타 네이버 문서(무관한 업체 문서일 수 있으니 브랜드 일치 확인) ④제미나이 조사.
+⭐identity.address는 도로명/지번 주소만(예: "서울 성동구 금호로 66 402호") — [네이버 지역검색]에 도로명이 있으면 그걸 그대로 써라(가장 정확). ⚠️전화번호·사업자등록번호·통신판매업신고번호·이메일은 절대 넣지 마라(그건 주소가 아니야).
 ⭐identity.homepage는 조사 자료에 URL이 있으면 채워줘. identity.instagram은 ⚠️'홈페이지 직접 확인' 항목에서 실제 확인된 핸들이 있을 때만 채워 — 그 외에는 추측하지 말고 빈 문자열로 둬(무관한 계정도 금지).
 ⭐단 instagram이 확정 안 됐으면 instagramCandidates에 도메인·브랜드명 기반 그럴듯한 추정 핸들 2~4개를 넣어줘(사장이 직접 고를 후보). 예: 도메인이 canvasgarden.shop이면 @canvasgarden, @canvasgarden_official, @canvasgarden.shop 등.
 나머지는 사실만 쓰고, 확인 안 된 필드는 빈 문자열. 모든 문장은 '해요체'로 끝내('~합니다/~습니다' 금지).
@@ -1312,7 +1320,7 @@ class NaverGeminiProvider implements SearchProvider {
       : "";
     const prompt = `브랜드명: "${input.name}"\n\n[사용자 입력]\n${
       info || "(입력이 적어요 — 조사 자료 위주로)"
-    }\n\n${kw.length ? `⭐가중 키워드(가장 중요하게 반영): ${kw.join(", ")}\n` : ""}${starLine}${verbatimLine}\n${this.digestBlock(input.homepageDigest)}[조사 자료]\n${research}\n\n위 자료로 '한 줄 소개' 후보 3개(각 40자 이내 — 브랜드 정체성이 무엇을·어떻게·누구에게 한 줄에 드러나게, 과장·오글거리는 표현 금지)와 '브랜드 소개' 후보 5개(서로 다른 앵글, 각 3~5문장 해요체)를 함께 만들어줘. values·identity도 형식에 맞게 채워줘.${
+    }\n\n${kw.length ? `⭐가중 키워드(가장 중요하게 반영): ${kw.join(", ")}\n` : ""}${starLine}${verbatimLine}\n${this.digestBlock(input.homepageDigest)}[조사 자료]\n${research}\n\n⭐자료 신뢰 순서(충돌 시 위가 이긴다): ①홈페이지 발췌 ②네이버 검증 블록(직접 쓴 소개·지도 교차검증·지역검색) ③기타 네이버 문서 ④제미나이 조사.\n위 자료로 '한 줄 소개' 후보 3개(각 40자 이내 — 브랜드 정체성이 무엇을·어떻게·누구에게 한 줄에 드러나게, 과장·오글거리는 표현 금지)와 '브랜드 소개' 후보 5개(서로 다른 앵글, 각 3~5문장 해요체)를 함께 만들어줘. values·identity도 형식에 맞게 채워줘.${
       round > 0 ? " 이전과는 다른 표현·각도로 새롭게 써줘." : ""
     }`;
     const opts = await this.generateOptions(prompt, round > 0 ? 1.0 : 0.9);
