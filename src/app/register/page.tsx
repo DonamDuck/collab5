@@ -406,6 +406,8 @@ function RegisterForm() {
       values,
       offers,
       targetAudience,
+      // 폼에 적힌 홈페이지 → 서버가 직접 읽어 초안에 반영(딥리드). URL만 보낸다.
+      homepage: homepage.trim() || undefined,
       round: draftRound,
     };
     const strs = (v: unknown): string[] =>
