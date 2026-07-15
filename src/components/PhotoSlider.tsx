@@ -49,7 +49,15 @@ export function PhotoSlider({
     try {
       el.releasePointerCapture(e.pointerId);
     } catch {}
-    goTo(Math.round(el.scrollLeft / el.clientWidth)); // 가까운 장으로 스냅
+    // 살짝만 밀어도 넘어가게 — 시작 장 기준 이동량이 폭의 15% 넘으면 다음/이전 장으로.
+    const width = el.clientWidth || 1;
+    const startPage = Math.round(drag.current.startLeft / width);
+    const moved = el.scrollLeft - drag.current.startLeft;
+    const threshold = width * 0.15;
+    let target = startPage;
+    if (moved > threshold) target = startPage + 1;
+    else if (moved < -threshold) target = startPage - 1;
+    goTo(Math.max(0, Math.min(photos.length - 1, target)));
   };
 
   if (!photos.length) return null;

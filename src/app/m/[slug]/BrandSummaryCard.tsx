@@ -50,7 +50,7 @@ export function BrandSummaryCard({
         <div className="mt-4 flex flex-wrap gap-2">
           {instagram && (
             <TrustChip href={instagramUrl(instagram)} icon={<InstagramIcon />}>
-              {instagramHandle(instagram)}
+              {instagramHandle(instagram).replace(/^@/, "")}
             </TrustChip>
           )}
           {homepage && (
@@ -79,7 +79,7 @@ function TrustChip({
       href={href}
       target="_blank"
       rel="noopener noreferrer nofollow"
-      className="inline-flex items-center gap-1.5 rounded-pill bg-primary-pale py-1.5 pl-2.5 pr-3.5 text-[13px] font-medium text-primary-on transition-colors hover:bg-primary-tint"
+      className="inline-flex items-center gap-1 rounded-pill bg-primary-pale py-1.5 pl-2.5 pr-3.5 text-[13px] font-medium text-primary-on transition-colors hover:bg-primary-tint"
     >
       <span className="shrink-0 text-primary-on">{icon}</span>
       {children}
