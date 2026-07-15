@@ -1438,6 +1438,10 @@ export function extractChipsFromResearch(research: string): KeywordChip[] {
     if (STOPWORDS.test(text)) return false;
     // 후기·리뷰 관련은 지금 제외(별도 재설계 예정 — 백로그). 방어적 필터.
     if (/후기|리뷰|별점|평점/.test(text)) return false;
+    // 실질 내용(한글·영문·숫자)이 없으면 배제 — "###", "()", "···", "-" 같은 기호 잔재 차단.
+    if (!/[가-힣a-zA-Z0-9]/.test(text)) return false;
+    // 메타·잡음 단어 단독은 배제 — "결과", "검색결과", "정보 없음" 등.
+    if (/^(결과|검색\s*결과|정보|내용|미상|불명|없음|해당\s*사항)$/.test(text)) return false;
     // 동사형 문장·접속 조각 배제(키워드는 명사구) — "~탐구합니다"·"~배우고"·"~짜거나" 등
     if (/(다|요|죠|고|며|나|서)\.?$/.test(text)) return false;
     const key = text.replace(/\s/g, "");
@@ -1461,11 +1465,13 @@ export function extractChipsFromResearch(research: string): KeywordChip[] {
     const lineMax = isNumSec ? 40 : 28;
     let count = 0;
     for (const rawLine of (parts[i + 1] ?? "").split(/\n/)) {
-      // 실메모 정리: 볼드·불릿·끝 괄호(출처) 제거
+      // 실메모 정리: 마크다운(볼드·#헤더·불릿) + 빈 괄호 + 끝 괄호(출처) 제거
       let line = rawLine
         .replace(/\*\*/g, "")
-        .replace(/^[\s·•\-*]+/, "")
-        .replace(/\s*[（(][^)）]*[)）]\s*$/g, "")
+        .replace(/^[\s#>·•\-*]+/, "") // 앞머리 마크다운(### 헤더·> 인용·불릿)
+        .replace(/[（(]\s*[)）]/g, "") // 빈 괄호 "()" 제거 → "결과()" 같은 잔재 차단
+        .replace(/\s*[（(][^)）]*[)）]\s*$/g, "") // 끝 괄호(출처)
+        .replace(/[#*`]+/g, "") // 남은 마크다운 기호
         .trim();
       // 숫자·이력은 라벨을 살린다("팔로워 1.5만") — 시점 클로즈만 제거. 그 외 섹션은 "라벨:" 접두 제거.
       if (isNumSec) {
