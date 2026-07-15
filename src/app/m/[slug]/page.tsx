@@ -167,6 +167,13 @@ export default async function MakerPage({
         </Section>
       )}
 
+      {/* 상세 주소 — 참고 수준으로 최하단 배치(추후 지도 연동용) */}
+      {maker.trust.address && (
+        <Section title="상세 주소">
+          <p className="text-[16px] leading-relaxed text-body">{maker.trust.address}</p>
+        </Section>
+      )}
+
       {/* 링크 복사 — 소개서 공유 */}
       <div className="mt-12">
         <CopyLinkButton />

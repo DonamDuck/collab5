@@ -1,6 +1,5 @@
-// /m 상단 브랜드 요약 카드 — 정체성(로고+이름+소개) + 신뢰정보 칩.
-// A형(칩): "보고서" 느낌의 회색 표 박스 대신 라운드 칩으로 따뜻하게.
-// design.md 토큰·Avatar(square=브랜드 로고). 스펙: docs/superpowers/specs/2026-07-13-m-brand-summary-card-design.md
+// /m 상단 브랜드 요약 카드 — 정체성(로고+이름) + 소개 + 신뢰 링크 칩(인스타·홈피).
+// 주소는 카드에서 빼고 최하단 '상세 주소' 섹션으로(참고 수준·지도용). 스펙: docs/superpowers/specs/2026-07-13-m-brand-summary-card-design.md
 import { Avatar } from "@/components/Avatar";
 import { instagramUrl, instagramHandle, normalizeUrl, prettyUrl } from "@/lib/links";
 import type { Maker } from "@/lib/types";
@@ -15,31 +14,24 @@ export function BrandSummaryCard({
   isOwner: boolean;
   logoUrl?: string;
 }) {
-  const { instagram, homepage, address } = maker.trust;
-  const hasTrust = !!(instagram || homepage || address);
+  const { instagram, homepage } = maker.trust;
 
   return (
     <div className="rounded-[18px] border border-hairline bg-surface p-5 shadow-e1">
-      {/* 정체성 존 */}
+      {/* 정체성 존 — 로고+이름+뱃지(한 줄) / 수정 우상단 */}
       <div className="flex items-start justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-[15px]">
+        <div className="flex min-w-0 items-center gap-3.5">
           {/* 로고 = 계정 프로필 이미지. 없으면 렌더 안 함(이니셜 폴백 미사용) → 텍스트 타이틀만. */}
-          {logoUrl && <Avatar image={logoUrl} name={maker.name} size={60} shape="square" />}
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-[23px] font-bold leading-tight tracking-tight text-ink">
-                {maker.name}
-              </h1>
-              {maker.collabOpen && (
-                <span className="inline-flex h-6 items-center rounded-pill bg-primary-pale px-2.5 text-xs font-medium text-primary-on">
-                  콜라보 받는 중
-                </span>
-              )}
-            </div>
-            {maker.oneLiner && (
-              <p className="mt-1.5 text-[15px] leading-relaxed text-body">{maker.oneLiner}</p>
+          {logoUrl && <Avatar image={logoUrl} name={maker.name} size={56} shape="square" />}
+          <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+            <h1 className="text-[22px] font-bold leading-tight tracking-tight text-ink">
+              {maker.name}
+            </h1>
+            {maker.collabOpen && (
+              <span className="inline-flex h-6 items-center rounded-pill bg-primary-pale px-2.5 text-xs font-medium text-primary-on">
+                콜라보 받는 중
+              </span>
             )}
-            {maker.region && <p className="mt-1 text-[13px] text-faint">{maker.region}</p>}
           </div>
         </div>
         <div className="shrink-0">
@@ -47,39 +39,77 @@ export function BrandSummaryCard({
         </div>
       </div>
 
-      {/* 신뢰정보 칩 — 인스타·홈피는 링크 칩(새 탭), 주소는 텍스트 칩. 값 있을 때만. */}
-      {hasTrust && (
+      {/* 소개·지역 — 카드 전체 폭(로고 옆 좁은 컬럼 문제 해소) */}
+      {maker.oneLiner && (
+        <p className="mt-3 text-[15px] leading-relaxed text-body">{maker.oneLiner}</p>
+      )}
+      {maker.region && <p className="mt-1 text-[13px] text-faint">{maker.region}</p>}
+
+      {/* 신뢰 링크 칩 — 인스타·홈피(아이콘 + 값, 새 탭). 주소는 최하단 섹션으로 이동. */}
+      {(instagram || homepage) && (
         <div className="mt-4 flex flex-wrap gap-2">
           {instagram && (
-            <TrustChip href={instagramUrl(instagram)}>{instagramHandle(instagram)}</TrustChip>
+            <TrustChip href={instagramUrl(instagram)} icon={<InstagramIcon />}>
+              {instagramHandle(instagram)}
+            </TrustChip>
           )}
           {homepage && (
-            <TrustChip href={normalizeUrl(homepage)}>{prettyUrl(homepage)}</TrustChip>
+            <TrustChip href={normalizeUrl(homepage)} icon={<HomeIcon />}>
+              {prettyUrl(homepage)}
+            </TrustChip>
           )}
-          {address && <TrustChip>{address}</TrustChip>}
         </div>
       )}
     </div>
   );
 }
 
-// 신뢰 칩 — href 있으면 연둣빛 링크 칩(새 탭), 없으면 중립 텍스트 칩(주소).
-function TrustChip({ href, children }: { href?: string; children: React.ReactNode }) {
-  if (href) {
-    return (
-      <a
-        href={href}
-        target="_blank"
-        rel="noopener noreferrer nofollow"
-        className="inline-flex items-center rounded-pill bg-primary-pale px-3.5 py-1.5 text-[13px] font-medium text-primary-on transition-colors hover:bg-primary-tint"
-      >
-        {children}
-      </a>
-    );
-  }
+// 신뢰 링크 칩 — 아이콘 + 값, 새 탭. 클릭 가능함을 아이콘·호버로 신호.
+function TrustChip({
+  href,
+  icon,
+  children,
+}: {
+  href: string;
+  icon: React.ReactNode;
+  children: React.ReactNode;
+}) {
   return (
-    <span className="inline-flex items-center rounded-pill bg-surface-soft px-3.5 py-1.5 text-[13px] text-body">
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer nofollow"
+      className="inline-flex items-center gap-1.5 rounded-pill bg-primary-pale py-1.5 pl-2.5 pr-3.5 text-[13px] font-medium text-primary-on transition-colors hover:bg-primary-tint"
+    >
+      <span className="shrink-0 text-primary-on">{icon}</span>
       {children}
-    </span>
+    </a>
+  );
+}
+
+function InstagramIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" className="h-[15px] w-[15px]">
+      <rect x="3" y="3" width="18" height="18" rx="5.5" />
+      <circle cx="12" cy="12" r="4" />
+      <circle cx="17.3" cy="6.7" r="1.1" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
+function HomeIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.9"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="h-[15px] w-[15px]"
+    >
+      <path d="M4 10.5 12 4l8 6.5" />
+      <path d="M6 9.8V19a1 1 0 0 0 1 1h3v-5h4v5h3a1 1 0 0 0 1-1V9.8" />
+    </svg>
   );
 }
