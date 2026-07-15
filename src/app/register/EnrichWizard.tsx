@@ -85,8 +85,10 @@ const resolvePick = (p: LinkPick) => (p.none ? "" : p.customOn ? p.customText.tr
 // 답변 완료 판정 — 후보 선택 / 직접입력 / '운영하지 않아요' 중 하나라도 명시했으면 완료
 const isPickAnswered = (p: LinkPick) => p.none || p.customOn || p.sel !== null;
 
-// 이야기 스텝 체크 항목 — 크롤 힌트를 섹션 라벨+미리보기+근거로 평탄화(한 줄/자세히 소개는 앞 스텝이 처리).
-type StoryItem = { key: string; sectionLabel: string; preview: string; reason: string };
+// 이야기 스텝 체크 항목 — 크롤 힌트. group=폼 섹션 라벨(그룹당 1회 노출), title=크롤한 제목(볼드), detail=상세.
+type StoryItem = { key: string; group: string; title: string; detail: string; reason: string };
+// 같은 group끼리 묶은 표시 단위 — 헤더 1회 + 항목들 체크박스.
+type StoryGroup = { group: string; items: StoryItem[] };
 
 // 블록 힌트 라벨 — BlockEditor CATALOG 라벨 승계(카탈로그와 문장 일치 유지)
 const BLOCK_HINT_LABELS: Record<BlockHint["type"], string> = {
@@ -101,16 +103,18 @@ function storyItemsOf(o: EnrichOptions): StoryItem[] {
   (o.activityHints ?? []).forEach((h, i) =>
     items.push({
       key: `activity-${i}`,
-      sectionLabel: "주로 어떤 활동을 하나요?",
-      preview: [h.title, h.desc].filter(Boolean).join(" — "),
+      group: "주로 어떤 활동을 하나요?",
+      title: h.title || "",
+      detail: h.desc || "",
       reason: h.source || "웹에서 봤어요",
     })
   );
   (o.collabHints ?? []).forEach((h, i) =>
     items.push({
       key: `collab-${i}`,
-      sectionLabel: "이런 콜라보 경험이 있어요.",
-      preview: [h.partner, h.desc].filter(Boolean).join(" — "),
+      group: "이런 콜라보 경험이 있어요.",
+      title: h.partner || "",
+      detail: h.desc || "",
       reason: h.source || "웹에서 봤어요",
     })
   );
@@ -118,22 +122,40 @@ function storyItemsOf(o: EnrichOptions): StoryItem[] {
     const types = o.seeksHint.types ?? [];
     items.push({
       key: "seeks",
-      sectionLabel: "이런 파트너를 찾고 있어요.",
-      preview: types.length ? `${o.seeksHint.note} — ${types.join(" · ")}` : o.seeksHint.note,
+      group: "이런 파트너를 찾고 있어요.",
+      title: types.length ? types.join(" · ") : "",
+      detail: o.seeksHint.note || "",
       reason: o.seeksHint.reason || "웹에서 봤어요",
     });
   }
   (o.blockHints ?? []).forEach((b) =>
     items.push({
       key: `block-${b.type}`,
-      sectionLabel: BLOCK_HINT_LABELS[b.type],
-      preview: b.items?.length
+      group: BLOCK_HINT_LABELS[b.type],
+      title: b.items?.length
         ? b.items.map((it) => [it.label, it.value ?? it.year].filter(Boolean).join(" ")).join(" · ")
-        : b.reason,
+        : "",
+      detail: "",
       reason: b.reason || "웹에서 봤어요",
     })
   );
   return items;
+}
+
+// 같은 group끼리 묶기(첫 등장 순서 유지) — 섹션 라벨 반복 노출 방지.
+function groupStoryItems(items: StoryItem[]): StoryGroup[] {
+  const groups: StoryGroup[] = [];
+  const byName = new Map<string, StoryGroup>();
+  for (const it of items) {
+    let g = byName.get(it.group);
+    if (!g) {
+      g = { group: it.group, items: [] };
+      byName.set(it.group, g);
+      groups.push(g);
+    }
+    g.items.push(it);
+  }
+  return groups;
 }
 
 export function EnrichWizard({
@@ -370,6 +392,7 @@ export function EnrichWizard({
 
   // 진행 스텝(칩 이후) — 링크 스텝은 항상(SNS·홈페이지 정보 필수 수집), 이야기 스텝은 힌트가 있을 때만
   const storyItems = options ? storyItemsOf(options) : [];
+  const storyGroups = groupStoryItems(storyItems);
   const linksReady = isPickAnswered(igPick) && isPickAnswered(hpPick);
   const steps: Kind[] = [
     "chips",
@@ -819,39 +842,52 @@ export function EnrichWizard({
           </div>
         )}
 
-        {/* 찾은 이야기 체크리스트(힌트 있을 때만) */}
+        {/* 찾은 이야기 체크리스트(힌트 있을 때만) — 섹션 그룹당 헤더 1회 + 항목 체크박스 */}
         {kind === "story" && (
           <div>
-            <p className="pr-8 text-lg font-bold text-ink">이런 이야기도 찾았어요</p>
+            <p className="pr-8 text-lg font-bold text-ink">소개서에 담을 추가 내용을 골라보세요.</p>
             <p className="mt-1.5 text-[15px] leading-relaxed text-mute">
-              웹에서 찾은 내용이에요. 담을 것만 골라주세요.
+              웹에서 찾은 내용을 정리해봤어요. 소개서에 담고 싶은 내용을 선택해 주세요.
             </p>
-            <div className="mt-4 max-h-[46vh] space-y-2 overflow-y-auto pr-0.5">
-              {storyItems.map((it) => {
-                const on = storyChecked.has(it.key);
-                return (
-                  <label
-                    key={it.key}
-                    className={`flex cursor-pointer items-start gap-2.5 rounded-md border px-3 py-3 transition-colors ${
-                      on ? "border-primary bg-primary-pale" : "border-hairline bg-surface"
-                    }`}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={on}
-                      onChange={() => toggleStoryItem(it.key)}
-                      className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--color-primary,theme(colors.lime.400))]"
-                    />
-                    <span className="min-w-0">
-                      <span className="block text-[15px] font-bold text-ink">{it.sectionLabel}</span>
-                      <span className="mt-1 block line-clamp-2 text-[14px] leading-relaxed text-mute">
-                        {it.preview}
-                      </span>
-                      <span className="mt-1 block text-[13px] text-faint">{it.reason}</span>
-                    </span>
-                  </label>
-                );
-              })}
+            <div className="mt-4 max-h-[46vh] space-y-4 overflow-y-auto slim-scrollbar pr-0.5">
+              {storyGroups.map((g) => (
+                <div key={g.group}>
+                  <p className="mb-1.5 text-[13px] font-medium text-mute">{g.group}</p>
+                  <div className="space-y-2">
+                    {g.items.map((it) => {
+                      const on = storyChecked.has(it.key);
+                      return (
+                        <label
+                          key={it.key}
+                          className={`flex cursor-pointer items-start gap-2.5 rounded-md border px-3 py-3 transition-colors ${
+                            on ? "border-primary bg-primary-pale" : "border-hairline bg-surface"
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={on}
+                            onChange={() => toggleStoryItem(it.key)}
+                            className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--color-primary,theme(colors.lime.400))]"
+                          />
+                          <span className="min-w-0">
+                            {it.title && (
+                              <span className="block text-[15px] font-bold text-ink">{it.title}</span>
+                            )}
+                            {it.detail && (
+                              <span
+                                className={`block text-[14px] leading-relaxed text-mute ${it.title ? "mt-0.5" : ""}`}
+                              >
+                                {it.detail}
+                              </span>
+                            )}
+                            <span className="mt-1 block text-[13px] text-faint">{it.reason}</span>
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
             </div>
             <button
               onClick={apply}
