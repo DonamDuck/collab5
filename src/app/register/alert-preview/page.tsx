@@ -45,16 +45,16 @@ export default function DraftDoneAlertPreview() {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="text-4xl leading-none" aria-hidden="true">🎉</div>
-            <p className="mt-3 text-lg font-bold text-ink">소개서 초본이 준비됐어요!</p>
+            <p className="mt-3 text-lg font-bold text-ink">소개서 초안이 준비됐어요!</p>
             <p className="mt-1.5 text-[15px] leading-relaxed text-body">
-              이제 내용을 다듬어 완성해보세요.
+              작성된 내용을 확인하고 완성해주세요.
             </p>
-            <div className="mt-4 rounded-md bg-primary-pale px-4 py-3 text-left">
+            <div className="mt-4 rounded-md bg-primary-pale px-4 py-3 text-center">
               <p className="text-[14px] leading-relaxed text-primary-on">
-                💡 작성된 소개서에 사진을 더하면 훨씬 눈에 띄어요.
+                💡 작성된 소개서에 사진을 더해 소개서를 더 눈에 띄게 만들어보세요.
               </p>
               <p className="mt-1 text-[13px] leading-relaxed text-primary-on">
-                지금 없어도, 나중에 언제든 추가할 수 있어요.
+                지금 사진이 없다면 나중에 언제든 추가할 수 있어요.
               </p>
             </div>
             <button
