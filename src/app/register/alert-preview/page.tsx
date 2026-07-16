@@ -34,7 +34,7 @@ export default function DraftDoneAlertPreview() {
       {/* ↓↓↓ register/page.tsx showDraftDone 모달과 동일 마크업 ↓↓↓ */}
       {open && (
         <div
-          className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 p-4 sm:items-center"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4"
           role="dialog"
           aria-modal="true"
           onClick={() => setOpen(false)}
