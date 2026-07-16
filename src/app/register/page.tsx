@@ -734,6 +734,8 @@ function RegisterForm() {
 
   // ── 등록 완료 얼럿(소개서 페이지로 이동) ──
   const [portfolioOpen, setPortfolioOpen] = useState(false);
+  // BlockEditor 카탈로그 시트 열림 여부(플로팅 버튼 숨김용) — BlockEditor가 알려줌.
+  const [blockSheetOpen, setBlockSheetOpen] = useState(false);
   const [createdSlug, setCreatedSlug] = useState("");
   const [loggedIn, setLoggedIn] = useState(false);
   const [editPw, setEditPw] = useState("");
@@ -900,6 +902,10 @@ function RegisterForm() {
     router.push(`/m/${createdSlug}`);
   };
 
+  // 어떤 레이어(위저드·모달·얼럿·넛지·블록시트)라도 열려 있으면 플로팅 버튼 숨김.
+  const layerOpen =
+    wizardOpen || descModalOpen || showDraftDone || showNudge || portfolioOpen || blockSheetOpen;
+
   if (editBooting) {
     return (
       <main className="mx-auto flex min-h-[60vh] w-full max-w-[640px] flex-col items-center justify-center px-4 text-center">
@@ -910,7 +916,7 @@ function RegisterForm() {
   }
 
   return (
-    <main className="mx-auto w-full max-w-[640px] px-4 py-8 sm:px-6">
+    <main className="mx-auto w-full max-w-[640px] px-4 pb-28 pt-8 sm:px-6">
       {editSlug ? (
         <>
           <div className="flex items-start justify-between gap-3">
@@ -1506,6 +1512,8 @@ function RegisterForm() {
           blocks={blocks}
           onChange={setBlocks}
           onUploadingChange={setBlocksUploading}
+          onSheetOpenChange={setBlockSheetOpen}
+          suppressFab={layerOpen}
           storyItems={[
             { key: "activities", label: "주로 어떤 활동을 하나요?", hint: "대표 활동을 소개해주세요.", added: openSections.has("activities") || hasActivities, onAdd: () => addStorySection("activities"), group: "recommend" },
             { key: "seeks", label: "이런 파트너를 찾고 있어요.", hint: "파트너와 꿈꾸는 협업 유형을 알려주세요.", added: openSections.has("seeks") || hasSeeks, onAdd: () => addStorySection("seeks"), group: "recommend" },
@@ -1648,7 +1656,18 @@ function RegisterForm() {
           </button>
         </div>
 
-        <div className="space-y-2">
+      </div>
+
+      {/* ── 플로팅 제출 바 (콜라보 카드 등록하기 / 수정 완료) — 레이어 열리면 아래로 사라짐 ── */}
+      <div
+        className={`fixed inset-x-0 bottom-0 z-40 transition-all duration-300 ease-out ${
+          layerOpen ? "pointer-events-none translate-y-28 opacity-0" : "translate-y-0 opacity-100"
+        }`}
+      >
+        <div
+          style={{ paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom))" }}
+          className="mx-auto max-w-[640px] bg-canvas px-4 pt-3 shadow-[0_-2px_12px_rgba(0,0,0,0.05)]"
+        >
           <button
             onClick={submit}
             disabled={
@@ -1659,7 +1678,7 @@ function RegisterForm() {
                 (p) => p.uploading
               )
             }
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-md bg-primary text-base font-medium text-primary-on disabled:opacity-40"
+            className="flex h-12 w-full items-center justify-center gap-2 rounded-md bg-primary text-base font-medium text-primary-on shadow-e2 disabled:opacity-40"
           >
             {pending && (
               <span className="h-4 w-4 animate-spin rounded-full border-2 border-primary-on border-t-transparent" />
@@ -1672,11 +1691,6 @@ function RegisterForm() {
                 ? "만드는 중…"
                 : "콜라보 카드 등록하기"}
           </button>
-          {!editSlug && (
-            <p className="text-center text-sm text-mute">
-              등록 후에는 언제든 콜라보 카드를 공유할 수 있어요.
-            </p>
-          )}
         </div>
       </div>
 
