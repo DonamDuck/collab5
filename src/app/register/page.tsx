@@ -994,27 +994,23 @@ function RegisterForm() {
           </div>
         )}
 
-        {/* ── ① 브랜드를 소개해주세요 ── */}
-        <GroupHeader n="①" title="브랜드를 소개해주세요." />
+        {/* ── ① 브랜드를 소개해주세요 (초안 받기 버튼 = 그룹 헤더 우측) ── */}
+        <GroupHeader
+          n="①"
+          title="브랜드를 소개해주세요."
+          action={
+            <button
+              type="button"
+              onClick={draftDescription}
+              disabled={!name.trim() || draftBusy}
+              className="inline-flex h-8 shrink-0 items-center gap-1 rounded-pill border border-primary bg-primary-pale px-3 text-sm font-medium text-primary-on disabled:opacity-40"
+            >
+              {draftBusy ? "쓰는 중…" : draftGenerated ? "✨ 초안 다시 받기" : "✨ 초안 받기"}
+            </button>
+          }
+        />
         <div className="space-y-8">
-          <Field
-            label="상호 *"
-            hint={hintFor("name")}
-            action={
-              <button
-                type="button"
-                onClick={draftDescription}
-                disabled={!name.trim() || draftBusy}
-                className="inline-flex h-7 shrink-0 items-center gap-1 rounded-pill border border-primary bg-primary-pale px-2.5 text-sm font-medium text-primary-on disabled:opacity-40"
-              >
-                {draftBusy
-                  ? "쓰는 중…"
-                  : draftGenerated
-                    ? "✨ 초안 다시 받기"
-                    : "✨ 초안 받기"}
-              </button>
-            }
-          >
+          <Field label="상호 *" hint={hintFor("name")}>
             <input
               id="name-field"
               value={name}
@@ -1708,7 +1704,7 @@ function RegisterForm() {
       {/* 초안받기 2스텝 모달 — 스텝1 한 줄 소개 → 스텝2 자세히 소개 → [확인] 시 둘 다 채움 */}
       {descModalOpen && (
         <div
-          className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 p-4 sm:items-center"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4"
           onClick={() => !draftBusy && setDescModalOpen(false)}
         >
           <ScrollLock />
@@ -1821,7 +1817,7 @@ function RegisterForm() {
       {/* 초본 완성 얼럿 — AI 크롤이 폼을 채운 직후 1회. 톤=보상(🎉), 사진은 '관문' 아닌 '초본 후 업그레이드'. */}
       {showDraftDone && (
         <div
-          className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 p-4 sm:items-center"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4"
           role="dialog"
           aria-modal="true"
           onClick={() => setShowDraftDone(false)}
@@ -1924,7 +1920,7 @@ function RegisterForm() {
 
       {/* 등록 완료 → 브랜드 소개서 얼럿 (소개서 페이지에서 확인·링크 공유) */}
       {portfolioOpen && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 p-4 sm:items-center">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4">
           <ScrollLock />
           <div className="w-full max-w-md rounded-lg border border-hairline bg-surface p-6 text-center shadow-e2">
             <p className="text-lg font-bold text-ink">✨ 브랜드 소개서가 완성됐어요!</p>
@@ -2109,14 +2105,27 @@ function DescPicker({
   );
 }
 
-function GroupHeader({ n, title, sub }: { n: string; title: string; sub?: string }) {
+function GroupHeader({
+  n,
+  title,
+  sub,
+  action,
+}: {
+  n: string;
+  title: string;
+  sub?: string;
+  action?: React.ReactNode; // 제목 행 우측 액션(예: ✨ 초안 받기)
+}) {
   return (
     <div className="mb-[23px] border-b border-hairline pb-2">
-      <div className="flex items-baseline gap-2">
-        <span className="rounded-pill bg-primary-tint px-2 py-0.5 text-sm font-bold text-primary-on">
-          {n}
-        </span>
-        <span className="text-[17px] font-bold text-ink">{title}</span>
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex min-w-0 items-baseline gap-2">
+          <span className="rounded-pill bg-primary-tint px-2 py-0.5 text-sm font-bold text-primary-on">
+            {n}
+          </span>
+          <span className="text-[17px] font-bold text-ink">{title}</span>
+        </div>
+        {action}
       </div>
       {sub && <p className="mt-1.5 text-sm leading-relaxed text-mute">{sub}</p>}
     </div>
