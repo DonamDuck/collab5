@@ -37,16 +37,22 @@ export function emptyBlock(type: BlockType): Block {
   }
 }
 
-export function BlockEditor({ blocks, onChange, onUploadingChange, storyItems }: {
+export function BlockEditor({ blocks, onChange, onUploadingChange, onSheetOpenChange, suppressFab, storyItems }: {
   blocks: Block[];
   // 값 또는 업데이터 함수 모두 허용(React setState 호환) — 비동기 병합 시 최신 상태 사용.
   onChange: (b: Block[] | ((prev: Block[]) => Block[])) => void;
   onUploadingChange?: (uploading: boolean) => void;
+  onSheetOpenChange?: (open: boolean) => void; // 카탈로그 시트 열림 → page 플로팅 버튼 숨김용
+  suppressFab?: boolean; // page의 다른 레이어(모달·얼럿)가 열리면 FAB도 숨김
   // 시트 폼 섹션 버튼들 — group으로 '작성 추천 ⭐'·'브랜드 이야기' 두 묶음으로 렌더.
   // 미전달 시 기존 카탈로그 단독 렌더(하위호환).
   storyItems?: { key: string; label: string; hint: string; added: boolean; onAdd: () => void; group: "recommend" | "story" }[];
 }) {
   const [open, setOpen] = useState(false);
+  // 시트 열림 상태를 page에 알림(플로팅 제출 바와 겹치지 않게).
+  useEffect(() => {
+    onSheetOpenChange?.(open);
+  }, [open, onSheetOpenChange]);
   const [, setUploading] = useState(0);
   // 강조 카드가 화면에 보이면 FAB 숨김(중복·하단 겹침 방지)
   const cardRef = useRef<HTMLDivElement>(null);
@@ -405,18 +411,18 @@ export function BlockEditor({ blocks, onChange, onUploadingChange, storyItems }:
         </button>
       </div>
 
-      {/* ── 우측 하단 플로팅 버튼 (텍스트형 · 항상 마운트 · 표시/숨김은 슬라이드 애니 · safe-area) ── */}
+      {/* ── 우측 하단 FAB (작게 '+ 추가') — 플로팅 제출 바 위에 위치. 시트·강조카드·레이어 열리면 숨김 ── */}
       <button
         type="button"
         onClick={() => setOpen(true)}
-        style={{ bottom: "calc(1.25rem + env(safe-area-inset-bottom))" }}
-        className={`fixed right-4 z-40 inline-flex h-12 items-center gap-1 rounded-pill bg-primary px-5 text-[14px] font-semibold text-primary-on shadow-xl ring-1 ring-black/5 transition-all duration-300 ease-out sm:right-6 ${
-          !cardVisible && !open
+        style={{ bottom: "calc(5rem + env(safe-area-inset-bottom))" }}
+        className={`fixed right-4 z-40 inline-flex h-10 items-center gap-1 rounded-pill bg-primary px-4 text-[13px] font-semibold text-primary-on shadow-xl ring-1 ring-black/5 transition-all duration-300 ease-out sm:right-6 ${
+          !cardVisible && !open && !suppressFab
             ? "translate-y-0 opacity-100"
             : "translate-y-24 opacity-0 pointer-events-none"
         }`}
       >
-        + 브랜드 정보 추가
+        + 추가
       </button>
 
       {/* ── 바텀시트 — 카탈로그 ── */}
