@@ -83,6 +83,14 @@ export async function findDuplicates(p: {
   return flags;
 }
 
+/** 프로필 사진만 갱신 — /my 프로필 사진 변경용(brandName·phone 등 미변경). */
+export async function updateProfileImage(uuid: string, imageUrl: string): Promise<void> {
+  const client = db();
+  if (!client) return; // 로컬 mock
+  const { error } = await client.from("profiles").update({ profile_image: imageUrl }).eq("uuid", uuid);
+  if (error) throw new Error(error.message);
+}
+
 export async function getProfile(authUuid: string): Promise<Profile | null> {
   const client = db();
   if (!client) return null;
