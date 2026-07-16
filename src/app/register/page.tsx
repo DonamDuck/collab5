@@ -16,6 +16,7 @@ import { uploadPhoto, uploadPdf } from "@/lib/upload";
 import { ScrollLock } from "@/components/ScrollLock";
 import type { ActivityHint, CollabHint, EnrichField } from "@/lib/enrich";
 import { EnrichWizard, type WizardFill } from "./EnrichWizard";
+import { SortableCard, emptyDnd, type DndState } from "./SortableCard";
 import { BlockEditor, emptyBlock } from "./BlockEditor";
 import { PhotoGrid } from "./PhotoGrid";
 import { StubSection } from "./StubSection";
@@ -159,6 +160,9 @@ function RegisterForm() {
   const [activities, setActivities] = useState<
     { title: string; desc: string; photos: { url: string; uploading?: boolean }[] }[]
   >([{ title: "", desc: "", photos: [] }]);
+  // 카드 순서변경(드래그·↑↓) 상태 — 활동·콜라보 각각.
+  const [actDnd, setActDnd] = useState<DndState>(emptyDnd);
+  const [colDnd, setColDnd] = useState<DndState>(emptyDnd);
   const [offersNote, setOffersNote] = useState("");
   const [seeksNote, setSeeksNote] = useState("");
   const [blocks, setBlocks] = useState<Block[]>([]);
@@ -284,6 +288,7 @@ function RegisterForm() {
   // ── 콜라보 이력 (활동과 동일한 인라인 카드 패턴, 최대 3세트) ──
   const addCollab = () =>
     setCollabHistory((p) => (p.length >= 5 ? p : [...p, emptyHist()]));
+  const moveCollab = (from: number, to: number) => setCollabHistory((p) => reorder(p, from, to));
   const removeCollab = (i: number) =>
     setCollabHistory((p) => p.filter((_, j) => j !== i));
   const setHist = (i: number, patch: Partial<HistItem>) =>
@@ -345,6 +350,7 @@ function RegisterForm() {
   // ── 대표 활동 (최대 3세트) ──
   const addActivity = () =>
     setActivities((p) => (p.length >= 5 ? p : [...p, { title: "", desc: "", photos: [] }]));
+  const moveActivity = (from: number, to: number) => setActivities((p) => reorder(p, from, to));
   const setAct = (i: number, patch: Partial<{ title: string; desc: string }>) =>
     setActivities((p) => p.map((a, j) => (j === i ? { ...a, ...patch } : a)));
   const addActPhotos = (i: number, files: FileList | null) =>
@@ -1175,22 +1181,16 @@ function RegisterForm() {
               보관 중이라, '선택한 것만·정확도 판단해 재노출' 고도화 시 여기 복원. → 백로그 [[위저드-힌트배너-재노출]] */}
           <div className="space-y-4">
           {activities.map((act, i) => (
-            <div
+            <SortableCard
               key={i}
-              className="space-y-3 rounded-md border border-hairline bg-surface p-3"
+              index={i}
+              count={activities.length}
+              label={`활동 ${i + 1}`}
+              onMove={moveActivity}
+              onRemove={i > 0 ? () => removeActivity(i) : undefined}
+              dnd={actDnd}
+              setDnd={setActDnd}
             >
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-semibold text-body">활동 {i + 1}</span>
-                {i > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => removeActivity(i)}
-                    className="text-sm text-faint hover:text-ink"
-                  >
-                    삭제
-                  </button>
-                )}
-              </div>
               <input
                 value={act.title}
                 onChange={(e) => setAct(i, { title: e.target.value })}
@@ -1211,7 +1211,7 @@ function RegisterForm() {
                 onRemove={(k) => removeActPhoto(i, k)}
                 onReorder={(from, to) => moveActPhoto(i, from, to)}
               />
-            </div>
+            </SortableCard>
           ))}
           {activities.length < 5 && (
             <button
@@ -1273,22 +1273,17 @@ function RegisterForm() {
                 → 백로그 [[위저드-힌트배너-재노출]] */}
             <div className="space-y-4">
               {collabHistory.map((h, i) => (
-                <div
+                <SortableCard
                   key={i}
-                  className="space-y-5 rounded-md border border-hairline bg-surface p-3"
+                  index={i}
+                  count={collabHistory.length}
+                  label={`콜라보 ${i + 1}`}
+                  onMove={moveCollab}
+                  onRemove={collabHistory.length > 1 ? () => removeCollab(i) : undefined}
+                  dnd={colDnd}
+                  setDnd={setColDnd}
+                  className="space-y-5"
                 >
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-semibold text-body">콜라보 {i + 1}</span>
-                    {collabHistory.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => removeCollab(i)}
-                        className="text-sm text-faint hover:text-ink"
-                      >
-                        삭제
-                      </button>
-                    )}
-                  </div>
                   {/* 타이틀 + 시기 — 한 행(타이틀 몇년, 어떤 콜라보 타입? 순서로 읽히게) */}
                   <div className="flex gap-2">
                     <input
@@ -1409,7 +1404,7 @@ function RegisterForm() {
                       onReorder={(from, to) => moveHistPhoto(i, from, to)}
                     />
                   </div>
-                </div>
+                </SortableCard>
               ))}
               {collabHistory.length < 5 && (
                 <button
