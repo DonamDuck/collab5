@@ -552,7 +552,7 @@ export function EnrichWizard({
               </div>
               <div>
                 <label className="mb-1.5 block text-[15px] font-medium text-body">
-                  어떤 곳인가요? <span className="text-primary-on">*</span>
+                  어떤 브랜드인가요? <span className="text-primary-on">*</span>
                 </label>
                 <input
                   value={btype}
