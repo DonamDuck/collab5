@@ -75,6 +75,17 @@ export interface OptionsInput {
   homepageDigest?: string; // 홈페이지 딥리드 발췌 — 서버(fetchHomepageDigest)에서만 생성, 클라이언트 텍스트 금지
 }
 
+/** 자세히 재생성 입력 — 사용자가 고른/수정한 한 줄 소개를 '관통 주제'로 자세히 5개만 다시 만든다.
+ *  ⚠️콜 규율: 이 경로는 generateOptions 1콜만 쓴다(재크롤 금지 — researchMemo 재사용). */
+export interface RegenDescInput {
+  name: string;
+  chosenOneLiner: string; // 사용자가 최종 확정한 한 줄 소개 = 5개 자세히의 공통 관통 주제
+  researchMemo?: string; // 이전 생성이 쓴 조사메모 재사용(재크롤 방지). 없으면 자료 없이 생성.
+  homepageDigest?: string; // 홈페이지 딥리드 발췌(있으면) — 서버에서만 생성
+  focusKeywords?: string[]; // 키워드 재료(선택한 키워드)
+  values?: string[]; // 브랜드 결 단어
+}
+
 /** 크롤이 발견한 활동 흔적 — 창작 아님, 조사 메모에 실제 등장한 것만 */
 export interface ActivityHint {
   title: string; // 짧은 활동명 (예: "가방 만들기 워크숍")
@@ -137,8 +148,11 @@ export interface SearchProvider {
   draft?(input: DraftInput): Promise<string[]>;
   /** (선택) 폼 정보 기반 한 줄 소개 후보 3개 — 초안받기 2스텝용. 각 40자 이내 */
   oneLiners?(input: DraftInput): Promise<string[]>;
-  /** (선택) 한 줄 소개 3개 + 브랜드 소개 5개를 한 번에 — 초안받기 이중 크롤 제거(research 1회+생성 1회) */
-  draftBoth?(input: DraftInput): Promise<{ oneLiners: string[]; descriptions: string[] }>;
+  /** (선택) 한 줄 소개 3개 + 브랜드 소개 5개를 한 번에 — 초안받기 이중 크롤 제거(research 1회+생성 1회).
+   *  researchMemo = 이번에 쓴 조사메모(자세히 재생성이 재사용해 재크롤을 막는다). */
+  draftBoth?(input: DraftInput): Promise<{ oneLiners: string[]; descriptions: string[]; researchMemo?: string }>;
+  /** (선택) 고른/수정한 한 줄 소개를 관통 주제로 '자세히 소개' 5개만 재생성(generateOptions 1콜, 재크롤 없음) */
+  regenDescriptions?(input: RegenDescInput): Promise<string[]>;
   /** (선택) 브랜드명(+지역·업종)으로 조사 메모만 생성(백그라운드 크롤 — 느린 단계) */
   research?(name: string, region?: string, businessType?: string): Promise<string>;
   /** (선택) 조사 메모 + 키워드 → 한줄소개·브랜드소개 5지선다(빠른 생성 단계) */
@@ -309,12 +323,27 @@ export class MockSearchProvider implements SearchProvider {
   }
 
   // 한 줄 소개 + 브랜드 소개 통합 mock — draft2(이중 크롤 제거) 데모용
-  async draftBoth(input: DraftInput): Promise<{ oneLiners: string[]; descriptions: string[] }> {
-    const [oneLiners, descriptions] = await Promise.all([
+  async draftBoth(input: DraftInput): Promise<{ oneLiners: string[]; descriptions: string[]; researchMemo?: string }> {
+    const [oneLiners, descriptions, researchMemo] = await Promise.all([
       this.oneLiners(input),
       this.draft(input),
+      this.research(input.name),
     ]);
-    return { oneLiners, descriptions };
+    return { oneLiners, descriptions, researchMemo };
+  }
+
+  // 자세히 재생성 mock — 고른 한 줄을 관통 주제로 5개 변주
+  async regenDescriptions(input: RegenDescInput): Promise<string[]> {
+    await new Promise((r) => setTimeout(r, 500));
+    const name = input.name.trim() || "우리 브랜드";
+    const ol = input.chosenOneLiner.trim();
+    return [
+      `${ol} — 작은 시작에서 출발해 여기까지 왔어요. 처음의 마음을 잊지 않으려 오늘도 정성을 지키고 있어요.`,
+      `${ol} 손이 많이 가는 방식을 고집하고 있어요. 빠르게보다 제대로를 택한 시간이 저희의 결이 됐어요.`,
+      `${ol} 찾아주시는 분들과 나눈 이야기가 다음을 만드는 힘이 돼요. 그 경험을 오래 남기고 싶어요.`,
+      `${ol} 저희를 아껴주시는 분들 덕에 꾸준히 이어가고 있어요. 그 마음에 정직하게 답하려 해요.`,
+      `${ol} 결이 맞는 분들과 함께라면 더 멀리 갈 수 있다고 믿어요. 좋은 첫인상으로 만나고 싶어요.`,
+    ];
   }
 
   // 조사 메모 mock
@@ -1317,7 +1346,7 @@ class NaverGeminiProvider implements SearchProvider {
 
   // 한 줄 소개 + 브랜드 소개를 한 번에 — 초안받기 이중 크롤 제거(research 1회 + 생성 1회).
   // generateOptions 응답이 oneLiners·descriptions를 둘 다 담는 것을 그대로 활용한다.
-  async draftBoth(input: DraftInput): Promise<{ oneLiners: string[]; descriptions: string[] }> {
+  async draftBoth(input: DraftInput): Promise<{ oneLiners: string[]; descriptions: string[]; researchMemo?: string }> {
     const research = input.researchMemo ?? (await this.research(input.name));
     const info = this.draftInfo(input);
     const kw = (input.focusKeywords?.length ? input.focusKeywords : input.values) ?? [];
@@ -1340,7 +1369,32 @@ class NaverGeminiProvider implements SearchProvider {
     return {
       oneLiners: opts.oneLiners.filter((s) => s.trim()).slice(0, 3),
       descriptions: opts.descriptions,
+      researchMemo: research, // 자세히 재생성이 재사용(재크롤 방지)
     };
+  }
+
+  // 고른/수정한 한 줄 소개를 관통 주제로 '자세히 소개' 5개만 재생성.
+  // ⚡콜 규율: generateOptions 1콜만(재크롤 없음 — researchMemo 재사용). oneLiners는 이미 확정이라 버린다.
+  // 프롬프트 핵심 = 고른 한 줄을 5개 공통 관통 주제로 삼되 5개 앵글은 서로 다르게(도배 금지).
+  async regenDescriptions(input: RegenDescInput): Promise<string[]> {
+    const chosen = input.chosenOneLiner.trim();
+    const kw = (input.focusKeywords?.length ? input.focusKeywords : input.values) ?? [];
+    const prompt = `브랜드명: "${input.name}"
+
+⭐⭐사장이 최종 선택한 '한 줄 소개' — 이 문장을 아래 '브랜드 소개(자세히 소개)' 5개 전체의 공통 관통 주제·핵심 메시지로 삼아라:
+"${chosen}"
+
+${kw.length ? `⭐가중 키워드(나열 말고 문장에 자연스럽게 녹여라): ${kw.join(", ")}\n\n` : ""}${this.digestBlock(input.homepageDigest)}[조사 자료]
+${input.researchMemo?.trim() || "(추가 조사 자료 없음 — 위 한 줄 소개와 키워드를 중심으로, 없는 사실은 지어내지 말고 담백하게)"}
+
+⭐지시:
+- 위 '한 줄 소개'가 담은 핵심(무엇을·어떻게·누구에게)을 5개 브랜드 소개 후보 전체가 공통으로 관통하게 써라. 5개가 서로 다른 얘기를 하면 안 된다 — 주제는 하나다.
+- ⚠️단, 5개의 앵글·강조점·도입은 서로 다르게 하라(같은 표현 도배 금지, 다양성 유지): ①시작 스토리 ②제품·방식 ③활동·경험 ④고객·쓰임 ⑤협업 상상.
+- 한 줄 소개 문구를 그대로 복붙·반복하지 말고, 그 주제를 매 후보마다 다른 각도로 풀어라.
+- 각 3~5문장, 모두 '해요체'('~합니다/~습니다' 금지). 1인칭 사장 시점 — 브랜드명·'이곳'·'이 브랜드'를 문장 주어로 쓰지 마라('저희/우리' 또는 주어 생략).
+- oneLiners·values·identity 등 나머지 필드는 형식 유지용으로만 간단히 채워도 돼. 핵심 결과물은 descriptions 5개다.`;
+    const opts = await this.generateOptions(prompt, 0.9);
+    return opts.descriptions;
   }
 
   async recrawl(input: RecrawlInput): Promise<EnrichCandidate | null> {
@@ -1404,11 +1458,19 @@ export async function enrichOneLiners(input: DraftInput): Promise<string[]> {
  *  미지원이면 기존 enrichOneLiners + enrichDraft 순차 폴백(하위호환). */
 export async function enrichDraftBoth(
   input: DraftInput
-): Promise<{ oneLiners: string[]; descriptions: string[] }> {
+): Promise<{ oneLiners: string[]; descriptions: string[]; researchMemo?: string }> {
   if (provider.draftBoth) return provider.draftBoth(input);
   const oneLiners = await enrichOneLiners(input);
   const descriptions = await enrichDraft(input);
   return { oneLiners, descriptions };
+}
+
+/** 고른/수정한 한 줄 소개를 관통 주제로 '자세히 소개' 5개만 재생성(+1 Gemini 콜, 재크롤 없음).
+ *  provider 미지원이면 규칙 기반 담백한 1개로 폴백. */
+export async function enrichRegenDescriptions(input: RegenDescInput): Promise<string[]> {
+  if (provider.regenDescriptions) return provider.regenDescriptions(input);
+  const ol = input.chosenOneLiner.trim();
+  return ol ? [`${ol.replace(/[.\s]*$/, "")}. 저희다운 방식으로 꾸준히 이어가고 있어요.`] : [];
 }
 
 /** 조사 메모 생성(백그라운드 크롤) — 위저드가 키워드 입력받는 동안 먼저 돌린다. */

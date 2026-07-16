@@ -29,6 +29,14 @@ function reorder<T>(arr: T[], from: number, to: number): T[] {
   return c;
 }
 
+// unknown → 문자열 배열(공백 제거) — enrich 응답 파싱 공용
+function toStrArr(v: unknown): string[] {
+  return Array.isArray(v) ? v.filter((s): s is string => typeof s === "string" && !!s.trim()) : [];
+}
+
+// 자세히 재생성(고른 한 줄 반영) 세션 상한 — 비용 가드. 편집→'다음' 판정으로만 소모.
+const DESC_REGEN_CAP = 2;
+
 // 편집 중 콜라보 이력 — 활동(activities)과 동일한 인라인 카드 패턴.
 // photos는 {url,uploading?} — 선택 즉시 Storage 업로드, 제출 시 URL만 전송. typeInput·typeInputOpen은 UI 로컬 상태(전송 제외).
 type HistItem = {
@@ -218,6 +226,12 @@ function RegisterForm() {
   const [olSel, setOlSel] = useState(0); // 선택한 한 줄 후보 인덱스 (-1 = 직접 입력)
   const [olCustom, setOlCustom] = useState(""); // 한 줄 소개 직접 입력값
   const [descCustom, setDescCustom] = useState(""); // 자세히 소개 직접 입력값
+  // ── 한 줄 선택 → 자세히 유기적 반영(트리거 1) 상태 ──
+  const [olOriginal, setOlOriginal] = useState<string[]>([]); // AI 생성 원본 한 줄(수정 감지용)
+  const [draftResearchMemo, setDraftResearchMemo] = useState(""); // draft2가 쓴 조사메모 캐시(재생성 재사용→재크롤 방지)
+  const [descRegenBusy, setDescRegenBusy] = useState(false); // 자세히 재생성 로딩(스텝2)
+  const [lastRegenOl, setLastRegenOl] = useState(""); // 마지막으로 재생성한 한 줄(같은 한줄 재요청 시 캐시 재사용)
+  const [descRegenCount, setDescRegenCount] = useState(0); // 세션 재생성 횟수(상한 DESC_REGEN_CAP)
 
   // 데모 프리필: `/register?demo=1` 진입 시 캔버스가든 예시로 텍스트를 채워 시작(사진은 직접).
   // URL 파라미터 기반 1회성 초기화 — 지연 초기값을 쓰면 SSR(window 부재)과 하이드레이션 불일치가 나므로 effect로 처리.
@@ -451,15 +465,60 @@ function RegisterForm() {
         if (fallback) descs = [fallback];
       }
       setOlChoices(ols);
+      setOlOriginal(ols); // 수정 감지 기준(원본 스냅샷)
       setOlSel(ols.length ? 0 : -1);
       setOlCustom("");
       setDescChoices(descs);
       setDescSel(descs.length ? 0 : -1);
       setDescCustom("");
+      // 새 초안이 도착했으니 자세히 재생성 캐시 리셋(횟수는 세션 유지 = 상한 규율)
+      setDraftResearchMemo(typeof res.researchMemo === "string" ? res.researchMemo : "");
+      setLastRegenOl("");
     } finally {
       setDraftGenerated(true);
       setDraftRound((r) => r + 1);
       setDraftBusy(false);
+    }
+  };
+  // 스텝1 '다음' — 한 줄을 '수정'/'직접입력'으로 바꿨으면 그 한 줄을 관통 주제로 자세히 5개 재생성(+1 콜).
+  // 사전 후보 중 다른 번호만 고른 경우는 재생성 안 함. 비용 가드: 같은 한줄 캐시·세션 상한.
+  const goToDescStep = async () => {
+    const chosen = (olSel === -1 ? olCustom : olChoices[olSel] ?? "").trim();
+    const isCustom = olSel === -1 && !!chosen; // 맨 아래 직접입력
+    const isEdited = olSel >= 0 && !!chosen && chosen !== (olOriginal[olSel] ?? "").trim(); // '수정'으로 원본과 달라짐
+    const shouldRegen =
+      (isCustom || isEdited) &&
+      chosen !== lastRegenOl && // 같은 한줄로 다시 오면 캐시 재사용(재콜 X)
+      descRegenCount < DESC_REGEN_CAP; // 세션 상한
+    setDraftStep(2);
+    if (!shouldRegen) return;
+    setDescRegenBusy(true);
+    try {
+      const res = await fetch("/api/enrich", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mode: "descFromOneLiner",
+          name: name.trim(),
+          chosenOneLiner: chosen,
+          researchMemo: draftResearchMemo || undefined,
+          values,
+          homepage: homepage.trim() || undefined,
+        }),
+      })
+        .then((r) => r.json())
+        .catch(() => ({}));
+      const descs = toStrArr(res.descriptions);
+      if (descs.length) {
+        setDescChoices(descs);
+        setDescSel(0);
+        setDescCustom("");
+        setLastRegenOl(chosen);
+        setDescRegenCount((c) => c + 1);
+      }
+      // descs 비면 기존 자세히 후보 그대로 유지(조용한 저하)
+    } finally {
+      setDescRegenBusy(false);
     }
   };
   const editDescChoice = (i: number, v: string) =>
@@ -1698,12 +1757,20 @@ function RegisterForm() {
                 </div>
                 <button
                   type="button"
-                  onClick={() => setDraftStep(2)}
+                  onClick={goToDescStep}
                   className="mt-4 h-11 w-full rounded-md bg-primary text-sm font-medium text-primary-on"
                 >
                   다음
                 </button>
               </>
+            ) : descRegenBusy ? (
+              /* 자세히 재생성 로딩 — 고른 한 줄을 관통 주제로 다시 쓰는 중 */
+              <div className="flex min-h-[180px] items-center justify-center">
+                <p className="flex items-center gap-2 text-sm font-medium text-primary-on">
+                  <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                  고르신 한 줄에 맞춰 자세히 소개를 다시 쓰고 있어요…
+                </p>
+              </div>
             ) : (
               <>
                 <p className="pr-8 text-base font-bold text-ink">

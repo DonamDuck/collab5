@@ -38,6 +38,8 @@ export type WizardFill = {
 };
 
 const MAX_STARS = 4;
+// 자세히 재생성(고른 한 줄 반영) 세션 상한 — 비용 가드
+const DESC_REGEN_CAP = 2;
 
 // 진행 단계: 씨앗 → (크롤) → 키워드 선택 → 확인·강조 → (생성) → 정보 → 한줄 → 소개 → 이야기
 type Kind =
@@ -231,6 +233,11 @@ export function EnrichWizard({
   const [oneLinerSel, setOneLinerSel] = useState(0);
   const [descList, setDescList] = useState<string[]>([]);
   const [descSel, setDescSel] = useState(0);
+  // 한 줄 선택 → 자세히 유기적 반영(트리거 1): 원본 스냅샷(수정 감지) + 재생성 가드
+  const [oneLinerOriginal, setOneLinerOriginal] = useState<string[]>([]);
+  const [descRegenBusy, setDescRegenBusy] = useState(false);
+  const [lastRegenOl, setLastRegenOl] = useState(""); // 같은 한줄 재요청 캐시
+  const [descRegenCount, setDescRegenCount] = useState(0); // 세션 상한(DESC_REGEN_CAP)
   // 이야기 체크 상태 — 기본 전부 체크(옵션 도착 시 초기화)
   const [storyChecked, setStoryChecked] = useState<Set<string>>(new Set());
   const toggleStoryItem = (key: string) =>
@@ -395,9 +402,11 @@ export function EnrichWizard({
       setFInstagram(igChosen ? igChosen.replace(/^@?/, "@") : "");
       setFHomepage(hpChosen);
       setOneLinerList(o.oneLiners);
+      setOneLinerOriginal(o.oneLiners); // 수정 감지 기준
       setOneLinerSel(0);
       setDescList(o.descriptions);
       setDescSel(0);
+      setLastRegenOl(""); // 새 생성 → 재생성 캐시 리셋(횟수는 세션 유지)
       // 기본 전부 체크 — values 항목 키 포함 위해 별표+AI 결 단어 조합을 동일하게 넘긴다.
       const recVals = Array.from(new Set([...starred, ...(o.values ?? [])])).slice(0, 8);
       setStoryChecked(new Set(storyItemsOf(o, recVals).map((it) => it.key)));
@@ -442,6 +451,46 @@ export function EnrichWizard({
   const goBack = () => {
     if (kind === "chips") setKind("seed");
     else if (stepIdx > 0) setKind(steps[stepIdx - 1]);
+  };
+
+  // 한 줄 스텝 '다음' — 한 줄을 '수정'/'직접입력'으로 바꿨으면 그 한 줄을 관통 주제로 자세히 5개 재생성(+1 콜).
+  // 사전 후보 중 다른 번호만 고른 경우는 재생성 안 함. 비용 가드: 같은 한줄 캐시·세션 상한(재크롤 없음).
+  const goToDescFromOneLiner = async () => {
+    const chosen = (oneLinerList[oneLinerSel] ?? "").trim();
+    const orig = (oneLinerOriginal[oneLinerSel] ?? "").trim();
+    const changed = !!chosen && chosen !== orig; // 수정 or 직접추가(원본 밖 인덱스면 orig="")
+    const shouldRegen = changed && chosen !== lastRegenOl && descRegenCount < DESC_REGEN_CAP;
+    goNext();
+    if (!shouldRegen) return;
+    const ingredients = selected.filter((t) => !isFactual(t) || factualOk.has(t));
+    setDescRegenBusy(true);
+    try {
+      const r = await fetch("/api/enrich", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mode: "descFromOneLiner",
+          name: query,
+          chosenOneLiner: chosen,
+          researchMemo: research || undefined, // 조사메모 재사용 → 재크롤 없음
+          focusKeywords: ingredients,
+          homepage: fHomepage || undefined,
+        }),
+      });
+      const d = await r.json().catch(() => ({}));
+      const descs: string[] = Array.isArray(d.descriptions)
+        ? d.descriptions.filter((s: unknown): s is string => typeof s === "string" && !!s.trim())
+        : [];
+      if (descs.length) {
+        setDescList(descs);
+        setDescSel(0);
+        setLastRegenOl(chosen);
+        setDescRegenCount((c) => c + 1);
+      }
+      // descs 비면 기존 자세히 후보 유지(조용한 저하)
+    } finally {
+      setDescRegenBusy(false);
+    }
   };
 
   const apply = () => {
@@ -843,7 +892,7 @@ export function EnrichWizard({
               />
             </div>
             <button
-              onClick={goNext}
+              onClick={goToDescFromOneLiner}
               className="mt-4 h-11 w-full rounded-md bg-primary text-sm font-medium text-primary-on"
             >
               다음 · 브랜드 소개 고르기
@@ -856,22 +905,32 @@ export function EnrichWizard({
           <div>
             <p className="pr-8 text-lg font-bold text-ink">브랜드 소개를 골라주세요</p>
             <p className="mt-1.5 text-[15px] leading-relaxed text-mute">‘수정’으로 다듬으며 비교하고, 마음에 드는 하나를 골라주세요.</p>
-            <div className="mt-4 max-h-[42vh] overflow-y-auto slim-scrollbar pr-0.5">
-              <OptionPicker
-                list={descList}
-                sel={descSel}
-                onSelect={setDescSel}
-                onEdit={(i, v) => setDescList((p) => p.map((x, j) => (j === i ? v : x)))}
-                onAddCustom={() => {
-                  setDescList((p) => [...p, ""]);
-                  setDescSel(descList.length);
-                }}
-                multiline
-              />
-            </div>
+            {descRegenBusy ? (
+              <div className="mt-4 flex min-h-[200px] items-center justify-center">
+                <p className="flex items-center gap-2 text-sm font-medium text-primary-on">
+                  <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                  고르신 한 줄에 맞춰 브랜드 소개를 다시 쓰고 있어요…
+                </p>
+              </div>
+            ) : (
+              <div className="mt-4 max-h-[42vh] overflow-y-auto slim-scrollbar pr-0.5">
+                <OptionPicker
+                  list={descList}
+                  sel={descSel}
+                  onSelect={setDescSel}
+                  onEdit={(i, v) => setDescList((p) => p.map((x, j) => (j === i ? v : x)))}
+                  onAddCustom={() => {
+                    setDescList((p) => [...p, ""]);
+                    setDescSel(descList.length);
+                  }}
+                  multiline
+                />
+              </div>
+            )}
             <button
               onClick={storyItems.length ? goNext : apply}
-              className="mt-4 h-11 w-full rounded-md bg-primary text-sm font-medium text-primary-on"
+              disabled={descRegenBusy}
+              className="mt-4 h-11 w-full rounded-md bg-primary text-sm font-medium text-primary-on disabled:opacity-50"
             >
               {storyItems.length ? "다음 · 찾은 이야기 고르기" : "선택한 내용으로 채우기"}
             </button>

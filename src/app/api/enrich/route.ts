@@ -8,6 +8,7 @@ import {
   enrichRecrawl,
   enrichDraft,
   enrichDraftBoth,
+  enrichRegenDescriptions,
   enrichOneLiners,
   enrichResearch,
   enrichOptions,
@@ -65,6 +66,7 @@ export async function POST(req: Request) {
     instagram?: unknown;
     homepage?: unknown;
     oneLiner?: unknown;
+    chosenOneLiner?: unknown;
     values?: unknown;
     offers?: unknown;
     targetAudience?: unknown;
@@ -226,7 +228,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "브랜드 이름이 필요해요." }, { status: 400 });
     }
     try {
-      const { oneLiners, descriptions } = await enrichDraftBoth({
+      const { oneLiners, descriptions, researchMemo } = await enrichDraftBoth({
         name,
         oneLiner: typeof body.oneLiner === "string" ? body.oneLiner : undefined,
         values: strArr(body.values),
@@ -239,7 +241,8 @@ export async function POST(req: Request) {
         homepageDigest: await digestOf(body.homepage), // 확정 홈페이지 딥리드(실패 시 undefined)
         round: typeof body.round === "number" ? body.round : 0,
       });
-      return NextResponse.json({ oneLiners, descriptions });
+      // researchMemo = 자세히 재생성(descFromOneLiner)이 재사용 → 재크롤 방지(콜 절감)
+      return NextResponse.json({ oneLiners, descriptions, researchMemo });
     } catch (e) {
       console.error("[enrich] draft2 failed:", e);
       return NextResponse.json(
@@ -248,6 +251,35 @@ export async function POST(req: Request) {
           descriptions: [],
           error: "지금은 초안 작성이 어려워요. 잠시 후 다시 시도하거나 직접 입력해 주세요.",
         },
+        { status: 200 }
+      );
+    }
+  }
+
+  // ── 자세히 재생성 모드: 고른/수정한 한 줄 소개를 관통 주제로 자세히 5개만 다시 생성 ──
+  //    ⚡콜 규율: 재크롤 없이 generateOptions 1콜만(researchMemo 재사용). 클라가 한줄 텍스트만 전달. ──
+  if (body.mode === "descFromOneLiner") {
+    const name = typeof body.name === "string" ? body.name.trim() : "";
+    const chosenOneLiner =
+      typeof body.chosenOneLiner === "string" ? body.chosenOneLiner.trim() : "";
+    if (!name || !chosenOneLiner) {
+      return NextResponse.json({ error: "브랜드 이름과 한 줄 소개가 필요해요." }, { status: 400 });
+    }
+    try {
+      const descriptions = await enrichRegenDescriptions({
+        name,
+        chosenOneLiner,
+        researchMemo: typeof body.researchMemo === "string" ? body.researchMemo : undefined,
+        focusKeywords: strArr(body.focusKeywords),
+        values: strArr(body.values),
+        homepageDigest: await digestOf(body.homepage), // 확정 홈페이지 딥리드(실패 시 undefined)
+      });
+      return NextResponse.json({ descriptions });
+    } catch (e) {
+      console.error("[enrich] descFromOneLiner failed:", e);
+      // 실패해도 기존 자세히 후보를 그대로 쓰게 빈 배열 — 클라가 교체하지 않고 유지
+      return NextResponse.json(
+        { descriptions: [], error: "자세히 소개를 다시 만들지 못했어요. 기존 후보로 계속 진행할게요." },
         { status: 200 }
       );
     }
