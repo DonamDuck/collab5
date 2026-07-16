@@ -541,23 +541,23 @@ export function EnrichWizard({
             <div className="mt-4 space-y-3">
               <div>
                 <label className="mb-1.5 block text-[15px] font-medium text-body">
-                  지역 <span className="text-primary-on">*</span>
+                  어떤 지역에 위치하고 있나요? <span className="text-primary-on">*</span>
                 </label>
                 <input
                   value={regionInput}
                   onChange={(e) => setRegionInput(e.target.value)}
-                  placeholder="예: 성수동, 홍대"
+                  placeholder="서울 성동구, 세운상가, 강남구 등"
                   className="h-11 w-full rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
                 />
               </div>
               <div>
                 <label className="mb-1.5 block text-[15px] font-medium text-body">
-                  업종 <span className="text-primary-on">*</span>
+                  어떤 곳인가요? <span className="text-primary-on">*</span>
                 </label>
                 <input
                   value={btype}
                   onChange={(e) => setBtype(e.target.value)}
-                  placeholder="예: 빈티지 샵, 카페"
+                  placeholder="빈티지샵, 의류 워크숍, 젤라또 가게 등"
                   className="h-11 w-full rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
                 />
               </div>
