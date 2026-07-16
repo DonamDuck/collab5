@@ -25,6 +25,7 @@ export function SortableCard({
   dnd,
   setDnd,
   className = "space-y-3",
+  idBase,
   children,
 }: {
   index: number;
@@ -35,6 +36,7 @@ export function SortableCard({
   dnd: DndState;
   setDnd: (s: DndState) => void;
   className?: string; // 카드 내부 세로 간격(활동=space-y-3, 콜라보=space-y-5 등)
+  idBase?: string; // 위치 기반 DOM id 접두어(순서변경 후 스크롤 추적용) → id=`${idBase}-${index}`
   children: React.ReactNode;
 }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -45,6 +47,7 @@ export function SortableCard({
   return (
     <div
       ref={ref}
+      id={idBase ? `${idBase}-${index}` : undefined}
       onDragOver={(e) => {
         if (dnd.drag === null) return;
         e.preventDefault();
@@ -55,7 +58,7 @@ export function SortableCard({
         if (dnd.drag !== null && dnd.drag !== index) onMove(dnd.drag, index);
         setDnd(emptyDnd);
       }}
-      className={`rounded-md border bg-surface p-3 transition-colors ${
+      className={`scroll-mt-4 rounded-md border bg-surface p-3 transition-colors ${
         dragging ? "opacity-40" : isOver ? "border-primary" : "border-hairline"
       } ${className}`}
     >
