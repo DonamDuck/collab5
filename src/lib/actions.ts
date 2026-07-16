@@ -4,6 +4,7 @@ import { createClient } from "@supabase/supabase-js";
 import { repo } from "./repo";
 import { deriveRegion } from "./region";
 import { getSessionUser } from "./supabase/server";
+import { updateProfileImage } from "./profiles";
 import { sha256 } from "./hash";
 import type { Block, CollabType, Maker } from "./types";
 
@@ -259,6 +260,18 @@ export async function updateMakerAction(
   });
   if (!updated) return { error: "업데이트에 실패했어요." };
   return { slug };
+}
+
+/** /my 프로필 사진 변경 — 로그인 사용자 본인 프로필만. */
+export async function updateProfileImageAction(imageUrl: string): Promise<{ error?: string }> {
+  const user = await getSessionUser();
+  if (!user) return { error: "로그인이 필요해요." };
+  try {
+    await updateProfileImage(user.id, imageUrl);
+    return {};
+  } catch {
+    return { error: "저장에 실패했어요." };
+  }
 }
 
 /** /my 토글 — 로그인 소유자만 collab_open·search_visible 부분 갱신. */

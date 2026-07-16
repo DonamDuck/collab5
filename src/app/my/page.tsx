@@ -3,12 +3,12 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/supabase/server";
 import { getProfile } from "@/lib/profiles";
-import { Avatar } from "@/components/Avatar";
 import { repo } from "@/lib/repo";
 import { ConnectMaker } from "./ConnectMaker";
 import { LogoutButton } from "./LogoutButton";
 import { ChangePasswordButton } from "./ChangePasswordButton";
 import { MakerRow } from "./MakerRow";
+import { ProfileAvatarEditor } from "./ProfileAvatarEditor";
 
 export default async function MyPage() {
   const user = await getSessionUser();
@@ -23,7 +23,7 @@ export default async function MyPage() {
   return (
     <main className="mx-auto w-full max-w-[640px] px-4 py-10 sm:px-6">
       <div className="flex items-center gap-3">
-        <Avatar image={profile?.profileImage || undefined} name={displayName} size={56} />
+        <ProfileAvatarEditor image={profile?.profileImage || undefined} name={displayName} />
         <div className="min-w-0">
           <h1 className="truncate text-2xl font-bold tracking-tight text-ink">{displayName}</h1>
           <p className="truncate text-sm text-mute">{user.email}</p>
