@@ -51,10 +51,7 @@ export default function DraftDoneAlertPreview() {
             </p>
             <div className="mt-4 rounded-md bg-primary-pale px-4 py-3 text-center">
               <p className="text-[14px] leading-relaxed text-primary-on">
-                💡 작성된 소개서에 사진을 더해 소개서를 더 눈에 띄게 만들어보세요.
-              </p>
-              <p className="mt-1 text-[13px] leading-relaxed text-primary-on">
-                지금 사진이 없다면 나중에 언제든 추가할 수 있어요.
+                💡 작성된 소개서에 사진을 더해 소개서를 더 눈에 띄게 만들어보세요. 지금 사진이 없다면 나중에 언제든 추가할 수 있어요.
               </p>
             </div>
             <button
