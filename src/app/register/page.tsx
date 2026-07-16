@@ -286,9 +286,21 @@ function RegisterForm() {
   };
 
   // ── 콜라보 이력 (활동과 동일한 인라인 카드 패턴, 최대 3세트) ──
+  // 카드 순서변경(↑↓·드래그) 후 이동한 자리로 부드럽게 스크롤 — 수동 스크롤 불필요.
+  // id는 위치 기반(`${idBase}-${to}`)이라 재정렬 후 그 자리에 이동한 카드가 있음.
+  const scrollCardTo = (idBase: string, to: number) => {
+    setTimeout(() => {
+      document
+        .getElementById(`${idBase}-${to}`)
+        ?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 30);
+  };
   const addCollab = () =>
     setCollabHistory((p) => (p.length >= 5 ? p : [...p, emptyHist()]));
-  const moveCollab = (from: number, to: number) => setCollabHistory((p) => reorder(p, from, to));
+  const moveCollab = (from: number, to: number) => {
+    setCollabHistory((p) => reorder(p, from, to));
+    scrollCardTo("col-card", to);
+  };
   const removeCollab = (i: number) =>
     setCollabHistory((p) => p.filter((_, j) => j !== i));
   const setHist = (i: number, patch: Partial<HistItem>) =>
@@ -350,7 +362,10 @@ function RegisterForm() {
   // ── 대표 활동 (최대 3세트) ──
   const addActivity = () =>
     setActivities((p) => (p.length >= 5 ? p : [...p, { title: "", desc: "", photos: [] }]));
-  const moveActivity = (from: number, to: number) => setActivities((p) => reorder(p, from, to));
+  const moveActivity = (from: number, to: number) => {
+    setActivities((p) => reorder(p, from, to));
+    scrollCardTo("act-card", to);
+  };
   const setAct = (i: number, patch: Partial<{ title: string; desc: string }>) =>
     setActivities((p) => p.map((a, j) => (j === i ? { ...a, ...patch } : a)));
   const addActPhotos = (i: number, files: FileList | null) =>
@@ -1199,6 +1214,7 @@ function RegisterForm() {
               onRemove={i > 0 ? () => removeActivity(i) : undefined}
               dnd={actDnd}
               setDnd={setActDnd}
+              idBase="act-card"
             >
               <input
                 value={act.title}
@@ -1292,6 +1308,7 @@ function RegisterForm() {
                   dnd={colDnd}
                   setDnd={setColDnd}
                   className="space-y-5"
+                  idBase="col-card"
                 >
                   {/* 타이틀 + 시기 — 한 행(타이틀 몇년, 어떤 콜라보 타입? 순서로 읽히게) */}
                   <div className="flex gap-2">

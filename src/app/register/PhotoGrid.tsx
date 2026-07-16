@@ -17,7 +17,6 @@ export function PhotoGrid({
   onReorder: (from: number, to: number) => void;
 }) {
   const [drag, setDrag] = useState<number | null>(null);
-  const [over, setOver] = useState<number | null>(null);
 
   return (
     <div>
@@ -27,22 +26,20 @@ export function PhotoGrid({
             key={i}
             draggable={!it.uploading}
             onDragStart={() => setDrag(i)}
-            onDragEnd={() => {
-              setDrag(null);
-              setOver(null);
-            }}
-            onDragOver={(e) => {
-              e.preventDefault();
-              if (over !== i) setOver(i);
+            onDragEnd={() => setDrag(null)}
+            onDragOver={(e) => e.preventDefault()}
+            onDragEnter={() => {
+              // 끌고 지나치는 즉시 자리 교체 — 맨 앞(1번) 자리까지 확실히 도달(드롭 정밀도 불필요)
+              if (drag === null || drag === i) return;
+              onReorder(drag, i);
+              setDrag(i); // 끌고 있는 사진이 이제 i번
             }}
             onDrop={(e) => {
               e.preventDefault();
-              if (drag !== null && drag !== i) onReorder(drag, i);
               setDrag(null);
-              setOver(null);
             }}
             className={`relative h-20 w-20 shrink-0 cursor-grab overflow-hidden rounded-md border transition-colors active:cursor-grabbing ${
-              drag === i ? "opacity-40" : over === i ? "border-primary" : "border-hairline"
+              drag === i ? "border-primary opacity-40" : "border-hairline"
             }`}
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
