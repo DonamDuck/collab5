@@ -883,7 +883,8 @@ export function EnrichWizard({
           <div>
             <p className="pr-8 text-lg font-bold text-ink">소개서에 담을 추가 내용을 골라보세요.</p>
             <p className="mt-1.5 text-[15px] leading-relaxed text-mute">
-              웹에서 찾은 내용을 정리해봤어요. 소개서에 담고 싶은 내용을 선택해 주세요.
+              AI가 찾은 내용을 정리해봤어요. 소개서에 담고 싶은 내용을 선택해 주세요. 내용이
+              다르거나 정확하지 않다면 제외해 주세요.
             </p>
             <div className="mt-4 max-h-[46vh] space-y-4 overflow-y-auto slim-scrollbar pr-0.5">
               {storyGroups.map((g) => (
