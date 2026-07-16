@@ -1170,28 +1170,9 @@ function RegisterForm() {
           onCollapse={() => closeSection("activities")}
         >
           <p className="mb-4 -mt-4 text-sm text-mute">대표 활동을 최대 3가지 소개해주세요. 사진도 담을 수 있어요.</p>
-          {/* 리빌에서 건너뛴(미사용) 힌트 — 섹션 안 소형 인라인 힌트로 영속(구 HintBanner 은퇴) */}
-          {actHints.some((_, i) => !usedActHints.has(i)) && (
-            <div className="mb-6 space-y-2">
-              {actHints.map((h, i) =>
-                usedActHints.has(i) ? null : (
-                  <div key={i} className="rounded-md bg-primary-pale/60 px-3 py-2.5">
-                    <p className="text-sm text-mute">
-                      웹에서 찾은 내용이에요 — <span className="font-medium text-ink">{h.title}</span>
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => applyActHint(i)}
-                      disabled={!canApplyActHint}
-                      className="mt-1 text-[13px] font-medium text-primary-on underline-offset-2 hover:underline disabled:no-underline disabled:opacity-50"
-                    >
-                      이 내용으로 시작하기
-                    </button>
-                  </div>
-                )
-              )}
-            </div>
-          )}
+          {/* [비활성] 미선택 활동 힌트 재노출 배너 — AI 플로우에서 사용자가 안 고른 추천은
+              부정확할 수 있어 굳이 다시 띄우지 않음(대표 지시). 데이터(actHints/usedActHints)는
+              보관 중이라, '선택한 것만·정확도 판단해 재노출' 고도화 시 여기 복원. → 백로그 [[위저드-힌트배너-재노출]] */}
           <div className="space-y-4">
           {activities.map((act, i) => (
             <div
@@ -1287,28 +1268,9 @@ function RegisterForm() {
           <p className="mb-4 -mt-4 text-sm text-mute">선택 · 최대 3개 · 지난 콜라보를 더하면 “검증된 파트너”라는 신호가 돼요.</p>
           <div>
 
-            {/* 리빌에서 건너뛴(미사용) 힌트 — 섹션 안 소형 인라인 힌트로 영속(구 HintBanner 은퇴) */}
-            {collabHints.some((_, i) => !usedCollabHints.has(i)) && (
-              <div className="mb-3 space-y-2">
-                {collabHints.map((h, i) =>
-                  usedCollabHints.has(i) ? null : (
-                    <div key={i} className="rounded-md bg-primary-pale/60 px-3 py-2.5">
-                      <p className="text-sm text-mute">
-                        웹에서 찾은 내용이에요 — <span className="font-medium text-ink">{h.partner}</span>
-                      </p>
-                      <button
-                        type="button"
-                        onClick={() => applyCollabHint(i)}
-                        disabled={!canApplyCollabHint}
-                        className="mt-1 text-[13px] font-medium text-primary-on underline-offset-2 hover:underline disabled:no-underline disabled:opacity-50"
-                      >
-                        이 내용으로 시작하기
-                      </button>
-                    </div>
-                  )
-                )}
-              </div>
-            )}
+            {/* [비활성] 미선택 콜라보 힌트 재노출 배너 — AI 플로우에서 안 고른 추천은 부정확할 수
+                있어 재노출 안 함(대표 지시). 데이터(collabHints/usedCollabHints) 보관 중.
+                → 백로그 [[위저드-힌트배너-재노출]] */}
             <div className="space-y-4">
               {collabHistory.map((h, i) => (
                 <div
