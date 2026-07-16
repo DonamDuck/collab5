@@ -283,7 +283,7 @@ function RegisterForm() {
 
   // ── 콜라보 이력 (활동과 동일한 인라인 카드 패턴, 최대 3세트) ──
   const addCollab = () =>
-    setCollabHistory((p) => (p.length >= 3 ? p : [...p, emptyHist()]));
+    setCollabHistory((p) => (p.length >= 5 ? p : [...p, emptyHist()]));
   const removeCollab = (i: number) =>
     setCollabHistory((p) => p.filter((_, j) => j !== i));
   const setHist = (i: number, patch: Partial<HistItem>) =>
@@ -344,7 +344,7 @@ function RegisterForm() {
 
   // ── 대표 활동 (최대 3세트) ──
   const addActivity = () =>
-    setActivities((p) => (p.length >= 3 ? p : [...p, { title: "", desc: "", photos: [] }]));
+    setActivities((p) => (p.length >= 5 ? p : [...p, { title: "", desc: "", photos: [] }]));
   const setAct = (i: number, patch: Partial<{ title: string; desc: string }>) =>
     setActivities((p) => p.map((a, j) => (j === i ? { ...a, ...patch } : a)));
   const addActPhotos = (i: number, files: FileList | null) =>
@@ -475,7 +475,7 @@ function RegisterForm() {
       const empty = p.findIndex((a) => !a.title.trim() && !a.desc.trim() && !a.photos.length);
       if (empty >= 0)
         return p.map((a, j) => (j === empty ? { ...a, title: h.title, desc: h.desc } : a));
-      if (p.length < 3) return [...p, { title: h.title, desc: h.desc, photos: [] }];
+      if (p.length < 5) return [...p, { title: h.title, desc: h.desc, photos: [] }];
       return p;
     });
   };
@@ -495,7 +495,7 @@ function RegisterForm() {
       );
       if (empty >= 0)
         return p.map((c, j) => (j === empty ? { ...c, partner: h.partner, desc: h.desc } : c));
-      if (p.length < 3) return [...p, { ...emptyHist(), partner: h.partner, desc: h.desc }];
+      if (p.length < 5) return [...p, { ...emptyHist(), partner: h.partner, desc: h.desc }];
       return p;
     });
   };
@@ -1213,11 +1213,11 @@ function RegisterForm() {
               />
             </div>
           ))}
-          {activities.length < 3 && (
+          {activities.length < 5 && (
             <button
               type="button"
               onClick={addActivity}
-              className="flex w-full items-center justify-center gap-1.5 rounded-md border border-dashed border-border-strong bg-surface py-2.5 text-sm text-mute"
+              className="flex w-full items-center justify-center gap-1.5 rounded-md border border-primary-tint bg-primary-pale py-2.5 text-sm font-medium text-primary-on transition-colors hover:bg-primary-tint"
             >
               ＋ 활동 추가
             </button>
@@ -1411,13 +1411,13 @@ function RegisterForm() {
                   </div>
                 </div>
               ))}
-              {collabHistory.length < 3 && (
+              {collabHistory.length < 5 && (
                 <button
                   type="button"
                   onClick={addCollab}
-                  className="flex w-full items-center justify-center gap-1.5 rounded-md border border-dashed border-border-strong bg-surface py-2.5 text-sm text-mute"
+                  className="flex w-full items-center justify-center gap-1.5 rounded-md border border-primary-tint bg-primary-pale py-2.5 text-sm font-medium text-primary-on transition-colors hover:bg-primary-tint"
                 >
-                  ＋ 콜라보 경험 추가
+                  ＋ 콜라보 추가
                 </button>
               )}
             </div>

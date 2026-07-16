@@ -195,13 +195,13 @@ export function BlockEditor({ blocks, onChange, onUploadingChange, storyItems }:
                     )}
                   </div>
                 ))}
-                {b.items.length < 4 && (
+                {b.items.length < 3 && (
                   <button
                     type="button"
                     onClick={() => setBlock(i, { ...b, items: [...b.items, { label: "", value: "" }] })}
-                    className="rounded-sm border border-dashed border-border-strong bg-surface px-3 py-1.5 text-sm text-mute"
+                    className="inline-flex items-center gap-1 rounded-sm border border-primary-tint bg-primary-pale px-3 py-1.5 text-sm font-medium text-primary-on transition-colors hover:bg-primary-tint"
                   >
-                    ＋ 추가
+                    ＋ 숫자 추가
                   </button>
                 )}
               </div>
@@ -236,13 +236,13 @@ export function BlockEditor({ blocks, onChange, onUploadingChange, storyItems }:
                     )}
                   </div>
                 ))}
-                {b.items.length < 5 && (
+                {b.items.length < 4 && (
                   <button
                     type="button"
                     onClick={() => setBlock(i, { ...b, items: [...b.items, { title: "", year: "" }] })}
-                    className="rounded-sm border border-dashed border-border-strong bg-surface px-3 py-1.5 text-sm text-mute"
+                    className="inline-flex items-center gap-1 rounded-sm border border-primary-tint bg-primary-pale px-3 py-1.5 text-sm font-medium text-primary-on transition-colors hover:bg-primary-tint"
                   >
-                    ＋ 추가
+                    ＋ 소개 추가
                   </button>
                 )}
               </div>
@@ -282,9 +282,9 @@ export function BlockEditor({ blocks, onChange, onUploadingChange, storyItems }:
                   <button
                     type="button"
                     onClick={() => setBlock(i, { ...b, items: [...b.items, { quote: "", source: "" }] })}
-                    className="rounded-sm border border-dashed border-border-strong bg-surface px-3 py-1.5 text-sm text-mute"
+                    className="inline-flex items-center gap-1 rounded-sm border border-primary-tint bg-primary-pale px-3 py-1.5 text-sm font-medium text-primary-on transition-colors hover:bg-primary-tint"
                   >
-                    ＋ 추가
+                    ＋ 후기 추가
                   </button>
                 )}
               </div>
