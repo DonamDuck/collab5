@@ -620,6 +620,11 @@ function RegisterForm() {
     setMissing([]);
     setReviewMode(true);
     setWizardOpen(false);
+    // 초본이 폼에 채워지는 순간 = 축하+사진유도 얼럿(AI 크롤 경로 한정, 세션 1회).
+    if (!draftDoneShownRef.current) {
+      draftDoneShownRef.current = true;
+      setShowDraftDone(true);
+    }
   };
 
   // 라벨 옆 표시: AI가 채운 필드면 ✨배지, 못 찾은 필드면 "직접 입력" 노티
@@ -643,6 +648,10 @@ function RegisterForm() {
     if (!offers.length) return "offers-chips";
     return null;
   };
+
+  // ── 초본 완성 얼럿(AI 크롤 직후 사진 유도 · 세션 1회) ──
+  const draftDoneShownRef = useRef(false); // '다시 받기'로 applyWizard 재호출돼도 처음 1번만
+  const [showDraftDone, setShowDraftDone] = useState(false);
 
   // ── 제출 인터셉트 추천 모달(등록 직전 1회) ──
   const [nudgeShown, setNudgeShown] = useState(false); // 한 번 뜨면 다음 등록엔 안 뜸
@@ -1724,6 +1733,43 @@ function RegisterForm() {
       )}
 
       {/* 제출 인터셉트 추천 모달 — 소개가 얇을 때 이야기 더하기 제안(바텀시트 스타일 재활용) */}
+      {/* 초본 완성 얼럿 — AI 크롤이 폼을 채운 직후 1회. 톤=보상(🎉), 사진은 '관문' 아닌 '초본 후 업그레이드'. */}
+      {showDraftDone && (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 p-4 sm:items-center"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setShowDraftDone(false)}
+        >
+          <ScrollLock />
+          <div
+            className="relative w-full max-w-md rounded-lg border border-hairline bg-surface p-6 text-center shadow-e2"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="text-4xl leading-none" aria-hidden="true">🎉</div>
+            <p className="mt-3 text-lg font-bold text-ink">소개서 초본이 준비됐어요!</p>
+            <p className="mt-1.5 text-[15px] leading-relaxed text-body">
+              이제 내용을 다듬어 완성해보세요.
+            </p>
+            <div className="mt-4 rounded-md bg-primary-pale px-4 py-3 text-left">
+              <p className="text-[14px] leading-relaxed text-primary-on">
+                💡 작성된 소개서에 사진을 더하면 훨씬 눈에 띄어요.
+              </p>
+              <p className="mt-1 text-[13px] leading-relaxed text-primary-on">
+                지금 없어도, 나중에 언제든 추가할 수 있어요.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowDraftDone(false)}
+              className="mt-5 h-11 w-full rounded-md bg-primary text-sm font-semibold text-primary-on"
+            >
+              소개서 완성하러 가기
+            </button>
+          </div>
+        </div>
+      )}
+
       {showNudge && (() => {
         const dismissNudge = () => { setNudgeShown(true); setShowNudge(false); };
         const items = ([
