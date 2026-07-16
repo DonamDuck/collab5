@@ -12,6 +12,7 @@ import { z } from "zod";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { josa } from "./josa";
 import { regionConflict, regionMatches } from "./regionSynonyms";
+import { DESC_ANCHOR_COUNT } from "./enrichBlend";
 
 /** 검증가능 신뢰 시그널 필드 — 못 찾으면 missing, 찾으면 sources에 출처 */
 export type EnrichField = "instagram" | "homepage" | "address";
@@ -332,18 +333,18 @@ export class MockSearchProvider implements SearchProvider {
     return { oneLiners, descriptions, researchMemo };
   }
 
-  // 자세히 재생성 mock — 고른 한 줄을 관통 주제로 5개 변주
+  // 자세히 재생성 mock — 고른 한 줄을 관통 주제로 '앵커' N개(서로 다른 렌즈). N=DESC_ANCHOR_COUNT.
   async regenDescriptions(input: RegenDescInput): Promise<string[]> {
     await new Promise((r) => setTimeout(r, 500));
-    const name = input.name.trim() || "우리 브랜드";
     const ol = input.chosenOneLiner.trim();
-    return [
-      `${ol} — 작은 시작에서 출발해 여기까지 왔어요. 처음의 마음을 잊지 않으려 오늘도 정성을 지키고 있어요.`,
-      `${ol} 손이 많이 가는 방식을 고집하고 있어요. 빠르게보다 제대로를 택한 시간이 저희의 결이 됐어요.`,
-      `${ol} 찾아주시는 분들과 나눈 이야기가 다음을 만드는 힘이 돼요. 그 경험을 오래 남기고 싶어요.`,
-      `${ol} 저희를 아껴주시는 분들 덕에 꾸준히 이어가고 있어요. 그 마음에 정직하게 답하려 해요.`,
-      `${ol} 결이 맞는 분들과 함께라면 더 멀리 갈 수 있다고 믿어요. 좋은 첫인상으로 만나고 싶어요.`,
+    const lensPool = [
+      `${ol} 손이 많이 가는 방식을 고집하고 있어요. 빠르게보다 제대로를 택한 시간이 저희의 결이 됐어요.`, // 어떻게
+      `작은 불편에서 시작했어요. ${ol} 그 마음을 잊지 않으려 오늘도 처음처럼 정성을 지키고 있어요.`, // 왜
+      `일상에서 자주 쓰는 분들을 생각하며 만들어요. ${ol} 손에 오래 남는 쓰임을 가장 먼저 챙기고 있어요.`, // 누구에게
+      `${ol} 그중에서도 가장 단단한 것부터 하나씩 갖춰가고 있어요. 겉보다 안이 튼튼하길 바라거든요.`, // 무엇을
+      `${ol} 담백하지만 따뜻한 결을 지키려 해요. 요란하지 않아도 오래 곁에 두고 싶은 느낌을 담고 있어요.`, // 분위기
     ];
+    return lensPool.slice(0, DESC_ANCHOR_COUNT);
   }
 
   // 조사 메모 mock
@@ -1373,28 +1374,69 @@ class NaverGeminiProvider implements SearchProvider {
     };
   }
 
-  // 고른/수정한 한 줄 소개를 관통 주제로 '자세히 소개' 5개만 재생성.
-  // ⚡콜 규율: generateOptions 1콜만(재크롤 없음 — researchMemo 재사용). oneLiners는 이미 확정이라 버린다.
-  // 프롬프트 핵심 = 고른 한 줄을 5개 공통 관통 주제로 삼되 5개 앵글은 서로 다르게(도배 금지).
+  // 앵커 재생성 전용 스키마 — descriptions 배열만(형식 군더더기 제거로 앵커에 집중).
+  private static readonly ANCHOR_SCHEMA = {
+    type: Type.OBJECT,
+    properties: {
+      descriptions: {
+        type: Type.ARRAY,
+        items: { type: Type.STRING },
+        description: "앵커 브랜드 소개 후보 — 각 3~5문장 해요체, 서로 다른 렌즈로 겹치지 않게",
+      },
+    },
+    required: ["descriptions"],
+  };
+
+  // 고른/수정한 한 줄 소개를 '관통 주제'로 삼아 '앵커' 자세히 N개만 생성(N=DESC_ANCHOR_COUNT).
+  // ⚡콜 규율: Gemini 1콜(재크롤 없음 — researchMemo 재사용). Gemini 전멸 시 Haiku 폴백.
+  // ⭐핵심: 한 줄은 *주제*지 *내용*이 아니다 — 그대로 부연 말고 그 주제의 다른 측면을 조사자료에서 끌어와 확장.
+  //    앵커끼리도 '서로 다른 렌즈'(어떻게/왜/누구에게/무엇을/분위기 중 N개)로 안 겹치게.
+  //    나머지 자유 M개는 클라가 사전 생성 풀에서 블렌드(서버는 앵커만 만든다).
   async regenDescriptions(input: RegenDescInput): Promise<string[]> {
+    const n = DESC_ANCHOR_COUNT;
     const chosen = input.chosenOneLiner.trim();
     const kw = (input.focusKeywords?.length ? input.focusKeywords : input.values) ?? [];
     const prompt = `브랜드명: "${input.name}"
 
-⭐⭐사장이 최종 선택한 '한 줄 소개' — 이 문장을 아래 '브랜드 소개(자세히 소개)' 5개 전체의 공통 관통 주제·핵심 메시지로 삼아라:
+⭐⭐사장이 최종 선택한 '한 줄 소개' — 이 문장을 아래 브랜드 소개 후보 전체의 공통 *관통 주제*로 삼아라:
 "${chosen}"
 
 ${kw.length ? `⭐가중 키워드(나열 말고 문장에 자연스럽게 녹여라): ${kw.join(", ")}\n\n` : ""}${this.digestBlock(input.homepageDigest)}[조사 자료]
 ${input.researchMemo?.trim() || "(추가 조사 자료 없음 — 위 한 줄 소개와 키워드를 중심으로, 없는 사실은 지어내지 말고 담백하게)"}
 
-⭐지시:
-- 위 '한 줄 소개'가 담은 핵심(무엇을·어떻게·누구에게)을 5개 브랜드 소개 후보 전체가 공통으로 관통하게 써라. 5개가 서로 다른 얘기를 하면 안 된다 — 주제는 하나다.
-- ⚠️단, 5개의 앵글·강조점·도입은 서로 다르게 하라(같은 표현 도배 금지, 다양성 유지): ①시작 스토리 ②제품·방식 ③활동·경험 ④고객·쓰임 ⑤협업 상상.
-- 한 줄 소개 문구를 그대로 복붙·반복하지 말고, 그 주제를 매 후보마다 다른 각도로 풀어라.
+⭐지시 — '앵커' 브랜드 소개 ${n}개를 써라(descriptions 배열에 정확히 ${n}개):
+- 위 '한 줄 소개'가 담은 핵심을 ${n}개 후보가 공통으로 관통하게. 주제는 하나다 — 서로 다른 얘기를 하면 안 돼.
+- ⚠️한 줄 소개는 *주제*지 *내용*이 아니다. 그 문장을 그대로 부연·반복하지 말고, 그 주제의 서로 다른 측면을 위 [조사 자료]에서 끌어와 확장하라.
+- ⚠️${n}개 앵커끼리도 겹치면 안 된다 — 각 앵커에 아래 렌즈 중 서로 다른 하나씩을 부여해 ${n}개를 뚜렷이 구분하라:
+  · 어떻게(방식·과정) · 왜(계기·철학) · 누구에게(고객·쓰임) · 무엇을(제품·핵심) · 분위기·감각
 - 각 3~5문장, 모두 '해요체'('~합니다/~습니다' 금지). 1인칭 사장 시점 — 브랜드명·'이곳'·'이 브랜드'를 문장 주어로 쓰지 마라('저희/우리' 또는 주어 생략).
-- oneLiners·values·identity 등 나머지 필드는 형식 유지용으로만 간단히 채워도 돼. 핵심 결과물은 descriptions 5개다.`;
-    const opts = await this.generateOptions(prompt, 0.9);
-    return opts.descriptions;
+- ⚠️collab5·플랫폼·"좋은 협업은 좋은 소개에서" 같은 서비스 철학·미션 문구는 넣지 마라. 이 소개는 사장님 1인칭 목소리다.`;
+    try {
+      const text = await this.generate(
+        prompt,
+        NaverGeminiProvider.ANCHOR_SCHEMA,
+        OPTIONS_SYSTEM,
+        0.9
+      );
+      const arr = (JSON.parse(text) as { descriptions?: unknown }).descriptions;
+      const list = Array.isArray(arr)
+        ? arr.filter((s): s is string => typeof s === "string" && !!s.trim())
+        : [];
+      if (list.length) return list.slice(0, n);
+      throw new Error("empty anchors");
+    } catch (e) {
+      console.warn(`[regen] gemini 앵커 실패 → Haiku 폴백`, (e as { status?: number })?.status);
+      const structured = await this.claude().messages.parse({
+        model: "claude-haiku-4-5",
+        max_tokens: 1200,
+        system: OPTIONS_SYSTEM,
+        messages: [{ role: "user", content: prompt }],
+        output_config: { format: zodOutputFormat(z.object({ descriptions: z.array(z.string()) })) },
+      });
+      return (structured.parsed_output?.descriptions ?? [])
+        .filter((s) => !!s?.trim())
+        .slice(0, n);
+    }
   }
 
   async recrawl(input: RecrawlInput): Promise<EnrichCandidate | null> {

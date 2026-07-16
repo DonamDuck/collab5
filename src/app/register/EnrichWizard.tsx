@@ -19,6 +19,7 @@ import type {
   SeeksHint,
 } from "@/lib/enrich";
 import { josa } from "@/lib/josa";
+import { blendDescriptions, canRegenDesc, noteRegenDesc } from "@/lib/enrichBlend";
 
 export type WizardFill = {
   name?: string;
@@ -38,8 +39,6 @@ export type WizardFill = {
 };
 
 const MAX_STARS = 4;
-// 자세히 재생성(고른 한 줄 반영) 세션 상한 — 비용 가드
-const DESC_REGEN_CAP = 2;
 
 // 진행 단계: 씨앗 → (크롤) → 키워드 선택 → 확인·강조 → (생성) → 정보 → 한줄 → 소개 → 이야기
 type Kind =
@@ -233,11 +232,12 @@ export function EnrichWizard({
   const [oneLinerSel, setOneLinerSel] = useState(0);
   const [descList, setDescList] = useState<string[]>([]);
   const [descSel, setDescSel] = useState(0);
-  // 한 줄 선택 → 자세히 유기적 반영(트리거 1): 원본 스냅샷(수정 감지) + 재생성 가드
+  // 한 줄 선택 → 자세히 유기적 반영(트리거 1): 원본 스냅샷(수정 감지) + 블렌드 소스 + 재생성 가드
   const [oneLinerOriginal, setOneLinerOriginal] = useState<string[]>([]);
+  const [descOriginal, setDescOriginal] = useState<string[]>([]); // 사전 생성 자세히 풀(블렌드 '자유 M')
   const [descRegenBusy, setDescRegenBusy] = useState(false);
   const [lastRegenOl, setLastRegenOl] = useState(""); // 같은 한줄 재요청 캐시
-  const [descRegenCount, setDescRegenCount] = useState(0); // 세션 상한(DESC_REGEN_CAP)
+  // 세션 재생성 상한은 모듈 공유 카운터(canRegenDesc/noteRegenDesc) — 모달·위저드 합산
   // 이야기 체크 상태 — 기본 전부 체크(옵션 도착 시 초기화)
   const [storyChecked, setStoryChecked] = useState<Set<string>>(new Set());
   const toggleStoryItem = (key: string) =>
@@ -405,8 +405,9 @@ export function EnrichWizard({
       setOneLinerOriginal(o.oneLiners); // 수정 감지 기준
       setOneLinerSel(0);
       setDescList(o.descriptions);
+      setDescOriginal(o.descriptions); // 블렌드 '자유 M'의 원본 풀(사전 생성분)
       setDescSel(0);
-      setLastRegenOl(""); // 새 생성 → 재생성 캐시 리셋(횟수는 세션 유지)
+      setLastRegenOl(""); // 새 생성 → 재생성 캐시 리셋(세션 횟수 카운터는 유지)
       // 기본 전부 체크 — values 항목 키 포함 위해 별표+AI 결 단어 조합을 동일하게 넘긴다.
       const recVals = Array.from(new Set([...starred, ...(o.values ?? [])])).slice(0, 8);
       setStoryChecked(new Set(storyItemsOf(o, recVals).map((it) => it.key)));
@@ -459,7 +460,7 @@ export function EnrichWizard({
     const chosen = (oneLinerList[oneLinerSel] ?? "").trim();
     const orig = (oneLinerOriginal[oneLinerSel] ?? "").trim();
     const changed = !!chosen && chosen !== orig; // 수정 or 직접추가(원본 밖 인덱스면 orig="")
-    const shouldRegen = changed && chosen !== lastRegenOl && descRegenCount < DESC_REGEN_CAP;
+    const shouldRegen = changed && chosen !== lastRegenOl && canRegenDesc(); // 세션 전역 상한(공유)
     goNext();
     if (!shouldRegen) return;
     const ingredients = selected.filter((t) => !isFactual(t) || factualOk.has(t));
@@ -478,16 +479,17 @@ export function EnrichWizard({
         }),
       });
       const d = await r.json().catch(() => ({}));
-      const descs: string[] = Array.isArray(d.descriptions)
-        ? d.descriptions.filter((s: unknown): s is string => typeof s === "string" && !!s.trim())
+      const anchors: string[] = Array.isArray(d.anchors)
+        ? d.anchors.filter((s: unknown): s is string => typeof s === "string" && !!s.trim())
         : [];
-      if (descs.length) {
-        setDescList(descs);
+      if (anchors.length) {
+        // 앵커 N + 사전 생성 풀에서 자유 M 블렌드(비율은 enrichBlend 상수가 결정)
+        setDescList(blendDescriptions(anchors, descOriginal));
         setDescSel(0);
         setLastRegenOl(chosen);
-        setDescRegenCount((c) => c + 1);
+        noteRegenDesc();
       }
-      // descs 비면 기존 자세히 후보 유지(조용한 저하)
+      // anchors 비면 기존 자세히 후보 유지(조용한 저하)
     } finally {
       setDescRegenBusy(false);
     }

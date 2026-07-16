@@ -266,7 +266,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "브랜드 이름과 한 줄 소개가 필요해요." }, { status: 400 });
     }
     try {
-      const descriptions = await enrichRegenDescriptions({
+      // 앵커 N개만 생성(N=DESC_ANCHOR_COUNT). 자유 M개 블렌드는 클라(사전 생성 풀 보유)가 담당.
+      const anchors = await enrichRegenDescriptions({
         name,
         chosenOneLiner,
         researchMemo: typeof body.researchMemo === "string" ? body.researchMemo : undefined,
@@ -274,12 +275,12 @@ export async function POST(req: Request) {
         values: strArr(body.values),
         homepageDigest: await digestOf(body.homepage), // 확정 홈페이지 딥리드(실패 시 undefined)
       });
-      return NextResponse.json({ descriptions });
+      return NextResponse.json({ anchors });
     } catch (e) {
       console.error("[enrich] descFromOneLiner failed:", e);
       // 실패해도 기존 자세히 후보를 그대로 쓰게 빈 배열 — 클라가 교체하지 않고 유지
       return NextResponse.json(
-        { descriptions: [], error: "자세히 소개를 다시 만들지 못했어요. 기존 후보로 계속 진행할게요." },
+        { anchors: [], error: "자세히 소개를 다시 만들지 못했어요. 기존 후보로 계속 진행할게요." },
         { status: 200 }
       );
     }

@@ -15,6 +15,7 @@ import { isRichIntro } from "@/lib/completeness";
 import { uploadPhoto, uploadPdf } from "@/lib/upload";
 import { ScrollLock } from "@/components/ScrollLock";
 import type { ActivityHint, CollabHint, EnrichField } from "@/lib/enrich";
+import { blendDescriptions, canRegenDesc, noteRegenDesc } from "@/lib/enrichBlend";
 import { EnrichWizard, type WizardFill } from "./EnrichWizard";
 import { SortableCard, emptyDnd, type DndState } from "./SortableCard";
 import { BlockEditor, emptyBlock } from "./BlockEditor";
@@ -33,9 +34,6 @@ function reorder<T>(arr: T[], from: number, to: number): T[] {
 function toStrArr(v: unknown): string[] {
   return Array.isArray(v) ? v.filter((s): s is string => typeof s === "string" && !!s.trim()) : [];
 }
-
-// 자세히 재생성(고른 한 줄 반영) 세션 상한 — 비용 가드. 편집→'다음' 판정으로만 소모.
-const DESC_REGEN_CAP = 2;
 
 // 편집 중 콜라보 이력 — 활동(activities)과 동일한 인라인 카드 패턴.
 // photos는 {url,uploading?} — 선택 즉시 Storage 업로드, 제출 시 URL만 전송. typeInput·typeInputOpen은 UI 로컬 상태(전송 제외).
@@ -228,10 +226,11 @@ function RegisterForm() {
   const [descCustom, setDescCustom] = useState(""); // 자세히 소개 직접 입력값
   // ── 한 줄 선택 → 자세히 유기적 반영(트리거 1) 상태 ──
   const [olOriginal, setOlOriginal] = useState<string[]>([]); // AI 생성 원본 한 줄(수정 감지용)
+  const [descOriginal, setDescOriginal] = useState<string[]>([]); // 사전 생성 자세히 풀(블렌드 '자유 M' 소스)
   const [draftResearchMemo, setDraftResearchMemo] = useState(""); // draft2가 쓴 조사메모 캐시(재생성 재사용→재크롤 방지)
   const [descRegenBusy, setDescRegenBusy] = useState(false); // 자세히 재생성 로딩(스텝2)
   const [lastRegenOl, setLastRegenOl] = useState(""); // 마지막으로 재생성한 한 줄(같은 한줄 재요청 시 캐시 재사용)
-  const [descRegenCount, setDescRegenCount] = useState(0); // 세션 재생성 횟수(상한 DESC_REGEN_CAP)
+  // 세션 재생성 상한은 모듈 공유 카운터(canRegenDesc/noteRegenDesc) — 모달·위저드 합산
 
   // 데모 프리필: `/register?demo=1` 진입 시 캔버스가든 예시로 텍스트를 채워 시작(사진은 직접).
   // URL 파라미터 기반 1회성 초기화 — 지연 초기값을 쓰면 SSR(window 부재)과 하이드레이션 불일치가 나므로 effect로 처리.
@@ -469,9 +468,10 @@ function RegisterForm() {
       setOlSel(ols.length ? 0 : -1);
       setOlCustom("");
       setDescChoices(descs);
+      setDescOriginal(descs); // 블렌드 '자유 M'의 원본 풀(사전 생성분)
       setDescSel(descs.length ? 0 : -1);
       setDescCustom("");
-      // 새 초안이 도착했으니 자세히 재생성 캐시 리셋(횟수는 세션 유지 = 상한 규율)
+      // 새 초안이 도착했으니 자세히 재생성 캐시 리셋(세션 횟수 카운터는 유지 = 상한 규율)
       setDraftResearchMemo(typeof res.researchMemo === "string" ? res.researchMemo : "");
       setLastRegenOl("");
     } finally {
@@ -489,7 +489,7 @@ function RegisterForm() {
     const shouldRegen =
       (isCustom || isEdited) &&
       chosen !== lastRegenOl && // 같은 한줄로 다시 오면 캐시 재사용(재콜 X)
-      descRegenCount < DESC_REGEN_CAP; // 세션 상한
+      canRegenDesc(); // 세션 전역 상한(모달·위저드 공유)
     setDraftStep(2);
     if (!shouldRegen) return;
     setDescRegenBusy(true);
@@ -508,15 +508,16 @@ function RegisterForm() {
       })
         .then((r) => r.json())
         .catch(() => ({}));
-      const descs = toStrArr(res.descriptions);
-      if (descs.length) {
-        setDescChoices(descs);
+      const anchors = toStrArr(res.anchors);
+      if (anchors.length) {
+        // 앵커 N + 사전 생성 풀에서 자유 M 블렌드(비율은 enrichBlend 상수가 결정)
+        setDescChoices(blendDescriptions(anchors, descOriginal));
         setDescSel(0);
         setDescCustom("");
         setLastRegenOl(chosen);
-        setDescRegenCount((c) => c + 1);
+        noteRegenDesc();
       }
-      // descs 비면 기존 자세히 후보 그대로 유지(조용한 저하)
+      // anchors 비면 기존 자세히 후보 그대로 유지(조용한 저하)
     } finally {
       setDescRegenBusy(false);
     }
