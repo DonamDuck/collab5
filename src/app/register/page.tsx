@@ -156,6 +156,7 @@ function RegisterForm() {
   const [customAudience, setCustomAudience] = useState("");
   const [collabHistory, setCollabHistory] = useState<HistItem[]>([emptyHist()]);
   const [collabOpen, setCollabOpen] = useState(true);
+  const [searchVisible, setSearchVisible] = useState(true); // 검색 노출(기본 on)
   const [instagram, setInstagram] = useState("");
   const [homepage, setHomepage] = useState("");
   const [description, setDescription] = useState("");
@@ -792,6 +793,7 @@ function RegisterForm() {
       setHomepage(m.trust.homepage ?? "");
       setAddress(m.trust.address ?? "");
       setCollabOpen(m.collabOpen);
+      setSearchVisible(m.searchVisible ?? true);
       setPhotos(m.photos.map((u) => ({ url: u })));
       setBlocks((m.blocks ?? []).map((b) => ({ ...b, uid: crypto.randomUUID() })));
       setIntroFileUrl(m.introFileUrl ?? "");
@@ -867,6 +869,7 @@ function RegisterForm() {
         introFileUrl: introFileUrl || undefined,
         photos: wrap(photoUrls),
         collabOpen,
+        searchVisible,
         instagram,
         homepage,
         address,
@@ -1630,30 +1633,57 @@ function RegisterForm() {
           </Field>
         </div>
 
-        {/* 콜라보 열림/닫힘 */}
-        <div className="flex items-center justify-between rounded-lg border border-hairline bg-surface px-4 py-3">
-          <div>
-            <p className="text-base font-medium text-ink">콜라보 받는 중</p>
-            <p className="text-sm text-mute">
-              켜두면 다른 메이커가 먼저 콜라보를 제안할 수 있어요.
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={() => setCollabOpen((v) => !v)}
-            role="switch"
-            aria-checked={collabOpen}
-            aria-label="콜라보 받는 중"
-            className={`flex h-[26px] w-11 shrink-0 items-center rounded-pill p-[2px] transition-colors ${
-              collabOpen ? "bg-primary" : "bg-border-strong"
-            }`}
-          >
-            <span
-              className={`h-[22px] w-[22px] rounded-pill bg-white transition-transform ${
-                collabOpen ? "translate-x-[18px]" : "translate-x-0"
+        {/* 콜라보 열림/닫힘 + 검색 노출 */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between rounded-lg border border-hairline bg-surface px-4 py-3">
+            <div>
+              <p className="text-base font-medium text-ink">콜라보 받는 중</p>
+              <p className="text-sm text-mute">
+                켜두면 다른 메이커가 먼저 콜라보를 제안할 수 있어요.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setCollabOpen((v) => !v)}
+              role="switch"
+              aria-checked={collabOpen}
+              aria-label="콜라보 받는 중"
+              className={`flex h-[26px] w-11 shrink-0 items-center rounded-pill p-[2px] transition-colors ${
+                collabOpen ? "bg-primary" : "bg-border-strong"
               }`}
-            />
-          </button>
+            >
+              <span
+                className={`h-[22px] w-[22px] rounded-pill bg-white transition-transform ${
+                  collabOpen ? "translate-x-[18px]" : "translate-x-0"
+                }`}
+              />
+            </button>
+          </div>
+
+          <div className="flex items-center justify-between rounded-lg border border-hairline bg-surface px-4 py-3">
+            <div>
+              <p className="text-base font-medium text-ink">검색에 보이기</p>
+              <p className="text-sm text-mute">
+                꺼두면 검색 결과에 노출되지 않아요. 링크로는 계속 공유할 수 있어요.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setSearchVisible((v) => !v)}
+              role="switch"
+              aria-checked={searchVisible}
+              aria-label="검색에 보이기"
+              className={`flex h-[26px] w-11 shrink-0 items-center rounded-pill p-[2px] transition-colors ${
+                searchVisible ? "bg-primary" : "bg-border-strong"
+              }`}
+            >
+              <span
+                className={`h-[22px] w-[22px] rounded-pill bg-white transition-transform ${
+                  searchVisible ? "translate-x-[18px]" : "translate-x-0"
+                }`}
+              />
+            </button>
+          </div>
         </div>
 
       </div>

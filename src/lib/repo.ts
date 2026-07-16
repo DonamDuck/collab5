@@ -11,6 +11,7 @@ export interface Repo {
   getMakerBySlug(slug: string): Promise<Maker | null>;
   getMakerById(id: number): Promise<Maker | null>;
   updateMakerContent(slug: string, content: Omit<Maker, "id" | "slug" | "createdAt" | "ownerUserId" | "editPasswordHash">): Promise<Maker | null>;
+  setMakerFlags(slug: string, flags: { collabOpen?: boolean; searchVisible?: boolean }): Promise<Maker | null>;
   setMakerOwner(slug: string, ownerUserId: string): Promise<void>;
   setMakerPasswordHash(slug: string, hash: string): Promise<void>;
   deleteMaker(slug: string): Promise<void>;
@@ -66,6 +67,7 @@ const seedMakers: Maker[] = [
       description: "버려지는 천에 새 이야기를 입히는 패브릭 브랜드.",
     },
     collabOpen: true,
+    searchVisible: true,
     createdAt: now(),
   },
   {
@@ -96,6 +98,7 @@ const seedMakers: Maker[] = [
       description: "오래된 물건에 다시 온기를 더하는 편집숍.",
     },
     collabOpen: true,
+    searchVisible: true,
     createdAt: now(),
   },
   {
@@ -126,6 +129,7 @@ const seedMakers: Maker[] = [
       description: "영도 바다를 닮은 깊고 진한 한 잔.",
     },
     collabOpen: true,
+    searchVisible: true,
     createdAt: now(),
   },
   {
@@ -156,6 +160,7 @@ const seedMakers: Maker[] = [
       description: "천천히 머물다 가는 그림책 책방.",
     },
     collabOpen: false,
+    searchVisible: true,
     createdAt: now(),
   },
 ];
@@ -204,6 +209,13 @@ class InMemoryRepo implements Repo {
     Object.assign(m, c);
     return m;
   }
+  async setMakerFlags(slug: string, flags: { collabOpen?: boolean; searchVisible?: boolean }): Promise<Maker | null> {
+    const m = this.makers.find((x) => x.slug === slug);
+    if (!m) return null;
+    if (flags.collabOpen !== undefined) m.collabOpen = flags.collabOpen;
+    if (flags.searchVisible !== undefined) m.searchVisible = flags.searchVisible;
+    return m;
+  }
   async setMakerOwner(slug: string, ownerUserId: string): Promise<void> {
     const m = this.makers.find((x) => x.slug === slug);
     if (m) m.ownerUserId = ownerUserId;
@@ -224,8 +236,9 @@ class InMemoryRepo implements Repo {
   }
   async searchMakers(q: string) {
     const t = q.trim().toLowerCase();
-    if (!t) return [...this.makers];
-    return this.makers.filter((m) =>
+    const visible = this.makers.filter((m) => m.searchVisible);
+    if (!t) return visible;
+    return visible.filter((m) =>
       [m.name, m.oneLiner, ...m.soul.values, ...m.offers, ...m.seeks]
         .join(" ")
         .toLowerCase()
@@ -268,7 +281,7 @@ interface MakerRow {
   photos: string[] | null;
   blocks: Maker["blocks"] | null; intro_file_url: string | null;
   soul: Maker["soul"]; trust: Maker["trust"];
-  collab_open: boolean; created_at: string; updated_at: string | null;
+  collab_open: boolean; search_visible: boolean | null; created_at: string; updated_at: string | null;
   owner_uuid: string | null; claim_token_hash: string | null;
 }
 interface CardRow {
@@ -296,7 +309,7 @@ function rowToMaker(r: MakerRow): Maker {
     blocks: (r.blocks ?? []).map((b) => ({ ...b, photos: b.photos ?? [], links: b.links ?? [] })),
     introFileUrl: r.intro_file_url ?? undefined,
     soul: r.soul, trust: r.trust,
-    collabOpen: r.collab_open, createdAt: r.created_at,
+    collabOpen: r.collab_open, searchVisible: r.search_visible ?? true, createdAt: r.created_at,
     updatedAt: r.updated_at ?? undefined,
     ownerUserId: r.owner_uuid ?? undefined,
     editPasswordHash: r.claim_token_hash ?? undefined,
@@ -322,6 +335,7 @@ class SupabaseRepo implements Repo {
       photos: input.photos,
       blocks: input.blocks, intro_file_url: input.introFileUrl ?? null,
       soul: input.soul, trust: input.trust, collab_open: input.collabOpen,
+      search_visible: input.searchVisible,
       owner_uuid: input.ownerUserId ?? null, claim_token_hash: input.editPasswordHash ?? null,
     };
     const { data, error } = await this.db.from("makers").insert(row).select().single();
@@ -347,6 +361,7 @@ class SupabaseRepo implements Repo {
       story: c.story, activities: c.activities, offers_note: c.offersNote, seeks_note: c.seeksNote,
       photos: c.photos, blocks: c.blocks, intro_file_url: c.introFileUrl ?? null,
       soul: c.soul, trust: c.trust, collab_open: c.collabOpen,
+      search_visible: c.searchVisible,
     };
     const { data } = await this.db.from("makers").update(patch).eq("slug", slug).select().maybeSingle();
     return data ? rowToMaker(data as MakerRow) : null;
@@ -371,12 +386,23 @@ class SupabaseRepo implements Repo {
   }
   async searchMakers(q: string) {
     const t = q.trim();
-    if (!t) return this.listMakers();
-    const { data } = await this.db
-      .from("makers").select()
-      .or(`name.ilike.%${t}%,one_liner.ilike.%${t}%,region.ilike.%${t}%`)
-      .order("created_at", { ascending: false });
+    // 검색은 search_visible=true 만 노출(소유자의 /my 목록은 별도라 여기 필터 무관).
+    let query = this.db.from("makers").select().eq("search_visible", true);
+    if (t) query = query.or(`name.ilike.%${t}%,one_liner.ilike.%${t}%,region.ilike.%${t}%`);
+    const { data } = await query.order("created_at", { ascending: false });
     return (data ?? []).map((r) => rowToMaker(r as MakerRow));
+  }
+  // /my 토글 — 소유자 검증은 actions에서. collab_open·search_visible 만 부분 갱신.
+  async setMakerFlags(
+    slug: string,
+    flags: { collabOpen?: boolean; searchVisible?: boolean }
+  ): Promise<Maker | null> {
+    const patch: Record<string, boolean> = {};
+    if (flags.collabOpen !== undefined) patch.collab_open = flags.collabOpen;
+    if (flags.searchVisible !== undefined) patch.search_visible = flags.searchVisible;
+    if (Object.keys(patch).length === 0) return this.getMakerBySlug(slug);
+    const { data } = await this.db.from("makers").update(patch).eq("slug", slug).select().maybeSingle();
+    return data ? rowToMaker(data as MakerRow) : null;
   }
 
   async createCard(input: Omit<CollabCard, "id" | "createdAt">): Promise<CollabCard> {
