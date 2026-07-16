@@ -49,7 +49,14 @@ export default async function MyPage() {
         ) : (
           <div className="mt-4 space-y-2">
             {makers.map((m) => (
-              <MakerRow key={m.slug} slug={m.slug} name={m.name} oneLiner={m.oneLiner} />
+              <MakerRow
+                key={m.slug}
+                slug={m.slug}
+                name={m.name}
+                oneLiner={m.oneLiner}
+                collabOpen={m.collabOpen}
+                searchVisible={m.searchVisible}
+              />
             ))}
             <div className="flex justify-center pt-2">
               <ConnectMaker label="+ 소개서 추가 연결" />

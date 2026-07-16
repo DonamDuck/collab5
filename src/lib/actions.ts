@@ -45,6 +45,7 @@ export interface RegisterInput {
   blocks?: Block[]; // 선택 블록(사진=Storage URL이라 그대로 전송)
   introFileUrl?: string; // 소개자료 PDF URL
   collabOpen: boolean;
+  searchVisible: boolean; // 검색 결과 노출 on/off
   instagram?: string;
   homepage?: string;
   address?: string; // 지역은 여기서 자동 추출
@@ -103,6 +104,7 @@ export async function createMakerAction(
       description: input.description?.trim() || undefined,
     },
     collabOpen: input.collabOpen,
+    searchVisible: input.searchVisible,
     ownerUserId,
     editPasswordHash,
   });
@@ -253,9 +255,25 @@ export async function updateMakerAction(
       description: input.description?.trim() || undefined,
     },
     collabOpen: input.collabOpen,
+    searchVisible: input.searchVisible,
   });
   if (!updated) return { error: "업데이트에 실패했어요." };
   return { slug };
+}
+
+/** /my 토글 — 로그인 소유자만 collab_open·search_visible 부분 갱신. */
+export async function updateMakerFlagsAction(
+  slug: string,
+  flags: { collabOpen?: boolean; searchVisible?: boolean }
+): Promise<{ error?: string }> {
+  const user = await getSessionUser();
+  if (!user) return { error: "로그인이 필요해요." };
+  const maker = await repo.getMakerBySlug(slug);
+  if (!maker) return { error: "소개서를 찾을 수 없어요." };
+  if (maker.ownerUserId !== user.id) return { error: "권한이 없어요." };
+  const updated = await repo.setMakerFlags(slug, flags);
+  if (!updated) return { error: "저장에 실패했어요." };
+  return {};
 }
 
 /** 소개서 삭제 — 로그인 소유자만. /my에서 사용. 카드·지표는 FK CASCADE로 함께 삭제. */
