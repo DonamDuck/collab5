@@ -37,10 +37,10 @@ export default function Home() {
             브랜드 소개서 만들기
           </Link>
           <Link
-            href="/search"
+            href="/preview"
             className="flex h-12 w-full items-center justify-center rounded-md border border-border-strong bg-surface px-6 text-base font-medium text-ink sm:w-auto"
           >
-            예시 소개서 보기
+            소개서 미리보기
           </Link>
         </div>
       </section>
