@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { deleteMakerAction, updateMakerFlagsAction } from "@/lib/actions";
+import { isDemoSlug } from "@/lib/demo";
 
 // /my 소개서 행 — 카드 클릭 시 소개서로 이동, 수정·삭제 + 검색노출·콜라보 토글(즉시 저장).
 export function MakerRow({
@@ -39,7 +40,14 @@ export function MakerRow({
       {/* 본문 + 수정·삭제 */}
       <div className="flex items-center gap-2 px-4 py-3">
         <Link href={`/m/${slug}`} className="min-w-0 flex-1 text-left">
-          <p className="truncate text-[15px] font-medium text-ink">{name}</p>
+          <p className="flex items-center gap-1.5 text-[15px] font-medium text-ink">
+            <span className="min-w-0 truncate">{name}</span>
+            {isDemoSlug(slug) && (
+              <span className="inline-flex h-6 shrink-0 items-center rounded-pill bg-surface-soft px-2 text-[12px] font-medium text-mute">
+                🔒 미리보기 고정본
+              </span>
+            )}
+          </p>
           {oneLiner && <p className="truncate text-sm text-mute">{oneLiner}</p>}
         </Link>
 
