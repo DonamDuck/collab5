@@ -2083,8 +2083,8 @@ function RegisterForm() {
               </div>
               <div className="space-y-5">
                 {[
-                  { src: "/preview/sample-none.png", label: "사진 없는 소개서" },
-                  { src: "/preview/sample-photo.png", label: "사진 있는 소개서" },
+                  { src: "/preview/sample-none.jpg", label: "사진 없는 소개서" },
+                  { src: "/preview/sample-photo.jpg", label: "사진 있는 소개서" },
                 ].map((s) => (
                   <div key={s.src}>
                     <p className="mb-1.5 text-sm font-medium text-body">{s.label}</p>
