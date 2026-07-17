@@ -36,6 +36,7 @@ MODIFY src/app/register/BlockEditor.tsx       (T9: 블록 첨부 접기)
 **Goal:** `/m/[slug]/page.tsx`의 `<main>` 내부(BrandSummaryCard ~ 상세 주소)를 `MakerArticle.tsx` 서버 컴포넌트로 이동. CopyLink/소개자료 블록은 페이지 고유라 page에 남긴다.
 
 **Steps:**
+0. **[Gate3 C2] 시드 확장 선행**: `src/lib/repo.ts` InMemory 시드 소개서가 MakerArticle의 **모든 분기**를 타도록 보강 — 블록 6종 전부·사진 있는 활동·collabHistory(사진 포함)·상세주소·offersNote/seeksNote. 픽셀 게이트가 커버 못 하는 분기 0.
 1. `src/app/m/[slug]/MakerArticle.tsx` 생성:
 ```tsx
 import type { Maker } from "@/lib/types";
@@ -113,7 +114,8 @@ function Tab({ href, active, children }: { href: string; active: boolean; childr
 }
 ```
    (데모 행 없으면 안내 문구 폴백 — CONFIRMED-2b. embed 모드는 v1 미구현·후속.)
-3. Run: `npx tsc --noEmit && npm run build` / Verify: 로컬 `/preview` 폴백 문구 확인(로컬엔 데모 행 없음), `?tab=` 전환 동작.
+2-b. **[Gate3 C3] InMemory에 데모 시드 2종 추가**: `repo.ts` 시드에 `m-demo-photo`(사진 있는 축약본)·`m-demo-none`(사진 0장) 추가 → 로컬에서 `/preview` 탭·레이아웃 실검증 가능. 폴백은 시드 슬러그를 임시로 바꿔 1회 확인 후 복원.
+3. Run: `npx tsc --noEmit && npm run build` / Verify: 로컬 `/preview` 두 탭 실렌더 + `?tab=` 전환 + 폴백 1회 확인.
 4. Commit: `feat(preview): 소개서 미리보기 라우트 (탭 2종 + 데모 폴백)`
 
 **Expected output:** `/preview`가 탭·폴백 포함 동작 (데모 데이터는 T3 후 프로덕션에서 표시).
@@ -175,7 +177,7 @@ import { isDemoSlug } from "@/lib/demo";
 **Goal:** 랜딩 순간 결과물 인지 (D6) + 버튼 rename/retarget.
 
 **Steps:**
-1. 프로덕션 `/m/m-ofjghi`·`/m/m-ay6uve`를 브라우저 모바일 뷰포트(375px)로 열어 상단~2섹션 스크린샷 → `public/preview/sample-photo.png`·`sample-none.png` 저장(폭 750px 리사이즈, 각 ≤150KB).
+1. **[Gate3 NIT-1] 스크린샷은 클론에서**: 대표 클론 실행 후 프로덕션 `/m/m-demo-photo`·`/m/m-demo-none`을 모바일 뷰포트(375px)로 열어 상단~2섹션 스크린샷 → `public/preview/sample-photo.png`·`sample-none.png`(폭 750px, 각 ≤150KB). URL 재작성 성공을 시각 검증 + 홈과 /preview 일치 보장. 사진 없는 클론이 캡처 시점에도 사진 0장인지 확인. **개발 중엔 임시 플레이스홀더 PNG로 레이아웃 QA, push 전 실캡처로 교체.**
 2. `git fetch` 후 `src/app/page.tsx`:
    - 버튼: `예시 소개서 보기` → `소개서 미리보기`, `href="/search"` → `href="/preview"`.
    - 히어로 섹션 바로 아래에:
@@ -226,9 +228,14 @@ import { isDemoSlug } from "@/lib/demo";
 1. `src/app/register/page.tsx`에 로컬 컴포넌트:
 ```tsx
 // 접힌 사진 첨부 — 사진 있으면 펼침 시작(기존 데이터 은닉 금지), 없으면 텍스트 버튼만.
-function CollapsedPhotos({ children, hasPhotos }: { children: React.ReactNode; hasPhotos: boolean }) {
-  const [open, setOpen] = useState(hasPhotos);
-  useEffect(() => { if (hasPhotos) setOpen(true); }, [hasPhotos]); // 위저드 주입·수정 로드 대응
+// [Gate3 NIT-3] 자동 펼침은 0→n 전이에서만 — 사용자가 일부러 접은 상태와 싸우지 않는다.
+function CollapsedPhotos({ children, photoCount }: { children: React.ReactNode; photoCount: number }) {
+  const [open, setOpen] = useState(photoCount > 0);
+  const prev = useRef(photoCount);
+  useEffect(() => {
+    if (prev.current === 0 && photoCount > 0) setOpen(true); // 위저드 주입·수정 로드(0→n)만
+    prev.current = photoCount;
+  }, [photoCount]);
   if (!open) return (
     <button type="button" onClick={() => setOpen(true)} className="text-[14px] text-mute underline underline-offset-2">
       + 사진 담기 (선택)
@@ -237,17 +244,20 @@ function CollapsedPhotos({ children, hasPhotos }: { children: React.ReactNode; h
   return <>{children}</>;
 }
 ```
-2. 활동 카드(1297행대)·콜라보 카드(1490행대)의 `<PhotoGrid …/>`(+라벨)를 `<CollapsedPhotos hasPhotos={act.photos.length > 0}>…</CollapsedPhotos>`로 감싼다. ① 메인 브랜드 사진은 손대지 않음.
-3. `src/app/register/BlockEditor.tsx` 공통 첨부(325행대)도 동일 패턴(파일 내 동일 로컬 컴포넌트 추가, `hasPhotos={b.photos.length > 0}`). 링크 첨부는 현행 유지.
-4. Run: `npx tsc --noEmit && npm run build` / Verify: 새 카드=접힘, 사진 추가→저장→수정 재진입=펼침+사진 표시(빈 스텁 경로 0 — NIT-3), 위저드 사진 힌트 주입 시 펼침.
+2. 활동 카드(1297행대)·콜라보 카드(1490행대)의 `<PhotoGrid …/>`(+라벨)를 `<CollapsedPhotos photoCount={act.photos.length}>…</CollapsedPhotos>`로 감싼다. ① 메인 브랜드 사진은 손대지 않음.
+3. `src/app/register/BlockEditor.tsx` 공통 첨부(325행대)도 동일 패턴(파일 내 동일 로컬 컴포넌트 추가, `photoCount={b.photos.length}`). 링크 첨부는 현행 유지.
+4. Run: `npx tsc --noEmit && npm run build` / Verify: 새 카드=접힘, 사진 추가→저장→수정 재진입=펼침+사진 표시(빈 스텁 경로 0), 위저드 사진 힌트 주입(0→n) 시 자동 펼침, **사용자가 접은 뒤 다른 상태 변경으로 재펼침되지 않음**.
 5. Commit: `feat(register): 카드·블록 사진 첨부 접기 (메인 유지)`
 
-## Task 8: 통합 검증 + 배포 게이트
+## Task 8: 통합 검증 + 배포 게이트 — [Gate3 C1] 클론이 배포보다 먼저
 
-**Steps:**
+**순서 (재배열됨):**
 1. `git fetch` → 리베이스 필요 시 수행 → `npx tsc --noEmit && npm run build`.
-2. 로컬 QA 일괄: 홈(버튼·섹션) → `/preview`(탭·폴백) → register(A′ 시트·접기·초본얼럿 불변) → /my(무변화).
-3. 대표 확인 후 `git push` (=prod 배포). 배포 후: 대표가 클론 스크립트 실행 → 프로덕션 `/preview` 탭 2종·검색 미노출·실기기 QA.
-4. vault 갱신: [[홈-예시노출-사진완화]] 상태·스크린샷 재촬영 운영 규칙, INDEX.
+2. 로컬 QA 일괄: 홈(버튼·섹션, 플레이스홀더) → `/preview`(데모 시드 탭·폴백) → register(A′ 시트·접기·초본얼럿 불변) → /my(무변화).
+3. **대표가 클론 스크립트 실행** (스크립트는 순수 데이터 작업 — 신규 코드 의존 0, `search_visible=false`는 이미 배포된 필터가 처리하므로 현행 prod에서도 무해·비노출).
+4. **배포 전 클론 검증**: 프로덕션 `/m/m-demo-photo`·`/m/m-demo-none` 직접 slug 접근으로 품질 확인(사진 표시=URL 재작성 성공, 사진 없는 쪽 0장 유지).
+5. 클론에서 실스크린샷 캡처 → `public/preview/` 교체 커밋 (T5 NIT-1).
+6. 대표 확인 후 `git push` (=prod 배포) → `/preview` 즉시 완전 동작(폴백 공백 0) → 검색 미노출·대표 실기기 QA.
+7. vault 갱신: [[홈-예시노출-사진완화]] 상태·스크린샷 재촬영 운영 규칙, INDEX.
 
-**Expected output:** 스펙 QA 체크리스트 전 항목 통과.
+**Expected output:** 스펙 QA 체크리스트 전 항목 통과, /preview 공백 노출 0.
