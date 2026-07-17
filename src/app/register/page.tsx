@@ -737,6 +737,8 @@ function RegisterForm() {
   const [portfolioOpen, setPortfolioOpen] = useState(false);
   // BlockEditor 카탈로그 시트 열림 여부(플로팅 버튼 숨김용) — BlockEditor가 알려줌.
   const [blockSheetOpen, setBlockSheetOpen] = useState(false);
+  // 소개서 미리보기 바텀시트(① 사진 섹션 링크) — 정적 이미지 2장, 폼 이탈 없음.
+  const [previewOpen, setPreviewOpen] = useState(false);
   const [createdSlug, setCreatedSlug] = useState("");
   const [loggedIn, setLoggedIn] = useState(false);
   const [editPw, setEditPw] = useState("");
@@ -905,9 +907,15 @@ function RegisterForm() {
     router.push(`/m/${createdSlug}`);
   };
 
-  // 어떤 레이어(위저드·모달·얼럿·넛지·블록시트)라도 열려 있으면 플로팅 버튼 숨김.
+  // 어떤 레이어(위저드·모달·얼럿·넛지·블록시트·미리보기시트)라도 열려 있으면 플로팅 버튼 숨김.
   const layerOpen =
-    wizardOpen || descModalOpen || showDraftDone || showNudge || portfolioOpen || blockSheetOpen;
+    wizardOpen ||
+    descModalOpen ||
+    showDraftDone ||
+    showNudge ||
+    portfolioOpen ||
+    blockSheetOpen ||
+    previewOpen;
 
   if (editBooting) {
     return (
@@ -1065,6 +1073,14 @@ function RegisterForm() {
             <p className="mb-2.5 text-[15px] text-mute">
               소개서에 담을 사진을 올려주세요. 최대 10장
             </p>
+            {/* 사진 불안 완화 — 사진 없이도 완성 예시를 그 자리에서 확인(바텀시트, 폼 이탈 없음) */}
+            <button
+              type="button"
+              onClick={() => setPreviewOpen(true)}
+              className="mb-2.5 text-[14px] text-primary-on underline underline-offset-2"
+            >
+              사진 없이 소개서를 만들어보셔도 좋아요 → 소개서 미리보기
+            </button>
             <PhotoGrid
               items={photos}
               max={10}
@@ -2030,6 +2046,62 @@ function RegisterForm() {
               {goingToPage || savingPw ? "이동 중…" : "소개서 확인하러 가기"}
             </button>
             <p className="mt-3 text-[13px] text-faint">언제든 ‘내 소개서’에서 수정할 수 있어요.</p>
+          </div>
+        </div>
+      )}
+
+      {/* 소개서 미리보기 바텀시트 — ① 사진 섹션 링크에서 열림. 정적 이미지 2장(사진 없는 버전 먼저),
+          외부 이동 링크 없음(폼 이탈 방지). 오버레이만 — 폼 상태·스크롤 비파괴. */}
+      {previewOpen && (
+        <div className="fixed inset-0 z-50" role="dialog" aria-modal="true">
+          <ScrollLock />
+          <div className="absolute inset-0 bg-ink/40" onClick={() => setPreviewOpen(false)} />
+          <div className="absolute inset-x-0 bottom-0 mx-auto max-w-[640px] overflow-hidden rounded-t-2xl bg-surface shadow-xl">
+            <div
+              style={{ paddingBottom: "calc(1.5rem + env(safe-area-inset-bottom))" }}
+              className="max-h-[60vh] overflow-y-auto slim-scrollbar p-4 sm:max-h-[70vh]"
+            >
+              <div className="mb-3 flex items-start justify-between">
+                <div className="pr-8">
+                  <p className="text-[16px] font-bold text-ink">소개서 미리보기</p>
+                  <p className="mt-1 text-[13px] leading-relaxed text-mute">
+                    사진이 없어도 이렇게 완성돼요. 나중에 언제든 더할 수 있어요.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setPreviewOpen(false)}
+                  aria-label="닫기"
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-pill text-mute hover:bg-surface-soft hover:text-ink"
+                >
+                  ✕
+                </button>
+              </div>
+              <div className="space-y-5">
+                {[
+                  { src: "/preview/sample-none.png", label: "사진 없는 소개서" },
+                  { src: "/preview/sample-photo.png", label: "사진 있는 소개서" },
+                ].map((s) => (
+                  <div key={s.src}>
+                    <p className="mb-1.5 text-sm font-medium text-body">{s.label}</p>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={s.src}
+                      alt={s.label}
+                      loading="lazy"
+                      className="w-full rounded-md border border-hairline"
+                    />
+                  </div>
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={() => setPreviewOpen(false)}
+                className="mt-5 h-11 w-full rounded-md bg-primary text-sm font-medium text-primary-on"
+              >
+                닫기
+              </button>
+            </div>
           </div>
         </div>
       )}
