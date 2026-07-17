@@ -3,9 +3,9 @@ import "./globals.css";
 import { SiteHeader } from "@/components/SiteHeader";
 
 export const metadata: Metadata = {
-  title: "collab5 — 마음 맞는 메이커들의 콜라보 카드",
+  title: "collab5 — 마음 맞는 메이커들의 콜라보 플랫폼",
   description:
-    "소소하고 소중한 아기자기한 곳들이 자기 이야기를 세상에 더 펼쳐나가는 교두보. 콜라보 요청 카드로 부담 없이 제안하세요.",
+    "소소하고 소중한 아기자기한 곳들이 자기 이야기를 세상에 더 펼쳐나가는 교두보. 브랜드 소개서로 부담 없이 제안하세요.",
 };
 
 export default function RootLayout({

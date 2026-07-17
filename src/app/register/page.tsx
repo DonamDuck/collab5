@@ -1063,7 +1063,7 @@ function RegisterForm() {
               브랜드 사진 (선택)
             </label>
             <p className="mb-2.5 text-[15px] text-mute">
-              콜라보 카드에 담을 사진을 올려주세요. 최대 10장
+              소개서에 담을 사진을 올려주세요. 최대 10장
             </p>
             <PhotoGrid
               items={photos}
@@ -1688,7 +1688,7 @@ function RegisterForm() {
 
       </div>
 
-      {/* ── 플로팅 제출 바 (콜라보 카드 등록하기 / 수정 완료) — 레이어 열리면 아래로 사라짐 ── */}
+      {/* ── 플로팅 제출 바 (브랜드 소개서 등록하기 / 수정 완료) — 레이어 열리면 아래로 사라짐 ── */}
       <div
         className={`fixed inset-x-0 bottom-0 z-40 transition-all duration-300 ease-out ${
           layerOpen ? "pointer-events-none translate-y-28 opacity-0" : "translate-y-0 opacity-100"
@@ -1719,7 +1719,7 @@ function RegisterForm() {
                 : "수정 완료"
               : pending
                 ? "만드는 중…"
-                : "콜라보 카드 등록하기"}
+                : "브랜드 소개서 등록하기"}
           </button>
         </div>
       </div>
@@ -1953,7 +1953,7 @@ function RegisterForm() {
                     onClick={() => { setNudgeShown(true); setShowNudge(false); doSubmit(); }}
                     className="h-11 flex-1 rounded-md bg-primary text-sm font-medium text-primary-on"
                   >
-                    콜라보 카드 등록하기
+                    브랜드 소개서 등록하기
                   </button>
                 </div>
               </div>
