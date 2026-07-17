@@ -27,12 +27,12 @@ export async function SiteHeader() {
             <path d="m13 13 4 4" strokeLinecap="round" />
           </svg>
         </Link>
-        {/* 콜라보 카드 만들기 → 짧게 '콜라보 카드' */}
+        {/* 브랜드 소개서 만들기 → 짧게 '브랜드 소개서' */}
         <Link
           href="/register"
           className="shrink-0 whitespace-nowrap rounded-md border border-border-strong bg-surface px-3 py-1.5 font-medium text-ink"
         >
-          콜라보 카드
+          브랜드 소개서
         </Link>
         {user ? (
           /* 프로필 원형(→ 내 소개서). 로그아웃은 /my 페이지에서. */

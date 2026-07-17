@@ -17,27 +17,29 @@ export default function Home() {
           좋은 소개에서 시작돼요.
         </h1>
         <p className="mx-auto mt-4 max-w-[460px] text-lg font-bold leading-snug text-primary-on">
-          콜라보를 제안하는 카드를
+          AI와 함께 브랜드 소개서를 만들어보세요.
           <br />
-          3분 만에 만들어보세요.
+          3분이면 충분해요.
         </p>
         <p className="mx-auto mt-3 max-w-[460px] break-keep text-base leading-relaxed text-body">
           작은 가게도, 1인 브랜드도 괜찮아요.
           <br />
           길게 설명하지 않아도 당신다운 첫인상을 전할 수 있어요.
+          <br />
+          무료로 시작할 수 있어요.
         </p>
         <div className="mt-7 flex flex-col items-center justify-center gap-2.5 sm:flex-row">
           <Link
             href="/register"
             className="flex h-12 w-full items-center justify-center rounded-md bg-primary px-6 text-base font-medium text-primary-on sm:w-auto"
           >
-            브랜드 카드 만들기
+            브랜드 소개서 만들기
           </Link>
           <Link
             href="/search"
             className="flex h-12 w-full items-center justify-center rounded-md border border-border-strong bg-surface px-6 text-base font-medium text-ink sm:w-auto"
           >
-            예시 카드 보기
+            예시 소개서 보기
           </Link>
         </div>
       </section>
@@ -45,7 +47,7 @@ export default function Home() {
       {/* §9.6 온보딩 3스텝 */}
       <section className="mt-16">
         <h2 className="text-center text-2xl font-bold tracking-tight text-ink sm:text-[28px]">
-          콜라보 카드를 만들어보세요
+          브랜드 소개서, 이렇게 만들어요
         </h2>
         <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
           <StepCard
@@ -56,23 +58,23 @@ export default function Home() {
           />
           <StepCard
             n={2}
-            title="콜라보 카드를 만들고 저장해요."
-            desc="생성한 콜라보 카드는 언제든 링크나 PDF로 공유할 수 있어요."
+            title="소개서를 만들고 저장해요"
+            desc="만든 소개서는 언제든 링크로 공유할 수 있어요."
             illu={<CardIllu />}
           />
           <StepCard
             n={3}
-            title="카드를 협업 파트너에게 전달해보세요."
-            desc="링크나 PDF로 보내면, 로그인 없이 바로 확인할 수 있어요."
+            title="소개서를 협업 파트너에게 전달해요"
+            desc="링크 하나만 보내면, 상대는 로그인 없이 바로 볼 수 있어요."
             illu={<ConnectIllu />}
           />
         </div>
       </section>
 
-      {/* 왜 카드? — DM vs 카드 */}
+      {/* 왜 소개서? — DM vs 소개서 */}
       <section className="mt-16">
         <h2 className="text-center text-2xl font-bold tracking-tight text-ink sm:text-[28px]">
-          왜 카드가 더 효과적일까요?
+          긴 DM보다, 한 장의 소개서
         </h2>
         <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2">
           {/* 그냥 DM */}
@@ -91,11 +93,11 @@ export default function Home() {
               ))}
             </ul>
           </div>
-          {/* 콜라보 카드 */}
+          {/* 브랜드 소개서 */}
           <div className="rounded-xl border border-primary bg-surface p-6 shadow-e1">
             <p className="flex items-center gap-1.5 text-[17px] font-bold text-ink">
               <span className="h-2 w-2 rounded-pill bg-primary" />
-              이렇게 달라집니다.
+              이렇게 달라져요
             </p>
             <ul className="mt-4 space-y-3">
               {[
@@ -119,7 +121,7 @@ export default function Home() {
           href="/register"
           className="inline-flex h-12 items-center justify-center rounded-md bg-primary px-7 text-base font-medium text-primary-on"
         >
-          30초 만에 시작하기
+          지금 시작하기
         </Link>
       </section>
     </main>
