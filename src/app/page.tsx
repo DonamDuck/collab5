@@ -1,6 +1,7 @@
 // 홈 랜딩 — 발신자(보내는 쪽) 여정 중심. MVP: 업체 리스트 노출 X (cold-start).
 // 등록 → 카드 만들기 → 공유. design.md §9.6 온보딩 3스텝.
 import Link from "next/link";
+import { PreviewPhones } from "./PreviewPhones";
 
 export default function Home() {
   return (
@@ -41,6 +42,19 @@ export default function Home() {
           >
             예시 소개서 보기
           </Link>
+        </div>
+      </section>
+
+      {/* 미리보기 — 실제 데모 소개서 2종(사진 있는/없는) 폰 프레임. 결과물 먼저 → 과정 설명 순서 */}
+      <section className="mt-16 rounded-2xl bg-surface-soft px-4 py-10 sm:px-8">
+        <h2 className="text-center text-2xl font-bold tracking-tight text-ink sm:text-[28px]">
+          이런 소개서가 만들어져요
+        </h2>
+        <p className="mx-auto mt-2 max-w-[440px] break-keep text-center text-base leading-relaxed text-body">
+          사진이 아직 없어도 괜찮아요. 두 버전 모두 실제 화면이에요.
+        </p>
+        <div className="mt-8">
+          <PreviewPhones />
         </div>
       </section>
 
