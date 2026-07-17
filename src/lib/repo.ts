@@ -236,6 +236,118 @@ const seedMakers: Maker[] = [
     searchVisible: true,
     createdAt: now(),
   },
+  // ── 데모 시드: /preview 로컬 검증용 고정본 2종 (검색 미노출·콜라보 닫힘) ──
+  {
+    id: 5,
+    slug: "m-demo-photo",
+    name: "모루초 스튜디오",
+    oneLiner: "쌀로 굽는 비건 구움과자와 시골 부엌 클래스",
+    region: "전주",
+    size: "1인",
+    offers: ["제품콜라보", "워크숍"],
+    seeks: ["팝업", "공간대여"],
+    targetAudience: ["비건 지향", "디저트 애호가"],
+    collabHistory: [
+      {
+        partner: "동네정미소",
+        types: ["제품콜라보"],
+        desc: "햅쌀 출시에 맞춰 쌀 카스텔라를 함께 만들었어요.",
+        year: "2025",
+        photos: ["https://picsum.photos/seed/demo-p-collab1/900/700"],
+      },
+    ],
+    story: "할머니 부엌에서 배운 쌀 반죽이 시작이었어요.",
+    activities: [
+      {
+        title: "쌀 구움과자 정기 굽기",
+        desc: "매주 목요일, 그 주의 곡물로 굽는 스몰배치.",
+        photos: [
+          "https://picsum.photos/seed/demo-p-act1/900/700",
+          "https://picsum.photos/seed/demo-p-act2/900/700",
+        ],
+      },
+    ],
+    offersNote: "레시피 개발부터 소량 생산까지 같이 할 수 있어요.",
+    seeksNote: "로컬 재료를 쓰는 공간·브랜드를 만나고 싶어요.",
+    photos: [
+      "https://picsum.photos/seed/demo-photo1/900/700",
+      "https://picsum.photos/seed/demo-photo2/900/700",
+    ],
+    blocks: [
+      {
+        type: "reviews",
+        items: [{ quote: "쌀로 만든 게 맞나 싶게 촉촉해요.", source: "단골 손님" }],
+        photos: ["https://picsum.photos/seed/demo-p-block1/900/700"],
+        links: [],
+      },
+    ],
+    soul: {
+      values: ["비건", "로컬", "수작업"],
+      tone: "소박하고 정직한",
+      trajectory: "시골 부엌에서 도시의 식탁으로",
+    },
+    trust: {
+      instagram: "@morucho.studio",
+      address: "전북 전주시 완산구 한옥마을길 12",
+      description: "쌀과 계절 곡물로만 굽는 작은 비건 베이커리.",
+    },
+    collabOpen: false,
+    searchVisible: false,
+    createdAt: now(),
+  },
+  {
+    id: 6,
+    slug: "m-demo-none",
+    name: "밑줄서점",
+    oneLiner: "문장을 수집하는 심야 책방",
+    region: "대구",
+    size: "1인",
+    offers: ["행사참여", "공동콘텐츠"],
+    seeks: ["워크숍", "공동굿즈"],
+    targetAudience: ["책 애호가", "글 쓰는 사람"],
+    collabHistory: [
+      {
+        partner: "새벽라디오",
+        types: ["공동콘텐츠"],
+        desc: "매달 마지막 금요일, 낭독 방송을 함께 만들어요.",
+        year: "2026",
+        photos: [],
+      },
+    ],
+    story: "좋아하는 문장에 밑줄을 긋다가, 밑줄을 나누는 가게를 열었어요.",
+    activities: [
+      {
+        title: "심야 낭독회",
+        desc: "밤 10시, 조명 하나 켜고 서로의 밑줄을 읽는 모임.",
+        photos: [],
+      },
+    ],
+    offersNote: "글과 목소리로 하는 협업이라면 무엇이든 열려 있어요.",
+    seeksNote: "책과 어울리는 물성을 만드는 분들을 찾고 있어요.",
+    photos: [],
+    blocks: [
+      {
+        type: "custom",
+        title: "이달의 밑줄",
+        body: "\"우리는 서로의 용기가 될 수 있다.\"\n— 이달의 수집 문장 중에서",
+        photos: [],
+        links: [],
+      },
+    ],
+    soul: {
+      values: ["문장", "밤", "다정함"],
+      tone: "낮게 가라앉은, 그러나 따뜻한",
+      trajectory: "혼자 읽던 밤에서 함께 읽는 밤으로",
+    },
+    trust: {
+      instagram: "@midnight.underline",
+      address: "대구 중구 종로 24 1층",
+      description: "밑줄 그은 문장을 매개로 사람을 잇는 책방.",
+    },
+    collabOpen: false,
+    searchVisible: false,
+    createdAt: now(),
+  },
 ];
 
 // ── 시드 카드: 카드 렌더 확인/데모용 (캔가 → 오월의숲) ──
