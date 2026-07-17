@@ -42,19 +42,92 @@ const seedMakers: Maker[] = [
     seeks: ["공간대여", "행사참여", "공동콘텐츠"],
     targetAudience: ["20-30대 여성", "친환경 라이프스타일", "핸드메이드 애호가"],
     collabHistory: [
-      { partner: "오월의숲", types: ["팝업", "워크숍"], year: "2025", photos: [] },
+      {
+        partner: "오월의숲",
+        types: ["팝업", "워크숍"],
+        desc: "연남 매장 한켠에서 한 달간 조각보 팝업과 원데이 워크숍을 함께 열었어요.",
+        year: "2025",
+        photos: [
+          "https://picsum.photos/seed/cg-collab1/900/700",
+          "https://picsum.photos/seed/cg-collab2/900/700",
+        ],
+      },
       { partner: "스톤브루", types: ["제품콜라보"], photos: [] },
     ],
-    story: "",
-    activities: [],
-    offersNote: "",
-    seeksNote: "",
+    story:
+      "버려지는 원단이 아까워 시작한 취미가 브랜드가 됐어요.\n한 조각씩 이어 붙이다 보니, 사람들도 하나둘 모이더라고요.",
+    activities: [
+      {
+        title: "조각보 가방 제작",
+        desc: "폐원단을 이어 만든 시그니처 라인. 시즌마다 새 조합을 선보여요.",
+        photos: [
+          "https://picsum.photos/seed/cg-act1/900/700",
+          "https://picsum.photos/seed/cg-act2/900/700",
+        ],
+      },
+      {
+        title: "패브릭 조각 워크숍",
+        desc: "천 조각으로 나만의 소품을 만드는 2시간 클래스.",
+        photos: [],
+      },
+    ],
+    offersNote: "저희 공간·재료·커리큘럼을 들고 어디든 갈 수 있어요. 브랜드 결이 맞다면 형태는 함께 정해요.",
+    seeksNote: "손으로 만드는 일의 가치를 아는 분들과 느슨하고 길게 협업하고 싶어요.",
     photos: [
       "https://picsum.photos/seed/canvasgarden1/900/700",
       "https://picsum.photos/seed/canvasgarden2/900/700",
       "https://picsum.photos/seed/canvasgarden3/900/700",
     ],
-    blocks: [],
+    blocks: [
+      {
+        type: "metrics",
+        items: [
+          { label: "인스타 팔로워", value: "8,200" },
+          { label: "워크숍 누적 수강생", value: "640명" },
+          { label: "재방문율", value: "38%" },
+        ],
+        photos: [],
+        links: [],
+      },
+      {
+        type: "reviews",
+        items: [
+          { quote: "천 조각이 이렇게 예쁜 가방이 될 줄 몰랐어요.", source: "워크숍 수강생" },
+          { quote: "선물했는데 받은 분이 브랜드를 먼저 찾아봤대요." },
+        ],
+        photos: [],
+        links: [],
+      },
+      {
+        type: "team",
+        intro: "디자이너 1명, 재봉 장인 1명. 작지만 손이 빠른 팀이에요.",
+        photos: ["https://picsum.photos/seed/cg-team1/900/700"],
+        links: [],
+      },
+      {
+        type: "press",
+        items: [
+          { title: "버려진 천의 두 번째 삶 — 캔버스가든 인터뷰", year: "2025" },
+          { title: "서울 업사이클 브랜드 5선" },
+        ],
+        photos: [],
+        links: [{ label: "인터뷰 기사", url: "https://example.com/canvasgarden-interview" }],
+      },
+      {
+        type: "space",
+        desc: "성수동 작업실 겸 쇼룸. 12명까지 워크숍이 가능해요.",
+        features: ["재봉틀 6대", "빔프로젝터", "주차 2대"],
+        photos: ["https://picsum.photos/seed/cg-space1/900/700"],
+        links: [],
+      },
+      {
+        type: "custom",
+        title: "지속가능성 약속",
+        body: "모든 제품은 폐원단 70% 이상으로 만들어요.\n남는 자투리도 워크숍 재료로 다시 씁니다.",
+        photos: [],
+        links: [{ url: "https://example.com/canvasgarden-sustainability" }],
+      },
+    ],
     soul: {
       values: ["친환경", "손맛", "느린 호흡"],
       tone: "단단하지만 다정한, 정성스러운",
@@ -63,7 +136,7 @@ const seedMakers: Maker[] = [
     trust: {
       homepage: "https://www.canvasgarden.shop",
       instagram: "@canvasgarden",
-      address: "서울특별시",
+      address: "서울 성동구 성수이로 88 2층 캔버스가든",
       description: "버려지는 천에 새 이야기를 입히는 패브릭 브랜드.",
     },
     collabOpen: true,
