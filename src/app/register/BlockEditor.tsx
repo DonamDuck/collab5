@@ -325,36 +325,38 @@ export function BlockEditor({ blocks, onChange, onUploadingChange, onSheetOpenCh
             {/* ── 공통 첨부: 사진(최대3) + 링크(최대3) ── */}
             <div className="space-y-3 border-t border-hairline pt-3">
               <div>
-                <p className="mb-1.5 text-sm text-mute">사진 담기 (선택 · 최대 3장)</p>
-                <div className="flex flex-wrap gap-2">
-                  {b.photos.map((url, k) => (
-                    <div key={k} className="relative h-20 w-20 shrink-0 overflow-hidden rounded-md border border-hairline">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={url} alt="" className="h-full w-full object-cover" />
-                      <button
-                        type="button"
-                        onClick={() => removePhoto(i, k)}
-                        aria-label="사진 삭제"
-                        className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-pill bg-ink/60 text-[11px] text-white"
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  ))}
-                  {b.photos.length < 3 && (
-                    <label className="flex h-20 w-20 shrink-0 cursor-pointer flex-col items-center justify-center rounded-md border border-dashed border-border-strong bg-surface text-mute">
-                      <span className="text-xl leading-none">＋</span>
-                      <span className="mt-1 text-[11px]">사진(선택)</span>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        multiple
-                        className="hidden"
-                        onChange={(e) => addPhotos(i, e.target.files)}
-                      />
-                    </label>
-                  )}
-                </div>
+                <CollapsedPhotos photoCount={b.photos.length}>
+                  <p className="mb-1.5 text-sm text-mute">사진 담기 (선택 · 최대 3장)</p>
+                  <div className="flex flex-wrap gap-2">
+                    {b.photos.map((url, k) => (
+                      <div key={k} className="relative h-20 w-20 shrink-0 overflow-hidden rounded-md border border-hairline">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={url} alt="" className="h-full w-full object-cover" />
+                        <button
+                          type="button"
+                          onClick={() => removePhoto(i, k)}
+                          aria-label="사진 삭제"
+                          className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-pill bg-ink/60 text-[11px] text-white"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+                    {b.photos.length < 3 && (
+                      <label className="flex h-20 w-20 shrink-0 cursor-pointer flex-col items-center justify-center rounded-md border border-dashed border-border-strong bg-surface text-mute">
+                        <span className="text-xl leading-none">＋</span>
+                        <span className="mt-1 text-[11px]">사진(선택)</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          multiple
+                          className="hidden"
+                          onChange={(e) => addPhotos(i, e.target.files)}
+                        />
+                      </label>
+                    )}
+                  </div>
+                </CollapsedPhotos>
               </div>
               <div>
                 {b.links.map((l, k) => (
@@ -506,6 +508,28 @@ export function BlockEditor({ blocks, onChange, onUploadingChange, onSheetOpenCh
       )}
     </div>
   );
+}
+
+// 접힌 사진 첨부 — 사진 있으면 펼침 시작(기존 데이터 은닉 금지), 없으면 텍스트 버튼만.
+// [Gate3 NIT-3] 자동 펼침은 0→n 전이에서만 — 사용자가 일부러 접은 상태와 싸우지 않는다. (register/page.tsx 동일 패턴)
+function CollapsedPhotos({ children, photoCount }: { children: React.ReactNode; photoCount: number }) {
+  const [open, setOpen] = useState(photoCount > 0);
+  const prev = useRef(photoCount);
+  useEffect(() => {
+    if (prev.current === 0 && photoCount > 0) setOpen(true); // 수정 로드·비동기 업로드 반영(0→n)만
+    prev.current = photoCount;
+  }, [photoCount]);
+  if (!open)
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="text-[14px] text-mute underline underline-offset-2"
+      >
+        + 사진 담기 (선택)
+      </button>
+    );
+  return <>{children}</>;
 }
 
 // space 특징 칩 — 키워드칩(③) 토글 패턴 + 직접 추가. 입력 상태를 이 카드에 격리.

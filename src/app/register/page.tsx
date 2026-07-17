@@ -1310,13 +1310,15 @@ function RegisterForm() {
                 placeholder="예: 이야기가 깃든 옷을 수선하고 업사이클링하는 워크숍을 진행해요."
                 className="w-full rounded-sm border border-hairline bg-surface px-3 py-2.5 text-base leading-relaxed text-ink outline-none placeholder:text-faint focus:border-focus"
               />
-              <PhotoGrid
-                items={act.photos}
-                max={3}
-                onAdd={(files) => addActPhotos(i, files)}
-                onRemove={(k) => removeActPhoto(i, k)}
-                onReorder={(from, to) => moveActPhoto(i, from, to)}
-              />
+              <CollapsedPhotos photoCount={act.photos.length}>
+                <PhotoGrid
+                  items={act.photos}
+                  max={3}
+                  onAdd={(files) => addActPhotos(i, files)}
+                  onRemove={(k) => removeActPhoto(i, k)}
+                  onReorder={(from, to) => moveActPhoto(i, from, to)}
+                />
+              </CollapsedPhotos>
             </SortableCard>
           ))}
           {activities.length < 5 && (
@@ -1502,14 +1504,16 @@ function RegisterForm() {
                   </div>
                   {/* 사진 첨부 — 카드 최하단으로 이동 */}
                   <div>
-                    <p className="mb-1.5 text-sm text-mute">사진 (선택 · 최대 3장)</p>
-                    <PhotoGrid
-                      items={h.photos}
-                      max={3}
-                      onAdd={(files) => addHistPhotos(i, files)}
-                      onRemove={(k) => removeHistPhoto(i, k)}
-                      onReorder={(from, to) => moveHistPhoto(i, from, to)}
-                    />
+                    <CollapsedPhotos photoCount={h.photos.length}>
+                      <p className="mb-1.5 text-sm text-mute">사진 (선택 · 최대 3장)</p>
+                      <PhotoGrid
+                        items={h.photos}
+                        max={3}
+                        onAdd={(files) => addHistPhotos(i, files)}
+                        onRemove={(k) => removeHistPhoto(i, k)}
+                        onReorder={(from, to) => moveHistPhoto(i, from, to)}
+                      />
+                    </CollapsedPhotos>
                   </div>
                 </SortableCard>
               ))}
@@ -2285,6 +2289,28 @@ function AiBadge() {
 // 못 찾은 검증가능 필드 — 직접 입력 노티
 function MissingNote() {
   return <span className="text-[11px] font-normal text-mute">· 직접 입력이 필요해요</span>;
+}
+
+// 접힌 사진 첨부 — 사진 있으면 펼침 시작(기존 데이터 은닉 금지), 없으면 텍스트 버튼만.
+// [Gate3 NIT-3] 자동 펼침은 0→n 전이에서만 — 사용자가 일부러 접은 상태와 싸우지 않는다.
+function CollapsedPhotos({ children, photoCount }: { children: React.ReactNode; photoCount: number }) {
+  const [open, setOpen] = useState(photoCount > 0);
+  const prev = useRef(photoCount);
+  useEffect(() => {
+    if (prev.current === 0 && photoCount > 0) setOpen(true); // 위저드 주입·수정 로드(0→n)만
+    prev.current = photoCount;
+  }, [photoCount]);
+  if (!open)
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="text-[14px] text-mute underline underline-offset-2"
+      >
+        + 사진 담기 (선택)
+      </button>
+    );
+  return <>{children}</>;
 }
 
 function ChipRow({
