@@ -2070,8 +2070,8 @@ function RegisterForm() {
             >
               <div className="mb-3 flex items-start justify-between">
                 <div className="pr-8">
-                  <p className="text-[16px] font-bold text-ink">소개서 미리보기</p>
-                  <p className="mt-1 text-[13px] leading-relaxed text-mute">
+                  <p className="text-[19px] font-bold text-ink">소개서 미리보기</p>
+                  <p className="mt-1.5 text-[15px] leading-relaxed text-mute">
                     사진이 없어도 이렇게 완성돼요. 나중에 언제든 더할 수 있어요.
                   </p>
                 </div>
