@@ -51,7 +51,7 @@ export default function Home() {
           이런 소개서가 만들어져요
         </h2>
         <p className="mx-auto mt-2 max-w-[440px] break-keep text-center text-base leading-relaxed text-body">
-          사진이 아직 없어도 괜찮아요. 두 버전 모두 실제 화면이에요.
+          아래 예시 소개서를 확인해 보세요
         </p>
         <div className="mt-8">
           <PreviewPhones />
