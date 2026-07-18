@@ -103,7 +103,8 @@ export interface CollabHint {
 export interface BlockHint {
   type: "metrics" | "press" | "space" | "reviews";
   reason: string; // "인스타그램에서 팔로워 1.2만을 봤어요" 형태 근거 한 줄
-  items?: { label: string; value?: string; year?: string }[]; // metrics·press 밑그림
+  desc?: string; // space 공간 소개 밑그림(해요체 한두 문장). metrics·press는 미사용
+  items?: { label: string; value?: string; year?: string; desc?: string }[]; // metrics·press 밑그림(press item desc=기사 한 줄 요약)
 }
 /** 크롤이 발견한 '원하는 파트너·협업' 단서 — 리빌 seeks 카드 소스 */
 export interface SeeksHint {
@@ -378,7 +379,21 @@ export class MockSearchProvider implements SearchProvider {
       collabHints: [
         { partner: "오월의숲", desc: "함께 팝업을 열었다는 후기가 보여요.", source: "카페글" },
       ],
-      blockHints: [],
+      blockHints: [
+        {
+          type: "press",
+          reason: "지역 매체에서 소개 기사를 봤어요",
+          items: [
+            { label: "은평시민신문", year: "2025", desc: "동네 사랑방 같은 작업실로 소개했어요." },
+            { label: "트립닷컴", year: "2025", desc: "" },
+          ],
+        },
+        {
+          type: "space",
+          reason: "블로그에서 공간 사진을 봤어요",
+          desc: "다양한 소품과 작업물을 볼 수 있는 아담한 작업실 겸 쇼룸이에요. 소규모 워크숍도 열려요.",
+        },
+      ],
       seeksHint: null,
     };
   }
@@ -463,16 +478,21 @@ const OptionsResultSchema = z.object({
       z.object({
         type: z.enum(["metrics", "press", "space", "reviews"]),
         reason: z.string().describe('"인스타그램에서 팔로워 1.2만을 봤어요" 형태 근거 한 줄'),
+        desc: z
+          .string()
+          .optional()
+          .describe("space 공간 소개 밑그림(해요체 한두 문장). metrics·press·reviews는 생략"),
         items: z
           .array(
             z.object({
               label: z.string(),
               value: z.string().optional(),
               year: z.string().optional(),
+              desc: z.string().optional(),
             })
           )
           .optional()
-          .describe("metrics·press 밑그림. space·reviews는 생략"),
+          .describe("metrics·press 밑그림. press item의 desc=그 매체가 브랜드를 소개한 내용 한 줄 요약. space·reviews는 생략"),
       })
     )
     .max(2)
@@ -557,6 +577,10 @@ const GEMINI_OPTIONS_SCHEMA = {
             type: Type.STRING,
             description: '"인스타그램에서 팔로워 1.2만을 봤어요" 형태의 근거 한 줄',
           },
+          desc: {
+            type: Type.STRING,
+            description: "space 공간 소개 밑그림(해요체 한두 문장). metrics·press·reviews는 빈 문자열",
+          },
           items: {
             type: Type.ARRAY,
             items: {
@@ -565,10 +589,11 @@ const GEMINI_OPTIONS_SCHEMA = {
                 label: { type: Type.STRING },
                 value: { type: Type.STRING, description: "없으면 빈 문자열" },
                 year: { type: Type.STRING, description: "없으면 빈 문자열" },
+                desc: { type: Type.STRING, description: "press: 그 매체가 브랜드를 소개한 내용 한 줄 요약. 없으면 빈 문자열" },
               },
               required: ["label"],
             },
-            description: "metrics·press 밑그림(label·value·year). space·reviews는 빈 배열",
+            description: "metrics·press 밑그림(label·value·year·desc). space·reviews는 빈 배열",
           },
         },
         required: ["type", "reason"],
@@ -628,8 +653,8 @@ ${BRAND_VOICE}
 - activityHints: 조사 메모에 실제로 언급된 이 브랜드의 활동(워크숍·클래스·팝업·제품라인 등)만 0~3건. collabHints: 메모에 파트너명이 드러난 협업 소식만 0~3건. 각 항목의 source는 그 정보가 나온 출처 유형(네이버 블로그 후기/카페글/웹 검색/인스타그램)으로. ⚠️메모에 없으면 절대 만들지 말고 빈 배열로 둬라(참고용 힌트라 사실만).
 - blockHints: 조사에서 근거가 뚜렷할 때만 추천 블록 최대 2개.
   공개 수치 발견(팔로워·서포터·펀딩액·판매량·매출·운영 연차·직원 규모·입점처 수 등, ⚠️후기 수·별점은 제외) → metrics(items에 label·value 밑그림) /
-  언론·수상·방송 → press(items에 label=제목, year) /
-  공간 운영 흔적 → space(items 없음).
+  언론·수상·방송 → press(items에 label=매체·수상명, year, desc=그 매체가 이 브랜드를 소개한 내용 한 줄 요약 "해요체". desc는 조사 메모에 실제로 드러난 내용만 — 없으면 빈 문자열, 창작 금지) /
+  공간 운영 흔적 → space(items 없음, desc=공간이 어떤 분위기이고 무엇을 할 수 있는지 조사 메모 근거로 해요체 한두 문장. 근거 없으면 빈 문자열).
   ⚠️reviews(고객 후기) 블록은 지금은 추천하지 마라 — 후기 표현은 별도 재설계 예정이라 blockHints에 reviews를 넣지 않는다.
   reason은 반드시 "~에서 …을 봤어요" 형태의 근거 한 줄. 근거 없으면 빈 배열.
 - seeksHint: 조사에서 이 브랜드가 어떤 파트너·협업을 원하는지 근거가 보이면 제안(없으면 null). 지어내지 않는다. types는 콜라보 유형(제품콜라보·팝업·워크숍·공동굿즈·공동콘텐츠·행사참여·공간대여 중), note는 해요체 한두 문장, reason은 '~에서 봤어요' 근거.
@@ -1233,11 +1258,13 @@ class NaverGeminiProvider implements SearchProvider {
           return {
             type: h.type,
             reason: h.reason.trim(),
+            desc: h.desc?.trim() || undefined, // space 공간 소개 밑그림
             items: items.length
               ? items.map((it) => ({
                   label: it.label.trim(),
                   value: it.value || undefined,
                   year: it.year || undefined,
+                  desc: it.desc?.trim() || undefined, // press 기사 한 줄 요약
                 }))
               : undefined,
           };
