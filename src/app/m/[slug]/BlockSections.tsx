@@ -76,12 +76,17 @@ function BlockBody({ b }: { b: Block }) {
       );
     case "press":
       return (
-        <div className="space-y-1.5">
+        <div className="space-y-3">
           {b.items.map((it, i) => (
-            <p key={i} className="text-[16px] text-body">
-              <span className="font-medium text-ink">{it.title}</span>
-              {it.year && <span className="text-mute"> · {it.year}</span>}
-            </p>
+            <div key={i}>
+              <p className="text-[16px] text-body">
+                <span className="font-medium text-ink">{it.title}</span>
+                {it.year && <span className="text-mute"> · {it.year}</span>}
+              </p>
+              {it.desc && (
+                <p className="mt-0.5 text-[15px] leading-relaxed text-mute">{it.desc}</p>
+              )}
+            </div>
           ))}
         </div>
       );

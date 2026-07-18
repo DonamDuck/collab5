@@ -107,8 +107,8 @@ const seedMakers: Maker[] = [
       {
         type: "press",
         items: [
-          { title: "버려진 천의 두 번째 삶 — 캔버스가든 인터뷰", year: "2025" },
-          { title: "서울 업사이클 브랜드 5선" },
+          { title: "버려진 천의 두 번째 삶 — 캔버스가든 인터뷰", year: "2025", desc: "폐원단을 가방으로 되살리는 작업 방식을 자세히 다뤄줬어요." },
+          { title: "서울 업사이클 브랜드 5선", desc: "지속가능한 로컬 브랜드로 함께 소개됐어요." },
         ],
         photos: [],
         links: [{ label: "인터뷰 기사", url: "https://example.com/canvasgarden-interview" }],

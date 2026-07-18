@@ -357,7 +357,14 @@ function sanitizeBlocks(blocks?: Block[]): Block[] {
       if (b.type === "metrics")
         return { type: b.type, photos: b.photos, links, items: b.items.filter((i) => i.label.trim() || i.value.trim()) };
       if (b.type === "press")
-        return { type: b.type, photos: b.photos, links, items: b.items.filter((i) => i.title.trim()) };
+        return {
+          type: b.type,
+          photos: b.photos,
+          links,
+          items: b.items
+            .filter((i) => i.title.trim())
+            .map((i) => ({ title: i.title, year: i.year, desc: i.desc?.trim() || undefined })),
+        };
       if (b.type === "reviews")
         return { type: b.type, photos: b.photos, links, items: b.items.filter((i) => i.quote.trim()) };
       if (b.type === "team")

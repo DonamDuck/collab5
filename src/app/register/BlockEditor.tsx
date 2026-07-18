@@ -31,7 +31,7 @@ export function emptyBlock(type: BlockType): Block {
     case "metrics": return { ...base, type, items: [{ label: "", value: "" }] };
     case "reviews": return { ...base, type, items: [{ quote: "", source: "" }] };
     case "team": return { ...base, type, intro: "" };
-    case "press": return { ...base, type, items: [{ title: "", year: "" }] };
+    case "press": return { ...base, type, items: [{ title: "", year: "", desc: "" }] };
     case "space": return { ...base, type, desc: "", features: [] };
     case "custom": return { ...base, type, title: "", body: "" };
   }
@@ -214,38 +214,47 @@ export function BlockEditor({ blocks, onChange, onUploadingChange, onSheetOpenCh
             )}
 
             {b.type === "press" && (
-              <div className="space-y-2">
+              <div className="space-y-3">
                 {b.items.map((it, k) => (
-                  <div key={k} className="flex items-center gap-2">
-                    <input
-                      value={it.title}
-                      onChange={(e) => setBlock(i, { ...b, items: b.items.map((x, y) => (y === k ? { ...x, title: e.target.value } : x)) })}
-                      placeholder="예: 2025 서울디자인위크 참여"
-                      className={inputCls}
+                  <div key={k} className="space-y-2 rounded-sm border border-hairline bg-surface-soft p-2.5">
+                    <div className="flex items-center gap-2">
+                      <input
+                        value={it.title}
+                        onChange={(e) => setBlock(i, { ...b, items: b.items.map((x, y) => (y === k ? { ...x, title: e.target.value } : x)) })}
+                        placeholder="어디에 소개됐나요? 예: OO신문, 트립닷컴"
+                        className={inputCls}
+                      />
+                      <input
+                        value={it.year ?? ""}
+                        onChange={(e) => setBlock(i, { ...b, items: b.items.map((x, y) => (y === k ? { ...x, year: e.target.value.replace(/\D/g, "").slice(0, 4) } : x)) })}
+                        placeholder="연도"
+                        inputMode="numeric"
+                        maxLength={4}
+                        className="h-10 w-20 shrink-0 rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
+                      />
+                      {b.items.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => setBlock(i, { ...b, items: b.items.filter((_, y) => y !== k) })}
+                          className="shrink-0 text-sm text-faint hover:text-ink"
+                        >
+                          삭제
+                        </button>
+                      )}
+                    </div>
+                    <textarea
+                      value={it.desc ?? ""}
+                      onChange={(e) => setBlock(i, { ...b, items: b.items.map((x, y) => (y === k ? { ...x, desc: e.target.value } : x)) })}
+                      rows={2}
+                      placeholder="어떻게 소개됐나요? (선택) 예: 동네 사랑방 같은 공간으로 소개했어요"
+                      className={taCls}
                     />
-                    <input
-                      value={it.year ?? ""}
-                      onChange={(e) => setBlock(i, { ...b, items: b.items.map((x, y) => (y === k ? { ...x, year: e.target.value.replace(/\D/g, "").slice(0, 4) } : x)) })}
-                      placeholder="연도"
-                      inputMode="numeric"
-                      maxLength={4}
-                      className="h-10 w-20 shrink-0 rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
-                    />
-                    {b.items.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => setBlock(i, { ...b, items: b.items.filter((_, y) => y !== k) })}
-                        className="shrink-0 text-sm text-faint hover:text-ink"
-                      >
-                        삭제
-                      </button>
-                    )}
                   </div>
                 ))}
                 {b.items.length < 4 && (
                   <button
                     type="button"
-                    onClick={() => setBlock(i, { ...b, items: [...b.items, { title: "", year: "" }] })}
+                    onClick={() => setBlock(i, { ...b, items: [...b.items, { title: "", year: "", desc: "" }] })}
                     className="inline-flex items-center gap-1 rounded-sm border border-primary-tint bg-primary-pale px-3 py-1.5 text-sm font-medium text-primary-on transition-colors hover:bg-primary-tint"
                   >
                     ＋ 소개 추가
@@ -322,78 +331,16 @@ export function BlockEditor({ blocks, onChange, onUploadingChange, onSheetOpenCh
               </div>
             )}
 
-            {/* ── 공통 첨부: 사진(최대3) + 링크(최대3) ── */}
-            <div className="space-y-3 border-t border-hairline pt-3">
-              <div>
-                <CollapsedPhotos photoCount={b.photos.length}>
-                  <p className="mb-1.5 text-sm text-mute">사진 담기 (선택 · 최대 3장)</p>
-                  <div className="flex flex-wrap gap-2">
-                    {b.photos.map((url, k) => (
-                      <div key={k} className="relative h-20 w-20 shrink-0 overflow-hidden rounded-md border border-hairline">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={url} alt="" className="h-full w-full object-cover" />
-                        <button
-                          type="button"
-                          onClick={() => removePhoto(i, k)}
-                          aria-label="사진 삭제"
-                          className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-pill bg-ink/60 text-[11px] text-white"
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    ))}
-                    {b.photos.length < 3 && (
-                      <label className="flex h-20 w-20 shrink-0 cursor-pointer flex-col items-center justify-center rounded-md border border-dashed border-border-strong bg-surface text-mute">
-                        <span className="text-xl leading-none">＋</span>
-                        <span className="mt-1 text-[11px]">사진(선택)</span>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          multiple
-                          className="hidden"
-                          onChange={(e) => addPhotos(i, e.target.files)}
-                        />
-                      </label>
-                    )}
-                  </div>
-                </CollapsedPhotos>
-              </div>
-              <div>
-                {b.links.map((l, k) => (
-                  <div key={k} className="mb-2 flex items-center gap-2">
-                    <input
-                      value={l.url}
-                      onChange={(e) => setLink(i, k, { url: e.target.value })}
-                      placeholder="https://"
-                      className="h-9 min-w-0 flex-1 rounded-sm border border-hairline bg-surface px-3 text-sm text-ink outline-none placeholder:text-faint focus:border-focus"
-                    />
-                    <input
-                      value={l.label ?? ""}
-                      onChange={(e) => setLink(i, k, { label: e.target.value })}
-                      placeholder="링크 이름 (선택)"
-                      className="h-9 w-32 shrink-0 rounded-sm border border-hairline bg-surface px-3 text-sm text-ink outline-none placeholder:text-faint focus:border-focus"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => removeLink(i, k)}
-                      aria-label="링크 삭제"
-                      className="shrink-0 text-sm text-faint hover:text-ink"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                ))}
-                {b.links.length < 3 && (
-                  <button
-                    type="button"
-                    onClick={() => addLink(i)}
-                    className="text-sm font-medium text-mute hover:text-ink"
-                  >
-                    ＋ 링크 추가
-                  </button>
-                )}
-              </div>
-            </div>
+            {/* ── 공통 첨부: 사진(최대3) + 링크(최대3) — 두 액션 버튼 스타일·위치 통일 ── */}
+            <BlockAttachments
+              photos={b.photos}
+              links={b.links}
+              onAddPhotos={(files) => addPhotos(i, files)}
+              onRemovePhoto={(k) => removePhoto(i, k)}
+              onAddLink={() => addLink(i)}
+              onSetLink={(k, p) => setLink(i, k, p)}
+              onRemoveLink={(k) => removeLink(i, k)}
+            />
           </div>
         );
       })}
@@ -510,26 +457,110 @@ export function BlockEditor({ blocks, onChange, onUploadingChange, onSheetOpenCh
   );
 }
 
-// 접힌 사진 첨부 — 사진 있으면 펼침 시작(기존 데이터 은닉 금지), 없으면 텍스트 버튼만.
-// [Gate3 NIT-3] 자동 펼침은 0→n 전이에서만 — 사용자가 일부러 접은 상태와 싸우지 않는다. (register/page.tsx 동일 패턴)
-function CollapsedPhotos({ children, photoCount }: { children: React.ReactNode; photoCount: number }) {
-  const [open, setOpen] = useState(photoCount > 0);
-  const prev = useRef(photoCount);
+// 블록 공통 첨부(사진 최대3 · 링크 최대3) — '＋ 사진 담기'와 '＋ 링크 추가' 버튼을
+// 같은 스타일·같은 위치(하단 한 줄)로 통일. 사진은 있으면 펼침 시작(0→n 전이에서만 자동 펼침 —
+// 사용자가 일부러 접은 상태와 싸우지 않는다).
+function BlockAttachments({
+  photos,
+  links,
+  onAddPhotos,
+  onRemovePhoto,
+  onAddLink,
+  onSetLink,
+  onRemoveLink,
+}: {
+  photos: string[];
+  links: BlockLink[];
+  onAddPhotos: (files: FileList | null) => void;
+  onRemovePhoto: (k: number) => void;
+  onAddLink: () => void;
+  onSetLink: (k: number, p: Partial<BlockLink>) => void;
+  onRemoveLink: (k: number) => void;
+}) {
+  const [photosOpen, setPhotosOpen] = useState(photos.length > 0);
+  const prev = useRef(photos.length);
   useEffect(() => {
-    if (prev.current === 0 && photoCount > 0) setOpen(true); // 수정 로드·비동기 업로드 반영(0→n)만
-    prev.current = photoCount;
-  }, [photoCount]);
-  if (!open)
-    return (
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="text-[14px] text-mute underline underline-offset-2"
-      >
-        + 사진 담기 (선택)
-      </button>
-    );
-  return <>{children}</>;
+    if (prev.current === 0 && photos.length > 0) setPhotosOpen(true); // 수정 로드·비동기 업로드(0→n)만
+    prev.current = photos.length;
+  }, [photos.length]);
+
+  const actionCls = "text-sm font-medium text-mute hover:text-ink";
+
+  return (
+    <div className="space-y-3 border-t border-hairline pt-3">
+      {photosOpen && (
+        <div>
+          <p className="mb-1.5 text-sm text-mute">사진 담기 (선택 · 최대 3장)</p>
+          <div className="flex flex-wrap gap-2">
+            {photos.map((url, k) => (
+              <div key={k} className="relative h-20 w-20 shrink-0 overflow-hidden rounded-md border border-hairline">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={url} alt="" className="h-full w-full object-cover" />
+                <button
+                  type="button"
+                  onClick={() => onRemovePhoto(k)}
+                  aria-label="사진 삭제"
+                  className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-pill bg-ink/60 text-[11px] text-white"
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
+            {photos.length < 3 && (
+              <label className="flex h-20 w-20 shrink-0 cursor-pointer flex-col items-center justify-center rounded-md border border-dashed border-border-strong bg-surface text-mute">
+                <span className="text-xl leading-none">＋</span>
+                <span className="mt-1 text-[11px]">사진(선택)</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  className="hidden"
+                  onChange={(e) => onAddPhotos(e.target.files)}
+                />
+              </label>
+            )}
+          </div>
+        </div>
+      )}
+      {links.map((l, k) => (
+        <div key={k} className="flex items-center gap-2">
+          <input
+            value={l.url}
+            onChange={(e) => onSetLink(k, { url: e.target.value })}
+            placeholder="https://"
+            className="h-9 min-w-0 flex-1 rounded-sm border border-hairline bg-surface px-3 text-sm text-ink outline-none placeholder:text-faint focus:border-focus"
+          />
+          <input
+            value={l.label ?? ""}
+            onChange={(e) => onSetLink(k, { label: e.target.value })}
+            placeholder="링크 이름 (선택)"
+            className="h-9 w-32 shrink-0 rounded-sm border border-hairline bg-surface px-3 text-sm text-ink outline-none placeholder:text-faint focus:border-focus"
+          />
+          <button
+            type="button"
+            onClick={() => onRemoveLink(k)}
+            aria-label="링크 삭제"
+            className="shrink-0 text-sm text-faint hover:text-ink"
+          >
+            ✕
+          </button>
+        </div>
+      ))}
+      {/* 액션 행 — 두 버튼 같은 스타일·같은 위치 */}
+      <div className="flex flex-wrap items-center gap-4">
+        {!photosOpen && (
+          <button type="button" onClick={() => setPhotosOpen(true)} className={actionCls}>
+            ＋ 사진 담기 (선택)
+          </button>
+        )}
+        {links.length < 3 && (
+          <button type="button" onClick={onAddLink} className={actionCls}>
+            ＋ 링크 추가
+          </button>
+        )}
+      </div>
+    </div>
+  );
 }
 
 // space 특징 칩 — 키워드칩(③) 토글 패턴 + 직접 추가. 입력 상태를 이 카드에 격리.

@@ -37,6 +37,18 @@ function toStrArr(v: unknown): string[] {
   return Array.isArray(v) ? v.filter((s): s is string => typeof s === "string" && !!s.trim()) : [];
 }
 
+// 짝 없는 따옴표 정리 — 크롤 제목에 열림 없이 닫힘만 남는 경우가 있어(예: 「레이지오터" 기사」)
+// 홀수 개(=짝 안 맞음)면 해당 종류 따옴표를 모두 제거. 스마트 따옴표는 열림/닫힘 수가 다르면 제거.
+function balanceQuotes(s: string): string {
+  let out = s;
+  for (const q of ['"', "'"]) {
+    if ((out.split(q).length - 1) % 2 === 1) out = out.split(q).join("");
+  }
+  if ((out.match(/[“]/g) || []).length !== (out.match(/[”]/g) || []).length) out = out.replace(/[“”]/g, "");
+  if ((out.match(/[‘]/g) || []).length !== (out.match(/[’]/g) || []).length) out = out.replace(/[‘’]/g, "");
+  return out.replace(/\s{2,}/g, " ").trim();
+}
+
 // 편집 중 콜라보 이력 — 활동(activities)과 동일한 인라인 카드 패턴.
 // photos는 {url,uploading?} — 선택 즉시 Storage 업로드, 제출 시 URL만 전송. typeInput·typeInputOpen은 UI 로컬 상태(전송 제외).
 type HistItem = {
@@ -686,8 +698,15 @@ function RegisterForm() {
             if (nb.type === "press") {
               const items = (h.items ?? [])
                 .filter((it) => it.label.trim())
-                .map((it) => ({ title: it.label, year: it.year || undefined }));
+                .map((it) => ({
+                  title: balanceQuotes(it.label), // 짝 없는 따옴표 정리(#1)
+                  year: it.year || undefined,
+                  desc: it.desc?.trim() ? balanceQuotes(it.desc) : undefined, // 매체별 소개 요약(#2)
+                }));
               if (items.length) nb.items = items;
+            }
+            if (nb.type === "space" && h.desc?.trim()) {
+              nb.desc = h.desc.trim(); // 공간 소개 밑그림 주입 — 없으면 빈 블록이 저장 시 탈락(#3)
             }
             return [...p, nb];
           });

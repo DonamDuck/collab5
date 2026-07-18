@@ -138,7 +138,7 @@ function storyItemsOf(o: EnrichOptions, values: string[]): StoryItem[] {
       title: b.items?.length
         ? b.items.map((it) => [it.label, it.value ?? it.year].filter(Boolean).join(" ")).join(" · ")
         : "",
-      detail: "",
+      detail: b.desc || "", // space 공간 소개 밑그림(있으면 체크리스트에 노출)
       reason: b.reason || "웹에서 봤어요",
     })
   );
