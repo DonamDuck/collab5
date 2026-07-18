@@ -109,7 +109,7 @@ function PhoneGallery({ demo }: { demo: { key: string; slides: readonly { src: s
         onPointerCancel={endDrag}
         onDragStart={(e) => e.preventDefault()}
         style={{ gap: SLIDE_GAP_PX }}
-        className="flex snap-x snap-mandatory overflow-x-auto px-[calc(13%+5px)] pb-2 cursor-grab select-none active:cursor-grabbing sm:snap-none sm:px-[21px] [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="flex snap-x snap-mandatory overflow-x-auto pl-[calc(6%+5px)] pr-[calc(13%+5px)] pb-2 cursor-grab select-none active:cursor-grabbing sm:snap-none sm:pl-1 sm:pr-[21px] [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         {demo.slides.map((s, i) => (
           <div
