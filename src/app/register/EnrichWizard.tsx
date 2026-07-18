@@ -57,9 +57,11 @@ type Kind =
 // 칩 섹션 표시 순서 + 사람이 읽는 라벨
 // ⚠️ enrich.ts가 만드는 칩 section과 반드시 동기화 — 여기 없는 섹션의 칩은 조용히 안 그려진다
 //    (홈페이지 메타 칩 "우리 소개(홈페이지)"가 누락돼 있던 사건 2026-07-19).
-const SECTION_ORDER = ["우리 소개(홈페이지)", "키워드", "정체", "제품", "활동", "콜라보", "원하는협업", "고객", "숫자", "알려짐", "공간", "추천", "직접"];
+const SECTION_ORDER = ["우리 소개(홈페이지)", "지도확인", "키워드", "정체", "제품", "활동", "콜라보", "원하는협업", "고객", "숫자", "알려짐", "공간", "후기흔적", "추천", "직접"];
 const SECTION_LABELS: Record<string, string> = {
   "우리 소개(홈페이지)": "홈페이지에 적힌 소개",
+  지도확인: "지도에서 확인했어요",
+  후기흔적: "후기에서 보여요",
   키워드: "브랜드 키워드",
   정체: "우리는",
   제품: "만드는 것",
@@ -251,11 +253,12 @@ export function EnrichWizard({
       return n;
     });
 
-  // 전체 칩(선택 화면 표시용) — 크롤 + (빈손이면 스타터) + 직접 추가. 텍스트로 dedupe.
+  // 전체 칩(선택 화면 표시용) — 크롤 + 스타터 + 직접 추가. 텍스트로 dedupe.
+  // 스타터 노출 여부는 서버(route)가 결정해 내려줌(빈손·칩 6개 미만) — tier와 무관하게 그린다.
   const allChips: KeywordChip[] = (() => {
     const seen = new Set<string>();
     const out: KeywordChip[] = [];
-    for (const c of [...crawlChips, ...(tier === "thin" ? starterChips : []), ...customChips]) {
+    for (const c of [...crawlChips, ...starterChips, ...customChips]) {
       const k = c.text.replace(/\s/g, "");
       if (seen.has(k)) continue;
       seen.add(k);

@@ -103,5 +103,43 @@ check(
   `chips=${gatedChips.length}`
 );
 
+// ── 네이버+제미나이 칩 조합 (대표 지시 2026-07-19) ──
+console.log("[네이버 칩 — 지도확인·후기흔적]");
+const naverMemo = `[지도 교차검증] ✅ 네이버 지도 주소가 입력 지역(양주 광사동)과 일치 — 이 업체가 맞아요. 주소·업종은 신뢰.
+
+[네이버 지역검색 — 주소·업종·전화]
+· 피망당구클럽 | 업종:스포츠,오락>당구장 | 도로명:경기도 양주시 고읍남로 6-14 | 지번:경기도 양주시 광사동 651-5 | 전화: | 링크:
+· 옆집당구장 | 업종:스포츠,오락>당구장 | 도로명:다른 주소 | 지번: | 전화: | 링크:
+
+[네이버 블로그 — 소비자 후기·분위기 단서]
+· 고읍동에 대형당구장 생겼네요 피망당구클럽 | 고읍동에 대형당구장 하나 생겼습니다~동호회 모임도 자주 열리고 심야까지 영업해요 주차공간이 없어서 아쉽지만 사장님이 친절해요`;
+const nChips = extractChipsFromResearch(naverMemo, "피망당구클럽", "당구장");
+const nTexts = nChips.map((c) => `${c.section}:${c.text}`);
+check("지도✅ → 업종 카테고리 칩(스포츠·오락)", nChips.some((c) => c.section === "지도확인" && c.text === "스포츠"), JSON.stringify(nTexts));
+check("사용자 입력 업종('당구장')은 칩 제외", !nChips.some((c) => c.text === "당구장"));
+check("브랜드명 없는 이웃 업체 행 무시(중복 카테고리만)", nChips.filter((c) => c.section === "지도확인").length <= 2);
+check("후기 텍스처: 넓은 공간(대형)", nChips.some((c) => c.text === "넓은 공간"));
+check("후기 텍스처: 동호회 모임·심야 영업", nChips.some((c) => c.text === "동호회 모임") && nChips.some((c) => c.text === "심야 영업"));
+check("부정 문맥 가드: '주차공간이 없어서' → 주차 칩 없음", !nChips.some((c) => c.text === "주차 가능"), JSON.stringify(nTexts));
+check("긍정 문맥: '사장님이 친절해요' → 친절 칩", nChips.some((c) => c.text === "친절한 응대"));
+
+const noMapMemo = naverMemo.replace("[지도 교차검증] ✅ 네이버 지도 주소가 입력 지역(양주 광사동)과 일치 — 이 업체가 맞아요. 주소·업종은 신뢰.", "");
+check("지도✅ 없으면 카테고리 칩 없음(오귀속 방지)", !extractChipsFromResearch(noMapMemo, "피망당구클럽", "당구장").some((c) => c.section === "지도확인"));
+check("'불친절' → 친절 칩 없음", !extractChipsFromResearch("[네이버 블로그 — 소비자 후기·분위기 단서]\n· 제목 | 직원이 불친절해서 실망", "가게").some((c) => c.text === "친절한 응대"));
+
+console.log("[겹침 통일 — 포함관계 1개]");
+// 실제 메모 순서 = 네이버 파트 먼저, [출처 2(제미나이)가 뒤
+const dupMemo = `[네이버 블로그 — 소비자 후기·분위기 단서]
+· 후기 | 동호회 모임이 활발해요
+
+[출처 2 · 제미나이]
+[키워드]
+동호회, 당구 강습`;
+const dChips = extractChipsFromResearch(dupMemo, "가게");
+const dongho = dChips.filter((c) => c.text.replace(/\s/g, "").includes("동호회"));
+check("제미나이 '동호회' + 네이버 '동호회 모임' → 1개(더 구체적인 쪽)", dongho.length === 1 && dongho[0].text === "동호회 모임", JSON.stringify(dChips.map((c) => c.text)));
+const wizardSrc2 = readFileSync(join(__dirname, "../src/app/register/EnrichWizard.tsx"), "utf8");
+check("위저드에 지도확인·후기흔적 섹션 등록", wizardSrc2.includes('"지도확인"') && wizardSrc2.includes('"후기흔적"'));
+
 console.log(`\n결과: ${pass} pass / ${fail} fail`);
 process.exit(fail ? 1 : 0);

@@ -1656,7 +1656,11 @@ function unguardParenCommas(s: string): string {
  * 유저가 '나를 나타내는 것'을 고르면 그게 생성 재료가 된다. 사실 게이트(factual)는
  * 기본 OFF·탭 확인 대상. 메모가 비었거나 구조가 없으면 빈 배열(→ thin 폴백).
  */
-export function extractChipsFromResearch(research: string, brandName?: string): KeywordChip[] {
+export function extractChipsFromResearch(
+  research: string,
+  brandName?: string,
+  businessType?: string
+): KeywordChip[] {
   if (!research) return [];
   const brand = brandName?.trim();
   const gi = research.indexOf("[출처 2"); // 제미나이 조사부분(구조 깔끔) 우선
@@ -1670,7 +1674,6 @@ export function extractChipsFromResearch(research: string, brandName?: string): 
     .trim();
   const parts = body.split(/\n?\s*\[([^\]\n]+)\]\s*/); // [pre, header, body, header, body, ...]
   const chips: KeywordChip[] = [];
-  const seen = new Set<string>();
   const STOPWORDS = /^(또한|그리고|하지만|특히|및|기타|등|다만|그러나|이\s*외|그\s*외)$/;
   const push = (raw: string, sec: { label: string; factual: boolean }) => {
     const text = raw
@@ -1702,13 +1705,21 @@ export function extractChipsFromResearch(research: string, brandName?: string): 
     if (brand && (text === brand || new RegExp(`^${brand.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*(은|는|이|가|의)?(\\s|$)`).test(text)))
       return false;
     const key = text.replace(/\s/g, "");
-    if (seen.has(key)) return false;
-    seen.add(key);
-    chips.push({
-      text,
-      section: sec.label,
-      factual: sec.factual || /\d/.test(text) || FACTUAL_RE.test(text),
-    });
+    // 사용자가 이미 입력한 업종과 동일한 칩은 무의미("당구장" 입력자에게 "당구장" 칩) — 제외
+    if (businessType && key === businessType.replace(/\s/g, "")) return false;
+    // 겹침 통일(대표 지시 07-19): 완전 동일뿐 아니라 포함 관계도 1개로 —
+    // "동호회" vs "동호회 모임"이면 더 구체적인(긴) 쪽만 남긴다. 네이버·제미나이 조합의 중복 정리.
+    const factual = sec.factual || /\d/.test(text) || FACTUAL_RE.test(text);
+    for (let j = 0; j < chips.length; j++) {
+      const ek = chips[j].text.replace(/\s/g, "");
+      if (ek === key || ek.includes(key)) return false; // 기존이 같거나 더 구체적 → 새 칩 흡수
+      if (key.includes(ek)) {
+        // 새 칩이 더 구체적 → 기존 자리에서 텍스트만 승격(중복 추가 없음)
+        chips[j] = { ...chips[j], text, factual: chips[j].factual || factual };
+        return false;
+      }
+    }
+    chips.push({ text, section: sec.label, factual });
     return true;
   };
   for (let i = 1; i < parts.length; i += 2) {
@@ -1766,8 +1777,79 @@ export function extractChipsFromResearch(research: string, brandName?: string): 
       if (count >= maxPerSection) break;
     }
   }
+  // ── 네이버 칩(대표 지시 2026-07-19 "네이버+제미나이 조합") — 제미나이가 빈손이어도
+  //    네이버가 검증해 둔 정보를 버리지 않는다. 오프라인 파싱(콜 0), push의 포함관계 통일로 중복 정리. ──
+
+  // ① 지도확인 칩: 지도 교차검증 ✅일 때만(동명 타지역 오귀속 방지), 브랜드명이 든 지역검색
+  //    행의 업종 카테고리("스포츠,오락>당구장")를 검증된 칩으로.
+  if (naverPart.includes("[지도 교차검증] ✅") && brand) {
+    const brandKey = brand.replace(/\s/g, "");
+    const localBlock = naverPart.match(/\[네이버 지역검색[^\]]*\]\n([\s\S]*?)(?=\n\[|$)/)?.[1] ?? "";
+    const catSec = { label: "지도확인", factual: false }; // 지도가 이미 검증 → 사실 게이트 불필요
+    for (const line of localBlock.split("\n")) {
+      const title = line.match(/^·\s*([^|]+)\|/)?.[1] ?? "";
+      if (!title.replace(/\s/g, "").includes(brandKey)) continue; // 동명·이웃 업체 행 제외
+      const cat = line.match(/업종:([^|]*)/)?.[1] ?? "";
+      for (const token of cat.split(/[>,/·]/)) {
+        const t = token.trim();
+        if (t.length >= 2 && t.length <= 12 && !/기타|etc/i.test(t)) push(t, catSec);
+      }
+    }
+  }
+
+  // ② 후기흔적 칩: 브랜드 필터링된 소비자 글(블로그·카페·표적검색)에서 큐레이션 사전으로만 추출.
+  //    LLM 없음·창작 없음 — 글에 실제 등장한 결만. 부정 문맥(주차 없어요·불친절)은 뒤 14자 윈도로 가드.
+  //    웹문서 블록은 제외(디렉토리 잡문 오염원 — 114On 사건).
+  {
+    const TEXTURE_DICT: { re: RegExp; chip: string }[] = [
+      { re: /대형|널찍|넓은/, chip: "넓은 공간" },
+      { re: /(?<!불)친절/, chip: "친절한 응대" },
+      { re: /깔끔|깨끗|청결/, chip: "깔끔한 공간" },
+      { re: /주차/, chip: "주차 가능" },
+      { re: /24시간/, chip: "24시간 운영" },
+      { re: /심야|새벽/, chip: "심야 영업" },
+      { re: /단체|회식/, chip: "단체 이용" },
+      { re: /동호회/, chip: "동호회 모임" },
+      { re: /데이트/, chip: "데이트 코스" },
+      { re: /가성비|저렴/, chip: "가성비" },
+      { re: /맛집/, chip: "맛집 입소문" },
+      { re: /예약/, chip: "예약 가능" },
+      { re: /포장/, chip: "포장 가능" },
+      { re: /배달/, chip: "배달 가능" },
+      { re: /수제|핸드메이드|손수/, chip: "수제" },
+      { re: /원데이\s*클래스|클래스|강습|레슨/, chip: "클래스·레슨" },
+      { re: /콜라보|협업/, chip: "콜라보 경험" },
+      { re: /팝업/, chip: "팝업 경험" },
+      { re: /워크숍|워크샵/, chip: "워크숍" },
+      { re: /단골/, chip: "단골 많음" },
+      { re: /루프탑|테라스/, chip: "루프탑·테라스" },
+      { re: /반려동물|애견|댕댕이/, chip: "반려동물 동반" },
+      { re: /제철/, chip: "제철 재료" },
+      { re: /비건|채식/, chip: "비건 옵션" },
+      { re: /감성/, chip: "감성 공간" },
+      { re: /키즈|아이와/, chip: "아이와 함께" },
+      { re: /혼밥|혼술/, chip: "혼밥·혼술" },
+    ];
+    const NEGATION = /없|불가|어려|아쉽|별로|안\s*되/;
+    let corpus = "";
+    for (const m of naverPart.matchAll(
+      /\[네이버 (?:블로그|카페글|표적검색)[^\]]*\]\n([\s\S]*?)(?=\n\[|$)/g
+    )) {
+      corpus += m[1] + "\n";
+    }
+    const texSec = { label: "후기흔적", factual: false }; // 결 제안 — 최종 판단은 사장님 선택
+    let texCount = 0;
+    for (const { re, chip } of TEXTURE_DICT) {
+      if (texCount >= 8) break;
+      const m = re.exec(corpus);
+      if (!m) continue;
+      if (NEGATION.test(corpus.slice(m.index + m[0].length, m.index + m[0].length + 14))) continue;
+      if (push(chip, texSec)) texCount++;
+    }
+  }
+
   // 홈페이지 메타 소개(신뢰도 최상) → 칩. 통짜가 짧으면 그대로, 길면 조각 분리.
-  // 제미나이 칩과는 push의 seen으로 자동 중복 제거. 맨 앞에 두어 우선 노출.
+  // 제미나이·네이버 칩과는 push의 포함관계 통일로 자동 중복 정리. 맨 앞에 두어 우선 노출.
   if (metaDesc) {
     const metaSec = { label: "우리 소개(홈페이지)", factual: false };
     const before = chips.length;
