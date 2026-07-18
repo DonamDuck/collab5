@@ -32,36 +32,9 @@ const DEMOS = [
   },
 ] as const;
 
+// 홈에서는 탭 없이 사진 예시 갤러리만 노출(결과물 티저). 두 버전 전체 탐색은 '소개서 미리보기' 버튼→/preview.
 export function PreviewPhones() {
-  const [active, setActive] = useState<(typeof DEMOS)[number]["key"]>("photos");
-
-  return (
-    <div>
-      {/* 탭 — 예시 종류 전환 */}
-      <div className="mb-6 flex justify-center gap-2">
-        {DEMOS.map((d) => (
-          <button
-            key={d.key}
-            type="button"
-            onClick={() => setActive(d.key)}
-            className={`inline-flex h-9 items-center rounded-pill border px-4 text-sm font-medium transition-colors ${
-              active === d.key
-                ? "border-primary bg-primary-tint text-primary-on"
-                : "border-hairline bg-surface text-mute"
-            }`}
-          >
-            {d.label}
-          </button>
-        ))}
-      </div>
-
-      {DEMOS.map((d) => (
-        <div key={d.key} className={active === d.key ? "" : "hidden"}>
-          <PhoneGallery demo={d} />
-        </div>
-      ))}
-    </div>
-  );
+  return <PhoneGallery demo={DEMOS[0]} />;
 }
 
 // 피크 캐러셀 — 다음 장이 걸쳐 보이는 갤러리(화살표 없음).

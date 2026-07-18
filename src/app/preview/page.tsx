@@ -15,7 +15,7 @@ export default async function PreviewPage({ searchParams }: { searchParams: Prom
     <main className="mx-auto w-full max-w-[640px] px-4 py-10 sm:px-6">
       <h1 className="text-2xl font-bold text-ink">소개서 미리보기</h1>
       <p className="mt-2 text-base text-mute">사진이 있는 버전과 없는 버전, 둘 다 살펴보세요.</p>
-      <div className="mt-5 flex gap-2">{/* 탭 = Link, active면 primary 톤 */}
+      <div className="mt-5 flex gap-7 border-b border-hairline">{/* 언더라인 탭 — active 밑줄 + 전체 베이스라인 */}
         <Tab href="/preview?tab=photo" active={active === "photo"}>사진 있는 소개서</Tab>
         <Tab href="/preview?tab=none" active={active === "none"}>사진 없는 소개서</Tab>
       </div>
@@ -30,6 +30,16 @@ export default async function PreviewPage({ searchParams }: { searchParams: Prom
     </main>
   );
 }
+// 언더라인 탭 — 선택 시 하단 라이닝(primary) + 볼드, 컨테이너 하단 베이스라인과 -mb-px로 겹침.
 function Tab({ href, active, children }: { href: string; active: boolean; children: React.ReactNode }) {
-  return <Link href={href} className={`flex h-10 items-center rounded-pill border px-4 text-[15px] font-medium ${active ? "border-primary bg-primary-pale text-primary-on" : "border-hairline bg-surface text-body"}`}>{children}</Link>;
+  return (
+    <Link
+      href={href}
+      className={`-mb-px flex h-11 items-center border-b-2 text-[15px] transition-colors ${
+        active ? "border-primary font-bold text-ink" : "border-transparent font-medium text-mute hover:text-body"
+      }`}
+    >
+      {children}
+    </Link>
+  );
 }

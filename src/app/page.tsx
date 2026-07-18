@@ -29,18 +29,12 @@ export default function Home() {
           <br />
           무료로 시작할 수 있어요.
         </p>
-        <div className="mt-7 flex flex-col items-center justify-center gap-2.5 sm:flex-row">
+        <div className="mt-7 flex justify-center">
           <Link
             href="/register"
             className="flex h-12 w-full items-center justify-center rounded-md bg-primary px-6 text-base font-medium text-primary-on sm:w-auto"
           >
             브랜드 소개서 만들기
-          </Link>
-          <Link
-            href="/preview"
-            className="flex h-12 w-full items-center justify-center rounded-md border border-border-strong bg-surface px-6 text-base font-medium text-ink sm:w-auto"
-          >
-            소개서 미리보기
           </Link>
         </div>
       </section>
@@ -55,6 +49,14 @@ export default function Home() {
         </p>
         <div className="mt-8">
           <PreviewPhones />
+        </div>
+        <div className="mt-8 flex justify-center">
+          <Link
+            href="/preview"
+            className="flex h-12 items-center justify-center rounded-md border border-border-strong bg-surface px-7 text-base font-medium text-ink"
+          >
+            소개서 미리보기
+          </Link>
         </div>
       </section>
 
