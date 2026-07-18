@@ -46,7 +46,7 @@ export default function Home() {
       </section>
 
       {/* 미리보기 — 실제 데모 소개서 2종(사진 있는/없는) 폰 프레임. 결과물 먼저 → 과정 설명 순서 */}
-      <section className="mt-16 rounded-2xl bg-surface-soft px-4 py-10 sm:px-8">
+      <section className="mt-16">
         <h2 className="text-center text-2xl font-bold tracking-tight text-ink sm:text-[28px]">
           이런 소개서가 만들어져요
         </h2>
@@ -88,7 +88,7 @@ export default function Home() {
       {/* 왜 소개서? — DM vs 소개서 */}
       <section className="mt-16">
         <h2 className="text-center text-2xl font-bold tracking-tight text-ink sm:text-[28px]">
-          긴 DM보다, 한 장의 소개서
+          소개서를 이렇게 활용해 보세요
         </h2>
         <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2">
           {/* 그냥 DM */}
