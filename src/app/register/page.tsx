@@ -1074,13 +1074,16 @@ function RegisterForm() {
               소개서에 담을 사진을 올려주세요. 최대 10장
             </p>
             {/* 사진 불안 완화 — 사진 없이도 완성 예시를 그 자리에서 확인(바텀시트, 폼 이탈 없음) */}
-            <button
-              type="button"
-              onClick={() => setPreviewOpen(true)}
-              className="mb-2.5 text-[14px] text-primary-on underline underline-offset-2"
-            >
-              사진 없이 소개서를 만들어보셔도 좋아요 → 소개서 미리보기
-            </button>
+            <p className="mb-2.5 text-[14px] leading-relaxed text-body">
+              지금 사진이 없다면 우선, 텍스트형 소개서를 만들어보세요.{" "}
+              <button
+                type="button"
+                onClick={() => setPreviewOpen(true)}
+                className="text-primary-on underline underline-offset-2"
+              >
+                사진 없는 소개서 예시보기
+              </button>
+            </p>
             <PhotoGrid
               items={photos}
               max={10}
@@ -2083,8 +2086,7 @@ function RegisterForm() {
               </div>
               <div className="space-y-5">
                 {[
-                  { src: "/preview/sample-none.jpg", label: "사진 없는 소개서" },
-                  { src: "/preview/sample-photo.jpg", label: "사진 있는 소개서" },
+                  { src: "/preview/sample-none.jpg", label: "사진 없이 작성한 소개서 (기본)" },
                 ].map((s) => (
                   <div key={s.src}>
                     <p className="mb-1.5 text-sm font-medium text-body">{s.label}</p>
