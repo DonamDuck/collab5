@@ -8,6 +8,8 @@
 import { useRef, useState } from "react";
 import Image from "next/image";
 
+const SLIDE_GAP_PX = 29; // 슬라이드 간격 — 기존 16px의 약 1.8배 (대표와 함께 조정 중)
+
 const DEMOS = [
   {
     key: "photos",
@@ -76,7 +78,7 @@ function PhoneGallery({ demo }: { demo: (typeof DEMOS)[number] }) {
     if (!el) return;
     const slide = el.firstElementChild as HTMLElement | null;
     if (!slide) return;
-    const step = slide.offsetWidth + 16; // gap-4
+    const step = slide.offsetWidth + SLIDE_GAP_PX;
     setIdx(Math.min(demo.slides.length - 1, Math.round(el.scrollLeft / step)));
   };
 
@@ -127,7 +129,8 @@ function PhoneGallery({ demo }: { demo: (typeof DEMOS)[number] }) {
         onPointerLeave={endDrag}
         onPointerCancel={endDrag}
         onDragStart={(e) => e.preventDefault()}
-        className="flex snap-x snap-mandatory gap-4 overflow-x-auto px-[13%] pb-2 cursor-grab select-none active:cursor-grabbing sm:snap-none sm:px-4 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        style={{ gap: SLIDE_GAP_PX }}
+        className="flex snap-x snap-mandatory overflow-x-auto px-[calc(13%+5px)] pb-2 cursor-grab select-none active:cursor-grabbing sm:snap-none sm:px-[21px] [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         {demo.slides.map((s, i) => (
           <div
