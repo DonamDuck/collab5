@@ -1068,11 +1068,8 @@ function RegisterForm() {
           {/* 브랜드 사진 (선택) */}
           <div>
             <label className="mb-1 block text-base font-medium text-body">
-              브랜드 사진 (선택)
+              브랜드 사진 (선택, 최대 10장)
             </label>
-            <p className="mb-2.5 text-[15px] text-mute">
-              소개서에 담을 사진을 올려주세요. 최대 10장
-            </p>
             {/* 사진 불안 완화 — 사진 없이도 완성 예시를 그 자리에서 확인(바텀시트, 폼 이탈 없음) */}
             <p className="mb-2.5 text-[14px] leading-relaxed text-body">
               지금 사진이 없다면 우선, 텍스트형 소개서를 만들어보세요.{" "}
