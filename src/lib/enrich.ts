@@ -789,6 +789,33 @@ const GEMINI_RESULT_SCHEMA = {
   required: ["candidates"],
 };
 
+// ── 오귀속 가드(피망당구클럽 114On 사건 2026-07-19) ──
+// 집계·디렉토리·기관 사이트는 브랜드 홈페이지가 아니다. 이런 도메인의 메타를
+// "브랜드가 직접 쓴 소개 · 신뢰도 최상"으로 승격하면 무관한 서비스 소개(전화번호검색 등)가
+// 소개서 재료로 주입된다. pickHomepage(승격)·extractLinksFromResearch(링크 후보) 공용.
+const DIRECTORY_HOSTS = [
+  "114.co.kr", // 전화번호부 — "○○ - 114On" 디렉토리 페이지가 웹문서 상위에 흔함
+  "bizno.net", "moneypin.biz", "nicebizinfo.com", // 사업자정보 조회
+  "saramin.co.kr", "jobkorea.co.kr", "jobplanet.co.kr", "rocketpunch.com", "wanted.co.kr", "catch.co.kr", // 채용·기업정보
+  "diningcode.com", "mangoplate.com", "siksinhot.com", "yogiyo.co.kr", "baemin.com", // 맛집·배달 집계
+  "spoinfo.or.kr", // 체육시설알리미(공단) — or.kr 블랭킷 차단은 비영리 브랜드를 다치게 해서 개별 등재
+];
+export function isDirectoryHost(host: string): boolean {
+  const h = host.replace(/^www\./, "").toLowerCase();
+  if (h.endsWith(".go.kr")) return true; // 정부·공공(체육시설알리미 등)은 브랜드 홈페이지일 수 없다
+  return DIRECTORY_HOSTS.some((d) => h === d || h.endsWith("." + d));
+}
+
+/** fetch한 페이지가 정말 이 브랜드의 것인가 — html(제목·본문·푸터 상호 포함)에 브랜드명이
+ *  통째로(공백 무시) 등장해야 인정. 남의 사이트(미등재 디렉토리 등)의 메타·인스타 승격을 차단.
+ *  안전 방향: 확인 실패 시 버린다(최악=메타 없이 thin 폴백 > 최악=헛소리 주입). */
+export function homepageBelongsToBrand(html: string, brandName: string): boolean {
+  const key = brandName.replace(/\s/g, "").toLowerCase();
+  if (key.length < 2) return false;
+  const hay = html.slice(0, 300_000).replace(/\s/g, "").toLowerCase();
+  return hay.includes(key);
+}
+
 class NaverGeminiProvider implements SearchProvider {
   private naverId = process.env.NAVER_CLIENT_ID!;
   private naverSecret = process.env.NAVER_CLIENT_SECRET!;
@@ -835,19 +862,24 @@ class NaverGeminiProvider implements SearchProvider {
       .trim();
   }
 
-  /** 네이버 결과 링크에서 브랜드 홈페이지(네이버/블로그/SNS 아닌 도메인) 하나 고르기 */
+  /** 네이버 결과 링크에서 브랜드 홈페이지(네이버/블로그/SNS/집계사이트 아닌 도메인) 하나 고르기.
+   *  2패스: 얕은 경로(루트·1단) 우선 — 깊은 상세경로(/detail/123 등)는 디렉토리 문서가 흔해서
+   *  후순위로 미루고, 최종 채택 여부는 gather()의 브랜드 실재 검증이 판정한다. */
   private pickHomepage(items: NaverItem[]): string | undefined {
+    const candidates: { origin: string; depth: number }[] = [];
     for (const it of items) {
       try {
         const u = new URL(it.link ?? "");
         const host = u.hostname.replace(/^www\./, "");
         if (/(^|\.)(naver|blog|instagram|facebook|youtube|tistory|kakao)\./.test(host)) continue;
-        return u.origin;
+        if (isDirectoryHost(host)) continue; // 집계·디렉토리 — 브랜드 홈페이지 아님
+        const depth = u.pathname.split("/").filter(Boolean).length;
+        candidates.push({ origin: u.origin, depth });
       } catch {
         /* 잘못된 URL 스킵 */
       }
     }
-    return undefined;
+    return (candidates.find((c) => c.depth <= 1) ?? candidates[0])?.origin;
   }
 
   /** 홈페이지 정적 HTML 1회 fetch — 인스타 스니핑 + 메타 수확이 같은 html을 재사용(fetch 1회 유지) */
@@ -898,14 +930,21 @@ class NaverGeminiProvider implements SearchProvider {
     return { title, desc };
   }
 
-  /** 홈페이지 fetch 1회 → 인스타 스니핑 + 브랜드가 직접 쓴 메타(title·description) 동시 수확 */
+  /** 홈페이지 fetch 1회 → 인스타 스니핑 + 브랜드가 직접 쓴 메타(title·description) 동시 수확.
+   *  verified: fetch한 페이지에 브랜드명이 실재하는가 — false면 남의 사이트(오귀속).
+   *  undefined = fetch 실패로 검증 불가(봇 차단 등 — 오귀속 단정도 불가). */
   private async fetchHomepageSignals(
-    homepage: string
-  ): Promise<{ instagram?: string; title?: string; desc?: string }> {
+    homepage: string,
+    brandName: string
+  ): Promise<{ instagram?: string; title?: string; desc?: string; verified?: boolean }> {
     const page = await this.fetchHomepage(homepage);
     if (!page) return {};
     const meta = this.extractHomepageMeta(page.html);
-    return { instagram: this.sniffInstagramFromHtml(page.html), ...meta };
+    return {
+      instagram: this.sniffInstagramFromHtml(page.html),
+      ...meta,
+      verified: homepageBelongsToBrand(page.html, brandName),
+    };
   }
 
   /** 지역+웹문서+블로그+카페+표적쿼리 병렬 검색 + 홈페이지 인스타·메타 수확 → '조사 메모'로 조립.
@@ -924,8 +963,15 @@ class NaverGeminiProvider implements SearchProvider {
     ]);
 
     // 홈페이지 정적 HTML 1회 fetch — 인스타 링크 확인 + 메타(브랜드가 직접 쓴 소개) 수확
-    const homepage = this.pickHomepage([...local, ...web]);
-    const signals = homepage ? await this.fetchHomepageSignals(homepage) : {};
+    let homepage = this.pickHomepage([...local, ...web]);
+    let signals = homepage ? await this.fetchHomepageSignals(homepage, query) : {};
+    // 오귀속 가드 — fetch했는데 페이지 어디에도 브랜드명이 없으면 남의 사이트다(미등재 디렉토리 등).
+    // 메타·인스타·홈페이지 링크 전부 폐기: 같은 오염원에서 나온 것들이라 하나만 남겨도 사고.
+    if (signals.verified === false) {
+      console.log("[enrich] homepage-misattr", JSON.stringify({ query, dropped: homepage }));
+      homepage = undefined;
+      signals = {};
+    }
     const sniffedIg = signals.instagram;
 
     // 동명 노이즈 필터 — 블로그·카페·표적검색은 제목+설명에 브랜드명이 통째로(공백 무시) 들어간 것만.
@@ -1747,6 +1793,11 @@ const TYPE_STARTERS: { match: RegExp; chips: string[] }[] = [
   { match: /베이커리|빵|디저트|케이크/, chips: ["당일 생산", "천연 발효", "예약 케이크", "비건 옵션", "제철 재료"] },
   { match: /꽃|플라워|플로리스트/, chips: ["제철 꽃", "주문 제작", "구독 배송", "클래스 운영", "행사 장식"] },
   { match: /의류|패션|브랜드|디자이너/, chips: ["자체 제작", "소량 생산", "시즌 컬렉션", "지속가능 소재", "팝업 참여"] },
+  { match: /당구|포켓볼|빌리아드|빌리어드/, chips: ["동호회 모임", "정기 대회", "레슨 운영", "단체 이용", "심야 영업"] },
+  { match: /스포츠|체육|볼링|탁구|배드민턴|테니스|골프|헬스|피트니스|필라테스|요가|클라이밍|수영|복싱|주짓수|태권도|검도/, chips: ["레슨 운영", "동호회 모임", "단체 이용", "초보 환영", "장비 대여"] },
+  { match: /식당|맛집|음식|한식|중식|일식|양식|분식|고기|구이|치킨|피자|버거|족발|국밥|국수|칼국수|백반|덮밥|초밥|횟집|도시락/, chips: ["단체석", "예약 가능", "포장 가능", "점심 영업", "제철 재료"] },
+  { match: /술집|주점|포차|펍|호프|이자카야|와인|칵테일|바틀/, chips: ["안주 자신", "단체석", "예약 가능", "심야 영업", "혼술 환영"] },
+  { match: /미용|헤어|네일|뷰티|피부|속눈썹|왁싱|메이크업/, chips: ["예약제", "1인 운영", "맞춤 시술", "단골 많음", "당일 예약"] },
 ];
 export function starterChipsForType(businessType: string): KeywordChip[] {
   const t = (businessType || "").trim();
@@ -1807,7 +1858,7 @@ export function extractLinksFromResearch(research: string): LinkFinds {
     } catch {
       return;
     }
-    if (NOT_HOMEPAGE.test(host) || hostSeen.has(host)) return;
+    if (NOT_HOMEPAGE.test(host) || isDirectoryHost(host) || hostSeen.has(host)) return;
     hostSeen.add(host);
     if (front) homepageCandidates.unshift(norm);
     else homepageCandidates.push(norm);
