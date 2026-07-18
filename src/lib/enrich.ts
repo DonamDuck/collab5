@@ -1782,7 +1782,10 @@ export function extractChipsFromResearch(
 
   // ① 지도확인 칩: 지도 교차검증 ✅일 때만(동명 타지역 오귀속 방지), 브랜드명이 든 지역검색
   //    행의 업종 카테고리("스포츠,오락>당구장")를 검증된 칩으로.
+  //    ⚠️ 네이버 검색 API는 지도 UI와 달리 최상위 umbrella까지 준다("음식점>카페,디저트").
+  //    "음식점"류 최상위 뭉텅이는 브랜드를 설명 못 함(전국 모든 식당) → 제외. 카페·디저트 등 리프만.
   if (naverPart.includes("[지도 교차검증] ✅") && brand) {
+    const GENERIC_CATEGORY = /^(음식점|쇼핑|생활|편의|서비스|종합|매장|상점|점포|기타)$/;
     const brandKey = brand.replace(/\s/g, "");
     const localBlock = naverPart.match(/\[네이버 지역검색[^\]]*\]\n([\s\S]*?)(?=\n\[|$)/)?.[1] ?? "";
     const catSec = { label: "지도확인", factual: false }; // 지도가 이미 검증 → 사실 게이트 불필요
@@ -1792,7 +1795,7 @@ export function extractChipsFromResearch(
       const cat = line.match(/업종:([^|]*)/)?.[1] ?? "";
       for (const token of cat.split(/[>,/·]/)) {
         const t = token.trim();
-        if (t.length >= 2 && t.length <= 12 && !/기타|etc/i.test(t)) push(t, catSec);
+        if (t.length >= 2 && t.length <= 12 && !GENERIC_CATEGORY.test(t)) push(t, catSec);
       }
     }
   }

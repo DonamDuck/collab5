@@ -125,6 +125,17 @@ check("긍정 문맥: '사장님이 친절해요' → 친절 칩", nChips.some((
 
 const noMapMemo = naverMemo.replace("[지도 교차검증] ✅ 네이버 지도 주소가 입력 지역(양주 광사동)과 일치 — 이 업체가 맞아요. 주소·업종은 신뢰.", "");
 check("지도✅ 없으면 카테고리 칩 없음(오귀속 방지)", !extractChipsFromResearch(noMapMemo, "피망당구클럽", "당구장").some((c) => c.section === "지도확인"));
+
+// 최상위 umbrella 제외 — 네이버 API "음식점>카페,디저트"에서 '음식점'은 브랜드 설명 못 함(레이지오터 사건)
+const cafeMemo = `[지도 교차검증] ✅ 네이버 지도 주소가 입력 지역(서울 은평구 대조동)과 일치 — 이 업체가 맞아요. 주소·업종은 신뢰.
+
+[네이버 지역검색 — 주소·업종·전화]
+· 레이지오터 | 업종:음식점>카페,디저트 | 도로명:서울특별시 은평구 통일로71길 2 | 지번: | 전화: | 링크:`;
+const cafeChips = extractChipsFromResearch(cafeMemo, "레이지오터", "카페, LP 카페");
+const cafeMap = cafeChips.filter((c) => c.section === "지도확인").map((c) => c.text);
+check("'음식점' 최상위 umbrella 제외", !cafeMap.includes("음식점"), JSON.stringify(cafeMap));
+check("'카페'·'디저트' 리프는 유지", cafeMap.includes("카페") && cafeMap.includes("디저트"), JSON.stringify(cafeMap));
+check("당구장 회귀: '스포츠'·'오락'은 그대로(umbrella 아님)", nChips.some((c) => c.text === "스포츠") && nChips.some((c) => c.text === "오락"));
 check("'불친절' → 친절 칩 없음", !extractChipsFromResearch("[네이버 블로그 — 소비자 후기·분위기 단서]\n· 제목 | 직원이 불친절해서 실망", "가게").some((c) => c.text === "친절한 응대"));
 
 console.log("[겹침 통일 — 포함관계 1개]");
