@@ -53,7 +53,7 @@ export default function Home() {
             href="/preview"
             className="flex h-12 items-center justify-center rounded-md border border-border-strong bg-surface px-7 text-base font-medium text-ink"
           >
-            소개서 미리보기
+            브랜드 소개서 둘러보기
           </Link>
         </div>
       </section>
