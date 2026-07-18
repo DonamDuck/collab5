@@ -32,14 +32,20 @@ const DEMOS = [
   },
 ] as const;
 
-// 홈에서는 탭 없이 사진 예시 갤러리만 노출(결과물 티저). 두 버전 전체 탐색은 '소개서 미리보기' 버튼→/preview.
+// 홈 갤러리는 한 스크롤로 사진 소개서(4장) → 텍스트 소개서(3장) 총 7장을 이어서 노출(결과물 티저).
+// key:"photos"로 둬야 첫 슬라이드(브랜드 카드+사진)가 priority 로딩됨. 두 버전 전체 탐색은 '소개서 미리보기' 버튼→/preview.
+const HOME_SLIDES = {
+  key: "photos" as const,
+  slides: [...DEMOS[0].slides, ...DEMOS[1].slides],
+};
+
 export function PreviewPhones() {
-  return <PhoneGallery demo={DEMOS[0]} />;
+  return <PhoneGallery demo={HOME_SLIDES} />;
 }
 
 // 피크 캐러셀 — 다음 장이 걸쳐 보이는 갤러리(화살표 없음).
 // 모바일: 네이티브 터치 스크롤(관성·스냅). 데스크탑: 마우스 드래그 + 놓으면 관성 글라이드(스르륵).
-function PhoneGallery({ demo }: { demo: (typeof DEMOS)[number] }) {
+function PhoneGallery({ demo }: { demo: { key: string; slides: readonly { src: string; alt: string }[] } }) {
   const trackRef = useRef<HTMLDivElement>(null);
   const [idx, setIdx] = useState(0);
   // 드래그 상태 + 속도 추적(px/ms). 놓을 때 관성으로 이어감.
