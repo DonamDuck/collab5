@@ -23,7 +23,7 @@ export default async function PreviewPage({ searchParams }: { searchParams: Prom
   ]);
 
   return (
-    <main className="mx-auto w-full max-w-[640px] px-4 py-10 sm:px-6">
+    <main className="mx-auto w-full max-w-[640px] px-4 py-10 pb-28 sm:px-6">
       <h1 className="text-2xl font-bold text-ink">브랜드 소개서 둘러보기</h1>
       <p className="mt-2 text-base text-mute">브랜드 소개서는 이렇게 완성돼요. 사진 유무에 따른 차이도 함께 둘러보세요.</p>
       <div className="mt-5">
@@ -35,8 +35,13 @@ export default async function PreviewPage({ searchParams }: { searchParams: Prom
           noneLogo={noneLogo}
         />
       </div>
-      <div className="mt-12 text-center">
-        <Link href="/register" className="inline-flex h-12 items-center justify-center rounded-md bg-primary px-7 text-base font-medium text-primary-on">내 소개서 만들기</Link>
+      <div className="fixed inset-x-0 bottom-0 z-50 flex justify-center px-4 pb-6 pt-3">
+        <Link
+          href="/register"
+          className="inline-flex h-12 w-full max-w-[400px] items-center justify-center rounded-full bg-primary px-7 text-base font-medium text-primary-on shadow-lg"
+        >
+          내 소개서 만들기
+        </Link>
       </div>
     </main>
   );
