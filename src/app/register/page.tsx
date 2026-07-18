@@ -8,8 +8,10 @@ import {
   getAuthStateAction,
   updateMakerAction,
   getEditDataAction,
+  getPreviewDemoNoneAction,
 } from "@/lib/actions";
-import type { CollabType, Block } from "@/lib/types";
+import { MakerArticle } from "../m/[slug]/MakerArticle";
+import type { CollabType, Block, Maker } from "@/lib/types";
 import { deriveRegion } from "@/lib/region";
 import { isRichIntro } from "@/lib/completeness";
 import { uploadPhoto, uploadPdf } from "@/lib/upload";
@@ -737,8 +739,14 @@ function RegisterForm() {
   const [portfolioOpen, setPortfolioOpen] = useState(false);
   // BlockEditor 카탈로그 시트 열림 여부(플로팅 버튼 숨김용) — BlockEditor가 알려줌.
   const [blockSheetOpen, setBlockSheetOpen] = useState(false);
-  // 소개서 미리보기 바텀시트(① 사진 섹션 링크) — 정적 이미지 2장, 폼 이탈 없음.
+  // 소개서 미리보기 바텀시트(① 사진 섹션 링크) — 실제 텍스트 데모 소개서를 페이지처럼 렌더(폼 이탈 없음).
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [demoMaker, setDemoMaker] = useState<{ maker: Maker; logoUrl: string | null } | null>(null);
+  // 시트 열 때 1회 지연 로딩(데모=고정 데이터라 캐시). 유료 콜 없음.
+  const openPreview = () => {
+    setPreviewOpen(true);
+    if (!demoMaker) getPreviewDemoNoneAction().then((d) => d && setDemoMaker(d));
+  };
   const [createdSlug, setCreatedSlug] = useState("");
   const [loggedIn, setLoggedIn] = useState(false);
   const [editPw, setEditPw] = useState("");
@@ -1075,7 +1083,7 @@ function RegisterForm() {
               지금 사진이 없다면 우선, 텍스트형 소개서를 만들어보세요.{" "}
               <button
                 type="button"
-                onClick={() => setPreviewOpen(true)}
+                onClick={openPreview}
                 className="text-primary-on underline underline-offset-2"
               >
                 사진 없는 소개서 예시보기
@@ -2063,13 +2071,13 @@ function RegisterForm() {
           <div className="absolute inset-x-0 bottom-0 mx-auto max-w-[640px] overflow-hidden rounded-t-2xl bg-surface shadow-xl">
             <div
               style={{ paddingBottom: "calc(1.5rem + env(safe-area-inset-bottom))" }}
-              className="max-h-[60vh] overflow-y-auto slim-scrollbar p-4 sm:max-h-[70vh]"
+              className="max-h-[85vh] overflow-y-auto slim-scrollbar p-4 sm:max-h-[85vh]"
             >
-              <div className="mb-3 flex items-start justify-between">
+              <div className="mb-4 flex items-start justify-between">
                 <div className="pr-8">
                   <p className="text-[19px] font-bold text-ink">소개서 미리보기</p>
                   <p className="mt-1.5 text-[15px] leading-relaxed text-mute">
-                    사진이 없어도 이렇게 완성돼요. 나중에 언제든 더할 수 있어요.
+                    사진은 나중에 언제든 더할 수 있어요.
                   </p>
                 </div>
                 <button
@@ -2081,26 +2089,16 @@ function RegisterForm() {
                   ✕
                 </button>
               </div>
-              <div className="space-y-5">
-                {[
-                  { src: "/preview/sample-none.jpg", label: "사진 없이 작성한 소개서 (기본)" },
-                ].map((s) => (
-                  <div key={s.src}>
-                    <p className="mb-1.5 text-sm font-medium text-body">{s.label}</p>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={s.src}
-                      alt={s.label}
-                      loading="lazy"
-                      className="w-full rounded-md border border-hairline"
-                    />
-                  </div>
-                ))}
-              </div>
+              {/* 실제 텍스트 데모 소개서를 페이지처럼 렌더(스크롤 전체) — 링크복사 플로팅 없음(MakerArticle엔 미포함) */}
+              {demoMaker ? (
+                <MakerArticle maker={demoMaker.maker} isOwner={false} logoUrl={demoMaker.logoUrl ?? undefined} />
+              ) : (
+                <p className="py-10 text-center text-sm text-mute">불러오는 중이에요…</p>
+              )}
               <button
                 type="button"
                 onClick={() => setPreviewOpen(false)}
-                className="mt-5 h-11 w-full rounded-md bg-primary text-sm font-medium text-primary-on"
+                className="mt-6 h-11 w-full rounded-md bg-primary text-sm font-medium text-primary-on"
               >
                 닫기
               </button>
