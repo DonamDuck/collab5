@@ -25,9 +25,7 @@ export default function Home() {
         <p className="mx-auto mt-3 max-w-[460px] break-keep text-base leading-relaxed text-body">
           작은 가게도, 1인 브랜드도 괜찮아요.
           <br />
-          길게 설명하지 않아도 당신다운 첫인상을 전할 수 있어요.
-          <br />
-          무료로 시작할 수 있어요.
+          몇 줄이면 소개서가 완성돼요. 무료로 시작해보세요.
         </p>
         <div className="mt-7 flex justify-center">
           <Link
@@ -42,10 +40,10 @@ export default function Home() {
       {/* 미리보기 — 실제 데모 소개서 2종(사진 있는/없는) 폰 프레임. 결과물 먼저 → 과정 설명 순서 */}
       <section className="mt-16">
         <h2 className="text-center text-2xl font-bold tracking-tight text-ink sm:text-[28px]">
-          이런 소개서가 만들어져요
+          3분이면 브랜드 소개서가 완성돼요.
         </h2>
         <p className="mx-auto mt-2 max-w-[440px] break-keep text-center text-base leading-relaxed text-body">
-          아래 예시 소개서를 확인해 보세요
+          몇 가지만 알려주시면, AI가 소개에 필요한 내용을 먼저 정리해드려요.
         </p>
         <div className="mt-8">
           <PreviewPhones />
