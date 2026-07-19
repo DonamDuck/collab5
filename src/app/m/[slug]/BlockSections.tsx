@@ -24,7 +24,7 @@ export function BlockSections({
         <Section key={i} title={b.type === "custom" ? b.title : TITLES[b.type]}>
           <BlockBody b={b} />
           {b.photos.length > 0 && (
-            <div className="mt-3 max-w-[460px]">
+            <div className="mt-3 max-w-[460px] print:max-w-none print:break-inside-avoid">
               <PhotoSlider photos={b.photos} />
             </div>
           )}
@@ -78,7 +78,7 @@ function BlockBody({ b }: { b: Block }) {
       return (
         <div className="space-y-3">
           {b.items.map((it, i) => (
-            <div key={i}>
+            <div key={i} className="print:break-inside-avoid">
               <p className="text-[16px] text-body">
                 <span className="font-medium text-ink">{it.title}</span>
                 {it.year && <span className="text-mute"> · {it.year}</span>}
@@ -87,7 +87,7 @@ function BlockBody({ b }: { b: Block }) {
                 <p className="mt-0.5 text-[15px] leading-relaxed text-mute">{it.desc}</p>
               )}
               {!!it.photos?.length && (
-                <div className="mt-2 max-w-[460px]">
+                <div className="mt-2 max-w-[460px] print:max-w-none">
                   <PhotoSlider photos={it.photos} />
                 </div>
               )}

@@ -14,7 +14,7 @@ export function MakerArticle({ maker, isOwner, logoUrl }: {
 
       {/* 브랜드 사진 — 스와이프 슬라이드 */}
       {maker.photos.length > 0 && (
-        <div className="mt-7 max-w-[460px]">
+        <div className="mt-7 max-w-[460px] print:max-w-none print:break-inside-avoid">
           <PhotoSlider photos={maker.photos} />
         </div>
       )}
@@ -33,7 +33,7 @@ export function MakerArticle({ maker, isOwner, logoUrl }: {
         <Section title="우리는 이런 일을 하고 있어요">
           <div className="space-y-6">
             {maker.activities.map((a, i) => (
-              <div key={i}>
+              <div key={i} className="print:break-inside-avoid">
                 {a.title && (
                   <p className="text-[18px] font-semibold leading-snug text-ink">{a.title}</p>
                 )}
@@ -41,7 +41,7 @@ export function MakerArticle({ maker, isOwner, logoUrl }: {
                   <p className="mt-1 text-[16px] leading-relaxed text-mute">{a.desc}</p>
                 )}
                 {a.photos.length > 0 && (
-                  <div className="mt-3 max-w-[460px]">
+                  <div className="mt-3 max-w-[460px] print:max-w-none">
                     <PhotoSlider photos={a.photos} />
                   </div>
                 )}
@@ -65,7 +65,7 @@ export function MakerArticle({ maker, isOwner, logoUrl }: {
         <Section title="함께한 콜라보">
           <div className="space-y-6">
             {maker.collabHistory.map((h, i) => (
-              <div key={i}>
+              <div key={i} className="print:break-inside-avoid">
                 <p className="text-[16px] text-body">
                   <span className="font-semibold text-ink">{h.partner}</span>
                   {h.types.length > 0 && <span className="text-mute"> · {h.types.join("·")}</span>}
@@ -73,7 +73,7 @@ export function MakerArticle({ maker, isOwner, logoUrl }: {
                 </p>
                 {h.desc && <p className="mt-0.5 whitespace-pre-line text-[15px] leading-relaxed text-mute">{h.desc}</p>}
                 {h.photos.length > 0 && (
-                  <div className="mt-3 max-w-[460px]">
+                  <div className="mt-3 max-w-[460px] print:max-w-none">
                     <PhotoSlider photos={h.photos} />
                   </div>
                 )}
@@ -160,10 +160,11 @@ export function MakerArticle({ maker, isOwner, logoUrl }: {
 }
 
 // 소개서 섹션 — 편집물처럼 큰 타이틀 + 상단 구분선 + 내용
+// 인쇄: 섹션 통째 개행보호는 긴 섹션이 통째로 밀려 대공백을 만들어 아이템 단위 보호로 대체
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="mt-9 border-t border-hairline pt-8 print:break-inside-avoid">
-      <h2 className="mb-4 text-[21px] font-bold leading-snug tracking-tight text-ink">{title}</h2>
+    <section className="mt-9 border-t border-hairline pt-8">
+      <h2 className="mb-4 text-[21px] font-bold leading-snug tracking-tight text-ink print:break-after-avoid-page">{title}</h2>
       {children}
     </section>
   );

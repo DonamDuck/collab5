@@ -105,7 +105,7 @@ export function PhotoSlider({
             type="button"
             onClick={() => goTo(idx - 1)}
             aria-label="이전 사진"
-            className="absolute left-2 top-1/2 hidden h-8 w-8 -translate-y-1/2 items-center justify-center rounded-pill bg-surface/85 text-ink shadow-e1 hover:bg-surface sm:flex"
+            className="absolute left-2 top-1/2 hidden h-8 w-8 -translate-y-1/2 items-center justify-center rounded-pill bg-surface/85 text-ink shadow-e1 hover:bg-surface sm:flex print:hidden!"
           >
             ‹
           </button>
@@ -115,7 +115,7 @@ export function PhotoSlider({
             type="button"
             onClick={() => goTo(idx + 1)}
             aria-label="다음 사진"
-            className="absolute right-2 top-1/2 hidden h-8 w-8 -translate-y-1/2 items-center justify-center rounded-pill bg-surface/85 text-ink shadow-e1 hover:bg-surface sm:flex"
+            className="absolute right-2 top-1/2 hidden h-8 w-8 -translate-y-1/2 items-center justify-center rounded-pill bg-surface/85 text-ink shadow-e1 hover:bg-surface sm:flex print:hidden!"
           >
             ›
           </button>
