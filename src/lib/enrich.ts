@@ -1723,19 +1723,9 @@ export function extractChipsFromResearch(
     const key = text.replace(/\s/g, "");
     // 사용자가 이미 입력한 업종과 동일한 칩은 무의미("당구장" 입력자에게 "당구장" 칩) — 제외
     if (businessType && key === businessType.replace(/\s/g, "")) return false;
-    // 겹침 통일(대표 지시 07-19): 완전 동일뿐 아니라 포함 관계도 1개로 —
-    // "동호회" vs "동호회 모임"이면 더 구체적인(긴) 쪽만 남긴다. 네이버·제미나이 조합의 중복 정리.
-    const factual = sec.factual || /\d/.test(text) || FACTUAL_RE.test(text);
-    for (let j = 0; j < chips.length; j++) {
-      const ek = chips[j].text.replace(/\s/g, "");
-      if (ek === key || ek.includes(key)) return false; // 기존이 같거나 더 구체적 → 새 칩 흡수
-      if (key.includes(ek)) {
-        // 새 칩이 더 구체적 → 기존 자리에서 텍스트만 승격(중복 추가 없음)
-        chips[j] = { ...chips[j], text, factual: chips[j].factual || factual };
-        return false;
-      }
-    }
-    chips.push({ text, section: sec.label, factual });
+    // 완전 동일(공백 무시)만 여기서 제거 — 포함관계 가족 통합은 마지막에 한 번에(consolidateChipFamilies)
+    if (chips.some((e) => e.text.replace(/\s/g, "") === key)) return false;
+    chips.push({ text, section: sec.label, factual: sec.factual || /\d/.test(text) || FACTUAL_RE.test(text) });
     return true;
   };
   for (let i = 1; i < parts.length; i += 2) {
@@ -1837,7 +1827,42 @@ export function extractChipsFromResearch(
       }
     if (chips.length > before) chips.unshift(...chips.splice(before)); // 메타 칩을 맨 앞으로
   }
-  return chips.slice(0, 28);
+  return consolidateChipFamilies(chips, businessType).slice(0, 28);
+}
+
+// 수식형 선호 판단용 긍정 어휘(오프라인 사전 — LLM 콜 0)
+const POSITIVE_RE =
+  /맛있|맛난|정성|수제|손수|신선|푸짐|친절|깔끔|유명|인기|특제|시그니처|프리미엄|전통|원조|장인|엄선|풍부|따뜻|아늑|감성|매력|특별|건강|국내산|제철|당일|직접/;
+
+/** 포함관계 '가족' 통합(대표 정책 2026-07-19) — "감자탕·맛있는 감자탕·얼큰 감자탕"처럼
+ *  한 뿌리(최소형)를 공유하는 칩들은 [뿌리 1개 + 가장 긍정적인 수식형 1개]만 남긴다.
+ *  수식형만 남기면 "얼큰 감자탕"이 업체 전체를 대표해버리는 왜곡이 생겨서(얼큰만 파는 집이 아님),
+ *  뿌리가 사실의 안전판, 수식형 1개가 표현의 결. "카페+LP 카페"도 둘 다 생존.
+ *  사용자 입력 업종은 '가상 뿌리' — 그 수식형들도 1개로 압축(뿌리 칩 자체는 입력 중복으로 이미 제외).
+ *  수식형 선정: 긍정 어휘 사전 히트 우선 → 동점이면 더 구체적인(긴) 쪽 → 동점이면 먼저 온 것. */
+function consolidateChipFamilies(chips: KeywordChip[], businessType?: string): KeywordChip[] {
+  const keys = chips.map((c) => c.text.replace(/\s/g, ""));
+  const btKey = businessType?.replace(/\s/g, "") ?? "";
+  // 각 칩의 뿌리 = 자기 텍스트 안에 통째로 들어있는 가장 짧은 다른 칩(또는 입력 업종). 없으면 자신이 뿌리.
+  const baseKeyOf = chips.map((_, i) => {
+    let base: string | null = null;
+    for (const k of btKey.length >= 2 ? [...keys, btKey] : keys) {
+      if (k === keys[i] || k.length < 2) continue;
+      if (keys[i].includes(k) && (base === null || k.length < base.length)) base = k;
+    }
+    return base;
+  });
+  // 가족별로 가장 긍정적인 수식형 1개 선발
+  const best = new Map<string, { idx: number; score: number }>();
+  chips.forEach((c, i) => {
+    const b = baseKeyOf[i];
+    if (!b) return;
+    const score = (POSITIVE_RE.test(c.text) ? 100 : 0) + Math.min(keys[i].length, 99);
+    const cur = best.get(b);
+    if (!cur || score > cur.score) best.set(b, { idx: i, score });
+  });
+  const winners = new Set([...best.values()].map((v) => v.idx));
+  return chips.filter((_, i) => baseKeyOf[i] === null || winners.has(i));
 }
 
 /** 업종 스타터 키워드 — 크롤 빈손 폴백용 '혹시 해당되나요?' 추측 칩(정적, 콜 0). */

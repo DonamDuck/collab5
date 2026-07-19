@@ -134,7 +134,7 @@ check("'음식점' 최상위 umbrella 제외", !cafeMap.includes("음식점"), J
 check("'카페'·'디저트' 리프는 유지", cafeMap.includes("카페") && cafeMap.includes("디저트"), JSON.stringify(cafeMap));
 check("당구장 회귀: '스포츠'·'오락'은 그대로(umbrella 아님)", nChips.some((c) => c.text === "스포츠") && nChips.some((c) => c.text === "오락"));
 
-console.log("[겹침 통일 — 포함관계 1개]");
+console.log("[겹침 통일 — 뿌리 1 + 긍정 수식형 1 (대표 정책 07-19)]");
 const dupMemo = `[출처 2 · 제미나이]
 [키워드]
 동호회, 당구 강습
@@ -143,7 +143,23 @@ const dupMemo = `[출처 2 · 제미나이]
 동호회 모임`;
 const dChips = extractChipsFromResearch(dupMemo, "가게");
 const dongho = dChips.filter((c) => c.text.replace(/\s/g, "").includes("동호회"));
-check("'동호회' + '동호회 모임' → 1개(더 구체적인 쪽 생존)", dongho.length === 1 && dongho[0].text === "동호회 모임", JSON.stringify(dChips.map((c) => c.text)));
+check("'동호회'(뿌리) + '동호회 모임'(수식형) → 둘 다 생존", dongho.length === 2, JSON.stringify(dChips.map((c) => c.text)));
+
+// 뿌리 + 수식형 여러 개 → 뿌리 1 + 가장 긍정적인 수식형 1
+const famMemo = `[출처 2 · 제미나이]
+[키워드]
+감자탕, 맛있는 감자탕, 얼큰 감자탕`;
+const fChips = extractChipsFromResearch(famMemo, "가게", "국밥").map((c) => c.text);
+check("뿌리 '감자탕' 생존", fChips.includes("감자탕"), JSON.stringify(fChips));
+check("긍정 수식형 '맛있는 감자탕'만 생존('얼큰' 탈락)", fChips.includes("맛있는 감자탕") && !fChips.includes("얼큰 감자탕"));
+// 사용자가 업종으로 뿌리를 입력한 경우 → 뿌리 칩은 입력 중복으로 빠지고, 수식형 긍정 1개만
+const fChips2 = extractChipsFromResearch(famMemo, "가게", "감자탕").map((c) => c.text);
+check("입력 업종=뿌리: 수식형 중 긍정 1개만", fChips2.filter((t) => t.includes("감자탕")).length === 1 && fChips2.includes("맛있는 감자탕"), JSON.stringify(fChips2));
+// 카페+LP 카페 → 둘 다 / 디저트+LP 카페(문자열 무관) → 둘 다
+const cafeFam = extractChipsFromResearch(`[출처 2 · 제미나이]\n[키워드]\n카페, LP 카페`, "가게", "식당").map((c) => c.text);
+check("'카페'+'LP 카페' → 둘 다 생존", cafeFam.includes("카페") && cafeFam.includes("LP 카페"), JSON.stringify(cafeFam));
+const dizFam = extractChipsFromResearch(`[출처 2 · 제미나이]\n[키워드]\n디저트, LP 카페`, "가게", "식당").map((c) => c.text);
+check("'디저트'+'LP 카페' → 포함관계 아님, 둘 다", dizFam.includes("디저트") && dizFam.includes("LP 카페"));
 const wizardSrc2 = readFileSync(join(__dirname, "../src/app/register/EnrichWizard.tsx"), "utf8");
 check("위저드에 지도확인 등록 + 후기흔적 은퇴", wizardSrc2.includes('"지도확인"') && !wizardSrc2.includes('"후기흔적"'));
 
