@@ -8,6 +8,7 @@ import {
   extractLinksFromResearch,
   extractChipsFromResearch,
   starterChipsForType,
+  sanitizeHttpUrl,
 } from "../src/lib/enrich";
 import { regionMatches, regionConflict } from "../src/lib/regionSynonyms";
 
@@ -230,6 +231,13 @@ const echoChips = extractChipsFromResearch(
 ).map((c) => c.text);
 check("잔향 단독('다른 브랜드'·'펀딩 달성액'·'워크숍') 배제", !echoChips.some((t) => ["다른 브랜드", "펀딩 달성액", "인스타그램 팔로워 수", "워크숍"].includes(t)), JSON.stringify(echoChips));
 check("구체 활동('가죽지갑 원데이 클래스 운영')은 유지", echoChips.includes("가죽지갑 원데이 클래스 운영"));
+
+// press 기사 URL 위생 (2026-07-19 press 링크 프리필 — 내 절반)
+console.log("[press URL 위생]");
+check("http(s) 통과", sanitizeHttpUrl("https://www.khan.co.kr/article/123") === "https://www.khan.co.kr/article/123");
+check("빈값·undefined → undefined", sanitizeHttpUrl("") === undefined && sanitizeHttpUrl(undefined) === undefined);
+check("잡값·상대경로 차단", sanitizeHttpUrl("확인 안 됨") === undefined && sanitizeHttpUrl("/article/123") === undefined);
+check("javascript: 스킴 차단", sanitizeHttpUrl("javascript:alert(1)") === undefined);
 
 console.log(`\n결과: ${pass} pass / ${fail} fail`);
 process.exit(fail ? 1 : 0);
