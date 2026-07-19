@@ -2324,9 +2324,9 @@ function CollapsedPhotos({ children, photoCount }: { children: React.ReactNode; 
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="text-[14px] text-mute underline underline-offset-2"
+        className="text-sm font-medium text-mute hover:text-ink"
       >
-        + 사진 담기 (선택)
+        ＋ 사진 추가 (선택)
       </button>
     );
   return <>{children}</>;

@@ -457,7 +457,7 @@ export function BlockEditor({ blocks, onChange, onUploadingChange, onSheetOpenCh
   );
 }
 
-// 블록 공통 첨부(사진 최대3 · 링크 최대3) — '＋ 사진 담기'와 '＋ 링크 추가' 버튼을
+// 블록 공통 첨부(사진 최대3 · 링크 최대3) — '＋ 사진 추가'와 '＋ 링크 추가' 버튼을
 // 같은 스타일·같은 위치(하단 한 줄)로 통일. 사진은 있으면 펼침 시작(0→n 전이에서만 자동 펼침 —
 // 사용자가 일부러 접은 상태와 싸우지 않는다).
 function BlockAttachments({
@@ -490,7 +490,7 @@ function BlockAttachments({
     <div className="space-y-3 border-t border-hairline pt-3">
       {photosOpen && (
         <div>
-          <p className="mb-1.5 text-sm text-mute">사진 담기 (선택 · 최대 3장)</p>
+          <p className="mb-1.5 text-sm text-mute">사진 추가 (선택 · 최대 3장)</p>
           <div className="flex flex-wrap gap-2">
             {photos.map((url, k) => (
               <div key={k} className="relative h-20 w-20 shrink-0 overflow-hidden rounded-md border border-hairline">
@@ -550,7 +550,7 @@ function BlockAttachments({
       <div className="flex flex-wrap items-center gap-4">
         {!photosOpen && (
           <button type="button" onClick={() => setPhotosOpen(true)} className={actionCls}>
-            ＋ 사진 담기 (선택)
+            ＋ 사진 추가 (선택)
           </button>
         )}
         {links.length < 3 && (
