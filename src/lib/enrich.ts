@@ -1140,8 +1140,14 @@ class NaverGeminiProvider implements SearchProvider {
 · 남의 업체로 판정하는 건 둘 중 하나일 때만: ①위치가 다른 지역이거나 ②하는 일의 뿌리가 서로 양립 불가능할 때(예: 당구장 vs 꽃집). 이때 그 업체 정보는 한 줄도 섞지 마.
 · 애매하면 위치 일치를 우선 근거로 삼아라. 힌트와 맞는 업체를 못 찾았으면 지어내지 말고 모든 소제목에 "확인 안 됨"이라고 써.)`
       : "";
-    const prompt = `절대 추측하거나 사실이 아닌 정보를 지어내지 마. 웹에서 확인된 것만 적는다.
-"${query}" 브랜드/업체를 웹에서 조사해줘.${loc}${anchorBlock}
+    // 검색 전략 — 교차검증(2026-07-19, gemini-2.5-flash 자가 비평)에서 채택:
+    // ①검색어 조합 명시 ②소상공인=UGC 인지 ③2차 재시도는 "지역 검색어로 넓게→그 안에서 상호 찾기"로 전환.
+    const searchStrategy = (round: number) =>
+      round === 1
+        ? `\n검색은 한 조합만 하지 말고 여러 조합을 시도해 — "${query}", "${query} ${region?.trim() ?? ""}", "${query} ${businessType?.trim() ?? ""}" 등. 웹 존재감이 약한 동네 가게일 수 있다 — 공식 출처가 없으면 블로그·카페 후기, 지역 커뮤니티 글, 지도 서비스 등록 정보에서도 유의미한 정보를 적극 발굴해(어디서 봤는지 함께).`
+        : `\n⚠️직전 조사에서 검색 근거를 못 찾았다. 검색 전략을 바꿔라: ①지역 기반 일반 검색어("${region?.trim() ?? ""} ${businessType?.trim() ?? ""}", "${region?.trim() ?? ""} ${businessType?.trim() ?? ""} 후기/맛집")로 넓게 검색한 뒤 그 결과 안에서 '${query}'를 찾아라 ②상호의 띄어쓰기를 바꿔서도 검색해봐 ③영업시간·메뉴·주차 같은 방문 정보 중심 검색도 시도. 그래도 못 찾으면 지어내지 말고 "확인 안 됨"으로.`;
+    const promptFor = (round: number) => `절대 추측하거나 사실이 아닌 정보를 지어내지 마. 웹에서 확인된 것만 적는다.
+"${query}" 브랜드/업체를 웹에서 조사해줘.${searchStrategy(round)}${loc}${anchorBlock}
 아래 소제목 순서 그대로, 확인된 사실만 개조식으로 정리해줘. 전체 1500자 이내. 해당 정보가 없으면 그 소제목에 "확인 안 됨" 한 줄만.
 
 [정체] 무엇을 만들고/하는 곳인지 한두 줄 + 창업 배경·브랜드 철학·시작 이야기가 있으면 두세 줄
@@ -1155,36 +1161,42 @@ class NaverGeminiProvider implements SearchProvider {
 [공간] 오프라인 매장·쇼룸·작업실·카페 운영 여부와 위치
 [신뢰정보] 홈페이지 URL · 주소
 [키워드] 위 조사에서 이 브랜드를 나타내는 짧은 키워드 8~15개, 쉼표로 구분 (각 2~15자 명사구 — 제품·소재·활동·분위기·강점 위주. 문장 금지, 다른 브랜드 것 섞지 말 것)
-공식 홈페이지·언론 보도 등 신뢰할 수 있는 출처를 우선해. 연도·날짜가 보이면 함께 적어줘(오래된 정보 구분용).
+출처는 공식 홈페이지·언론 보도가 있으면 우선하되, 지역 소상공인은 그런 출처가 없는 경우가 많다 — 네이버 플레이스·지도 등록 정보, 블로그·카페 후기, 지역 커뮤니티 글 등 웹에서 확인 가능한 출처를 폭넓게 활용해(어디서 봤는지 함께). 연도·날짜가 보이면 함께 적어줘(오래된 정보 구분용).
 ⭐인스타그램은 실제 instagram.com/○○ 페이지를 확인한 경우에만 @핸들. 브랜드명·도메인으로 추측 금지 — 확인 안 되면 "인스타: 확인 안 됨".
 확실하지 않으면 적지 말고 넘어가. 과장·추측 금지.`;
-    // 보조 소스라 실패 시 빠르게 포기(네이버 단독). 429는 쿼터/레이트리밋 → 모델 공유라 재시도 무의미.
-    for (const model of NaverGeminiProvider.GEMINI_MODELS) {
-      try {
-        const response = await this.ai().models.generateContent({
-          model,
-          contents: prompt,
-          config: { tools: [{ googleSearch: {} }], temperature: 0.2 },
-        });
-        // ⭐그라운딩 근거 체크 — 검색 근거(chunks/supports)가 없으면 웹을 안 보고 지어낸 답변이다.
-        // 상상의 업체를 만들어낸 사고(캔버스가든→가짜 식물 스튜디오) 이후 도입: 근거 없으면 메모 폐기.
-        const gm = response.candidates?.[0]?.groundingMetadata;
-        const grounded = !!(gm?.groundingChunks?.length || gm?.groundingSupports?.length);
-        if (!grounded) {
-          // 비접지 응답은 검색 과금이 없음 → 다음 모델 재시도는 토큰 비용뿐(호출 수 원칙 무관).
-          console.warn(`[enrich] gemini ${model} 검색 근거 없음(비접지 생성) → 폐기, 다음 모델`);
-          continue;
+    // A+B 재시도 정책(대표 확정 2026-07-19): 1라운드(전 모델)가 비접지로 전멸하면
+    // 검색 전략을 바꾼 2라운드 1회 재시도 — 유저가 수동으로 '다시 검색'하던 걸 서버가 대신.
+    // 비접지 응답은 검색 과금 0(토큰만 몇 원) → 추가 과금은 재시도가 접지 성공했을 때의 정상 검색뿐.
+    // 429(쿼터)·기타 하드 에러는 라운드 불문 즉시 포기(네이버 단독) — 쿼터 공유라 재시도 무의미.
+    for (let round = 1; round <= 2; round++) {
+      if (round === 2) console.warn("[enrich] gemini 1라운드 전멸 → 검색전략 변형 2라운드 재시도");
+      for (const model of NaverGeminiProvider.GEMINI_MODELS) {
+        try {
+          const response = await this.ai().models.generateContent({
+            model,
+            contents: promptFor(round),
+            config: { tools: [{ googleSearch: {} }], temperature: 0.2 },
+          });
+          // ⭐그라운딩 근거 체크 — 검색 근거(chunks/supports)가 없으면 웹을 안 보고 지어낸 답변이다.
+          // 상상의 업체를 만들어낸 사고(캔버스가든→가짜 식물 스튜디오) 이후 도입: 근거 없으면 메모 폐기.
+          const gm = response.candidates?.[0]?.groundingMetadata;
+          const grounded = !!(gm?.groundingChunks?.length || gm?.groundingSupports?.length);
+          if (!grounded) {
+            // 비접지 응답은 검색 과금이 없음 → 다음 모델 재시도는 토큰 비용뿐(호출 수 원칙 무관).
+            console.warn(`[enrich] gemini ${model} 검색 근거 없음(비접지 생성) → 폐기 (round ${round})`);
+            continue;
+          }
+          return (response.text ?? "").trim();
+        } catch (e) {
+          const status = (e as { status?: number; code?: number })?.status ?? (e as { code?: number })?.code;
+          if (status === 503 || status === 404) {
+            console.warn(`[enrich] gemini search ${model} ${status} → 다음 모델 폴백`);
+            continue; // 일시 과부하(503)·모델 없음(404)은 다음 모델 시도
+          }
+          // 429(쿼터)·grounding 미지원·기타 → 즉시 네이버 단독으로 degrade(지연 최소화)
+          console.warn(`[enrich] gemini search ${model} 실패(${status ?? "?"}) → 네이버 단독`);
+          return "";
         }
-        return (response.text ?? "").trim();
-      } catch (e) {
-        const status = (e as { status?: number; code?: number })?.status ?? (e as { code?: number })?.code;
-        if (status === 503 || status === 404) {
-          console.warn(`[enrich] gemini search ${model} ${status} → 다음 모델 폴백`);
-          continue; // 일시 과부하(503)·모델 없음(404)은 다음 모델 시도
-        }
-        // 429(쿼터)·grounding 미지원·기타 → 즉시 네이버 단독으로 degrade(지연 최소화)
-        console.warn(`[enrich] gemini search ${model} 실패(${status ?? "?"}) → 네이버 단독`);
-        return "";
       }
     }
     return "";
