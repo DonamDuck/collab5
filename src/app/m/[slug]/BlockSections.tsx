@@ -86,6 +86,16 @@ function BlockBody({ b }: { b: Block }) {
               {it.desc && (
                 <p className="mt-0.5 text-[15px] leading-relaxed text-mute">{it.desc}</p>
               )}
+              {it.link && (
+                <a
+                  href={normalizeUrl(it.link)}
+                  target="_blank"
+                  rel="noopener noreferrer nofollow"
+                  className="mt-1 inline-block text-[14px] font-medium text-primary-on underline underline-offset-2"
+                >
+                  기사 보기
+                </a>
+              )}
             </div>
           ))}
         </div>
