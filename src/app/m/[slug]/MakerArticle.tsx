@@ -41,7 +41,7 @@ export function MakerArticle({ maker, isOwner, logoUrl }: {
                   <p className="mt-1 text-[16px] leading-relaxed text-mute">{a.desc}</p>
                 )}
                 {a.photos.length > 0 && (
-                  <div className="mt-3 max-w-[460px] print:max-w-none">
+                  <div className="mt-3 max-w-[460px] print:mx-auto">
                     <PhotoSlider photos={a.photos} />
                   </div>
                 )}
@@ -73,7 +73,7 @@ export function MakerArticle({ maker, isOwner, logoUrl }: {
                 </p>
                 {h.desc && <p className="mt-0.5 whitespace-pre-line text-[15px] leading-relaxed text-mute">{h.desc}</p>}
                 {h.photos.length > 0 && (
-                  <div className="mt-3 max-w-[460px] print:max-w-none">
+                  <div className="mt-3 max-w-[460px] print:mx-auto">
                     <PhotoSlider photos={h.photos} />
                   </div>
                 )}

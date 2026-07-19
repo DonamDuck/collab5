@@ -24,7 +24,7 @@ export function BlockSections({
         <Section key={i} title={b.type === "custom" ? b.title : TITLES[b.type]}>
           <BlockBody b={b} />
           {b.photos.length > 0 && (
-            <div className="mt-3 max-w-[460px] print:max-w-none print:break-inside-avoid">
+            <div className="mt-3 max-w-[460px] print:mx-auto print:break-inside-avoid">
               <PhotoSlider photos={b.photos} />
             </div>
           )}
@@ -87,7 +87,7 @@ function BlockBody({ b }: { b: Block }) {
                 <p className="mt-0.5 text-[15px] leading-relaxed text-mute">{it.desc}</p>
               )}
               {!!it.photos?.length && (
-                <div className="mt-2 max-w-[460px] print:max-w-none">
+                <div className="mt-2 max-w-[460px] print:mx-auto">
                   <PhotoSlider photos={it.photos} />
                 </div>
               )}
