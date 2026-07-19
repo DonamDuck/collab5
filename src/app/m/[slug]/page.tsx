@@ -45,6 +45,12 @@ export default async function MakerPage({
 
       {/* 링크 복사 — 소개서 공유 */}
       <div className="mt-12 print:hidden">
+        {/* 프로필 연결 — 비회원 관리비번으로 만든 미점유 소개서를 로그인 계정에 귀속(선택). 링크 복사 바로 위. */}
+        {claimable && (
+          <div className="mb-3">
+            <ConnectProfileButton slug={slug} loggedIn={!!user} />
+          </div>
+        )}
         <CopyLinkButton />
         <p className="mt-2.5 text-center text-[13px] text-faint">
           링크를 복사해 협업하고 싶은 곳에 보내보세요.
@@ -56,16 +62,6 @@ export default async function MakerPage({
           </a>
         )}
       </div>
-
-      {/* 프로필 연결 — 비회원 관리비번으로 만든 미점유 소개서를 로그인 계정에 귀속(선택) */}
-      {claimable && (
-        <div className="mt-8 border-t border-hairline pt-6">
-          <ConnectProfileButton slug={slug} loggedIn={!!user} />
-          <p className="mt-2.5 text-center text-[13px] text-faint">
-            이 소개서를 만든 계정으로 연결하면 로그인만으로 수정할 수 있어요.
-          </p>
-        </div>
-      )}
     </main>
   );
 }
