@@ -468,6 +468,7 @@ interface MakerRow {
   soul: Maker["soul"]; trust: Maker["trust"];
   collab_open: boolean; search_visible: boolean | null; created_at: string; updated_at: string | null;
   owner_uuid: string | null; claim_token_hash: string | null;
+  enrichment: Maker["enrichment"] | null;
 }
 interface CardRow {
   id: number; slug: string; from_maker_id: number;
@@ -498,6 +499,7 @@ function rowToMaker(r: MakerRow): Maker {
     updatedAt: r.updated_at ?? undefined,
     ownerUserId: r.owner_uuid ?? undefined,
     editPasswordHash: r.claim_token_hash ?? undefined,
+    enrichment: r.enrichment ?? undefined,
   };
 }
 function rowToCard(r: CardRow): CollabCard {
@@ -521,6 +523,7 @@ class SupabaseRepo implements Repo {
       blocks: input.blocks, intro_file_url: input.introFileUrl ?? null,
       soul: input.soul, trust: input.trust, collab_open: input.collabOpen,
       search_visible: input.searchVisible,
+      enrichment: input.enrichment ?? null,
       owner_uuid: input.ownerUserId ?? null, claim_token_hash: input.editPasswordHash ?? null,
     };
     const { data, error } = await this.db.from("makers").insert(row).select().single();
