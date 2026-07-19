@@ -1076,10 +1076,10 @@ class NaverGeminiProvider implements SearchProvider {
   //   폴백 2.0-flash-lite(토큰 최저 $0.075/$0.30) → 2.5-flash(더 똑똑, 안전망).
   // ⚠️gemini-2.0-flash-lite는 2026-07 기준 404(서비스 종료) — 제거함
   private static readonly GEMINI_MODELS = ["gemini-2.5-flash-lite", "gemini-2.5-flash"];
-  // 플랜B(대표 확정 2026-07-19): 검색은 lite 병렬 N콜 병합 — 독립 주사위 N개로 접지 확률↑ +
-  // 합집합으로 정보 풍부화. N = ENRICH_SEARCH_RUNS(기본 3, 1~4). 콜당 ~1원 → 3콜 ≈ 3원(< flash 1콜 6원).
-  // 전멸 시에만 flash 1회 안전망. flash 단독 실험으로 돌아가려면 이 두 상수를 바꾸면 됨.
-  private static readonly SEARCH_PRIMARY = "gemini-2.5-flash-lite";
+  // 검색 모델 최종 판정(대표 A/B 체감 2026-07-19): flash 1콜 승 — lite 병렬 3콜 병합보다 체감 우위.
+  // 기본 1콜(ENRICH_SEARCH_RUNS로 병렬 늘리기 가능), 비접지 시 검색전략 변형 프롬프트로 flash 1회 재시도.
+  // 콜당 토큰비 ~6원. lite 병합으로 되돌리기 = PRIMARY를 lite로 + ENRICH_SEARCH_RUNS=3.
+  private static readonly SEARCH_PRIMARY = "gemini-2.5-flash";
   private static readonly SEARCH_RESCUE = "gemini-2.5-flash";
 
   // 모델당 1회 시도(무료 티어 RPM 절약) → 503/429면 즉시 다음 모델로. 전부 실패하면 throw.
@@ -1092,7 +1092,11 @@ class NaverGeminiProvider implements SearchProvider {
     temperature = 0.4
   ): Promise<string> {
     let lastErr: unknown;
-    for (const model of NaverGeminiProvider.GEMINI_MODELS) {
+    // ENRICH_GEN_MODEL: 생성(구조화) 모델 강제 지정 — A/B 실험·모델 전환용(기본 lite→flash 폴백 체인)
+    const genModels = process.env.ENRICH_GEN_MODEL
+      ? [process.env.ENRICH_GEN_MODEL]
+      : NaverGeminiProvider.GEMINI_MODELS;
+    for (const model of genModels) {
       try {
         const response = await this.ai().models.generateContent({
           model,
@@ -1162,7 +1166,6 @@ class NaverGeminiProvider implements SearchProvider {
 [콜라보] 다른 브랜드·공간·작가와 함께한 협업 이력 (파트너 이름이 확인된 것만)
 [원하는 협업] 이 브랜드가 찾는 파트너·하고 싶다고 밝힌 협업 (모집글·인터뷰 발언 등 근거 필수)
 [고객] 주요 고객층·타겟 (연령·관심사 등, 확인된 것만)
-[숫자] 이 브랜드의 공개된 수치를 종류를 가리지 말고 최대한 많이 — 팔로워·구독자, 서포터·후원자 수, 펀딩 달성액·달성률, 누적 판매량·생산량, 매출·거래액, 운영 연차(설립연도), 직원·팀 규모, 입점처·팝업·매장 수, 회원·고객 수, 제품/굿즈 종류 수 등 (각 항목 어디서 봤는지 함께). ⚠️후기 개수·리뷰 수·별점·평점은 제외. ⚠️수치는 출처에 문자 그대로 적힌 것만 — '약'·'~이상'으로 어림하거나 반올림하지 마라. 특히 인스타 팔로워 수는 제3자 통계 사이트가 틀리거나 오래된 경우가 많다 — 출처와 시점이 명확하지 않으면 적지 마라.
 [알려짐] 언론·매거진·방송·수상 노출 — ⚠️구체적인 매체명·프로그램명·수상명을 반드시 함께(예: "○○매거진 2023년 소개", "△△대상 수상"). 매체·수상 이름을 모르면 그 줄은 생략(막연히 "매체 노출"이라고만 쓰지 마)
 [공간] 오프라인 매장·쇼룸·작업실·카페 운영 여부와 위치
 [신뢰정보] 홈페이지 URL · 주소
@@ -1173,7 +1176,7 @@ class NaverGeminiProvider implements SearchProvider {
     // 플랜B 병렬 병합(대표 확정 2026-07-19): lite N콜을 병렬로(대기시간 = 1콜) —
     // 각 콜이 독립 grounding 주사위. 마지막 1콜은 검색전략 변형(promptFor(2))으로 다양성 확보.
     // 접지 성공분만 합쳐 메모로. 전멸 시 flash 1회 안전망(promptFor(2)). 비접지 = 검색 과금 0.
-    const runs = Math.max(1, Math.min(4, Number(process.env.ENRICH_SEARCH_RUNS) || 3));
+    const runs = Math.max(1, Math.min(4, Number(process.env.ENRICH_SEARCH_RUNS) || 1));
     const attempts = await Promise.all(
       Array.from({ length: runs }, (_, i) =>
         this.searchAttempt(
@@ -1655,7 +1658,6 @@ const CHIP_SECTIONS: Record<string, { label: string; factual: boolean }> = {
   콜라보: { label: "콜라보", factual: false },
   "원하는 협업": { label: "원하는협업", factual: false },
   고객: { label: "고객", factual: false },
-  숫자: { label: "숫자", factual: true }, // 사실 게이트
   알려짐: { label: "알려짐", factual: true }, // 사실 게이트(방송·수상·언론)
   공간: { label: "공간", factual: false },
   키워드: { label: "키워드", factual: false }, // 제미나이가 스스로 증류한 짧은 명사구 모음

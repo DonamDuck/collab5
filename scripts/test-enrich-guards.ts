@@ -187,13 +187,12 @@ check("메뉴 가격 제외: '설렁탕 11,000원' 없음", !jTexts.some((t) => 
 check("메뉴 가격 제외: '해장국 11,000원'·'간천엽 15,000원' 없음", !jTexts.some((t) => /11,000원|15,000원|40,000원/.test(t)));
 check("전화번호 제외: '전화번호 02-379-4294' 없음", !jTexts.some((t) => /02-379-4294|전화/.test(t)), JSON.stringify(jTexts));
 check("영업시간 제외: '영업시간 매일 06 00 - 21 00' 없음", !jTexts.some((t) => /영업\s*시간|06 00/.test(t)));
-check("★유지: '운영 연차 30년 이상'(브랜드 임팩트 숫자)", jTexts.includes("운영 연차 30년 이상"), JSON.stringify(jTexts));
+check("숫자 칩 전면 제외(대표 07-19): '운영 연차 30년 이상' 없음", !jTexts.includes("운영 연차 30년 이상"), JSON.stringify(jTexts));
 check("★유지: '사장님이 직접 담근 배추김치'(브랜드 성격)", jTexts.includes("사장님이 직접 담근 배추김치"));
 check("★유지: '부드러운 우거지'·'섞박지'(맛 결)", jTexts.includes("부드러운 우거지") && jTexts.includes("섞박지"));
-// 회귀: 숫자 칩("팔로워 1.5만")은 원/전화/시간 아니면 그대로
-const numMemo = `[출처 2 · 제미나이]\n[숫자]\n인스타 팔로워 1.5만\n누적 방문객 5만 명`;
-const numChips = extractChipsFromResearch(numMemo, "가게").map((c) => c.text);
-check("회귀: '팔로워 1.5만'·'누적 방문객 5만 명' 유지", numChips.includes("인스타 팔로워 1.5만") && numChips.includes("누적 방문객 5만 명"), JSON.stringify(numChips));
+// 숫자 섹션은 칩 소스에서 완전 제외(CHIP_SECTIONS서 삭제 — 온라인 수치 신뢰불가, 고객 직접입력)
+const numMemo = `[출처 2 · 제미나이]\n[숫자]\n인스타 팔로워 1.5만\n누적 방문객 5만 명\n제품/굿즈 종류 수 감자빵 외 다양한 굿즈 판매`;
+check("[숫자] 섹션 칩 0(비숫자 잡문 포함 전부 소멸)", extractChipsFromResearch(numMemo, "가게").length === 0);
 
 // ── 감자탕 케이스 (대표 QA 2026-07-19 — 푸짐한감자탕) ──
 console.log("[감자탕 — 요리 umbrella·탕류 스타터·후기 노이즈]");
@@ -219,9 +218,9 @@ check("표적검색 텍스트도 칩 소스 아님", !extractChipsFromResearch(
 
 // 고아 조사 조각 배제 (레이지오터 라이브서 발견 — "운영 연차 으로 운영 중")
 console.log("[고아 조사 조각]");
-const orphanChips = extractChipsFromResearch(`[출처 2 · 제미나이]\n[숫자]\n운영 연차 으로 운영 중\n운영 연차 7년`, "가게");
-check("'운영 연차 으로 운영 중' 배제", !orphanChips.some((c) => c.text.includes("으로")), JSON.stringify(orphanChips.map((c) => c.text)));
-check("정상 '운영 연차 7년'은 유지", orphanChips.some((c) => c.text === "운영 연차 7년"));
+const orphanChips = extractChipsFromResearch(`[출처 2 · 제미나이]\n[정체]\n동네 사랑방 으로 운영 중\n오래된 단골 가게`, "가게");
+check("고아 조사('~ 으로 운영 중') 배제", !orphanChips.some((c) => c.text.includes("으로")), JSON.stringify(orphanChips.map((c) => c.text)));
+check("정상 칩('오래된 단골 가게')은 유지", orphanChips.some((c) => c.text === "오래된 단골 가게"));
 
 // 프롬프트 잔향(echo) 배제 (lite 병합 QA에서 발견 — 콜렉트마이페이보릿)
 console.log("[프롬프트 잔향 배제]");
