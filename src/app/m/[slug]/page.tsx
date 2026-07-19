@@ -4,6 +4,7 @@ import { getSessionUser } from "@/lib/supabase/server";
 import { getProfile } from "@/lib/profiles";
 import { CopyLinkButton } from "./CopyLinkButton";
 import { MakerArticle } from "./MakerArticle";
+import { ConnectProfileButton } from "./ConnectProfileButton";
 
 // 공개 업체 상세페이지 — 누구나 열람(MVP 검색 결과의 도착지). 검증 가능한 신뢰 시그널 노출.
 export default async function MakerPage({
@@ -22,6 +23,9 @@ export default async function MakerPage({
   ]);
   const isOwner = !!user && maker.ownerUserId === user.id;
   const logoUrl = ownerProfile?.profileImage || undefined;
+  // 점유 가능 = 아직 소유 계정 없음(비회원 생성) + 관리 비번 존재(비번으로 점유 검증 가능).
+  // 이미 소유(회원 생성 or 점유됨)면 버튼 미노출. 비번 없는 익명 소개서는 점유 불가라 미노출.
+  const claimable = !maker.ownerUserId && !!maker.editPasswordHash;
 
   return (
     <main className="mx-auto w-full max-w-[640px] px-4 py-10 sm:px-6">
@@ -41,6 +45,16 @@ export default async function MakerPage({
           </a>
         )}
       </div>
+
+      {/* 프로필 연결 — 비회원 관리비번으로 만든 미점유 소개서를 로그인 계정에 귀속(선택) */}
+      {claimable && (
+        <div className="mt-8 border-t border-hairline pt-6">
+          <ConnectProfileButton slug={slug} loggedIn={!!user} />
+          <p className="mt-2.5 text-center text-[13px] text-faint">
+            이 소개서를 만든 계정으로 연결하면 로그인만으로 수정할 수 있어요.
+          </p>
+        </div>
+      )}
     </main>
   );
 }
