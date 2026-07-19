@@ -789,6 +789,34 @@ const GEMINI_RESULT_SCHEMA = {
   required: ["candidates"],
 };
 
+// ── 오귀속 가드(피망당구클럽 114On 사건 2026-07-19) ──
+// 집계·디렉토리·기관 사이트는 브랜드 홈페이지가 아니다. 이런 도메인의 메타를
+// "브랜드가 직접 쓴 소개 · 신뢰도 최상"으로 승격하면 무관한 서비스 소개(전화번호검색 등)가
+// 소개서 재료로 주입된다. pickHomepage(승격)·extractLinksFromResearch(링크 후보) 공용.
+const DIRECTORY_HOSTS = [
+  "114.co.kr", // 전화번호부 — "○○ - 114On" 디렉토리 페이지가 웹문서 상위에 흔함
+  "bizno.net", "moneypin.biz", "nicebizinfo.com", // 사업자정보 조회
+  "saramin.co.kr", "jobkorea.co.kr", "jobplanet.co.kr", "rocketpunch.com", "wanted.co.kr", "catch.co.kr", // 채용·기업정보
+  "diningcode.com", "mangoplate.com", "siksinhot.com", "yogiyo.co.kr", "baemin.com", // 맛집·배달 집계
+  "spoinfo.or.kr", // 체육시설알리미(공단) — or.kr 블랭킷 차단은 비영리 브랜드를 다치게 해서 개별 등재
+  "tabling.co.kr", "catchtable.co.kr", // 예약 플랫폼 — 제미나이가 홈페이지로 오인(콜렉트마이페이보릿 사건)
+];
+export function isDirectoryHost(host: string): boolean {
+  const h = host.replace(/^www\./, "").toLowerCase();
+  if (h.endsWith(".go.kr")) return true; // 정부·공공(체육시설알리미 등)은 브랜드 홈페이지일 수 없다
+  return DIRECTORY_HOSTS.some((d) => h === d || h.endsWith("." + d));
+}
+
+/** fetch한 페이지가 정말 이 브랜드의 것인가 — html(제목·본문·푸터 상호 포함)에 브랜드명이
+ *  통째로(공백 무시) 등장해야 인정. 남의 사이트(미등재 디렉토리 등)의 메타·인스타 승격을 차단.
+ *  안전 방향: 확인 실패 시 버린다(최악=메타 없이 thin 폴백 > 최악=헛소리 주입). */
+export function homepageBelongsToBrand(html: string, brandName: string): boolean {
+  const key = brandName.replace(/\s/g, "").toLowerCase();
+  if (key.length < 2) return false;
+  const hay = html.slice(0, 300_000).replace(/\s/g, "").toLowerCase();
+  return hay.includes(key);
+}
+
 class NaverGeminiProvider implements SearchProvider {
   private naverId = process.env.NAVER_CLIENT_ID!;
   private naverSecret = process.env.NAVER_CLIENT_SECRET!;
@@ -835,19 +863,24 @@ class NaverGeminiProvider implements SearchProvider {
       .trim();
   }
 
-  /** 네이버 결과 링크에서 브랜드 홈페이지(네이버/블로그/SNS 아닌 도메인) 하나 고르기 */
+  /** 네이버 결과 링크에서 브랜드 홈페이지(네이버/블로그/SNS/집계사이트 아닌 도메인) 하나 고르기.
+   *  2패스: 얕은 경로(루트·1단) 우선 — 깊은 상세경로(/detail/123 등)는 디렉토리 문서가 흔해서
+   *  후순위로 미루고, 최종 채택 여부는 gather()의 브랜드 실재 검증이 판정한다. */
   private pickHomepage(items: NaverItem[]): string | undefined {
+    const candidates: { origin: string; depth: number }[] = [];
     for (const it of items) {
       try {
         const u = new URL(it.link ?? "");
         const host = u.hostname.replace(/^www\./, "");
         if (/(^|\.)(naver|blog|instagram|facebook|youtube|tistory|kakao)\./.test(host)) continue;
-        return u.origin;
+        if (isDirectoryHost(host)) continue; // 집계·디렉토리 — 브랜드 홈페이지 아님
+        const depth = u.pathname.split("/").filter(Boolean).length;
+        candidates.push({ origin: u.origin, depth });
       } catch {
         /* 잘못된 URL 스킵 */
       }
     }
-    return undefined;
+    return (candidates.find((c) => c.depth <= 1) ?? candidates[0])?.origin;
   }
 
   /** 홈페이지 정적 HTML 1회 fetch — 인스타 스니핑 + 메타 수확이 같은 html을 재사용(fetch 1회 유지) */
@@ -898,14 +931,21 @@ class NaverGeminiProvider implements SearchProvider {
     return { title, desc };
   }
 
-  /** 홈페이지 fetch 1회 → 인스타 스니핑 + 브랜드가 직접 쓴 메타(title·description) 동시 수확 */
+  /** 홈페이지 fetch 1회 → 인스타 스니핑 + 브랜드가 직접 쓴 메타(title·description) 동시 수확.
+   *  verified: fetch한 페이지에 브랜드명이 실재하는가 — false면 남의 사이트(오귀속).
+   *  undefined = fetch 실패로 검증 불가(봇 차단 등 — 오귀속 단정도 불가). */
   private async fetchHomepageSignals(
-    homepage: string
-  ): Promise<{ instagram?: string; title?: string; desc?: string }> {
+    homepage: string,
+    brandName: string
+  ): Promise<{ instagram?: string; title?: string; desc?: string; verified?: boolean }> {
     const page = await this.fetchHomepage(homepage);
     if (!page) return {};
     const meta = this.extractHomepageMeta(page.html);
-    return { instagram: this.sniffInstagramFromHtml(page.html), ...meta };
+    return {
+      instagram: this.sniffInstagramFromHtml(page.html),
+      ...meta,
+      verified: homepageBelongsToBrand(page.html, brandName),
+    };
   }
 
   /** 지역+웹문서+블로그+카페+표적쿼리 병렬 검색 + 홈페이지 인스타·메타 수확 → '조사 메모'로 조립.
@@ -924,8 +964,15 @@ class NaverGeminiProvider implements SearchProvider {
     ]);
 
     // 홈페이지 정적 HTML 1회 fetch — 인스타 링크 확인 + 메타(브랜드가 직접 쓴 소개) 수확
-    const homepage = this.pickHomepage([...local, ...web]);
-    const signals = homepage ? await this.fetchHomepageSignals(homepage) : {};
+    let homepage = this.pickHomepage([...local, ...web]);
+    let signals = homepage ? await this.fetchHomepageSignals(homepage, query) : {};
+    // 오귀속 가드 — fetch했는데 페이지 어디에도 브랜드명이 없으면 남의 사이트다(미등재 디렉토리 등).
+    // 메타·인스타·홈페이지 링크 전부 폐기: 같은 오염원에서 나온 것들이라 하나만 남겨도 사고.
+    if (signals.verified === false) {
+      console.log("[enrich] homepage-misattr", JSON.stringify({ query, dropped: homepage }));
+      homepage = undefined;
+      signals = {};
+    }
     const sniffedIg = signals.instagram;
 
     // 동명 노이즈 필터 — 블로그·카페·표적검색은 제목+설명에 브랜드명이 통째로(공백 무시) 들어간 것만.
@@ -1029,6 +1076,10 @@ class NaverGeminiProvider implements SearchProvider {
   //   폴백 2.0-flash-lite(토큰 최저 $0.075/$0.30) → 2.5-flash(더 똑똑, 안전망).
   // ⚠️gemini-2.0-flash-lite는 2026-07 기준 404(서비스 종료) — 제거함
   private static readonly GEMINI_MODELS = ["gemini-2.5-flash-lite", "gemini-2.5-flash"];
+  // 검색(grounding)만 flash 우선(대표 지시 2026-07-19 — 칩 품질·런간 변동 완화 실험).
+  // 구조화 호출(generate)은 lite 우선 유지 = 비용 불변. 콜당 토큰비 약 1원(lite)→6원(flash) 수준.
+  // 되돌리기 = 이 배열을 GEMINI_MODELS와 동일하게.
+  private static readonly SEARCH_MODELS = ["gemini-2.5-flash", "gemini-2.5-flash-lite"];
 
   // 모델당 1회 시도(무료 티어 RPM 절약) → 503/429면 즉시 다음 모델로. 전부 실패하면 throw.
   // schema/system을 인자로 받아 구조화 호출을 재사용(구조화·5지선다 공용).
@@ -1081,15 +1132,27 @@ class NaverGeminiProvider implements SearchProvider {
       ? `\n[업체 특정 앵커 — 네이버 실측 데이터로 이미 확인된 이 업체의 신원]\n${anchor}\n(⚠️이 앵커는 '어느 업체인지' 특정하는 용도로만 써라. 조사 내용은 앵커를 받아쓰지 말고 네가 웹에서 직접 확인한 것만 적어라. 공식 홈페이지 도메인이 있으면 그 사이트 내용을 우선 검색해라. 앵커와 다른 업체의 정보는 절대 섞지 마라.)\n`
       : "";
     // 지역+업종 = 동명 업체 판별 신호. 틀린 업체 정보를 채우느니 빈손이 낫다(솔직 배너가 받아줌).
+    // '업종·하는 일'은 고객 자유입력이라 웹 분류와 표현이 다를 수 있음 → 동명 판정 기준을
+    // 계열 관용으로 캘리브레이션(대표 지시 2026-07-19: '명백히 다르다' 판단 강화).
     const hintBits = [
       region?.trim() && `위치: ${region.trim()}`,
-      businessType?.trim() && `업종: ${businessType.trim()}`,
+      businessType?.trim() && `업종·하는 일: ${businessType.trim()}`,
     ].filter(Boolean);
     const loc = hintBits.length
-      ? `\n(⭐브랜드 특정 힌트 → ${hintBits.join(" · ")}. ⚠️같은 이름이라도 위치·업종이 이 힌트와 명백히 다르면 동명의 남의 업체다 — 그 업체 정보는 한 줄도 섞지 마. 힌트와 맞는 업체를 못 찾았으면 지어내지 말고 모든 소제목에 "확인 안 됨"이라고 써.)`
+      ? `\n(⭐브랜드 특정 힌트 → ${hintBits.join(" · ")}.
+⚠️동명의 남의 업체 판별 기준 — '업종·하는 일'은 고객이 자기 말로 적은 표현이라 웹의 분류·표현과 얼마든지 다를 수 있다:
+· 표현이 달라도 같은 계열이면 같은 업체로 본다 — 예: "감자탕"↔"한식·국밥·해장국", "카페"↔"LP카페·디저트·브런치", "공방"↔"클래스·핸드메이드 스튜디오".
+· 남의 업체로 판정하는 건 둘 중 하나일 때만: ①위치가 다른 지역이거나 ②하는 일의 뿌리가 서로 양립 불가능할 때(예: 당구장 vs 꽃집). 이때 그 업체 정보는 한 줄도 섞지 마.
+· 애매하면 위치 일치를 우선 근거로 삼아라. 힌트와 맞는 업체를 못 찾았으면 지어내지 말고 모든 소제목에 "확인 안 됨"이라고 써.)`
       : "";
-    const prompt = `절대 추측하거나 사실이 아닌 정보를 지어내지 마. 웹에서 확인된 것만 적는다.
-"${query}" 브랜드/업체를 웹에서 조사해줘.${loc}${anchorBlock}
+    // 검색 전략 — 교차검증(2026-07-19, gemini-2.5-flash 자가 비평)에서 채택:
+    // ①검색어 조합 명시 ②소상공인=UGC 인지 ③2차 재시도는 "지역 검색어로 넓게→그 안에서 상호 찾기"로 전환.
+    const searchStrategy = (round: number) =>
+      round === 1
+        ? `\n검색은 한 조합만 하지 말고 여러 조합을 시도해 — "${query}", "${query} ${region?.trim() ?? ""}", "${query} ${businessType?.trim() ?? ""}" 등. 웹 존재감이 약한 동네 가게일 수 있다 — 공식 출처가 없으면 블로그·카페 후기, 지역 커뮤니티 글, 지도 서비스 등록 정보에서도 유의미한 정보를 적극 발굴해(어디서 봤는지 함께).`
+        : `\n⚠️직전 조사에서 검색 근거를 못 찾았다. 검색 전략을 바꿔라: ①지역 기반 일반 검색어("${region?.trim() ?? ""} ${businessType?.trim() ?? ""}", "${region?.trim() ?? ""} ${businessType?.trim() ?? ""} 후기/맛집")로 넓게 검색한 뒤 그 결과 안에서 '${query}'를 찾아라 ②상호의 띄어쓰기를 바꿔서도 검색해봐 ③영업시간·메뉴·주차 같은 방문 정보 중심 검색도 시도. 그래도 못 찾으면 지어내지 말고 "확인 안 됨"으로.`;
+    const promptFor = (round: number) => `절대 추측하거나 사실이 아닌 정보를 지어내지 마. 웹에서 확인된 것만 적는다.
+"${query}" 브랜드/업체를 웹에서 조사해줘.${searchStrategy(round)}${loc}${anchorBlock}
 아래 소제목 순서 그대로, 확인된 사실만 개조식으로 정리해줘. 전체 1500자 이내. 해당 정보가 없으면 그 소제목에 "확인 안 됨" 한 줄만.
 
 [정체] 무엇을 만들고/하는 곳인지 한두 줄 + 창업 배경·브랜드 철학·시작 이야기가 있으면 두세 줄
@@ -1098,41 +1161,47 @@ class NaverGeminiProvider implements SearchProvider {
 [콜라보] 다른 브랜드·공간·작가와 함께한 협업 이력 (파트너 이름이 확인된 것만)
 [원하는 협업] 이 브랜드가 찾는 파트너·하고 싶다고 밝힌 협업 (모집글·인터뷰 발언 등 근거 필수)
 [고객] 주요 고객층·타겟 (연령·관심사 등, 확인된 것만)
-[숫자] 이 브랜드의 공개된 수치를 종류를 가리지 말고 최대한 많이 — 팔로워·구독자, 서포터·후원자 수, 펀딩 달성액·달성률, 누적 판매량·생산량, 매출·거래액, 운영 연차(설립연도), 직원·팀 규모, 입점처·팝업·매장 수, 회원·고객 수, 제품/굿즈 종류 수 등 (각 항목 어디서 봤는지 함께). ⚠️후기 개수·리뷰 수·별점·평점은 제외.
+[숫자] 이 브랜드의 공개된 수치를 종류를 가리지 말고 최대한 많이 — 팔로워·구독자, 서포터·후원자 수, 펀딩 달성액·달성률, 누적 판매량·생산량, 매출·거래액, 운영 연차(설립연도), 직원·팀 규모, 입점처·팝업·매장 수, 회원·고객 수, 제품/굿즈 종류 수 등 (각 항목 어디서 봤는지 함께). ⚠️후기 개수·리뷰 수·별점·평점은 제외. ⚠️수치는 출처에 문자 그대로 적힌 것만 — '약'·'~이상'으로 어림하거나 반올림하지 마라. 특히 인스타 팔로워 수는 제3자 통계 사이트가 틀리거나 오래된 경우가 많다 — 출처와 시점이 명확하지 않으면 적지 마라.
 [알려짐] 언론·매거진·방송·수상 노출 — ⚠️구체적인 매체명·프로그램명·수상명을 반드시 함께(예: "○○매거진 2023년 소개", "△△대상 수상"). 매체·수상 이름을 모르면 그 줄은 생략(막연히 "매체 노출"이라고만 쓰지 마)
 [공간] 오프라인 매장·쇼룸·작업실·카페 운영 여부와 위치
 [신뢰정보] 홈페이지 URL · 주소
 [키워드] 위 조사에서 이 브랜드를 나타내는 짧은 키워드 8~15개, 쉼표로 구분 (각 2~15자 명사구 — 제품·소재·활동·분위기·강점 위주. 문장 금지, 다른 브랜드 것 섞지 말 것)
-공식 홈페이지·언론 보도 등 신뢰할 수 있는 출처를 우선해. 연도·날짜가 보이면 함께 적어줘(오래된 정보 구분용).
+출처는 공식 홈페이지·언론 보도가 있으면 우선하되, 지역 소상공인은 그런 출처가 없는 경우가 많다 — 네이버 플레이스·지도 등록 정보, 블로그·카페 후기, 지역 커뮤니티 글 등 웹에서 확인 가능한 출처를 폭넓게 활용해(어디서 봤는지 함께). 연도·날짜가 보이면 함께 적어줘(오래된 정보 구분용).
 ⭐인스타그램은 실제 instagram.com/○○ 페이지를 확인한 경우에만 @핸들. 브랜드명·도메인으로 추측 금지 — 확인 안 되면 "인스타: 확인 안 됨".
 확실하지 않으면 적지 말고 넘어가. 과장·추측 금지.`;
-    // 보조 소스라 실패 시 빠르게 포기(네이버 단독). 429는 쿼터/레이트리밋 → 모델 공유라 재시도 무의미.
-    for (const model of NaverGeminiProvider.GEMINI_MODELS) {
-      try {
-        const response = await this.ai().models.generateContent({
-          model,
-          contents: prompt,
-          config: { tools: [{ googleSearch: {} }], temperature: 0.2 },
-        });
-        // ⭐그라운딩 근거 체크 — 검색 근거(chunks/supports)가 없으면 웹을 안 보고 지어낸 답변이다.
-        // 상상의 업체를 만들어낸 사고(캔버스가든→가짜 식물 스튜디오) 이후 도입: 근거 없으면 메모 폐기.
-        const gm = response.candidates?.[0]?.groundingMetadata;
-        const grounded = !!(gm?.groundingChunks?.length || gm?.groundingSupports?.length);
-        if (!grounded) {
-          // 비접지 응답은 검색 과금이 없음 → 다음 모델 재시도는 토큰 비용뿐(호출 수 원칙 무관).
-          console.warn(`[enrich] gemini ${model} 검색 근거 없음(비접지 생성) → 폐기, 다음 모델`);
-          continue;
+    // A+B 재시도 정책(대표 확정 2026-07-19): 1라운드(전 모델)가 비접지로 전멸하면
+    // 검색 전략을 바꾼 2라운드 1회 재시도 — 유저가 수동으로 '다시 검색'하던 걸 서버가 대신.
+    // 비접지 응답은 검색 과금 0(토큰만 몇 원) → 추가 과금은 재시도가 접지 성공했을 때의 정상 검색뿐.
+    // 429(쿼터)·기타 하드 에러는 라운드 불문 즉시 포기(네이버 단독) — 쿼터 공유라 재시도 무의미.
+    for (let round = 1; round <= 2; round++) {
+      if (round === 2) console.warn("[enrich] gemini 1라운드 전멸 → 검색전략 변형 2라운드 재시도");
+      for (const model of NaverGeminiProvider.SEARCH_MODELS) {
+        try {
+          const response = await this.ai().models.generateContent({
+            model,
+            contents: promptFor(round),
+            config: { tools: [{ googleSearch: {} }], temperature: 0.2 },
+          });
+          // ⭐그라운딩 근거 체크 — 검색 근거(chunks/supports)가 없으면 웹을 안 보고 지어낸 답변이다.
+          // 상상의 업체를 만들어낸 사고(캔버스가든→가짜 식물 스튜디오) 이후 도입: 근거 없으면 메모 폐기.
+          const gm = response.candidates?.[0]?.groundingMetadata;
+          const grounded = !!(gm?.groundingChunks?.length || gm?.groundingSupports?.length);
+          if (!grounded) {
+            // 비접지 응답은 검색 과금이 없음 → 다음 모델 재시도는 토큰 비용뿐(호출 수 원칙 무관).
+            console.warn(`[enrich] gemini ${model} 검색 근거 없음(비접지 생성) → 폐기 (round ${round})`);
+            continue;
+          }
+          return (response.text ?? "").trim();
+        } catch (e) {
+          const status = (e as { status?: number; code?: number })?.status ?? (e as { code?: number })?.code;
+          if (status === 503 || status === 404) {
+            console.warn(`[enrich] gemini search ${model} ${status} → 다음 모델 폴백`);
+            continue; // 일시 과부하(503)·모델 없음(404)은 다음 모델 시도
+          }
+          // 429(쿼터)·grounding 미지원·기타 → 즉시 네이버 단독으로 degrade(지연 최소화)
+          console.warn(`[enrich] gemini search ${model} 실패(${status ?? "?"}) → 네이버 단독`);
+          return "";
         }
-        return (response.text ?? "").trim();
-      } catch (e) {
-        const status = (e as { status?: number; code?: number })?.status ?? (e as { code?: number })?.code;
-        if (status === 503 || status === 404) {
-          console.warn(`[enrich] gemini search ${model} ${status} → 다음 모델 폴백`);
-          continue; // 일시 과부하(503)·모델 없음(404)은 다음 모델 시도
-        }
-        // 429(쿼터)·grounding 미지원·기타 → 즉시 네이버 단독으로 degrade(지연 최소화)
-        console.warn(`[enrich] gemini search ${model} 실패(${status ?? "?"}) → 네이버 단독`);
-        return "";
       }
     }
     return "";
@@ -1610,7 +1679,11 @@ function unguardParenCommas(s: string): string {
  * 유저가 '나를 나타내는 것'을 고르면 그게 생성 재료가 된다. 사실 게이트(factual)는
  * 기본 OFF·탭 확인 대상. 메모가 비었거나 구조가 없으면 빈 배열(→ thin 폴백).
  */
-export function extractChipsFromResearch(research: string, brandName?: string): KeywordChip[] {
+export function extractChipsFromResearch(
+  research: string,
+  brandName?: string,
+  businessType?: string
+): KeywordChip[] {
   if (!research) return [];
   const brand = brandName?.trim();
   const gi = research.indexOf("[출처 2"); // 제미나이 조사부분(구조 깔끔) 우선
@@ -1624,7 +1697,6 @@ export function extractChipsFromResearch(research: string, brandName?: string): 
     .trim();
   const parts = body.split(/\n?\s*\[([^\]\n]+)\]\s*/); // [pre, header, body, header, body, ...]
   const chips: KeywordChip[] = [];
-  const seen = new Set<string>();
   const STOPWORDS = /^(또한|그리고|하지만|특히|및|기타|등|다만|그러나|이\s*외|그\s*외)$/;
   const push = (raw: string, sec: { label: string; factual: boolean }) => {
     const text = raw
@@ -1639,6 +1711,14 @@ export function extractChipsFromResearch(research: string, brandName?: string): 
     if (/후기|리뷰|별점|평점/.test(text)) return false;
     // 행정 정보는 키워드가 아니다 — 사업자·신고번호·주소(주소는 identity로 이미 감)
     if (/사업자|통신판매|신고번호|등록번호|고유번호|^주소/.test(text)) return false;
+    // 거래·운영 정보는 콜라보 키워드가 아니다(대표 지시 2026-07-19 — 장모님해장국 사건).
+    //   메뉴 가격·전화번호·영업시간은 소개서 재료로 무의미 → 제외.
+    //   ⚠️ "운영 연차 30년"·"팔로워 1.5만"처럼 브랜드 임팩트 숫자는 살린다(원/전화/시간 패턴만 저격).
+    if (/\d[\d,]*\s*원(?![가-힣])/.test(text)) return false; // 가격("설렁탕 11,000원"·"해장국 11,000원")
+    if (/전화|연락처|대표번호|문의(?:처|전화)?\s*[:：]?\s*\d|☎|℡/.test(text)) return false; // 전화 라벨
+    if (/(?<![-\d])\d{2,4}[-.\s]\d{3,4}[-.\s]\d{4}(?![-\d])/.test(text)) return false; // 전화번호 형태(02-379-4294)
+    if (/영업\s*시간|운영\s*시간|영업\s*중|브레이크\s*타임|라스트\s*오더|매일\s*\d{1,2}[:\s]\d{2}|\d{1,2}\s*[:시]\s*\d{2}\s*[-~–]\s*\d{1,2}/.test(text))
+      return false; // 영업시간("영업시간 매일 06 00 - 21 00")
     // 실질 내용(한글·영문·숫자)이 없으면 배제 — "###", "()", "···", "-" 같은 기호 잔재 차단.
     if (!/[가-힣a-zA-Z0-9]/.test(text)) return false;
     // 메타·잡음 단어 단독은 배제 — "결과", "검색결과", "정보 없음" 등.
@@ -1647,6 +1727,8 @@ export function extractChipsFromResearch(research: string, brandName?: string): 
     if (/^(매체|언론|미디어|방송|신문)\s*(노출|소개)/.test(text)) return false;
     // 동사형 문장·접속 조각 배제(키워드는 명사구) — "~탐구합니다"·"~배우고"·"~짜거나" 등
     if (/(다|요|죠|고|며|나|서)\.?$/.test(text)) return false;
+    // 고아 조사 배제 — 앞 명사가 클렌징으로 떨어져 나가 조사만 남은 조각("운영 연차 으로 운영 중")
+    if (/(^|\s)(으로|이라|이며|이고)(\s|$)/.test(text)) return false;
     // 미완결 조각 배제(접속·비교·관형 어미로 끝) — "'호락호락'이라는 이름처럼", "~을 위한" 등
     if (/(처럼|같은|같이|위한|위해|통한|통해|관한|관련|대한|이라는|라는|든지|거나|면서|로서|로써|등의|에서|으로|에게|까지|부터|보다|브랜드로|곳으로)$/.test(text))
       return false;
@@ -1656,13 +1738,11 @@ export function extractChipsFromResearch(research: string, brandName?: string): 
     if (brand && (text === brand || new RegExp(`^${brand.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*(은|는|이|가|의)?(\\s|$)`).test(text)))
       return false;
     const key = text.replace(/\s/g, "");
-    if (seen.has(key)) return false;
-    seen.add(key);
-    chips.push({
-      text,
-      section: sec.label,
-      factual: sec.factual || /\d/.test(text) || FACTUAL_RE.test(text),
-    });
+    // 사용자가 이미 입력한 업종과 동일한 칩은 무의미("당구장" 입력자에게 "당구장" 칩) — 제외
+    if (businessType && key === businessType.replace(/\s/g, "")) return false;
+    // 완전 동일(공백 무시)만 여기서 제거 — 포함관계 가족 통합은 마지막에 한 번에(consolidateChipFamilies)
+    if (chips.some((e) => e.text.replace(/\s/g, "") === key)) return false;
+    chips.push({ text, section: sec.label, factual: sec.factual || /\d/.test(text) || FACTUAL_RE.test(text) });
     return true;
   };
   for (let i = 1; i < parts.length; i += 2) {
@@ -1720,8 +1800,37 @@ export function extractChipsFromResearch(research: string, brandName?: string): 
       if (count >= maxPerSection) break;
     }
   }
+  // ── 네이버 칩(대표 지시 2026-07-19 "네이버+제미나이 조합") — 제미나이가 빈손이어도
+  //    네이버가 검증해 둔 정보를 버리지 않는다. 오프라인 파싱(콜 0), push의 포함관계 통일로 중복 정리. ──
+
+  // ① 지도확인 칩: 지도 교차검증 ✅일 때만(동명 타지역 오귀속 방지), 브랜드명이 든 지역검색
+  //    행의 업종 카테고리("스포츠,오락>당구장")를 검증된 칩으로.
+  //    ⚠️ 네이버 검색 API는 지도 UI와 달리 최상위 umbrella까지 준다("음식점>카페,디저트").
+  //    "음식점"류 최상위 뭉텅이는 브랜드를 설명 못 함(전국 모든 식당) → 제외. 카페·디저트 등 리프만.
+  if (naverPart.includes("[지도 교차검증] ✅") && brand) {
+    // 최상위 뭉텅이 제외 — 브랜드 특성 없음. 요리 대분류(한식·중식…)도 포함(감자탕집→'한식' 무의미).
+    const GENERIC_CATEGORY =
+      /^(음식점|쇼핑|생활|편의|서비스|종합|매장|상점|점포|기타|한식|중식|일식|양식|분식|아시아음식|아시안|세계음식|뷔페|퓨전요리|퓨전|음식)$/;
+    const brandKey = brand.replace(/\s/g, "");
+    const localBlock = naverPart.match(/\[네이버 지역검색[^\]]*\]\n([\s\S]*?)(?=\n\[|$)/)?.[1] ?? "";
+    const catSec = { label: "지도확인", factual: false }; // 지도가 이미 검증 → 사실 게이트 불필요
+    for (const line of localBlock.split("\n")) {
+      const title = line.match(/^·\s*([^|]+)\|/)?.[1] ?? "";
+      if (!title.replace(/\s/g, "").includes(brandKey)) continue; // 동명·이웃 업체 행 제외
+      const cat = line.match(/업종:([^|]*)/)?.[1] ?? "";
+      for (const token of cat.split(/[>,/·]/)) {
+        const t = token.trim();
+        if (t.length >= 2 && t.length <= 12 && !GENERIC_CATEGORY.test(t)) push(t, catSec);
+      }
+    }
+  }
+
+  // (후기흔적 칩은 2026-07-19 대표 지시로 은퇴 — 소비자 후기는 의견 편차·부정 후기 유입 위험이
+  //  있어 칩 소스에서 제외. 블로그·카페 검색 자체는 유지: 링크 후보·지역 신호·생성 참고자료로만 쓴다.
+  //  근본 개선은 [[크롤-키워드-재설계]] '후기 재설계' 백로그에서.)
+
   // 홈페이지 메타 소개(신뢰도 최상) → 칩. 통짜가 짧으면 그대로, 길면 조각 분리.
-  // 제미나이 칩과는 push의 seen으로 자동 중복 제거. 맨 앞에 두어 우선 노출.
+  // 제미나이·네이버 칩과는 push의 포함관계 통일로 자동 중복 정리. 맨 앞에 두어 우선 노출.
   if (metaDesc) {
     const metaSec = { label: "우리 소개(홈페이지)", factual: false };
     const before = chips.length;
@@ -1735,7 +1844,42 @@ export function extractChipsFromResearch(research: string, brandName?: string): 
       }
     if (chips.length > before) chips.unshift(...chips.splice(before)); // 메타 칩을 맨 앞으로
   }
-  return chips.slice(0, 28);
+  return consolidateChipFamilies(chips, businessType).slice(0, 28);
+}
+
+// 수식형 선호 판단용 긍정 어휘(오프라인 사전 — LLM 콜 0)
+const POSITIVE_RE =
+  /맛있|맛난|정성|수제|손수|신선|푸짐|친절|깔끔|유명|인기|특제|시그니처|프리미엄|전통|원조|장인|엄선|풍부|따뜻|아늑|감성|매력|특별|건강|국내산|제철|당일|직접/;
+
+/** 포함관계 '가족' 통합(대표 정책 2026-07-19) — "감자탕·맛있는 감자탕·얼큰 감자탕"처럼
+ *  한 뿌리(최소형)를 공유하는 칩들은 [뿌리 1개 + 가장 긍정적인 수식형 1개]만 남긴다.
+ *  수식형만 남기면 "얼큰 감자탕"이 업체 전체를 대표해버리는 왜곡이 생겨서(얼큰만 파는 집이 아님),
+ *  뿌리가 사실의 안전판, 수식형 1개가 표현의 결. "카페+LP 카페"도 둘 다 생존.
+ *  사용자 입력 업종은 '가상 뿌리' — 그 수식형들도 1개로 압축(뿌리 칩 자체는 입력 중복으로 이미 제외).
+ *  수식형 선정: 긍정 어휘 사전 히트 우선 → 동점이면 더 구체적인(긴) 쪽 → 동점이면 먼저 온 것. */
+function consolidateChipFamilies(chips: KeywordChip[], businessType?: string): KeywordChip[] {
+  const keys = chips.map((c) => c.text.replace(/\s/g, ""));
+  const btKey = businessType?.replace(/\s/g, "") ?? "";
+  // 각 칩의 뿌리 = 자기 텍스트 안에 통째로 들어있는 가장 짧은 다른 칩(또는 입력 업종). 없으면 자신이 뿌리.
+  const baseKeyOf = chips.map((_, i) => {
+    let base: string | null = null;
+    for (const k of btKey.length >= 2 ? [...keys, btKey] : keys) {
+      if (k === keys[i] || k.length < 2) continue;
+      if (keys[i].includes(k) && (base === null || k.length < base.length)) base = k;
+    }
+    return base;
+  });
+  // 가족별로 가장 긍정적인 수식형 1개 선발
+  const best = new Map<string, { idx: number; score: number }>();
+  chips.forEach((c, i) => {
+    const b = baseKeyOf[i];
+    if (!b) return;
+    const score = (POSITIVE_RE.test(c.text) ? 100 : 0) + Math.min(keys[i].length, 99);
+    const cur = best.get(b);
+    if (!cur || score > cur.score) best.set(b, { idx: i, score });
+  });
+  const winners = new Set([...best.values()].map((v) => v.idx));
+  return chips.filter((_, i) => baseKeyOf[i] === null || winners.has(i));
 }
 
 /** 업종 스타터 키워드 — 크롤 빈손 폴백용 '혹시 해당되나요?' 추측 칩(정적, 콜 0). */
@@ -1747,6 +1891,11 @@ const TYPE_STARTERS: { match: RegExp; chips: string[] }[] = [
   { match: /베이커리|빵|디저트|케이크/, chips: ["당일 생산", "천연 발효", "예약 케이크", "비건 옵션", "제철 재료"] },
   { match: /꽃|플라워|플로리스트/, chips: ["제철 꽃", "주문 제작", "구독 배송", "클래스 운영", "행사 장식"] },
   { match: /의류|패션|브랜드|디자이너/, chips: ["자체 제작", "소량 생산", "시즌 컬렉션", "지속가능 소재", "팝업 참여"] },
+  { match: /당구|포켓볼|빌리아드|빌리어드/, chips: ["동호회 모임", "정기 대회", "레슨 운영", "단체 이용", "심야 영업"] },
+  { match: /스포츠|체육|볼링|탁구|배드민턴|테니스|골프|헬스|피트니스|필라테스|요가|클라이밍|수영|복싱|주짓수|태권도|검도/, chips: ["레슨 운영", "동호회 모임", "단체 이용", "초보 환영", "장비 대여"] },
+  { match: /식당|맛집|음식|한식|중식|일식|양식|분식|고기|구이|치킨|피자|버거|족발|보쌈|국밥|국수|칼국수|백반|덮밥|초밥|횟집|도시락|감자탕|해장국|설렁탕|곰탕|삼계탕|매운탕|추어탕|우거지탕|뼈해장국|순대국|찌개|전골|쌀국수|마라|훠궈|아구찜|갈비찜/, chips: ["단체석", "예약 가능", "포장 가능", "점심 영업", "제철 재료"] },
+  { match: /술집|주점|포차|펍|호프|이자카야|와인|칵테일|바틀/, chips: ["안주 자신", "단체석", "예약 가능", "심야 영업", "혼술 환영"] },
+  { match: /미용|헤어|네일|뷰티|피부|속눈썹|왁싱|메이크업/, chips: ["예약제", "1인 운영", "맞춤 시술", "단골 많음", "당일 예약"] },
 ];
 export function starterChipsForType(businessType: string): KeywordChip[] {
   const t = (businessType || "").trim();
@@ -1807,7 +1956,7 @@ export function extractLinksFromResearch(research: string): LinkFinds {
     } catch {
       return;
     }
-    if (NOT_HOMEPAGE.test(host) || hostSeen.has(host)) return;
+    if (NOT_HOMEPAGE.test(host) || isDirectoryHost(host) || hostSeen.has(host)) return;
     hostSeen.add(host);
     if (front) homepageCandidates.unshift(norm);
     else homepageCandidates.push(norm);

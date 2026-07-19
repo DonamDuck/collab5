@@ -32,9 +32,11 @@ export const REGION_GROUPS: RegionGroup[] = [
     primary: [
       "경기", "경기도", "수원", "성남", "판교", "분당", "일산", "고양", "용인",
       "부천", "안양", "화성", "동탄", "광교", "평택", "의정부", "남양주", "파주",
-      "김포", "하남", "구리", "안산",
+      "김포", "하남", "구리", "안산", "포천", "동두천", "시흥", "군포", "의왕",
+      "과천", "여주", "가평", "연천",
     ],
-    ambiguous: ["광명"],
+    // 일반어와 겹침: 양주(洋酒)·오산(誤算)·이천(二千)·안성(안성맞춤)·양평(서울 양평동) — 시·군 접미사 있을 때만
+    ambiguous: ["광명", "양주", "오산", "이천", "안성", "양평"],
   },
   { key: "인천", primary: ["인천", "인천광역시", "송도", "청라", "부평"] },
   {
@@ -122,11 +124,21 @@ export function regionConflict(userRegion: string, docText: string): boolean {
   return true; // 문서 지역 전부가 사용자와 다른 광역 → 충돌
 }
 
-/** 텍스트가 사용자 지역과 같은 광역을 명시하는가(지도 교차검증·corroboration용). */
+/** 텍스트가 사용자 지역과 같은 광역을 명시하는가(지도 교차검증·corroboration용).
+ *  그룹 매칭 실패 시 스템 직접 대조 폴백 — 테이블 미등재 지역(양주·군 단위 등)이
+ *  "해석 불가 → ⚠️불일치" 오판을 내던 사건 방지(피망당구클럽 2026-07-19).
+ *  폴백은 긍정 확인(신뢰 부여)에만 쓴다 — 부정 필터(regionConflict)엔 미적용. */
 export function regionMatches(userRegion: string, docText: string): boolean {
   const userGroups = resolveRegionGroups(userRegion);
-  if (!userGroups.size) return false;
   const docGroups = resolveRegionGroups(docText);
   for (const g of docGroups) if (userGroups.has(g)) return true;
+  // 폴백: 사용자 지역 토큰의 스템(행정 접미사 제거)이 주소 텍스트에 그대로 등장하면 일치.
+  // 앞글자가 한글이면 다른 지명의 꼬리(남'양주')이므로 불인정 — 양주≠남양주.
+  for (const token of userRegion.split(/[\s,·]+/)) {
+    const stem = token.replace(/(특별시|광역시|특별자치시|특별자치도|시|군|구|동|읍|면|리)$/, "");
+    if (stem.length < 2) continue;
+    const re = new RegExp(`(^|[^가-힣])${stem.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`);
+    if (re.test(docText)) return true;
+  }
   return false;
 }
