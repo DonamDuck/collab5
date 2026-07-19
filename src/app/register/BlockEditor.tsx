@@ -236,7 +236,7 @@ export function BlockEditor({ blocks, onChange, onUploadingChange, onSheetOpenCh
                   <button
                     type="button"
                     onClick={() => setBlock(i, { ...b, items: [...b.items, { label: "", value: "" }] })}
-                    className="inline-flex items-center gap-1 rounded-sm border border-primary-tint bg-primary-pale px-3 py-1.5 text-sm font-medium text-primary-on transition-colors hover:bg-primary-tint"
+                    className="flex w-full items-center justify-center gap-1 rounded-sm border border-primary-tint bg-primary-pale py-1.5 text-sm font-medium text-primary-on transition-colors hover:bg-primary-tint"
                   >
                     ＋ 숫자 추가
                   </button>
@@ -369,7 +369,7 @@ export function BlockEditor({ blocks, onChange, onUploadingChange, onSheetOpenCh
                   <button
                     type="button"
                     onClick={() => setBlock(i, { ...b, items: [...b.items, { quote: "", source: "" }] })}
-                    className="inline-flex items-center gap-1 rounded-sm border border-primary-tint bg-primary-pale px-3 py-1.5 text-sm font-medium text-primary-on transition-colors hover:bg-primary-tint"
+                    className="flex w-full items-center justify-center gap-1 rounded-sm border border-primary-tint bg-primary-pale py-1.5 text-sm font-medium text-primary-on transition-colors hover:bg-primary-tint"
                   >
                     ＋ 후기 추가
                   </button>
@@ -637,8 +637,9 @@ function BlockAttachments({
   );
 }
 
-// press item 필드(사진·링크) — 기본 접힘(가운데 정렬 텍스트 버튼), 값이 생기면(직접입력·크롤프리필 0→n) 자동 펼침.
-// [Gate3 NIT-3] 패턴과 동일: 사용자가 일부러 접은 상태와 싸우지 않는다.
+// press item 필드(사진·링크) — 기본 접힘(좌측 텍스트 버튼, 다른 텍스트형 "+담기"류와 동일 정렬),
+// 값이 생기면(직접입력·크롤프리필 0→n) 자동 펼침. [Gate3 NIT-3] 패턴과 동일: 사용자가 일부러 접은
+// 상태와 싸우지 않는다. (⚠️버튼형 "+추가"들과 달리 이 텍스트 버튼들은 중앙정렬 대상 아님 — 대표 확정)
 function CollapsedField({ hasValue, label, children }: { hasValue: boolean; label: string; children: React.ReactNode }) {
   const [open, setOpen] = useState(hasValue);
   const prev = useRef(hasValue);
@@ -648,15 +649,13 @@ function CollapsedField({ hasValue, label, children }: { hasValue: boolean; labe
   }, [hasValue]);
   if (!open)
     return (
-      <div className="flex justify-center">
-        <button
-          type="button"
-          onClick={() => setOpen(true)}
-          className="text-[14px] text-mute underline underline-offset-2"
-        >
-          {label}
-        </button>
-      </div>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="text-[14px] text-mute underline underline-offset-2"
+      >
+        {label}
+      </button>
     );
   return <>{children}</>;
 }
