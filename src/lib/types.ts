@@ -48,7 +48,7 @@ export type Block = BlockBase & (
   | { type: "metrics"; items: { label: string; value: string }[] }
   | { type: "reviews"; items: { quote: string; source?: string }[] }
   | { type: "team"; intro: string }
-  | { type: "press"; items: { title: string; year?: string; desc?: string; link?: string }[] }
+  | { type: "press"; items: { title: string; year?: string; desc?: string; link?: string; photos?: string[] }[] }
   | { type: "space"; desc: string; features: string[] }
   | { type: "custom"; title: string; body: string }
 );

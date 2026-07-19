@@ -86,6 +86,11 @@ function BlockBody({ b }: { b: Block }) {
               {it.desc && (
                 <p className="mt-0.5 text-[15px] leading-relaxed text-mute">{it.desc}</p>
               )}
+              {!!it.photos?.length && (
+                <div className="mt-2 max-w-[460px]">
+                  <PhotoSlider photos={it.photos} />
+                </div>
+              )}
               {it.link && (
                 <a
                   href={normalizeUrl(it.link)}
