@@ -799,6 +799,7 @@ const DIRECTORY_HOSTS = [
   "saramin.co.kr", "jobkorea.co.kr", "jobplanet.co.kr", "rocketpunch.com", "wanted.co.kr", "catch.co.kr", // 채용·기업정보
   "diningcode.com", "mangoplate.com", "siksinhot.com", "yogiyo.co.kr", "baemin.com", // 맛집·배달 집계
   "spoinfo.or.kr", // 체육시설알리미(공단) — or.kr 블랭킷 차단은 비영리 브랜드를 다치게 해서 개별 등재
+  "tabling.co.kr", "catchtable.co.kr", // 예약 플랫폼 — 제미나이가 홈페이지로 오인(콜렉트마이페이보릿 사건)
 ];
 export function isDirectoryHost(host: string): boolean {
   const h = host.replace(/^www\./, "").toLowerCase();
@@ -1075,6 +1076,10 @@ class NaverGeminiProvider implements SearchProvider {
   //   폴백 2.0-flash-lite(토큰 최저 $0.075/$0.30) → 2.5-flash(더 똑똑, 안전망).
   // ⚠️gemini-2.0-flash-lite는 2026-07 기준 404(서비스 종료) — 제거함
   private static readonly GEMINI_MODELS = ["gemini-2.5-flash-lite", "gemini-2.5-flash"];
+  // 검색(grounding)만 flash 우선(대표 지시 2026-07-19 — 칩 품질·런간 변동 완화 실험).
+  // 구조화 호출(generate)은 lite 우선 유지 = 비용 불변. 콜당 토큰비 약 1원(lite)→6원(flash) 수준.
+  // 되돌리기 = 이 배열을 GEMINI_MODELS와 동일하게.
+  private static readonly SEARCH_MODELS = ["gemini-2.5-flash", "gemini-2.5-flash-lite"];
 
   // 모델당 1회 시도(무료 티어 RPM 절약) → 503/429면 즉시 다음 모델로. 전부 실패하면 throw.
   // schema/system을 인자로 받아 구조화 호출을 재사용(구조화·5지선다 공용).
@@ -1156,7 +1161,7 @@ class NaverGeminiProvider implements SearchProvider {
 [콜라보] 다른 브랜드·공간·작가와 함께한 협업 이력 (파트너 이름이 확인된 것만)
 [원하는 협업] 이 브랜드가 찾는 파트너·하고 싶다고 밝힌 협업 (모집글·인터뷰 발언 등 근거 필수)
 [고객] 주요 고객층·타겟 (연령·관심사 등, 확인된 것만)
-[숫자] 이 브랜드의 공개된 수치를 종류를 가리지 말고 최대한 많이 — 팔로워·구독자, 서포터·후원자 수, 펀딩 달성액·달성률, 누적 판매량·생산량, 매출·거래액, 운영 연차(설립연도), 직원·팀 규모, 입점처·팝업·매장 수, 회원·고객 수, 제품/굿즈 종류 수 등 (각 항목 어디서 봤는지 함께). ⚠️후기 개수·리뷰 수·별점·평점은 제외.
+[숫자] 이 브랜드의 공개된 수치를 종류를 가리지 말고 최대한 많이 — 팔로워·구독자, 서포터·후원자 수, 펀딩 달성액·달성률, 누적 판매량·생산량, 매출·거래액, 운영 연차(설립연도), 직원·팀 규모, 입점처·팝업·매장 수, 회원·고객 수, 제품/굿즈 종류 수 등 (각 항목 어디서 봤는지 함께). ⚠️후기 개수·리뷰 수·별점·평점은 제외. ⚠️수치는 출처에 문자 그대로 적힌 것만 — '약'·'~이상'으로 어림하거나 반올림하지 마라. 특히 인스타 팔로워 수는 제3자 통계 사이트가 틀리거나 오래된 경우가 많다 — 출처와 시점이 명확하지 않으면 적지 마라.
 [알려짐] 언론·매거진·방송·수상 노출 — ⚠️구체적인 매체명·프로그램명·수상명을 반드시 함께(예: "○○매거진 2023년 소개", "△△대상 수상"). 매체·수상 이름을 모르면 그 줄은 생략(막연히 "매체 노출"이라고만 쓰지 마)
 [공간] 오프라인 매장·쇼룸·작업실·카페 운영 여부와 위치
 [신뢰정보] 홈페이지 URL · 주소
@@ -1170,7 +1175,7 @@ class NaverGeminiProvider implements SearchProvider {
     // 429(쿼터)·기타 하드 에러는 라운드 불문 즉시 포기(네이버 단독) — 쿼터 공유라 재시도 무의미.
     for (let round = 1; round <= 2; round++) {
       if (round === 2) console.warn("[enrich] gemini 1라운드 전멸 → 검색전략 변형 2라운드 재시도");
-      for (const model of NaverGeminiProvider.GEMINI_MODELS) {
+      for (const model of NaverGeminiProvider.SEARCH_MODELS) {
         try {
           const response = await this.ai().models.generateContent({
             model,
