@@ -383,6 +383,7 @@ function sanitizeBlocks(blocks?: Block[]): Block[] {
               year: i.year,
               desc: i.desc?.trim() || undefined,
               link: sanitizePressLink(i.link),
+              photos: i.photos ?? [],
             })),
         };
       if (b.type === "reviews")
