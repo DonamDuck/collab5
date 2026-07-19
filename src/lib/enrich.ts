@@ -1404,10 +1404,14 @@ class NaverGeminiProvider implements SearchProvider {
     const kw = input.focusKeywords?.length
       ? `⭐사장이 직접 고른 키워드(이것들이 곧 이 브랜드다 — 모든 후보의 재료로 최우선 사용. 단, 나열하지 말고 자연스러운 문장으로 녹여라): ${input.focusKeywords.join(", ")}\n\n`
       : "";
-    // ⭐ 별표 = 한 줄 소개에 반드시 반영(캡 3, 순서=우선). 40자 안에 다 못 담으면 뒤 순위는 장문으로.
+    // ⭐ 별표 = 한 줄 소개 가중(캡 3, 순서=우선). '앵커 2 + 자유 3' 블렌드(대표 지시 2026-07-19):
+    // 전부에 별표를 박으면 5개가 다 똑같이 시작함("직물을 잇고 조각을…" 도배). 2개만 앵커, 3개는 자유.
     const starred = (input.starredKeywords ?? []).filter((s) => s?.trim()).slice(0, 3);
     const star = starred.length
-      ? `⭐⭐한 줄 소개(oneLiners)에 반드시 반영할 핵심(우선순위 순): ${starred.join(" > ")}. 1순위는 모든 한 줄 후보에 꼭 담고, 자리가 부족하면 뒤 순위는 descriptions(장문)에서 비중 있게 다뤄.\n\n`
+      ? `⭐한 줄 소개(oneLiners) 5개는 다음 규칙으로 — 5개가 시작 어구·구조·강조점이 확실히 서로 달라야 한다(같은 말로 시작 금지):
+· 2개는 별표 핵심(우선순위: ${starred.join(" > ")})을 중심 앵커로 강하게 반영.
+· 나머지 3개는 별표에 얽매이지 말고 조사 자료의 다른 앵글(제품·활동·고객·분위기·철학 등)로 자유롭게.
+자리가 부족한 뒤 순위 별표는 descriptions(장문)에서 비중 있게 다뤄.\n\n`
       : "";
     const verbatim = (input.verbatimKeywords ?? []).filter((s) => s?.trim());
     const verb = verbatim.length
