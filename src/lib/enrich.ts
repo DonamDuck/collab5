@@ -1793,7 +1793,9 @@ export function extractChipsFromResearch(
   //    ⚠️ 네이버 검색 API는 지도 UI와 달리 최상위 umbrella까지 준다("음식점>카페,디저트").
   //    "음식점"류 최상위 뭉텅이는 브랜드를 설명 못 함(전국 모든 식당) → 제외. 카페·디저트 등 리프만.
   if (naverPart.includes("[지도 교차검증] ✅") && brand) {
-    const GENERIC_CATEGORY = /^(음식점|쇼핑|생활|편의|서비스|종합|매장|상점|점포|기타)$/;
+    // 최상위 뭉텅이 제외 — 브랜드 특성 없음. 요리 대분류(한식·중식…)도 포함(감자탕집→'한식' 무의미).
+    const GENERIC_CATEGORY =
+      /^(음식점|쇼핑|생활|편의|서비스|종합|매장|상점|점포|기타|한식|중식|일식|양식|분식|아시아음식|아시안|세계음식|뷔페|퓨전요리|퓨전|음식)$/;
     const brandKey = brand.replace(/\s/g, "");
     const localBlock = naverPart.match(/\[네이버 지역검색[^\]]*\]\n([\s\S]*?)(?=\n\[|$)/)?.[1] ?? "";
     const catSec = { label: "지도확인", factual: false }; // 지도가 이미 검증 → 사실 게이트 불필요
@@ -1821,17 +1823,12 @@ export function extractChipsFromResearch(
       { re: /심야|새벽/, chip: "심야 영업" },
       { re: /단체|회식/, chip: "단체 이용" },
       { re: /동호회/, chip: "동호회 모임" },
-      { re: /데이트/, chip: "데이트 코스" },
       { re: /가성비|저렴/, chip: "가성비" },
       { re: /맛집/, chip: "맛집 입소문" },
       { re: /예약/, chip: "예약 가능" },
       { re: /포장/, chip: "포장 가능" },
       { re: /배달/, chip: "배달 가능" },
       { re: /수제|핸드메이드|손수/, chip: "수제" },
-      { re: /원데이\s*클래스|클래스|강습|레슨/, chip: "클래스·레슨" },
-      { re: /콜라보|협업/, chip: "콜라보 경험" },
-      { re: /팝업/, chip: "팝업 경험" },
-      { re: /워크숍|워크샵/, chip: "워크숍" },
       { re: /단골/, chip: "단골 많음" },
       { re: /루프탑|테라스/, chip: "루프탑·테라스" },
       { re: /반려동물|애견|댕댕이/, chip: "반려동물 동반" },
@@ -1842,20 +1839,22 @@ export function extractChipsFromResearch(
       { re: /혼밥|혼술/, chip: "혼밥·혼술" },
     ];
     const NEGATION = /없|불가|어려|아쉽|별로|안\s*되/;
-    let corpus = "";
-    for (const m of naverPart.matchAll(
-      /\[네이버 (?:블로그|카페글|표적검색)[^\]]*\]\n([\s\S]*?)(?=\n\[|$)/g
-    )) {
-      corpus += m[1] + "\n";
-    }
+    // 소스 = 블로그·카페만. 표적검색(브랜드+"팝업/콜라보" 강제쿼리)은 쿼리 편향이라 제외
+    //   (장모님/푸짐한감자탕 사건: "(팝업) 성수동 웨이팅"이 팝업 칩으로 오귀속됐음).
+    // 줄 단위로 본다 — 부정어 게이트가 줄 경계를 안 넘게(한 줄=한 후기, 딴 후기의 '없어서' 오염 차단).
     const texSec = { label: "후기흔적", factual: false }; // 결 제안 — 최종 판단은 사장님 선택
     let texCount = 0;
-    for (const { re, chip } of TEXTURE_DICT) {
+    outer: for (const { re, chip } of TEXTURE_DICT) {
       if (texCount >= 8) break;
-      const m = re.exec(corpus);
-      if (!m) continue;
-      if (NEGATION.test(corpus.slice(m.index + m[0].length, m.index + m[0].length + 14))) continue;
-      if (push(chip, texSec)) texCount++;
+      for (const bm of naverPart.matchAll(/\[네이버 (?:블로그|카페글)[^\]]*\]\n([\s\S]*?)(?=\n\[|$)/g)) {
+        for (const line of bm[1].split("\n")) {
+          const m = re.exec(line);
+          if (!m) continue;
+          if (NEGATION.test(line.slice(m.index + m[0].length, m.index + m[0].length + 14))) continue;
+          if (push(chip, texSec)) texCount++;
+          continue outer; // 이 결은 확보 — 다음 결로
+        }
+      }
     }
   }
 
@@ -1888,7 +1887,7 @@ const TYPE_STARTERS: { match: RegExp; chips: string[] }[] = [
   { match: /의류|패션|브랜드|디자이너/, chips: ["자체 제작", "소량 생산", "시즌 컬렉션", "지속가능 소재", "팝업 참여"] },
   { match: /당구|포켓볼|빌리아드|빌리어드/, chips: ["동호회 모임", "정기 대회", "레슨 운영", "단체 이용", "심야 영업"] },
   { match: /스포츠|체육|볼링|탁구|배드민턴|테니스|골프|헬스|피트니스|필라테스|요가|클라이밍|수영|복싱|주짓수|태권도|검도/, chips: ["레슨 운영", "동호회 모임", "단체 이용", "초보 환영", "장비 대여"] },
-  { match: /식당|맛집|음식|한식|중식|일식|양식|분식|고기|구이|치킨|피자|버거|족발|국밥|국수|칼국수|백반|덮밥|초밥|횟집|도시락/, chips: ["단체석", "예약 가능", "포장 가능", "점심 영업", "제철 재료"] },
+  { match: /식당|맛집|음식|한식|중식|일식|양식|분식|고기|구이|치킨|피자|버거|족발|보쌈|국밥|국수|칼국수|백반|덮밥|초밥|횟집|도시락|감자탕|해장국|설렁탕|곰탕|삼계탕|매운탕|추어탕|우거지탕|뼈해장국|순대국|찌개|전골|쌀국수|마라|훠궈|아구찜|갈비찜/, chips: ["단체석", "예약 가능", "포장 가능", "점심 영업", "제철 재료"] },
   { match: /술집|주점|포차|펍|호프|이자카야|와인|칵테일|바틀/, chips: ["안주 자신", "단체석", "예약 가능", "심야 영업", "혼술 환영"] },
   { match: /미용|헤어|네일|뷰티|피부|속눈썹|왁싱|메이크업/, chips: ["예약제", "1인 운영", "맞춤 시술", "단골 많음", "당일 예약"] },
 ];
