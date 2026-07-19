@@ -1076,10 +1076,11 @@ class NaverGeminiProvider implements SearchProvider {
   //   폴백 2.0-flash-lite(토큰 최저 $0.075/$0.30) → 2.5-flash(더 똑똑, 안전망).
   // ⚠️gemini-2.0-flash-lite는 2026-07 기준 404(서비스 종료) — 제거함
   private static readonly GEMINI_MODELS = ["gemini-2.5-flash-lite", "gemini-2.5-flash"];
-  // 검색(grounding)만 flash 우선(대표 지시 2026-07-19 — 칩 품질·런간 변동 완화 실험).
-  // 구조화 호출(generate)은 lite 우선 유지 = 비용 불변. 콜당 토큰비 약 1원(lite)→6원(flash) 수준.
-  // 되돌리기 = 이 배열을 GEMINI_MODELS와 동일하게.
-  private static readonly SEARCH_MODELS = ["gemini-2.5-flash", "gemini-2.5-flash-lite"];
+  // 플랜B(대표 확정 2026-07-19): 검색은 lite 병렬 N콜 병합 — 독립 주사위 N개로 접지 확률↑ +
+  // 합집합으로 정보 풍부화. N = ENRICH_SEARCH_RUNS(기본 3, 1~4). 콜당 ~1원 → 3콜 ≈ 3원(< flash 1콜 6원).
+  // 전멸 시에만 flash 1회 안전망. flash 단독 실험으로 돌아가려면 이 두 상수를 바꾸면 됨.
+  private static readonly SEARCH_PRIMARY = "gemini-2.5-flash-lite";
+  private static readonly SEARCH_RESCUE = "gemini-2.5-flash";
 
   // 모델당 1회 시도(무료 티어 RPM 절약) → 503/429면 즉시 다음 모델로. 전부 실패하면 throw.
   // schema/system을 인자로 받아 구조화 호출을 재사용(구조화·5지선다 공용).
@@ -1153,7 +1154,7 @@ class NaverGeminiProvider implements SearchProvider {
         : `\n⚠️직전 조사에서 검색 근거를 못 찾았다. 검색 전략을 바꿔라: ①지역 기반 일반 검색어("${region?.trim() ?? ""} ${businessType?.trim() ?? ""}", "${region?.trim() ?? ""} ${businessType?.trim() ?? ""} 후기/맛집")로 넓게 검색한 뒤 그 결과 안에서 '${query}'를 찾아라 ②상호의 띄어쓰기를 바꿔서도 검색해봐 ③영업시간·메뉴·주차 같은 방문 정보 중심 검색도 시도. 그래도 못 찾으면 지어내지 말고 "확인 안 됨"으로.`;
     const promptFor = (round: number) => `절대 추측하거나 사실이 아닌 정보를 지어내지 마. 웹에서 확인된 것만 적는다.
 "${query}" 브랜드/업체를 웹에서 조사해줘.${searchStrategy(round)}${loc}${anchorBlock}
-아래 소제목 순서 그대로, 확인된 사실만 개조식으로 정리해줘. 전체 1500자 이내. 해당 정보가 없으면 그 소제목에 "확인 안 됨" 한 줄만.
+아래 소제목 순서 그대로, 확인된 사실만 개조식으로 정리해줘. 전체 1500자 이내. 해당 정보가 없으면 그 소제목에 "확인 안 됨" 한 줄만 — 소제목 설명에 나온 단어(워크숍·클래스·팔로워·펀딩 등)를 실제 확인 없이 되풀이해 적지 마라.
 
 [정체] 무엇을 만들고/하는 곳인지 한두 줄 + 창업 배경·브랜드 철학·시작 이야기가 있으면 두세 줄
 [제품/특징] 주력 제품·서비스와 그 특징·차별점 (재료·방식 등, 각 한 줄)
@@ -1169,42 +1170,54 @@ class NaverGeminiProvider implements SearchProvider {
 출처는 공식 홈페이지·언론 보도가 있으면 우선하되, 지역 소상공인은 그런 출처가 없는 경우가 많다 — 네이버 플레이스·지도 등록 정보, 블로그·카페 후기, 지역 커뮤니티 글 등 웹에서 확인 가능한 출처를 폭넓게 활용해(어디서 봤는지 함께). 연도·날짜가 보이면 함께 적어줘(오래된 정보 구분용).
 ⭐인스타그램은 실제 instagram.com/○○ 페이지를 확인한 경우에만 @핸들. 브랜드명·도메인으로 추측 금지 — 확인 안 되면 "인스타: 확인 안 됨".
 확실하지 않으면 적지 말고 넘어가. 과장·추측 금지.`;
-    // A+B 재시도 정책(대표 확정 2026-07-19): 1라운드(전 모델)가 비접지로 전멸하면
-    // 검색 전략을 바꾼 2라운드 1회 재시도 — 유저가 수동으로 '다시 검색'하던 걸 서버가 대신.
-    // 비접지 응답은 검색 과금 0(토큰만 몇 원) → 추가 과금은 재시도가 접지 성공했을 때의 정상 검색뿐.
-    // 429(쿼터)·기타 하드 에러는 라운드 불문 즉시 포기(네이버 단독) — 쿼터 공유라 재시도 무의미.
-    for (let round = 1; round <= 2; round++) {
-      if (round === 2) console.warn("[enrich] gemini 1라운드 전멸 → 검색전략 변형 2라운드 재시도");
-      for (const model of NaverGeminiProvider.SEARCH_MODELS) {
-        try {
-          const response = await this.ai().models.generateContent({
-            model,
-            contents: promptFor(round),
-            config: { tools: [{ googleSearch: {} }], temperature: 0.2 },
-          });
-          // ⭐그라운딩 근거 체크 — 검색 근거(chunks/supports)가 없으면 웹을 안 보고 지어낸 답변이다.
-          // 상상의 업체를 만들어낸 사고(캔버스가든→가짜 식물 스튜디오) 이후 도입: 근거 없으면 메모 폐기.
-          const gm = response.candidates?.[0]?.groundingMetadata;
-          const grounded = !!(gm?.groundingChunks?.length || gm?.groundingSupports?.length);
-          if (!grounded) {
-            // 비접지 응답은 검색 과금이 없음 → 다음 모델 재시도는 토큰 비용뿐(호출 수 원칙 무관).
-            console.warn(`[enrich] gemini ${model} 검색 근거 없음(비접지 생성) → 폐기 (round ${round})`);
-            continue;
-          }
-          return (response.text ?? "").trim();
-        } catch (e) {
-          const status = (e as { status?: number; code?: number })?.status ?? (e as { code?: number })?.code;
-          if (status === 503 || status === 404) {
-            console.warn(`[enrich] gemini search ${model} ${status} → 다음 모델 폴백`);
-            continue; // 일시 과부하(503)·모델 없음(404)은 다음 모델 시도
-          }
-          // 429(쿼터)·grounding 미지원·기타 → 즉시 네이버 단독으로 degrade(지연 최소화)
-          console.warn(`[enrich] gemini search ${model} 실패(${status ?? "?"}) → 네이버 단독`);
-          return "";
-        }
-      }
+    // 플랜B 병렬 병합(대표 확정 2026-07-19): lite N콜을 병렬로(대기시간 = 1콜) —
+    // 각 콜이 독립 grounding 주사위. 마지막 1콜은 검색전략 변형(promptFor(2))으로 다양성 확보.
+    // 접지 성공분만 합쳐 메모로. 전멸 시 flash 1회 안전망(promptFor(2)). 비접지 = 검색 과금 0.
+    const runs = Math.max(1, Math.min(4, Number(process.env.ENRICH_SEARCH_RUNS) || 3));
+    const attempts = await Promise.all(
+      Array.from({ length: runs }, (_, i) =>
+        this.searchAttempt(
+          NaverGeminiProvider.SEARCH_PRIMARY,
+          promptFor(runs > 1 && i === runs - 1 ? 2 : 1),
+          `병렬${i + 1}/${runs}`
+        )
+      )
+    );
+    let grounded = attempts.filter((t) => t);
+    if (!grounded.length) {
+      console.warn("[enrich] lite 병렬 전멸 → flash 안전망 1회");
+      const rescue = await this.searchAttempt(NaverGeminiProvider.SEARCH_RESCUE, promptFor(2), "안전망");
+      if (rescue) grounded = [rescue];
     }
-    return "";
+    console.log("[enrich] search-merge", JSON.stringify({ runs, grounded: grounded.length }));
+    if (!grounded.length) return "";
+    if (grounded.length === 1) return grounded[0];
+    return grounded
+      .map((g, i) => `《병렬 조사 ${i + 1} — 같은 업체를 독립 조사한 결과. 겹치는 내용 = 상호 보강 근거》\n${g}`)
+      .join("\n\n");
+  }
+
+  /** 검색 1시도(모델·프롬프트 지정) — 접지 성공 시 텍스트, 실패·비접지·에러는 ""(슬롯만 조용히 실패). */
+  private async searchAttempt(model: string, prompt: string, tag: string): Promise<string> {
+    try {
+      const response = await this.ai().models.generateContent({
+        model,
+        contents: prompt,
+        config: { tools: [{ googleSearch: {} }], temperature: 0.2 },
+      });
+      // ⭐그라운딩 근거 체크 — 근거 없으면 웹을 안 보고 지어낸 답변(캔버스가든 상상업체 사고 이후 도입) → 폐기.
+      const gm = response.candidates?.[0]?.groundingMetadata;
+      const grounded = !!(gm?.groundingChunks?.length || gm?.groundingSupports?.length);
+      if (!grounded) {
+        console.warn(`[enrich] gemini ${model} ${tag} 비접지 → 폐기`);
+        return "";
+      }
+      return (response.text ?? "").trim();
+    } catch (e) {
+      const status = (e as { status?: number; code?: number })?.status ?? (e as { code?: number })?.code;
+      console.warn(`[enrich] gemini search ${model} ${tag} 실패(${status ?? "?"})`);
+      return ""; // 이 슬롯만 포기 — 나머지 병렬 슬롯·안전망이 커버
+    }
   }
 
   // 네이버 메모 + 제미나이 웹 조사 메모를 라벨 붙여 합침(구조화 단계 입력용).
@@ -1729,6 +1742,10 @@ export function extractChipsFromResearch(
     if (/(다|요|죠|고|며|나|서)\.?$/.test(text)) return false;
     // 고아 조사 배제 — 앞 명사가 클렌징으로 떨어져 나가 조사만 남은 조각("운영 연차 으로 운영 중")
     if (/(^|\s)(으로|이라|이며|이고)(\s|$)/.test(text)) return false;
+    // 프롬프트 잔향 배제 — 소제목 설명 어휘를 확인 없이 되풀이한 것(lite 병합에서 관찰:
+    // 숫자 없는 "펀딩 달성액"·"인스타그램 팔로워 수", 단독 "다른 브랜드"·"워크숍" 등)
+    if (/^(다른\s*브랜드|인스타그램\s*팔로워(\s*수)?|팔로워\s*수|구독자\s*수|펀딩\s*달성액|펀딩\s*달성률|누적\s*판매량|제품\s*라인|주력\s*제품|워크숍|클래스|팝업|공간|작가|서비스)$/.test(text))
+      return false;
     // 미완결 조각 배제(접속·비교·관형 어미로 끝) — "'호락호락'이라는 이름처럼", "~을 위한" 등
     if (/(처럼|같은|같이|위한|위해|통한|통해|관한|관련|대한|이라는|라는|든지|거나|면서|로서|로써|등의|에서|으로|에게|까지|부터|보다|브랜드로|곳으로)$/.test(text))
       return false;
