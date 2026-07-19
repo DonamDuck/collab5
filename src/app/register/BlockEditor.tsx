@@ -5,11 +5,12 @@ import { useState, useRef, useEffect } from "react";
 import type { Block, BlockType, BlockLink } from "@/lib/types";
 import { uploadPhoto } from "@/lib/upload";
 import { ScrollLock } from "@/components/ScrollLock";
+import { SortableCard, emptyDnd, reorder, type DndState } from "./SortableCard";
 
 const CATALOG: { type: BlockType; label: string; hint: string }[] = [
   { type: "metrics", label: "우리를 보여주는 숫자", hint: "팔로워, 월 방문, 누적 판매 등의 지표도 콜라보에 도움을 줄 수 있어요." },
   { type: "reviews", label: "고객들의 이야기", hint: "고객의 반응을 공유해보세요." },
-  { type: "team", label: "만드는 사람들", hint: "콜라버 정보를 등록하면 더 가깝게 느껴질 수 있어요." },
+  { type: "team", label: "구성원 이야기", hint: "콜라버 정보를 등록하면 더 가깝게 느껴질 수 있어요." },
   { type: "press", label: "소개된 곳들", hint: "수상이나 언론, 방송에 나온 적이 있다면요." },
   { type: "space", label: "우리의 공간", hint: "공간이 있다면, 그 자체가 매력이 돼요." },
   { type: "custom", label: "직접 만들기", hint: "소개 영역을 직접 구성해보세요." },
@@ -54,6 +55,8 @@ export function BlockEditor({ blocks, onChange, onUploadingChange, onSheetOpenCh
     onSheetOpenChange?.(open);
   }, [open, onSheetOpenChange]);
   const [, setUploading] = useState(0);
+  // press 항목 순서변경(드래그·↑↓) — press 블록은 최대 1개(canAdd)라 단일 상태로 충분.
+  const [pressItemDnd, setPressItemDnd] = useState<DndState>(emptyDnd);
   // 강조 카드가 화면에 보이면 FAB 숨김(중복·하단 겹침 방지)
   const cardRef = useRef<HTMLDivElement>(null);
   const [cardVisible, setCardVisible] = useState(true);
@@ -216,7 +219,18 @@ export function BlockEditor({ blocks, onChange, onUploadingChange, onSheetOpenCh
             {b.type === "press" && (
               <div className="space-y-3">
                 {b.items.map((it, k) => (
-                  <div key={k} className="space-y-2 rounded-sm border border-hairline bg-surface-soft p-2.5">
+                  <SortableCard
+                    key={k}
+                    index={k}
+                    count={b.items.length}
+                    label={`소개 ${k + 1}`}
+                    onMove={(from, to) => setBlock(i, { ...b, items: reorder(b.items, from, to) })}
+                    onRemove={b.items.length > 1 ? () => setBlock(i, { ...b, items: b.items.filter((_, y) => y !== k) }) : undefined}
+                    dnd={pressItemDnd}
+                    setDnd={setPressItemDnd}
+                    className="space-y-2"
+                    idBase="press-item"
+                  >
                     <div className="flex items-center gap-2">
                       <input
                         value={it.title}
@@ -232,15 +246,6 @@ export function BlockEditor({ blocks, onChange, onUploadingChange, onSheetOpenCh
                         maxLength={4}
                         className="h-10 w-20 shrink-0 rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
                       />
-                      {b.items.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => setBlock(i, { ...b, items: b.items.filter((_, y) => y !== k) })}
-                          className="shrink-0 text-sm text-faint hover:text-ink"
-                        >
-                          삭제
-                        </button>
-                      )}
                     </div>
                     <textarea
                       value={it.desc ?? ""}
@@ -249,13 +254,15 @@ export function BlockEditor({ blocks, onChange, onUploadingChange, onSheetOpenCh
                       placeholder="어떻게 소개됐나요? (선택) 예: 동네 사랑방 같은 공간으로 소개했어요"
                       className={taCls}
                     />
-                    <input
-                      value={it.link ?? ""}
-                      onChange={(e) => setBlock(i, { ...b, items: b.items.map((x, y) => (y === k ? { ...x, link: e.target.value } : x)) })}
-                      placeholder="기사 링크 (선택) https://"
-                      className={inputCls}
-                    />
-                  </div>
+                    <CollapsedPressLink hasValue={!!it.link?.trim()}>
+                      <input
+                        value={it.link ?? ""}
+                        onChange={(e) => setBlock(i, { ...b, items: b.items.map((x, y) => (y === k ? { ...x, link: e.target.value } : x)) })}
+                        placeholder="기사 링크 https://"
+                        className={inputCls}
+                      />
+                    </CollapsedPressLink>
+                  </SortableCard>
                 ))}
                 {b.items.length < 4 && (
                   <button
@@ -570,6 +577,28 @@ function BlockAttachments({
       </div>
     </div>
   );
+}
+
+// press item 링크 — 기본 접힘(텍스트 버튼), 값이 생기면(직접입력·크롤프리필 0→n) 자동 펼침.
+// [Gate3 NIT-3] 패턴과 동일: 사용자가 일부러 접은 상태와 싸우지 않는다.
+function CollapsedPressLink({ hasValue, children }: { hasValue: boolean; children: React.ReactNode }) {
+  const [open, setOpen] = useState(hasValue);
+  const prev = useRef(hasValue);
+  useEffect(() => {
+    if (!prev.current && hasValue) setOpen(true);
+    prev.current = hasValue;
+  }, [hasValue]);
+  if (!open)
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="text-[14px] text-mute underline underline-offset-2"
+      >
+        ＋ 링크 추가 (선택)
+      </button>
+    );
+  return <>{children}</>;
 }
 
 // space 특징 칩 — 키워드칩(③) 토글 패턴 + 직접 추가. 입력 상태를 이 카드에 격리.
