@@ -10,7 +10,7 @@ export async function SiteHeader() {
   const displayName = profile?.brandName || user?.email?.split("@")[0] || "";
 
   return (
-    <header className="sticky top-0 z-10 flex h-14 items-center justify-between border-b border-hairline bg-canvas px-4 sm:px-6">
+    <header className="sticky top-0 z-10 flex h-14 items-center justify-between border-b border-hairline bg-canvas px-4 sm:px-6 print:hidden">
       <Link href="/" className="flex items-center">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/logo-lockup.svg" alt="collab5" className="h-7 w-auto" />

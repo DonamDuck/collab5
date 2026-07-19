@@ -80,7 +80,7 @@ export function PhotoSlider({
           }`}
         >
           {photos.map((src, i) => (
-            <div key={i} className="relative aspect-[4/3] w-full shrink-0 snap-center bg-surface-soft">
+            <div key={i} className="relative aspect-[4/3] w-full shrink-0 snap-center bg-surface-soft [&:not(:first-child)]:print:hidden">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={src}
@@ -94,7 +94,7 @@ export function PhotoSlider({
 
         {/* 장수 카운터 */}
         {multi && (
-          <span className="pointer-events-none absolute right-2 top-2 rounded-pill bg-ink/55 px-2 py-0.5 text-[11px] font-medium text-white">
+          <span className="pointer-events-none absolute right-2 top-2 rounded-pill bg-ink/55 px-2 py-0.5 text-[11px] font-medium text-white print:hidden">
             {idx + 1} / {photos.length}
           </span>
         )}
@@ -124,7 +124,7 @@ export function PhotoSlider({
 
       {/* 인디케이터 점 */}
       {multi && (
-        <div className="mt-2.5 flex items-center justify-center gap-1.5">
+        <div className="mt-2.5 flex items-center justify-center gap-1.5 print:hidden">
           {photos.map((_, i) => (
             <button
               key={i}

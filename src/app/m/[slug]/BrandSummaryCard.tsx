@@ -17,7 +17,7 @@ export function BrandSummaryCard({
   const { instagram, homepage } = maker.trust;
 
   return (
-    <div className="rounded-[18px] border border-hairline bg-surface p-5 shadow-e1">
+    <div className="rounded-[18px] border border-hairline bg-surface p-5 shadow-e1 print:break-inside-avoid print:shadow-none">
       {/* 정체성 존 — 로고+이름+뱃지(한 줄) / 수정은 타이틀과 수직 중앙 정렬(로고 높이에 맞춰 내려옴) */}
       <div className="flex items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3.5">

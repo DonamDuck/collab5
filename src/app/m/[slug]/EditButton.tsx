@@ -53,7 +53,7 @@ export function EditButton({
       <button
         type="button"
         onClick={onClick}
-        className="inline-flex h-7 items-center gap-1 rounded-md border border-hairline bg-surface px-2.5 text-xs font-medium text-mute hover:border-border-strong hover:text-ink"
+        className="inline-flex h-7 items-center gap-1 rounded-md border border-hairline bg-surface px-2.5 text-xs font-medium text-mute hover:border-border-strong hover:text-ink print:hidden"
       >
         수정
       </button>

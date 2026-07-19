@@ -162,7 +162,7 @@ export function MakerArticle({ maker, isOwner, logoUrl }: {
 // 소개서 섹션 — 편집물처럼 큰 타이틀 + 상단 구분선 + 내용
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="mt-9 border-t border-hairline pt-8">
+    <section className="mt-9 border-t border-hairline pt-8 print:break-inside-avoid">
       <h2 className="mb-4 text-[21px] font-bold leading-snug tracking-tight text-ink">{title}</h2>
       {children}
     </section>

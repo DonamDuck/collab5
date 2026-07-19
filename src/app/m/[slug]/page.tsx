@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { headers } from "next/headers";
 import { repo } from "@/lib/repo";
 import { getSessionUser } from "@/lib/supabase/server";
 import { getProfile } from "@/lib/profiles";
@@ -27,13 +28,23 @@ export default async function MakerPage({
   // 이미 소유(회원 생성 or 점유됨)면 버튼 미노출. 비번 없는 익명 소개서는 점유 불가라 미노출.
   const claimable = !maker.ownerUserId && !!maker.editPasswordHash;
 
+  // 인쇄 푸터용 공개 URL — 지류 포트폴리오 하단에 표시(수기 입력·QR 대체용)
+  const h = await headers();
+  const host = h.get("x-forwarded-host") ?? h.get("host") ?? "";
+  const publicUrl = host ? `${h.get("x-forwarded-proto") ?? "https"}://${host}/m/${slug}` : `/m/${slug}`;
+
   return (
-    <main className="mx-auto w-full max-w-[640px] px-4 py-10 sm:px-6">
+    <main className="mx-auto w-full max-w-[640px] px-4 py-10 sm:px-6 print:max-w-none print:px-0 print:py-0">
       {/* 소개서 본문 — /preview와 공유하는 단일 렌더 */}
       <MakerArticle maker={maker} isOwner={isOwner} logoUrl={logoUrl} />
 
+      {/* 인쇄 전용 푸터 — 화면엔 안 보이고 지류에만 URL 노출 */}
+      <div className="hidden print:mt-8 print:block print:border-t print:border-hairline print:pt-4 print:text-center print:text-[12px] print:text-mute">
+        {publicUrl}
+      </div>
+
       {/* 링크 복사 — 소개서 공유 */}
-      <div className="mt-12">
+      <div className="mt-12 print:hidden">
         <CopyLinkButton />
         <p className="mt-2.5 text-center text-[13px] text-faint">
           링크를 복사해 협업하고 싶은 곳에 보내보세요.

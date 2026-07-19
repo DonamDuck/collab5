@@ -100,3 +100,14 @@ body {
 .slim-scrollbar::-webkit-scrollbar-track { background: transparent; }
 .slim-scrollbar::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 9999px; }
 .slim-scrollbar::-webkit-scrollbar-thumb:hover { background: var(--faint); }
+
+/* ───────────────────────────────────────────────
+   인쇄(지류 포트폴리오) — 데스크탑 브라우저 인쇄/‘PDF로 저장’ 공용.
+   마케팅 컨시어지 선물 패키지용(2026-07-20). 나머지 인쇄 규칙은
+   컴포넌트의 print: 유틸리티에 콜로케이트.
+   ─────────────────────────────────────────────── */
+@page { size: A4; margin: 12mm; }
+@media print {
+  :root { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  html, body { background: #ffffff !important; }
+}
