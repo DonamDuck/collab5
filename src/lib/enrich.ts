@@ -1075,7 +1075,10 @@ class NaverGeminiProvider implements SearchProvider {
   //   3.1-flash-lite 대비 토큰 2.5배↓ & grounding 무료 9배↑(일1500 vs 월5000). 구조화·검색엔 이 품질로 충분.
   //   폴백 2.0-flash-lite(토큰 최저 $0.075/$0.30) → 2.5-flash(더 똑똑, 안전망).
   // ⚠️gemini-2.0-flash-lite는 2026-07 기준 404(서비스 종료) — 제거함
-  private static readonly GEMINI_MODELS = ["gemini-2.5-flash-lite", "gemini-2.5-flash"];
+  // 생성(구조화) 모델 최종 판정(대표 블라인드 A/B 2026-07-19): flash 승 — lite는 상투 마무리·안내멘트
+  // 잦고, flash는 조사 구체사실(책 낭독 모임·살구 팝업·협업 지향)을 살림. lite = 과부하 폴백으로 강등.
+  // 콜당 토큰비 ~1.5원 → ~10원. 임시 실험·롤백은 ENRICH_GEN_MODEL env로.
+  private static readonly GEMINI_MODELS = ["gemini-2.5-flash", "gemini-2.5-flash-lite"];
   // 검색 모델 최종 판정(대표 A/B 체감 2026-07-19): flash 1콜 승 — lite 병렬 3콜 병합보다 체감 우위.
   // 기본 1콜(ENRICH_SEARCH_RUNS로 병렬 늘리기 가능), 비접지 시 검색전략 변형 프롬프트로 flash 1회 재시도.
   // 콜당 토큰비 ~6원. lite 병합으로 되돌리기 = PRIMARY를 lite로 + ENRICH_SEARCH_RUNS=3.
