@@ -20,6 +20,8 @@ import type {
 } from "@/lib/enrich";
 import { josa } from "@/lib/josa";
 import { blendDescriptions, canRegenDesc, noteRegenDesc } from "@/lib/enrichBlend";
+import { buildEnrichment } from "@/lib/enrichment";
+import type { Enrichment } from "@/lib/types";
 
 export type WizardFill = {
   name?: string;
@@ -36,6 +38,7 @@ export type WizardFill = {
   seeksHint?: SeeksHint; // 원하는 파트너·협업 단서(전체)
   // 이야기 스텝에서 체크한 것 — 인덱스/타입 기반. 있으면 page가 즉시 폼에 주입.
   selectedHints?: { activities: number[]; collabs: number[]; blocks: string[]; seeks: boolean };
+  enrichment?: Enrichment; // 크롤 스냅샷(picked-only). 생성 저장용
 };
 
 const MAX_STARS = 4;
@@ -213,6 +216,7 @@ export function EnrichWizard({
   const [tier, setTier] = useState<"rich" | "thin">("rich");
   const [links, setLinks] = useState<LinkFinds>({});
   const [research, setResearch] = useState("");
+  const [createdAtIso, setCreatedAtIso] = useState("");
 
   // ① 선택(순서 유지) / ② 별표(탭 순서=우선순위, 캡 3) + 사실 확인 + 링크 답변
   const [selected, setSelected] = useState<string[]>([]);
@@ -343,6 +347,7 @@ export function EnrichWizard({
       setFactualOk(new Set());
       setIgPick(EMPTY_PICK);
       setHpPick(EMPTY_PICK);
+      setCreatedAtIso(new Date().toISOString());
       setKind("chips");
     } catch {
       // 크롤 실패여도 막다른 길 없음 — 스타터 칩 + 직접 추가로 진행
@@ -351,6 +356,7 @@ export function EnrichWizard({
       setTier("thin");
       setLinks({});
       setResearch("");
+      setCreatedAtIso(new Date().toISOString());
       setKind("chips");
     }
   };
@@ -515,6 +521,17 @@ export function EnrichWizard({
           seeks: !!options?.seeksHint && storyChecked.has("seeks"),
         }
       : undefined;
+    const enrichment = buildEnrichment({
+      region: regionInput,
+      businessType: btype,
+      tier,
+      createdAt: createdAtIso || new Date().toISOString(),
+      selected,
+      starred,
+      confirmed: factualOk,
+      sectionOf: (t) => chipOf(t)?.section,
+      factualOf: (t) => isFactual(t),
+    });
     onApply({
       name: fName.trim() || query || undefined,
       oneLiner: oneLinerList[oneLinerSel]?.trim() || undefined,
@@ -529,6 +546,7 @@ export function EnrichWizard({
       blockHints: options?.blockHints?.length ? options.blockHints : undefined,
       seeksHint: options?.seeksHint ?? undefined,
       selectedHints,
+      enrichment: enrichment ?? undefined,
     });
   };
 
