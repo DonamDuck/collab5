@@ -25,7 +25,7 @@ AI 크롤 위저드에서 **고객이 선택·확정한 신호**를 소개서(ma
 - ❌ **미선택(unpicked) 칩·힌트 저장** — unpicked는 {거절 / 이번에 놓침 / 지금은 아니지만 미래엔 맞음}이 섞인 **모호 신호**다. 부정 신호 자산으로 쓰면 고객이 놓쳤거나 미래에 하려는 정보로 그 브랜드를 오노출·오라벨링할 위험이 있어 저장하지 않는다. **→ 미래 매처는 "부정 신호 풀"이 실수로 누락된 게 아니라 의도적으로 수집되지 않았음을 알아야 한다.**
 - ❌ **step-4 생성 힌트(activity/collab/block Hints) 별도 저장** — 고객이 **선택한** 힌트는 이미 `maker.activities` / `maker.collab_history` / `maker.blocks`에 저장된다(중복). 미선택 힌트는 위 원칙상 제외. 따라서 enrichment에 힌트 섹션은 두지 않는다.
 - ❌ **링크 후보 저장** — 고른 링크는 이미 `maker.trust.instagram/homepage`에 있고, 후보(추정 핸들 등)는 검색·매칭에 쓰이지 않는다.
-- ❌ **재크롤-온-편집 시 enrichment 갱신** — v1은 **생성(create) 시점에만** enrichment를 기록한다. 편집(update)에서는 기존 값을 **보존만** 한다(덮어쓰지 않음). 편집 중 재크롤로 새 스냅샷을 반영하는 건 v1 범위 밖.
+- ❌ **수정 화면에서의 갱신·재크롤** — 크롤 위저드가 **생성 화면에만** 있으므로(수정 화면엔 씨앗·재크롤 UI 없음) enrichment는 **AI 크롤(생성) 시점에만** 기록된다. 수정 시엔 기존 값을 **보존만** 한다(폼 필드 수정은 enrichment에 무관). 대표 확정: "AI 크롤할 때만 저장해도 충분." 수정 화면에 재크롤을 붙여 enrichment를 갱신하는 건 별도 기능(범위 밖, 현재 백로그에도 두지 않음).
 
 ## 3. 데이터 모델
 
@@ -41,12 +41,14 @@ export interface EnrichmentChip {
 }
 
 export interface Enrichment {
-  version: 1;                 // 스키마 진화 대비(매처가 소비 시작하면 반드시 변경됨)
-  crawledAt: string;          // ISO — 크롤 응답 시각
+  createdAt: string;          // ISO — 이 스냅샷(크롤) 생성 시각. jsonb 내부라 camelCase(precedent: proposal.toName)
   tier: "rich" | "thin";      // 크롤 수집 밀도
   seed: { region: string; businessType: string }; // 고객이 씨앗에 입력
   chips: EnrichmentChip[];    // 고객이 "선택한" 칩만
 }
+// ⚠️ 네이밍: DB 컬럼은 snake_case(`enrichment` 컬럼, makers 행의 `created_at`은 별개=행 생성시각).
+//    jsonb "내부" 키는 기존 관례가 camelCase(collab_cards.proposal.toName/expectedEffect가 DB에 camelCase로 저장됨) → createdAt.
+// ⚠️ version 필드 없음(대표 지시): 지금 소비자 없음. 스키마 첫 변경 시점에 추가+기존행 backfill(SET version=1) 하면 됨.
 
 // Maker에 추가 (optional)
 export interface Maker {
@@ -88,7 +90,7 @@ export function buildEnrichment(params: {
   region: string;
   businessType: string;
   tier: "rich" | "thin";                    // 크롤 응답의 tier(서버 판정) 그대로 — 여기서 재계산하지 않음
-  crawledAt: string;
+  createdAt: string;
   selected: string[];                       // 선택 칩 텍스트
   starred: string[];
   confirmed: Set<string>;                   // factualOk
@@ -106,8 +108,7 @@ export function buildEnrichment(params: {
   // 업종도 없고 선택 칩도 0이면 저장 가치가 없음 → null (수동 생성과 동일 취급).
   if (!businessType && chips.length === 0) return null;
   return {
-    version: 1,
-    crawledAt: params.crawledAt,
+    createdAt: params.createdAt,
     tier: params.tier,
     seed: { region: params.region.trim(), businessType },
     chips,
@@ -117,10 +118,11 @@ export function buildEnrichment(params: {
 
 ### 위저드 배선 (`EnrichWizard.tsx`)
 
-- `runCrawl` 성공 시 `crawledAt = new Date().toISOString()`를 상태에 저장(크롤 시각). 재크롤하면 last-crawl-wins(유지한 칩에 대응하는 크롤 시각을 반영 — 올바른 provenance).
+- `runCrawl` 성공 시 `createdAt = new Date().toISOString()`를 상태에 저장(스냅샷 생성=크롤 시각). 재크롤하면 last-crawl-wins(유지한 칩에 대응하는 크롤 시각을 반영 — 올바른 provenance).
 - `tier`는 **크롤 응답값(`d.tier`, 서버 판정)** 그대로 상태에 보관한 것을 넘긴다(앱에서 재계산 안 함).
 - `apply()`에서 `buildEnrichment`로 스냅샷을 만든다. **null이면 `WizardFill.enrichment`를 생략(undefined)**; 아니면 실어 보낸다.
-  입력: `regionInput`, `btype`, `tier`, `crawledAt`, `selected`, `starred`, `factualOk`, `chipOf(text)?.section`, `isFactual(text)`.
+  입력: `regionInput`, `btype`, `tier`, `createdAt`, `selected`, `starred`, `factualOk`, `chipOf(text)?.section`, `isFactual(text)`.
+- **크롤 위저드는 생성 화면에만 존재**(수정 화면엔 씨앗 입력·재크롤 없음). 따라서 enrichment는 **AI 크롤(생성) 시점에만** 만들어진다 = "생성 전용 캡처". 대표 확정("AI 크롤할 때만 저장해도 충분").
 - **선택 칩이 0개여도** enrichment는 만들어진다 — 씨앗 업종(`businessType`)이 유효 신호이기 때문(seed·tier·시각 포함), `chips: []` 허용. 씨앗 스텝이 지역·업종을 **둘 다 필수**로 받으므로(`seedReady`) 정상 크롤 경로에선 `businessType`이 항상 존재 → `buildEnrichment`는 non-null. 업종도 없고 칩도 0인 경우에만 null(방어적 — 정상 경로 밖).
 
 ### 폼·저장 배선
@@ -142,7 +144,7 @@ export function buildEnrichment(params: {
 |---|---|---|
 | `types.ts` `Enrichment`/`EnrichmentChip`/`Maker.enrichment` | 도메인 형태 | — |
 | `lib/enrichment.ts` `buildEnrichment` | 위저드 상태 → 스냅샷 (순수) | types |
-| `EnrichWizard.tsx` | crawledAt 캡처 + apply 시 buildEnrichment 호출 | enrichment, types |
+| `EnrichWizard.tsx` | createdAt 캡처 + apply 시 buildEnrichment 호출 (생성 화면 전용) | enrichment, types |
 | `WizardFill` / `page.tsx` | enrichment를 폼→저장으로 전달 | — |
 | `RegisterInput` / `actions.ts` | create=기록 / update=보존 | repo |
 | `repo.ts` (Supabase+InMemory) | 컬럼 read/write, update 시 보존 | — |
@@ -164,6 +166,7 @@ export function buildEnrichment(params: {
 
 ## 9. v1 한계·리스크(문서화)
 
-- 편집 중 재크롤로 새 스냅샷을 반영하지 않음(생성 시점 값 고정). 필요 시 v2에서 "enrichment dirty" 플래그로 조건부 갱신.
-- 미래 매처가 소비를 시작하면 스키마가 바뀔 것이므로 `version` 필드로 마이그레이션한다.
+- enrichment는 **AI 크롤(생성) 시점 스냅샷으로 고정** — 수정 화면엔 재크롤이 없어 갱신되지 않는다(대표 확정, 범위 밖).
+- **버전 필드 없음(대표 지시)**: 스키마가 실제로 처음 바뀌는 시점에 `version` 추가 + 기존행 backfill(`UPDATE … SET enrichment = jsonb_set(enrichment,'{version}','1')`)로 대응.
+- **쿼리 성능은 소비 시점 과제(백로그)**: v1은 저장만이라 인덱스 없음. 미래 검색·매칭이 `chips`/`seed.businessType`로 조회를 시작하면 **jsonb GIN 인덱스**(또는 핫필드 컬럼 승격)를 그때 설계한다. → [[크롤-키워드-재설계]] §v2 백로그 "enrichment 활용(검색·매칭)"과 함께 해석.
 - **네거티브 전용 계약 금지 사항**: enrichment는 "고객이 선택한 것"만 담는다. 미래 소비자는 이 데이터를 **긍정 신호**로만 취급한다(미선택을 부정 신호로 재구성하지 않는다 — 우리가 애초에 저장하지 않는다).
