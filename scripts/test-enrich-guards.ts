@@ -118,10 +118,7 @@ const nTexts = nChips.map((c) => `${c.section}:${c.text}`);
 check("지도✅ → 업종 카테고리 칩(스포츠·오락)", nChips.some((c) => c.section === "지도확인" && c.text === "스포츠"), JSON.stringify(nTexts));
 check("사용자 입력 업종('당구장')은 칩 제외", !nChips.some((c) => c.text === "당구장"));
 check("브랜드명 없는 이웃 업체 행 무시(중복 카테고리만)", nChips.filter((c) => c.section === "지도확인").length <= 2);
-check("후기 텍스처: 넓은 공간(대형)", nChips.some((c) => c.text === "넓은 공간"));
-check("후기 텍스처: 동호회 모임·심야 영업", nChips.some((c) => c.text === "동호회 모임") && nChips.some((c) => c.text === "심야 영업"));
-check("부정 문맥 가드: '주차공간이 없어서' → 주차 칩 없음", !nChips.some((c) => c.text === "주차 가능"), JSON.stringify(nTexts));
-check("긍정 문맥: '사장님이 친절해요' → 친절 칩", nChips.some((c) => c.text === "친절한 응대"));
+check("후기 칩 은퇴(대표 지시 07-19): 블로그에 결 표현 있어도 후기흔적 칩 0", !nChips.some((c) => c.section === "후기흔적"), JSON.stringify(nTexts));
 
 const noMapMemo = naverMemo.replace("[지도 교차검증] ✅ 네이버 지도 주소가 입력 지역(양주 광사동)과 일치 — 이 업체가 맞아요. 주소·업종은 신뢰.", "");
 check("지도✅ 없으면 카테고리 칩 없음(오귀속 방지)", !extractChipsFromResearch(noMapMemo, "피망당구클럽", "당구장").some((c) => c.section === "지도확인"));
@@ -136,21 +133,19 @@ const cafeMap = cafeChips.filter((c) => c.section === "지도확인").map((c) =>
 check("'음식점' 최상위 umbrella 제외", !cafeMap.includes("음식점"), JSON.stringify(cafeMap));
 check("'카페'·'디저트' 리프는 유지", cafeMap.includes("카페") && cafeMap.includes("디저트"), JSON.stringify(cafeMap));
 check("당구장 회귀: '스포츠'·'오락'은 그대로(umbrella 아님)", nChips.some((c) => c.text === "스포츠") && nChips.some((c) => c.text === "오락"));
-check("'불친절' → 친절 칩 없음", !extractChipsFromResearch("[네이버 블로그 — 소비자 후기·분위기 단서]\n· 제목 | 직원이 불친절해서 실망", "가게").some((c) => c.text === "친절한 응대"));
 
 console.log("[겹침 통일 — 포함관계 1개]");
-// 실제 메모 순서 = 네이버 파트 먼저, [출처 2(제미나이)가 뒤. 블로그 줄엔 브랜드명 포함(근접 게이트).
-const dupMemo = `[네이버 블로그 — 소비자 후기·분위기 단서]
-· 가게 후기 | 가게는 동호회 모임이 활발해요
-
-[출처 2 · 제미나이]
+const dupMemo = `[출처 2 · 제미나이]
 [키워드]
-동호회, 당구 강습`;
+동호회, 당구 강습
+
+[제품/특징]
+동호회 모임`;
 const dChips = extractChipsFromResearch(dupMemo, "가게");
 const dongho = dChips.filter((c) => c.text.replace(/\s/g, "").includes("동호회"));
-check("제미나이 '동호회' + 네이버 '동호회 모임' → 1개(더 구체적인 쪽)", dongho.length === 1 && dongho[0].text === "동호회 모임", JSON.stringify(dChips.map((c) => c.text)));
+check("'동호회' + '동호회 모임' → 1개(더 구체적인 쪽 생존)", dongho.length === 1 && dongho[0].text === "동호회 모임", JSON.stringify(dChips.map((c) => c.text)));
 const wizardSrc2 = readFileSync(join(__dirname, "../src/app/register/EnrichWizard.tsx"), "utf8");
-check("위저드에 지도확인·후기흔적 섹션 등록", wizardSrc2.includes('"지도확인"') && wizardSrc2.includes('"후기흔적"'));
+check("위저드에 지도확인 등록 + 후기흔적 은퇴", wizardSrc2.includes('"지도확인"') && !wizardSrc2.includes('"후기흔적"'));
 
 // ── 거래·운영 정보 제외 (대표 지시 2026-07-19 — 장모님해장국) ──
 console.log("[거래·운영 정보 제외]");
@@ -198,15 +193,19 @@ const gMap = gChips.filter((c) => c.section === "지도확인").map((c) => c.tex
 const gTex = gChips.filter((c) => c.section === "후기흔적").map((c) => c.text);
 check("요리 umbrella '한식' 제외", !gMap.includes("한식"), JSON.stringify(gMap));
 check("입력 업종 '감자탕' 제외 → 지도확인 비거나 리프만", !gMap.includes("감자탕"));
-check("후기 이벤트 노이즈 '데이트 코스' 없음(dict서 제거)", !gChips.some((c) => c.text === "데이트 코스"), JSON.stringify(gTex));
-check("후기 이벤트 노이즈 '팝업 경험' 없음(dict서 제거)", !gChips.some((c) => c.text === "팝업 경험"));
-check("진짜 결 '24시간 운영'·'배달 가능'·'심야 영업'은 유지", gTex.includes("24시간 운영") && gTex.includes("배달 가능") && gTex.includes("심야 영업"), JSON.stringify(gTex));
+check("후기 칩 전면 은퇴: 블로그 줄에서 어떤 칩도 안 만듦", gTex.length === 0, JSON.stringify(gTex));
 check("탕류 스타터: 감자탕 → 식당 스타터(단체석)", starterChipsForType("감자탕").some((c) => c.text === "단체석"), JSON.stringify(starterChipsForType("감자탕").map((c) => c.text)));
 check("탕류 스타터: 해장국·설렁탕도 식당", starterChipsForType("해장국").some((c) => c.text === "포장 가능") && starterChipsForType("설렁탕집").some((c) => c.text === "단체석"));
 check("오탐 방지: 목욕탕은 식당 스타터 아님", !starterChipsForType("목욕탕").some((c) => c.text === "단체석"));
-check("표적검색은 후기흔적 소스에서 제외(쿼리 편향)", !extractChipsFromResearch(
+check("표적검색 텍스트도 칩 소스 아님", !extractChipsFromResearch(
   `[네이버 표적검색 — 콜라보·팝업·워크숍 흔적]\n· (팝업) 브랜드 성수동 역대급 웨이팅 팝업`, "브랜드", "카페"
 ).some((c) => c.section === "후기흔적"));
+
+// 고아 조사 조각 배제 (레이지오터 라이브서 발견 — "운영 연차 으로 운영 중")
+console.log("[고아 조사 조각]");
+const orphanChips = extractChipsFromResearch(`[출처 2 · 제미나이]\n[숫자]\n운영 연차 으로 운영 중\n운영 연차 7년`, "가게");
+check("'운영 연차 으로 운영 중' 배제", !orphanChips.some((c) => c.text.includes("으로")), JSON.stringify(orphanChips.map((c) => c.text)));
+check("정상 '운영 연차 7년'은 유지", orphanChips.some((c) => c.text === "운영 연차 7년"));
 
 console.log(`\n결과: ${pass} pass / ${fail} fail`);
 process.exit(fail ? 1 : 0);
