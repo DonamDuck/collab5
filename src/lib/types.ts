@@ -54,6 +54,22 @@ export type Block = BlockBase & (
 );
 export type BlockType = Block["type"];
 
+/** 크롤 스냅샷 — 위저드에서 고객이 "선택한" 신호(picked-only). v1=저장만, 미래 검색·매칭 자산.
+ *  jsonb 내부 키는 camelCase(관례: collab_cards.proposal.toName). 미저장: 조사메모·미선택·힌트·링크후보. */
+export interface EnrichmentChip {
+  text: string;       // 칩 제목
+  section: string;    // 칩 섹션(키워드/정체/제품/…/직접)
+  factual: boolean;   // 숫자·이력 등 사실성 칩
+  starred: boolean;   // 고객 별표(우선순위)
+  confirmed: boolean; // factual 칩 "맞아요" 확인
+}
+export interface Enrichment {
+  createdAt: string;  // ISO — 스냅샷(크롤) 생성 시각
+  tier: "rich" | "thin";
+  seed: { region: string; businessType: string };
+  chips: EnrichmentChip[]; // 선택 칩만
+}
+
 /** 업체 프로필 = 콜라보 카드의 '집' + 공개 상세페이지(검색 대상) */
 export interface Maker {
   id: number; // 정수 시퀀스 PK (DB 자동)
@@ -74,6 +90,7 @@ export interface Maker {
   seeksNote: string;       // 파트너 직접 설명
   photos: string[]; // 브랜드 사진(카드·프로필 슬라이드용). MVP=리사이즈 data URL
   blocks: Block[]; // 선택 블록(순서 보존)
+  enrichment?: Enrichment; // 크롤 스냅샷(생성 시 기록, 수정 시 보존). 없으면 undefined
   introFileUrl?: string; // 소개자료 PDF(코어 위계)
   soul: SoulLayer;
   trust: TrustSignals;
