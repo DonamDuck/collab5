@@ -11,6 +11,7 @@ export function ConnectProfileButton({ slug, loggedIn }: { slug: string; loggedI
   const router = useRouter();
   const searchParams = useSearchParams();
   const [open, setOpen] = useState(false);
+  const [done, setDone] = useState(false);
   const [pw, setPw] = useState("");
   const [err, setErr] = useState("");
   const [pending, start] = useTransition();
@@ -37,11 +38,16 @@ export function ConnectProfileButton({ slug, loggedIn }: { slug: string; loggedI
         setErr(r.error);
         return;
       }
-      setOpen(false);
-      // URL의 connect 플래그 제거 + 서버 재렌더(이제 소유자 → 버튼 사라지고 수정 세션 인증됨)
-      router.replace(`/m/${slug}`);
-      router.refresh();
+      setOpen(false); // 비번 얼럿 닫고
+      setDone(true); // 완료 얼럿 오픈 (닫을 때 소유자 전환 반영)
     });
+
+  // 완료 얼럿 확인 → 얼럿만 닫음. 겸사겸사 소유자 전환 반영(연결 버튼 사라지고 수정 세션 인증) + connect 플래그 URL 정리.
+  const closeDone = () => {
+    setDone(false);
+    router.replace(`/m/${slug}`);
+    router.refresh();
+  };
 
   return (
     <>
@@ -88,6 +94,24 @@ export function ConnectProfileButton({ slug, loggedIn }: { slug: string; loggedI
                 {pending ? "연결 중…" : "연결하기"}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {done && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4">
+          <div className="w-full max-w-sm rounded-lg border border-hairline bg-surface p-6 text-center shadow-e2">
+            <p className="text-base font-bold text-ink">🎉 소개서 연결 완료</p>
+            <p className="mt-1.5 text-sm leading-relaxed text-mute">
+              프로필 메뉴에서 언제든 내 소개서를 확인할 수 있어요.
+            </p>
+            <button
+              type="button"
+              onClick={closeDone}
+              className="mt-5 h-11 w-full rounded-md bg-primary text-sm font-medium text-primary-on"
+            >
+              확인
+            </button>
           </div>
         </div>
       )}
