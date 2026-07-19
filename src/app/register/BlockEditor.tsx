@@ -31,7 +31,7 @@ export function emptyBlock(type: BlockType): Block {
     case "metrics": return { ...base, type, items: [{ label: "", value: "" }] };
     case "reviews": return { ...base, type, items: [{ quote: "", source: "" }] };
     case "team": return { ...base, type, intro: "" };
-    case "press": return { ...base, type, items: [{ title: "", year: "", desc: "" }] };
+    case "press": return { ...base, type, items: [{ title: "", year: "", desc: "", link: "" }] };
     case "space": return { ...base, type, desc: "", features: [] };
     case "custom": return { ...base, type, title: "", body: "" };
   }
@@ -249,12 +249,18 @@ export function BlockEditor({ blocks, onChange, onUploadingChange, onSheetOpenCh
                       placeholder="어떻게 소개됐나요? (선택) 예: 동네 사랑방 같은 공간으로 소개했어요"
                       className={taCls}
                     />
+                    <input
+                      value={it.link ?? ""}
+                      onChange={(e) => setBlock(i, { ...b, items: b.items.map((x, y) => (y === k ? { ...x, link: e.target.value } : x)) })}
+                      placeholder="기사 링크 (선택) https://"
+                      className={inputCls}
+                    />
                   </div>
                 ))}
                 {b.items.length < 4 && (
                   <button
                     type="button"
-                    onClick={() => setBlock(i, { ...b, items: [...b.items, { title: "", year: "", desc: "" }] })}
+                    onClick={() => setBlock(i, { ...b, items: [...b.items, { title: "", year: "", desc: "", link: "" }] })}
                     className="inline-flex items-center gap-1 rounded-sm border border-primary-tint bg-primary-pale px-3 py-1.5 text-sm font-medium text-primary-on transition-colors hover:bg-primary-tint"
                   >
                     ＋ 소개 추가
@@ -340,6 +346,7 @@ export function BlockEditor({ blocks, onChange, onUploadingChange, onSheetOpenCh
               onAddLink={() => addLink(i)}
               onSetLink={(k, p) => setLink(i, k, p)}
               onRemoveLink={(k) => removeLink(i, k)}
+              hideLinks={b.type === "press"} // press는 item별 링크로 일원화(대표 결정) — 블록 공유 링크 숨김
             />
           </div>
         );
@@ -468,6 +475,7 @@ function BlockAttachments({
   onAddLink,
   onSetLink,
   onRemoveLink,
+  hideLinks,
 }: {
   photos: string[];
   links: BlockLink[];
@@ -476,6 +484,7 @@ function BlockAttachments({
   onAddLink: () => void;
   onSetLink: (k: number, p: Partial<BlockLink>) => void;
   onRemoveLink: (k: number) => void;
+  hideLinks?: boolean; // true면 블록 공유 링크 섹션 자체를 숨김(예: press — item별 링크로 대체)
 }) {
   const [photosOpen, setPhotosOpen] = useState(photos.length > 0);
   const prev = useRef(photos.length);
@@ -522,7 +531,7 @@ function BlockAttachments({
           </div>
         </div>
       )}
-      {links.map((l, k) => (
+      {!hideLinks && links.map((l, k) => (
         <div key={k} className="flex items-center gap-2">
           <input
             value={l.url}
@@ -553,7 +562,7 @@ function BlockAttachments({
             ＋ 사진 추가 (선택)
           </button>
         )}
-        {links.length < 3 && (
+        {!hideLinks && links.length < 3 && (
           <button type="button" onClick={onAddLink} className={actionCls}>
             ＋ 링크 추가
           </button>

@@ -704,6 +704,7 @@ function RegisterForm() {
                   title: balanceQuotes(it.label), // 짝 없는 따옴표 정리(#1)
                   year: it.year || undefined,
                   desc: it.desc?.trim() ? balanceQuotes(it.desc) : undefined, // 매체별 소개 요약(#2)
+                  link: it.url || undefined, // 기사 원문 링크 프리필(1팀 캡처·sanitizeHttpUrl 검증됨 — actions.ts에서 저장 시 재검증)
                 }));
               if (items.length) nb.items = items;
             }

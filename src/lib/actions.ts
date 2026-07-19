@@ -30,6 +30,18 @@ export interface HistoryWire {
 const unwrapPhotos = (photos?: PhotoWire[]): string[] =>
   (photos ?? []).map((p) => p.u).filter(Boolean);
 
+// press item 링크 위생 처리 — http(s) 절대 URL만 통과(크롤 프리필·수기입력 공용 검증). enrich.ts sanitizeHttpUrl과 동일 규칙.
+function sanitizePressLink(raw?: string): string | undefined {
+  const s = raw?.trim();
+  if (!s) return undefined;
+  try {
+    const u = new URL(s);
+    return u.protocol === "http:" || u.protocol === "https:" ? u.href : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export interface RegisterInput {
   name: string;
   oneLiner: string;
@@ -366,7 +378,12 @@ function sanitizeBlocks(blocks?: Block[]): Block[] {
           links,
           items: b.items
             .filter((i) => i.title.trim())
-            .map((i) => ({ title: i.title, year: i.year, desc: i.desc?.trim() || undefined })),
+            .map((i) => ({
+              title: i.title,
+              year: i.year,
+              desc: i.desc?.trim() || undefined,
+              link: sanitizePressLink(i.link),
+            })),
         };
       if (b.type === "reviews")
         return { type: b.type, photos: b.photos, links, items: b.items.filter((i) => i.quote.trim()) };
