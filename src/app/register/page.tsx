@@ -11,7 +11,7 @@ import {
   getPreviewDemoNoneAction,
 } from "@/lib/actions";
 import { MakerArticle } from "../m/[slug]/MakerArticle";
-import type { CollabType, Block, Maker } from "@/lib/types";
+import type { CollabType, Block, Maker, Enrichment } from "@/lib/types";
 import { deriveRegion } from "@/lib/region";
 import { isRichIntro } from "@/lib/completeness";
 import { uploadPhoto, uploadPdf } from "@/lib/upload";
@@ -187,6 +187,7 @@ function RegisterForm() {
   const [offersNote, setOffersNote] = useState("");
   const [seeksNote, setSeeksNote] = useState("");
   const [blocks, setBlocks] = useState<Block[]>([]);
+  const [enrichment, setEnrichment] = useState<Enrichment | undefined>(undefined);
   const [blocksUploading, setBlocksUploading] = useState(false);
   const [introFileUrl, setIntroFileUrl] = useState("");
   const [pdfUploading, setPdfUploading] = useState(false);
@@ -611,6 +612,7 @@ function RegisterForm() {
   // 사용자가 이미 만진 필드는 덮지 않는다. 미선택 활동·콜라보 힌트는 actHints/collabHints에
   // 남아 섹션 안 인라인 힌트로 재등장하고, 미선택 seeks·블록 힌트는 적용 없이 소멸.
   const applyWizard = (fill: WizardFill) => {
+    setEnrichment(fill.enrichment);
     const filled = new Set<string>();
     if (fill.name !== undefined) {
       setName(fill.name);
@@ -899,6 +901,7 @@ function RegisterForm() {
         photos: wrap(photoUrls),
         collabOpen,
         searchVisible,
+        enrichment,
         instagram,
         homepage,
         address,
