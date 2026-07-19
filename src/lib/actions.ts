@@ -6,7 +6,7 @@ import { deriveRegion } from "./region";
 import { getSessionUser } from "./supabase/server";
 import { updateProfileImage } from "./profiles";
 import { sha256 } from "./hash";
-import type { Block, CollabType, Maker } from "./types";
+import type { Block, CollabType, Maker, Enrichment } from "./types";
 
 // 사진(리사이즈 data URL)은 개당 수십만~100만 자에 달해, 배열에 문자열로 담아
 // 서버액션으로 보내면 React Flight의 배열 누적 한도(1e6)에 걸려 터진다.
@@ -52,6 +52,7 @@ export interface RegisterInput {
   address?: string; // 지역은 여기서 자동 추출
   description?: string;
   editPassword?: string; // 비회원 수정 비밀번호(로그인 상태면 무시)
+  enrichment?: Enrichment; // 크롤 스냅샷(생성 시만 기록)
 }
 
 /** 이름 → slug. 한글 등 비ASCII면 랜덤 핸들로 폴백(mock 단계). */
@@ -106,6 +107,7 @@ export async function createMakerAction(
     },
     collabOpen: input.collabOpen,
     searchVisible: input.searchVisible,
+    enrichment: input.enrichment,
     ownerUserId,
     editPasswordHash,
   });
@@ -238,6 +240,7 @@ export async function updateMakerAction(
   const pwOk =
     !!maker.editPasswordHash && !!password && sha256(password.trim()) === maker.editPasswordHash;
   if (!isOwner && !pwOk) return { error: "수정 권한이 없어요." };
+  // enrichment는 의도적으로 전달하지 않음 — 전달하면 일반 수정마다 저장된 크롤 스냅샷을 덮어씀(보존 불변식).
   const updated = await repo.updateMakerContent(slug, {
     name: input.name.trim(),
     oneLiner: input.oneLiner.trim(),
