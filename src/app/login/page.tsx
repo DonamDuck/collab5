@@ -38,7 +38,10 @@ function LoginForm() {
         setErr(r.error);
         return;
       }
-      router.replace("/"); // push+refresh 중복 제거 — 서버 렌더가 새 세션 헤더 반영
+      // 로그인 후 복귀 경로 — 내부 절대경로(/…)만 허용(오픈 리다이렉트 방지). 없으면 홈.
+      const redirect = searchParams.get("redirect");
+      const dest = redirect && redirect.startsWith("/") && !redirect.startsWith("//") ? redirect : "/";
+      router.replace(dest); // push+refresh 중복 제거 — 서버 렌더가 새 세션 헤더 반영
     });
 
   const kakao = async () => {

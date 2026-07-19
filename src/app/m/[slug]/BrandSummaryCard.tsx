@@ -18,8 +18,8 @@ export function BrandSummaryCard({
 
   return (
     <div className="rounded-[18px] border border-hairline bg-surface p-5 shadow-e1">
-      {/* 정체성 존 — 로고+이름+뱃지(한 줄) / 수정 우상단 */}
-      <div className="flex items-start justify-between gap-3">
+      {/* 정체성 존 — 로고+이름+뱃지(한 줄) / 수정은 타이틀과 수직 중앙 정렬(로고 높이에 맞춰 내려옴) */}
+      <div className="flex items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3.5">
           {/* 로고 = 계정 프로필 이미지. 없으면 렌더 안 함(이니셜 폴백 미사용) → 텍스트 타이틀만. */}
           {logoUrl && <Avatar image={logoUrl} name={maker.name} size={56} shape="square" />}
