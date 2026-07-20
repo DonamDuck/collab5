@@ -656,13 +656,14 @@ ${BRAND_VOICE}
   · ⭐⭐상투어 블랙리스트 금지 — "믿습니다 / 응원합니다·응원해요 / 빛나는(미래·성장 등) / 든든한 버팀목 / 소중한 / 특별한 / 함께 성장 / 꿈을 향해 / 첫걸음·시작점" 같은 추상 격려·감정어를 쓰지 마라. 이런 말은 아무 브랜드에나 붙는 공허한 상투어다 — 이 브랜드가 아닌 문장은 지워라.
   · ⭐⭐마무리 규칙(핵심) — 마지막 문장을 추상 응원·격려·바람으로 끝내지 마라("~되기를 바랍니다 / ~응원합니다"류 마무리 금지). 대신 그 브랜드만의 구체 사실이나 담백한 진술로 닫아라. 예: "빛나는 미래를 응원합니다"(X) → "매주 목요일 저녁, 함께 책을 읽습니다"(O).
   · ⭐형용사보다 명사·행위 — 감정 형용사("빛나는·소중한·특별한")를 줄이고 조사 자료의 구체 사실(활동·프로그램·공간·재료·방식)로 말하라.
+  · ⭐⭐따옴표 절제 — 키워드·별칭을 따옴표로 감싸지 마라. 주어진 키워드를 썼다는 걸 표시하려고 인용부호를 두르는 건 금지다. 예: 이곳이 "동네 사랑방"이 되기를 바랐어요 / 공간을 "동네도서관"이라 부르며 "누구에게나 열려있는 공간"으로(X) → 이곳이 동네 사랑방이 되기를 바랐어요 / 카페로 쓰던 공간을 동네도서관이라 부르고 있어요(O). 따옴표는 실제 인용(사장 발언·수상명·프로그램 공식 명칭)에만 쓰고, 후보 하나당 최대 1회. 대부분의 후보는 따옴표 0회가 정상이다.
   · ⚠️균형 — 위 세 규칙은 따뜻함(warmth)을 죽이라는 게 아니다. 담백함(조용한 확신)은 유지하되 구체에 뿌리내리지 않은 빈 감정어만 걷어내는 거다. 지나치게 사무적·건조해지지 않게, 온기는 구체 사실 속에서 배어나게 하라.
   · 1문장째 = 우리가 무엇을 하는 곳인지 구체적으로. 일반론("~을 사랑하는 브랜드예요") 금지.
   · 가운데 = 조사 메모의 사실 2~3개를 구체적으로(제품·활동·공간·이력 — 고유명사·재료·방식 그대로). "다양한 활동을 해요"처럼 뭉뚱그리지 마라.
   · 마지막 = 그 앵글의 주제와 자연스럽게 이어지는 마무리 한 문장. 협업의 여지를 부드럽게 남기되, 모든 후보를 일률적인 협업 초대로 끝내지 마라(영업 멘트 금지).
   · 5개 앵글: 시작 스토리 / 제품·방식 / 활동·경험 / 고객·쓰임 / 협업 상상.
 - ⚠️조사 메모에 구체 명사·사실이 부족하면 위 개수·구체성 요구보다 '창작·과장 금지'가 우선이다. 없는 디테일을 지어내지 말고, 메모 안에서 가장 구체적인 수준으로만 써라.
-- ⭐가중 키워드가 주어지면 그 방향을 최우선으로 반영해 모든 후보를 그 결에 맞춘다. 단 키워드를 나열하지 말고 문장에 녹여라.
+- ⭐가중 키워드가 주어지면 그 방향을 최우선으로 반영해 모든 후보를 그 결에 맞춘다. 단 키워드를 나열하지 말고 문장에 녹여라 — 키워드를 따옴표로 감싸 티 내지도 마라.
 - 조사 메모 안의 사실만 쓴다. 창작·과장 금지. identity(주소·홈피 등)는 확인된 것만, 없으면 빈 문자열.
 - 인스타: 실제 확인된 핸들만 identity.instagram에 넣는다(추측 금지). ⭐메모의 "[홈페이지 직접 확인]" 또는 "[웹 텍스트에서 발견된 인스타 핸들]"에 있는 값은 웹에서 실제로 확인된 것이니 브랜드 것이 맞다고 판단되면 채워도 된다(sources에 출처 남기기). 확정 못 하면 identity.instagram은 빈 문자열로 두고, 대신 instagramCandidates에 도메인·브랜드명 기반 그럴듯한 추정 핸들 2~4개를 제시한다(사장이 직접 고를 후보용). 예: 도메인이 canvasgarden.shop이면 @canvasgarden, @canvasgarden_official, @canvasgarden.shop 등.
 - activityHints: 조사 메모에 실제로 언급된 이 브랜드의 활동(워크숍·클래스·팝업·제품라인 등)만 0~3건. collabHints: 메모에 파트너명이 드러난 협업 소식만 0~3건. 각 항목의 source는 그 정보가 나온 출처 유형(네이버 블로그 후기/카페글/웹 검색/인스타그램)으로. ⚠️메모에 없으면 절대 만들지 말고 빈 배열로 둬라(참고용 힌트라 사실만).
@@ -1530,7 +1531,7 @@ class NaverGeminiProvider implements SearchProvider {
       : "";
     const verbatim = (input.verbatimKeywords ?? []).filter((s) => s?.trim());
     const verb = verbatim.length
-      ? `⭐그대로 쓸 문구(사장이 직접 쓴 표현 — 의역·바꿔쓰기 금지, 원문 그대로 등장시켜): ${verbatim.map((v) => `"${v}"`).join(", ")}\n\n`
+      ? `⭐그대로 쓸 문구(사장이 직접 쓴 표현 — 의역·바꿔쓰기 금지, 원문 그대로 등장시켜. ⚠️단어만 그대로 쓰라는 뜻이지 따옴표로 감싸라는 뜻이 아니다 — 문장에 자연스럽게 녹여라): ${verbatim.join(", ")}\n\n`
       : "";
     const prompt = `브랜드명: "${input.name}"\n\n${note}${kw}${star}${verb}${this.digestBlock(input.homepageDigest)}[조사 자료 — 네이버 검색 + 제미나이 웹 조사]\n${input.research}\n\n위 정보로 한 줄 소개 5개, 브랜드 소개 5개(각 3~5문장, 어미는 시스템 지침의 '어미 리듬' — 선언=~합니다/부연=~이에요 혼합), 브랜드 결 단어 2~4개, identity(지역·주소·인스타·홈피)를 뽑아줘.
 ⭐⭐자료 신뢰 순서(충돌 시 위가 이긴다): ①홈페이지 발췌(있으면) ②네이버의 [브랜드가 직접 쓴 소개]·[지도 교차검증]·[네이버 지역검색] ③기타 네이버 문서(무관한 업체 문서일 수 있으니 브랜드 일치 확인) ④제미나이 조사.
@@ -1543,7 +1544,12 @@ class NaverGeminiProvider implements SearchProvider {
     const opts = await this.generateOptions(prompt, 0.9);
     // 지도 링크는 모델이 아니라 코드가 넣는다 — 네이버 좌표로 조립한 값을 메모에서 되찾아 덮어씀.
     const mapUrl = extractMapLinkFromResearch(input.research);
-    return mapUrl ? { ...opts, identity: { ...opts.identity, mapUrl } } : opts;
+    const cleaned: EnrichOptions = {
+      ...opts,
+      oneLiners: opts.oneLiners.map(stripDecorativeQuotes),
+      descriptions: opts.descriptions.map(stripDecorativeQuotes),
+    };
+    return mapUrl ? { ...cleaned, identity: { ...cleaned.identity, mapUrl } } : cleaned;
   }
 
   // draft·oneLiners 공용 — 폼 입력을 프롬프트용 메모로 조립
@@ -1602,7 +1608,7 @@ class NaverGeminiProvider implements SearchProvider {
       ? `⭐⭐한 줄 소개에 반드시 반영할 핵심(우선순위 순, 최대 3개): ${starred.join(" > ")}. 1순위는 모든 한 줄 후보에 꼭 담고, 40자 안에 다 못 담으면 뒤 순위는 '브랜드 소개'(장문)로 넘겨.\n`
       : "";
     const verbatimLine = verbatim.length
-      ? `⭐그대로 넣을 문구(의역·표현 변형 절대 금지, 원문 그대로 등장시켜): ${verbatim.join(", ")}.\n`
+      ? `⭐그대로 넣을 문구(의역·표현 변형 절대 금지, 원문 그대로 등장시켜 — 단 따옴표로 감싸지 말고 문장에 녹여라): ${verbatim.join(", ")}.\n`
       : "";
     const prompt = `브랜드명: "${input.name}"\n\n[사용자 입력]\n${
       info || "(입력이 적어요 — 조사 자료 위주로)"
@@ -2303,6 +2309,18 @@ export function searchLooksEmpty(text: string): boolean {
 /** 재시도 발동 기준 — 1차 조사 칩이 이 개수 미만이면 검색 2콜을 더 돌린다(대표 정책 2026-07-20).
  *  낮출수록 콜 수·비용이 준다(10 → 7 등). 씨딩 단계라 품질 우선으로 10에서 시작. */
 export const CHIP_TARGET = 10;
+
+/** 장식 따옴표 해제(대표 QA 2026-07-20) — 모델이 주어진 키워드를 썼다고 표시하려고
+ *  "동네 사랑방"·"동네도서관"처럼 짧은 명사구를 따옴표로 두르는 버릇이 있다.
+ *  한 문단에 2개 이상 = 라벨 스팸으로 보고 전부 해제. 1개 이하는 실제 인용일 수 있어 보존.
+ *  ⚠️긴 인용(15자 초과)은 실제 발언·문장 인용일 가능성이 높아 개수에서 제외하고 보존한다. */
+export function stripDecorativeQuotes(text: string): string {
+  if (!text) return text;
+  const QUOTED = /[“"]([^“”"\n]{1,15})[”"]/g;
+  const shortQuotes = [...text.matchAll(QUOTED)];
+  if (shortQuotes.length < 2) return text;
+  return text.replace(QUOTED, (_m, inner) => inner);
+}
 
 export function researchTier(research: string, chipCount: number): "rich" | "thin" {
   if (!research) return "thin";

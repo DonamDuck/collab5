@@ -11,6 +11,7 @@ import {
   sanitizeHttpUrl,
   sniffInstagramFromText,
   naverMapLink,
+  stripDecorativeQuotes,
   extractMapLinkFromResearch,
   searchLooksEmpty,
   isOwnerVoiceHost,
@@ -366,6 +367,17 @@ const noVerifiedMemo = SRC1 + `[지도 교차검증] ✅ 일치
 const nv = extractLinksFromResearch(noVerifiedMemo);
 check("출처1 헤더를 섹션으로 오인하지 않음(한글 도메인 홈피 생존)", nv.homepageCandidates.some((u) => u.includes("100")), JSON.stringify(nv.homepageCandidates));
 check("그 경우에도 아티클은 제외", !nv.homepageCandidates.some((u) => u.includes("omni")));
+
+// 장식 따옴표 해제 (대표 QA 2026-07-20 — 상왕제약 소개글 라벨 스팸)
+console.log("[장식 따옴표]");
+const quoted = `저희는 성동구 왕십리 오래된 동네의 정취를 담고 있습니다. 이곳이 "동네 사랑방"이 되기를 바랐어요. 카페로 운영하던 공간을 "동네도서관"이라 부르며 "누구에게나 열려있는 공간"으로 만들고 있습니다.`;
+const stripped = stripDecorativeQuotes(quoted);
+check("따옴표 2개↑ → 전부 해제", !stripped.includes('"'), stripped);
+check("본문 단어는 보존", stripped.includes("동네 사랑방") && stripped.includes("동네도서관") && stripped.includes("누구에게나 열려있는 공간"));
+check("따옴표 1개는 보존(실제 인용일 수 있음)", stripDecorativeQuotes('올해 "베스트 로컬상"을 받았어요.').includes('"'));
+check("긴 인용(15자 초과)은 개수에서 제외 → 보존", stripDecorativeQuotes('사장님은 "오래 남을 것을 만들고 싶었다고 말합니다"고 했어요.').includes('"'));
+check("따옴표 없으면 그대로", stripDecorativeQuotes("담백한 문장이에요.") === "담백한 문장이에요.");
+check("빈 값 안전", stripDecorativeQuotes("") === "");
 
 console.log(`\n결과: ${pass} pass / ${fail} fail`);
 process.exit(fail ? 1 : 0);
