@@ -2340,6 +2340,16 @@ export function sniffInstagramFromText(text: string, exclude?: string): string[]
     found.set(h, Math.max(found.get(h) ?? 0, score));
   };
   for (const m of text.matchAll(/instagram\.com\/([A-Za-z0-9_.]{2,30})/g)) add(m[1], 2);
+  // ⚠️URL을 먼저 지운 뒤 라벨 스캔 — 안 그러면 "instagram.com"이 insta + "gram.com"으로 재매칭돼
+  //   @gram.com 같은 유령 핸들이 생긴다.
+  const noUrl = text.replace(/https?:\/\/\S+/g, " ").replace(/[A-Za-z0-9.-]+\.(com|net|co\.kr|kr|shop|io)\b/g, " ");
+  // 한국어 라벨 뒤 핸들 — 소상공인 글에 제일 흔한 형태인데 그동안 통째로 놓쳤다
+  // (두더지요가원 당근 본문 "인스타그램-moleyoga", 대표 QA 2026-07-20).
+  // @도 instagram.com도 없지만 '인스타'라고 명시돼 있으니 추측이 아니라 명기된 값이다.
+  for (const m of noUrl.matchAll(
+    /(?:인스타(?:그램)?|인별|IG|insta(?:gram)?)\s*(?:계정|아이디)?\s*[-–:：=]?\s*@?([A-Za-z][A-Za-z0-9_.]{2,29})/gi
+  ))
+    add(m[1], 2);
   for (const m of text.matchAll(/@([A-Za-z0-9_.]{3,30})/g)) add(m[1], 1);
   return [...found.entries()]
     .sort((a, b) => b[1] - a[1])

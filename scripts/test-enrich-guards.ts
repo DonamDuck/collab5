@@ -477,5 +477,16 @@ check("칩 화면에서 섹션 라벨 헤더 제거", !/mb-1\.5 text-\[13px\] fo
 check("SECTION_ORDER는 순서 소스로 유지", /SECTION_ORDER\.filter\(\(s\) => allChips\.some/.test(wz3));
 check("SECTION_ORDER에 특장점 반영", /"제품", "특장점"/.test(wz3));
 
+// 한국어 라벨 인스타 핸들 (대표 QA 2026-07-20 두더지요가원 — 당근 본문 "인스타그램-moleyoga")
+console.log("[한국어 라벨 인스타]");
+check("당근 실물: 인스타그램-moleyoga", sniffInstagramFromText("정발산동 | 요가 카카오채널로 부탁드립니다 인스타그램-moleyoga https://www.daangn.com/x").includes("@moleyoga"));
+check("콜론 표기", sniffInstagramFromText("문의는 인스타 : canga_studio 로").includes("@canga_studio"));
+check("공백 표기", sniffInstagramFromText("인스타그램 sangwang_espresso 에서").includes("@sangwang_espresso"));
+check("영문 IG 표기", sniffInstagramFromText("IG: horak_lib 팔로우").includes("@horak_lib"));
+check("⛔ 'instagram.com'이 @gram.com으로 재매칭되지 않음", !sniffInstagramFromText("https://instagram.com/canvasgarden 참고").includes("@gram.com"));
+check("링크 케이스는 핸들만", JSON.stringify(sniffInstagramFromText("https://instagram.com/canvasgarden 참고")) === JSON.stringify(["@canvasgarden"]));
+check("⛔ 오탐: '인스타그램 마케팅 대행사'", sniffInstagramFromText("인스타그램 마케팅 대행사입니다").length === 0);
+check("⛔ 오탐: 무관 문장", sniffInstagramFromText("요가원에서 수련을 합니다").length === 0);
+
 console.log(`\n결과: ${pass} pass / ${fail} fail`);
 process.exit(fail ? 1 : 0);
