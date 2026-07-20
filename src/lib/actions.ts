@@ -6,6 +6,7 @@ import { deriveRegion } from "./region";
 import { getSessionUser } from "./supabase/server";
 import { updateProfileImage } from "./profiles";
 import { sha256 } from "./hash";
+import { mapLinkLabel } from "./links";
 import type { Block, CollabType, Maker, Enrichment } from "./types";
 
 // 사진(리사이즈 data URL)은 개당 수십만~100만 자에 달해, 배열에 문자열로 담아
@@ -61,6 +62,7 @@ export interface RegisterInput {
   searchVisible: boolean; // 검색 결과 노출 on/off
   instagram?: string;
   homepage?: string;
+  mapUrl?: string; // 지도 링크(네이버·카카오·구글). 화이트리스트 밖이면 저장 시 버림
   address?: string; // 지역은 여기서 자동 추출
   description?: string;
   editPassword?: string; // 비회원 수정 비밀번호(로그인 상태면 무시)
@@ -114,6 +116,8 @@ export async function createMakerAction(
     trust: {
       instagram: input.instagram?.trim() || undefined,
       homepage: input.homepage?.trim() || undefined,
+      // 지도 칩이 "네이버 지도"라 써놓고 딴 데로 가면 안 되니 서버에서도 서비스 검증(클라 우회 차단)
+      mapUrl: mapLinkLabel(input.mapUrl) ? input.mapUrl!.trim() : undefined,
       address: input.address?.trim() || undefined,
       description: input.description?.trim() || undefined,
     },
@@ -277,6 +281,8 @@ export async function updateMakerAction(
     trust: {
       instagram: input.instagram?.trim() || undefined,
       homepage: input.homepage?.trim() || undefined,
+      // 지도 칩이 "네이버 지도"라 써놓고 딴 데로 가면 안 되니 서버에서도 서비스 검증(클라 우회 차단)
+      mapUrl: mapLinkLabel(input.mapUrl) ? input.mapUrl!.trim() : undefined,
       address: input.address?.trim() || undefined,
       description: input.description?.trim() || undefined,
     },

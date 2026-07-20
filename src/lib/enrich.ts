@@ -141,6 +141,7 @@ export interface EnrichOptions {
     address?: string;
     instagram?: string; // 확실히 확인된 것만(홈페이지 링크 등)
     homepage?: string;
+    mapUrl?: string; // 지도 링크 — 코드가 네이버 좌표로 조립(모델 출력 아님)
     hint?: string;
   };
   instagramCandidates: string[]; // 불확실할 때 사장이 고를 인스타 후보(추정 포함)
@@ -756,6 +757,8 @@ interface NaverItem {
   address?: string;
   roadAddress?: string;
   bloggername?: string;
+  mapx?: string; // 경도 ×10^7 (WGS84)
+  mapy?: string; // 위도 ×10^7
 }
 
 /** Gemini용 응답 스키마 (EnrichResultSchema의 OpenAPI 형태) */
@@ -1052,6 +1055,11 @@ class NaverGeminiProvider implements SearchProvider {
       parts.push(
         `\n[지도 교차검증] ✅ 네이버 지도 주소가 입력 지역(${rgn})과 일치 — 이 업체가 맞아요. 주소·업종은 신뢰.`
       );
+      // 지역이 일치할 때만 지도 링크를 만든다 — 동명 타지역 업체로 보내는 사고(오귀속) 차단.
+      // 좌표는 네이버 API가 준 값이라 AI 개입 0. 아래 마커는 extractMapLinkFromResearch가 파싱.
+      const hit = local.find((it) => regionMatches(rgn, localAddr(it)));
+      const link = hit && naverMapLink(this.clean(hit.title), hit.mapx, hit.mapy);
+      if (link) parts.push(`[지도 링크] ${link} (⚠️홈페이지가 아니라 지도 링크다 — homepage에 넣지 마라)`);
     } else if (mapCollided) {
       parts.push(
         `\n[지도 교차검증] ⚠️ 네이버 지도 결과가 입력 지역(${rgn})과 불일치 — 동명의 다른 지역 업체가 섞였을 수 있어요. 지역이 안 맞는 정보는 이 브랜드 것으로 단정하지 마세요.`
@@ -1491,7 +1499,10 @@ class NaverGeminiProvider implements SearchProvider {
 나머지는 사실만 쓰고, 확인 안 된 필드는 빈 문자열. 짧은 필드(note·desc·힌트 등)는 해요체, 브랜드 소개(descriptions)만 '어미 리듬' 혼합체.
 ⭐⭐oneLiners 필수 점검: 브랜드명(상호)을 문장 안에 절대 넣지 마라. 서술어는 말로 소개하듯 행위+진행형("~을 만들고 있어요/열고 있어요/만들어 가고 있어요")으로 — 단답 현재형("~을 만들어요/열어요"), "만나보세요·함께해요" 같은 권유형, "선물해요·선사해요" 같은 감성형 금지.
 ⭐activityHints·collabHints는 조사 자료·홈페이지 발췌에 실제로 언급된 활동·협업만 0~3건씩(source=출처 유형, 홈페이지 발췌면 "홈페이지"). 자료에 없으면 빈 배열 — 지어내기 금지.`;
-    return this.generateOptions(prompt, 0.9);
+    const opts = await this.generateOptions(prompt, 0.9);
+    // 지도 링크는 모델이 아니라 코드가 넣는다 — 네이버 좌표로 조립한 값을 메모에서 되찾아 덮어씀.
+    const mapUrl = extractMapLinkFromResearch(input.research);
+    return mapUrl ? { ...opts, identity: { ...opts.identity, mapUrl } } : opts;
   }
 
   // draft·oneLiners 공용 — 폼 입력을 프롬프트용 메모로 조립
@@ -2146,6 +2157,25 @@ export function detectRegionMismatch(research: string, region?: string): string 
   }
   if (!found.size) return null; // 메모에 지명 자체가 없음 → 판단 보류
   return [...found].slice(0, 2).join("·");
+}
+
+/** 조사 메모에서 코드가 심어둔 지도 링크를 회수. 모델이 만든 값이 아니라 우리가 넣은 값이라 안전. */
+export function extractMapLinkFromResearch(research: string): string | undefined {
+  const m = research.match(/\[지도 링크\]\s*(https:\/\/map\.naver\.com\/\S+)/);
+  return m?.[1];
+}
+
+/** 네이버 지역검색 결과(상호+좌표) → 네이버 지도 딥링크. AI 개입 0 — 좌표는 API가 준 값 그대로다.
+ *  mapx/mapy는 WGS84 ×10^7 정수 문자열. 좌표가 없거나 이상하면 null(링크 안 만듦). */
+export function naverMapLink(title: string, mapx?: string, mapy?: string): string | null {
+  const name = title.replace(/<[^>]*>/g, "").trim(); // 네이버가 감싸는 <b> 제거
+  if (!name) return null;
+  const lng = Number(mapx) / 1e7;
+  const lat = Number(mapy) / 1e7;
+  // 대한민국 대략 범위 밖이면 좌표가 깨진 것 — 엉뚱한 위치로 보내느니 링크를 포기한다.
+  if (!Number.isFinite(lng) || !Number.isFinite(lat)) return null;
+  if (lng < 124 || lng > 132 || lat < 33 || lat > 39) return null;
+  return `https://map.naver.com/p/search/${encodeURIComponent(name)}?c=${lng.toFixed(6)},${lat.toFixed(6)},17,0,0,0,dh`;
 }
 
 /** 웹 텍스트에 '실제로 적혀 있던' 인스타 핸들만 수확(브랜드명 유추 아님).

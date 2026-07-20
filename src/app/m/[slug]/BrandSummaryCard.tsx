@@ -1,7 +1,7 @@
 // /m 상단 브랜드 요약 카드 — 정체성(로고+이름) + 소개 + 신뢰 링크 칩(인스타·홈피).
 // 주소는 카드에서 빼고 최하단 '상세 주소' 섹션으로(참고 수준·지도용). 스펙: docs/superpowers/specs/2026-07-13-m-brand-summary-card-design.md
 import { Avatar } from "@/components/Avatar";
-import { instagramUrl, instagramHandle, normalizeUrl, prettyUrl } from "@/lib/links";
+import { instagramUrl, instagramHandle, normalizeUrl, prettyUrl, mapLinkLabel } from "@/lib/links";
 import type { Maker } from "@/lib/types";
 import { EditButton } from "./EditButton";
 
@@ -14,7 +14,9 @@ export function BrandSummaryCard({
   isOwner: boolean;
   logoUrl?: string;
 }) {
-  const { instagram, homepage } = maker.trust;
+  const { instagram, homepage, mapUrl } = maker.trust;
+  // 지도 링크 — 홈페이지 없는 동네 가게엔 이게 사실상 홈페이지 역할(주소·시간·전화·사진·후기).
+  const mapLabel = mapLinkLabel(mapUrl);
 
   return (
     <div className="rounded-[18px] border border-hairline bg-surface p-5 shadow-e1 print:break-inside-avoid print:shadow-none">
@@ -46,7 +48,7 @@ export function BrandSummaryCard({
       {maker.region && <p className="mt-1 text-[13px] text-faint">{maker.region}</p>}
 
       {/* 신뢰 링크 칩 — 인스타·홈피(아이콘 + 값, 새 탭). 주소는 최하단 섹션으로 이동. */}
-      {(instagram || homepage) && (
+      {(instagram || homepage || mapLabel) && (
         <div className="mt-4 flex flex-wrap gap-2">
           {instagram && (
             <TrustChip href={instagramUrl(instagram)} icon={<InstagramIcon />}>
@@ -56,6 +58,12 @@ export function BrandSummaryCard({
           {homepage && (
             <TrustChip href={normalizeUrl(homepage)} icon={<HomeIcon />}>
               {prettyUrl(homepage)}
+            </TrustChip>
+          )}
+          {/* 축약 링크(naver.me/xxx)는 사람이 읽을 수 없으니 URL 대신 서비스명을 보여준다. */}
+          {mapLabel && mapUrl && (
+            <TrustChip href={normalizeUrl(mapUrl)} icon={<PinIcon />}>
+              {mapLabel}
             </TrustChip>
           )}
         </div>
@@ -93,6 +101,23 @@ function InstagramIcon() {
       <rect x="3" y="3" width="18" height="18" rx="5.5" />
       <circle cx="12" cy="12" r="4" />
       <circle cx="17.3" cy="6.7" r="1.1" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
+function PinIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.9"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="h-[15px] w-[15px]"
+    >
+      <path d="M12 21s7-5.6 7-11a7 7 0 1 0-14 0c0 5.4 7 11 7 11Z" />
+      <circle cx="12" cy="10" r="2.6" />
     </svg>
   );
 }

@@ -1,5 +1,6 @@
 import type { Maker } from "@/lib/types";
 import { PhotoSlider } from "@/components/PhotoSlider";
+import { normalizeUrl, mapLinkLabel } from "@/lib/links";
 import { BrandSummaryCard } from "./BrandSummaryCard";
 import { BlockSections } from "./BlockSections";
 
@@ -152,7 +153,22 @@ export function MakerArticle({ maker, isOwner, logoUrl }: {
       {/* 상세 주소 — 참고 수준으로 최하단 배치(추후 지도 연동용) */}
       {maker.trust.address && (
         <Section title="상세 주소">
-          <p className="text-[16px] leading-relaxed text-body">{maker.trust.address}</p>
+          {/* 지도 링크가 있으면 주소 자체를 지도로 연결(찾아가기). 없으면 기존처럼 텍스트. */}
+          {mapLinkLabel(maker.trust.mapUrl) ? (
+            <a
+              href={normalizeUrl(maker.trust.mapUrl!)}
+              target="_blank"
+              rel="noopener noreferrer nofollow"
+              className="inline-flex items-baseline gap-1.5 text-[16px] leading-relaxed text-body underline decoration-hairline underline-offset-4 hover:text-ink hover:decoration-current"
+            >
+              {maker.trust.address}
+              <span className="shrink-0 text-[13px] text-faint print:hidden">
+                {mapLinkLabel(maker.trust.mapUrl)}에서 보기 ↗
+              </span>
+            </a>
+          ) : (
+            <p className="text-[16px] leading-relaxed text-body">{maker.trust.address}</p>
+          )}
         </Section>
       )}
     </>

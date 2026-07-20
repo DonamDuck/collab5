@@ -25,6 +25,9 @@ export interface TrustSignals {
   homepage?: string;
   instagram?: string;
   address?: string;
+  /** 지도 링크(네이버 지도·카카오맵 등). 홈페이지 없는 동네 가게의 사실상 대체 홈페이지 —
+   *  주소·영업시간·전화·사진·후기가 한 번에 딸려온다. trust가 jsonb라 마이그레이션 불필요. */
+  mapUrl?: string;
   description?: string; // 본인 작성(폴리셔 보정)
 }
 

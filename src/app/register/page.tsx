@@ -15,6 +15,7 @@ import type { CollabType, Block, Maker, Enrichment } from "@/lib/types";
 import { deriveRegion } from "@/lib/region";
 import { isRichIntro } from "@/lib/completeness";
 import { uploadPhoto, uploadPdf } from "@/lib/upload";
+import { mapLinkLabel } from "@/lib/links";
 import { ScrollLock } from "@/components/ScrollLock";
 import type { ActivityHint, CollabHint, EnrichField } from "@/lib/enrich";
 import { blendDescriptions, canRegenDesc, noteRegenDesc } from "@/lib/enrichBlend";
@@ -173,6 +174,7 @@ function RegisterForm() {
   const [searchVisible, setSearchVisible] = useState(true); // 검색 노출(기본 on)
   const [instagram, setInstagram] = useState("");
   const [homepage, setHomepage] = useState("");
+  const [mapUrl, setMapUrl] = useState("");
   const [description, setDescription] = useState("");
   const [address, setAddress] = useState("");
   const [photos, setPhotos] = useState<{ url: string; uploading?: boolean }[]>([]);
@@ -630,6 +632,7 @@ function RegisterForm() {
       setInstagram(fill.instagram);
       filled.add("instagram");
     }
+    if (fill.mapUrl !== undefined) setMapUrl(fill.mapUrl);
     if (fill.homepage !== undefined) {
       setHomepage(fill.homepage);
       filled.add("homepage");
@@ -823,6 +826,7 @@ function RegisterForm() {
       );
       setInstagram(m.trust.instagram ?? "");
       setHomepage(m.trust.homepage ?? "");
+      setMapUrl(m.trust.mapUrl ?? "");
       setAddress(m.trust.address ?? "");
       setCollabOpen(m.collabOpen);
       setSearchVisible(m.searchVisible ?? true);
@@ -905,6 +909,7 @@ function RegisterForm() {
         enrichment,
         instagram,
         homepage,
+        mapUrl,
         address,
         description,
       };
@@ -1681,6 +1686,21 @@ function RegisterForm() {
               placeholder="https://"
               className="h-11 w-full rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
             />
+          </Field>
+          {/* 지도 링크 — 홈페이지 없는 가게가 대다수라, 주소·시간·전화·사진이 한 번에 딸려오는
+              지도 링크가 사실상 홈페이지 역할을 한다. 지도 앱 '공유'의 축약 링크를 그대로 붙여넣으면 됨. */}
+          <Field label="지도 링크 (선택)">
+            <input
+              value={mapUrl}
+              onChange={(e) => setMapUrl(e.target.value)}
+              placeholder="네이버 지도·카카오맵 공유 링크"
+              className="h-11 w-full rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
+            />
+            {mapUrl.trim() && !mapLinkLabel(mapUrl) && (
+              <p className="mt-1 text-sm text-mute">
+                네이버 지도·카카오맵·구글 지도 링크만 넣을 수 있어요. 지도 앱의 공유 버튼에서 복사해 주세요.
+              </p>
+            )}
           </Field>
         </div>
 

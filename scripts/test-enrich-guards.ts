@@ -10,9 +10,12 @@ import {
   starterChipsForType,
   sanitizeHttpUrl,
   sniffInstagramFromText,
+  naverMapLink,
+  extractMapLinkFromResearch,
   searchLooksEmpty,
 } from "../src/lib/enrich";
 import { regionMatches, regionConflict } from "../src/lib/regionSynonyms";
+import { mapLinkLabel } from "../src/lib/links";
 
 let pass = 0;
 let fail = 0;
@@ -275,6 +278,32 @@ check(
     `[정체]\n성수동에서 에스프레소를 내리는 작은 카페. 2021년 문을 열었고 로스팅을 직접 한다.\n[제품/특징]\n시그니처는 크림이 올라간 아인슈페너, 원두는 주 2회 자가 로스팅.\n[활동]\n원데이 드립 클래스를 월 1회 운영하고 인근 편집숍과 팝업을 진행했다.\n[고객]\n20~30대 커피 애호가, 성수 나들이객이 주 고객층.`
   )
 );
+
+// 지도 링크 조립 (2026-07-20 — 네이버 좌표 기반, AI 개입 0)
+console.log("[지도 링크]");
+const sw = naverMapLink("<b>상왕제약 홍익점</b>", "1270332970", "375658472");
+check("좌표 → 네이버 지도 링크", !!sw && sw.includes("map.naver.com/p/search/") && sw.includes("127.033297,37.565847"), String(sw));
+check("<b> 태그 제거", !!sw && !sw.includes("%3Cb%3E"));
+check("좌표 없으면 링크 안 만듦", naverMapLink("가게", undefined, undefined) === null);
+check("한국 밖 좌표 차단", naverMapLink("가게", "1390000000", "356000000") === null);
+check("상호 비면 null", naverMapLink("  ", "1270332970", "375658472") === null);
+check(
+  "메모에서 지도 링크 회수",
+  extractMapLinkFromResearch("[지도 교차검증] ✅ 일치\n[지도 링크] https://map.naver.com/p/search/a?c=127.0,37.5,17,0,0,0,dh (⚠️홈페이지 아님)")
+    === "https://map.naver.com/p/search/a?c=127.0,37.5,17,0,0,0,dh"
+);
+check("지도 링크 없으면 undefined", extractMapLinkFromResearch("[정체]\n확인 안 됨") === undefined);
+
+// 지도 링크 화이트리스트 (칩 라벨 = 실제 목적지 보장)
+console.log("[지도 링크 화이트리스트]");
+check("naver.me 축약 → 네이버 지도", mapLinkLabel("https://naver.me/FLyT1nM4") === "네이버 지도");
+check("map.naver.com → 네이버 지도", mapLinkLabel("https://map.naver.com/p/search/x") === "네이버 지도");
+check("kakao 계열 → 카카오맵", mapLinkLabel("https://place.map.kakao.com/123") === "카카오맵" && mapLinkLabel("https://kko.to/abc") === "카카오맵");
+check("구글 지도 단축 → 구글 지도", mapLinkLabel("https://maps.app.goo.gl/abc") === "구글 지도");
+check("프로토콜 없어도 인식", mapLinkLabel("naver.me/FLyT1nM4") === "네이버 지도");
+check("⛔ 사칭 도메인 거부(naver.me.evil.com)", mapLinkLabel("https://naver.me.evil.com/x") === null);
+check("⛔ 무관 링크 거부", mapLinkLabel("https://evil.example.com/pretend-map") === null);
+check("빈값 → null", mapLinkLabel("") === null && mapLinkLabel(undefined) === null);
 
 console.log(`\n결과: ${pass} pass / ${fail} fail`);
 process.exit(fail ? 1 : 0);

@@ -30,6 +30,7 @@ export type WizardFill = {
   address?: string;
   instagram?: string;
   homepage?: string;
+  mapUrl?: string; // 지도 링크 — 크롤이 네이버 좌표로 조립(지역 일치 시에만)
   values?: string[];
   description?: string;
   activityHints?: ActivityHint[]; // 크롤이 발견한 활동 흔적(참고용)
@@ -233,6 +234,7 @@ export function EnrichWizard({
   // 개별 필드(수정 가능)
   const [fName, setFName] = useState("");
   const [fAddress, setFAddress] = useState("");
+  const [fMapUrl, setFMapUrl] = useState("");
   const [fInstagram, setFInstagram] = useState("");
   const [fHomepage, setFHomepage] = useState("");
   // 5지선다: 편집 가능한 후보 리스트 + 선택 인덱스(스텝 오가도 유지)
@@ -409,6 +411,8 @@ export function EnrichWizard({
       setLastGenKey(genKey);
       setFName(o.identity.name || query);
       setFAddress(o.identity.address || "");
+      // 지도 링크 = 코드가 네이버 좌표로 조립한 값(지역 일치 시에만 생성) — 오귀속 위험 없음
+      setFMapUrl(o.identity.mapUrl || "");
       // 링크는 유저가 링크 스텝에서 확정한 것만 — 크롤이 찾았어도 자동첨부 금지(오귀속 방지)
       setFInstagram(igChosen ? igChosen.replace(/^@?/, "@") : "");
       setFHomepage(hpChosen);
@@ -539,6 +543,7 @@ export function EnrichWizard({
       address: fAddress.trim() || undefined,
       instagram: fInstagram.trim() || undefined,
       homepage: fHomepage.trim() || undefined,
+      mapUrl: fMapUrl.trim() || undefined,
       // 결 단어(values)도 이제 추천 선택 대상 — 'values' 항목을 체크했을 때만 폼에 반영.
       values: recommendedValues.length && storyChecked.has("values") ? recommendedValues : undefined,
       activityHints: options?.activityHints?.length ? options.activityHints : undefined,
