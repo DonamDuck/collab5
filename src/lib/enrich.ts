@@ -972,7 +972,7 @@ class NaverGeminiProvider implements SearchProvider {
     const localQuery = region?.trim() ? `${query} ${region.trim()}` : query;
     const [local, web, blog, cafe, collabBlog, popupBlog, workshopBlog] = await Promise.all([
       this.naver("local", localQuery, 5),
-      this.naver("webkr", query, 3),
+      this.naver("webkr", query, 10), // 사장님 원문이 하위 랭크에 묻혀 있음(상왕제약=7위) — 넓게 본다
       this.naver("blog", query, 5),
       this.naver("cafearticle", query, 3),
       this.naver("blog", `${query} 콜라보`, 3),
@@ -991,6 +991,23 @@ class NaverGeminiProvider implements SearchProvider {
       signals = {};
     }
     const sniffedIg = signals.instagram;
+    // 사장님이 직접 쓴 소개 — 네이버 플레이스 [정보] 탭 글이 주문·예약 플랫폼에 그대로 실린 것.
+    // 검색 결과 요약(snippet)에 이미 담겨 오므로 그 사이트를 방문하지 않는다(robots 무관·비용 0).
+    const ownerVoice = [...web, ...local]
+      .map((it) => {
+        let host = "";
+        try {
+          host = new URL(it.link ?? "").hostname;
+        } catch {
+          return null;
+        }
+        if (!isOwnerVoiceHost(host)) return null;
+        const desc = this.clean(it.description);
+        if (desc.replace(/\s/g, "").length < 30) return null; // 운영시간만 있는 껍데기 제외
+        return { host, desc };
+      })
+      .filter((x): x is { host: string; desc: string } => !!x)
+      .slice(0, 3);
     // 웹 텍스트(네이버 지역·웹문서·블로그·카페)에 실제로 적힌 인스타 핸들 — 추측이 아니라 '발견'.
     // 홈페이지가 없는 동네 가게는 이 경로가 유일한 인스타 근거인 경우가 많다(상왕제약 사례).
     const textIg = sniffInstagramFromText(
@@ -1031,6 +1048,14 @@ class NaverGeminiProvider implements SearchProvider {
       parts.push("[브랜드가 직접 쓴 소개 — 홈페이지 메타 · 신뢰도 최상]");
       if (signals.title) parts.push(`· 제목: ${signals.title}`);
       if (signals.desc) parts.push(`· 소개: ${signals.desc}`);
+      parts.push("");
+    }
+    if (ownerVoice.length) {
+      parts.push("[사장님이 직접 쓴 소개 — 신뢰도 최상 · 이 브랜드의 자기 표현]");
+      for (const o of ownerVoice) parts.push(`· ${o.desc} (${o.host})`);
+      parts.push(
+        "→ 브랜드가 스스로 고른 표현·강조점이다. 한 줄 소개·자세히 소개의 중심 재료로 삼고, 여기 나온 구체 사실(원두·시그니처 메뉴·공간 성격 등)을 우선 반영해라."
+      );
       parts.push("");
     }
     if (sniffedIg || homepage) {
@@ -1170,7 +1195,9 @@ class NaverGeminiProvider implements SearchProvider {
     query: string,
     region?: string,
     businessType?: string,
-    anchor?: string
+    anchor?: string,
+    /** 재시도용 — 돌릴 검색전략 라운드들(병렬). 미지정=기본 1라운드. */
+    rounds?: number[]
   ): Promise<string> {
     if (process.env.ENRICH_GEMINI_SEARCH === "0") return "";
     // 네이버 검증 앵커 — '어느 업체인지' 조준용(대표 아이디어 2026-07-15). 내용 받아쓰기 금지로 바이어스 방어.
@@ -1195,7 +1222,8 @@ class NaverGeminiProvider implements SearchProvider {
     // ①검색어 조합 명시 ②소상공인=UGC 인지 ③2차 재시도는 "지역 검색어로 넓게→그 안에서 상호 찾기"로 전환.
     const searchStrategy = (round: number) =>
       round === 1
-        ? `\n검색은 한 조합만 하지 말고 여러 조합을 시도해 — "${query}", "${query} ${region?.trim() ?? ""}", "${query} ${businessType?.trim() ?? ""}" 등. 웹 존재감이 약한 동네 가게일 수 있다 — 공식 출처가 없으면 블로그·카페 후기, 지역 커뮤니티 글, 지도 서비스 등록 정보에서도 유의미한 정보를 적극 발굴해(어디서 봤는지 함께).`
+        ? `\n검색은 한 조합만 하지 말고 여러 조합을 시도해 — "${query}", "${query} ${region?.trim() ?? ""}", "${query} ${businessType?.trim() ?? ""}" 등. 웹 존재감이 약한 동네 가게일 수 있다 — 공식 출처가 없으면 블로그·카페 후기, 지역 커뮤니티 글, 지도 서비스 등록 정보에서도 유의미한 정보를 적극 발굴해(어디서 봤는지 함께).
+⭐SNS·홈페이지는 이름만으로는 안 나온다 — 전용 검색어로도 반드시 따로 찾아봐: "${query} 인스타", "instagram.com ${query}", "${query} 공식", "${query} 홈페이지". 계정·사이트를 찾으면 그 안의 소개·공지 내용도 사실 정리에 활용해.`
         : round === 3
           ? `\n⚠️직전 조사가 빈손이었다. 이번엔 SNS·소셜 중심으로 찾아라: ①"${query} 인스타", "${query} instagram", "instagram.com ${query}" ②"${query} 소식/공지/예약" 같은 운영 계정 글 ③해시태그(#${query.replace(/\s/g, "")})가 붙은 후기 글. 계정을 찾으면 그 계정이 올린 내용(제품·클래스·공지)에서 사실을 정리해. 계정을 못 찾으면 지어내지 말고 "확인 안 됨"으로.`
           : `\n⚠️직전 조사에서 검색 근거를 못 찾았다. 검색 전략을 바꿔라: ①지역 기반 일반 검색어("${region?.trim() ?? ""} ${businessType?.trim() ?? ""}", "${region?.trim() ?? ""} ${businessType?.trim() ?? ""} 후기/맛집")로 넓게 검색한 뒤 그 결과 안에서 '${query}'를 찾아라 ②상호의 띄어쓰기를 바꿔서도 검색해봐 ③영업시간·메뉴·주차 같은 방문 정보 중심 검색도 시도. 그래도 못 찾으면 지어내지 말고 "확인 안 됨"으로.`;
@@ -1219,40 +1247,25 @@ class NaverGeminiProvider implements SearchProvider {
     // 플랜B 병렬 병합(대표 확정 2026-07-19): lite N콜을 병렬로(대기시간 = 1콜) —
     // 각 콜이 독립 grounding 주사위. 마지막 1콜은 검색전략 변형(promptFor(2))으로 다양성 확보.
     // 접지 성공분만 합쳐 메모로. 전멸 시 flash 1회 안전망(promptFor(2)). 비접지 = 검색 과금 0.
-    const runs = Math.max(1, Math.min(4, Number(process.env.ENRICH_SEARCH_RUNS) || 1));
+    // 돌릴 검색전략 라운드 — 기본은 1라운드 1콜. 재시도(rounds=[2,3])는 research()가 칩 수를 보고 지시한다.
+    //   ⭐안전망(비접지 시 재검색)은 은퇴(2026-07-20 대표 설계): 비접지 결과는 폐기되므로 네이버 칩만 남고,
+    //     그러면 칩<10이 되어 재시도가 자동으로 걸린다 — 안전망이 하던 일을 재시도가 더 잘한다(전략 2종).
+    const plan = rounds?.length ? rounds : [1];
     const attempts = await Promise.all(
-      Array.from({ length: runs }, (_, i) =>
+      plan.map((r, i) =>
         this.searchAttempt(
           NaverGeminiProvider.SEARCH_PRIMARY,
-          promptFor(runs > 1 && i === runs - 1 ? 2 : 1),
-          `병렬${i + 1}/${runs}`
+          promptFor(r),
+          `라운드${r}${plan.length > 1 ? `(${i + 1}/${plan.length})` : ""}`
         )
       )
     );
-    let grounded = attempts.filter((t) => t);
-    if (!grounded.length) {
-      console.warn("[enrich] lite 병렬 전멸 → flash 안전망 1회");
-      const rescue = await this.searchAttempt(NaverGeminiProvider.SEARCH_RESCUE, promptFor(2), "안전망");
-      if (rescue) grounded = [rescue];
-    }
-    // ⭐빈손 재시도(2026-07-20 대표 지시) — 접지는 됐는데 알맹이가 없는 경우(대부분 "확인 안 됨")는
-    //   위 안전망이 안 걸린다. 대표가 손으로 한 번 더 돌리던 걸 코드가 대신: 전략 다른 2콜을 병렬로
-    //   더 굴려 합친다(대기시간 = 1콜). 잘 나온 케이스는 그대로 1콜 — 빈손일 때만 과금.
-    let retried = 0;
-    if (grounded.length && searchLooksEmpty(grounded.join("\n"))) {
-      const extra = await Promise.all([
-        this.searchAttempt(NaverGeminiProvider.SEARCH_RESCUE, promptFor(2), "빈손재시도-지역"),
-        this.searchAttempt(NaverGeminiProvider.SEARCH_RESCUE, promptFor(3), "빈손재시도-SNS"),
-      ]);
-      const gains = extra.filter((t) => t && !searchLooksEmpty(t));
-      retried = extra.filter(Boolean).length;
-      if (gains.length) grounded = [...grounded, ...gains];
-    }
-    console.log("[enrich] search-merge", JSON.stringify({ runs, grounded: grounded.length, retried }));
+    const grounded = attempts.filter((t) => t);
+    console.log("[enrich] search", JSON.stringify({ plan, grounded: grounded.length }));
     if (!grounded.length) return "";
     if (grounded.length === 1) return grounded[0];
     return grounded
-      .map((g, i) => `《병렬 조사 ${i + 1} — 같은 업체를 독립 조사한 결과. 겹치는 내용 = 상호 보강 근거》\n${g}`)
+      .map((g, i) => `《독립 조사 ${i + 1} — 같은 업체를 다른 검색전략으로 조사한 결과. 겹치는 내용 = 상호 보강 근거》\n${g}`)
       .join("\n\n");
   }
 
@@ -1371,7 +1384,26 @@ class NaverGeminiProvider implements SearchProvider {
     const naver = await this.gather(name, region);
     const anchor = extractNaverAnchor(naver);
     const gemini = await this.geminiSearch(name, region, businessType, anchor ?? undefined);
-    return this.combineResearch(naver, gemini);
+    let combined = this.combineResearch(naver, gemini);
+
+    // ⭐재시도 정책(대표 확정 2026-07-20) — 유저가 실제로 보는 것은 '칩 개수'다. 검색이 접지됐는지·
+    //   메모가 길었는지가 아니라 칩이 부족하면 한 번 더 판다. 전략 다른 2콜을 병렬로(대기시간 = 1콜).
+    //   ⛔딱 1회만 — 재시도 후에도 부족하면 그대로 간다(재귀 없음). 최대 검색 2콜 + 생성 1콜.
+    const chips = extractChipsFromResearch(combined, name, businessType);
+    if (chips.length < CHIP_TARGET) {
+      const more = await this.geminiSearch(name, region, businessType, anchor ?? undefined, [2, 3]);
+      if (more) {
+        const merged = this.combineResearch(naver, [gemini, more].filter(Boolean).join("\n\n"));
+        const after = extractChipsFromResearch(merged, name, businessType);
+        console.log(
+          "[enrich] chip-retry",
+          JSON.stringify({ before: chips.length, after: after.length, target: CHIP_TARGET })
+        );
+        // 재시도가 손해를 보진 않게 — 칩이 줄면(노이즈로 가족통합이 꼬인 경우) 원본 유지.
+        if (after.length >= chips.length) combined = merged;
+      }
+    }
+    return combined;
   }
 
   // EnrichOptions 정규화(빈 문자열 → undefined, 후보 5개/결 4개 제한)
@@ -1794,6 +1826,13 @@ export function extractChipsFromResearch(
     .exec(naverPart)?.[1]
     ?.replace(/[.…]+\s*$/, "") // 메타 잘림 말줄임(…/..) 제거
     .trim();
+  // 사장님이 직접 쓴 소개(주문·예약 플랫폼에 실린 네이버 플레이스 소개문)도 같은 급의 칩 소스.
+  // 홈페이지가 없는 동네 가게는 이게 유일한 '자기 표현' 원천이다(대표 발견 2026-07-20).
+  const ownerVoiceDesc = /\[사장님이 직접 쓴 소개[^\]]*\]\s*\n·\s*(.+)$/m
+    .exec(naverPart)?.[1]
+    ?.replace(/\s*\([^)]*\)\s*$/, "") // 꼬리의 출처 호스트 제거
+    .replace(/[.…]+\s*$/, "")
+    .trim();
   const parts = body.split(/\n?\s*\[([^\]\n]+)\]\s*/); // [pre, header, body, header, body, ...]
   const chips: KeywordChip[] = [];
   const STOPWORDS = /^(또한|그리고|하지만|특히|및|기타|등|다만|그러나|이\s*외|그\s*외)$/;
@@ -1934,12 +1973,13 @@ export function extractChipsFromResearch(
 
   // 홈페이지 메타 소개(신뢰도 최상) → 칩. 통짜가 짧으면 그대로, 길면 조각 분리.
   // 제미나이·네이버 칩과는 push의 포함관계 통일로 자동 중복 정리. 맨 앞에 두어 우선 노출.
-  if (metaDesc) {
+  const selfDesc = metaDesc || ownerVoiceDesc;
+  if (selfDesc) {
     const metaSec = { label: "우리 소개(홈페이지)", factual: false };
     const before = chips.length;
-    if (metaDesc.length <= 28) push(metaDesc, metaSec);
+    if (selfDesc.length <= 28) push(selfDesc, metaSec);
     else
-      for (const frag of metaDesc.split(/[,，;·、]|\s+(?:그리고|및)\s+/)) {
+      for (const frag of selfDesc.split(/[,，;·、]|\s+(?:그리고|및)\s+/)) {
         const f = frag.replace(/\.{2,}$|…$/g, "").trim();
         if (push(f, metaSec)) {
           if (chips.length - before >= 4) break;
@@ -2159,6 +2199,16 @@ export function detectRegionMismatch(research: string, region?: string): string 
   return [...found].slice(0, 2).join("·");
 }
 
+/** 사장님이 직접 쓴 소개가 그대로 실리는 플랫폼 — 주문·예약·클래스 중개나 본인 채널.
+ *  네이버 플레이스 [정보] 탭 소개문이 여기로 신디케이션되는 경우가 많다(상왕제약=패스오더에서 원문 확인).
+ *  ⚠️디렉토리(114·머니핀 등 자동생성 요약)와 반대 성격 — 그쪽은 isDirectoryHost가 이미 거른다. */
+const OWNER_VOICE_HOSTS =
+  /(^|\.)(passorder\.co\.kr|obud\.co|daangn\.com|pf\.kakao\.com|tabling\.co\.kr|catchtable\.co\.kr|naver\.me|smartstore\.naver\.com|litt\.ly|linktr\.ee)$/i;
+
+export function isOwnerVoiceHost(host: string): boolean {
+  return OWNER_VOICE_HOSTS.test(host.replace(/^www\./i, ""));
+}
+
 /** 조사 메모에서 코드가 심어둔 지도 링크를 회수. 모델이 만든 값이 아니라 우리가 넣은 값이라 안전. */
 export function extractMapLinkFromResearch(research: string): string | undefined {
   const m = research.match(/\[지도 링크\]\s*(https:\/\/map\.naver\.com\/\S+)/);
@@ -2215,6 +2265,10 @@ export function searchLooksEmpty(text: string): boolean {
   // 소제목 3~4개에 한 문장씩만 있어도 120자는 넘는다(그 아래면 쓸 만한 알맹이가 없다는 뜻).
   return unknown >= 6 || body.length < 120;
 }
+
+/** 재시도 발동 기준 — 1차 조사 칩이 이 개수 미만이면 검색 2콜을 더 돌린다(대표 정책 2026-07-20).
+ *  낮출수록 콜 수·비용이 준다(10 → 7 등). 씨딩 단계라 품질 우선으로 10에서 시작. */
+export const CHIP_TARGET = 10;
 
 export function researchTier(research: string, chipCount: number): "rich" | "thin" {
   if (!research) return "thin";
