@@ -175,6 +175,7 @@ function RegisterForm() {
   const [instagram, setInstagram] = useState("");
   const [homepage, setHomepage] = useState("");
   const [mapUrl, setMapUrl] = useState("");
+  const [mapUrlEditing, setMapUrlEditing] = useState(false);
   const [description, setDescription] = useState("");
   const [address, setAddress] = useState("");
   const [photos, setPhotos] = useState<{ url: string; uploading?: boolean }[]>([]);
@@ -1690,12 +1691,36 @@ function RegisterForm() {
           {/* 지도 링크 — 홈페이지 없는 가게가 대다수라, 주소·시간·전화·사진이 한 번에 딸려오는
               지도 링크가 사실상 홈페이지 역할을 한다. 지도 앱 '공유'의 축약 링크를 그대로 붙여넣으면 됨. */}
           <Field label="지도 링크 (선택)">
-            <input
-              value={mapUrl}
-              onChange={(e) => setMapUrl(e.target.value)}
-              placeholder="네이버 지도·카카오맵 공유 링크"
-              className="h-11 w-full rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
-            />
+            {/* 지도 URL은 좌표·한글이 퍼센트 인코딩돼 흉물스럽다 — 확인되면 서비스명만 보여주고
+                원문은 [변경]을 눌렀을 때만 편집. 잘못 넣은 값은 그대로 입력창에 남겨 고치게 한다. */}
+            {mapLinkLabel(mapUrl) && !mapUrlEditing ? (
+              <div className="flex h-11 items-center gap-2 rounded-sm border border-hairline bg-surface px-3">
+                <span className="text-base text-ink">📍 {mapLinkLabel(mapUrl)}</span>
+                <a
+                  href={mapUrl}
+                  target="_blank"
+                  rel="noopener noreferrer nofollow"
+                  className="text-sm text-primary-on underline underline-offset-2"
+                >
+                  열어보기 ↗
+                </a>
+                <button
+                  type="button"
+                  onClick={() => setMapUrlEditing(true)}
+                  className="ml-auto text-sm text-mute hover:text-ink"
+                >
+                  변경
+                </button>
+              </div>
+            ) : (
+              <input
+                value={mapUrl}
+                onChange={(e) => setMapUrl(e.target.value)}
+                onBlur={() => mapLinkLabel(mapUrl) && setMapUrlEditing(false)}
+                placeholder="네이버 지도·카카오맵 공유 링크"
+                className="h-11 w-full rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
+              />
+            )}
             {mapUrl.trim() && !mapLinkLabel(mapUrl) && (
               <p className="mt-1 text-sm text-mute">
                 네이버 지도·카카오맵·구글 지도 링크만 넣을 수 있어요. 지도 앱의 공유 버튼에서 복사해 주세요.

@@ -86,6 +86,7 @@ type LinkFinds = {
   instagramCandidates?: string[];
   homepage?: string;
   homepageCandidates?: string[];
+  mapUrl?: string; // 코드가 네이버 좌표로 조립한 지도 링크(지역 일치 시에만)
 };
 // 링크 선택 상태 — sel=고른 후보, customOn=직접입력 활성, customText=직접입력 값, none=운영 안 함
 type LinkPick = { sel: string | null; customOn: boolean; customText: string; none: boolean };
@@ -872,6 +873,24 @@ export function EnrichWizard({
                 pick={hpPick}
                 onPick={setHpPick}
               />
+              {/* 지도 링크 — 좌표로 조립·지역검증까지 끝난 값이라 물어볼 게 없다. 확인만 시켜주고
+                  URL 원문(퍼센트 인코딩) 대신 서비스명으로 보여준다. 틀렸으면 폼에서 지우면 됨. */}
+              {links.mapUrl && (
+                <div className="rounded-lg border border-hairline bg-surface-soft px-3.5 py-3">
+                  <p className="text-[13px] text-mute">지도 · 웹에서 확인했어요</p>
+                  <div className="mt-1 flex items-center gap-2">
+                    <span className="text-[15px] font-medium text-ink">📍 네이버 지도</span>
+                    <a
+                      href={links.mapUrl}
+                      target="_blank"
+                      rel="noopener noreferrer nofollow"
+                      className="text-[13px] text-primary-on underline underline-offset-2"
+                    >
+                      열어보기 ↗
+                    </a>
+                  </div>
+                </div>
+              )}
             </div>
             <button
               onClick={generate}
