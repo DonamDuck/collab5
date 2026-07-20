@@ -396,5 +396,16 @@ const enrichSrc = readFileSync(join(__dirname, "../src/lib/enrich.ts"), "utf8");
 check("보이스 헌법에 맞춤법·띄어쓰기 조항 존재", /맞춤법·띄어쓰기 \(출력 전 반드시 자기 점검\)/.test(enrichSrc));
 check("의존명사 띄어쓰기 예시 포함", /할수\(X\)→할 수/.test(enrichSrc));
 
+// press 매체명 창작 금지 (대표 QA 2026-07-20 — 성동매거진 사례)
+// 배경: 지류 지역신문(성동매거진)은 실재하나 웹 색인이 없어 url이 비는 게 정상.
+//       링크 없는 press 항목은 계속 허용하고, '매체명 창작'만 프롬프트로 차단한다.
+console.log("[press 매체명 정책]");
+const es = readFileSync(join(__dirname, "../src/lib/enrich.ts"), "utf8");
+check("매체명 글자 그대로 옮기라는 지시 존재", /label\(매체명\)은 조사 자료의 표기를 글자 그대로/.test(es));
+check("그럴싸한 이름 창작 금지 명시", /그럴싸한 이름을 지어내지 마라/.test(es));
+check("모르면 항목 자체를 빼라", /매체명을 정확히 모르면 그 항목 자체를 빼라/.test(es));
+check("⭐지류신문=url 없어도 정상(항목 유지) 정책 명시", /지류신문·사보처럼 웹 링크가 없는 매체도 많다/.test(es));
+check("스키마 label에도 창작 금지", /비슷하게 바꾸거나 그럴싸한 이름을 만들지 마라/.test(es));
+
 console.log(`\n결과: ${pass} pass / ${fail} fail`);
 process.exit(fail ? 1 : 0);
