@@ -1,23 +1,27 @@
 // 신뢰 시그널(인스타·홈피) 링크/표시 유틸 — 카드·프로필 공용.
 
+/** 인스타 입력값 → 순수 핸들. @·URL·경로 순서에 무관하게 정규화.
+ *  폼이 @를 고정 접두어로 붙이므로 프로필 URL을 붙여넣으면 "@https://instagram.com/handle"
+ *  형태로 저장됨 → 선행 @를 먼저 걷어내야 URL 접두어 제거가 먹는다(안 그러면 링크가 깨짐). */
+export function instagramSlug(input: string): string {
+  return input
+    .trim()
+    .replace(/^@+/, "")
+    .replace(/^https?:\/\//i, "")
+    .replace(/^(www\.)?instagram\.com\//i, "")
+    .replace(/^@+/, "")
+    .split(/[/?#]/)[0]
+    .trim();
+}
+
 /** 인스타 핸들 → 실제 프로필 URL. 이미 URL이면 정규화. */
 export function instagramUrl(handle: string): string {
-  const h = handle
-    .trim()
-    .replace(/^https?:\/\/(www\.)?instagram\.com\//i, "")
-    .replace(/^@/, "")
-    .replace(/\/+$/, "");
-  return `https://instagram.com/${h}`;
+  return `https://instagram.com/${instagramSlug(handle)}`;
 }
 
 /** 인스타 표시용 @핸들 */
 export function instagramHandle(handle: string): string {
-  const h = handle
-    .trim()
-    .replace(/^https?:\/\/(www\.)?instagram\.com\//i, "")
-    .replace(/^@/, "")
-    .replace(/\/+$/, "");
-  return `@${h}`;
+  return `@${instagramSlug(handle)}`;
 }
 
 /** 홈페이지 href — 프로토콜 없으면 https 붙임 */

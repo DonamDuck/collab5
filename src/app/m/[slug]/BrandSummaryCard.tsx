@@ -9,10 +9,12 @@ export function BrandSummaryCard({
   maker,
   isOwner,
   logoUrl,
+  readOnly,
 }: {
   maker: Maker;
   isOwner: boolean;
   logoUrl?: string;
+  readOnly?: boolean; // /preview 데모용 — 남의 예시라 수정 진입점 자체를 숨긴다
 }) {
   const { instagram, homepage, mapUrl } = maker.trust;
   // 지도 링크 — 홈페이지 없는 동네 가게엔 이게 사실상 홈페이지 역할(주소·시간·전화·사진·후기).
@@ -36,9 +38,11 @@ export function BrandSummaryCard({
             )}
           </div>
         </div>
-        <div className="shrink-0">
-          <EditButton slug={maker.slug} isOwner={isOwner} hasPassword={!!maker.editPasswordHash} />
-        </div>
+        {!readOnly && (
+          <div className="shrink-0">
+            <EditButton slug={maker.slug} isOwner={isOwner} hasPassword={!!maker.editPasswordHash} />
+          </div>
+        )}
       </div>
 
       {/* 소개·지역 — 카드 전체 폭(로고 옆 좁은 컬럼 문제 해소) */}
@@ -87,10 +91,11 @@ function TrustChip({
       href={href}
       target="_blank"
       rel="noopener noreferrer nofollow"
-      className="inline-flex items-center gap-1 rounded-pill bg-primary-pale py-1.5 pl-2.5 pr-3.5 text-[13px] font-medium text-primary-on transition-colors hover:bg-primary-tint"
+      className="inline-flex max-w-full items-center gap-1 rounded-pill bg-primary-pale py-1.5 pl-2.5 pr-3.5 text-[13px] font-medium text-primary-on transition-colors hover:bg-primary-tint"
     >
       <span className="shrink-0 text-primary-on">{icon}</span>
-      {children}
+      {/* 긴 홈페이지 URL이 카드 밖으로 흘러넘치지 않도록 텍스트만 말줄임 */}
+      <span className="min-w-0 truncate">{children}</span>
     </a>
   );
 }

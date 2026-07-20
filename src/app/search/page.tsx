@@ -151,14 +151,15 @@ export default function SearchPage() {
                   )}
                 </div>
                 <div className="px-4 py-3">
-                  <div className="flex items-center gap-2">
-                    <span className="text-base font-medium text-ink">{m.name}</span>
+                  <div className="flex min-w-0 items-center gap-2">
+                    {/* 공백 없는 긴 상호가 카드(overflow-hidden)에 잘려버리지 않고 말줄임되도록 */}
+                    <span className="min-w-0 truncate text-base font-medium text-ink">{m.name}</span>
                     {m.collabOpen && (
-                      <span className="inline-flex h-5 items-center rounded-sm bg-primary-pale px-1.5 text-[11px] font-medium text-primary-on">
+                      <span className="shrink-0 inline-flex h-5 items-center rounded-sm bg-primary-pale px-1.5 text-[11px] font-medium text-primary-on">
                         콜라보 받는 중
                       </span>
                     )}
-                    {m.region && <span className="text-xs text-mute">· {m.region}</span>}
+                    {m.region && <span className="shrink-0 text-xs text-mute">· {m.region}</span>}
                   </div>
                   {m.oneLiner && (
                     <p className="mt-0.5 line-clamp-1 text-sm text-body">{m.oneLiner}</p>

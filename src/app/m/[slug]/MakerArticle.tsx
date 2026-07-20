@@ -5,13 +5,14 @@ import { BrandSummaryCard } from "./BrandSummaryCard";
 import { BlockSections } from "./BlockSections";
 
 // 소개서 본문 — /m 상세와 /preview 데모가 공유하는 단일 렌더.
-export function MakerArticle({ maker, isOwner, logoUrl }: {
+export function MakerArticle({ maker, isOwner, logoUrl, readOnly }: {
   maker: Maker; isOwner: boolean; logoUrl?: string;
+  readOnly?: boolean; // /preview 데모용 — 남의 예시라 수정 진입점 자체를 숨긴다
 }) {
   return (
     <>
       {/* ── 상단 요약 카드 — 로고+정체성 + 신뢰정보 박스 ── */}
-      <BrandSummaryCard maker={maker} isOwner={isOwner} logoUrl={logoUrl} />
+      <BrandSummaryCard maker={maker} isOwner={isOwner} logoUrl={logoUrl} readOnly={readOnly} />
 
       {/* 브랜드 사진 — 스와이프 슬라이드 */}
       {maker.photos.length > 0 && (

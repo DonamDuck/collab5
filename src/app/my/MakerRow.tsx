@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { deleteMakerAction, updateMakerFlagsAction } from "@/lib/actions";
 import { isDemoSlug } from "@/lib/demo";
+import { ScrollLock } from "@/components/ScrollLock";
 
 // /my 소개서 행 — 카드 클릭 시 소개서로 이동, 수정·삭제 + 검색노출·콜라보 토글(즉시 저장).
 export function MakerRow({
@@ -79,6 +80,7 @@ export function MakerRow({
 
       {confirming && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4">
+          <ScrollLock />
           <div className="w-full max-w-sm rounded-lg border border-hairline bg-surface p-6 text-center shadow-e2">
             <p className="text-lg font-bold text-ink">소개서를 삭제할까요?</p>
             <p className="mt-2 text-[15px] leading-relaxed text-body">
