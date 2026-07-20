@@ -433,7 +433,7 @@ check("조각 단위 방어: 연결어미 종결 칩 배제", !extractChipsFromR
 console.log("[이용 섹션 · 소개 6개]");
 const src2 = readFileSync(join(__dirname, "../src/lib/enrich.ts"), "utf8");
 const wz2 = readFileSync(join(__dirname, "../src/app/register/EnrichWizard.tsx"), "utf8");
-check("조사 소제목에 [이용] 추가", /\[이용\] 그 공간을 쓰는 방식/.test(src2));
+check("조사 소제목에 [이용/편의시설] 추가", /\[이용\/편의시설\] 그 공간을 쓰는 방식/.test(src2));
 check("브랜드 성격 드러나는 것만 제약", /브랜드 성격이 드러나는 것만/.test(src2));
 check("⛔ 가격·전화·영업시간 제외 명시(어제 정책 유지)", /가격·전화·영업시간은 여기 쓰지 마라/.test(src2));
 check("⛔ 와이파이·정수기류 제외", /와이파이·정수기·화장실처럼/.test(src2));
@@ -445,6 +445,37 @@ check("이용 칩 생성됨", 이용Chips.some((c) => c.section === "이용" && 
 check("normalizeOptions 캡 6", /descriptions: \(o\.descriptions \?\? \[\]\)\.filter\(Boolean\)\.slice\(0, 6\)/.test(src2));
 check("스키마·프롬프트에 5개 잔존 없음", !/'브랜드 소개' 후보 5개|descriptions 5개|브랜드 소개 후보 5개/.test(src2));
 check("6번째 = 사실 정리형 정의 존재", /6번째 = '사실 정리형'/.test(src2));
+
+// 제품·서비스 / 특장점 분리 + 주소 파편 차단 + 칩 뷰 한 판 (대표 확정 2026-07-20)
+console.log("[특장점 분리 · 주소 파편 · 한 판 뷰]");
+const src3 = readFileSync(join(__dirname, "../src/lib/enrich.ts"), "utf8");
+const wz3 = readFileSync(join(__dirname, "../src/app/register/EnrichWizard.tsx"), "utf8");
+check("[제품·서비스]로 분리", /\[제품·서비스\] 주력 제품·서비스의 이름·종류/.test(src3));
+check("[특장점] 신설(차이만 적기)", /\[특장점\] ⭐다른 곳과 무엇이 다른가/.test(src3));
+check("업종별 예시 포함(요가원·송금·카페)", /요가원이면 프로그램\(하타·빈야사·테라피\)/.test(src3));
+check("CHIP_SECTIONS에 특장점", /특장점: \{ label: "특장점"/.test(src3));
+check("구버전 메모 호환 유지([제품\/특징])", /"제품\/특징": \{ label: "제품"/.test(src3));
+
+// 센트비 실사례 — 주소 파편은 전멸, 특장점만 생존
+const sentbe = extractChipsFromResearch(`[출처 2 · 제미나이]
+[공간]
+서울 법인(본사): 서울시 영등포구 여의대로 70
+원센트럴 8F
+10-01
+UIC Building
+해외 법인(싱가포르): 5 Shenton Way
+1F
+[특장점]
+은행 대비 낮은 수수료
+싱가포르 MAS 라이선스 보유`, "센트비", "핀테크").map((c) => c.text);
+check("주소 파편 전멸(10-01·1F·UIC Building·8F)", !sentbe.some((t) => /10-01|^1F$|UIC Building|8F|여의대로|Shenton/.test(t)), JSON.stringify(sentbe));
+check("특장점 칩은 생존", sentbe.includes("은행 대비 낮은 수수료") && sentbe.includes("싱가포르 MAS 라이선스 보유"));
+check("일반 주소 표기도 차단", !extractChipsFromResearch("[출처 2 · 제미나이]\n[공간]\n경상남도 김해시 분성로 332", "가게").length);
+
+// 뷰 한 판 — 섹션 라벨 헤더가 칩 목록에서 사라졌는가(순서 소스로는 계속 사용)
+check("칩 화면에서 섹션 라벨 헤더 제거", !/mb-1\.5 text-\[13px\] font-medium text-faint">\{SECTION_LABELS/.test(wz3));
+check("SECTION_ORDER는 순서 소스로 유지", /SECTION_ORDER\.filter\(\(s\) => allChips\.some/.test(wz3));
+check("SECTION_ORDER에 특장점 반영", /"제품", "특장점"/.test(wz3));
 
 console.log(`\n결과: ${pass} pass / ${fail} fail`);
 process.exit(fail ? 1 : 0);

@@ -62,7 +62,7 @@ type Kind =
 // 칩 섹션 표시 순서 + 사람이 읽는 라벨
 // ⚠️ enrich.ts가 만드는 칩 section과 반드시 동기화 — 여기 없는 섹션의 칩은 조용히 안 그려진다
 //    (홈페이지 메타 칩 "우리 소개(홈페이지)"가 누락돼 있던 사건 2026-07-19).
-const SECTION_ORDER = ["우리 소개(홈페이지)", "지도확인", "키워드", "정체", "제품", "활동", "콜라보", "원하는협업", "고객", "숫자", "알려짐", "공간", "이용", "추천", "직접"];
+const SECTION_ORDER = ["우리 소개(홈페이지)", "지도확인", "키워드", "정체", "제품", "특장점", "활동", "콜라보", "원하는협업", "고객", "숫자", "알려짐", "공간", "이용", "추천", "직접"];
 const SECTION_LABELS: Record<string, string> = {
   "우리 소개(홈페이지)": "홈페이지에 적힌 소개",
   지도확인: "지도에서 확인했어요",
@@ -697,38 +697,37 @@ export function EnrichWizard({
               <span className="text-[13px] text-faint">{selected.length}개 선택</span>
             </div>
 
-            <div className="mt-2 max-h-[42vh] space-y-3 overflow-y-auto slim-scrollbar pr-0.5">
+            <div className="mt-2 max-h-[46vh] overflow-y-auto slim-scrollbar pr-0.5">
               {/* 안전망: SECTION_ORDER에 없는 섹션도 뒤에 그린다 — 서버가 새 섹션을 추가해도 칩이 조용히 사라지지 않게 */}
-              {[
-                ...SECTION_ORDER.filter((s) => allChips.some((c) => c.section === s)),
-                ...[...new Set(allChips.map((c) => c.section))].filter((s) => !SECTION_ORDER.includes(s)),
-              ].map((s) => (
-                <div key={s}>
-                  <p className="mb-1.5 text-[13px] font-medium text-faint">{SECTION_LABELS[s] ?? s}</p>
-                  <div className="flex flex-wrap gap-2">
-                    {allChips
-                      .filter((c) => c.section === s)
-                      .map((c) => {
-                        const on = selected.includes(c.text);
-                        return (
-                          <button
-                            key={c.text}
-                            type="button"
-                            onClick={() => toggleChip(c.text)}
-                            className={`inline-flex min-h-9 items-center rounded-pill border px-3.5 py-1.5 text-left text-sm leading-snug transition-colors ${
-                              on
-                                ? "border-primary bg-primary-tint text-primary-on"
-                                : "border-hairline bg-surface text-body"
-                            }`}
-                          >
-                            {c.text}
-                            {on ? " ✓" : ""}
-                          </button>
-                        );
-                      })}
-                  </div>
-                </div>
-              ))}
+              {/* ⭐한 판 통합(대표 확정 07-20) — 섹션 라벨을 붙였더니 정보가 왜곡됐다:
+                  캔버스가든 '생분해 안감'은 *쓰는* 소재인데 "만드는 것"으로, 요가원 '하타'도
+                  "만드는 것"으로 뜨니 고객이 사실이 아니라고 느껴 안 누름. 라벨을 떼면
+                  '우리 브랜드를 설명하는 말인가'만 판단하면 되고, 그게 우리가 원하는 판단이다.
+                  ⚠️섹션 정보는 버리는 게 아니라 화면에서만 감춤 — enrichment 스냅샷엔 그대로 저장돼
+                  나중에 매칭·검색 자산으로 쓰인다. 순서는 SECTION_ORDER를 그대로 따라 중요한 게 위로. */}
+              <div className="flex flex-wrap gap-2">
+                {[
+                  ...SECTION_ORDER.filter((s) => allChips.some((c) => c.section === s)),
+                  ...[...new Set(allChips.map((c) => c.section))].filter((s) => !SECTION_ORDER.includes(s)),
+                ].flatMap((s) => allChips.filter((c) => c.section === s)).map((c) => {
+                  const on = selected.includes(c.text);
+                  return (
+                    <button
+                      key={c.text}
+                      type="button"
+                      onClick={() => toggleChip(c.text)}
+                      className={`inline-flex min-h-9 items-center rounded-pill border px-3.5 py-1.5 text-left text-sm leading-snug transition-colors ${
+                        on
+                          ? "border-primary bg-primary-tint text-primary-on"
+                          : "border-hairline bg-surface text-body"
+                      }`}
+                    >
+                      {c.text}
+                      {on ? " ✓" : ""}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
             {/* 직접 추가 — 크롤 구멍 메움 + 문장으로 쓰고 싶은 사람의 출구 */}
