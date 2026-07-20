@@ -12,6 +12,7 @@ import {
   sniffInstagramFromText,
   naverMapLink,
   stripDecorativeQuotes,
+  tidyTypography,
   extractMapLinkFromResearch,
   searchLooksEmpty,
   isOwnerVoiceHost,
@@ -378,6 +379,22 @@ check("따옴표 1개는 보존(실제 인용일 수 있음)", stripDecorativeQu
 check("긴 인용(15자 초과)은 개수에서 제외 → 보존", stripDecorativeQuotes('사장님은 "오래 남을 것을 만들고 싶었다고 말합니다"고 했어요.').includes('"'));
 check("따옴표 없으면 그대로", stripDecorativeQuotes("담백한 문장이에요.") === "담백한 문장이에요.");
 check("빈 값 안전", stripDecorativeQuotes("") === "");
+
+// 기계적 교정 (대표 지시 2026-07-20 — 맞춤법·띄어쓰기 기본 점검)
+console.log("[기계적 교정]");
+check("중복 공백 → 한 칸", tidyTypography("저희는  성수동에서   굽고 있어요.") === "저희는 성수동에서 굽고 있어요.");
+check("마침표 앞 공백 제거", tidyTypography("굽고 있어요 .") === "굽고 있어요.");
+check("문장부호 뒤 공백 보정", tidyTypography("굽고 있어요.매주 목요일에 열어요.") === "굽고 있어요. 매주 목요일에 열어요.");
+check("괄호 안쪽 공백 정리", tidyTypography("원두( 라바짜 )를 씁니다.") === "원두(라바짜)를 씁니다.");
+check("정상 문장은 안 건드림", tidyTypography("매주 목요일, 그 주의 곡물로 굽습니다.") === "매주 목요일, 그 주의 곡물로 굽습니다.");
+check("소수점·숫자 보존", tidyTypography("문은 8.5시간 열려 있어요.") === "문은 8.5시간 열려 있어요.");
+check("빈 값 안전", tidyTypography("") === "");
+check("⛔ 도메인 안 깨짐(canvasgarden.shop)", tidyTypography("홈페이지는 canvasgarden.shop 이에요.") === "홈페이지는 canvasgarden.shop 이에요.");
+check("⛔ URL 안 깨짐", tidyTypography("https://map.naver.com/p/search/x 를 보세요.") === "https://map.naver.com/p/search/x 를 보세요.");
+// 맞춤법 조항이 보이스 헌법(모든 생성 경로 공유)에 실렸는지
+const enrichSrc = readFileSync(join(__dirname, "../src/lib/enrich.ts"), "utf8");
+check("보이스 헌법에 맞춤법·띄어쓰기 조항 존재", /맞춤법·띄어쓰기 \(출력 전 반드시 자기 점검\)/.test(enrichSrc));
+check("의존명사 띄어쓰기 예시 포함", /할수\(X\)→할 수/.test(enrichSrc));
 
 console.log(`\n결과: ${pass} pass / ${fail} fail`);
 process.exit(fail ? 1 : 0);
