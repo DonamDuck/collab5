@@ -39,6 +39,34 @@ export function prettyUrl(url: string): string {
     .replace(/\/+$/, "");
 }
 
+/** 대표 URL 표시 라벨 — 홈페이지가 없는 소상공인은 카톡 채널·링크트리 하나만 걸어두는 경우가
+ *  많다(대표 확정 2026-07-20). URL 원문 대신 알아볼 수 있는 서비스명으로 보여준다.
+ *  ⚠️여기 없는 도메인은 null → 호출부가 prettyUrl(도메인)로 폴백(진짜 홈페이지는 도메인이 더 정확). */
+const CHANNEL_HOSTS: [RegExp, string][] = [
+  [/^pf\.kakao\.com$/i, "카카오톡 채널"],
+  [/^(open\.)?kakao\.com$/i, "카카오톡"],
+  [/^litt\.ly$/i, "리틀리"],
+  [/^linktr\.ee$/i, "링크트리"],
+  [/^smartstore\.naver\.com$/i, "스마트스토어"],
+  [/^blog\.naver\.com$/i, "네이버 블로그"],
+  [/^(cafe\.naver\.com|cafe\.daum\.net)$/i, "카페"],
+  [/^(www\.)?youtube\.com$|^youtu\.be$/i, "유튜브"],
+  [/^(www\.)?threads\.(net|com)$/i, "스레드"],
+];
+
+/** 대표 URL을 사람이 읽는 라벨로. 알려진 채널이면 서비스명, 아니면 null(도메인 표시로 폴백). */
+export function channelLabel(url?: string): string | null {
+  if (!url?.trim()) return null;
+  let host: string;
+  try {
+    host = new URL(normalizeUrl(url)).hostname;
+  } catch {
+    return null;
+  }
+  for (const [re, label] of CHANNEL_HOSTS) if (re.test(host)) return label;
+  return null;
+}
+
 /** 허용 지도 서비스 — 칩에 "네이버 지도"라고 써놓고 딴 데로 가는 사고 방지용 화이트리스트.
  *  naver.me·kko.to는 각 사의 공식 축약 도메인(공유 버튼이 주는 형태). */
 const MAP_HOSTS: [RegExp, string][] = [

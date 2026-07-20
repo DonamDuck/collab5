@@ -20,7 +20,7 @@ import {
   CHIP_TARGET,
 } from "../src/lib/enrich";
 import { regionMatches, regionConflict } from "../src/lib/regionSynonyms";
-import { mapLinkLabel } from "../src/lib/links";
+import { mapLinkLabel, channelLabel } from "../src/lib/links";
 
 let pass = 0;
 let fail = 0;
@@ -487,6 +487,22 @@ check("⛔ 'instagram.com'이 @gram.com으로 재매칭되지 않음", !sniffIns
 check("링크 케이스는 핸들만", JSON.stringify(sniffInstagramFromText("https://instagram.com/canvasgarden 참고")) === JSON.stringify(["@canvasgarden"]));
 check("⛔ 오탐: '인스타그램 마케팅 대행사'", sniffInstagramFromText("인스타그램 마케팅 대행사입니다").length === 0);
 check("⛔ 오탐: 무관 문장", sniffInstagramFromText("요가원에서 수련을 합니다").length === 0);
+
+// 대표 URL 확장 (대표 확정 2026-07-20 — 홈페이지 없는 가게가 카톡 채널만 거는 경우)
+console.log("[대표 URL — 브랜드 채널 포용]");
+const SRC1b = `[출처 1 · 네이버 검색 API — 특히 [브랜드가 직접 쓴 소개]·[지도 교차검증]·[네이버 지역검색] 블록은 최상위 신뢰]\n`;
+const mkMemo = (link: string) => SRC1b + `[네이버 지역검색 — 주소·업종·전화]\n· 가게 | 업종:요가 | 도로명:서울 | 지번: | 전화: | 링크:${link}`;
+const passes = (u: string) => extractLinksFromResearch(mkMemo(u)).homepageCandidates.length > 0;
+check("✅ 카카오톡 채널 후보 통과", passes("http://pf.kakao.com/_rgAlX/chat"));
+check("✅ 리틀리·링크트리 통과", passes("https://litt.ly/x") && passes("https://linktr.ee/x"));
+check("✅ 스마트스토어·네이버블로그 통과", passes("https://smartstore.naver.com/x") && passes("https://blog.naver.com/x"));
+check("✅ 진짜 홈페이지는 그대로", passes("https://canvasgarden.shop"));
+check("⛔ 인스타·페북은 계속 차단(별도 칸 있음)", !passes("https://www.instagram.com/brand") && !passes("https://www.facebook.com/brand"));
+check("⛔ 오픈마켓 계속 차단(브랜드 채널 아님)", !passes("https://www.coupang.com/x") && !passes("https://smartstore.11st.co.kr/x"));
+check("⛔ 디렉토리 계속 차단(오귀속 방지)", !passes("https://www.114.co.kr/x") && !passes("https://moneypin.biz/x"));
+check("칩 라벨: 카카오톡 채널", channelLabel("http://pf.kakao.com/_rgAlX/chat") === "카카오톡 채널");
+check("칩 라벨: 리틀리·링크트리", channelLabel("https://litt.ly/x") === "리틀리" && channelLabel("https://linktr.ee/x") === "링크트리");
+check("일반 도메인은 null → 도메인 표시로 폴백", channelLabel("https://canvasgarden.shop") === null);
 
 console.log(`\n결과: ${pass} pass / ${fail} fail`);
 process.exit(fail ? 1 : 0);

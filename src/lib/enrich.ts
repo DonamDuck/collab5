@@ -2115,8 +2115,16 @@ export interface LinkFinds {
 }
 
 // 홈페이지가 아님 — 포털·SNS·오픈마켓 도메인.
+// 대표 URL 후보에서 제외할 도메인(대표 확정 2026-07-20 '대표 URL'로 확장).
+//   홈페이지가 없는 소상공인은 카톡 채널·링크트리 하나만 걸어두는 경우가 많아, 브랜드가 직접
+//   운영하는 채널(pf.kakao·litt.ly·linktr.ee·스마트스토어·네이버 블로그/카페)은 이제 받아들인다.
+//   ⛔계속 차단: 인스타·페북(별도 칸 있음) · 오픈마켓(쿠팡·11번가·G마켓 = 브랜드 채널 아님)
+//     · 포털 검색·문서 서비스(google·notion·tistory 등 오귀속 소지)
 const NOT_HOMEPAGE =
-  /(naver|blog|instagram|facebook|youtube|tistory|kakao|band|twitter|x\.com|threads|wadiz|coupang|smartstore|11st|gmarket|linktr|notion|google|daum)/i;
+  /(^|\.)(instagram|facebook|twitter|x)\.com$|(^|\.)(threads)\.(net|com)$|(coupang|11st|gmarket|auction|wadiz|tistory|notion|google|band\.us)/i;
+// 브랜드가 직접 운영하는 채널 — NOT_HOMEPAGE의 넓은 패턴에 걸리지 않도록 명시 허용
+const BRAND_CHANNEL =
+  /^(pf\.kakao\.com|open\.kakao\.com|litt\.ly|linktr\.ee|smartstore\.naver\.com|blog\.naver\.com|cafe\.naver\.com|youtu\.be|(www\.)?youtube\.com)$/i;
 
 /** 주소 필드 정화 — 전화·사업자등록번호·통신판매업신고·이메일이 섞여 들어오는 경우 제거.
  *  주소 고유의 숫자(도로명 66·402호·413-111번지)는 보존한다. */
@@ -2158,7 +2166,8 @@ export function extractLinksFromResearch(research: string): LinkFinds {
     } catch {
       return;
     }
-    if (NOT_HOMEPAGE.test(host) || isDirectoryHost(host) || hostSeen.has(host)) return;
+    if (hostSeen.has(host)) return;
+    if (!BRAND_CHANNEL.test(host) && (NOT_HOMEPAGE.test(host) || isDirectoryHost(host))) return;
     hostSeen.add(host);
     if (front) homepageCandidates.unshift(norm);
     else homepageCandidates.push(norm);

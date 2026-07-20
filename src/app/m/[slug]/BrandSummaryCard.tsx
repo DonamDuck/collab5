@@ -1,7 +1,7 @@
 // /m 상단 브랜드 요약 카드 — 정체성(로고+이름) + 소개 + 신뢰 링크 칩(인스타·홈피).
 // 주소는 카드에서 빼고 최하단 '상세 주소' 섹션으로(참고 수준·지도용). 스펙: docs/superpowers/specs/2026-07-13-m-brand-summary-card-design.md
 import { Avatar } from "@/components/Avatar";
-import { instagramUrl, instagramHandle, normalizeUrl, prettyUrl, mapLinkLabel } from "@/lib/links";
+import { instagramUrl, instagramHandle, normalizeUrl, prettyUrl, mapLinkLabel, channelLabel } from "@/lib/links";
 import type { Maker } from "@/lib/types";
 import { EditButton } from "./EditButton";
 
@@ -9,12 +9,10 @@ export function BrandSummaryCard({
   maker,
   isOwner,
   logoUrl,
-  readOnly,
 }: {
   maker: Maker;
   isOwner: boolean;
   logoUrl?: string;
-  readOnly?: boolean; // /preview 데모용 — 남의 예시라 수정 진입점 자체를 숨긴다
 }) {
   const { instagram, homepage, mapUrl } = maker.trust;
   // 지도 링크 — 홈페이지 없는 동네 가게엔 이게 사실상 홈페이지 역할(주소·시간·전화·사진·후기).
@@ -38,11 +36,9 @@ export function BrandSummaryCard({
             )}
           </div>
         </div>
-        {!readOnly && (
-          <div className="shrink-0">
-            <EditButton slug={maker.slug} isOwner={isOwner} hasPassword={!!maker.editPasswordHash} />
-          </div>
-        )}
+        <div className="shrink-0">
+          <EditButton slug={maker.slug} isOwner={isOwner} hasPassword={!!maker.editPasswordHash} />
+        </div>
       </div>
 
       {/* 소개·지역 — 카드 전체 폭(로고 옆 좁은 컬럼 문제 해소) */}
@@ -60,8 +56,10 @@ export function BrandSummaryCard({
             </TrustChip>
           )}
           {homepage && (
+            /* 대표 URL — 카톡 채널·링크트리처럼 알려진 채널이면 서비스명으로, 아니면 도메인 그대로.
+               아이콘은 기존 집 아이콘 유지(대표 확정 07-20). */
             <TrustChip href={normalizeUrl(homepage)} icon={<HomeIcon />}>
-              {prettyUrl(homepage)}
+              {channelLabel(homepage) ?? prettyUrl(homepage)}
             </TrustChip>
           )}
           {/* 축약 링크(naver.me/xxx)는 사람이 읽을 수 없으니 URL 대신 서비스명을 보여준다. */}
@@ -91,11 +89,10 @@ function TrustChip({
       href={href}
       target="_blank"
       rel="noopener noreferrer nofollow"
-      className="inline-flex max-w-full items-center gap-1 rounded-pill bg-primary-pale py-1.5 pl-2.5 pr-3.5 text-[13px] font-medium text-primary-on transition-colors hover:bg-primary-tint"
+      className="inline-flex items-center gap-1 rounded-pill bg-primary-pale py-1.5 pl-2.5 pr-3.5 text-[13px] font-medium text-primary-on transition-colors hover:bg-primary-tint"
     >
       <span className="shrink-0 text-primary-on">{icon}</span>
-      {/* 긴 홈페이지 URL이 카드 밖으로 흘러넘치지 않도록 텍스트만 말줄임 */}
-      <span className="min-w-0 truncate">{children}</span>
+      {children}
     </a>
   );
 }
