@@ -225,6 +225,8 @@ export function EnrichWizard({
   const [starred, setStarred] = useState<string[]>([]);
   const [factualOk, setFactualOk] = useState<Set<string>>(new Set());
   const [igPick, setIgPick] = useState<LinkPick>(EMPTY_PICK);
+  // 지도 답변 — yes=크롤 링크 채택 / custom=직접 입력 / none=운영 안 함(빈값). 지도 후보 있을 때만 질문.
+  const [mapPick, setMapPick] = useState<{ ans: "yes" | "custom" | "none" | null; customText: string }>({ ans: null, customText: "" });
   const [hpPick, setHpPick] = useState<LinkPick>(EMPTY_PICK);
   const [customInput, setCustomInput] = useState("");
 
@@ -453,7 +455,7 @@ export function EnrichWizard({
     : [];
   const storyItems = options ? storyItemsOf(options, recommendedValues) : [];
   const storyGroups = groupStoryItems(storyItems);
-  const linksReady = isPickAnswered(igPick) && isPickAnswered(hpPick);
+  const linksReady = isPickAnswered(igPick) && isPickAnswered(hpPick) && (!links.mapUrl || mapPick.ans !== null);
   const steps: Kind[] = [
     "chips",
     "confirm",
@@ -544,7 +546,13 @@ export function EnrichWizard({
       address: fAddress.trim() || undefined,
       instagram: fInstagram.trim() || undefined,
       homepage: fHomepage.trim() || undefined,
-      mapUrl: fMapUrl.trim() || undefined,
+      mapUrl: links.mapUrl
+        ? mapPick.ans === "yes"
+          ? links.mapUrl
+          : mapPick.ans === "custom"
+            ? mapPick.customText.trim() || undefined
+            : undefined // none 또는 미답(후보 없던 경우) — 안 넣음
+        : fMapUrl.trim() || undefined,
       // 결 단어(values)도 이제 추천 선택 대상 — 'values' 항목을 체크했을 때만 폼에 반영.
       values: recommendedValues.length && storyChecked.has("values") ? recommendedValues : undefined,
       activityHints: options?.activityHints?.length ? options.activityHints : undefined,
@@ -873,22 +881,55 @@ export function EnrichWizard({
                 pick={hpPick}
                 onPick={setHpPick}
               />
-              {/* 지도 링크 — 좌표로 조립·지역검증까지 끝난 값이라 물어볼 게 없다. 확인만 시켜주고
-                  URL 원문(퍼센트 인코딩) 대신 서비스명으로 보여준다. 틀렸으면 폼에서 지우면 됨. */}
+              {/* 지도 링크 — 좌표 조립+지역검증까지 끝났지만 최종 확인은 사장 몫(대표 QA 07-20).
+                  URL 원문(퍼센트 인코딩) 대신 서비스명으로 보여주고, 인스타·홈피와 같은 3버튼 패턴. */}
               {links.mapUrl && (
-                <div className="rounded-lg border border-hairline bg-surface-soft px-3.5 py-3">
-                  <p className="text-[13px] text-mute">지도 · 웹에서 확인했어요</p>
-                  <div className="mt-1 flex items-center gap-2">
+                <div className="rounded-md border border-hairline bg-surface px-3 py-3">
+                  <p className="text-[15px] font-semibold text-ink">
+                    지도 링크 <span className="ml-1 text-[13px] font-normal text-faint">네이버 지도 URL을 찾았어요</span>
+                  </p>
+                  <div className="mt-0.5 flex items-center gap-2">
                     <span className="text-[15px] font-medium text-ink">📍 네이버 지도</span>
                     <a
                       href={links.mapUrl}
                       target="_blank"
                       rel="noopener noreferrer nofollow"
-                      className="text-[13px] text-primary-on underline underline-offset-2"
+                      className="text-[13px] font-medium text-primary-on underline underline-offset-2"
                     >
-                      열어보기 ↗
+                      확인하기 ↗
                     </a>
                   </div>
+                  <p className="mt-1 text-[13px] leading-relaxed text-mute">이 장소가 맞나요?</p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {(
+                      [
+                        ["yes", "맞아요"],
+                        ["custom", "아니에요"],
+                        ["none", "운영하지 않아요"],
+                      ] as const
+                    ).map(([ans, label]) => (
+                      <button
+                        key={ans}
+                        type="button"
+                        onClick={() => setMapPick((m) => ({ ...m, ans }))}
+                        className={`h-8 rounded-pill border px-3.5 text-[13px] font-medium transition-colors ${
+                          mapPick.ans === ans
+                            ? "border-primary bg-primary-tint text-primary-on"
+                            : "border-border-strong bg-surface text-ink"
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                  {mapPick.ans === "custom" && (
+                    <input
+                      value={mapPick.customText}
+                      onChange={(e) => setMapPick((m) => ({ ...m, customText: e.target.value }))}
+                      placeholder="네이버 지도·카카오맵 공유 링크"
+                      className="mt-1.5 h-11 w-full rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
+                    />
+                  )}
                 </div>
               )}
             </div>
@@ -1106,8 +1147,8 @@ function LinkPicker({
 
   return (
     <div className="rounded-md border border-hairline bg-surface px-3 py-3">
-      <p className="text-[13px] text-faint">
-        {label} · {note}
+      <p className="text-[15px] font-semibold text-ink">
+        {label} <span className="ml-1 text-[13px] font-normal text-faint">{note}</span>
       </p>
 
       {single ? (

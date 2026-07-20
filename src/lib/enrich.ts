@@ -2119,10 +2119,14 @@ export function extractLinksFromResearch(research: string): LinkFinds {
     if (front) homepageCandidates.unshift(norm);
     else homepageCandidates.push(norm);
   };
-  // "홈페이지: domain.com" 라인(스킴 없어도) 우선
-  const hpLine = research.match(/홈페이지[^\n:]*:\s*([^\s)|]+\.[a-z]{2,}[^\s)|]*)/i)?.[1];
-  if (hpLine && !/확인\s*안\s*됨/.test(hpLine)) addHp(hpLine, true);
-  for (const m of research.matchAll(/https?:\/\/[^\s)"'|]+/g)) addHp(m[0]);
+  // ⭐후보 소스 제한(대표 확정 2026-07-20): 메모 전체 URL 스캔은 웹문서 10건 확장 후
+  //   아티클(복지관 갤러리·당근·패스오더)이 죄다 후보로 떠서 은퇴. '공식인지 판단 가능한' 소스만:
+  //   ①[홈페이지 직접 확인] 블록 — pickHomepage가 고르고 브랜드 실재 검증까지 통과한 것
+  //   ②[네이버 지역검색]의 링크 필드 — 사업자가 직접 등록한 주소
+  const verifiedHp = research.match(/\[홈페이지 직접 확인[^\]]*\][^\n]*\n·\s*홈페이지:\s*(https?:\/\/\S+)/)?.[1];
+  if (verifiedHp) addHp(verifiedHp, true);
+  const localSection = research.match(/\[네이버 지역검색[^\]]*\]([\s\S]*?)(?=\n\[|$)/)?.[1] ?? "";
+  for (const m of localSection.matchAll(/링크:(https?:\/\/[^\s|]+)/g)) addHp(m[1]);
   const homepage = homepageCandidates[0];
 
   // ── 인스타 후보: 확인된 핸들 + 메모 내 instagram.com/xxx + 홈피 도메인 기반 추측 1개 ──
