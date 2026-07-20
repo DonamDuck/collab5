@@ -6,6 +6,7 @@
 import { useState, useEffect, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { claimMakerAction } from "@/lib/actions";
+import { ScrollLock } from "@/components/ScrollLock";
 
 export function ConnectProfileButton({ slug, loggedIn }: { slug: string; loggedIn: boolean }) {
   const router = useRouter();
@@ -61,6 +62,7 @@ export function ConnectProfileButton({ slug, loggedIn }: { slug: string; loggedI
 
       {open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4">
+          <ScrollLock />
           <div className="w-full max-w-sm rounded-lg border border-hairline bg-surface p-6 shadow-e2">
             <p className="text-base font-bold text-ink">프로필에 연결하기</p>
             <p className="mt-1.5 text-sm leading-relaxed text-mute">
@@ -100,6 +102,7 @@ export function ConnectProfileButton({ slug, loggedIn }: { slug: string; loggedI
 
       {done && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4">
+          <ScrollLock />
           <div className="w-full max-w-sm rounded-lg border border-hairline bg-surface p-6 text-center shadow-e2">
             <p className="text-base font-bold text-ink">🎉 소개서 연결 완료</p>
             <p className="mt-1.5 text-sm leading-relaxed text-mute">

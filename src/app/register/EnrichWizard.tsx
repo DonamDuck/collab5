@@ -21,6 +21,7 @@ import type {
 import { josa } from "@/lib/josa";
 import { blendDescriptions, canRegenDesc, noteRegenDesc } from "@/lib/enrichBlend";
 import { buildEnrichment } from "@/lib/enrichment";
+import { instagramSlug } from "@/lib/links";
 import type { Enrichment } from "@/lib/types";
 
 export type WizardFill = {
@@ -959,7 +960,17 @@ export function EnrichWizard({
             <div className="mt-4 space-y-3">
               <FieldEdit label="상호" value={fName} onChange={setFName} placeholder="예: 캔버스가든" />
               <FieldEdit label="주소" value={fAddress} onChange={setFAddress} placeholder="예: 서울 성동구 성수동" />
-              <FieldEdit label="인스타그램" value={fInstagram} onChange={setFInstagram} placeholder="@handle" fixedPrefix="@" />
+              <FieldEdit
+                label="인스타그램"
+                value={fInstagram}
+                onChange={setFInstagram}
+                placeholder="@handle"
+                fixedPrefix="@"
+                // 프로필 URL을 붙여넣은 경우에만 핸들로 정리 — 평소 타이핑은 그대로
+                normalize={(v) =>
+                  /instagram\.com|^https?:\/\//i.test(v) ? instagramSlug(v) : v.replace(/^@+/, "")
+                }
+              />
               <FieldEdit label="홈페이지" value={fHomepage} onChange={setFHomepage} placeholder="https://" />
             </div>
             <button
@@ -1244,6 +1255,7 @@ function FieldEdit({
   candidates,
   candidateHint,
   fixedPrefix,
+  normalize,
 }: {
   label: string;
   value: string;
@@ -1252,6 +1264,7 @@ function FieldEdit({
   candidates?: string[];
   candidateHint?: string;
   fixedPrefix?: string; // 인스타 "@"처럼 항상 붙는 접두어 — 입력창 밖에 고정해 사용자 표기 편차 제거
+  normalize?: (v: string) => string; // 붙여넣기 정리용(예: 인스타 프로필 URL → 핸들)
 }) {
   // 값이 비어있고(=자동으로 확정 못함) 후보가 있으면 골라서 채우게 노출
   const showCandidates = !value.trim() && !!candidates?.length;
@@ -1266,7 +1279,8 @@ function FieldEdit({
           <input
             value={stripPrefix(value)}
             onChange={(e) => {
-              const v = stripPrefix(e.target.value);
+              const raw = e.target.value;
+              const v = normalize ? normalize(raw) : stripPrefix(raw);
               onChange(v ? fixedPrefix + v : ""); // 빈 값이면 접두어만 남지 않게 진짜 빈 문자열로
             }}
             placeholder="handle"

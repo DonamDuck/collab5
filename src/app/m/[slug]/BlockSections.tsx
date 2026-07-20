@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import type { Block } from "@/lib/types";
 import { PhotoSlider } from "@/components/PhotoSlider";
 import { normalizeUrl, prettyUrl } from "@/lib/links";
@@ -20,31 +21,42 @@ export function BlockSections({
 }) {
   return (
     <>
-      {blocks.map((b, i) => (
-        <Section key={i} title={b.type === "custom" ? b.title : TITLES[b.type]}>
-          <BlockBody b={b} />
-          {b.photos.length > 0 && (
-            <div className="mt-3 max-w-[460px] print:mx-auto print:break-inside-avoid">
-              <PhotoSlider photos={b.photos} />
-            </div>
-          )}
-          {b.links.length > 0 && (
-            <div className="mt-3 flex flex-wrap gap-2">
-              {b.links.map((l, k) => (
-                <a
-                  key={k}
-                  href={normalizeUrl(l.url)}
-                  target="_blank"
-                  rel="noopener noreferrer nofollow"
-                  className="inline-flex h-9 items-center gap-1 rounded-sm bg-surface-soft px-3 text-[14px] font-medium text-body hover:bg-primary-pale hover:text-primary-on"
-                >
-                  🔗 {l.label?.trim() || prettyUrl(l.url)}
-                </a>
-              ))}
-            </div>
-          )}
-        </Section>
-      ))}
+      {blocks.map((b, i) => {
+        const title = b.type === "custom" ? b.title : TITLES[b.type];
+        const content = (
+          <>
+            <BlockBody b={b} />
+            {b.photos.length > 0 && (
+              <div className="mt-3 max-w-[460px] print:mx-auto print:break-inside-avoid">
+                <PhotoSlider photos={b.photos} />
+              </div>
+            )}
+            {b.links.length > 0 && (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {b.links.map((l, k) => (
+                  <a
+                    key={k}
+                    href={normalizeUrl(l.url)}
+                    target="_blank"
+                    rel="noopener noreferrer nofollow"
+                    className="inline-flex h-9 max-w-full items-center gap-1 truncate rounded-sm bg-surface-soft px-3 text-[14px] font-medium text-body hover:bg-primary-pale hover:text-primary-on"
+                  >
+                    🔗 {l.label?.trim() || prettyUrl(l.url)}
+                  </a>
+                ))}
+              </div>
+            )}
+          </>
+        );
+        // 제목 없는 커스텀 블록(본문/사진/링크만으로 생존)은 Section을 거치면 빈 <h2>가 그려지므로 감싸지 않는다.
+        return title.trim() ? (
+          <Section key={i} title={title}>
+            {content}
+          </Section>
+        ) : (
+          <Fragment key={i}>{content}</Fragment>
+        );
+      })}
     </>
   );
 }
@@ -57,7 +69,9 @@ function BlockBody({ b }: { b: Block }) {
         <div className="grid grid-cols-2 gap-3">
           {b.items.map((it, i) => (
             <div key={i}>
-              <p className="text-[18px] font-bold leading-snug text-ink">{it.value}</p>
+              {it.value && (
+                <p className="text-[18px] font-bold leading-snug text-ink">{it.value}</p>
+              )}
               <p className="mt-0.5 text-[14px] text-mute">{it.label}</p>
             </div>
           ))}
@@ -127,11 +141,15 @@ function BlockBody({ b }: { b: Block }) {
       );
     case "team":
       return (
-        <p className="whitespace-pre-line text-[17px] leading-relaxed text-body">{b.intro}</p>
+        b.intro && (
+          <p className="whitespace-pre-line text-[17px] leading-relaxed text-body">{b.intro}</p>
+        )
       );
     case "custom":
       return (
-        <p className="whitespace-pre-line text-[17px] leading-relaxed text-body">{b.body}</p>
+        b.body && (
+          <p className="whitespace-pre-line text-[17px] leading-relaxed text-body">{b.body}</p>
+        )
       );
   }
 }

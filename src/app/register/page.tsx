@@ -15,7 +15,7 @@ import type { CollabType, Block, Maker, Enrichment } from "@/lib/types";
 import { deriveRegion } from "@/lib/region";
 import { isRichIntro } from "@/lib/completeness";
 import { uploadPhoto, uploadPdf } from "@/lib/upload";
-import { mapLinkLabel } from "@/lib/links";
+import { mapLinkLabel, instagramSlug } from "@/lib/links";
 import { ScrollLock } from "@/components/ScrollLock";
 import type { ActivityHint, CollabHint, EnrichField } from "@/lib/enrich";
 import { blendDescriptions, canRegenDesc, noteRegenDesc } from "@/lib/enrichBlend";
@@ -213,7 +213,11 @@ function RegisterForm() {
   // 데이터 존재 판정 — 제출 payload 단일 관문·완성도·스텁 hasData 공용.
   const hasStory = !!story.trim();
   const hasActivities = activities.some((a) => a.title.trim() || a.desc.trim() || a.photos.length > 0);
-  const hasCollabs = collabHistory.some((h) => h.partner.trim() || h.desc.trim() || h.photos.length > 0);
+  // types(콜라보 유형 칩)까지 봐야 함 — 아래 filledHist 필터와 조건이 어긋나면
+  // "칩만 고른" 카드가 filledHist엔 남는데 이 게이트에서 걸려 전체가 []로 저장됨(유실).
+  const hasCollabs = collabHistory.some(
+    (h) => h.partner.trim() || h.types.length > 0 || h.desc.trim() || h.photos.length > 0
+  );
   const hasKeywords = values.length > 0;
   const hasCustomers = targetAudience.length > 0;
   const hasOffersNote = !!offersNote.trim();
@@ -778,6 +782,7 @@ function RegisterForm() {
   const [editPw, setEditPw] = useState("");
   const [showEditPw, setShowEditPw] = useState(false);
   const [savingPw, setSavingPw] = useState(false);
+  const [pwErr, setPwErr] = useState("");
   const [editSlug, setEditSlug] = useState<string | null>(null);
   const [editAuthPw, setEditAuthPw] = useState(""); // 수정 저장 재검증용(세션스토리지에서, 소유자는 빈 값)
   // ?edit로 진입 시 데이터 불러오는 동안 로딩 화면(빈 생성폼 깜빡임 방지)
@@ -937,8 +942,16 @@ function RegisterForm() {
     if (!loggedIn) {
       if (!editPw.trim()) return;
       setSavingPw(true);
-      await setMakerPasswordAction(createdSlug, editPw.trim()).catch(() => {});
+      setPwErr("");
+      // 실패를 삼키면 안 됨 — 비번이 안 걸린 채 넘어가면 나중에 본인 소개서를 영영 수정 못 한다.
+      const r = await setMakerPasswordAction(createdSlug, editPw.trim()).catch(() => ({
+        error: "비밀번호 저장에 실패했어요. 잠시 후 다시 시도해주세요.",
+      }));
       setSavingPw(false);
+      if (r?.error) {
+        setPwErr(r.error);
+        return;
+      }
     }
     setGoingToPage(true);
     router.push(`/m/${createdSlug}`);
@@ -1028,7 +1041,7 @@ function RegisterForm() {
       <div className="mt-10 flex items-center gap-3">
         <div className="h-px flex-1 bg-hairline" />
         <span className="shrink-0 text-sm font-medium text-mute">
-          또는 아래에 직접 입력 할 수 있어요.
+          또는 아래에 직접 입력할 수 있어요.
         </span>
         <div className="h-px flex-1 bg-hairline" />
       </div>
@@ -1681,7 +1694,11 @@ function RegisterForm() {
               <input
                 value={instagram.replace(/^@+/, "")}
                 onChange={(e) => {
-                  const v = e.target.value.replace(/^@+/, "");
+                  const raw = e.target.value;
+                  // 프로필 URL을 붙여넣은 경우에만 핸들로 정리 — 평소 타이핑은 그대로 둬야 방해가 없다
+                  const v = /instagram\.com|^https?:\/\//i.test(raw)
+                    ? instagramSlug(raw)
+                    : raw.replace(/^@+/, "");
                   setInstagram(v ? `@${v}` : "");
                 }}
                 placeholder="handle"
@@ -2120,6 +2137,7 @@ function RegisterForm() {
                       )}
                     </button>
                   </div>
+                  {pwErr && <p className="mt-2 text-[13px] text-red-600">{pwErr}</p>}
                   <p className="mt-2 text-[13px] leading-relaxed text-faint">
                     잊어버리면 고객센터를 통해서만 찾을 수 있으니 기억해주세요.
                   </p>

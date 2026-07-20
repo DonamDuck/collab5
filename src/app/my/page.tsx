@@ -12,7 +12,7 @@ import { ProfileAvatarEditor } from "./ProfileAvatarEditor";
 
 export default async function MyPage() {
   const user = await getSessionUser();
-  if (!user) redirect("/login");
+  if (!user) redirect("/login?redirect=%2Fmy"); // 로그인 후 원래 가려던 /my로 복귀
   // 프로필·소개서 목록은 서로 독립 조회 — 병렬로 가져와 왕복 1회분 단축
   const [profile, makers] = await Promise.all([
     getProfile(user.id),

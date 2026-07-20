@@ -52,7 +52,7 @@ function Panel({ visible, maker, logoUrl }: { visible: boolean; maker: Maker | n
   return (
     <div hidden={!visible}>
       {maker ? (
-        <MakerArticle maker={maker} isOwner={false} logoUrl={logoUrl} />
+        <MakerArticle maker={maker} isOwner={false} logoUrl={logoUrl} readOnly />
       ) : (
         <p className="rounded-md border border-hairline bg-surface-soft p-6 text-base text-mute">
           미리보기를 준비하고 있어요. 잠시 후 다시 봐주세요.
