@@ -429,5 +429,22 @@ check("무의미 칩('소개'·'고민했지만'·'잊히지') 0개", !obudChips
 check("지도 칩은 정상 유지", obudChips.includes("요가"), JSON.stringify(obudChips));
 check("조각 단위 방어: 연결어미 종결 칩 배제", !extractChipsFromResearch("[출처 2 · 제미나이]\n[키워드]\n고민했지만, 좋은 원두", "가게").some((c) => c.text === "고민했지만"));
 
+// [이용] 섹션 + 자세히 소개 6개 (대표 확정 2026-07-20 — 구글 AI 개요 참고)
+console.log("[이용 섹션 · 소개 6개]");
+const src2 = readFileSync(join(__dirname, "../src/lib/enrich.ts"), "utf8");
+const wz2 = readFileSync(join(__dirname, "../src/app/register/EnrichWizard.tsx"), "utf8");
+check("조사 소제목에 [이용] 추가", /\[이용\] 그 공간을 쓰는 방식/.test(src2));
+check("브랜드 성격 드러나는 것만 제약", /브랜드 성격이 드러나는 것만/.test(src2));
+check("⛔ 가격·전화·영업시간 제외 명시(어제 정책 유지)", /가격·전화·영업시간은 여기 쓰지 마라/.test(src2));
+check("⛔ 와이파이·정수기류 제외", /와이파이·정수기·화장실처럼/.test(src2));
+check("CHIP_SECTIONS에 이용 매핑", /이용: \{ label: "이용"/.test(src2));
+check("위저드 SECTION_ORDER에 '이용' 존재(미노출 방지)", /"공간", "이용"/.test(wz2));
+const 이용Chips = extractChipsFromResearch("[출처 2 · 제미나이]\n[이용]\n요가 매트 대여\n반려동물 동반", "가게");
+check("이용 칩 생성됨", 이용Chips.some((c) => c.section === "이용" && c.text === "요가 매트 대여"), JSON.stringify(이용Chips));
+// 개수 상한이 한 군데라도 5로 남아 있으면 6번째가 조용히 잘린다
+check("normalizeOptions 캡 6", /descriptions: \(o\.descriptions \?\? \[\]\)\.filter\(Boolean\)\.slice\(0, 6\)/.test(src2));
+check("스키마·프롬프트에 5개 잔존 없음", !/'브랜드 소개' 후보 5개|descriptions 5개|브랜드 소개 후보 5개/.test(src2));
+check("6번째 = 사실 정리형 정의 존재", /6번째 = '사실 정리형'/.test(src2));
+
 console.log(`\n결과: ${pass} pass / ${fail} fail`);
 process.exit(fail ? 1 : 0);
