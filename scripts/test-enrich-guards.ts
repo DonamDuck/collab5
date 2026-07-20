@@ -9,6 +9,8 @@ import {
   extractChipsFromResearch,
   starterChipsForType,
   sanitizeHttpUrl,
+  sniffInstagramFromText,
+  searchLooksEmpty,
 } from "../src/lib/enrich";
 import { regionMatches, regionConflict } from "../src/lib/regionSynonyms";
 
@@ -238,6 +240,41 @@ check("http(s) 통과", sanitizeHttpUrl("https://www.khan.co.kr/article/123") ==
 check("빈값·undefined → undefined", sanitizeHttpUrl("") === undefined && sanitizeHttpUrl(undefined) === undefined);
 check("잡값·상대경로 차단", sanitizeHttpUrl("확인 안 됨") === undefined && sanitizeHttpUrl("/article/123") === undefined);
 check("javascript: 스킴 차단", sanitizeHttpUrl("javascript:alert(1)") === undefined);
+
+// 웹 텍스트 인스타 수확 (2026-07-20 상왕제약 사례 — 홈페이지 없는 가게)
+console.log("[웹 텍스트 인스타 수확]");
+check(
+  "블로그 본문의 @핸들 수확",
+  sniffInstagramFromText("성수 상왕제약 다녀왔어요 인스타 @sangwang_espresso 확인하고 가세요").includes("@sangwang_espresso")
+);
+check(
+  "instagram.com 링크 수확 + 링크 우선",
+  sniffInstagramFromText("https://instagram.com/sangwang_espresso 참고 @otherguy")[0] === "@sangwang_espresso"
+);
+check(
+  "서비스 경로(p·reel·explore) 제외",
+  !sniffInstagramFromText("https://instagram.com/p/Cabc123 https://instagram.com/reel/xyz").length
+);
+check("이메일 오탐 방지: 숫자만 핸들 제외", !sniffInstagramFromText("@1234567").length);
+check(
+  "이미 홈페이지로 확인된 핸들은 중복 제외",
+  !sniffInstagramFromText("인스타 @canga_studio 임", "@canga_studio").length
+);
+check("핸들 없으면 빈 배열", sniffInstagramFromText("그냥 맛있는 카페였어요").length === 0);
+
+// 빈손 판정 (재시도 트리거)
+console.log("[빈손 판정]");
+check(
+  "전부 '확인 안 됨' → 빈손",
+  searchLooksEmpty(`[정체]\n확인 안 됨\n[제품/특징]\n확인 안 됨\n[활동]\n확인 안 됨\n[콜라보]\n확인 안 됨\n[원하는 협업]\n확인 안 됨\n[고객]\n확인 안 됨\n[알려짐]\n확인 안 됨`)
+);
+check("빈 문자열 → 빈손", searchLooksEmpty(""));
+check(
+  "알맹이 있으면 빈손 아님",
+  !searchLooksEmpty(
+    `[정체]\n성수동에서 에스프레소를 내리는 작은 카페. 2021년 문을 열었고 로스팅을 직접 한다.\n[제품/특징]\n시그니처는 크림이 올라간 아인슈페너, 원두는 주 2회 자가 로스팅.\n[활동]\n원데이 드립 클래스를 월 1회 운영하고 인근 편집숍과 팝업을 진행했다.\n[고객]\n20~30대 커피 애호가, 성수 나들이객이 주 고객층.`
+  )
+);
 
 console.log(`\n결과: ${pass} pass / ${fail} fail`);
 process.exit(fail ? 1 : 0);

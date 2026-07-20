@@ -663,7 +663,7 @@ ${BRAND_VOICE}
 - ⚠️조사 메모에 구체 명사·사실이 부족하면 위 개수·구체성 요구보다 '창작·과장 금지'가 우선이다. 없는 디테일을 지어내지 말고, 메모 안에서 가장 구체적인 수준으로만 써라.
 - ⭐가중 키워드가 주어지면 그 방향을 최우선으로 반영해 모든 후보를 그 결에 맞춘다. 단 키워드를 나열하지 말고 문장에 녹여라.
 - 조사 메모 안의 사실만 쓴다. 창작·과장 금지. identity(주소·홈피 등)는 확인된 것만, 없으면 빈 문자열.
-- 인스타: 실제 확인된 핸들만 identity.instagram에 넣는다(추측 금지). 확정 못 하면 identity.instagram은 빈 문자열로 두고, 대신 instagramCandidates에 도메인·브랜드명 기반 그럴듯한 추정 핸들 2~4개를 제시한다(사장이 직접 고를 후보용). 예: 도메인이 canvasgarden.shop이면 @canvasgarden, @canvasgarden_official, @canvasgarden.shop 등.
+- 인스타: 실제 확인된 핸들만 identity.instagram에 넣는다(추측 금지). ⭐메모의 "[홈페이지 직접 확인]" 또는 "[웹 텍스트에서 발견된 인스타 핸들]"에 있는 값은 웹에서 실제로 확인된 것이니 브랜드 것이 맞다고 판단되면 채워도 된다(sources에 출처 남기기). 확정 못 하면 identity.instagram은 빈 문자열로 두고, 대신 instagramCandidates에 도메인·브랜드명 기반 그럴듯한 추정 핸들 2~4개를 제시한다(사장이 직접 고를 후보용). 예: 도메인이 canvasgarden.shop이면 @canvasgarden, @canvasgarden_official, @canvasgarden.shop 등.
 - activityHints: 조사 메모에 실제로 언급된 이 브랜드의 활동(워크숍·클래스·팝업·제품라인 등)만 0~3건. collabHints: 메모에 파트너명이 드러난 협업 소식만 0~3건. 각 항목의 source는 그 정보가 나온 출처 유형(네이버 블로그 후기/카페글/웹 검색/인스타그램)으로. ⚠️메모에 없으면 절대 만들지 말고 빈 배열로 둬라(참고용 힌트라 사실만).
 - blockHints: 조사에서 근거가 뚜렷할 때만 추천 블록 최대 2개.
   공개 수치 발견(팔로워·서포터·펀딩액·판매량·매출·운영 연차·직원 규모·입점처 수 등, ⚠️후기 수·별점은 제외) → metrics(items에 label·value 밑그림) /
@@ -988,6 +988,14 @@ class NaverGeminiProvider implements SearchProvider {
       signals = {};
     }
     const sniffedIg = signals.instagram;
+    // 웹 텍스트(네이버 지역·웹문서·블로그·카페)에 실제로 적힌 인스타 핸들 — 추측이 아니라 '발견'.
+    // 홈페이지가 없는 동네 가게는 이 경로가 유일한 인스타 근거인 경우가 많다(상왕제약 사례).
+    const textIg = sniffInstagramFromText(
+      [...local, ...web, ...blog, ...cafe]
+        .map((it) => `${this.clean(it.title)} ${this.clean(it.description)} ${it.link ?? ""}`)
+        .join("\n"),
+      sniffedIg
+    );
 
     // 동명 노이즈 필터 — 블로그·카페·표적검색은 제목+설명에 브랜드명이 통째로(공백 무시) 들어간 것만.
     // (예: "캔버스가든" 검색이 "에르메스 가든파티 캔버스"·"스누피가든"에 분리 매칭되는 오염 차단)
@@ -1029,6 +1037,14 @@ class NaverGeminiProvider implements SearchProvider {
         sniffedIg
           ? `· 인스타그램: ${sniffedIg} (홈페이지 링크에서 실제 확인됨 — 이 값을 신뢰해서 채워)`
           : `· 인스타그램: 홈페이지 정적 HTML에서 링크 확인 안 됨(추측하지 말 것)`
+      );
+    }
+    // 홈페이지 링크로 못 잡았어도, 웹 문서·후기 본문에 핸들이 적혀 있으면 그건 '확인된 근거'다.
+    if (!sniffedIg && textIg.length) {
+      parts.push("\n[웹 텍스트에서 발견된 인스타 핸들 — 실제로 적혀 있던 값(추측 아님)]");
+      for (const h of textIg) parts.push(`· ${h}`);
+      parts.push(
+        "→ 이 브랜드 것이 맞다고 판단되면 identity.instagram에 채워도 된다(출처 = 웹 검색). 여러 개면 브랜드명과 가장 가까운 것."
       );
     }
     // 지도 교차검증 결과를 메모 상단에 명시 — 구조화 모델이 지역 안 맞는 정보를 거르게.
@@ -1172,7 +1188,9 @@ class NaverGeminiProvider implements SearchProvider {
     const searchStrategy = (round: number) =>
       round === 1
         ? `\n검색은 한 조합만 하지 말고 여러 조합을 시도해 — "${query}", "${query} ${region?.trim() ?? ""}", "${query} ${businessType?.trim() ?? ""}" 등. 웹 존재감이 약한 동네 가게일 수 있다 — 공식 출처가 없으면 블로그·카페 후기, 지역 커뮤니티 글, 지도 서비스 등록 정보에서도 유의미한 정보를 적극 발굴해(어디서 봤는지 함께).`
-        : `\n⚠️직전 조사에서 검색 근거를 못 찾았다. 검색 전략을 바꿔라: ①지역 기반 일반 검색어("${region?.trim() ?? ""} ${businessType?.trim() ?? ""}", "${region?.trim() ?? ""} ${businessType?.trim() ?? ""} 후기/맛집")로 넓게 검색한 뒤 그 결과 안에서 '${query}'를 찾아라 ②상호의 띄어쓰기를 바꿔서도 검색해봐 ③영업시간·메뉴·주차 같은 방문 정보 중심 검색도 시도. 그래도 못 찾으면 지어내지 말고 "확인 안 됨"으로.`;
+        : round === 3
+          ? `\n⚠️직전 조사가 빈손이었다. 이번엔 SNS·소셜 중심으로 찾아라: ①"${query} 인스타", "${query} instagram", "instagram.com ${query}" ②"${query} 소식/공지/예약" 같은 운영 계정 글 ③해시태그(#${query.replace(/\s/g, "")})가 붙은 후기 글. 계정을 찾으면 그 계정이 올린 내용(제품·클래스·공지)에서 사실을 정리해. 계정을 못 찾으면 지어내지 말고 "확인 안 됨"으로.`
+          : `\n⚠️직전 조사에서 검색 근거를 못 찾았다. 검색 전략을 바꿔라: ①지역 기반 일반 검색어("${region?.trim() ?? ""} ${businessType?.trim() ?? ""}", "${region?.trim() ?? ""} ${businessType?.trim() ?? ""} 후기/맛집")로 넓게 검색한 뒤 그 결과 안에서 '${query}'를 찾아라 ②상호의 띄어쓰기를 바꿔서도 검색해봐 ③영업시간·메뉴·주차 같은 방문 정보 중심 검색도 시도. 그래도 못 찾으면 지어내지 말고 "확인 안 됨"으로.`;
     const promptFor = (round: number) => `절대 추측하거나 사실이 아닌 정보를 지어내지 마. 웹에서 확인된 것만 적는다.
 "${query}" 브랜드/업체를 웹에서 조사해줘.${searchStrategy(round)}${loc}${anchorBlock}
 아래 소제목 순서 그대로, 확인된 사실만 개조식으로 정리해줘. 전체 1500자 이내. 해당 정보가 없으면 그 소제목에 "확인 안 됨" 한 줄만 — 소제목 설명에 나온 단어(워크숍·클래스·팔로워·펀딩 등)를 실제 확인 없이 되풀이해 적지 마라.
@@ -1188,7 +1206,7 @@ class NaverGeminiProvider implements SearchProvider {
 [신뢰정보] 홈페이지 URL · 주소
 [키워드] 위 조사에서 이 브랜드를 나타내는 짧은 키워드 8~15개, 쉼표로 구분 (각 2~15자 명사구 — 제품·소재·활동·분위기·강점 위주. 문장 금지, 다른 브랜드 것 섞지 말 것)
 출처는 공식 홈페이지·언론 보도가 있으면 우선하되, 지역 소상공인은 그런 출처가 없는 경우가 많다 — 네이버 플레이스·지도 등록 정보, 블로그·카페 후기, 지역 커뮤니티 글 등 웹에서 확인 가능한 출처를 폭넓게 활용해(어디서 봤는지 함께). 연도·날짜가 보이면 함께 적어줘(오래된 정보 구분용).
-⭐인스타그램은 실제 instagram.com/○○ 페이지를 확인한 경우에만 @핸들. 브랜드명·도메인으로 추측 금지 — 확인 안 되면 "인스타: 확인 안 됨".
+⭐인스타그램 — 다음 둘 중 하나면 @핸들을 적어(어디서 봤는지 함께): ①instagram.com/○○ 페이지를 확인했다 ②검색 결과·블로그·후기 본문에 그 핸들이 실제 문자로 적혀 있었다(예: 본문의 "인스타 @○○"). ⛔브랜드명·도메인에서 유추해 만들어내는 건 절대 금지. 둘 다 아니면 "인스타: 확인 안 됨".
 확실하지 않으면 적지 말고 넘어가. 과장·추측 금지.`;
     // 플랜B 병렬 병합(대표 확정 2026-07-19): lite N콜을 병렬로(대기시간 = 1콜) —
     // 각 콜이 독립 grounding 주사위. 마지막 1콜은 검색전략 변형(promptFor(2))으로 다양성 확보.
@@ -1209,7 +1227,20 @@ class NaverGeminiProvider implements SearchProvider {
       const rescue = await this.searchAttempt(NaverGeminiProvider.SEARCH_RESCUE, promptFor(2), "안전망");
       if (rescue) grounded = [rescue];
     }
-    console.log("[enrich] search-merge", JSON.stringify({ runs, grounded: grounded.length }));
+    // ⭐빈손 재시도(2026-07-20 대표 지시) — 접지는 됐는데 알맹이가 없는 경우(대부분 "확인 안 됨")는
+    //   위 안전망이 안 걸린다. 대표가 손으로 한 번 더 돌리던 걸 코드가 대신: 전략 다른 2콜을 병렬로
+    //   더 굴려 합친다(대기시간 = 1콜). 잘 나온 케이스는 그대로 1콜 — 빈손일 때만 과금.
+    let retried = 0;
+    if (grounded.length && searchLooksEmpty(grounded.join("\n"))) {
+      const extra = await Promise.all([
+        this.searchAttempt(NaverGeminiProvider.SEARCH_RESCUE, promptFor(2), "빈손재시도-지역"),
+        this.searchAttempt(NaverGeminiProvider.SEARCH_RESCUE, promptFor(3), "빈손재시도-SNS"),
+      ]);
+      const gains = extra.filter((t) => t && !searchLooksEmpty(t));
+      retried = extra.filter(Boolean).length;
+      if (gains.length) grounded = [...grounded, ...gains];
+    }
+    console.log("[enrich] search-merge", JSON.stringify({ runs, grounded: grounded.length, retried }));
     if (!grounded.length) return "";
     if (grounded.length === 1) return grounded[0];
     return grounded
@@ -1220,11 +1251,31 @@ class NaverGeminiProvider implements SearchProvider {
   /** 검색 1시도(모델·프롬프트 지정) — 접지 성공 시 텍스트, 실패·비접지·에러는 ""(슬롯만 조용히 실패). */
   private async searchAttempt(model: string, prompt: string, tag: string): Promise<string> {
     try {
-      const response = await this.ai().models.generateContent({
-        model,
-        contents: prompt,
-        config: { tools: [{ googleSearch: {} }], temperature: 0.2 },
-      });
+      // ⚡생각(thinking) 끄기 — 2.5-flash는 기본이 dynamic thinking이라 lite 대비 체감이 느려졌던 원인.
+      //   이 단계는 "검색해서 본 것만 정리"라 추론 여지가 거의 없어 품질 손실 없이 지연만 줄인다.
+      //   (생성 단계는 글맛이 걸려 있어 그대로 둠 — 대표 블라인드 A/B로 고른 flash 품질 유지)
+      //   ENRICH_SEARCH_THINKING=1이면 다시 켜서 비교 가능.
+      const thinking = process.env.ENRICH_SEARCH_THINKING === "1";
+      const call = (withThinkingOff: boolean) =>
+        this.ai().models.generateContent({
+          model,
+          contents: prompt,
+          config: {
+            tools: [{ googleSearch: {} }],
+            temperature: 0.2,
+            ...(withThinkingOff ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
+          },
+        });
+      let response;
+      try {
+        response = await call(!thinking);
+      } catch (e) {
+        // 모델이 thinkingBudget을 안 받으면(400) 옵션 없이 1회 재시도 — 검색이 통째로 죽는 것 방지.
+        const status = (e as { status?: number; code?: number })?.status ?? (e as { code?: number })?.code;
+        if (thinking || status !== 400) throw e;
+        console.warn(`[enrich] ${model} thinkingBudget 거부(400) → 옵션 없이 재시도`);
+        response = await call(false);
+      }
       // ⭐그라운딩 근거 체크 — 근거 없으면 웹을 안 보고 지어낸 답변(캔버스가든 상상업체 사고 이후 도입) → 폐기.
       const gm = response.candidates?.[0]?.groundingMetadata;
       const grounded = !!(gm?.groundingChunks?.length || gm?.groundingSupports?.length);
@@ -2095,6 +2146,44 @@ export function detectRegionMismatch(research: string, region?: string): string 
   }
   if (!found.size) return null; // 메모에 지명 자체가 없음 → 판단 보류
   return [...found].slice(0, 2).join("·");
+}
+
+/** 웹 텍스트에 '실제로 적혀 있던' 인스타 핸들만 수확(브랜드명 유추 아님).
+ *  instagram.com/핸들 링크 우선, 없으면 본문의 @핸들. 서비스 경로·잡핸들은 제외. */
+const IG_RESERVED = new Set([
+  "p", "reel", "reels", "explore", "stories", "tv", "accounts", "direct",
+  "about", "developer", "legal", "privacy", "terms", "help", "instagram",
+]);
+export function sniffInstagramFromText(text: string, exclude?: string): string[] {
+  const found = new Map<string, number>(); // 핸들 → 점수(링크=2, 본문 @=1)
+  const add = (raw: string, score: number) => {
+    const h = raw.replace(/^@/, "").replace(/[.]+$/, "").toLowerCase();
+    if (h.length < 3 || h.length > 30) return;
+    if (IG_RESERVED.has(h)) return;
+    if (!/[a-z]/.test(h)) return; // 숫자만 = 게시물 id류
+    if (exclude && exclude.replace(/^@/, "").toLowerCase() === h) return;
+    found.set(h, Math.max(found.get(h) ?? 0, score));
+  };
+  for (const m of text.matchAll(/instagram\.com\/([A-Za-z0-9_.]{2,30})/g)) add(m[1], 2);
+  for (const m of text.matchAll(/@([A-Za-z0-9_.]{3,30})/g)) add(m[1], 1);
+  return [...found.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3)
+    .map(([h]) => `@${h}`);
+}
+
+/** 제미나이 조사 결과가 사실상 빈손인가 — 대부분 "확인 안 됨"이거나 알맹이가 거의 없음.
+ *  접지는 됐지만(=안전망 미작동) 내용이 없는 케이스를 잡아 재시도를 트리거한다. */
+export function searchLooksEmpty(text: string): boolean {
+  if (!text.trim()) return true;
+  const unknown = (text.match(/확인 안 됨/g) || []).length;
+  const body = text
+    .replace(/\[[^\]]*\]/g, "") // 소제목 제거
+    .replace(/확인 안 됨/g, "")
+    .replace(/\s/g, "");
+  // 10개 소제목 중 6개 이상이 "확인 안 됨" = 주된 판정. 길이(120자)는 형식이 깨진 응답용 backstop —
+  // 소제목 3~4개에 한 문장씩만 있어도 120자는 넘는다(그 아래면 쓸 만한 알맹이가 없다는 뜻).
+  return unknown >= 6 || body.length < 120;
 }
 
 export function researchTier(research: string, chipCount: number): "rich" | "thin" {
