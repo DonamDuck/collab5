@@ -16,6 +16,7 @@ import {
   extractMapLinkFromResearch,
   searchLooksEmpty,
   isOwnerVoiceHost,
+  isUsableOwnerVoice,
   CHIP_TARGET,
 } from "../src/lib/enrich";
 import { regionMatches, regionConflict } from "../src/lib/regionSynonyms";
@@ -406,6 +407,27 @@ check("그럴싸한 이름 창작 금지 명시", /그럴싸한 이름을 지어
 check("모르면 항목 자체를 빼라", /매체명을 정확히 모르면 그 항목 자체를 빼라/.test(es));
 check("⭐지류신문=url 없어도 정상(항목 유지) 정책 명시", /지류신문·사보처럼 웹 링크가 없는 매체도 많다/.test(es));
 check("스키마 label에도 창작 금지", /비슷하게 바꾸거나 그럴싸한 이름을 만들지 마라/.test(es));
+
+// 잘린 검색 요약 방어 (대표 QA 2026-07-20 — 두더지요가원 무의미 칩)
+console.log("[잘린 스니펫 방어]");
+const obud = `소개 ; "두더지 요가원"으로 하게 된 이유 1. 기억에 남는 강렬한 이름. 영어나 산스크리트어도 고민했지만, 한 번 들으면 잊히지`;
+check("⛔ 오붓 잘린 스니펫 = 사장님 소개로 인정 안 함", !isUsableOwnerVoice(obud));
+check("⛔ 섹션 라벨 시작 배제", !isUsableOwnerVoice("소개 ; 우리는 요가를 합니다 그리고 또 무언가를 합니다"));
+check("⛔ 번호 목록 배제", !isUsableOwnerVoice("우리가 시작한 이유 1. 첫째 이유는 이것이고 둘째는 저것입니다"));
+check("⛔ 연결어미로 잘린 문장 배제", !isUsableOwnerVoice("정성껏 굽는 빵을 만들며 매일 아침 문을 열고 있지만"));
+check("✅ 정상 사장님 소개는 통과", isUsableOwnerVoice("이탈리아 정통 라바짜 원두로 내린 커피와 시그니처 치즈계란빵이 대표메뉴인 카페입니다."));
+
+const obudMemo = `[사장님이 직접 쓴 소개 — 신뢰도 최상 · 이 브랜드의 자기 표현]
+· ${obud} (www.obud.co)
+
+[지도 교차검증] ✅ 네이버 지도 주소가 입력 지역(경기도 고양시 일산동구)과 일치 — 이 업체가 맞아요.
+
+[네이버 지역검색 — 주소·업종·전화]
+· 두더지요가원 | 업종:스포츠,오락>요가 | 도로명:경기 고양시 일산동구 | 지번: | 전화: | 링크:`;
+const obudChips = extractChipsFromResearch(obudMemo, "두더지요가원", "요가원, 요가").map((c) => c.text);
+check("무의미 칩('소개'·'고민했지만'·'잊히지') 0개", !obudChips.some((t) => /^소개$|고민했지만|잊히지|기억에 남는/.test(t)), JSON.stringify(obudChips));
+check("지도 칩은 정상 유지", obudChips.includes("요가"), JSON.stringify(obudChips));
+check("조각 단위 방어: 연결어미 종결 칩 배제", !extractChipsFromResearch("[출처 2 · 제미나이]\n[키워드]\n고민했지만, 좋은 원두", "가게").some((c) => c.text === "고민했지만"));
 
 console.log(`\n결과: ${pass} pass / ${fail} fail`);
 process.exit(fail ? 1 : 0);

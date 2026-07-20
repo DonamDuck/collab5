@@ -1018,6 +1018,7 @@ class NaverGeminiProvider implements SearchProvider {
         if (desc.replace(/\s/g, "").length < 30) return null; // 운영시간만 있는 껍데기 제외
         // 후기 목록·평점 메타가 잡힌 요약은 사장님 글이 아니다(당근 '후기 2개 · 인증 22회 · 5.0').
         if (/후기\s*\d|리뷰\s*\d|인증\s*\d+\s*회|\d+일\s*전\s*작성|평점|별점|^\s*\d[.,]\d\s*·/.test(desc)) return null;
+        if (!isUsableOwnerVoice(desc)) return null; // 검색 요약이 잘렸거나 섹션 라벨·번호목록이면 제외
         return { host, desc };
       })
       .filter((x): x is { host: string; desc: string } => !!x)
@@ -1854,11 +1855,14 @@ export function extractChipsFromResearch(
     .trim();
   // 사장님이 직접 쓴 소개(주문·예약 플랫폼에 실린 네이버 플레이스 소개문)도 같은 급의 칩 소스.
   // 홈페이지가 없는 동네 가게는 이게 유일한 '자기 표현' 원천이다(대표 발견 2026-07-20).
-  const ownerVoiceDesc = /\[사장님이 직접 쓴 소개[^\]]*\]\s*\n·\s*(.+)$/m
+  const ownerVoiceRaw = /\[사장님이 직접 쓴 소개[^\]]*\]\s*\n·\s*(.+)$/m
     .exec(naverPart)?.[1]
     ?.replace(/\s*\([^)]*\)\s*$/, "") // 꼬리의 출처 호스트 제거
     .replace(/[.…]+\s*$/, "")
     .trim();
+  // 2차 방어(대표 QA 07-20 두더지요가원) — gather에서 걸러도 기존 메모·다른 경로로 들어올 수 있어
+  // 칩 추출 직전에 한 번 더 본다. 잘린 스니펫을 쪼개면 "소개"·"고민했지만" 같은 무의미 칩이 나온다.
+  const ownerVoiceDesc = ownerVoiceRaw && isUsableOwnerVoice(ownerVoiceRaw) ? ownerVoiceRaw : undefined;
   const parts = body.split(/\n?\s*\[([^\]\n]+)\]\s*/); // [pre, header, body, header, body, ...]
   const chips: KeywordChip[] = [];
   const STOPWORDS = /^(또한|그리고|하지만|특히|및|기타|등|다만|그러나|이\s*외|그\s*외)$/;
@@ -1885,6 +1889,10 @@ export function extractChipsFromResearch(
       return false; // 영업시간("영업시간 매일 06 00 - 21 00")
     // 실질 내용(한글·영문·숫자)이 없으면 배제 — "###", "()", "···", "-" 같은 기호 잔재 차단.
     if (!/[가-힣a-zA-Z0-9]/.test(text)) return false;
+    // 문장이 잘린 조각 배제 — 연결어미로 끝나면 칩이 아니라 문장 토막이다(검색 요약 절단).
+    if (/(지만|는데|은데|어서|아서|면서|거나|려고|도록|으며|이며)$/.test(text)) return false;
+    // 페이지 섹션 라벨 단독 배제 — 브랜드 정보가 아니라 사이트 구조어.
+    if (/^(소개|안내|정보|상세|위치|문의|예약|메뉴|공지|홈|더보기)$/.test(text)) return false;
     // 메타·잡음 단어 단독은 배제 — "결과", "검색결과", "정보 없음" 등.
     if (/^(결과|검색\s*결과|정보|내용|미상|불명|없음|해당\s*사항)$/.test(text)) return false;
     // 매체명 없는 막연한 노출 언급 배제 — "매체 노출 2023년" 등(매체명 있으면 그 이름으로 시작함).
@@ -2238,6 +2246,23 @@ export function detectRegionMismatch(research: string, region?: string): string 
   }
   if (!found.size) return null; // 메모에 지명 자체가 없음 → 판단 보류
   return [...found].slice(0, 2).join("·");
+}
+
+/** 검색 요약(snippet)이 '사장님 소개문'으로 쓸 만한가 — 웹문서 요약은 중간에서 잘리고
+ *  섹션 라벨·번호 목록이 섞여 온다(오붓 두더지요가원: "소개 ; …하게 된 이유 1. 기억에 남는 강렬한
+ *  이름. 영어나 산스크리트어도 고민했지만, 한 번 들으면 잊히지").
+ *  이런 조각을 칩으로 쪼개면 "소개"·"고민했지만" 같은 무의미 칩이 나온다 → 통째로 배제. */
+export function isUsableOwnerVoice(desc: string): boolean {
+  const t = desc.trim();
+  if (!t) return false;
+  if (/^(소개|안내|정보|상세|위치|문의|예약|메뉴|공지)\s*[;:·|]/.test(t)) return false; // 섹션 라벨로 시작
+  if (/\s\d+\.\s/.test(t)) return false; // 번호 목록("… 이유 1. 기억에 남는 …")
+  if (/\s[;|]\s/.test(t)) return false; // 스니펫 구조 구분자
+  // 마지막 어절이 연결어미·미완성 활용형이면 문장이 잘린 것
+  const last = t.split(/\s+/).pop() ?? "";
+  if (/(지만|하지만|는데|은데|어서|아서|면서|거나|려고|도록|으며|이며|고서)$/.test(last)) return false;
+  if (/(잊히지|하지|되지|있지|없지|리지|기지)$/.test(last)) return false; // "…들으면 잊히지"류 절단
+  return true;
 }
 
 /** 사장님이 직접 쓴 소개가 그대로 실리는 플랫폼 — 주문·예약·클래스 중개나 본인 채널.
