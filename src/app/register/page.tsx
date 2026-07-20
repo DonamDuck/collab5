@@ -1674,7 +1674,9 @@ function RegisterForm() {
           </Field>
           <Field label="인스타그램 (선택)" hint={hintFor("instagram", "instagram")}>
             {/* '@' 고정 접두어 — 입력창 밖에 표시해 사용자가 넣거나 빠뜨리는 표기 편차 제거(대표 지시 07-20) */}
-            <div className="flex h-11 w-full items-center rounded-sm border border-hairline bg-surface px-3 focus-within:border-focus">
+            {/* 포커스 링은 래퍼가 소유 — globals.css의 전역 :focus-visible 규칙이 레이어 밖이라
+                Tailwind outline-none보다 우선한다. 안쪽 input은 `!`로 눌러 링 겹침을 막는다. */}
+            <div className="flex h-11 w-full items-center rounded-sm border border-hairline bg-surface px-3 focus-within:[outline:2px_solid_var(--focus)] focus-within:[outline-offset:2px]">
               <span className="shrink-0 text-base text-mute">@</span>
               <input
                 value={instagram.replace(/^@+/, "")}
@@ -1683,7 +1685,7 @@ function RegisterForm() {
                   setInstagram(v ? `@${v}` : "");
                 }}
                 placeholder="handle"
-                className="h-full min-w-0 flex-1 bg-transparent text-base text-ink outline-none placeholder:text-faint"
+                className="h-full min-w-0 flex-1 bg-transparent text-base text-ink outline-none! placeholder:text-faint"
               />
             </div>
           </Field>
@@ -1856,7 +1858,7 @@ function RegisterForm() {
         >
           <ScrollLock />
           <div
-            className="relative w-full max-w-md rounded-lg border border-hairline bg-surface p-5 shadow-e2"
+            className="slim-scrollbar relative max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-y-auto rounded-lg border border-hairline bg-surface p-5 shadow-e2"
             onClick={(e) => e.stopPropagation()}
           >
             <button
@@ -1971,7 +1973,7 @@ function RegisterForm() {
         >
           <ScrollLock />
           <div
-            className="relative w-full max-w-md rounded-lg border border-hairline bg-surface p-6 text-center shadow-e2"
+            className="slim-scrollbar relative max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-y-auto rounded-lg border border-hairline bg-surface p-6 text-center shadow-e2"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="text-4xl leading-none" aria-hidden="true">🎉</div>
@@ -2069,7 +2071,7 @@ function RegisterForm() {
       {portfolioOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4">
           <ScrollLock />
-          <div className="w-full max-w-md rounded-lg border border-hairline bg-surface p-6 text-center shadow-e2">
+          <div className="slim-scrollbar max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-y-auto rounded-lg border border-hairline bg-surface p-6 text-center shadow-e2">
             <p className="text-lg font-bold text-ink">✨ 브랜드 소개서가 완성됐어요!</p>
             {loggedIn ? (
               <>

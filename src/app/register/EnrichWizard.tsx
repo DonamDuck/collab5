@@ -573,7 +573,7 @@ export function EnrichWizard({
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 p-4 sm:items-center">
       <ScrollLock />
       <div
-        className="relative w-full max-w-md rounded-lg border border-hairline bg-surface p-5 shadow-e2"
+        className="relative flex max-h-[calc(100dvh-2rem)] w-full max-w-md flex-col rounded-lg border border-hairline bg-surface p-5 shadow-e2"
         onClick={(e) => e.stopPropagation()}
       >
         <button
@@ -584,6 +584,8 @@ export function EnrichWizard({
         >
           ✕
         </button>
+        {/* 내용만 스크롤 — 스텝이 길어져도 잘리지 않고, ✕는 패널에 고정(대표 QA 07-20) */}
+        <div className="slim-scrollbar -mx-5 min-h-0 flex-1 overflow-y-auto px-5">
 
         {/* 진행 단계 표시 + 뒤로 */}
         {stepIdx >= 0 && (
@@ -1088,6 +1090,7 @@ export function EnrichWizard({
             </button>
           </div>
         )}
+        </div>
       </div>
     </div>
   );
@@ -1128,7 +1131,7 @@ function LinkPicker({
   const stripPrefix = (v: string) =>
     fixedPrefix ? v.replace(new RegExp(`^\\${fixedPrefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}+`), "") : v;
   const customInput = pick.customOn && fixedPrefix ? (
-    <div className="mt-1.5 flex h-11 w-full items-center rounded-sm border border-hairline bg-surface px-3 focus-within:border-focus">
+    <div className="mt-1.5 flex h-11 w-full items-center rounded-sm border border-hairline bg-surface px-3 focus-within:[outline:2px_solid_var(--focus)] focus-within:[outline-offset:2px]">
       <span className="shrink-0 text-base text-mute">{fixedPrefix}</span>
       <input
         autoFocus
@@ -1142,7 +1145,7 @@ function LinkPicker({
           })
         }
         placeholder="handle"
-        className="h-full min-w-0 flex-1 bg-transparent text-base text-ink outline-none placeholder:text-faint"
+        className="h-full min-w-0 flex-1 bg-transparent text-base text-ink outline-none! placeholder:text-faint"
       />
     </div>
   ) : (
@@ -1258,7 +1261,7 @@ function FieldEdit({
     <div>
       <label className="mb-1.5 block text-[15px] font-medium text-body">{label}</label>
       {fixedPrefix ? (
-        <div className="flex h-11 w-full items-center rounded-sm border border-hairline bg-surface px-3 focus-within:border-focus">
+        <div className="flex h-11 w-full items-center rounded-sm border border-hairline bg-surface px-3 focus-within:[outline:2px_solid_var(--focus)] focus-within:[outline-offset:2px]">
           <span className="shrink-0 text-base text-mute">{fixedPrefix}</span>
           <input
             value={stripPrefix(value)}
@@ -1267,7 +1270,7 @@ function FieldEdit({
               onChange(v ? fixedPrefix + v : ""); // 빈 값이면 접두어만 남지 않게 진짜 빈 문자열로
             }}
             placeholder="handle"
-            className="h-full min-w-0 flex-1 bg-transparent text-base text-ink outline-none placeholder:text-faint"
+            className="h-full min-w-0 flex-1 bg-transparent text-base text-ink outline-none! placeholder:text-faint"
           />
         </div>
       ) : (
