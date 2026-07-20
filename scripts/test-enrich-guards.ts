@@ -309,7 +309,8 @@ check("빈값 → null", mapLinkLabel("") === null && mapLinkLabel(undefined) ==
 
 // 사장님 원문(플레이스 소개 신디케이션) — 2026-07-20 대표 발견
 console.log("[사장님이 직접 쓴 소개]");
-check("패스오더·오붓·당근·카카오채널 = 사장님 목소리 출처", ["app.passorder.co.kr","www.obud.co","daangn.com","pf.kakao.com"].every(isOwnerVoiceHost));
+check("패스오더·오붓·카카오채널 = 사장님 목소리 출처", ["app.passorder.co.kr","www.obud.co","pf.kakao.com"].every(isOwnerVoiceHost));
+check("⛔ 당근·태블링 제외(요약에 후기·평점 메타가 잡힘 — 07-20 회귀 수리)", !isOwnerVoiceHost("daangn.com") && !isOwnerVoiceHost("tabling.co.kr"));
 check("⛔ 디렉토리는 사장님 목소리 아님", !isOwnerVoiceHost("moneypin.biz") && !isOwnerVoiceHost("www.114.co.kr"));
 const ownerMemo = `[사장님이 직접 쓴 소개 — 신뢰도 최상 · 이 브랜드의 자기 표현]
 · 맛있는 에스프레소로 인정받은 에스프레소바, 이탈리아 정통 라바짜 원두, 시그니처 치즈계란빵 (app.passorder.co.kr)
@@ -321,6 +322,17 @@ const ownerChips = extractChipsFromResearch(ownerMemo, "상왕제약 홍익점",
 check("사장님 원문 → 칩 생성", ownerChips.length > 0, JSON.stringify(ownerChips));
 check("구체 사실('라바짜'·'치즈계란빵') 칩화", ownerChips.some((t) => /라바짜|치즈계란빵/.test(t)), JSON.stringify(ownerChips));
 check("출처 호스트는 칩에 안 섞임", !ownerChips.some((t) => t.includes("passorder")));
+// 실제 산문형 소개(상왕제약 원문) — 상호 자기지칭·후기 메타 잔해가 칩이 되면 안 된다
+const proseMemo = `[사장님이 직접 쓴 소개 — 신뢰도 최상 · 이 브랜드의 자기 표현]
+· 맛있는 에스프레소로 인정받은 에스프레소바 상왕제약의 두번째 공간, 카페 상왕제약. 이탈리아 정통 라바짜 원두로 내린 커피와 시그니처 치즈계란빵이 대표메뉴인 카페 상왕제약. (app.passorder.co.kr)
+→ 표현이다.`;
+const proseChips = extractChipsFromResearch(proseMemo, "상왕제약 홍익점", "카페").map((c) => c.text);
+check("상호 자기지칭('카페 상왕제약') 칩 차단", !proseChips.some((t) => t.includes("상왕제약")), JSON.stringify(proseChips));
+check("후기 메타('포테토칩·인증 22회·5.0')는 사장님 소개로 인정 안 함", (() => {
+  // gather 단계 가드 시뮬 — 후기 메타 패턴이 desc에 있으면 ownerVoice로 안 뽑힘
+  const reviewDesc = "후기 2개 ; 포테토칩 · 서울시 성동구 홍익동 인증 22회·25일 전 작성 · 5.0 · 커피가 항상";
+  return /후기\s*\d|리뷰\s*\d|인증\s*\d+\s*회|\d+일\s*전\s*작성|평점|별점/.test(reviewDesc);
+})());
 check("재시도 기준 상수 노출(조정 가능)", CHIP_TARGET === 10);
 
 console.log(`\n결과: ${pass} pass / ${fail} fail`);

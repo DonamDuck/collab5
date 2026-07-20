@@ -1004,6 +1004,8 @@ class NaverGeminiProvider implements SearchProvider {
         if (!isOwnerVoiceHost(host)) return null;
         const desc = this.clean(it.description);
         if (desc.replace(/\s/g, "").length < 30) return null; // 운영시간만 있는 껍데기 제외
+        // 후기 목록·평점 메타가 잡힌 요약은 사장님 글이 아니다(당근 '후기 2개 · 인증 22회 · 5.0').
+        if (/후기\s*\d|리뷰\s*\d|인증\s*\d+\s*회|\d+일\s*전\s*작성|평점|별점|^\s*\d[.,]\d\s*·/.test(desc)) return null;
         return { host, desc };
       })
       .filter((x): x is { host: string; desc: string } => !!x)
@@ -1197,10 +1199,16 @@ class NaverGeminiProvider implements SearchProvider {
     businessType?: string,
     anchor?: string,
     /** 재시도용 — 돌릴 검색전략 라운드들(병렬). 미지정=기본 1라운드. */
-    rounds?: number[]
+    rounds?: number[],
+    /** 사장이 직접 쓴 소개(네이버 스니펫 실측) — 키워드·사실의 정당한 재료로 명시 전달 */
+    ownerVoice?: string
   ): Promise<string> {
     if (process.env.ENRICH_GEMINI_SEARCH === "0") return "";
     // 네이버 검증 앵커 — '어느 업체인지' 조준용(대표 아이디어 2026-07-15). 내용 받아쓰기 금지로 바이어스 방어.
+    // 사장님 소개 — 앵커('받아쓰기 금지')와 달리 이건 받아써도 되는 1차 사실이다. 명시적으로 허용.
+    const ownerBlock = ownerVoice
+      ? `\n[사장님이 직접 쓴 소개 — 네이버 검색에서 실측 확인된 원문]\n"${ownerVoice}"\n(사장이 직접 쓴 소개라 이미 확인된 사실이다. [정체]·[제품/특징]·[키워드]에 여기 나온 구체 표현 — 원두·시그니처 메뉴·공간 성격 등 — 을 그대로 반영해라. 단, 여기 없는 내용을 이걸 근거로 지어내진 마라.)\n`
+      : "";
     const anchorBlock = anchor
       ? `\n[업체 특정 앵커 — 네이버 실측 데이터로 이미 확인된 이 업체의 신원]\n${anchor}\n(⚠️이 앵커는 '어느 업체인지' 특정하는 용도로만 써라. 조사 내용은 앵커를 받아쓰지 말고 네가 웹에서 직접 확인한 것만 적어라. 공식 홈페이지 도메인이 있으면 그 사이트 내용을 우선 검색해라. 앵커와 다른 업체의 정보는 절대 섞지 마라.)\n`
       : "";
@@ -1228,7 +1236,7 @@ class NaverGeminiProvider implements SearchProvider {
           ? `\n⚠️직전 조사가 빈손이었다. 이번엔 SNS·소셜 중심으로 찾아라: ①"${query} 인스타", "${query} instagram", "instagram.com ${query}" ②"${query} 소식/공지/예약" 같은 운영 계정 글 ③해시태그(#${query.replace(/\s/g, "")})가 붙은 후기 글. 계정을 찾으면 그 계정이 올린 내용(제품·클래스·공지)에서 사실을 정리해. 계정을 못 찾으면 지어내지 말고 "확인 안 됨"으로.`
           : `\n⚠️직전 조사에서 검색 근거를 못 찾았다. 검색 전략을 바꿔라: ①지역 기반 일반 검색어("${region?.trim() ?? ""} ${businessType?.trim() ?? ""}", "${region?.trim() ?? ""} ${businessType?.trim() ?? ""} 후기/맛집")로 넓게 검색한 뒤 그 결과 안에서 '${query}'를 찾아라 ②상호의 띄어쓰기를 바꿔서도 검색해봐 ③영업시간·메뉴·주차 같은 방문 정보 중심 검색도 시도. 그래도 못 찾으면 지어내지 말고 "확인 안 됨"으로.`;
     const promptFor = (round: number) => `절대 추측하거나 사실이 아닌 정보를 지어내지 마. 웹에서 확인된 것만 적는다.
-"${query}" 브랜드/업체를 웹에서 조사해줘.${searchStrategy(round)}${loc}${anchorBlock}
+"${query}" 브랜드/업체를 웹에서 조사해줘.${searchStrategy(round)}${loc}${ownerBlock}${anchorBlock}
 아래 소제목 순서 그대로, 확인된 사실만 개조식으로 정리해줘. 전체 1500자 이내. 해당 정보가 없으면 그 소제목에 "확인 안 됨" 한 줄만 — 소제목 설명에 나온 단어(워크숍·클래스·팔로워·펀딩 등)를 실제 확인 없이 되풀이해 적지 마라.
 
 [정체] 무엇을 만들고/하는 곳인지 한두 줄 + 창업 배경·브랜드 철학·시작 이야기가 있으면 두세 줄
@@ -1383,7 +1391,8 @@ class NaverGeminiProvider implements SearchProvider {
   async research(name: string, region?: string, businessType?: string): Promise<string> {
     const naver = await this.gather(name, region);
     const anchor = extractNaverAnchor(naver);
-    const gemini = await this.geminiSearch(name, region, businessType, anchor ?? undefined);
+    const ownerVoice = extractOwnerVoiceFromResearch(naver);
+    const gemini = await this.geminiSearch(name, region, businessType, anchor ?? undefined, undefined, ownerVoice);
     let combined = this.combineResearch(naver, gemini);
 
     // ⭐재시도 정책(대표 확정 2026-07-20) — 유저가 실제로 보는 것은 '칩 개수'다. 검색이 접지됐는지·
@@ -1391,7 +1400,7 @@ class NaverGeminiProvider implements SearchProvider {
     //   ⛔딱 1회만 — 재시도 후에도 부족하면 그대로 간다(재귀 없음). 최대 검색 2콜 + 생성 1콜.
     const chips = extractChipsFromResearch(combined, name, businessType);
     if (chips.length < CHIP_TARGET) {
-      const more = await this.geminiSearch(name, region, businessType, anchor ?? undefined, [2, 3]);
+      const more = await this.geminiSearch(name, region, businessType, anchor ?? undefined, [2, 3], ownerVoice);
       if (more) {
         const merged = this.combineResearch(naver, [gemini, more].filter(Boolean).join("\n\n"));
         const after = extractChipsFromResearch(merged, name, businessType);
@@ -1977,10 +1986,16 @@ export function extractChipsFromResearch(
   if (selfDesc) {
     const metaSec = { label: "우리 소개(홈페이지)", factual: false };
     const before = chips.length;
+    // ⚠️'·'로는 자르지 않는다(2026-07-20) — 사장 문장의 구분자가 아니라 후기·메타 나열 구분자다.
+    //   긴 산문은 문장(.!?) → 쉼표 → 연결어 순으로 잘게 나눠 28자 칩 후보를 만든다.
     if (selfDesc.length <= 28) push(selfDesc, metaSec);
     else
-      for (const frag of selfDesc.split(/[,，;·、]|\s+(?:그리고|및)\s+/)) {
+      for (const frag of selfDesc.split(/[.!?]\s*|[,，;、]|\s+(?:그리고|및)\s+/)) {
         const f = frag.replace(/\.{2,}$|…$/g, "").trim();
+        // 상호(토큰 단위)가 든 조각은 칩이 아니다 — "카페 상왕제약" 같은 잔해 차단(2026-07-20).
+        //   상호 토큰(3자+)이 조각에 들어 있으면 그건 브랜드 자기 지칭이지 키워드가 아님.
+        const fKey = f.replace(/\s/g, "");
+        if (brandName && brandName.split(/\s+/).some((tk) => tk.length >= 3 && fKey.includes(tk))) continue;
         if (push(f, metaSec)) {
           if (chips.length - before >= 4) break;
         }
@@ -2202,11 +2217,21 @@ export function detectRegionMismatch(research: string, region?: string): string 
 /** 사장님이 직접 쓴 소개가 그대로 실리는 플랫폼 — 주문·예약·클래스 중개나 본인 채널.
  *  네이버 플레이스 [정보] 탭 소개문이 여기로 신디케이션되는 경우가 많다(상왕제약=패스오더에서 원문 확인).
  *  ⚠️디렉토리(114·머니핀 등 자동생성 요약)와 반대 성격 — 그쪽은 isDirectoryHost가 이미 거른다. */
+// ⚠️당근·태블링·캐치테이블은 제외(2026-07-20 회귀 수리): 가게 페이지는 맞지만 검색 요약에
+//   사장 소개 대신 '후기 2개 · 포테토칩 · 인증 22회 · 5.0' 같은 후기·예약 메타가 잡힌다.
 const OWNER_VOICE_HOSTS =
-  /(^|\.)(passorder\.co\.kr|obud\.co|daangn\.com|pf\.kakao\.com|tabling\.co\.kr|catchtable\.co\.kr|naver\.me|smartstore\.naver\.com|litt\.ly|linktr\.ee)$/i;
+  /(^|\.)(passorder\.co\.kr|obud\.co|pf\.kakao\.com|smartstore\.naver\.com|litt\.ly|linktr\.ee)$/i;
 
 export function isOwnerVoiceHost(host: string): boolean {
   return OWNER_VOICE_HOSTS.test(host.replace(/^www\./i, ""));
+}
+
+/** 조사 메모에서 사장님 소개 원문 회수 — geminiSearch에 '확인된 사실'로 전달해
+ *  [키워드]·[제품/특징]이 그 구체 표현(원두·시그니처 메뉴 등)을 반영하게 한다.
+ *  정규식으로 긴 산문을 칩으로 쪼개는 건 한계(28자 상한·명사구 인식 불가) — 의미 추출은 LLM 몫. */
+export function extractOwnerVoiceFromResearch(research: string): string | undefined {
+  const m = /\[사장님이 직접 쓴 소개[^\]]*\]\s*\n·\s*(.+)$/m.exec(research);
+  return m?.[1]?.replace(/\s*\([^)]*\)\s*$/, "").trim() || undefined;
 }
 
 /** 조사 메모에서 코드가 심어둔 지도 링크를 회수. 모델이 만든 값이 아니라 우리가 넣은 값이라 안전. */
