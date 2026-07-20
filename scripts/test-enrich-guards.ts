@@ -337,7 +337,10 @@ check("재시도 기준 상수 노출(조정 가능)", CHIP_TARGET === 10);
 
 // 홈페이지 후보 소스 제한 (대표 확정 2026-07-20 — 아티클 오염 차단)
 console.log("[홈페이지 후보 소스 제한]");
-const hpMemo = `[홈페이지 직접 확인 — 신뢰도 높음]
+// ⚠️combineResearch의 출처1 헤더를 반드시 포함할 것 — 헤더 설명문에 "[네이버 지역검색]" 같은
+//   섹션명이 들어 있어, 헤더를 섹션으로 오인하면 본문을 통째로 놓친다(2026-07-20 실제 회귀).
+const SRC1 = `[출처 1 · 네이버 검색 API — 실측 데이터라 사실성 최상. 특히 [브랜드가 직접 쓴 소개]·[지도 교차검증]·[네이버 지역검색] 블록은 최상위 신뢰]\n`;
+const hpMemo = SRC1 + `[홈페이지 직접 확인 — 신뢰도 높음]
 · 홈페이지: https://canvasgarden.shop
 · 인스타그램: 홈페이지 정적 HTML에서 링크 확인 안 됨(추측하지 말 것)
 
@@ -352,6 +355,17 @@ const hpLinks = extractLinksFromResearch(hpMemo);
 check("직접확인 홈피가 1순위", hpLinks.homepageCandidates[0] === "https://canvasgarden.shop", JSON.stringify(hpLinks.homepageCandidates));
 check("지역검색 링크(사업자 등록)는 후보 포함", hpLinks.homepageCandidates.some((u) => u.includes("인스타없는공식홈피")));
 check("⛔ 웹문서 아티클(복지관·당근·패스오더)은 후보 제외", !hpLinks.homepageCandidates.some((u) => /omni\.or\.kr|daangn|passorder/.test(u)), JSON.stringify(hpLinks.homepageCandidates));
+// 출처1 헤더 오인 회귀 방지 — 홈피 검증 실패(블록 없음) + 한글 도메인 케이스(상왕제약 실사례)
+const noVerifiedMemo = SRC1 + `[지도 교차검증] ✅ 일치
+
+[네이버 지역검색 — 주소·업종·전화]
+· 상왕제약 홍익점 | 업종:카페 | 도로명:서울 성동구 왕십리로26길 32 | 지번: | 전화: | 링크:https://100원커피이벤트-선착순주문하기.com
+
+[네이버 웹문서 — 홈페이지·SNS 단서]
+· 이음가게 | 복지관 | 링크:https://omni.or.kr/gallery/x`;
+const nv = extractLinksFromResearch(noVerifiedMemo);
+check("출처1 헤더를 섹션으로 오인하지 않음(한글 도메인 홈피 생존)", nv.homepageCandidates.some((u) => u.includes("100")), JSON.stringify(nv.homepageCandidates));
+check("그 경우에도 아티클은 제외", !nv.homepageCandidates.some((u) => u.includes("omni")));
 
 console.log(`\n결과: ${pass} pass / ${fail} fail`);
 process.exit(fail ? 1 : 0);

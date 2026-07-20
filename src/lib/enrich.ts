@@ -2123,9 +2123,14 @@ export function extractLinksFromResearch(research: string): LinkFinds {
   //   아티클(복지관 갤러리·당근·패스오더)이 죄다 후보로 떠서 은퇴. '공식인지 판단 가능한' 소스만:
   //   ①[홈페이지 직접 확인] 블록 — pickHomepage가 고르고 브랜드 실재 검증까지 통과한 것
   //   ②[네이버 지역검색]의 링크 필드 — 사업자가 직접 등록한 주소
-  const verifiedHp = research.match(/\[홈페이지 직접 확인[^\]]*\][^\n]*\n·\s*홈페이지:\s*(https?:\/\/\S+)/)?.[1];
+  //   ⚠️섹션 헤더 매칭은 반드시 `]\n`(줄 끝)까지 요구할 것 — combineResearch의 출처1 헤더 설명문에
+  //     "[브랜드가 직접 쓴 소개]·[지도 교차검증]·[네이버 지역검색] 블록은 최상위 신뢰"처럼 같은
+  //     이름이 문장 안에 들어 있어, `]`까지만 보면 헤더를 섹션으로 오인해 본문을 통째로 놓친다(07-20 회귀).
+  const verifiedHp = research.match(
+    /\[홈페이지 직접 확인[^\]\n]*\]\n(?:·[^\n]*\n)*?·\s*홈페이지:\s*(https?:\/\/\S+)/
+  )?.[1];
   if (verifiedHp) addHp(verifiedHp, true);
-  const localSection = research.match(/\[네이버 지역검색[^\]]*\]([\s\S]*?)(?=\n\[|$)/)?.[1] ?? "";
+  const localSection = research.match(/\[네이버 지역검색[^\]\n]*\]\n([\s\S]*?)(?=\n\[|$)/)?.[1] ?? "";
   for (const m of localSection.matchAll(/링크:(https?:\/\/[^\s|]+)/g)) addHp(m[1]);
   const homepage = homepageCandidates[0];
 

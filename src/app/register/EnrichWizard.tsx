@@ -870,6 +870,7 @@ export function EnrichWizard({
                 placeholder="@handle"
                 pick={igPick}
                 onPick={setIgPick}
+                fixedPrefix="@"
               />
               <LinkPicker
                 label="홈페이지"
@@ -956,7 +957,7 @@ export function EnrichWizard({
             <div className="mt-4 space-y-3">
               <FieldEdit label="상호" value={fName} onChange={setFName} placeholder="예: 캔버스가든" />
               <FieldEdit label="주소" value={fAddress} onChange={setFAddress} placeholder="예: 서울 성동구 성수동" />
-              <FieldEdit label="인스타그램" value={fInstagram} onChange={setFInstagram} placeholder="@handle" />
+              <FieldEdit label="인스타그램" value={fInstagram} onChange={setFInstagram} placeholder="@handle" fixedPrefix="@" />
               <FieldEdit label="홈페이지" value={fHomepage} onChange={setFHomepage} placeholder="https://" />
             </div>
             <button
@@ -1105,6 +1106,7 @@ function LinkPicker({
   placeholder,
   pick,
   onPick,
+  fixedPrefix,
 }: {
   label: string;
   note: string;
@@ -1114,20 +1116,45 @@ function LinkPicker({
   placeholder: string;
   pick: LinkPick;
   onPick: (p: LinkPick) => void;
+  fixedPrefix?: string; // 인스타 "@"처럼 고정 접두어 — 입력창 밖에 표시하고 값엔 안 섞음(빈칸/중복 @ 방지)
 }) {
   const multi = candidates.length >= 2;
   const single = candidates.length === 1;
   const pickCandidate = (c: string) => onPick({ sel: c, customOn: false, customText: pick.customText, none: false });
   const pickCustom = () => onPick({ sel: null, customOn: true, customText: pick.customText, none: false });
   const pickNone = () => onPick({ sel: null, customOn: false, customText: pick.customText, none: true });
-  const customInput = pick.customOn && (
-    <input
-      autoFocus
-      value={pick.customText}
-      onChange={(e) => onPick({ sel: null, customOn: true, customText: e.target.value, none: false })}
-      placeholder={placeholder}
-      className="mt-1.5 h-11 w-full rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
-    />
+  // customText는 계속 "@handle" 전체를 담는다(다운스트림 정규화와 일관) — 접두어는 화면에서만
+  // 떼어 보여주고, 입력 즉시 다시 붙여 저장(사용자가 지우거나 중복 입력해도 항상 고정값 유지).
+  const stripPrefix = (v: string) =>
+    fixedPrefix ? v.replace(new RegExp(`^\\${fixedPrefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}+`), "") : v;
+  const customInput = pick.customOn && fixedPrefix ? (
+    <div className="mt-1.5 flex h-11 w-full items-center rounded-sm border border-hairline bg-surface px-3 focus-within:border-focus">
+      <span className="shrink-0 text-base text-mute">{fixedPrefix}</span>
+      <input
+        autoFocus
+        value={stripPrefix(pick.customText)}
+        onChange={(e) =>
+          onPick({
+            sel: null,
+            customOn: true,
+            customText: fixedPrefix + stripPrefix(e.target.value),
+            none: false,
+          })
+        }
+        placeholder="handle"
+        className="h-full min-w-0 flex-1 bg-transparent text-base text-ink outline-none placeholder:text-faint"
+      />
+    </div>
+  ) : (
+    pick.customOn && (
+      <input
+        autoFocus
+        value={pick.customText}
+        onChange={(e) => onPick({ sel: null, customOn: true, customText: e.target.value, none: false })}
+        placeholder={placeholder}
+        className="mt-1.5 h-11 w-full rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
+      />
+    )
   );
   // 라디오 행(리스트·0후보 공용)
   const radioRow = (on: boolean, onClick: () => void, text: string, muted = false) => (
@@ -1213,6 +1240,7 @@ function FieldEdit({
   placeholder,
   candidates,
   candidateHint,
+  fixedPrefix,
 }: {
   label: string;
   value: string;
@@ -1220,18 +1248,36 @@ function FieldEdit({
   placeholder?: string;
   candidates?: string[];
   candidateHint?: string;
+  fixedPrefix?: string; // 인스타 "@"처럼 항상 붙는 접두어 — 입력창 밖에 고정해 사용자 표기 편차 제거
 }) {
   // 값이 비어있고(=자동으로 확정 못함) 후보가 있으면 골라서 채우게 노출
   const showCandidates = !value.trim() && !!candidates?.length;
+  const stripPrefix = (v: string) =>
+    fixedPrefix ? v.replace(new RegExp(`^\\${fixedPrefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}+`), "") : v;
   return (
     <div>
       <label className="mb-1.5 block text-[15px] font-medium text-body">{label}</label>
-      <input
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        className="h-11 w-full rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
-      />
+      {fixedPrefix ? (
+        <div className="flex h-11 w-full items-center rounded-sm border border-hairline bg-surface px-3 focus-within:border-focus">
+          <span className="shrink-0 text-base text-mute">{fixedPrefix}</span>
+          <input
+            value={stripPrefix(value)}
+            onChange={(e) => {
+              const v = stripPrefix(e.target.value);
+              onChange(v ? fixedPrefix + v : ""); // 빈 값이면 접두어만 남지 않게 진짜 빈 문자열로
+            }}
+            placeholder="handle"
+            className="h-full min-w-0 flex-1 bg-transparent text-base text-ink outline-none placeholder:text-faint"
+          />
+        </div>
+      ) : (
+        <input
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder}
+          className="h-11 w-full rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
+        />
+      )}
       {showCandidates && (
         <div className="mt-2 rounded-md border border-hairline bg-surface-soft p-2.5">
           {candidateHint && <p className="mb-2 text-[13px] leading-relaxed text-mute">{candidateHint}</p>}

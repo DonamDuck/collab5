@@ -1673,12 +1673,19 @@ function RegisterForm() {
             )}
           </Field>
           <Field label="인스타그램 (선택)" hint={hintFor("instagram", "instagram")}>
-            <input
-              value={instagram}
-              onChange={(e) => setInstagram(e.target.value)}
-              placeholder="@handle"
-              className="h-11 w-full rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
-            />
+            {/* '@' 고정 접두어 — 입력창 밖에 표시해 사용자가 넣거나 빠뜨리는 표기 편차 제거(대표 지시 07-20) */}
+            <div className="flex h-11 w-full items-center rounded-sm border border-hairline bg-surface px-3 focus-within:border-focus">
+              <span className="shrink-0 text-base text-mute">@</span>
+              <input
+                value={instagram.replace(/^@+/, "")}
+                onChange={(e) => {
+                  const v = e.target.value.replace(/^@+/, "");
+                  setInstagram(v ? `@${v}` : "");
+                }}
+                placeholder="handle"
+                className="h-full min-w-0 flex-1 bg-transparent text-base text-ink outline-none placeholder:text-faint"
+              />
+            </div>
           </Field>
           <Field label="홈페이지 (선택)" hint={hintFor("homepage", "homepage")}>
             <input
