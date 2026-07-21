@@ -879,7 +879,7 @@ export function EnrichWizard({
                 label="홈페이지"
                 note={hpCandidates.length === 0 ? "웹에서 못 찾았어요" : "웹에서 발견했어요"}
                 question="우리 브랜드의 공식 홈페이지가 맞나요?"
-                emptyPrompt="공식 홈페이지가 있으신가요?"
+                emptyPrompt="홈페이지 링크가 있으신가요?"
                 candidates={hpCandidates}
                 placeholder="https://"
                 pick={hpPick}
