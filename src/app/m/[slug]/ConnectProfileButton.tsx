@@ -7,6 +7,7 @@ import { useState, useEffect, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { claimMakerAction } from "@/lib/actions";
 import { ScrollLock } from "@/components/ScrollLock";
+import { PasswordInput } from "@/components/PasswordInput";
 
 export function ConnectProfileButton({ slug, loggedIn }: { slug: string; loggedIn: boolean }) {
   const router = useRouter();
@@ -68,15 +69,15 @@ export function ConnectProfileButton({ slug, loggedIn }: { slug: string; loggedI
             <p className="mt-1.5 text-sm leading-relaxed text-mute">
               이 소개서의 관리 비밀번호를 입력하면 지금 로그인한 계정에 연결돼요.
             </p>
-            <input
-              type="password"
+            <PasswordInput
               value={pw}
               onChange={(e) => setPw(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.nativeEvent.isComposing && pw.trim()) submit();
               }}
               placeholder="관리 비밀번호"
-              className="mt-4 h-11 w-full rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
+              wrapperClassName="mt-4"
+              className="h-11 w-full rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
             />
             {err && <p className="mt-2 text-sm text-red-600">{err}</p>}
             <div className="mt-4 flex gap-2">

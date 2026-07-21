@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { signInAction } from "@/lib/auth-actions";
 import { authEnvReady, createBrowserAuthClient } from "@/lib/supabase/client";
 import { LoadingOverlay } from "@/components/LoadingOverlay";
+import { PasswordInput } from "@/components/PasswordInput";
 
 const KAKAO_ON = process.env.NEXT_PUBLIC_KAKAO_ENABLED === "1";
 
@@ -69,8 +70,7 @@ function LoginForm() {
           placeholder="이메일"
           className="h-11 w-full rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
         />
-        <input
-          type="password"
+        <PasswordInput
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           onKeyDown={(e) => {
