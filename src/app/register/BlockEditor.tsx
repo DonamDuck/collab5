@@ -317,7 +317,7 @@ export function BlockEditor({ blocks, onChange, onUploadingChange, onSheetOpenCh
                       <input
                         value={it.link ?? ""}
                         onChange={(e) => setBlock(i, { ...b, items: b.items.map((x, y) => (y === k ? { ...x, link: e.target.value } : x)) })}
-                        placeholder="기사 링크 https://"
+                        placeholder="소개 링크 https://"
                         className={inputCls}
                       />
                     </CollapsedField>
