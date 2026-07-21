@@ -1933,7 +1933,7 @@ function RegisterForm() {
               <div className="flex min-h-[180px] items-center justify-center">
                 <p className="flex items-center gap-2 text-sm font-medium text-primary-on">
                   <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-                  고르신 한 줄에 맞춰 자세히 소개를 다시 쓰고 있어요…
+                  고르신 소개에 맞춰 자세히 소개를 다시 쓰고 있어요…
                 </p>
               </div>
             ) : (
