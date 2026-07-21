@@ -504,5 +504,74 @@ check("칩 라벨: 카카오톡 채널", channelLabel("http://pf.kakao.com/_rgAl
 check("칩 라벨: 리틀리·링크트리", channelLabel("https://litt.ly/x") === "리틀리" && channelLabel("https://linktr.ee/x") === "링크트리");
 check("일반 도메인은 null → 도메인 표시로 폴백", channelLabel("https://canvasgarden.shop") === null);
 
+// ── 07-21 실크롤 10곳 QA에서 나온 칩 오염 (대표 확정) ──
+console.log("[07-21 칩 오염 회귀]");
+const SRC1c = `[출처 1 · 네이버 검색 API — 특히 [브랜드가 직접 쓴 소개]·[지도 교차검증]·[네이버 지역검색] 블록은 최상위 신뢰]\n`;
+const gemMemo = (name: string, body: string) => SRC1c + `[출처 2 · 제미나이 웹 조사]\n${body}`;
+const chipTexts = (memo: string, name: string, type?: string) =>
+  extractChipsFromResearch(memo, name, type).map((c) => c.text);
+
+// 🔴1 오귀속 — 지역검색은 이웃 업체 줄도 준다(속초옥수수소금빵 ← 달달공장 booking 링크)
+const neighborMemo =
+  SRC1c +
+  `[네이버 지역검색 — 주소·업종·전화]\n` +
+  `· 속초옥수수소금빵 | 업종:카페,디저트>베이커리 | 도로명:강원 속초시 수복로187번길 1 | 지번: | 전화: | 링크:https://www.instagram.com/sokcho_cornsaltbread\n` +
+  `· 달달공장 속초본점 | 업종:카페,디저트>베이커리 | 도로명:강원 속초시 동해대로 4339 | 지번: | 전화: | 링크:https://booking.naver.com/booking/6/bizes/786371`;
+const neighborLinks = extractLinksFromResearch(neighborMemo, "속초옥수수소금빵");
+check("⛔ 이웃 업체 링크가 대표 URL로 새지 않음", !JSON.stringify(neighborLinks.homepageCandidates).includes("786371"), JSON.stringify(neighborLinks.homepageCandidates));
+check("⛔ 예약 플랫폼 호스트에서 '@booking' 인스타 후보 파생 안 됨", !neighborLinks.instagramCandidates.includes("@booking"), JSON.stringify(neighborLinks.instagramCandidates));
+check("✅ 상호 일치 줄은 그대로 수집(인스타는 hp 아님 → 후보 비어도 인스타로는 잡힘)", neighborLinks.instagramCandidates.includes("@sokcho_cornsaltbread"));
+check("구버전 호출(상호 미전달)도 첫 줄만", extractLinksFromResearch(neighborMemo).homepageCandidates.length <= 1);
+
+// 🔴2/(c) 칩 0개 폴백 — 제미나이 전 섹션 "확인 안 됨"인데 지역검색 상호 완전일치가 있으면 업종 칩
+const zeroMemo =
+  SRC1c +
+  `[네이버 지역검색 — 주소·업종·전화]\n` +
+  `· 필라테스숲 서면점 | 업종:스포츠시설>필라테스 | 도로명:부산 부산진구 가야대로 779 | 지번: | 전화: | 링크:https://www.instagram.com/forest_pilates_sm\n` +
+  `· 온리바레 서면점 | 업종:스포츠시설>요가 | 도로명:부산 부산진구 | 지번: | 전화: | 링크:https://example.com\n` +
+  `[출처 2 · 제미나이 웹 조사]\n[정체]\n확인 안 됨\n[제품·서비스]\n확인 안 됨\n[키워드]\n확인 안 됨`;
+// 사용자가 입력한 업종("필라테스")과 다른 업종 표기일 때 회복되는지가 폴백의 요점.
+const zeroChips = chipTexts(zeroMemo, "필라테스숲 서면점", "운동");
+check("✅ 칩 0개였던 케이스가 업종 칩으로 회복", zeroChips.includes("필라테스"), JSON.stringify(zeroChips));
+check("⛔ 폴백은 이웃 업체(온리바레) 업종을 물어오지 않음", !zeroChips.includes("요가"), JSON.stringify(zeroChips));
+check("⛔ 폴백에서도 최상위 뭉텅이는 제외", !zeroChips.includes("스포츠시설") && !zeroChips.includes("스포츠"));
+// ⚠️한계(대표 보고 07-21): 지역검색 업종이 사용자가 친 업종과 '같은 단어'면 중복이라 제거된다.
+//   즉 '필라테스숲 서면점 + 업종 필라테스'는 폴백해도 여전히 0칩 → route.ts의 업종 스타터가 받는다.
+check("한계 명시: 업종이 사용자 입력과 동일하면 폴백해도 0칩", chipTexts(zeroMemo, "필라테스숲 서면점", "필라테스").length === 0);
+check("→ 그 경우 업종 스타터가 화면을 채운다", starterChipsForType("필라테스").length === 5);
+// 칩이 있는 정상 케이스엔 폴백이 끼어들지 않는다
+const richMemo = zeroMemo.replace("[정체]\n확인 안 됨", "[정체]\n동네 사람들이 편히 오는 소규모 스튜디오");
+check("⛔ 칩이 있으면 폴백 미발동(지도 ✅ 없는 업종 칩 안 붙음)", !chipTexts(richMemo, "필라테스숲 서면점").includes("필라테스"));
+
+// (b) [알려짐] 칩 은퇴 — press blockHints로만 간다
+const pressMemo = gemMemo("한담누리", `[알려짐]\n* 뉴스렙 2019년 1월 29일 기사 "제주도 게스트하우스 핫플 한담누리\n[제품·서비스]\n* 도미토리`);
+check("⛔ [알려짐]은 더 이상 칩이 아님(따옴표 깨진 기사 제목 포함)", !chipTexts(pressMemo, "한담누리").some((t) => t.includes("뉴스렙")), JSON.stringify(chipTexts(pressMemo, "한담누리")));
+check("✅ 같은 메모의 다른 섹션은 정상 수집", chipTexts(pressMemo, "한담누리").includes("도미토리"));
+
+// (a) 금지·제약 문구 차단
+const banMemo = gemMemo("한담누리", `[이용/편의시설]\n* 조식 제공\n* 객실 내 육류, 튀김류 조리 불가\n* 멤버십 회원만 이용 가능\n* 웨이팅 없음`);
+const banChips = chipTexts(banMemo, "한담누리");
+check("⛔ '~조리 불가' 차단", !banChips.some((t) => t.includes("불가")), JSON.stringify(banChips));
+check("⛔ '회원만 이용 가능' 차단", !banChips.some((t) => t.includes("회원만")));
+check("✅ '조식 제공'은 살아남음", banChips.includes("조식 제공"));
+check("✅ 오탐 방지: '웨이팅 없음'은 장점이라 통과", banChips.includes("웨이팅 없음"), JSON.stringify(banChips));
+
+// '등' 꼬리 (짧은 줄이 통째로 들어오는 경로)
+const etcMemo = gemMemo("어페어커피", `[제품·서비스]\n* 아메리카노 등\n* 까눌레 등`);
+check("⛔ '등' 꼬리 제거", chipTexts(etcMemo, "어페어커피").includes("아메리카노") && !chipTexts(etcMemo, "어페어커피").some((t) => t.endsWith(" 등")), JSON.stringify(chipTexts(etcMemo, "어페어커피")));
+
+// 날짜 단독 조각 (노아동물병원 [콜라보])
+const dateMemo = gemMemo("노아", `[콜라보]\n* 2024년 8월 16일, 우치공원관리사무소와 업무협약을 체결했다.`);
+check("⛔ 날짜만 남은 조각 차단", !chipTexts(dateMemo, "24시 노아동물메디컬센터").includes("2024년 8월 16일"), JSON.stringify(chipTexts(dateMemo, "24시 노아동물메디컬센터")));
+
+// 브랜드 토큰 주어 문장 (아뜰리에호수)
+const subjMemo = gemMemo("아뜰리에호수", `[정체]\n아뜰리에호수는 커플링, 우정링 등 세상에 단 하나뿐인 반지를 직접 제작할 수 있는 공방이다.`);
+const subjChips = chipTexts(subjMemo, "아뜰리에호수 전주한옥마을");
+check("⛔ 브랜드 토큰+조사로 시작하는 잘린 조각 차단", !subjChips.some((t) => t.startsWith("아뜰리에호수는")), JSON.stringify(subjChips));
+
+// 따옴표 짝 (알려짐 밖의 섹션에서도 방어)
+const quoteMemo = gemMemo("너의 작업실", `[활동]\n* "북토크\n* 독서 모임`);
+check("✅ 짝 안 맞는 따옴표는 벗겨서 살림", chipTexts(quoteMemo, "너의 작업실").includes("북토크"), JSON.stringify(chipTexts(quoteMemo, "너의 작업실")));
+
 console.log(`\n결과: ${pass} pass / ${fail} fail`);
 process.exit(fail ? 1 : 0);

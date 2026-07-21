@@ -154,7 +154,8 @@ export async function POST(req: Request) {
       // 솔직 배너 + 업종 스타터로 안내한다(제미나이 degrade·레이트리밋 시에도 빈 화면 방지).
       const tier = chips.length === 0 ? "thin" : researchTier(memo, chips.length);
       // 지도 링크는 코드가 좌표로 조립해 메모에 심어둔 값 — 위저드 링크 확인 화면에 함께 보여준다.
-      const links = { ...extractLinksFromResearch(memo), mapUrl: extractMapLinkFromResearch(memo) };
+      // name 전달 필수 — 지역검색은 이웃 업체 줄도 함께 주므로 상호가 일치하는 줄의 링크만 쓴다.
+      const links = { ...extractLinksFromResearch(memo, name), mapUrl: extractMapLinkFromResearch(memo) };
       // 칩이 6개 미만이면 업종 스타터로 보강 — 네이버 칩만 2~3개 나온 소형 업체가
       // 유용한 스타터('혹시 해당되나요?')까지 잃지 않게(07-19 네이버 칩 도입으로 경계 상향).
       const starter = tier === "thin" || chips.length < 6 ? starterChipsForType(businessType) : [];
