@@ -88,33 +88,36 @@ export function MakerArticle({ maker, isOwner, logoUrl, readOnly }: {
       {/* 선택 블록 — 배열 순서대로 렌더 */}
       {maker.blocks.length > 0 && <BlockSections blocks={maker.blocks} Section={Section} />}
 
-      {/* ⑤⑥ 통폐합(2026-07-22) — 콜라보 한 섹션: 통합 칩(offers∪seeks) + 제공 한마디 + 파트너상.
+      {/* ⑤⑥ 통폐합(2026-07-22) — 콜라보 3형제: 기대(통합 칩)·제공·파트너를 같은 타이틀 위계로.
+          제공·파트너 제목도 Section h2와 동일 스타일(대표 확정), 블록 간격은 활동 아이템 간격(space-y-6).
           기존 소개서도 합집합 읽기로 그대로 정상 렌더(분기 없음). */}
       {(maker.offers.length > 0 || maker.seeks.length > 0 || maker.offersNote || maker.seeksNote) && (
-        <Section title="콜라보를 기대하고 있어요">
-          {(maker.offers.length > 0 || maker.seeks.length > 0) && (
-            <div className="mb-4 flex flex-wrap gap-2">
-              {[...new Set([...maker.offers, ...maker.seeks])].map((o) => (
-                <TypeChip key={o}>{o}</TypeChip>
-              ))}
-            </div>
-          )}
-          {maker.offersNote && (
-            <div className="mb-4">
-              <h3 className="mb-1.5 text-[15px] font-semibold text-body">이런 콜라보를 제공할 수 있어요</h3>
-              <p className="whitespace-pre-line text-[17px] leading-relaxed text-body">
-                {maker.offersNote}
-              </p>
-            </div>
-          )}
-          {maker.seeksNote && (
-            <div>
-              <h3 className="mb-1.5 text-[15px] font-semibold text-body">이런 파트너를 찾고 있어요</h3>
-              <p className="whitespace-pre-line text-[17px] leading-relaxed text-body">
-                {maker.seeksNote}
-              </p>
-            </div>
-          )}
+        <Section title="이런 콜라보를 기대하고 있어요!">
+          <div className="space-y-6">
+            {(maker.offers.length > 0 || maker.seeks.length > 0) && (
+              <div className="flex flex-wrap gap-2">
+                {[...new Set([...maker.offers, ...maker.seeks])].map((o) => (
+                  <TypeChip key={o}>{o}</TypeChip>
+                ))}
+              </div>
+            )}
+            {maker.offersNote && (
+              <div className="print:break-inside-avoid">
+                <h2 className="mb-4 text-[21px] font-bold leading-snug tracking-tight text-ink print:break-after-avoid-page">이런 콜라보를 제공할 수 있어요</h2>
+                <p className="whitespace-pre-line text-[17px] leading-relaxed text-body">
+                  {maker.offersNote}
+                </p>
+              </div>
+            )}
+            {maker.seeksNote && (
+              <div className="print:break-inside-avoid">
+                <h2 className="mb-4 text-[21px] font-bold leading-snug tracking-tight text-ink print:break-after-avoid-page">이런 파트너를 찾고 있어요</h2>
+                <p className="whitespace-pre-line text-[17px] leading-relaxed text-body">
+                  {maker.seeksNote}
+                </p>
+              </div>
+            )}
+          </div>
         </Section>
       )}
 
