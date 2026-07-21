@@ -1086,11 +1086,11 @@ function RegisterForm() {
               className="h-11 w-full scroll-mt-20 rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
             />
           </Field>
-          <Field label="한 줄 소개 (선택)" hint={hintFor("oneLiner")}>
+          <Field label="한두 문장 소개 (선택)" hint={hintFor("oneLiner")}>
             <input
               value={oneLiner}
               onChange={(e) => setOneLiner(e.target.value)}
-              placeholder="예: 패브릭으로 짓는 친환경 가방과 조각 워크숍"
+              placeholder="헌옷의 재발견, 나다움을 표현하는 직물 워크숍을 열고 있어요."
               className="h-11 w-full rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
             />
           </Field>
@@ -1105,7 +1105,7 @@ function RegisterForm() {
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={4}
-              placeholder="버려지는 천에 새 이야기를 입히는 패브릭 브랜드."
+              placeholder="헌옷과 다양한 소재를 활용한 조각 워크숍을 열고 있어요. 참가자들은 버려질 뻔한 옷을 작은 소품과 가방, 액자로 다시 만들어가며, 잊고 지냈던 자신만의 취향과 표현을 발견합니다. 때로는 양말이나 비닐봉투처럼 예상하지 못한 소재를 통해, 문자 대신 손으로 자신을 표현하는 즐거움을 함께 나누고 있습니다."
               className="w-full rounded-sm border border-hairline bg-surface px-3 py-2 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
             />
             <p className="mt-1.5 text-sm text-mute">
@@ -1185,7 +1185,7 @@ function RegisterForm() {
                   value={offersNote}
                   onChange={(e) => setOffersNote(e.target.value)}
                   rows={4}
-                  placeholder="예: 친환경 가방을 만들어요. 브랜드 제품 콜라보, 굿즈 제작을 기대하고 있어요."
+                  placeholder="매력적인 분들과의 제품 콜라보, 서로의 매력을 담은 원데이 워크숍, 공동 굿즈 등 다양한 콜라보를 기대해요!"
                   className="w-full rounded-sm border border-hairline bg-surface px-3 py-2.5 text-base leading-relaxed text-ink outline-none placeholder:text-faint focus:border-focus"
                 />
               </div>
