@@ -237,7 +237,7 @@ export default async function CardPage({
           {/* 하드축 칩(키위틴트) + 결 칩(파스텔, 보조층) */}
           {(maker.offers.length > 0 || maker.soul.values.length > 0) && (
             <div className="mt-4 flex flex-wrap gap-1.5">
-              {maker.offers.map((o) => (
+              {[...new Set([...maker.offers, ...maker.seeks])].map((o) => (
                 <span
                   key={`o-${o}`}
                   className="inline-flex h-7 items-center rounded-pill bg-primary-tint px-2.5 text-[12px] font-medium text-primary-on"
@@ -263,20 +263,7 @@ export default async function CardPage({
             </p>
           )}
 
-          {/* 찾는 콜라보 — 제안 접점 (수신자가 "내가 줄 수 있는 게 있나") */}
-          {maker.seeks.length > 0 && (
-            <div className="mt-2 flex flex-wrap items-center gap-1.5">
-              <span className="text-[12px] text-faint">찾는 콜라보</span>
-              {maker.seeks.map((s) => (
-                <span
-                  key={`s-${s}`}
-                  className="inline-flex h-7 items-center rounded-pill border border-hairline bg-surface px-2.5 text-[12px] font-medium text-mute"
-                >
-                  {s}
-                </span>
-              ))}
-            </div>
-          )}
+          {/* 구 "찾는 콜라보" 칩 줄 은퇴(2026-07-22 통합) — 유형은 위 통합 칩(offers∪seeks)이 담당 */}
         </div>
 
         {/* 7. RSVP (앞 24px) */}

@@ -150,37 +150,19 @@ export const PortfolioCard = forwardRef<HTMLDivElement, { data: PortfolioData }>
           </div>
         )}
 
-        {/* 콜라보 유형 */}
+        {/* 콜라보 유형 — 통합 칩 1세트(offers∪seeks, 2026-07-22 통합) */}
         {(data.offers.length > 0 || data.seeks.length > 0) && (
-          <div style={{ marginTop: 20, display: "flex", gap: 24, flexWrap: "wrap" }}>
-            {data.offers.length > 0 && (
-              <div>
-                <div style={{ fontSize: 12, fontWeight: 600, color: C.faint, marginBottom: 8 }}>
-                  제공할 수 있어요
-                </div>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                  {data.offers.map((o) => (
-                    <span key={o} style={chip(C.kiwiPale, C.kiwiOn)}>
-                      {o}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-            {data.seeks.length > 0 && (
-              <div>
-                <div style={{ fontSize: 12, fontWeight: 600, color: C.faint, marginBottom: 8 }}>
-                  찾고 있어요
-                </div>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                  {data.seeks.map((s) => (
-                    <span key={s} style={chip(C.chipGray, C.mute)}>
-                      {s}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
+          <div style={{ marginTop: 20 }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: C.faint, marginBottom: 8 }}>
+              함께하고 싶은 콜라보
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+              {[...new Set([...data.offers, ...data.seeks])].map((o) => (
+                <span key={o} style={chip(C.kiwiPale, C.kiwiOn)}>
+                  {o}
+                </span>
+              ))}
+            </div>
           </div>
         )}
 

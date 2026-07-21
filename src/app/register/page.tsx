@@ -222,7 +222,7 @@ function RegisterForm() {
   const hasKeywords = values.length > 0;
   const hasCustomers = targetAudience.length > 0;
   const hasOffersNote = !!offersNote.trim();
-  const hasSeeks = seeks.length > 0 || !!seeksNote.trim();
+  const hasSeeks = !!seeksNote.trim(); // 구 seeks 칩 은퇴(2026-07-22 통합) — 파트너상 서술만 남음
 
   // ── enrich(딸깍 자동완성) 상태 ──
   const [query, setQuery] = useState(""); // 불러오기 검색어(업체명만)
@@ -270,9 +270,9 @@ function RegisterForm() {
     setValues(d.values);
     setActivities(d.activities.map((a) => ({ title: a.title, desc: a.desc, photos: [] })));
     setOffersNote(d.offersNote);
-    setOffers(d.offers);
+    setOffers([...new Set([...d.offers, ...d.seeks])] as CollabType[]); // 구 seeks 칩 흡수(통합)
     setSeeksNote(d.seeksNote);
-    setSeeks(d.seeks);
+    setSeeks([]);
     setTargetAudience(d.targetAudience);
     setAddress(d.address);
     setInstagram(d.instagram);
@@ -707,7 +707,8 @@ function RegisterForm() {
         const types = fill.seeksHint.types.filter((t): t is CollabType =>
           (COLLAB_TYPES as string[]).includes(t)
         );
-        if (!seeks.length && types.length) setSeeks(types);
+        // 구 seeks 칩 은퇴(통합) — 유형은 통합 칩(offers)에 합집합으로 흡수
+        if (types.length) setOffers((p) => [...new Set([...p, ...types])] as CollabType[]);
         if (!seeksNote.trim() && fill.seeksHint.note.trim()) setSeeksNote(fill.seeksHint.note);
         openSection("seeks");
         filled.add("seeks");
@@ -835,8 +836,9 @@ function RegisterForm() {
           title: a.title, desc: a.desc, photos: a.photos.map((u) => ({ url: u })),
         }))
       );
-      setOffers(m.offers);
-      setSeeks(m.seeks);
+      // 통합 마이그레이션(2026-07-22): 기존 소개서의 seeks 칩을 offers에 흡수해 로드 → 저장 시 자연 수렴
+      setOffers([...new Set([...m.offers, ...m.seeks])] as CollabType[]);
+      setSeeks([]);
       setOffersNote(m.offersNote ?? "");
       setSeeksNote(m.seeksNote ?? "");
       setTargetAudience(m.targetAudience ?? []);
@@ -918,7 +920,7 @@ function RegisterForm() {
         name,
         oneLiner,
         offers,
-        seeks: hasSeeks ? seeks : [],
+        seeks: [], // 구 seeks 칩 은퇴(통합) — 유형은 offers 1세트가 정본. 저장 시 항상 비워 자연 수렴
         values: hasKeywords ? values : [],
         targetAudience: hasCustomers ? targetAudience : [],
         collabHistory: hasCollabs ? historyOut.map((h) => ({ ...h, photos: wrap(h.photos) })) : [],
@@ -1191,9 +1193,10 @@ function RegisterForm() {
             </div>
           </div>
 
-          {/* 협업 유형 칩 — 구⑤에서 ①로 이사(필수 유지, 검색·매칭 하드축). 라벨은 구⑤ 제목 승계 */}
+          {/* 협업 유형 칩 — 공급·수요 통합 1세트 (2026-07-22 대표 확정 — 검색이 이미 offers∪seeks OR라 구분에 실체 없음).
+              구 seeks 칩은 은퇴, 저장 시 합집합이 offers로 들어간다. */}
           <div id="offers-chips" className="scroll-mt-4">
-            <Field label="어떤 협업을 할 수 있나요? *">
+            <Field label="함께하고 싶은 콜라보를 골라주세요. *" hint={aiFilled.has("offers") ? <AiBadge /> : null}>
               <ChipRow
                 options={COLLAB_TYPES}
                 selected={offers}
@@ -1201,7 +1204,7 @@ function RegisterForm() {
               />
               {/* 구 sec-offersNote(시트) → ① 칩 하단 상시 노출로 이사. 칩과 한 세트 */}
               <div className="mt-4">
-                <p className="mb-1.5 text-sm text-mute">제공 가능한 콜라보를 조금 더 소개해주세요.(선택)</p>
+                <p className="mb-1.5 flex items-center gap-2 text-sm text-mute">이런 콜라보를 제공할 수 있어요 (선택){aiFilled.has("offersNote") ? <AiBadge /> : null}</p>
                 <textarea
                   value={offersNote}
                   onChange={(e) => setOffersNote(e.target.value)}
@@ -1415,22 +1418,14 @@ function RegisterForm() {
           onExpand={() => openSection("seeks")}
           onCollapse={() => closeSection("seeks")}
         >
-          <div className="space-y-8">
-            <textarea
-              value={seeksNote}
-              onChange={(e) => setSeeksNote(e.target.value)}
-              rows={4}
-              placeholder="예: 지속가능성을 이야기하는 브랜드, 라이프스타일 브랜드, 카페와 함께하고 싶어요."
-              className="w-full rounded-sm border border-hairline bg-surface px-3 py-2.5 text-base leading-relaxed text-ink outline-none placeholder:text-faint focus:border-focus"
-            />
-            <Field label="이런 콜라보를 찾고 있어요">
-              <ChipRow
-                options={COLLAB_TYPES}
-                selected={seeks}
-                onToggle={(t) => toggle(seeks, setSeeks, t)}
-              />
-            </Field>
-          </div>
+          {/* 구 "이런 콜라보를 찾고 있어요" 칩 은퇴(2026-07-22 통합) — 유형은 ① 통합 칩 1세트가 담당, 여기는 파트너상 서술만 */}
+          <textarea
+            value={seeksNote}
+            onChange={(e) => setSeeksNote(e.target.value)}
+            rows={4}
+            placeholder="예: 지속가능성을 이야기하는 브랜드, 라이프스타일 브랜드, 카페와 함께하고 싶어요."
+            className="w-full rounded-sm border border-hairline bg-surface px-3 py-2.5 text-base leading-relaxed text-ink outline-none placeholder:text-faint focus:border-focus"
+          />
         </StubSection>
 
         {/* ── 스텁 C — 이런 콜라보 경험이 있어요 (구⑦) ── */}
@@ -1610,7 +1605,7 @@ function RegisterForm() {
           suppressFab={layerOpen}
           storyItems={[
             { key: "activities", label: "주로 어떤 활동을 하나요?", hint: "대표 활동을 소개해주세요.", added: openSections.has("activities") || hasActivities, onAdd: () => addStorySection("activities"), group: "recommend" },
-            { key: "seeks", label: "이런 파트너를 찾고 있어요.", hint: "파트너와 꿈꾸는 협업 유형을 알려주세요.", added: openSections.has("seeks") || hasSeeks, onAdd: () => addStorySection("seeks"), group: "recommend" },
+            { key: "seeks", label: "이런 파트너를 찾고 있어요.", hint: "어떤 파트너와 만나고 싶은지 알려주세요.", added: openSections.has("seeks") || hasSeeks, onAdd: () => addStorySection("seeks"), group: "recommend" },
             { key: "collabs", label: "이런 콜라보 경험이 있어요.", hint: "지난 콜라보를 더하면 검증된 파트너 신호가 돼요.", added: openSections.has("collabs") || hasCollabs, onAdd: () => addStorySection("collabs"), group: "recommend" },
             { key: "customers", label: "저희는 주로 이런 고객과 함께하고 있어요.", hint: "주요 고객을 알려주세요.", added: openSections.has("customers") || hasCustomers, onAdd: () => addStorySection("customers"), group: "recommend" },
             { key: "story", label: "왜 이 브랜드를 시작하셨나요?", hint: "시작하게 된 계기를 편하게 적어주세요.", added: openSections.has("story") || hasStory, onAdd: () => addStorySection("story"), group: "story" },
@@ -2039,7 +2034,7 @@ function RegisterForm() {
         const dismissNudge = () => { setNudgeShown(true); setShowNudge(false); };
         const items = ([
           ["activities", "주로 어떤 활동을 하나요?", "대표 활동을 소개해주세요.", hasActivities],
-          ["seeks", "이런 파트너를 찾고 있어요.", "파트너와 꿈꾸는 협업 유형을 알려주세요.", hasSeeks],
+          ["seeks", "이런 파트너를 찾고 있어요.", "어떤 파트너와 만나고 싶은지 알려주세요.", hasSeeks],
           ["collabs", "이런 콜라보 경험이 있어요.", "지난 콜라보를 더하면 검증된 파트너 신호가 돼요.", hasCollabs],
           ["customers", "저희는 주로 이런 고객과 함께하고 있어요.", "주요 고객을 알려주세요.", hasCustomers],
         ] as const).filter(([key, , , has]) => !has && !openSections.has(key));

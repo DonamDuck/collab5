@@ -8,7 +8,7 @@ export interface IntroPresence {
   keywords: boolean;
   customers: boolean;
   offersNote: boolean;
-  seeks: boolean; // seeks 칩 또는 seeksNote
+  seeks: boolean; // seeksNote(파트너상 서술)만 — 구 seeks 칩은 통합 은퇴(2026-07-22)
   blocks: number; // 내용 있는 블록 수
 }
 export function narrativeCount(p: IntroPresence): number {

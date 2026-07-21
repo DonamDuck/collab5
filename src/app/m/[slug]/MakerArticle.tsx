@@ -88,37 +88,31 @@ export function MakerArticle({ maker, isOwner, logoUrl, readOnly }: {
       {/* 선택 블록 — 배열 순서대로 렌더 */}
       {maker.blocks.length > 0 && <BlockSections blocks={maker.blocks} Section={Section} />}
 
-      {/* ⑤ 이런 협업을 기대하고 있어요 — offers */}
-      {(maker.offers.length > 0 || maker.offersNote) && (
-        <Section title="이런 협업을 기대하고 있어요">
-          {maker.offersNote && (
-            <p className="mb-3 whitespace-pre-line text-[17px] leading-relaxed text-body">
-              {maker.offersNote}
-            </p>
-          )}
-          {maker.offers.length > 0 && (
-            <div className="flex flex-wrap gap-2">
-              {maker.offers.map((o) => (
+      {/* ⑤⑥ 통폐합(2026-07-22) — 콜라보 한 섹션: 통합 칩(offers∪seeks) + 제공 한마디 + 파트너상.
+          기존 소개서도 합집합 읽기로 그대로 정상 렌더(분기 없음). */}
+      {(maker.offers.length > 0 || maker.seeks.length > 0 || maker.offersNote || maker.seeksNote) && (
+        <Section title="콜라보를 기대하고 있어요">
+          {(maker.offers.length > 0 || maker.seeks.length > 0) && (
+            <div className="mb-4 flex flex-wrap gap-2">
+              {[...new Set([...maker.offers, ...maker.seeks])].map((o) => (
                 <TypeChip key={o}>{o}</TypeChip>
               ))}
             </div>
           )}
-        </Section>
-      )}
-
-      {/* ⑥ 이런 분들과 함께하고 싶어요 — seeks */}
-      {(maker.seeks.length > 0 || maker.seeksNote) && (
-        <Section title="이런 분들과 함께하고 싶어요">
-          {maker.seeksNote && (
-            <p className="mb-3 whitespace-pre-line text-[17px] leading-relaxed text-body">
-              {maker.seeksNote}
-            </p>
+          {maker.offersNote && (
+            <div className="mb-4">
+              <h3 className="mb-1.5 text-[15px] font-semibold text-body">이런 콜라보를 제공할 수 있어요</h3>
+              <p className="whitespace-pre-line text-[17px] leading-relaxed text-body">
+                {maker.offersNote}
+              </p>
+            </div>
           )}
-          {maker.seeks.length > 0 && (
-            <div className="flex flex-wrap gap-2">
-              {maker.seeks.map((s) => (
-                <TypeChip key={s}>{s}</TypeChip>
-              ))}
+          {maker.seeksNote && (
+            <div>
+              <h3 className="mb-1.5 text-[15px] font-semibold text-body">이런 파트너를 찾고 있어요</h3>
+              <p className="whitespace-pre-line text-[17px] leading-relaxed text-body">
+                {maker.seeksNote}
+              </p>
             </div>
           )}
         </Section>
