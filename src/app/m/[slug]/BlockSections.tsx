@@ -112,7 +112,7 @@ function BlockBody({ b }: { b: Block }) {
                   rel="noopener noreferrer nofollow"
                   className="mt-1 inline-block text-[14px] font-medium text-primary-on underline underline-offset-2"
                 >
-                  기사 보기
+                  소개 보기
                 </a>
               )}
             </div>
