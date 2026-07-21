@@ -1329,7 +1329,7 @@ class NaverGeminiProvider implements SearchProvider {
         console.warn(`[enrich] gemini ${model} ${tag} 비접지 → 폐기`);
         return "";
       }
-      return (response.text ?? "").trim();
+      return sanitizeSearchText((response.text ?? "").trim(), model, tag);
     } catch (e) {
       const status = (e as { status?: number; code?: number })?.status ?? (e as { code?: number })?.code;
       console.warn(`[enrich] gemini search ${model} ${tag} 실패(${status ?? "?"})`);
@@ -2456,6 +2456,46 @@ export function searchLooksEmpty(text: string): boolean {
 /** 재시도 발동 기준 — 1차 조사 칩이 이 개수 미만이면 검색 2콜을 더 돌린다(대표 정책 2026-07-20).
  *  낮출수록 콜 수·비용이 준다(10 → 7 등). 씨딩 단계라 품질 우선으로 10에서 시작. */
 export const CHIP_TARGET = 10;
+
+/** 검색 응답 폭주 방어(2026-07-21 필라테스숲 서면점 사고).
+ *  제미나이가 "확인 안 됨"으로 답을 끝낸 뒤 무관한 한 줄
+ *  (`{"answer":"The current time in Seoul…"}`)을 1,300줄 넘게 반복하다 토큰 상한에 잘렸다.
+ *  결과: 메모 144,111자 · 244초 · 칩이 "July 23"·"2024.}"로 오염. 이 메모는 그대로 생성 단계
+ *  프롬프트에 실려 비용까지 튄다. LLM의 전형적 degeneration이라 프롬프트로는 못 막는다 → 출력에서 자른다.
+ *  ① 같은 줄이 3회 연속 = 폭주 신호 → 그 지점 이후 전량 폐기(뒤쪽은 이미 쓰레기다)
+ *  ② 그래도 길면 하드 상한. 정상 조사 메모는 3~7천 자라 24,000자면 충분히 여유롭다. */
+export function sanitizeSearchText(raw: string, model = "", tag = "", maxChars = 24_000): string {
+  if (!raw) return "";
+  const kept: string[] = [];
+  let prev = "";
+  let repeat = 0;
+  let runStart = 0; // 현재 줄이 처음 등장한 위치 — 폭주 판정 시 '반복 구간 전체'를 걷어내려고 기억한다
+  let cut = false;
+  for (const line of raw.split("\n")) {
+    const key = line.trim();
+    if (key && key === prev) {
+      if (++repeat >= 2) {
+        // 동일 줄 3번째 등장 = 폭주. 이미 담은 반복분까지 되감아 버린다
+        // (2개만 남겨도 그 줄에서 "July 23"·"2024.}" 같은 쓰레기 칩이 나온다).
+        kept.length = runStart;
+        cut = true;
+        break;
+      }
+    } else {
+      repeat = 0;
+      prev = key;
+      runStart = kept.length;
+    }
+    kept.push(line);
+  }
+  let text = kept.join("\n").trimEnd();
+  if (text.length > maxChars) {
+    text = text.slice(0, maxChars).trimEnd();
+    cut = true;
+  }
+  if (cut) console.warn(`[enrich] gemini ${model} ${tag} 응답 폭주 감지 → ${raw.length}자 → ${text.length}자로 절단`);
+  return text;
+}
 
 /** 장식 따옴표 해제(대표 QA 2026-07-20) — 모델이 주어진 키워드를 썼다고 표시하려고
  *  "동네 사랑방"·"동네도서관"처럼 짧은 명사구를 따옴표로 두르는 버릇이 있다.

@@ -18,6 +18,7 @@ import {
   isOwnerVoiceHost,
   isUsableOwnerVoice,
   CHIP_TARGET,
+  sanitizeSearchText,
 } from "../src/lib/enrich";
 import { regionMatches, regionConflict } from "../src/lib/regionSynonyms";
 import { mapLinkLabel, channelLabel } from "../src/lib/links";
@@ -572,6 +573,18 @@ check("⛔ 브랜드 토큰+조사로 시작하는 잘린 조각 차단", !subjC
 // 따옴표 짝 (알려짐 밖의 섹션에서도 방어)
 const quoteMemo = gemMemo("너의 작업실", `[활동]\n* "북토크\n* 독서 모임`);
 check("✅ 짝 안 맞는 따옴표는 벗겨서 살림", chipTexts(quoteMemo, "너의 작업실").includes("북토크"), JSON.stringify(chipTexts(quoteMemo, "너의 작업실")));
+
+// 검색 응답 폭주(degeneration) 방어 — 07-21 필라테스숲 서면점
+console.log("[검색 응답 폭주 방어]");
+const junk = ` {"answer":"The current time in Seoul, South Korea is 12:48:38 on Tuesday, July 23, 2024."}`;
+const runaway = `**[정체]** 확인 안 됨\n**[키워드]** 확인 안 됨\n` + Array(1300).fill(junk).join("\n");
+const cleaned = sanitizeSearchText(runaway, "flash", "테스트");
+check("✅ 반복 폭주 절단", cleaned.length < 500, `${runaway.length}자 → ${cleaned.length}자`);
+check("✅ 폭주 앞의 정상 내용은 보존", cleaned.includes("**[정체]** 확인 안 됨"));
+check("⛔ 절단 후 쓰레기 칩이 안 나옴", !extractChipsFromResearch(`[출처 2]\n${cleaned}`, "필라테스숲 서면점", "필라테스").some((c) => /July|2024\.\}/.test(c.text)));
+check("✅ 정상 메모는 손대지 않음", sanitizeSearchText("[정체]\n동네 스튜디오\n[키워드]\n필라테스, 소도구") === "[정체]\n동네 스튜디오\n[키워드]\n필라테스, 소도구");
+check("✅ 빈 줄 반복은 폭주가 아님", sanitizeSearchText("가\n\n\n\n나").includes("나"));
+check("✅ 하드 상한(24,000자)", sanitizeSearchText("가".repeat(30_000)).length <= 24_000);
 
 console.log(`\n결과: ${pass} pass / ${fail} fail`);
 process.exit(fail ? 1 : 0);
