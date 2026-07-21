@@ -1706,11 +1706,11 @@ function RegisterForm() {
               />
             </div>
           </Field>
-          <Field label="홈페이지 (선택)" hint={hintFor("homepage", "homepage")}>
+          <Field label="대표 URL (선택)" hint={hintFor("homepage", "homepage")}>
             <input
               value={homepage}
               onChange={(e) => setHomepage(e.target.value)}
-              placeholder="https://"
+              placeholder="홈페이지·카카오톡 채널·링크트리 등"
               className="h-11 w-full rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
             />
           </Field>

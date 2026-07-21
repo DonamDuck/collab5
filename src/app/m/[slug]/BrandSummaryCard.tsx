@@ -1,7 +1,7 @@
 // /m 상단 브랜드 요약 카드 — 정체성(로고+이름) + 소개 + 신뢰 링크 칩(인스타·홈피).
 // 주소는 카드에서 빼고 최하단 '상세 주소' 섹션으로(참고 수준·지도용). 스펙: docs/superpowers/specs/2026-07-13-m-brand-summary-card-design.md
 import { Avatar } from "@/components/Avatar";
-import { instagramUrl, instagramHandle, normalizeUrl, prettyUrl, mapLinkLabel } from "@/lib/links";
+import { instagramUrl, instagramHandle, normalizeUrl, prettyUrl, mapLinkLabel, channelLabel } from "@/lib/links";
 import type { Maker } from "@/lib/types";
 import { EditButton } from "./EditButton";
 
@@ -60,8 +60,10 @@ export function BrandSummaryCard({
             </TrustChip>
           )}
           {homepage && (
+            /* 대표 URL — 카톡 채널·링크트리처럼 알려진 채널이면 서비스명으로, 아니면 도메인 그대로.
+               아이콘은 기존 집 아이콘 유지(대표 확정 07-20). */
             <TrustChip href={normalizeUrl(homepage)} icon={<HomeIcon />}>
-              {prettyUrl(homepage)}
+              {channelLabel(homepage) ?? prettyUrl(homepage)}
             </TrustChip>
           )}
           {/* 축약 링크(naver.me/xxx)는 사람이 읽을 수 없으니 URL 대신 서비스명을 보여준다. */}

@@ -390,7 +390,7 @@ export class MockSearchProvider implements SearchProvider {
         `작지만 단단한 로컬 브랜드를 꾸려가고 있어요`,
         `오래 남을 것을 고민하며 만들고 있어요`,
       ],
-      descriptions: (await this.draft({ name, values: input.focusKeywords })).slice(0, 5),
+      descriptions: (await this.draft({ name, values: input.focusKeywords })).slice(0, 6),
       values: input.focusKeywords?.slice(0, 4) ?? ["정성", "손맛", "로컬"],
       activityHints: [
         { title: "가방 만들기 워크숍", desc: "5주 과정 워크숍 후기가 여러 건 보여요.", source: "네이버 블로그 후기" },
@@ -473,7 +473,7 @@ const OptionsResultSchema = z.object({
     .array(z.string())
     .describe("인스타 핸들 후보 0~4개(@형식) — 확정 안 됐을 때 사장이 고를 추정치"),
   oneLiners: z.array(z.string()).describe("한 줄 소개 후보 5개 — 서로 다른 앵글"),
-  descriptions: z.array(z.string()).describe("브랜드 소개 후보 5개 — 서로 다른 앵글, 각 3~5문장, 어미는 시스템 지침의 '어미 리듬'(기능 기반 혼합체)"),
+  descriptions: z.array(z.string()).describe("브랜드 소개 후보 6개 — 1~5는 서로 다른 앵글, 6번은 사실 정리형. 각 3~5문장, 어미는 시스템 지침의 '어미 리듬'(기능 기반 혼합체)"),
   values: z.array(z.string()).describe("브랜드 결 단어 2~4개"),
   activityHints: z
     .array(
@@ -559,7 +559,7 @@ const GEMINI_OPTIONS_SCHEMA = {
     descriptions: {
       type: Type.ARRAY,
       items: { type: Type.STRING },
-      description: "브랜드 소개 후보 5개 — 서로 다른 앵글, 각 3~5문장, 어미는 시스템 지침의 '어미 리듬'(기능 기반 혼합체)",
+      description: "브랜드 소개 후보 6개 — 1~5는 서로 다른 앵글, 6번은 사실 정리형(구체 사실 밀도 높게). 각 3~5문장, 어미는 시스템 지침의 '어미 리듬'(기능 기반 혼합체)",
     },
     values: { type: Type.ARRAY, items: { type: Type.STRING }, description: "브랜드 결 단어 2~4개" },
     activityHints: {
@@ -658,7 +658,7 @@ ${BRAND_VOICE}
   · 브랜드명은 넣지 마라(카드에 이름이 따로 보인다 — 이름 없이 서는 문장으로).
   · 5개 앵글: ①핵심 제품·방식(가장 구체) ②철학·태도를 구체 행동으로 ③고객이 얻는 경험 ④숫자·이력 근거(조사에 있을 때만, 없으면 다른 각도) ⑤협업 파트너가 끌릴 지점.
   · 형용사를 줄이고 명사로 말하라. "감성적인 소품"(X) → "폐원단으로 짓는 파우치"(O).
-- descriptions 5개 (각 3~5문장, 어미는 아래 '어미 리듬' 규칙):
+- descriptions 6개 (각 3~5문장, 어미는 아래 '어미 리듬' 규칙):
   · ⭐⭐1인칭 시점 필수 — 사장이 자기 브랜드를 직접 말하는 어투. ①문장 주어로 브랜드명·'이곳'·'이 브랜드'를 쓰지 마라('○○는/은 ~해요' 금지). ②브랜드명 자체를 문장에 넣지 마라("안녕하세요 ○○입니다" 같은 자기소개도 금지). ③주어는 '저희/우리' 또는 생략 — ⚠️매 문장을 '저희는'으로 시작하지 말고 자연스럽게 변주해라(주어 생략을 적극 활용). 예: "호락호락도서관은 매력적인 공간이에요"(X) → "매력적인 공간을 가꿔가고 있어요"(O).
   · ⭐⭐어미 리듬 = 문장의 역할이 어미를 정한다(기능 기반 혼합체). 믿음·주장·확정 선언(뼈대)은 "~합니다"("자신을 표현하는 방법이라고 생각합니다" / "취향과 표현을 발견합니다"), 이유·부연·숨 고르기(연결)는 "~이에요/~예요"("이야기가 담기기 때문이에요"), 바람·지향(마무리)은 차분한 "~바랍니다". ⚠️합니다만 연속=사보처럼 딱딱 / 에요만 연속=수다처럼 가벼움 — 선언 사이에 부연이 끼며 숨 쉬는 리듬으로 섞어라. 애교체(~한답니다·~하고 있죠·~거든요)는 지양(조용한 확신이 기준). 과한 이모지·느낌표 금지.
   · ⭐Why가 한 번은 보이게 — 5개 후보 전체에서 "왜 이 일을 하는가"(브랜드가 믿는 가치)가 최소 한 번은 드러나야 한다. 단 Why도 조사 메모의 구체에 뿌리내려야 하며("정성을 담습니다"류 어디에나 붙는 철학 금지), 모든 후보를 "우리는 ~을 믿습니다. 그래서"로 시작하는 템플릿 반복은 금지 — 철학·시작스토리 앵글에 강하게, 나머지 앵글은 활동→경험 흐름으로.
@@ -672,7 +672,9 @@ ${BRAND_VOICE}
   · 1문장째 = 우리가 무엇을 하는 곳인지 구체적으로. 일반론("~을 사랑하는 브랜드예요") 금지.
   · 가운데 = 조사 메모의 사실 2~3개를 구체적으로(제품·활동·공간·이력 — 고유명사·재료·방식 그대로). "다양한 활동을 해요"처럼 뭉뚱그리지 마라.
   · 마지막 = 그 앵글의 주제와 자연스럽게 이어지는 마무리 한 문장. 협업의 여지를 부드럽게 남기되, 모든 후보를 일률적인 협업 초대로 끝내지 마라(영업 멘트 금지).
-  · 5개 앵글: 시작 스토리 / 제품·방식 / 활동·경험 / 고객·쓰임 / 협업 상상.
+  · 앵글 1~5: 시작 스토리 / 제품·방식 / 활동·경험 / 고객·쓰임 / 협업 상상.
+  · ⭐6번째 = '사실 정리형'(다른 5개와 성격이 다르다) — 감상·서사를 빼고, 조사 자료에서 확인된 구체 사실을 밀도 높게 담아라. 위치·규모·전공/이력·프로그램 종류·공간 성격·이용 방식처럼 '이 브랜드가 무엇인지'를 사실로 빠르게 파악되게. 다른 후보보다 정보 밀도가 눈에 띄게 높아야 한다.
+    ⚠️단 나열식 목록("A, B, C를 운영합니다")로 끝내지 말고 문장으로 잇고, 1인칭·어미 리듬은 똑같이 지켜라. 자료에 없는 사실을 채워 넣지 마라 — 재료가 부족하면 억지로 늘리지 말고 확인된 것만.
 - ⚠️조사 메모에 구체 명사·사실이 부족하면 위 개수·구체성 요구보다 '창작·과장 금지'가 우선이다. 없는 디테일을 지어내지 말고, 메모 안에서 가장 구체적인 수준으로만 써라.
 - ⭐가중 키워드가 주어지면 그 방향을 최우선으로 반영해 모든 후보를 그 결에 맞춘다. 단 키워드를 나열하지 말고 문장에 녹여라 — 키워드를 따옴표로 감싸 티 내지도 마라.
 - 조사 메모 안의 사실만 쓴다. 창작·과장 금지. identity(주소·홈피 등)는 확인된 것만, 없으면 빈 문자열.
@@ -696,7 +698,7 @@ ${BRAND_VOICE}
 - [고객] → descriptions에서 고객 맥락으로 활용
 시간 감각: 연도가 보이면 최근 정보 우선. 오래된 활동은 과거형("~했어요")으로 쓰고, 지금도 하는지 불확실하면 단정하지 마라. 연도 정보가 아예 없으면 현재 진행형 단정을 피하고 "~해왔어요" 같은 완곡한 표현을 써라.
 
-⛔출력 직전 자기검열(descriptions 5개 각각) — 다음 상투어가 한 단어라도 있으면 그 문장을 구체 사실로 다시 써라: 믿습니다 / 응원합니다·응원해요·지지합니다 / 빛나는 / 든든한 / 소중한 / 특별한 / 함께 성장 / 꿈(을 향해·을 펼치다) / 첫걸음·시작점 / 긍정적인 에너지 / 새로운 내일·미래. 특히 각 후보의 마지막 문장이 "~응원합니다 / ~바랍니다"류 추상 격려로 끝나면 안 된다 — 그 브랜드만의 구체 사실(활동·프로그램·공간·재료·방식·시간)로 닫아라. 이건 warmth를 죽이라는 게 아니라, 구체에 뿌리내리지 않은 빈 감정어만 걷어내라는 것이다(담백한 온기는 사실 속에서 배어난다).`;
+⛔출력 직전 자기검열(descriptions 6개 각각) — 다음 상투어가 한 단어라도 있으면 그 문장을 구체 사실로 다시 써라: 믿습니다 / 응원합니다·응원해요·지지합니다 / 빛나는 / 든든한 / 소중한 / 특별한 / 함께 성장 / 꿈(을 향해·을 펼치다) / 첫걸음·시작점 / 긍정적인 에너지 / 새로운 내일·미래. 특히 각 후보의 마지막 문장이 "~응원합니다 / ~바랍니다"류 추상 격려로 끝나면 안 된다 — 그 브랜드만의 구체 사실(활동·프로그램·공간·재료·방식·시간)로 닫아라. 이건 warmth를 죽이라는 게 아니라, 구체에 뿌리내리지 않은 빈 감정어만 걷어내라는 것이다(담백한 온기는 사실 속에서 배어난다).`;
 
 class ClaudeSearchProvider implements SearchProvider {
   private _client: Anthropic | null = null;
@@ -1253,13 +1255,15 @@ class NaverGeminiProvider implements SearchProvider {
 아래 소제목 순서 그대로, 확인된 사실만 개조식으로 정리해줘. 전체 1500자 이내. 해당 정보가 없으면 그 소제목에 "확인 안 됨" 한 줄만 — 소제목 설명에 나온 단어(워크숍·클래스·팔로워·펀딩 등)를 실제 확인 없이 되풀이해 적지 마라.
 
 [정체] 무엇을 만들고/하는 곳인지 한두 줄 + 창업 배경·브랜드 철학·시작 이야기가 있으면 두세 줄
-[제품/특징] 주력 제품·서비스와 그 특징·차별점 (재료·방식 등, 각 한 줄)
+[제품·서비스] 주력 제품·서비스의 이름·종류 (각 한 줄). 업종에 맞게: 요가원이면 프로그램(하타·빈야사·테라피), 송금·IT면 서비스 라인(개인 송금·기업 결제·API), 카페면 대표 메뉴·원두, 공방이면 제품군·클래스
+[특장점] ⭐다른 곳과 무엇이 다른가 — 가격·기술·자격/인증·규모·경력·운영 방식 (예: "은행 대비 낮은 수수료", "싱가포르 MAS 라이선스 보유", "15개 언어 상담", "직접 로스팅", "8년 차"). 제품 이름을 여기 반복하지 말고 '차이'만 적어라
 [활동] 워크숍·클래스·팝업·제품 라인 등 실제로 한 활동 (각각 무엇이었는지)
 [콜라보] 다른 브랜드·공간·작가와 함께한 협업 이력 (파트너 이름이 확인된 것만)
 [원하는 협업] 이 브랜드가 찾는 파트너·하고 싶다고 밝힌 협업 (모집글·인터뷰 발언 등 근거 필수)
 [고객] 주요 고객층·타겟 (연령·관심사 등, 확인된 것만)
 [알려짐] 언론·매거진·방송·수상 노출 — ⚠️구체적인 매체명·프로그램명·수상명을 반드시 함께(예: "○○매거진 2023년 소개", "△△대상 수상"). 매체·수상 이름을 모르면 그 줄은 생략(막연히 "매체 노출"이라고만 쓰지 마)
 [공간] 오프라인 매장·쇼룸·작업실·카페 운영 여부와 위치
+[이용/편의시설] 그 공간을 쓰는 방식·갖춘 것 중 ⭐브랜드 성격이 드러나는 것만 (예: 요가 매트 대여, 탈의실, 대기 공간, 반려동물 동반, 단체석, 원데이 예약제, 포장 가능). ⛔가격·전화·영업시간은 여기 쓰지 마라. ⛔와이파이·정수기·화장실처럼 어느 업소에나 있어 브랜드를 설명 못 하는 것도 빼라
 [신뢰정보] 홈페이지 URL · 주소
 [키워드] 위 조사에서 이 브랜드를 나타내는 짧은 키워드 8~15개, 쉼표로 구분 (각 2~15자 명사구 — 제품·소재·활동·분위기·강점 위주. 문장 금지, 다른 브랜드 것 섞지 말 것)
 출처는 공식 홈페이지·언론 보도가 있으면 우선하되, 지역 소상공인은 그런 출처가 없는 경우가 많다 — 네이버 플레이스·지도 등록 정보, 블로그·카페 후기, 지역 커뮤니티 글 등 웹에서 확인 가능한 출처를 폭넓게 활용해(어디서 봤는지 함께). 연도·날짜가 보이면 함께 적어줘(오래된 정보 구분용).
@@ -1325,7 +1329,7 @@ class NaverGeminiProvider implements SearchProvider {
         console.warn(`[enrich] gemini ${model} ${tag} 비접지 → 폐기`);
         return "";
       }
-      return (response.text ?? "").trim();
+      return sanitizeSearchText((response.text ?? "").trim(), model, tag);
     } catch (e) {
       const status = (e as { status?: number; code?: number })?.status ?? (e as { code?: number })?.code;
       console.warn(`[enrich] gemini search ${model} ${tag} 실패(${status ?? "?"})`);
@@ -1452,7 +1456,7 @@ class NaverGeminiProvider implements SearchProvider {
         )
       ).slice(0, 4),
       oneLiners: (o.oneLiners ?? []).filter(Boolean).slice(0, 5),
-      descriptions: (o.descriptions ?? []).filter(Boolean).slice(0, 5),
+      descriptions: (o.descriptions ?? []).filter(Boolean).slice(0, 6),
       values: (o.values ?? []).filter(Boolean).slice(0, 4),
       activityHints: (o.activityHints ?? [])
         .filter((h) => h && h.title?.trim() && h.desc?.trim())
@@ -1584,7 +1588,7 @@ class NaverGeminiProvider implements SearchProvider {
     const round = input.round ?? 0;
     const prompt = `브랜드명: "${input.name}"\n\n[사용자 입력]\n${
       info || "(입력이 적어요 — 조사 자료 위주로)"
-    }\n\n${kw.length ? `⭐가중 키워드(가장 중요하게 반영): ${kw.join(", ")}\n\n` : ""}[조사 자료]\n${research}\n\n위 자료로 '브랜드 소개' 후보 5개를 서로 다른 앵글로(각 3~5문장, 어미는 시스템 지침의 '어미 리듬' — 선언=~합니다/부연=~이에요 혼합). oneLiners·values·identity도 채워줘.${
+    }\n\n${kw.length ? `⭐가중 키워드(가장 중요하게 반영): ${kw.join(", ")}\n\n` : ""}[조사 자료]\n${research}\n\n위 자료로 '브랜드 소개' 후보 6개를(1~5는 서로 다른 앵글, 6번은 사실 정리형) (각 3~5문장, 어미는 시스템 지침의 '어미 리듬' — 선언=~합니다/부연=~이에요 혼합). oneLiners·values·identity도 채워줘.${
       round > 0 ? " 이전과는 다른 표현·각도로 새롭게 써줘." : ""
     }`;
     const opts = await this.generateOptions(prompt, round > 0 ? 1.0 : 0.9);
@@ -1624,7 +1628,7 @@ class NaverGeminiProvider implements SearchProvider {
       : "";
     const prompt = `브랜드명: "${input.name}"\n\n[사용자 입력]\n${
       info || "(입력이 적어요 — 조사 자료 위주로)"
-    }\n\n${kw.length ? `⭐가중 키워드(가장 중요하게 반영): ${kw.join(", ")}\n` : ""}${starLine}${verbatimLine}\n${this.digestBlock(input.homepageDigest)}[조사 자료]\n${research}\n\n⭐자료 신뢰 순서(충돌 시 위가 이긴다): ①홈페이지 발췌 ②네이버 검증 블록(직접 쓴 소개·지도 교차검증·지역검색) ③기타 네이버 문서 ④제미나이 조사.\n위 자료로 '한 줄 소개' 후보 3개(각 40자 이내 — 브랜드 정체성이 무엇을·어떻게·누구에게 한 줄에 드러나게, 서술어는 말로 소개하듯 행위+진행형 "~을 만들고 있어요/열고 있어요"로 — 단답 현재형 "~을 만들어요/열어요" 금지, 과장·오글거리는 표현 금지)와 '브랜드 소개' 후보 5개(서로 다른 앵글, 각 3~5문장, 어미는 시스템 지침의 '어미 리듬' — 선언=~합니다/부연=~이에요 혼합)를 함께 만들어줘. values·identity도 형식에 맞게 채워줘.${
+    }\n\n${kw.length ? `⭐가중 키워드(가장 중요하게 반영): ${kw.join(", ")}\n` : ""}${starLine}${verbatimLine}\n${this.digestBlock(input.homepageDigest)}[조사 자료]\n${research}\n\n⭐자료 신뢰 순서(충돌 시 위가 이긴다): ①홈페이지 발췌 ②네이버 검증 블록(직접 쓴 소개·지도 교차검증·지역검색) ③기타 네이버 문서 ④제미나이 조사.\n위 자료로 '한 줄 소개' 후보 3개(각 40자 이내 — 브랜드 정체성이 무엇을·어떻게·누구에게 한 줄에 드러나게, 서술어는 말로 소개하듯 행위+진행형 "~을 만들고 있어요/열고 있어요"로 — 단답 현재형 "~을 만들어요/열어요" 금지, 과장·오글거리는 표현 금지)와 '브랜드 소개' 후보 6개(1~5는 서로 다른 앵글, 6번은 사실 정리형, 각 3~5문장, 어미는 시스템 지침의 '어미 리듬' — 선언=~합니다/부연=~이에요 혼합)를 함께 만들어줘. values·identity도 형식에 맞게 채워줘.${
       round > 0 ? " 이전과는 다른 표현·각도로 새롭게 써줘." : ""
     }`;
     const opts = await this.generateOptions(prompt, round > 0 ? 1.0 : 0.9);
@@ -1795,14 +1799,21 @@ export async function enrichOptions(input: OptionsInput): Promise<EnrichOptions 
 // 신뢰정보(홈피·주소)는 칩 제외 — 링크 확인 게이트에서 별도 처리.
 const CHIP_SECTIONS: Record<string, { label: string; factual: boolean }> = {
   정체: { label: "정체", factual: false },
-  "제품/특징": { label: "제품", factual: false },
+  "제품/특징": { label: "제품", factual: false }, // 구버전 메모 호환
+  "제품·서비스": { label: "제품", factual: false },
   제품: { label: "제품", factual: false },
+  특장점: { label: "특장점", factual: false }, // 다른 곳과의 차이 — 콜라보 상대가 가장 궁금해하는 정보
   활동: { label: "활동", factual: false },
   콜라보: { label: "콜라보", factual: false },
   "원하는 협업": { label: "원하는협업", factual: false },
   고객: { label: "고객", factual: false },
-  알려짐: { label: "알려짐", factual: true }, // 사실 게이트(방송·수상·언론)
+  // ⚠️[알려짐]은 칩에서 은퇴(대표 확정 2026-07-21). 언론·수상은 기사 제목을 통째로 물고 와
+  //   ("감 매거진 15. 플라스틱 (유리의 투명함을 구현하다 폴리메타크릴레이트)") 칩으로 쓸 수 없었고,
+  //   따옴표 짝이 깨진 조각("기사 \"제주도 …핫플 한담누리")·빈 인용("기사 \"\"")이 반복됐다.
+  //   이 정보는 이미 blockHints(press)로 매체명·연도·링크가 구조화돼 가므로 칩은 순손실.
   공간: { label: "공간", factual: false },
+  이용: { label: "이용", factual: false }, // 구버전 호환
+  "이용/편의시설": { label: "이용", factual: false }, // 공간을 쓰는 방식·갖춘 것(브랜드 성격 드러나는 것만 — 대표 정책 07-20)
   키워드: { label: "키워드", factual: false }, // 제미나이가 스스로 증류한 짧은 명사구 모음
 };
 // 섹션과 무관하게 사실 게이트로 승격시키는 단서(오귀속 시 거짓말이 될 고유명사·수치).
@@ -1867,10 +1878,17 @@ export function extractChipsFromResearch(
   const chips: KeywordChip[] = [];
   const STOPWORDS = /^(또한|그리고|하지만|특히|및|기타|등|다만|그러나|이\s*외|그\s*외)$/;
   const push = (raw: string, sec: { label: string; factual: boolean }) => {
-    const text = raw
+    let text = raw
       .replace(/^(이\s*외에도|그\s*외에도|이외에도)\s*/, "")
       .replace(/[.。]\s*$/, "")
+      // '등' 꼬리 제거는 push 안에서 한다(2026-07-21) — 조각 분리 경로에만 있어서
+      // 짧은 줄이 통째로 들어오면 "까눌레 등"·"아메리카노 등"이 그대로 칩이 됐다.
+      .replace(/\s*(등|등을|등이|등의)$/, "")
       .trim();
+    // 짝이 안 맞는 따옴표는 문장이 잘렸다는 신호 — 통째로 벗긴다(대표 QA 07-21 한담누리
+    //   '기사 "제주도 게스트하우스 핫플 한담누리' / 너의 작업실 '기사 ""').
+    if ((text.match(/["'“”‘’]/g) ?? []).length % 2 === 1) text = text.replace(/["'“”‘’]/g, "").trim();
+    text = text.replace(/[.。]\s*$/, "").trim();
     const maxLen = /숫자|알려짐/.test(sec.label) ? 40 : 28;
     if (text.length < 2 || text.length > maxLen) return false;
     if (/확인\s*안\s*됨|해당\s*없음|없습니다/.test(text)) return false;
@@ -1890,9 +1908,31 @@ export function extractChipsFromResearch(
     // 실질 내용(한글·영문·숫자)이 없으면 배제 — "###", "()", "···", "-" 같은 기호 잔재 차단.
     if (!/[가-힣a-zA-Z0-9]/.test(text)) return false;
     // 문장이 잘린 조각 배제 — 연결어미로 끝나면 칩이 아니라 문장 토막이다(검색 요약 절단).
+    //   ⚠️'와/과'로 끝나는 조각도 잘림 신호이긴 하나 규칙으로 못 막는다 — "효과·성과·결과·사과"가
+    //     모두 오탐이고, 실제 사고 사례("우드톤 인테리어와 옥수수")는 뒷단어까지 붙어 있어 안 걸린다.
     if (/(지만|는데|은데|어서|아서|면서|거나|려고|도록|으며|이며)$/.test(text)) return false;
+    // 금지·제약 문구 배제(대표 확정 2026-07-21) — 사실이어도 소개서에 넣을 문장이 아니다.
+    //   "객실 내 육류·튀김류·생선류 조리 불가", "2일 전 취소 시 환불 불가", "멤버십 회원만 이용 가능".
+    //   ⚠️'없음'은 넣지 마라 — "웨이팅 없음"·"주차 걱정 없음"은 오히려 장점 칩이다.
+    if (/(불가능|불가|금지|제한됩|할\s*수\s*없|되지\s*않|안\s*됩니다|미제공)(?![가-힣])/.test(text)) return false;
+    if (/만\s*(이용|사용|출입|입장|예약)\s*가능|회원만|전용만/.test(text)) return false;
+    // 날짜·기간 단독 배제 — 문장 앞머리에서 잘려 나온 조각(07-21 노아동물병원 [콜라보] "2024년 8월 16일";
+    //   원문은 "…우치동물원의 동물 의료지원을 위한 업무협약을 체결했다").
+    if (/^\d{4}년(\s*\d{1,2}월)?(\s*\d{1,2}일)?$/.test(text)) return false;
+    if (/^\d{1,2}월(\s*\d{1,2}일)?$/.test(text)) return false;
     // 페이지 섹션 라벨 단독 배제 — 브랜드 정보가 아니라 사이트 구조어.
     if (/^(소개|안내|정보|상세|위치|문의|예약|메뉴|공지|홈|더보기)$/.test(text)) return false;
+    // 주소 조각 배제(대표 QA 07-20 센트비) — [공간]에서 주소를 쪼개 "10-01"·"1F"·"UIC Building"
+    // 같은 파편이 칩으로 올라왔음. 주소는 identity.address로 따로 가므로 칩에선 불필요.
+    if (/^\d+[-–]\d+$/.test(text)) return false; // "10-01"
+    if (/^(지하\s*)?[B]?\d{1,3}\s*(F|층|호|호실|동)$/i.test(text)) return false; // "1F"·"8F"·"402호"·"3층"
+    if (/^[A-Za-z][A-Za-z\s.]*\s(Building|Tower|Center|Centre|Plaza)$/i.test(text)) return false; // "UIC Building"
+    if (/(빌딩|타워|센터|플라자|오피스텔)$/.test(text) && text.length <= 12) return false; // "원센트럴 8F"류 잔재
+    if (/^[가-힣]*(시|도|구|군)\s|^\s*(서울|경기|부산|대구|인천|광주|대전|울산|세종|강원|충북|충남|전북|전남|경북|경남|제주)\s/.test(text)) return false; // "서울시 영등포구 여의대로 70"
+    if (/(로|길)\s?\d+([-–]\d+)?$/.test(text)) return false; // "여의대로 70"·"분성로 332"
+    if (/\d+\s*F$/i.test(text)) return false; // "원센트럴 8F"
+    if (/\s(Way|Street|St|Road|Rd|Ave|Avenue|Blvd)\.?$/i.test(text)) return false; // "5 Shenton Way"
+    if (/(법인|본사|지사|사옥|사업장)\s*[(:：]/.test(text)) return false; // "해외 법인(싱가포르): …"
     // 메타·잡음 단어 단독은 배제 — "결과", "검색결과", "정보 없음" 등.
     if (/^(결과|검색\s*결과|정보|내용|미상|불명|없음|해당\s*사항)$/.test(text)) return false;
     // 매체명 없는 막연한 노출 언급 배제 — "매체 노출 2023년" 등(매체명 있으면 그 이름으로 시작함).
@@ -1912,6 +1952,17 @@ export function extractChipsFromResearch(
     if (/(에|에서)\s*(위치|자리|소재)/.test(text)) return false;
     // 브랜드명 자체·브랜드명 주어 문장은 칩이 아니다 ("캔버스가든", "캔버스가든은 ~")
     if (brand && (text === brand || new RegExp(`^${brand.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*(은|는|이|가|의)?(\\s|$)`).test(text)))
+      return false;
+    // 브랜드명 '토큰'으로 시작하는 문장도 같은 이유로 배제(2026-07-21 아뜰리에호수).
+    //   상호가 "아뜰리에호수 전주한옥마을"이면 위 전체일치 규칙은 "아뜰리에호수는 커플링"을 못 잡는다.
+    //   → 상호를 공백으로 쪼갠 토큰(3자+) 뒤에 조사가 붙어 시작하면 브랜드 주어 문장이 잘린 것.
+    if (
+      brand &&
+      brand
+        .split(/\s+/)
+        .filter((tk) => tk.length >= 3)
+        .some((tk) => new RegExp(`^${tk.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(은|는|이|가|의|에서|도)(\\s|$)`).test(text))
+    )
       return false;
     const key = text.replace(/\s/g, "");
     // 사용자가 이미 입력한 업종과 동일한 칩은 무의미("당구장" 입력자에게 "당구장" 칩) — 제외
@@ -1986,7 +2037,7 @@ export function extractChipsFromResearch(
   if (naverPart.includes("[지도 교차검증] ✅") && brand) {
     // 최상위 뭉텅이 제외 — 브랜드 특성 없음. 요리 대분류(한식·중식…)도 포함(감자탕집→'한식' 무의미).
     const GENERIC_CATEGORY =
-      /^(음식점|쇼핑|생활|편의|서비스|종합|매장|상점|점포|기타|한식|중식|일식|양식|분식|아시아음식|아시안|세계음식|뷔페|퓨전요리|퓨전|음식)$/;
+      /^(음식점|쇼핑|생활|편의|서비스|종합|매장|상점|점포|기타|스포츠시설|문화시설|의료시설|교육시설|한식|중식|일식|양식|분식|아시아음식|아시안|세계음식|뷔페|퓨전요리|퓨전|음식)$/;
     const brandKey = brand.replace(/\s/g, "");
     const localBlock = naverPart.match(/\[네이버 지역검색[^\]]*\]\n([\s\S]*?)(?=\n\[|$)/)?.[1] ?? "";
     const catSec = { label: "지도확인", factual: false }; // 지도가 이미 검증 → 사실 게이트 불필요
@@ -2026,6 +2077,27 @@ export function extractChipsFromResearch(
         }
       }
     if (chips.length > before) chips.unshift(...chips.splice(before)); // 메타 칩을 맨 앞으로
+  }
+  // ── 최후 폴백(대표 확정 2026-07-21) — 칩이 하나도 없을 때만 발동 ──
+  // 사고 사례: '필라테스숲 서면점'은 네이버 메모가 3,277자(후기 5건·1주년 콜라보 이벤트·시간표·
+  // 인스타 핸들)였는데도 제미나이가 전 섹션을 "확인 안 됨"으로 폐기 → 칩 0개. 재시도 2콜을 더
+  // 태워도 답이 같아, 콜만 쓰고 빈손이었다. 지도 교차검증 ✅가 없어 위 지도확인 칩도 못 탔다.
+  // → 빈손일 때에 한해 '상호가 정확히 일치하는' 지역검색 행의 업종 카테고리를 칩으로 인정한다.
+  //   (상호 완전일치는 지도 ✅ 없이도 충분히 강한 신호. 빈손 아닐 땐 기존 게이트를 그대로 둔다.)
+  if (chips.length === 0 && brand) {
+    const GENERIC_CATEGORY =
+      /^(음식점|쇼핑|유통|생활|편의|서비스|종합|매장|상점|점포|기타|스포츠시설|문화시설|의료시설|교육시설|한식|중식|일식|양식|분식|아시아음식|아시안|세계음식|뷔페|퓨전요리|퓨전|음식|스포츠|오락)$/;
+    const brandKey = brand.replace(/\s/g, "");
+    const localBlock = naverPart.match(/\[네이버 지역검색[^\]]*\]\n([\s\S]*?)(?=\n\[|$)/)?.[1] ?? "";
+    const catSec = { label: "지도확인", factual: false };
+    for (const line of localBlock.split("\n")) {
+      const title = line.match(/^·\s*([^|]+)\|/)?.[1]?.replace(/\s/g, "") ?? "";
+      if (title !== brandKey) continue; // 폴백은 '완전일치'만 — 포함관계는 이웃 지점을 물어온다
+      for (const token of (line.match(/업종:([^|]*)/)?.[1] ?? "").split(/[>,/·]/)) {
+        const t = token.trim();
+        if (t.length >= 2 && t.length <= 12 && !GENERIC_CATEGORY.test(t)) push(t, catSec);
+      }
+    }
   }
   return consolidateChipFamilies(chips, businessType).slice(0, 28);
 }
@@ -2096,8 +2168,16 @@ export interface LinkFinds {
 }
 
 // 홈페이지가 아님 — 포털·SNS·오픈마켓 도메인.
+// 대표 URL 후보에서 제외할 도메인(대표 확정 2026-07-20 '대표 URL'로 확장).
+//   홈페이지가 없는 소상공인은 카톡 채널·링크트리 하나만 걸어두는 경우가 많아, 브랜드가 직접
+//   운영하는 채널(pf.kakao·litt.ly·linktr.ee·스마트스토어·네이버 블로그/카페)은 이제 받아들인다.
+//   ⛔계속 차단: 인스타·페북(별도 칸 있음) · 오픈마켓(쿠팡·11번가·G마켓 = 브랜드 채널 아님)
+//     · 포털 검색·문서 서비스(google·notion·tistory 등 오귀속 소지)
 const NOT_HOMEPAGE =
-  /(naver|blog|instagram|facebook|youtube|tistory|kakao|band|twitter|x\.com|threads|wadiz|coupang|smartstore|11st|gmarket|linktr|notion|google|daum)/i;
+  /(^|\.)(instagram|facebook|twitter|x)\.com$|(^|\.)(threads)\.(net|com)$|(coupang|11st|gmarket|auction|wadiz|tistory|notion|google|band\.us)/i;
+// 브랜드가 직접 운영하는 채널 — NOT_HOMEPAGE의 넓은 패턴에 걸리지 않도록 명시 허용
+const BRAND_CHANNEL =
+  /^(pf\.kakao\.com|open\.kakao\.com|litt\.ly|linktr\.ee|smartstore\.naver\.com|blog\.naver\.com|cafe\.naver\.com|youtu\.be|(www\.)?youtube\.com)$/i;
 
 /** 주소 필드 정화 — 전화·사업자등록번호·통신판매업신고·이메일이 섞여 들어오는 경우 제거.
  *  주소 고유의 숫자(도로명 66·402호·413-111번지)는 보존한다. */
@@ -2123,7 +2203,7 @@ function cleanAddress(raw?: string): string | undefined {
 
 /** 조사메모에서 인스타/홈피 '후보들'을 오프라인 추출(콜 0, 창작 없음 — 메모에 실제 등장한 것만).
  *  여러 개면 유저가 리스트에서 선택, 단일이면 맞아요/아니에요. 자동첨부 금지. */
-export function extractLinksFromResearch(research: string): LinkFinds {
+export function extractLinksFromResearch(research: string, brandName?: string): LinkFinds {
   const empty: LinkFinds = { instagramConfirmed: false, instagramCandidates: [], homepageCandidates: [] };
   if (!research) return empty;
 
@@ -2139,7 +2219,8 @@ export function extractLinksFromResearch(research: string): LinkFinds {
     } catch {
       return;
     }
-    if (NOT_HOMEPAGE.test(host) || isDirectoryHost(host) || hostSeen.has(host)) return;
+    if (hostSeen.has(host)) return;
+    if (!BRAND_CHANNEL.test(host) && (NOT_HOMEPAGE.test(host) || isDirectoryHost(host))) return;
     hostSeen.add(host);
     if (front) homepageCandidates.unshift(norm);
     else homepageCandidates.push(norm);
@@ -2156,7 +2237,23 @@ export function extractLinksFromResearch(research: string): LinkFinds {
   )?.[1];
   if (verifiedHp) addHp(verifiedHp, true);
   const localSection = research.match(/\[네이버 지역검색[^\]\n]*\]\n([\s\S]*?)(?=\n\[|$)/)?.[1] ?? "";
-  for (const m of localSection.matchAll(/링크:(https?:\/\/[^\s|]+)/g)) addHp(m[1]);
+  // ⚠️지역검색은 결과를 여러 건 준다 — 줄마다 '다른 업체'다(2026-07-21 대표 QA 속초옥수수소금빵:
+  //   이웃 가게 '달달공장 속초본점'의 booking.naver 링크가 대표 URL로 채택됐고, 그 호스트에서
+  //   인스타 후보 '@booking'까지 파생됐다). 상호가 일치하는 줄의 링크만 쓴다.
+  const brandKeyL = brandName?.replace(/\s/g, "") ?? "";
+  let fromLocal = 0;
+  for (const line of localSection.split("\n")) {
+    const link = line.match(/링크:(https?:\/\/[^\s|]+)/)?.[1];
+    if (!link) continue;
+    if (brandKeyL) {
+      const title = line.match(/^·\s*([^|]+)\|/)?.[1]?.replace(/\s/g, "") ?? "";
+      if (!title || !(title.includes(brandKeyL) || brandKeyL.includes(title))) continue;
+    } else if (fromLocal >= 1) {
+      break; // 상호를 모를 땐(구버전 호출) 첫 줄 = 검색 최상위 = 우리 업체로만 본다
+    }
+    fromLocal++;
+    addHp(link);
+  }
   const homepage = homepageCandidates[0];
 
   // ── 인스타 후보: 확인된 핸들 + 메모 내 instagram.com/xxx + 홈피 도메인 기반 추측 1개 ──
@@ -2178,8 +2275,12 @@ export function extractLinksFromResearch(research: string): LinkFinds {
   for (const m of research.matchAll(/instagram\.com\/([a-zA-Z0-9._]+)/g)) addIg(m[1]);
   if (homepage) {
     try {
-      const base = new URL(homepage).hostname.replace(/^www\./, "").split(".")[0];
-      if (/^[a-z0-9]{2,}$/i.test(base)) addIg(base);
+      const host = new URL(homepage).hostname.replace(/^www\./, "");
+      const base = host.split(".")[0];
+      // 도메인 기반 추측은 '브랜드 자체 도메인'일 때만 — 예약·채널 플랫폼(booking.naver.com,
+      // pf.kakao.com, smartstore.naver.com…)의 앞 토큰은 브랜드가 아니라 서비스 이름이다.
+      // (07-21 속초옥수수소금빵: booking.naver.com → '@booking'이 인스타 후보로 올라옴)
+      if (/^[a-z0-9]{2,}$/i.test(base) && !BRAND_CHANNEL.test(host) && host.split(".").length <= 3) addIg(base);
     } catch {
       /* noop */
     }
@@ -2321,6 +2422,16 @@ export function sniffInstagramFromText(text: string, exclude?: string): string[]
     found.set(h, Math.max(found.get(h) ?? 0, score));
   };
   for (const m of text.matchAll(/instagram\.com\/([A-Za-z0-9_.]{2,30})/g)) add(m[1], 2);
+  // ⚠️URL을 먼저 지운 뒤 라벨 스캔 — 안 그러면 "instagram.com"이 insta + "gram.com"으로 재매칭돼
+  //   @gram.com 같은 유령 핸들이 생긴다.
+  const noUrl = text.replace(/https?:\/\/\S+/g, " ").replace(/[A-Za-z0-9.-]+\.(com|net|co\.kr|kr|shop|io)\b/g, " ");
+  // 한국어 라벨 뒤 핸들 — 소상공인 글에 제일 흔한 형태인데 그동안 통째로 놓쳤다
+  // (두더지요가원 당근 본문 "인스타그램-moleyoga", 대표 QA 2026-07-20).
+  // @도 instagram.com도 없지만 '인스타'라고 명시돼 있으니 추측이 아니라 명기된 값이다.
+  for (const m of noUrl.matchAll(
+    /(?:인스타(?:그램)?|인별|IG|insta(?:gram)?)\s*(?:계정|아이디)?\s*[-–:：=]?\s*@?([A-Za-z][A-Za-z0-9_.]{2,29})/gi
+  ))
+    add(m[1], 2);
   for (const m of text.matchAll(/@([A-Za-z0-9_.]{3,30})/g)) add(m[1], 1);
   return [...found.entries()]
     .sort((a, b) => b[1] - a[1])
@@ -2345,6 +2456,46 @@ export function searchLooksEmpty(text: string): boolean {
 /** 재시도 발동 기준 — 1차 조사 칩이 이 개수 미만이면 검색 2콜을 더 돌린다(대표 정책 2026-07-20).
  *  낮출수록 콜 수·비용이 준다(10 → 7 등). 씨딩 단계라 품질 우선으로 10에서 시작. */
 export const CHIP_TARGET = 10;
+
+/** 검색 응답 폭주 방어(2026-07-21 필라테스숲 서면점 사고).
+ *  제미나이가 "확인 안 됨"으로 답을 끝낸 뒤 무관한 한 줄
+ *  (`{"answer":"The current time in Seoul…"}`)을 1,300줄 넘게 반복하다 토큰 상한에 잘렸다.
+ *  결과: 메모 144,111자 · 244초 · 칩이 "July 23"·"2024.}"로 오염. 이 메모는 그대로 생성 단계
+ *  프롬프트에 실려 비용까지 튄다. LLM의 전형적 degeneration이라 프롬프트로는 못 막는다 → 출력에서 자른다.
+ *  ① 같은 줄이 3회 연속 = 폭주 신호 → 그 지점 이후 전량 폐기(뒤쪽은 이미 쓰레기다)
+ *  ② 그래도 길면 하드 상한. 정상 조사 메모는 3~7천 자라 24,000자면 충분히 여유롭다. */
+export function sanitizeSearchText(raw: string, model = "", tag = "", maxChars = 24_000): string {
+  if (!raw) return "";
+  const kept: string[] = [];
+  let prev = "";
+  let repeat = 0;
+  let runStart = 0; // 현재 줄이 처음 등장한 위치 — 폭주 판정 시 '반복 구간 전체'를 걷어내려고 기억한다
+  let cut = false;
+  for (const line of raw.split("\n")) {
+    const key = line.trim();
+    if (key && key === prev) {
+      if (++repeat >= 2) {
+        // 동일 줄 3번째 등장 = 폭주. 이미 담은 반복분까지 되감아 버린다
+        // (2개만 남겨도 그 줄에서 "July 23"·"2024.}" 같은 쓰레기 칩이 나온다).
+        kept.length = runStart;
+        cut = true;
+        break;
+      }
+    } else {
+      repeat = 0;
+      prev = key;
+      runStart = kept.length;
+    }
+    kept.push(line);
+  }
+  let text = kept.join("\n").trimEnd();
+  if (text.length > maxChars) {
+    text = text.slice(0, maxChars).trimEnd();
+    cut = true;
+  }
+  if (cut) console.warn(`[enrich] gemini ${model} ${tag} 응답 폭주 감지 → ${raw.length}자 → ${text.length}자로 절단`);
+  return text;
+}
 
 /** 장식 따옴표 해제(대표 QA 2026-07-20) — 모델이 주어진 키워드를 썼다고 표시하려고
  *  "동네 사랑방"·"동네도서관"처럼 짧은 명사구를 따옴표로 두르는 버릇이 있다.
