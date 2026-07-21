@@ -46,8 +46,9 @@ export function BrandSummaryCard({
       </div>
 
       {/* 소개·지역 — 카드 전체 폭(로고 옆 좁은 컬럼 문제 해소) */}
+      {/* whitespace-pre-line = 입력이 멀티라인이라 친 대로 줄바꿈 유지(안 그러면 두 줄로 쓴 게 뭉개짐) */}
       {maker.oneLiner && (
-        <p className="mt-3 text-[15px] leading-relaxed text-body">{maker.oneLiner}</p>
+        <p className="mt-3 whitespace-pre-line text-[15px] leading-relaxed text-body">{maker.oneLiner}</p>
       )}
       {maker.region && <p className="mt-1 text-[13px] text-faint">{maker.region}</p>}
 
