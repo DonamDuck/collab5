@@ -658,6 +658,22 @@ function RegisterForm() {
       filled.add("description");
       setDraftGenerated(true); // 위저드가 이미 소개 초안을 채움 → 버튼은 '다시 받기'로
     }
+    // '제공할 수 있는' 협업 초안 — 필수 offers 칩 + 제공 콜라보 텍스트 프리필 (2026-07-21 성역 해제).
+    // never-overwrite: 사용자가 이미 만진 필드는 덮지 않는다.
+    if (fill.offersHint) {
+      const types = fill.offersHint.types.filter((t): t is CollabType =>
+        (COLLAB_TYPES as string[]).includes(t)
+      );
+      if (!offers.length && types.length) {
+        setOffers(types);
+        filled.add("offers");
+      }
+      if (!offersNote.trim() && fill.offersHint.note.trim()) {
+        setOffersNote(fill.offersHint.note);
+        openSection("offersNote");
+        filled.add("offersNote");
+      }
+    }
     // 힌트는 전체 보관(인라인 힌트 영속) — 선택돼 즉시 적용된 인덱스는 used 처리해 중복 노출 방지
     if (fill.activityHints?.length) {
       setActHints(fill.activityHints);

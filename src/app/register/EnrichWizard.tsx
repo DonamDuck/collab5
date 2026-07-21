@@ -38,6 +38,7 @@ export type WizardFill = {
   collabHints?: CollabHint[]; // 크롤이 발견한 콜라보 흔적(참고용)
   blockHints?: BlockHint[]; // 크롤 근거 기반 추천 블록(전체 — 폼 인라인 힌트 영속용)
   seeksHint?: SeeksHint; // 원하는 파트너·협업 단서(전체)
+  offersHint?: SeeksHint; // '제공할 수 있는' 협업 초안 — 필수 협업 유형+제공 콜라보 텍스트 프리필용
   // 이야기 스텝에서 체크한 것 — 인덱스/타입 기반. 있으면 page가 즉시 폼에 주입.
   selectedHints?: { activities: number[]; collabs: number[]; blocks: string[]; seeks: boolean };
   enrichment?: Enrichment; // 크롤 스냅샷(picked-only). 생성 저장용
@@ -563,6 +564,7 @@ export function EnrichWizard({
       collabHints: options?.collabHints?.length ? options.collabHints : undefined,
       blockHints: options?.blockHints?.length ? options.blockHints : undefined,
       seeksHint: options?.seeksHint ?? undefined,
+      offersHint: options?.offersHint ?? undefined,
       selectedHints,
       enrichment: enrichment ?? undefined,
     });

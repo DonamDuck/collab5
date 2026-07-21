@@ -157,6 +157,7 @@ export interface EnrichOptions {
   collabHints: CollabHint[]; // 발견된 콜라보 흔적 0~3건 (참고용)
   blockHints: BlockHint[]; // 근거 기반 추천 블록 0~2건 (근거 없으면 빈 배열)
   seeksHint: SeeksHint | null; // 원하는 파트너·협업 단서 (근거 없으면 null)
+  offersHint: SeeksHint | null; // '제공할 수 있는' 협업 초안 — 필수 협업 유형+제공 콜라보 텍스트 프리필용 (2026-07-21 성역 해제)
 }
 
 /** 검색 단계 추상화 — mock ↔ Claude/Gemini 교체 지점. */
@@ -428,6 +429,7 @@ export class MockSearchProvider implements SearchProvider {
         },
       ],
       seeksHint: null,
+      offersHint: null,
     };
   }
 }
@@ -541,6 +543,15 @@ const OptionsResultSchema = z.object({
     .nullable()
     .default(null)
     .describe("이 브랜드가 원하는 파트너·협업 근거가 보일 때만. 없으면 null"),
+  offersHint: z
+    .object({
+      types: z.array(z.string()).max(4).describe("이 브랜드가 '제공할 수 있는' 콜라보 유형 최대 4개(제품콜라보·팝업·워크숍·공동굿즈·공동콘텐츠·행사참여·공간대여 중)"),
+      note: z.string().describe("제공 가능한 콜라보 소개 한두 문장 — 해본 것은 과거형, 열려 있는 것은 현재형"),
+      reason: z.string().describe("'~에서 봤어요' 근거 한 줄"),
+    })
+    .nullable()
+    .default(null)
+    .describe("콜라보 이력·공간·활동에서 유도한 '제공 가능한 협업' 초안. 유도 근거조차 없으면 null"),
 });
 
 const GEMINI_OPTIONS_SCHEMA = {
@@ -654,8 +665,23 @@ const GEMINI_OPTIONS_SCHEMA = {
       required: ["types", "note", "reason"],
       description: "조사에서 이 브랜드가 원하는 파트너·협업 근거가 보일 때만. 없으면 null — 창작 금지",
     },
+    offersHint: {
+      type: Type.OBJECT,
+      nullable: true,
+      properties: {
+        types: {
+          type: Type.ARRAY,
+          items: { type: Type.STRING },
+          description: "이 브랜드가 '제공할 수 있는' 콜라보 유형 최대 4개(제품콜라보·팝업·워크숍·공동굿즈·공동콘텐츠·행사참여·공간대여 중)",
+        },
+        note: { type: Type.STRING, description: "제공 가능한 콜라보 소개 한두 문장 — 해본 것은 과거형, 열려 있는 것은 현재형" },
+        reason: { type: Type.STRING, description: "'~에서 봤어요' 근거 한 줄" },
+      },
+      required: ["types", "note", "reason"],
+      description: "콜라보 이력·공간·활동에서 유도한 '제공 가능한 협업' 초안. 유도 근거조차 없으면 null — 창작 금지",
+    },
   },
-  required: ["identity", "instagramCandidates", "oneLiners", "descriptions", "values", "activityHints", "collabHints", "blockHints", "seeksHint"],
+  required: ["identity", "instagramCandidates", "oneLiners", "descriptions", "values", "activityHints", "collabHints", "blockHints", "seeksHint", "offersHint"],
 };
 
 const OPTIONS_SYSTEM = `너는 콜라보 플랫폼 collab5의 브랜드 소개 카피라이터야. 웹 조사 메모를 바탕으로 브랜드가 고를 수 있는 '한 줄 소개'와 '브랜드 소개'를 각각 5개씩 서로 다른 앵글로 만든다.
@@ -700,6 +726,7 @@ ${BRAND_VOICE}
   ⚠️reviews(고객 후기) 블록은 지금은 추천하지 마라 — 후기 표현은 별도 재설계 예정이라 blockHints에 reviews를 넣지 않는다.
   reason은 반드시 "~에서 …을 봤어요" 형태의 근거 한 줄. 근거 없으면 빈 배열.
 - seeksHint: 조사에서 이 브랜드가 어떤 파트너·협업을 원하는지 근거가 보이면 제안. 직접 표명이 없어도 ⭐과거 콜라보 이력·공간 성격·활동에서 '할 수 있는 협업'을 유도해 제안해라(예: 시음 행사를 해봤으면 행사참여, 테라스·대관 공간이 있으면 소규모 행사·팝업). 유도조차 할 근거가 없을 때만 null. 지어내지 않는다 — note에는 근거가 된 이력·공간을 언급한다. types는 콜라보 유형(제품콜라보·팝업·워크숍·공동굿즈·공동콘텐츠·행사참여·공간대여 중), note는 해요체 한두 문장, reason은 '~에서 봤어요' 근거.
+- offersHint: seeksHint(원하는 파트너)와 별개로, 이 브랜드가 파트너에게 '제공할 수 있는' 협업의 초안. 콜라보 이력·공간·활동·제품에서 유도해라 — 사장님들이 가장 낯설어하는 항목이라 맞춤 초안이 특히 값지다. types 최대 4개(같은 유형 목록에서), note는 한두 문장: ⭐해본 것은 과거형으로("와인 시음 행사를 함께해 봤어요"), 앞으로 열려 있는 것은 현재형으로("페어링 팝업도 열려 있습니다") — 이력이 없으면 공간·제품에서 가능한 것만 담백하게. 근거 없는 유형을 넣지 마라. 유도 근거조차 없으면 null.
 
 조사 메모 → 출력 매핑(각 항목의 근거 섹션. 해당 섹션이 없거나 "확인 안 됨"이면 그 출력은 빈 값/빈 배열/null로 둔다):
 - [브랜드가 직접 쓴 소개] 메타 → oneLiners·descriptions의 사실 근거(사장 직접 설명 다음 순위)
@@ -1511,6 +1538,14 @@ class NaverGeminiProvider implements SearchProvider {
               reason: o.seeksHint.reason.trim(),
             }
           : null,
+      offersHint:
+        o.offersHint && o.offersHint.note?.trim() && o.offersHint.reason?.trim()
+          ? {
+              types: (o.offersHint.types ?? []).filter(Boolean).slice(0, 4),
+              note: o.offersHint.note.trim(),
+              reason: o.offersHint.reason.trim(),
+            }
+          : null,
     };
   }
 
@@ -1532,7 +1567,7 @@ class NaverGeminiProvider implements SearchProvider {
   // 인스타 발췌(바이오·캡션) → 프롬프트 블록. 사장님이 직접 쓴 글 = 최상위 신뢰 자료.
   private igBlock(d?: string): string {
     return d?.trim()
-      ? `[인스타그램 발췌 — 사장님이 직접 쓴 글(바이오·게시물 캡션)]\n${d.trim()}\n\n⭐⭐이건 사장님 본인이 쓴 글이라 신뢰 최상위 자료야. 제3자 문서(기사·블로그·검색)와 사실이 충돌하면 무조건 이쪽을 따라라. 애칭·슬로건·"낮술·혼술 환영" 같은 고유 표현은 원형을 최대한 보존해 반영해라. 단 ⛔영업시간·휴무·가격·기간 한정 행사는 여기 있어도 소개서에 쓰지 마라(유통기한 정보 금지 규칙). 일회성 행사 캡션은 "매달/꾸준히 ~을 하고 있어요"처럼 반복 패턴으로 일반화해서만 써라.\n\n`
+      ? `[인스타그램 발췌 — 사장님이 직접 쓴 글(바이오·게시물 캡션)]\n${d.trim()}\n\n⭐⭐이건 사장님 본인이 쓴 글이라 신뢰 최상위 자료야. 제3자 문서(기사·블로그·검색)와 사실이 충돌하면 무조건 이쪽을 따라라. 애칭·슬로건·"낮술·혼술 환영" 같은 고유 표현은 원형을 최대한 보존해 반영해라. ⭐⭐특히 바이오의 핵심 자기규정(예: "가성비 보틀샵 | 통조림 편집샵 | 미니 와인 바", "낮술, 혼술, 모두 환영")은 이 브랜드의 자기소개 그 자체다 — oneLiners·descriptions 후보 중 최소 절반에 그 표현이 살아 있게 반영해라. 소극적으로 쓰지 마라. 단 ⛔영업시간·휴무·가격·기간 한정 행사는 여기 있어도 소개서에 쓰지 마라(유통기한 정보 금지 규칙). 일회성 행사 캡션은 "매달/꾸준히 ~을 하고 있어요"처럼 반복 패턴으로 일반화해서만 써라.\n\n`
       : "";
   }
 
