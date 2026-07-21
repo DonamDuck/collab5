@@ -299,6 +299,35 @@ export interface HomepageDigest {
   failReason?: string;
 }
 
+/** 조사 메모 속 보도기사류 URL(최대 2개)을 골라 본문 발췌 — '소개된 곳' 설명·사실 보강용.
+ *  (2026-07-21 로직 업그레이드 ②: 크롤이 기사 URL만 얻고 본문은 안 읽어 소개 설명이 범용문장이 되던 문제)
+ *  실패는 전부 조용한 저하("") — 기존 동작 유지. SSRF 가드는 safeFetchHtml이 담당. */
+export async function fetchArticleExcerpts(memo: string | undefined, max = 2): Promise<string> {
+  if (!memo?.trim()) return "";
+  const urls = [...new Set([...memo.matchAll(/https?:\/\/[^\s"'<>)|\]]+/g)].map((m) => m[0]))]
+    .filter((u) => {
+      try {
+        const { hostname, pathname } = new URL(u);
+        if (SKIP_HOSTS.test(hostname)) return false; // SNS·네이버 등은 별도 경로가 담당
+        return /news|article|press|magazine|journal/i.test(hostname + pathname);
+      } catch {
+        return false;
+      }
+    })
+    .slice(0, max);
+  if (!urls.length) return "";
+  const deadline = Date.now() + 6_000;
+  const settled = await Promise.allSettled(urls.map((u) => safeFetchHtml(u, deadline)));
+  const parts: string[] = [];
+  settled.forEach((s, i) => {
+    if (s.status !== "fulfilled") return;
+    const text = extractMainText(s.value).slice(0, 2_500);
+    if (text.length > 200) parts.push(`[기사—${new URL(urls[i]).hostname}]\n${text}`);
+  });
+  if (parts.length) console.log("[article-excerpts]", JSON.stringify({ urls: urls.length, got: parts.length }));
+  return parts.join("\n\n");
+}
+
 export async function fetchHomepageDigest(rawUrl: string): Promise<HomepageDigest> {
   const started = Date.now();
   const deadline = started + TOTAL_BUDGET_MS;

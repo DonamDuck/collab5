@@ -19,7 +19,8 @@ import {
   researchTier,
   detectRegionMismatch,
 } from "@/lib/enrich";
-import { fetchHomepageDigest } from "@/lib/homepage";
+import { fetchHomepageDigest, fetchArticleExcerpts } from "@/lib/homepage";
+import { fetchInstagramDigest } from "@/lib/instagram";
 
 // 홈페이지 딥리드(예산 8초) + Gemini 생성 여유 — Vercel 기본값(짧음) 대신 명시
 export const maxDuration = 60;
@@ -34,6 +35,21 @@ async function digestOf(homepage: unknown): Promise<string | undefined> {
     return d.ok ? d.digest : undefined;
   } catch (e) {
     console.warn("[enrich] homepage digest failed:", e);
+    return undefined;
+  }
+}
+
+// 확정 인스타 핸들 → 바이오 + (조사 메모 속 게시물 URL의) 캡션 발췌. 실패는 조용한 저하.
+// digest 텍스트는 서버에서만 만든다 — 클라이언트 텍스트를 프롬프트에 넣지 않는다(주입 차단).
+async function igDigestOf(instagram: unknown, researchMemo: unknown): Promise<string | undefined> {
+  const handle = typeof instagram === "string" ? instagram.trim() : "";
+  if (!handle) return undefined;
+  try {
+    const d = await fetchInstagramDigest(handle, typeof researchMemo === "string" ? researchMemo : undefined);
+    if (d.ok) console.log(`[enrich] instagram digest: bio+${d.posts}posts (@${handle.replace(/^@/, "")})`);
+    return d.ok ? d.digest : undefined;
+  } catch (e) {
+    console.warn("[enrich] instagram digest failed:", e);
     return undefined;
   }
 }
@@ -189,6 +205,11 @@ export async function POST(req: Request) {
         verbatimKeywords: strArr(body.verbatimKeywords),
         ownerNote: typeof body.ownerNote === "string" ? body.ownerNote : undefined,
         homepageDigest: await digestOf(body.homepage), // 확정 홈페이지 딥리드(실패 시 undefined)
+        instagramDigest: await igDigestOf(body.instagram, body.research), // 확정 인스타 딥리드(실패 시 undefined)
+        pressDigest:
+          (await fetchArticleExcerpts(
+            typeof body.research === "string" ? body.research : undefined
+          ).catch(() => "")) || undefined, // 메모 속 기사 본문 발췌(실패 시 undefined)
       });
       return NextResponse.json({ options });
     } catch (e) {
@@ -244,6 +265,11 @@ export async function POST(req: Request) {
         verbatimKeywords: strArr(body.verbatimKeywords),
         researchMemo: typeof body.researchMemo === "string" ? body.researchMemo : undefined,
         homepageDigest: await digestOf(body.homepage), // 확정 홈페이지 딥리드(실패 시 undefined)
+        instagramDigest: await igDigestOf(body.instagram, body.researchMemo), // 확정 인스타 딥리드(실패 시 undefined)
+        pressDigest:
+          (await fetchArticleExcerpts(
+            typeof body.researchMemo === "string" ? body.researchMemo : undefined
+          ).catch(() => "")) || undefined, // 메모 속 기사 본문 발췌(실패 시 undefined)
         round: typeof body.round === "number" ? body.round : 0,
       });
       // researchMemo = 자세히 재생성(descFromOneLiner)이 재사용 → 재크롤 방지(콜 절감)
@@ -279,6 +305,7 @@ export async function POST(req: Request) {
         focusKeywords: strArr(body.focusKeywords),
         values: strArr(body.values),
         homepageDigest: await digestOf(body.homepage), // 확정 홈페이지 딥리드(실패 시 undefined)
+        instagramDigest: await igDigestOf(body.instagram, body.researchMemo), // 확정 인스타 딥리드(실패 시 undefined)
       });
       return NextResponse.json({ anchors });
     } catch (e) {

@@ -466,6 +466,8 @@ function RegisterForm() {
       targetAudience,
       // 폼에 적힌 홈페이지 → 서버가 직접 읽어 초안에 반영(딥리드). URL만 보낸다.
       homepage: homepage.trim() || undefined,
+      // 폼에 적힌 인스타 핸들 → 서버가 바이오·캡션을 직접 읽는다(사장님 글 딥리드).
+      instagram: instagram.trim() || undefined,
       round: draftRound,
     };
     const strs = (v: unknown): string[] =>
@@ -528,6 +530,7 @@ function RegisterForm() {
           researchMemo: draftResearchMemo || undefined,
           values,
           homepage: homepage.trim() || undefined,
+          instagram: instagram.trim() || undefined,
         }),
       })
         .then((r) => r.json())
@@ -592,7 +595,7 @@ function RegisterForm() {
   };
   const canApplyActHint =
     activities.some((a) => !a.title.trim() && !a.desc.trim() && !a.photos.length) ||
-    activities.length < 3;
+    activities.length < 5;
   const injectCollabHint = (h: CollabHint) => {
     setCollabHistory((p) => {
       const empty = p.findIndex(
@@ -1332,7 +1335,7 @@ function RegisterForm() {
           onExpand={() => openSection("activities")}
           onCollapse={() => closeSection("activities")}
         >
-          <p className="mb-4 -mt-4 text-sm text-mute">대표 활동을 최대 3가지 소개해주세요. 사진도 담을 수 있어요.</p>
+          <p className="mb-4 -mt-4 text-sm text-mute">대표 활동을 최대 5가지 소개해주세요. 사진도 담을 수 있어요.</p>
           {/* [비활성] 미선택 활동 힌트 재노출 배너 — AI 플로우에서 사용자가 안 고른 추천은
               부정확할 수 있어 굳이 다시 띄우지 않음(대표 지시). 데이터(actHints/usedActHints)는
               보관 중이라, '선택한 것만·정확도 판단해 재노출' 고도화 시 여기 복원. → 백로그 [[위저드-힌트배너-재노출]] */}

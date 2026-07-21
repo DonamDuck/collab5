@@ -69,14 +69,16 @@ export interface RegisterInput {
   enrichment?: Enrichment; // 크롤 스냅샷(생성 시만 기록)
 }
 
-/** 이름 → slug. 한글 등 비ASCII면 랜덤 핸들로 폴백(mock 단계). */
+/** 이름 → slug. 한글 등 비ASCII면 랜덤 핸들로 폴백(mock 단계).
+ *  ⚠️"캔앤코르크A"처럼 한글+ASCII 한두 글자면 ascii가 "a"만 남아 /m/a 같은
+ *  한 글자 slug가 나온다(2026-07-21 실측) — 3자 미만이면 랜덤 핸들로 폴백. */
 function slugify(name: string): string {
   const ascii = name
     .toLowerCase()
     .trim()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
-  return ascii || "m-" + Math.random().toString(36).slice(2, 8);
+  return ascii.length >= 3 ? ascii : "m-" + Math.random().toString(36).slice(2, 8);
 }
 
 export async function createMakerAction(

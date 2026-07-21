@@ -22,6 +22,7 @@ import {
 } from "../src/lib/enrich";
 import { regionMatches, regionConflict } from "../src/lib/regionSynonyms";
 import { mapLinkLabel, channelLabel } from "../src/lib/links";
+import { sanitizeHandle, extractPostUrls } from "../src/lib/instagram";
 
 let pass = 0;
 let fail = 0;
@@ -585,6 +586,21 @@ check("⛔ 절단 후 쓰레기 칩이 안 나옴", !extractChipsFromResearch(`[
 check("✅ 정상 메모는 손대지 않음", sanitizeSearchText("[정체]\n동네 스튜디오\n[키워드]\n필라테스, 소도구") === "[정체]\n동네 스튜디오\n[키워드]\n필라테스, 소도구");
 check("✅ 빈 줄 반복은 폭주가 아님", sanitizeSearchText("가\n\n\n\n나").includes("나"));
 check("✅ 하드 상한(24,000자)", sanitizeSearchText("가".repeat(30_000)).length <= 24_000);
+
+// 인스타 딥리드 헬퍼 — 07-21 로직 업그레이드 ① (캔앤코르크 실측 기반)
+console.log("[인스타 딥리드 헬퍼]");
+check("✅ 핸들 정규화(@ 제거)", sanitizeHandle("@can.n.cork") === "can.n.cork");
+check("✅ 핸들 밑줄·숫자 허용", sanitizeHandle("cafe_2go") === "cafe_2go");
+check("⛔ 경로 주입 차단(슬래시)", sanitizeHandle("a/../../etc") === undefined);
+check("⛔ 한글·공백 핸들 거부", sanitizeHandle("캔앤코르크") === undefined && sanitizeHandle("a b") === undefined);
+check("⛔ 빈 핸들 거부", sanitizeHandle("") === undefined && sanitizeHandle(undefined) === undefined);
+const igMemo = `조사: https://www.instagram.com/can.n.cork/p/Da9yjh0PDvB/ 그리고 https://instagram.com/p/DWOtTtYj03L 및 릴스 https://www.instagram.com/can.n.cork/reel/Xy12345678a/`;
+const postUrls = extractPostUrls(igMemo);
+check("✅ 메모에서 포스트 shortcode 수확(계정경로·reel 포함)", postUrls.length === 3, JSON.stringify(postUrls));
+check("✅ 정식 URL로 재조립(임의 URL 페치 방지)", postUrls.every((u) => /^https:\/\/www\.instagram\.com\/p\/[A-Za-z0-9_-]+\/$/.test(u)), JSON.stringify(postUrls));
+check("✅ 중복 shortcode 제거", extractPostUrls(`${igMemo}\n${igMemo}`).length === 3);
+check("✅ 상한 5개", extractPostUrls(Array.from({ length: 9 }, (_, i) => `https://instagram.com/p/AbCdEf${i}gHi/`).join(" ")).length === 5);
+check("✅ 포스트 URL 없으면 빈 배열", extractPostUrls("인스타 @can.n.cork 만 언급") .length === 0);
 
 console.log(`\n결과: ${pass} pass / ${fail} fail`);
 process.exit(fail ? 1 : 0);

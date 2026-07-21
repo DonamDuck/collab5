@@ -403,6 +403,8 @@ export function EnrichWizard({
           verbatimKeywords: verbatim,
           // 확약된 공식 홈페이지 → 서버가 직접 읽어 소개서에 반영(딥리드). URL만 보낸다.
           homepage: hpChosen || undefined,
+          // 확약된 인스타 핸들 → 서버가 바이오·(메모 속 게시물) 캡션을 직접 읽는다(사장님 글 딥리드).
+          instagram: igChosen || undefined,
         }),
       });
       const d = await r.json();
