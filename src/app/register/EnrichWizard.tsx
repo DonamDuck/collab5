@@ -854,7 +854,7 @@ export function EnrichWizard({
             <p className="pr-8 text-[13px] font-medium text-primary-on">사전 정보 마지막 확인!</p>
             <p className="mt-1 pr-8 text-lg font-bold text-ink">이 링크가 맞나요?</p>
             <p className="mt-1.5 text-[15px] leading-relaxed text-mute">
-              확인해주신 SNS, 홈페이지 정보를 소개서에 담아드릴게요. 공식 홈페이지가 있다면
+              확인해주신 SNS, 홈페이지 정보를 소개서에 담아드릴게요. 홈페이지 링크가 있다면
               내용까지 직접 읽고 더 정확하게 써드려요.
             </p>
             <div className="mt-4 space-y-2">
@@ -878,8 +878,8 @@ export function EnrichWizard({
               <LinkPicker
                 label="홈페이지"
                 note={hpCandidates.length === 0 ? "웹에서 못 찾았어요" : "웹에서 발견했어요"}
-                question="우리 브랜드의 공식 홈페이지가 맞나요?"
-                emptyPrompt="공식 홈페이지가 있으신가요?"
+                question="우리 브랜드의 홈페이지가 맞나요?"
+                emptyPrompt="홈페이지 링크가 있으신가요?"
                 candidates={hpCandidates}
                 placeholder="https://"
                 pick={hpPick}

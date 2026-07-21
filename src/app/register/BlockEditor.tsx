@@ -652,7 +652,8 @@ function CollapsedField({ hasValue, label, children }: { hasValue: boolean; labe
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="text-[14px] text-mute underline underline-offset-2"
+        // 접힘 상태의 두 버튼(사진·링크)은 inline이라 부모 space-y로는 가로 간격이 안 생김 → mr로 띄운다
+        className="mr-4 text-[14px] text-mute underline underline-offset-2"
       >
         {label}
       </button>
