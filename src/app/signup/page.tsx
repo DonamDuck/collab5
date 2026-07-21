@@ -7,6 +7,7 @@ import { signUpAction, checkSignupDuplicatesAction } from "@/lib/auth-actions";
 import { uploadPhoto } from "@/lib/upload";
 import { Avatar } from "@/components/Avatar";
 import { LoadingOverlay } from "@/components/LoadingOverlay";
+import { PasswordInput } from "@/components/PasswordInput";
 import { validatePassword, formatPhone } from "@/lib/validation";
 
 export default function SignupPage() {
@@ -114,8 +115,7 @@ export default function SignupPage() {
           {dup.email && <p className="mt-1.5 text-sm text-red-600">{DUP_MSG.email}</p>}
         </Field>
         <Field label="비밀번호">
-          <input
-            type="password"
+          <PasswordInput
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="8자 이상, 특수문자 1개 이상"
@@ -123,8 +123,7 @@ export default function SignupPage() {
           />
         </Field>
         <Field label="비밀번호 확인">
-          <input
-            type="password"
+          <PasswordInput
             value={password2}
             onChange={(e) => setPassword2(e.target.value)}
             placeholder="한 번 더 입력해주세요"

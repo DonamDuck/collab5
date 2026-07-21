@@ -17,6 +17,7 @@ import { isRichIntro } from "@/lib/completeness";
 import { uploadPhoto, uploadPdf } from "@/lib/upload";
 import { mapLinkLabel, instagramSlug } from "@/lib/links";
 import { ScrollLock } from "@/components/ScrollLock";
+import { PasswordInput } from "@/components/PasswordInput";
 import type { ActivityHint, CollabHint, EnrichField } from "@/lib/enrich";
 import { blendDescriptions, canRegenDesc, noteRegenDesc } from "@/lib/enrichBlend";
 import { EnrichWizard, type WizardFill } from "./EnrichWizard";
@@ -780,7 +781,6 @@ function RegisterForm() {
   const [createdSlug, setCreatedSlug] = useState("");
   const [loggedIn, setLoggedIn] = useState(false);
   const [editPw, setEditPw] = useState("");
-  const [showEditPw, setShowEditPw] = useState(false);
   const [savingPw, setSavingPw] = useState(false);
   const [pwErr, setPwErr] = useState("");
   const [editSlug, setEditSlug] = useState<string | null>(null);
@@ -2111,34 +2111,12 @@ function RegisterForm() {
                     소개서 관리 비밀번호 <span className="text-red-500">*</span>{" "}
                     <span className="font-normal text-faint">(입력 규칙 없음)</span>
                   </label>
-                  <div className="relative">
-                    <input
-                      type={showEditPw ? "text" : "password"}
-                      value={editPw}
-                      onChange={(e) => setEditPw(e.target.value)}
-                      placeholder="비밀번호를 입력해주세요"
-                      className="h-11 w-full rounded-sm border border-hairline bg-surface px-3 pr-11 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowEditPw((v) => !v)}
-                      aria-label={showEditPw ? "비밀번호 숨기기" : "비밀번호 보기"}
-                      className="absolute inset-y-0 right-0 flex w-11 items-center justify-center text-faint hover:text-body"
-                    >
-                      {showEditPw ? (
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 10 8 10 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
-                          <path d="M6.61 6.61A18.5 18.5 0 0 0 2 12s3 8 10 8a9.12 9.12 0 0 0 5.39-1.61" />
-                          <line x1="2" y1="2" x2="22" y2="22" />
-                        </svg>
-                      ) : (
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M2 12s3-8 10-8 10 8 10 8-3 8-10 8-10-8-10-8Z" />
-                          <circle cx="12" cy="12" r="3" />
-                        </svg>
-                      )}
-                    </button>
-                  </div>
+                  <PasswordInput
+                    value={editPw}
+                    onChange={(e) => setEditPw(e.target.value)}
+                    placeholder="비밀번호를 입력해주세요"
+                    className="h-11 w-full rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
+                  />
                   {pwErr && <p className="mt-2 text-[13px] text-red-600">{pwErr}</p>}
                   <p className="mt-2 text-[13px] leading-relaxed text-faint">
                     잊어버리면 고객센터를 통해서만 찾을 수 있으니 기억해주세요.

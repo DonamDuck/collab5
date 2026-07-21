@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { verifyMakerPasswordAction } from "@/lib/actions";
 import { ScrollLock } from "@/components/ScrollLock";
+import { PasswordInput } from "@/components/PasswordInput";
 
 // 우상단 수정 버튼 — 소유자면 바로 / 비회원생성(비번 있음)이면 비번 모달 / 회원생성(비번 없음)이면 로그인 필요 얼럿.
 export function EditButton({
@@ -92,15 +93,15 @@ export function EditButton({
           <div className="w-full max-w-sm rounded-lg border border-hairline bg-surface p-6 shadow-e2">
             <p className="text-base font-bold text-ink">소개서 수정</p>
             <p className="mt-1.5 text-sm text-mute">소개서 관리 비밀번호를 입력해주세요.</p>
-            <input
-              type="password"
+            <PasswordInput
               value={pw}
               onChange={(e) => setPw(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.nativeEvent.isComposing) go();
               }}
               placeholder="비밀번호"
-              className="mt-4 h-11 w-full rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
+              wrapperClassName="mt-4"
+              className="h-11 w-full rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
             />
             {err && <p className="mt-2 text-sm text-red-600">{err}</p>}
             <div className="mt-4 flex gap-2">

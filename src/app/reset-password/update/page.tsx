@@ -5,6 +5,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserAuthClient } from "@/lib/supabase/client";
 import { validatePassword } from "@/lib/validation";
+import { PasswordInput } from "@/components/PasswordInput";
 
 export default function UpdatePasswordPage() {
   const router = useRouter();
@@ -39,15 +40,13 @@ export default function UpdatePasswordPage() {
     <main className="mx-auto w-full max-w-[400px] px-4 py-14 sm:px-6">
       <h1 className="text-2xl font-bold tracking-tight text-ink">새 비밀번호 설정</h1>
       <div className="mt-5 space-y-3">
-        <input
-          type="password"
+        <PasswordInput
           value={pw}
           onChange={(e) => setPw(e.target.value)}
           placeholder="새 비밀번호 (8자 이상, 특수문자 포함)"
           className="h-11 w-full rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
         />
-        <input
-          type="password"
+        <PasswordInput
           value={pw2}
           onChange={(e) => setPw2(e.target.value)}
           placeholder="새 비밀번호 확인"

@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { claimBySlugAction } from "@/lib/actions";
+import { PasswordInput } from "@/components/PasswordInput";
 
 // 기존 소개서 연결 — URL/슬러그 + 비번. 성공 시 /my 새로고침.
 // label: 트리거 버튼 문구(추가 연결 시 "+ 소개서 추가 연결").
@@ -47,12 +48,12 @@ export function ConnectMaker({ label = "기존 소개서 연결하기" }: { labe
         placeholder="소개서 링크 또는 m-xxxxxx"
         className="mt-3 h-11 w-full rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
       />
-      <input
-        type="password"
+      <PasswordInput
         value={pw}
         onChange={(e) => setPw(e.target.value)}
         placeholder="관리 비밀번호"
-        className="mt-2 h-11 w-full rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
+        wrapperClassName="mt-2"
+        className="h-11 w-full rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
       />
       {err && <p className="mt-2 text-sm text-red-600">{err}</p>}
       <p className="mt-2 text-[13px] text-faint">
