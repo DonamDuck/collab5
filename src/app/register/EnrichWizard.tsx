@@ -977,7 +977,7 @@ export function EnrichWizard({
               onClick={goNext}
               className="mt-5 h-11 w-full rounded-md bg-primary text-sm font-medium text-primary-on"
             >
-              다음 · 한 줄 소개 고르기
+              다음 · 한두 문장 소개 고르기
             </button>
           </div>
         )}
@@ -985,7 +985,7 @@ export function EnrichWizard({
         {/* 한 줄 소개 5지선다 */}
         {kind === "oneLiner" && options && (
           <div>
-            <p className="pr-8 text-lg font-bold text-ink">한 줄 소개를 골라주세요</p>
+            <p className="pr-8 text-lg font-bold text-ink">마음에 드는 소개를 골라주세요.</p>
             <p className="mt-1.5 text-[15px] leading-relaxed text-mute">‘수정’으로 다듬으며 비교하고, 마음에 드는 하나를 골라주세요.</p>
             <div className="mt-4 max-h-[42vh] overflow-y-auto slim-scrollbar pr-0.5">
               <OptionPicker

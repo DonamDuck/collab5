@@ -1899,7 +1899,7 @@ function RegisterForm() {
             ) : draftStep === 1 ? (
               <>
                 <p className="pr-8 text-base font-bold text-ink">
-                  마음에 드는 한 줄 소개를 골라주세요{" "}
+                  마음에 드는 소개를 골라주세요{" "}
                   <span className="text-sm font-medium text-mute">1/2</span>
                 </p>
                 <p className="mt-1 text-sm text-mute">
