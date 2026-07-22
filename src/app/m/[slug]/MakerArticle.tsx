@@ -92,7 +92,7 @@ export function MakerArticle({ maker, isOwner, logoUrl, readOnly }: {
           제공·파트너 제목도 Section h2와 동일 스타일(대표 확정), 블록 간격은 활동 아이템 간격(space-y-6).
           기존 소개서도 합집합 읽기로 그대로 정상 렌더(분기 없음). */}
       {(maker.offers.length > 0 || maker.seeks.length > 0 || maker.offersNote || maker.seeksNote) && (
-        <Section title="이런 콜라보를 기대하고 있어요!">
+        <Section title="이런 콜라보를 기대하고 있어요">
           <div className="space-y-6">
             {(maker.offers.length > 0 || maker.seeks.length > 0) && (
               <div className="flex flex-wrap gap-2">
