@@ -2,6 +2,7 @@
 // 등록 → 카드 만들기 → 공유. design.md §9.6 온보딩 3스텝.
 import Link from "next/link";
 import { PreviewPhones } from "./PreviewPhones";
+import { Reveal } from "@/components/Reveal";
 
 export default function Home() {
   return (
@@ -38,7 +39,7 @@ export default function Home() {
       </section>
 
       {/* 미리보기 — 실제 데모 소개서 2종(사진 있는/없는) 폰 프레임. 결과물 먼저 → 과정 설명 순서 */}
-      <section className="mt-16">
+      <Reveal as="section" className="mt-16">
         <h2 className="text-center text-2xl font-bold tracking-tight text-ink sm:text-[28px]">
           3분이면 브랜드 소개서가 완성돼요.
         </h2>
@@ -56,88 +57,103 @@ export default function Home() {
             브랜드 소개서 둘러보기
           </Link>
         </div>
-      </section>
+      </Reveal>
 
       {/* §9.6 온보딩 3스텝 */}
       <section className="mt-16">
-        <h2 className="text-center text-2xl font-bold tracking-tight text-ink sm:text-[28px]">
-          브랜드 소개서, 이렇게 만들어요
-        </h2>
+        <Reveal>
+          <h2 className="text-center text-2xl font-bold tracking-tight text-ink sm:text-[28px]">
+            브랜드 소개서, 이렇게 만들어요
+          </h2>
+        </Reveal>
         <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <StepCard
-            n={1}
-            title="내 브랜드를 소개해요"
-            desc="AI가 온라인 정보를 찾아, 초안 작성을 도와드려요."
-            illu={<NodeIllu />}
-          />
-          <StepCard
-            n={2}
-            title="소개서를 만들고 저장해요"
-            desc="만든 소개서는 언제든 링크로 공유할 수 있어요."
-            illu={<CardIllu />}
-          />
-          <StepCard
-            n={3}
-            title="소개서를 협업 파트너에게 전달해요"
-            desc="링크 하나만 보내면, 상대는 로그인 없이 바로 볼 수 있어요."
-            illu={<ConnectIllu />}
-          />
+          {/* 카드 스태거 — 순차 등장(90ms 간격) */}
+          <Reveal delay={0} className="h-full">
+            <StepCard
+              n={1}
+              title="내 브랜드를 소개해요"
+              desc="AI가 온라인 정보를 찾아, 초안 작성을 도와드려요."
+              illu={<NodeIllu />}
+            />
+          </Reveal>
+          <Reveal delay={90} className="h-full">
+            <StepCard
+              n={2}
+              title="소개서를 만들고 저장해요"
+              desc="만든 소개서는 언제든 링크로 공유할 수 있어요."
+              illu={<CardIllu />}
+            />
+          </Reveal>
+          <Reveal delay={180} className="h-full">
+            <StepCard
+              n={3}
+              title="소개서를 협업 파트너에게 전달해요"
+              desc="링크 하나만 보내면, 상대는 로그인 없이 바로 볼 수 있어요."
+              illu={<ConnectIllu />}
+            />
+          </Reveal>
         </div>
       </section>
 
       {/* 왜 소개서? — DM vs 소개서 */}
       <section className="mt-16">
-        <h2 className="text-center text-2xl font-bold tracking-tight text-ink sm:text-[28px]">
-          소개서를 이렇게 활용해 보세요
-        </h2>
+        <Reveal>
+          <h2 className="text-center text-2xl font-bold tracking-tight text-ink sm:text-[28px]">
+            소개서를 이렇게 활용해 보세요
+          </h2>
+        </Reveal>
         <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2">
           {/* 그냥 DM */}
-          <div className="rounded-xl border border-hairline bg-surface-soft p-6">
-            <p className="text-[17px] font-bold text-mute">이런 경험 있으셨나요?</p>
-            <ul className="mt-4 space-y-3">
-              {[
-                "내가 어떤 브랜드인지 하나씩 설명해야 해요.",
-                "상대는 내용을 이해하기 전부터 부담을 느껴요.",
-                "다른 메시지 사이에 금방 묻혀버려요.",
-              ].map((t) => (
-                <li key={t} className="flex gap-2 text-base leading-relaxed text-body">
-                  <span className="text-faint">·</span>
-                  {t}
-                </li>
-              ))}
-            </ul>
-          </div>
+          <Reveal delay={0} className="h-full">
+            <div className="h-full rounded-xl border border-hairline bg-surface-soft p-6">
+              <p className="text-[17px] font-bold text-mute">이런 경험 있으셨나요?</p>
+              <ul className="mt-4 space-y-3">
+                {[
+                  "내가 어떤 브랜드인지 하나씩 설명해야 해요.",
+                  "상대는 내용을 이해하기 전부터 부담을 느껴요.",
+                  "다른 메시지 사이에 금방 묻혀버려요.",
+                ].map((t) => (
+                  <li key={t} className="flex gap-2 text-base leading-relaxed text-body">
+                    <span className="text-faint">·</span>
+                    {t}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </Reveal>
           {/* 브랜드 소개서 */}
-          <div className="rounded-xl border border-primary bg-surface p-6 shadow-e1">
-            <p className="flex items-center gap-1.5 text-[17px] font-bold text-ink">
-              <span className="h-2 w-2 rounded-pill bg-primary" />
-              이렇게 달라져요
-            </p>
-            <ul className="mt-4 space-y-3">
-              {[
-                "브랜드와 협업 제안을 한 번에 전달할 수 있어요.",
-                "상대가 필요한 정보를 한눈에 이해할 수 있어요.",
-                "더 편하게, 더 자신 있게 협업을 시작할 수 있어요.",
-              ].map((t) => (
-                <li key={t} className="flex gap-2 text-base leading-relaxed text-body">
-                  <span className="font-bold text-primary-on">✓</span>
-                  {t}
-                </li>
-              ))}
-            </ul>
-          </div>
+          <Reveal delay={110} className="h-full">
+            <div className="h-full rounded-xl border border-primary bg-surface p-6 shadow-e1">
+              <p className="flex items-center gap-1.5 text-[17px] font-bold text-ink">
+                <span className="h-2 w-2 rounded-pill bg-primary" />
+                이렇게 달라져요
+              </p>
+              <ul className="mt-4 space-y-3">
+                {[
+                  "브랜드와 협업 제안을 한 번에 전달할 수 있어요.",
+                  "상대가 필요한 정보를 한눈에 이해할 수 있어요.",
+                  "더 편하게, 더 자신 있게 협업을 시작할 수 있어요.",
+                ].map((t) => (
+                  <li key={t} className="flex gap-2 text-base leading-relaxed text-body">
+                    <span className="font-bold text-primary-on">✓</span>
+                    {t}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </Reveal>
         </div>
       </section>
 
       {/* 마무리 CTA */}
-      <section className="mt-12 text-center">
+      <Reveal as="section" className="mt-12 text-center">
         <Link
           href="/register"
           className="inline-flex h-12 items-center justify-center rounded-md bg-primary px-7 text-base font-medium text-primary-on"
         >
           지금 시작하기
         </Link>
-      </section>
+      </Reveal>
     </main>
   );
 }
@@ -154,7 +170,8 @@ function StepCard({
   illu: React.ReactNode;
 }) {
   return (
-    <div className="rounded-xl border border-hairline bg-surface p-6">
+    // h-full = Reveal 래퍼가 그리드 아이템이 돼도 카드 높이를 셀에 맞춰 균등하게(스태거 도입 후)
+    <div className="h-full rounded-xl border border-hairline bg-surface p-6">
       <div className="flex h-12 w-12 items-center justify-center text-ink">{illu}</div>
       <p className="mt-4 text-xs font-bold tracking-wide text-primary-on">
         STEP {n}
