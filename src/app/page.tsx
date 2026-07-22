@@ -12,7 +12,7 @@ export default function Home() {
           순수 CSS라 JS 하이드레이션 전에도 재생 → 히어로가 안 보이는 위화감 없음(Reveal의 opacity-0 문제 회피). */}
       <style>{`
         @keyframes home-rise { from { opacity: 0; transform: translateY(40px); } to { opacity: 1; transform: translateY(0); } }
-        .home-rise { animation: home-rise 0.6s ease-out both; }
+        .home-rise { animation: home-rise 0.85s ease-out both; }
         @media (prefers-reduced-motion: reduce) { .home-rise { animation: none; } }
       `}</style>
       {/* Hero — 온로드 라이즈 1번(순차의 첫 블록) */}

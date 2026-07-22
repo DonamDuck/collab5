@@ -37,7 +37,7 @@ export function Reveal({
           io.disconnect(); // 리빌은 1회 — 위로 되감기지 않음
         }
       },
-      { threshold: 0.15, rootMargin: "0px 0px -10% 0px" } // 살짝 일찍 트리거
+      { threshold: 0.15, rootMargin: "0px 0px -22% 0px" } // 하단 컷 -22%: 요소가 화면 하단에서 미리 뜨지 않고, 더 스크롤해 올라온 뒤 트리거(대표 지시 2026-07-22)
     );
     io.observe(el);
     return () => io.disconnect();
@@ -47,7 +47,7 @@ export function Reveal({
     <Tag
       ref={ref as React.Ref<HTMLElement>}
       style={{ transitionDelay: shown ? `${delay}ms` : "0ms" }}
-      className={`transition-all duration-500 ease-out motion-reduce:transition-none ${
+      className={`transition-all duration-700 ease-out motion-reduce:transition-none ${
         shown ? "translate-y-0 opacity-100" : "translate-y-5 opacity-0"
       } ${className}`}
     >
