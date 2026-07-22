@@ -155,8 +155,8 @@ export default function Home() {
         </div>
       </section>
 
-      {/* 마무리 CTA */}
-      <Reveal as="section" className="mt-12 text-center">
+      {/* 마무리 CTA — eager 필수: 페이지 맨 마지막 요소라 하단 -22% 데드존을 못 벗어나 리빌이 영영 안 터짐 */}
+      <Reveal as="section" eager className="mt-12 text-center">
         <Link
           href="/register"
           className="inline-flex h-12 items-center justify-center rounded-md bg-primary px-7 text-base font-medium text-primary-on"
