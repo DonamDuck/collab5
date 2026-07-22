@@ -3,14 +3,14 @@
 // (DB는 '공유 → 타인 열람(view) 루프 = 배포 시점'에 투입 — masterbrain 2026-06-21 결정)
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import type { BusinessSize, CollabCard, CollabType, Maker, Reaction, ViewEvent } from "./types";
+import type { BusinessSize, CollabCard, CollabType, Maker, MakerStatus, Reaction, ViewEvent } from "./types";
 
 export interface Repo {
   // 업체
-  createMaker(input: Omit<Maker, "id" | "createdAt">): Promise<Maker>;
+  createMaker(input: Omit<Maker, "id" | "createdAt" | "status">): Promise<Maker>;
   getMakerBySlug(slug: string): Promise<Maker | null>;
   getMakerById(id: number): Promise<Maker | null>;
-  updateMakerContent(slug: string, content: Omit<Maker, "id" | "slug" | "createdAt" | "ownerUserId" | "editPasswordHash">): Promise<Maker | null>;
+  updateMakerContent(slug: string, content: Omit<Maker, "id" | "slug" | "createdAt" | "ownerUserId" | "editPasswordHash" | "status">): Promise<Maker | null>;
   setMakerFlags(slug: string, flags: { collabOpen?: boolean; searchVisible?: boolean }): Promise<Maker | null>;
   setMakerOwner(slug: string, ownerUserId: string): Promise<void>;
   setMakerPasswordHash(slug: string, hash: string): Promise<void>;
@@ -141,6 +141,7 @@ const seedMakers: Maker[] = [
     },
     collabOpen: true,
     searchVisible: true,
+    status: "active",
     createdAt: now(),
   },
   {
@@ -172,6 +173,7 @@ const seedMakers: Maker[] = [
     },
     collabOpen: true,
     searchVisible: true,
+    status: "active",
     createdAt: now(),
   },
   {
@@ -203,6 +205,7 @@ const seedMakers: Maker[] = [
     },
     collabOpen: true,
     searchVisible: true,
+    status: "active",
     createdAt: now(),
   },
   {
@@ -234,6 +237,7 @@ const seedMakers: Maker[] = [
     },
     collabOpen: false,
     searchVisible: true,
+    status: "active",
     createdAt: now(),
   },
   // ── 데모 시드: /preview 로컬 검증용 고정본 2종 (검색 미노출·콜라보 닫힘) ──
@@ -293,6 +297,7 @@ const seedMakers: Maker[] = [
     },
     collabOpen: false,
     searchVisible: false,
+    status: "active",
     createdAt: now(),
   },
   {
@@ -346,6 +351,7 @@ const seedMakers: Maker[] = [
     },
     collabOpen: false,
     searchVisible: false,
+    status: "active",
     createdAt: now(),
   },
 ];
@@ -377,18 +383,18 @@ class InMemoryRepo implements Repo {
   private nextViewId = 1;
   private nextReactionId = 1;
 
-  async createMaker(input: Omit<Maker, "id" | "createdAt">): Promise<Maker> {
-    const maker: Maker = { ...input, id: this.nextMakerId++, createdAt: now(), updatedAt: now() };
+  async createMaker(input: Omit<Maker, "id" | "createdAt" | "status">): Promise<Maker> {
+    const maker: Maker = { status: "active", ...input, id: this.nextMakerId++, createdAt: now(), updatedAt: now() };
     this.makers.push(maker);
     return maker;
   }
   async getMakerBySlug(slug: string) {
-    return this.makers.find((m) => m.slug === slug) ?? null;
+    return this.makers.find((m) => m.slug === slug && m.status !== "inactive") ?? null;
   }
   async getMakerById(id: number) {
-    return this.makers.find((m) => m.id === id) ?? null;
+    return this.makers.find((m) => m.id === id && m.status !== "inactive") ?? null;
   }
-  async updateMakerContent(slug: string, c: Omit<Maker, "id" | "slug" | "createdAt" | "ownerUserId" | "editPasswordHash">): Promise<Maker | null> {
+  async updateMakerContent(slug: string, c: Omit<Maker, "id" | "slug" | "createdAt" | "ownerUserId" | "editPasswordHash" | "status">): Promise<Maker | null> {
     const m = this.makers.find((x) => x.slug === slug);
     if (!m) return null;
     Object.assign(m, c);
@@ -410,18 +416,19 @@ class InMemoryRepo implements Repo {
     if (m) m.editPasswordHash = hash;
   }
   async deleteMaker(slug: string): Promise<void> {
-    const i = this.makers.findIndex((x) => x.slug === slug);
-    if (i >= 0) this.makers.splice(i, 1);
+    // 소프트 삭제(2026-07-22): 하드 splice 대신 status=inactive
+    const m = this.makers.find((x) => x.slug === slug);
+    if (m) m.status = "inactive";
   }
   async listMakersByOwner(ownerUserId: string): Promise<Maker[]> {
-    return this.makers.filter((x) => x.ownerUserId === ownerUserId);
+    return this.makers.filter((x) => x.ownerUserId === ownerUserId && x.status !== "inactive");
   }
   async listMakers() {
     return [...this.makers];
   }
   async searchMakers(q: string) {
     const t = q.trim().toLowerCase();
-    const visible = this.makers.filter((m) => m.searchVisible);
+    const visible = this.makers.filter((m) => m.searchVisible && m.status !== "inactive");
     if (!t) return visible;
     return visible.filter((m) =>
       [m.name, m.oneLiner, ...m.soul.values, ...m.offers, ...m.seeks]
@@ -466,7 +473,7 @@ interface MakerRow {
   photos: string[] | null;
   blocks: Maker["blocks"] | null; intro_file_url: string | null;
   soul: Maker["soul"]; trust: Maker["trust"];
-  collab_open: boolean; search_visible: boolean | null; created_at: string; updated_at: string | null;
+  collab_open: boolean; search_visible: boolean | null; status: string | null; created_at: string; updated_at: string | null;
   owner_uuid: string | null; claim_token_hash: string | null;
   enrichment: Maker["enrichment"] | null;
 }
@@ -495,7 +502,9 @@ function rowToMaker(r: MakerRow): Maker {
     blocks: (r.blocks ?? []).map((b) => ({ ...b, photos: b.photos ?? [], links: b.links ?? [] })),
     introFileUrl: r.intro_file_url ?? undefined,
     soul: r.soul, trust: r.trust,
-    collabOpen: r.collab_open, searchVisible: r.search_visible ?? true, createdAt: r.created_at,
+    collabOpen: r.collab_open, searchVisible: r.search_visible ?? true,
+    status: (r.status as MakerStatus) ?? "active",
+    createdAt: r.created_at,
     updatedAt: r.updated_at ?? undefined,
     ownerUserId: r.owner_uuid ?? undefined,
     editPasswordHash: r.claim_token_hash ?? undefined,
@@ -510,7 +519,7 @@ class SupabaseRepo implements Repo {
   private db: SupabaseClient;
   constructor(url: string, key: string) { this.db = createClient(url, key); }
 
-  async createMaker(input: Omit<Maker, "id" | "createdAt">): Promise<Maker> {
+  async createMaker(input: Omit<Maker, "id" | "createdAt" | "status">): Promise<Maker> {
     // id·created_at·updated_at 은 DB가 자동 부여
     const row = {
       slug: input.slug, name: input.name, one_liner: input.oneLiner,
@@ -523,6 +532,7 @@ class SupabaseRepo implements Repo {
       blocks: input.blocks, intro_file_url: input.introFileUrl ?? null,
       soul: input.soul, trust: input.trust, collab_open: input.collabOpen,
       search_visible: input.searchVisible,
+      status: "active", // 생성 default = active (소프트 삭제 시에만 inactive)
       enrichment: input.enrichment ?? null,
       owner_uuid: input.ownerUserId ?? null, claim_token_hash: input.editPasswordHash ?? null,
     };
@@ -531,11 +541,12 @@ class SupabaseRepo implements Repo {
     return rowToMaker(data as MakerRow);
   }
   async getMakerBySlug(slug: string) {
-    const { data } = await this.db.from("makers").select().eq("slug", slug).maybeSingle();
+    // status='active'만 — inactive(소프트 삭제)는 /m·수정·검증 전 경로에서 비노출(원천 차단)
+    const { data } = await this.db.from("makers").select().eq("slug", slug).eq("status", "active").maybeSingle();
     return data ? rowToMaker(data as MakerRow) : null;
   }
   async getMakerById(id: number) {
-    const { data } = await this.db.from("makers").select().eq("id", id).maybeSingle();
+    const { data } = await this.db.from("makers").select().eq("id", id).eq("status", "active").maybeSingle();
     return data ? rowToMaker(data as MakerRow) : null;
   }
   async updateMakerContent(
@@ -561,11 +572,12 @@ class SupabaseRepo implements Repo {
     await this.db.from("makers").update({ claim_token_hash: hash }).eq("slug", slug);
   }
   async deleteMaker(slug: string): Promise<void> {
-    // collab_cards·view_events·reactions는 FK ON DELETE CASCADE로 함께 삭제됨.
-    await this.db.from("makers").delete().eq("slug", slug);
+    // 소프트 삭제(2026-07-22): 하드 delete 대신 status=inactive. DB 행·카드·지표는 보관, 전 노출면에서만 사라짐.
+    await this.db.from("makers").update({ status: "inactive" }).eq("slug", slug);
   }
   async listMakersByOwner(ownerUserId: string): Promise<Maker[]> {
-    const { data } = await this.db.from("makers").select().eq("owner_uuid", ownerUserId).order("created_at", { ascending: false });
+    // /my — 소프트 삭제분은 목록에서 제외(status='active'만)
+    const { data } = await this.db.from("makers").select().eq("owner_uuid", ownerUserId).eq("status", "active").order("created_at", { ascending: false });
     return (data ?? []).map((r) => rowToMaker(r as MakerRow));
   }
   async listMakers() {
@@ -574,8 +586,8 @@ class SupabaseRepo implements Repo {
   }
   async searchMakers(q: string) {
     const t = q.trim();
-    // 검색은 search_visible=true 만 노출(소유자의 /my 목록은 별도라 여기 필터 무관).
-    let query = this.db.from("makers").select().eq("search_visible", true);
+    // 검색은 search_visible=true + status='active' 만 노출(소유자의 /my 목록은 별도라 여기 필터 무관).
+    let query = this.db.from("makers").select().eq("search_visible", true).eq("status", "active");
     if (t) query = query.or(`name.ilike.%${t}%,one_liner.ilike.%${t}%,region.ilike.%${t}%`);
     const { data } = await query.order("created_at", { ascending: false });
     return (data ?? []).map((r) => rowToMaker(r as MakerRow));
