@@ -12,7 +12,7 @@ export default function Home() {
           순수 CSS라 JS 하이드레이션 전에도 재생 → 히어로가 안 보이는 위화감 없음(Reveal의 opacity-0 문제 회피). */}
       <style>{`
         @keyframes home-rise { from { opacity: 0; transform: translateY(40px); } to { opacity: 1; transform: translateY(0); } }
-        .home-rise { animation: home-rise 0.85s ease-out both; }
+        .home-rise { animation: home-rise 0.95s ease-out both; }
         @media (prefers-reduced-motion: reduce) { .home-rise { animation: none; } }
       `}</style>
       {/* Hero — 온로드 라이즈 1번(순차의 첫 블록) */}
@@ -49,7 +49,7 @@ export default function Home() {
       {/* 미리보기 — 실제 데모 소개서 2종(사진 있는/없는) 폰 프레임. 결과물 먼저 → 과정 설명 순서.
           온로드 라이즈 2번(제목·섭타이틀·목업 통째로 세트). delay로 히어로(1번) 뒤에 이어 올라온다.
           데스크탑·모바일 동일 대응(스크롤 위치 무관, 로드 시 순차 재생). 대표 지시 2026-07-22. */}
-      <section className="home-rise mt-16" style={{ animationDelay: "180ms" }}>
+      <section className="home-rise mt-16" style={{ animationDelay: "600ms" }}>
         <h2 className="text-center text-2xl font-bold tracking-tight text-ink sm:text-[28px]">
           3분이면 브랜드 소개서가 완성돼요.
         </h2>
