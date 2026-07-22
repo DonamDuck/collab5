@@ -7,8 +7,16 @@ import { Reveal } from "@/components/Reveal";
 export default function Home() {
   return (
     <main className="mx-auto w-full max-w-[960px] px-4 py-12 sm:px-6">
-      {/* Hero */}
-      <section className="mx-auto max-w-[600px] text-center">
+      {/* 온로드 라이즈 키프레임 — 서버가 <style>로 직접 렌더(React 19 head 호이스트).
+          ⚠️Tailwind v4(Lightning CSS)가 유틸로 안 잡히는 raw @keyframes를 제거해서 globals.css엔 못 둠 → 여기 인라인.
+          순수 CSS라 JS 하이드레이션 전에도 재생 → 히어로가 안 보이는 위화감 없음(Reveal의 opacity-0 문제 회피). */}
+      <style>{`
+        @keyframes home-rise { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        .home-rise { animation: home-rise 0.6s ease-out both; }
+        @media (prefers-reduced-motion: reduce) { .home-rise { animation: none; } }
+      `}</style>
+      {/* Hero — 온로드 라이즈 1번(순차의 첫 블록) */}
+      <section className="home-rise mx-auto max-w-[600px] text-center">
         <div className="mb-4 inline-flex items-center gap-1.5 rounded-pill bg-surface-soft px-3 py-1">
           <span className="h-2 w-2 rounded-pill bg-primary" />
           <span className="text-xs font-medium text-mute">잘 맞는 콜라보</span>
@@ -39,27 +47,26 @@ export default function Home() {
       </section>
 
       {/* 미리보기 — 실제 데모 소개서 2종(사진 있는/없는) 폰 프레임. 결과물 먼저 → 과정 설명 순서.
-          제목·섭타이틀은 로드 시 바로 노출(모바일 첫 화면이 휑해 보이지 않게, 대표 지시) — 애니는 목업부터. */}
-      <section className="mt-16">
+          온로드 라이즈 2번(제목·섭타이틀·목업 통째로 세트). delay로 히어로(1번) 뒤에 이어 올라온다.
+          데스크탑·모바일 동일 대응(스크롤 위치 무관, 로드 시 순차 재생). 대표 지시 2026-07-22. */}
+      <section className="home-rise mt-16" style={{ animationDelay: "180ms" }}>
         <h2 className="text-center text-2xl font-bold tracking-tight text-ink sm:text-[28px]">
           3분이면 브랜드 소개서가 완성돼요.
         </h2>
         <p className="mx-auto mt-2 max-w-[440px] break-keep text-center text-base leading-relaxed text-body">
           몇 가지만 알려주시면, AI가 소개에 필요한 내용을 먼저 정리해드려요.
         </p>
-        <Reveal>
-          <div className="mt-8">
-            <PreviewPhones />
-          </div>
-          <div className="mt-8 flex justify-center">
-            <Link
-              href="/preview"
-              className="flex h-12 items-center justify-center rounded-md border border-border-strong bg-surface px-7 text-base font-medium text-ink"
-            >
-              브랜드 소개서 둘러보기
-            </Link>
-          </div>
-        </Reveal>
+        <div className="mt-8">
+          <PreviewPhones />
+        </div>
+        <div className="mt-8 flex justify-center">
+          <Link
+            href="/preview"
+            className="flex h-12 items-center justify-center rounded-md border border-border-strong bg-surface px-7 text-base font-medium text-ink"
+          >
+            브랜드 소개서 둘러보기
+          </Link>
+        </div>
       </section>
 
       {/* §9.6 온보딩 3스텝 */}
