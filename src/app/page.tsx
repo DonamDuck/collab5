@@ -38,26 +38,29 @@ export default function Home() {
         </div>
       </section>
 
-      {/* 미리보기 — 실제 데모 소개서 2종(사진 있는/없는) 폰 프레임. 결과물 먼저 → 과정 설명 순서 */}
-      <Reveal as="section" className="mt-16">
+      {/* 미리보기 — 실제 데모 소개서 2종(사진 있는/없는) 폰 프레임. 결과물 먼저 → 과정 설명 순서.
+          제목·섭타이틀은 로드 시 바로 노출(모바일 첫 화면이 휑해 보이지 않게, 대표 지시) — 애니는 목업부터. */}
+      <section className="mt-16">
         <h2 className="text-center text-2xl font-bold tracking-tight text-ink sm:text-[28px]">
           3분이면 브랜드 소개서가 완성돼요.
         </h2>
         <p className="mx-auto mt-2 max-w-[440px] break-keep text-center text-base leading-relaxed text-body">
           몇 가지만 알려주시면, AI가 소개에 필요한 내용을 먼저 정리해드려요.
         </p>
-        <div className="mt-8">
-          <PreviewPhones />
-        </div>
-        <div className="mt-8 flex justify-center">
-          <Link
-            href="/preview"
-            className="flex h-12 items-center justify-center rounded-md border border-border-strong bg-surface px-7 text-base font-medium text-ink"
-          >
-            브랜드 소개서 둘러보기
-          </Link>
-        </div>
-      </Reveal>
+        <Reveal>
+          <div className="mt-8">
+            <PreviewPhones />
+          </div>
+          <div className="mt-8 flex justify-center">
+            <Link
+              href="/preview"
+              className="flex h-12 items-center justify-center rounded-md border border-border-strong bg-surface px-7 text-base font-medium text-ink"
+            >
+              브랜드 소개서 둘러보기
+            </Link>
+          </div>
+        </Reveal>
+      </section>
 
       {/* §9.6 온보딩 3스텝 */}
       <section className="mt-16">
