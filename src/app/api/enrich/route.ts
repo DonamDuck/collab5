@@ -256,6 +256,10 @@ export async function POST(req: Request) {
     try {
       const { oneLiners, descriptions, researchMemo } = await enrichDraftBoth({
         name,
+        // 크롤 씨앗 — 다시받기가 주소 파생 region + enrichment.seed.businessType을 넘겨 위저드 수준 정확도로
+        region: typeof body.region === "string" ? body.region.trim() || undefined : undefined,
+        businessType:
+          typeof body.businessType === "string" ? body.businessType.trim() || undefined : undefined,
         oneLiner: typeof body.oneLiner === "string" ? body.oneLiner : undefined,
         values: strArr(body.values),
         offers: strArr(body.offers),

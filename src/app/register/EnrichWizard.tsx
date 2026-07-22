@@ -44,7 +44,7 @@ export type WizardFill = {
   enrichment?: Enrichment; // 크롤 스냅샷(picked-only). 생성 저장용
 };
 
-const MAX_STARS = 4;
+const MAX_STARS = 6; // 4→6 (대표 지시 2026-07-22). 생성 프롬프트 캡(enrich.ts slice(0,6))과 동기.
 
 // 진행 단계: 씨앗 → (크롤) → 키워드 선택 → 확인·강조 → (생성) → 정보 → 한줄 → 소개 → 이야기
 type Kind =

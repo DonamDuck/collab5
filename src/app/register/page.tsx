@@ -451,19 +451,31 @@ function RegisterForm() {
     return parts.join(" ");
   };
 
-  // 초안받기: 상호 옆 버튼 → 모달 즉시 오픈(로딩) → 한 줄/자세히 후보 병렬 생성 → 2스텝 선택.
-  // 첫 클릭='초안 받기', 이후='초안 다시 받기'(round 증가 → 다른 각도의 후보들).
+  // 초안 다시 받기: AI 크롤(enrichment)한 소개서 전용(대표 정책 2026-07-22 — 버튼 노출도 enrichment 게이트).
+  // 모달 즉시 오픈(로딩) → 한 줄/자세히 후보 병렬 생성 → 2스텝 선택. round 증가 = 다른 각도 변주.
+  // 재료 = 위저드 생성과 동일 규칙 미러: 씨앗(주소 파생 region·seed.businessType) + 칩(사실 게이트 통과분).
   const draftDescription = async () => {
     if (!name.trim() || draftBusy) return;
     setDraftBusy(true);
     setDraftStep(1);
     setDescModalOpen(true);
+    // 칩 매핑 — 위저드 generate()와 동일: factual인데 미확인이면 제외, 별표→starred, 별표+직접쓴 칩→verbatim
+    const usableChips = (enrichment?.chips ?? []).filter((c) => !c.factual || c.confirmed);
+    const starredChips = usableChips.filter((c) => c.starred).map((c) => c.text);
     const payload = {
       name: name.trim(),
+      // 크롤 씨앗 — 주소가 폼에 있으면 그 파생 region 우선, 없으면 생성 때 저장한 seed.region
+      region: deriveRegion(address) || enrichment?.seed.region || undefined,
+      businessType: enrichment?.seed.businessType || undefined,
       oneLiner,
       values,
       offers,
       targetAudience,
+      focusKeywords: usableChips.map((c) => c.text),
+      starredKeywords: starredChips,
+      verbatimKeywords: usableChips
+        .filter((c) => c.starred && c.section === "직접")
+        .map((c) => c.text),
       // 폼에 적힌 홈페이지 → 서버가 직접 읽어 초안에 반영(딥리드). URL만 보낸다.
       homepage: homepage.trim() || undefined,
       // 폼에 적힌 인스타 핸들 → 서버가 바이오·캡션을 직접 읽는다(사장님 글 딥리드).
@@ -860,6 +872,8 @@ function RegisterForm() {
       setPhotos(m.photos.map((u) => ({ url: u })));
       setBlocks((m.blocks ?? []).map((b) => ({ ...b, uid: crypto.randomUUID() })));
       setIntroFileUrl(m.introFileUrl ?? "");
+      // 생성 때 저장한 크롤 스냅샷 → 다시받기 재료·버튼 게이트(크롤한 소개서만 노출)
+      setEnrichment(m.enrichment);
       // 수정모드 규칙: 데이터 있는 섹션은 펼쳐진 채 복귀(빈 섹션은 접힌 스텁/시트 잔류)
       const open = new Set<SectionKey>();
       if ((m.story ?? "").trim()) open.add("story");
@@ -1082,19 +1096,23 @@ function RegisterForm() {
           </div>
         )}
 
-        {/* ── ① 브랜드를 소개해주세요 (초안 받기 버튼 = 그룹 헤더 우측) ── */}
+        {/* ── ① 브랜드를 소개해주세요 (초안 다시 받기 = 그룹 헤더 우측) ──
+            AI 크롤(enrichment) 게이트: 크롤한 소개서만 노출(대표 정책 2026-07-22).
+            크롤 안 한 집단의 초안 니즈는 별도 백로그([[다시받기-크롤연동]])에서 다르게 다룸. */}
         <GroupHeader
           n="①"
           title="브랜드를 소개해주세요."
           action={
-            <button
-              type="button"
-              onClick={draftDescription}
-              disabled={!name.trim() || draftBusy}
-              className="inline-flex h-8 shrink-0 items-center gap-1 rounded-pill border border-primary bg-primary-pale px-3 text-sm font-medium text-primary-on disabled:opacity-40"
-            >
-              {draftBusy ? "쓰는 중…" : draftGenerated ? "✨ 초안 다시 받기" : "✨ 초안 받기"}
-            </button>
+            enrichment ? (
+              <button
+                type="button"
+                onClick={draftDescription}
+                disabled={!name.trim() || draftBusy}
+                className="inline-flex h-8 shrink-0 items-center gap-1 rounded-pill border border-primary bg-primary-pale px-3 text-sm font-medium text-primary-on disabled:opacity-40"
+              >
+                {draftBusy ? "쓰는 중…" : "✨ 초안 다시 받기"}
+              </button>
+            ) : undefined
           }
         />
         <div className="space-y-8">
@@ -1131,11 +1149,12 @@ function RegisterForm() {
               placeholder="헌옷과 다양한 소재를 활용한 죠각 워크숍을 열고 있어요. 참가자들은 버려질 뻔한 옷을 작은 소품과 가방, 액자로 다시 만들어가며, 잊고 지냈던 자신만의 취향과 표현을 발견합니다. 때로는 양말이나 비닐봉투처럼 예상하지 못한 소재를 통해, 문자 대신 손으로 자신을 표현하는 즐거움을 함께 나누고 있습니다."
               className="w-full rounded-sm border border-hairline bg-surface px-3 py-2 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
             />
-            <p className="mt-1.5 text-sm text-mute">
-              {draftGenerated
-                ? "‘초안 다시 받기’를 누르면 다른 느낌의 소개로 새로 써드려요."
-                : "‘초안 받기’를 누르면 입력한 정보로 소개를 대신 써드려요. 그대로 써도, 더 다듬어도 좋아요."}
-            </p>
+            {/* 안내도 버튼과 같은 게이트 — 크롤 안 한 소개서엔 버튼이 없으니 문구도 숨김 */}
+            {enrichment && (
+              <p className="mt-1.5 text-sm text-mute">
+                ‘초안 다시 받기’를 누르면 다른 느낌의 소개로 새로 써드려요.
+              </p>
+            )}
           </div>
 
           {/* 브랜드 사진 (선택) */}
