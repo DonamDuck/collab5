@@ -53,12 +53,14 @@ export interface RecrawlInput {
 /** 소개 초안 생성 입력 — 폼에 입력된 정보 기반. round로 '다시 받기' 시 다른 각도로 변주. */
 export interface DraftInput {
   name: string;
+  region?: string; // 크롤 씨앗 — 있으면 research가 동명 타지역 오귀속을 줄임(다시받기: 주소 파생 or enrichment.seed)
+  businessType?: string; // 크롤 씨앗 — enrichment.seed.businessType(폼에 업종 독립 입력 없음)
   oneLiner?: string;
   values?: string[];
   offers?: string[];
   targetAudience?: string[];
   focusKeywords?: string[]; // 가중 키워드 — 생성 방향을 잡는다(선택한 키워드 = 재료)
-  starredKeywords?: string[]; // ⭐ 한 줄 소개에 반드시 반영(캡 3, 배열 순서 = 우선순위)
+  starredKeywords?: string[]; // ⭐ 한 줄 소개에 반드시 반영(캡 6 — 위저드 MAX_STARS와 동기, 배열 순서 = 우선순위)
   verbatimKeywords?: string[]; // '그대로 넣기' — 슬로건·인증·상표. 표현 변형 금지
   researchMemo?: string; // 이미 크롤한 조사메모 재사용(키워드 추출 때 쓴 것) — 재크롤 방지(콜 절감)
   homepageDigest?: string; // 홈페이지 딥리드 발췌 — 서버(fetchHomepageDigest)에서만 생성, 클라이언트 텍스트 금지
@@ -72,7 +74,7 @@ export interface OptionsInput {
   name: string;
   research: string; // enrichResearch()가 만든 조사 메모(네이버+제미나이)
   focusKeywords?: string[]; // 유저가 고른 키워드 = 생성 재료(안 고른 건 버림)
-  starredKeywords?: string[]; // ⭐ 한 줄 소개에 반드시 반영(캡 3, 순서=우선순위)
+  starredKeywords?: string[]; // ⭐ 한 줄 소개에 반드시 반영(캡 6 — 위저드 MAX_STARS와 동기, 순서=우선순위)
   verbatimKeywords?: string[]; // 그대로 넣기 — 유저가 직접 쓴 문구(의역 금지)
   ownerNote?: string; // 사장이 직접 쓴 한두 문장 — 생성의 최우선 중심축
   homepageDigest?: string; // 홈페이지 딥리드 발췌 — 서버(fetchHomepageDigest)에서만 생성, 클라이언트 텍스트 금지
@@ -1599,9 +1601,10 @@ class NaverGeminiProvider implements SearchProvider {
     const kw = input.focusKeywords?.length
       ? `⭐사장이 직접 고른 키워드(이것들이 곧 이 브랜드다 — 모든 후보의 재료로 최우선 사용. 단, 나열하지 말고 자연스러운 문장으로 녹여라): ${input.focusKeywords.join(", ")}\n\n`
       : "";
-    // ⭐ 별표 = 한 줄 소개 가중(캡 3, 순서=우선). '앵커 2 + 자유 3' 블렌드(대표 지시 2026-07-19):
+    // ⭐ 별표 = 한 줄 소개 가중(캡 6 — 위저드 MAX_STARS와 동기, 순서=우선). '앵커 2 + 자유 3' 블렌드(대표 지시 2026-07-19):
     // 전부에 별표를 박으면 5개가 다 똑같이 시작함("직물을 잇고 조각을…" 도배). 2개만 앵커, 3개는 자유.
-    const starred = (input.starredKeywords ?? []).filter((s) => s?.trim()).slice(0, 3);
+    // 캡을 늘려도 앵커는 여전히 2개 — 뒤 순위 별표는 장문에서 소화(도배 방지 정책 유지, 2026-07-22 캡 4→6 대표 지시).
+    const starred = (input.starredKeywords ?? []).filter((s) => s?.trim()).slice(0, 6);
     const star = starred.length
       ? `⭐한 줄 소개(oneLiners) 5개는 다음 규칙으로 — 5개가 시작 어구·구조·강조점이 확실히 서로 달라야 한다(같은 말로 시작 금지):
 · 2개는 별표 핵심(우선순위: ${starred.join(" > ")})을 중심 앵커로 강하게 반영.
@@ -1676,15 +1679,17 @@ class NaverGeminiProvider implements SearchProvider {
   // 한 줄 소개 + 브랜드 소개를 한 번에 — 초안받기 이중 크롤 제거(research 1회 + 생성 1회).
   // generateOptions 응답이 oneLiners·descriptions를 둘 다 담는 것을 그대로 활용한다.
   async draftBoth(input: DraftInput): Promise<{ oneLiners: string[]; descriptions: string[]; researchMemo?: string }> {
-    const research = input.researchMemo ?? (await this.research(input.name));
+    // 씨앗(지역·업종)이 오면 research에 전달 — 상호만으로 크롤하던 다시받기의 동명 타지역 오귀속 방어(위저드와 동일 수준)
+    const research =
+      input.researchMemo ?? (await this.research(input.name, input.region, input.businessType));
     const info = this.draftInfo(input);
     const kw = (input.focusKeywords?.length ? input.focusKeywords : input.values) ?? [];
     const round = input.round ?? 0;
-    // ⭐ 별표 = 한 줄 소개 반드시 반영(캡 3, 순서=우선순위). 자리 부족하면 뒤 순위는 장문으로.
-    const starred = (input.starredKeywords ?? []).filter((s) => s?.trim()).slice(0, 3);
+    // ⭐ 별표 = 한 줄 소개 반드시 반영(캡 6 — 위저드 MAX_STARS와 동기, 순서=우선순위). 자리 부족하면 뒤 순위는 장문으로.
+    const starred = (input.starredKeywords ?? []).filter((s) => s?.trim()).slice(0, 6);
     const verbatim = (input.verbatimKeywords ?? []).filter((s) => s?.trim());
     const starLine = starred.length
-      ? `⭐⭐한 줄 소개에 반드시 반영할 핵심(우선순위 순, 최대 3개): ${starred.join(" > ")}. 1순위는 모든 한 줄 후보에 꼭 담고, 40자 안에 다 못 담으면 뒤 순위는 '브랜드 소개'(장문)로 넘겨.\n`
+      ? `⭐⭐한 줄 소개에 반드시 반영할 핵심(우선순위 순, 최대 6개): ${starred.join(" > ")}. 1순위는 모든 한 줄 후보에 꼭 담고, 40자 안에 다 못 담으면 뒤 순위는 '브랜드 소개'(장문)로 넘겨.\n`
       : "";
     const verbatimLine = verbatim.length
       ? `⭐그대로 넣을 문구(의역·표현 변형 절대 금지, 원문 그대로 등장시켜 — 단 따옴표로 감싸지 말고 문장에 녹여라): ${verbatim.join(", ")}.\n`
