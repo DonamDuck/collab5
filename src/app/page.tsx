@@ -81,24 +81,24 @@ export default function Home() {
           <Reveal delay={0} className="h-full">
             <StepCard
               n={1}
-              title="내 브랜드를 소개해요"
-              desc="AI가 온라인 정보를 찾아, 초안 작성을 도와드려요."
+              title="브랜드 이름을 알려주세요"
+              desc="흩어져 있던 우리 브랜드의 이야기를 먼저 찾아 모아드려요."
               illu={<NodeIllu />}
             />
           </Reveal>
           <Reveal delay={90} className="h-full">
             <StepCard
               n={2}
-              title="소개서를 만들고 저장해요"
-              desc="만든 소개서는 언제든 링크로 공유할 수 있어요."
+              title="마음에 드는 소개를 골라 다듬어요"
+              desc="몇 번의 선택이면 소개서가 완성돼요. 언제든 다시 고칠 수 있어요."
               illu={<CardIllu />}
             />
           </Reveal>
           <Reveal delay={180} className="h-full">
             <StepCard
               n={3}
-              title="소개서를 협업 파트너에게 전달해요"
-              desc="링크 하나만 보내면, 상대는 로그인 없이 바로 볼 수 있어요."
+              title="소개서 링크를 활용해요"
+              desc="협업 파트너에게 전달하거나, 개인 포트폴리오 페이지로 쓸 수 있어요."
               illu={<ConnectIllu />}
             />
           </Reveal>
@@ -109,7 +109,7 @@ export default function Home() {
       <section className="mt-16">
         <Reveal>
           <h2 className="text-center text-2xl font-bold tracking-tight text-ink sm:text-[28px]">
-            소개서를 이렇게 활용해 보세요
+            브랜드 소개서는 이렇게 활용할 수 있어요.
           </h2>
         </Reveal>
         <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -142,7 +142,7 @@ export default function Home() {
                 {[
                   "브랜드와 협업 제안을 한 번에 전달할 수 있어요.",
                   "상대가 필요한 정보를 한눈에 이해할 수 있어요.",
-                  "더 편하게, 더 자신 있게 협업을 시작할 수 있어요.",
+                  "프로필 링크에 걸어두면 우리 브랜드의 포트폴리오가 돼요.",
                 ].map((t) => (
                   <li key={t} className="flex gap-2 text-base leading-relaxed text-body">
                     <span className="font-bold text-primary-on">✓</span>
@@ -156,10 +156,16 @@ export default function Home() {
       </section>
 
       {/* 마무리 CTA — eager 필수: 페이지 맨 마지막 요소라 하단 -22% 데드존을 못 벗어나 리빌이 영영 안 터짐 */}
-      <Reveal as="section" eager className="mt-12 text-center">
+      <Reveal as="section" eager className="mt-14 text-center">
+        {/* 미션 한 줄 — 소개서가 쌓이면 발견으로 이어진다(BM 발굴 방향을 고객 언어로, 대표 확정 2026-07-23) */}
+        <p className="mx-auto max-w-[440px] break-keep text-xl font-bold leading-snug tracking-tight text-ink">
+          좋은 소개는 쌓일수록 힘이 돼요.
+          <br />
+          다음 콜라보가 우리를 먼저 찾아오도록.
+        </p>
         <Link
           href="/register"
-          className="inline-flex h-12 items-center justify-center rounded-md bg-primary px-7 text-base font-medium text-primary-on"
+          className="mt-6 inline-flex h-12 items-center justify-center rounded-md bg-primary px-7 text-base font-medium text-primary-on"
         >
           지금 시작하기
         </Link>
