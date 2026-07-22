@@ -11,11 +11,15 @@ export function Reveal({
   delay = 0,
   className = "",
   as: Tag = "div",
+  eager = false,
 }: {
   children: React.ReactNode;
   delay?: number; // ms — 카드 스태거
   className?: string;
   as?: ElementType; // 시맨틱 유지용(예: "section"). 기본 div
+  // 하단 컷 없이 뷰포트에 닿자마자 트리거. ⚠️페이지 '맨 마지막' 요소는 필수 —
+  // 하단 -22% 데드존을 영영 못 벗어나(그 아래 콘텐츠가 없어) 리빌이 안 터진다(지금 시작하기 CTA 실종 회귀).
+  eager?: boolean;
 }) {
   const ref = useRef<HTMLElement>(null);
   const [shown, setShown] = useState(false);
@@ -37,7 +41,8 @@ export function Reveal({
           io.disconnect(); // 리빌은 1회 — 위로 되감기지 않음
         }
       },
-      { threshold: 0.15, rootMargin: "0px 0px -22% 0px" } // 하단 컷 -22%: 요소가 화면 하단에서 미리 뜨지 않고, 더 스크롤해 올라온 뒤 트리거(대표 지시 2026-07-22)
+      // 하단 컷 -22%: 요소가 화면 하단에서 미리 뜨지 않고, 더 스크롤해 올라온 뒤 트리거(대표 지시 2026-07-22)
+      { threshold: 0.15, rootMargin: eager ? "0px" : "0px 0px -22% 0px" }
     );
     io.observe(el);
     return () => io.disconnect();
