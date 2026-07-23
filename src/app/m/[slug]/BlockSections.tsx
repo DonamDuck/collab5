@@ -93,10 +93,20 @@ function BlockBody({ b }: { b: Block }) {
         <div className="space-y-3">
           {b.items.map((it, i) => (
             <div key={i} className="print:break-inside-avoid">
-              <p className="text-[16px] text-body">
-                <span className="font-medium text-ink">{it.title}</span>
-                {it.year && <span className="text-mute"> · {it.year}</span>}
-              </p>
+              {/* 제목·연도 한 줄, 그 오른쪽에 밑줄 텍스트 '소개 보기' + ↗ */}
+              <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                <p className="text-[16px] text-body">
+                  <span className="font-medium text-ink">{it.title}</span>
+                  {it.year && <span className="text-mute"> · {it.year}</span>}
+                </p>
+                {it.link && (
+                  <a href={normalizeUrl(it.link)} target="_blank" rel="noopener noreferrer nofollow"
+                    className="inline-flex items-center gap-0.5 text-[14px] font-medium text-primary-on underline underline-offset-2 print:hidden">
+                    소개 보기
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9" /></svg>
+                  </a>
+                )}
+              </div>
               {it.desc && (
                 <p className="mt-0.5 text-[15px] leading-relaxed text-mute">{it.desc}</p>
               )}
@@ -104,12 +114,6 @@ function BlockBody({ b }: { b: Block }) {
                 <div className="mt-2 max-w-[460px] print:mx-auto">
                   <PhotoSlider photos={it.photos} />
                 </div>
-              )}
-              {it.link && (
-                <a href={normalizeUrl(it.link)} target="_blank" rel="noopener noreferrer nofollow"
-                  className="mt-1 inline-block text-[14px] font-medium text-primary-on underline underline-offset-2 print:hidden">
-                  소개 보기
-                </a>
               )}
             </div>
           ))}
