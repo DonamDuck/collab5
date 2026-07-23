@@ -36,8 +36,19 @@ export function MakerArticle({ maker, isOwner, logoUrl, readOnly }: {
           <div className="space-y-6">
             {maker.activities.map((a, i) => (
               <div key={i} className="print:break-inside-avoid">
-                {a.title && (
-                  <p className="text-[18px] font-semibold leading-snug text-ink">{a.title}</p>
+                {(a.title || a.link) && (
+                  <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                    {a.title && (
+                      <p className="text-[18px] font-semibold leading-snug text-ink">{a.title}</p>
+                    )}
+                    {a.link && (
+                      <a href={normalizeUrl(a.link)} target="_blank" rel="noopener noreferrer nofollow"
+                        className="inline-flex items-center gap-0.5 text-[14px] font-medium text-primary-on underline underline-offset-2 print:hidden">
+                        아티클 보기
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9" /></svg>
+                      </a>
+                    )}
+                  </div>
                 )}
                 {a.desc && (
                   <p className="mt-1 text-[16px] leading-relaxed text-mute">{a.desc}</p>
@@ -46,12 +57,6 @@ export function MakerArticle({ maker, isOwner, logoUrl, readOnly }: {
                   <div className="mt-3 max-w-[460px] print:mx-auto">
                     <PhotoSlider photos={a.photos} />
                   </div>
-                )}
-                {a.link && (
-                  <a href={normalizeUrl(a.link)} target="_blank" rel="noopener noreferrer nofollow"
-                    className="mt-1 inline-block text-[14px] font-medium text-primary-on underline underline-offset-2 print:hidden">
-                    아티클 보기
-                  </a>
                 )}
               </div>
             ))}
@@ -74,22 +79,26 @@ export function MakerArticle({ maker, isOwner, logoUrl, readOnly }: {
           <div className="space-y-6">
             {maker.collabHistory.map((h, i) => (
               <div key={i} className="print:break-inside-avoid">
-                <p className="text-[16px] text-body">
-                  <span className="font-semibold text-ink">{h.partner}</span>
-                  {h.types.length > 0 && <span className="text-mute"> · {h.types.join("·")}</span>}
-                  {h.year && <span className="text-mute"> · {h.year}</span>}
-                </p>
+                {/* 제목·타입·연도 한 줄, 그 오른쪽에 밑줄 텍스트 '아티클 보기'(헤더가 주인공, 링크는 가벼운 액센트) */}
+                <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                  <p className="text-[16px] text-body">
+                    <span className="font-semibold text-ink">{h.partner}</span>
+                    {h.types.length > 0 && <span className="text-mute"> · {h.types.join("·")}</span>}
+                    {h.year && <span className="text-mute"> · {h.year}</span>}
+                  </p>
+                  {h.link && (
+                    <a href={normalizeUrl(h.link)} target="_blank" rel="noopener noreferrer nofollow"
+                      className="inline-flex items-center gap-0.5 text-[14px] font-medium text-primary-on underline underline-offset-2 print:hidden">
+                      아티클 보기
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9" /></svg>
+                    </a>
+                  )}
+                </div>
                 {h.desc && <p className="mt-0.5 whitespace-pre-line text-[15px] leading-relaxed text-mute">{h.desc}</p>}
                 {h.photos.length > 0 && (
                   <div className="mt-3 max-w-[460px] print:mx-auto">
                     <PhotoSlider photos={h.photos} />
                   </div>
-                )}
-                {h.link && (
-                  <a href={normalizeUrl(h.link)} target="_blank" rel="noopener noreferrer nofollow"
-                    className="mt-1 inline-block text-[14px] font-medium text-primary-on underline underline-offset-2 print:hidden">
-                    아티클 보기
-                  </a>
                 )}
               </div>
             ))}
