@@ -38,10 +38,11 @@ export interface CollabHistory {
   desc?: string; // 콜라보 내용 한 줄 소개
   year?: string; // 년도 (최신순 정렬용)
   photos: string[]; // 콜라보 사진 최대 3
+  link?: string; // 관련 링크(블로그·후기 등, 선택) — press item.link과 동일 패턴
 }
 
-/** 대표 활동 — 제목·설명·사진(최대 3) */
-export interface Activity { title: string; desc: string; photos: string[]; }
+/** 대표 활동 — 제목·설명·사진(최대 3)·링크(선택) */
+export interface Activity { title: string; desc: string; photos: string[]; link?: string; }
 
 /** 선택 블록 — 공통 photos(최대3)·links(최대3) + 타입별 고유 필드. 배열 순서 = 소개서 노출 순서 */
 export interface BlockLink { label?: string; url: string }
