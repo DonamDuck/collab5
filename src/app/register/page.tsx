@@ -59,6 +59,7 @@ type HistItem = {
   desc: string;
   year: string;
   photos: { url: string; uploading?: boolean }[];
+  link: string; // 관련 링크(블로그·후기 등, 선택)
   typeInput: string;
   typeInputOpen: boolean; // '+ 유형 직접 추가' 토글(입력창 노출 여부)
 };
@@ -68,6 +69,7 @@ const emptyHist = (): HistItem => ({
   desc: "",
   year: "",
   photos: [],
+  link: "",
   typeInput: "",
   typeInputOpen: false,
 });
@@ -183,8 +185,8 @@ function RegisterForm() {
   // ── 소개서 개편 신규 필드 ──
   const [story, setStory] = useState("");
   const [activities, setActivities] = useState<
-    { title: string; desc: string; photos: { url: string; uploading?: boolean }[] }[]
-  >([{ title: "", desc: "", photos: [] }]);
+    { title: string; desc: string; photos: { url: string; uploading?: boolean }[]; link: string }[]
+  >([{ title: "", desc: "", photos: [], link: "" }]);
   // 카드 순서변경(드래그·↑↓) 상태 — 활동·콜라보 각각.
   const [actDnd, setActDnd] = useState<DndState>(emptyDnd);
   const [colDnd, setColDnd] = useState<DndState>(emptyDnd);
@@ -213,11 +215,13 @@ function RegisterForm() {
 
   // 데이터 존재 판정 — 제출 payload 단일 관문·완성도·스텁 hasData 공용.
   const hasStory = !!story.trim();
-  const hasActivities = activities.some((a) => a.title.trim() || a.desc.trim() || a.photos.length > 0);
-  // types(콜라보 유형 칩)까지 봐야 함 — 아래 filledHist 필터와 조건이 어긋나면
-  // "칩만 고른" 카드가 filledHist엔 남는데 이 게이트에서 걸려 전체가 []로 저장됨(유실).
+  const hasActivities = activities.some(
+    (a) => a.title.trim() || a.desc.trim() || a.photos.length > 0 || a.link.trim()
+  );
+  // types(콜라보 유형 칩)·link까지 봐야 함 — 아래 filledHist 필터와 조건이 어긋나면
+  // 그 신호만 있는 카드가 filledHist엔 남는데 이 게이트에서 걸려 전체가 []로 저장됨(유실).
   const hasCollabs = collabHistory.some(
-    (h) => h.partner.trim() || h.types.length > 0 || h.desc.trim() || h.photos.length > 0
+    (h) => h.partner.trim() || h.types.length > 0 || h.desc.trim() || h.photos.length > 0 || h.link.trim()
   );
   const hasKeywords = values.length > 0;
   const hasCustomers = targetAudience.length > 0;
@@ -268,7 +272,7 @@ function RegisterForm() {
     setDescription(d.description);
     setStory(d.story);
     setValues(d.values);
-    setActivities(d.activities.map((a) => ({ title: a.title, desc: a.desc, photos: [] })));
+    setActivities(d.activities.map((a) => ({ title: a.title, desc: a.desc, photos: [], link: "" })));
     setOffersNote(d.offersNote);
     setOffers([...new Set([...d.offers, ...d.seeks])] as CollabType[]); // 구 seeks 칩 흡수(통합)
     setSeeksNote(d.seeksNote);
@@ -278,7 +282,7 @@ function RegisterForm() {
     setInstagram(d.instagram);
     setHomepage(d.homepage);
     setCollabHistory([
-      { partner: d.history.partner, types: d.history.types, desc: "", year: d.history.year, photos: [], typeInput: "", typeInputOpen: false },
+      { partner: d.history.partner, types: d.history.types, desc: "", year: d.history.year, photos: [], link: "", typeInput: "", typeInputOpen: false },
     ]);
     setBlocks([
       { type: "metrics", uid: crypto.randomUUID(), photos: [], links: [], items: [{ label: "인스타 팔로워", value: "1.2만" }, { label: "누적 워크숍", value: "48회" }] },
@@ -398,12 +402,12 @@ function RegisterForm() {
 
   // ── 대표 활동 (최대 3세트) ──
   const addActivity = () =>
-    setActivities((p) => (p.length >= 5 ? p : [...p, { title: "", desc: "", photos: [] }]));
+    setActivities((p) => (p.length >= 5 ? p : [...p, { title: "", desc: "", photos: [], link: "" }]));
   const moveActivity = (from: number, to: number) => {
     setActivities((p) => reorder(p, from, to));
     scrollCardTo("act-card", to);
   };
-  const setAct = (i: number, patch: Partial<{ title: string; desc: string }>) =>
+  const setAct = (i: number, patch: Partial<{ title: string; desc: string; link: string }>) =>
     setActivities((p) => p.map((a, j) => (j === i ? { ...a, ...patch } : a)));
   const addActPhotos = (i: number, files: FileList | null) =>
     uploadInto(files, 3 - (activities[i]?.photos.length ?? 0), 800, (f) =>
@@ -595,7 +599,7 @@ function RegisterForm() {
       const empty = p.findIndex((a) => !a.title.trim() && !a.desc.trim() && !a.photos.length);
       if (empty >= 0)
         return p.map((a, j) => (j === empty ? { ...a, title: h.title, desc: h.desc } : a));
-      if (p.length < 5) return [...p, { title: h.title, desc: h.desc, photos: [] }];
+      if (p.length < 5) return [...p, { title: h.title, desc: h.desc, photos: [], link: "" }];
       return p;
     });
   };
@@ -845,7 +849,7 @@ function RegisterForm() {
       setValues(m.soul.values ?? []);
       setActivities(
         (m.activities.length ? m.activities : [{ title: "", desc: "", photos: [] }]).map((a) => ({
-          title: a.title, desc: a.desc, photos: a.photos.map((u) => ({ url: u })),
+          title: a.title, desc: a.desc, photos: a.photos.map((u) => ({ url: u })), link: a.link ?? "",
         }))
       );
       // 통합 마이그레이션(2026-07-22): 기존 소개서의 seeks 칩을 offers에 흡수해 로드 → 저장 시 자연 수렴
@@ -860,7 +864,7 @@ function RegisterForm() {
           : [{ partner: "", types: [], desc: "", year: "", photos: [] }]
         ).map((h) => ({
           partner: h.partner, types: h.types, desc: h.desc ?? "", year: h.year ?? "",
-          photos: h.photos.map((u) => ({ url: u })), typeInput: "", typeInputOpen: false,
+          photos: h.photos.map((u) => ({ url: u })), link: h.link ?? "", typeInput: "", typeInputOpen: false,
         }))
       );
       setInstagram(m.trust.instagram ?? "");
@@ -908,15 +912,16 @@ function RegisterForm() {
       // 사진은 선택 즉시 Storage 업로드됨 → 여기선 URL만 수집(업로드중 항목 제외)
       // 내용이 있는 카드만(빈 카드는 제외) — 활동과 동일 규칙
       const filledHist = collabHistory.filter(
-        (h) => h.partner.trim() || h.types.length || h.desc.trim() || h.photos.length
+        (h) => h.partner.trim() || h.types.length || h.desc.trim() || h.photos.length || h.link.trim()
       );
       const photoUrls = photos.filter((p) => !p.uploading).map((p) => p.url);
       const activityOut = activities
-        .filter((a) => a.title.trim() || a.desc.trim() || a.photos.length)
+        .filter((a) => a.title.trim() || a.desc.trim() || a.photos.length || a.link.trim())
         .map((a) => ({
           title: a.title.trim(),
           desc: a.desc.trim(),
           photos: a.photos.filter((p) => !p.uploading).map((p) => p.url),
+          link: a.link.trim() || undefined,
         }));
       const historyOut = filledHist.map((h) => ({
         partner: h.partner.trim(),
@@ -924,6 +929,7 @@ function RegisterForm() {
         desc: h.desc.trim(),
         year: h.year || undefined,
         photos: h.photos.filter((p) => !p.uploading).map((p) => p.url),
+        link: h.link.trim() || undefined,
       }));
       // 사진 base64는 배열에 문자열로 담으면 React Flight 배열 한도(1e6)에 걸린다.
       // → {u} 객체로 감싸 전송(actions.ts에서 되풂). @see PhotoWire
@@ -1412,6 +1418,14 @@ function RegisterForm() {
                   onReorder={(from, to) => moveActPhoto(i, from, to)}
                 />
               </CollapsedPhotos>
+              <CollapsedLink hasLink={!!act.link.trim()}>
+                <input
+                  value={act.link}
+                  onChange={(e) => setAct(i, { link: e.target.value })}
+                  placeholder="소개 링크 https:// (블로그·후기 등)"
+                  className="h-10 w-full rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
+                />
+              </CollapsedLink>
             </SortableCard>
           ))}
           {activities.length < 5 && (
@@ -1599,6 +1613,16 @@ function RegisterForm() {
                         onReorder={(from, to) => moveHistPhoto(i, from, to)}
                       />
                     </CollapsedPhotos>
+                  </div>
+                  <div>
+                    <CollapsedLink hasLink={!!h.link.trim()}>
+                      <input
+                        value={h.link}
+                        onChange={(e) => setHist(i, { link: e.target.value })}
+                        placeholder="소개 링크 https:// (블로그·후기 등)"
+                        className="h-10 w-full rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
+                      />
+                    </CollapsedLink>
                   </div>
                 </SortableCard>
               ))}
@@ -2413,6 +2437,27 @@ function CollapsedPhotos({ children, photoCount }: { children: React.ReactNode; 
         className="text-sm font-medium text-mute hover:text-ink"
       >
         ＋ 사진 추가 (선택)
+      </button>
+    );
+  return <>{children}</>;
+}
+
+// 콜라보·활동 카드의 링크 필드 — 기본 접힘, 값 있으면(수정 로드) 자동 펼침. CollapsedPhotos와 동일 패턴.
+function CollapsedLink({ children, hasLink }: { children: React.ReactNode; hasLink: boolean }) {
+  const [open, setOpen] = useState(hasLink);
+  const prev = useRef(hasLink);
+  useEffect(() => {
+    if (!prev.current && hasLink) setOpen(true);
+    prev.current = hasLink;
+  }, [hasLink]);
+  if (!open)
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="text-sm font-medium text-mute hover:text-ink"
+      >
+        ＋ 링크 추가 (선택)
       </button>
     );
   return <>{children}</>;

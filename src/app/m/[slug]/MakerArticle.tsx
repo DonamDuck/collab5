@@ -47,6 +47,12 @@ export function MakerArticle({ maker, isOwner, logoUrl, readOnly }: {
                     <PhotoSlider photos={a.photos} />
                   </div>
                 )}
+                {a.link && (
+                  <a href={normalizeUrl(a.link)} target="_blank" rel="noopener noreferrer nofollow"
+                    className="mt-1 inline-block text-[14px] font-medium text-primary-on underline underline-offset-2 print:hidden">
+                    소개 보기
+                  </a>
+                )}
               </div>
             ))}
           </div>
@@ -78,6 +84,12 @@ export function MakerArticle({ maker, isOwner, logoUrl, readOnly }: {
                   <div className="mt-3 max-w-[460px] print:mx-auto">
                     <PhotoSlider photos={h.photos} />
                   </div>
+                )}
+                {h.link && (
+                  <a href={normalizeUrl(h.link)} target="_blank" rel="noopener noreferrer nofollow"
+                    className="mt-1 inline-block text-[14px] font-medium text-primary-on underline underline-offset-2 print:hidden">
+                    소개 보기
+                  </a>
                 )}
               </div>
             ))}

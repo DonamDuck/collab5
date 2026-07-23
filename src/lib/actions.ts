@@ -20,6 +20,7 @@ export interface ActivityWire {
   title: string;
   desc: string;
   photos: PhotoWire[];
+  link?: string;
 }
 export interface HistoryWire {
   partner: string;
@@ -27,11 +28,12 @@ export interface HistoryWire {
   desc?: string;
   year?: string;
   photos: PhotoWire[];
+  link?: string;
 }
 const unwrapPhotos = (photos?: PhotoWire[]): string[] =>
   (photos ?? []).map((p) => p.u).filter(Boolean);
 
-// press item 링크 위생 처리 — http(s) 절대 URL만 통과(크롤 프리필·수기입력 공용 검증). enrich.ts sanitizeHttpUrl과 동일 규칙.
+// 항목 링크 위생 처리 — http(s) 절대 URL만 통과(press·콜라보·활동 항목 공용, 수기입력·크롤 프리필). enrich.ts sanitizeHttpUrl과 동일 규칙.
 function sanitizePressLink(raw?: string): string | undefined {
   const s = raw?.trim();
   if (!s) return undefined;
@@ -102,12 +104,14 @@ export async function createMakerAction(
       desc: h.desc?.trim() || undefined,
       year: h.year,
       photos: unwrapPhotos(h.photos),
+      link: sanitizePressLink(h.link),
     })),
     story: input.story?.trim() ?? "",
     activities: (input.activities ?? []).map((a) => ({
       title: a.title,
       desc: a.desc,
       photos: unwrapPhotos(a.photos),
+      link: sanitizePressLink(a.link),
     })),
     offersNote: input.offersNote?.trim() ?? "",
     seeksNote: input.seeksNote?.trim() ?? "",
@@ -269,10 +273,11 @@ export async function updateMakerAction(
     collabHistory: input.collabHistory.map((h) => ({
       partner: h.partner, types: h.types,
       desc: h.desc?.trim() || undefined, year: h.year, photos: unwrapPhotos(h.photos),
+      link: sanitizePressLink(h.link),
     })),
     story: input.story?.trim() ?? "",
     activities: (input.activities ?? []).map((a) => ({
-      title: a.title, desc: a.desc, photos: unwrapPhotos(a.photos),
+      title: a.title, desc: a.desc, photos: unwrapPhotos(a.photos), link: sanitizePressLink(a.link),
     })),
     offersNote: input.offersNote?.trim() ?? "",
     seeksNote: input.seeksNote?.trim() ?? "",
