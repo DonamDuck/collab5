@@ -15,7 +15,7 @@ const COLLAB_TYPES: CollabType[] = [
   "공간대여",
 ];
 
-const PAGE_SIZE = 12; // 페이지당 카드 수
+const PAGE_SIZE = 20; // 페이지당 카드 수 (12→20, 대표 지시 2026-07-23)
 
 export default function SearchPage() {
   const [all, setAll] = useState<Maker[]>([]);
