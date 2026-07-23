@@ -15,7 +15,7 @@ const COLLAB_TYPES: CollabType[] = [
   "공간대여",
 ];
 
-const PAGE_SIZE = 20; // 페이지당 카드 수 (12→20, 대표 지시 2026-07-23)
+const PAGE_SIZE = 15; // 페이지당 카드 수 (3열 그리드라 3의 배수 15, 대표 지시 2026-07-23)
 
 export default function SearchPage() {
   const [all, setAll] = useState<Maker[]>([]);
@@ -182,8 +182,8 @@ export default function SearchPage() {
           ))}
         </ul>
 
-        {/* 페이지네이션 — 카드가 한 페이지를 넘을 때만 */}
-        {totalPages > 1 && (
+        {/* 페이지네이션 — 결과가 있으면 1페이지여도 항상 노출(대표 지시). 0건은 위 빈 상태가 담당 */}
+        {shown.length > 0 && (
           <nav className="mt-6 flex items-center justify-center gap-1.5" aria-label="페이지">
             <button
               type="button"
