@@ -3,7 +3,6 @@ import { PhotoSlider } from "@/components/PhotoSlider";
 import { normalizeUrl, mapLinkLabel } from "@/lib/links";
 import { BrandSummaryCard } from "./BrandSummaryCard";
 import { BlockSections } from "./BlockSections";
-import { ViewLink } from "./ViewLink";
 
 // 소개서 본문 — /m 상세와 /preview 데모가 공유하는 단일 렌더.
 export function MakerArticle({ maker, isOwner, logoUrl, readOnly }: {
@@ -37,13 +36,8 @@ export function MakerArticle({ maker, isOwner, logoUrl, readOnly }: {
           <div className="space-y-6">
             {maker.activities.map((a, i) => (
               <div key={i} className="print:break-inside-avoid">
-                {(a.title || a.link) && (
-                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                    {a.title && (
-                      <p className="text-[18px] font-semibold leading-snug text-ink">{a.title}</p>
-                    )}
-                    {a.link && <ViewLink href={a.link} label="아티클 보기" />}
-                  </div>
+                {a.title && (
+                  <p className="text-[18px] font-semibold leading-snug text-ink">{a.title}</p>
                 )}
                 {a.desc && (
                   <p className="mt-1 text-[16px] leading-relaxed text-mute">{a.desc}</p>
@@ -52,6 +46,12 @@ export function MakerArticle({ maker, isOwner, logoUrl, readOnly }: {
                   <div className="mt-3 max-w-[460px] print:mx-auto">
                     <PhotoSlider photos={a.photos} />
                   </div>
+                )}
+                {a.link && (
+                  <a href={normalizeUrl(a.link)} target="_blank" rel="noopener noreferrer nofollow"
+                    className="mt-1 inline-block text-[14px] font-medium text-primary-on underline underline-offset-2 print:hidden">
+                    아티클 보기
+                  </a>
                 )}
               </div>
             ))}
@@ -74,20 +74,22 @@ export function MakerArticle({ maker, isOwner, logoUrl, readOnly }: {
           <div className="space-y-6">
             {maker.collabHistory.map((h, i) => (
               <div key={i} className="print:break-inside-avoid">
-                {/* 제목·타입·연도 한 줄, 그 옆에 '아티클 보기' 칩 인라인(대표 지시 순서: 제목·타입·아티클) */}
-                <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                  <p className="text-[16px] text-body">
-                    <span className="font-semibold text-ink">{h.partner}</span>
-                    {h.types.length > 0 && <span className="text-mute"> · {h.types.join("·")}</span>}
-                    {h.year && <span className="text-mute"> · {h.year}</span>}
-                  </p>
-                  {h.link && <ViewLink href={h.link} label="아티클 보기" />}
-                </div>
+                <p className="text-[16px] text-body">
+                  <span className="font-semibold text-ink">{h.partner}</span>
+                  {h.types.length > 0 && <span className="text-mute"> · {h.types.join("·")}</span>}
+                  {h.year && <span className="text-mute"> · {h.year}</span>}
+                </p>
                 {h.desc && <p className="mt-0.5 whitespace-pre-line text-[15px] leading-relaxed text-mute">{h.desc}</p>}
                 {h.photos.length > 0 && (
                   <div className="mt-3 max-w-[460px] print:mx-auto">
                     <PhotoSlider photos={h.photos} />
                   </div>
+                )}
+                {h.link && (
+                  <a href={normalizeUrl(h.link)} target="_blank" rel="noopener noreferrer nofollow"
+                    className="mt-1 inline-block text-[14px] font-medium text-primary-on underline underline-offset-2 print:hidden">
+                    아티클 보기
+                  </a>
                 )}
               </div>
             ))}
