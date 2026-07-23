@@ -1409,23 +1409,26 @@ function RegisterForm() {
                 placeholder="예: 이야기가 깃든 옷을 수선하고 업사이클링하는 워크숍을 진행해요."
                 className="w-full rounded-sm border border-hairline bg-surface px-3 py-2.5 text-base leading-relaxed text-ink outline-none placeholder:text-faint focus:border-focus"
               />
-              <CollapsedPhotos photoCount={act.photos.length}>
-                <PhotoGrid
-                  items={act.photos}
-                  max={3}
-                  onAdd={(files) => addActPhotos(i, files)}
-                  onRemove={(k) => removeActPhoto(i, k)}
-                  onReorder={(from, to) => moveActPhoto(i, from, to)}
-                />
-              </CollapsedPhotos>
-              <CollapsedLink hasLink={!!act.link.trim()}>
-                <input
-                  value={act.link}
-                  onChange={(e) => setAct(i, { link: e.target.value })}
-                  placeholder="소개 링크 https:// (블로그·후기 등)"
-                  className="h-10 w-full rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
-                />
-              </CollapsedLink>
+              {/* 사진·링크 접힘 버튼 — press와 동일하게 한 줄 인라인(space-y-2로 그룹) */}
+              <div className="space-y-2">
+                <CollapsedPhotos photoCount={act.photos.length}>
+                  <PhotoGrid
+                    items={act.photos}
+                    max={3}
+                    onAdd={(files) => addActPhotos(i, files)}
+                    onRemove={(k) => removeActPhoto(i, k)}
+                    onReorder={(from, to) => moveActPhoto(i, from, to)}
+                  />
+                </CollapsedPhotos>
+                <CollapsedLink hasLink={!!act.link.trim()}>
+                  <input
+                    value={act.link}
+                    onChange={(e) => setAct(i, { link: e.target.value })}
+                    placeholder="소개 링크 https:// (블로그·후기 등)"
+                    className="h-10 w-full rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
+                  />
+                </CollapsedLink>
+              </div>
             </SortableCard>
           ))}
           {activities.length < 5 && (
@@ -1601,8 +1604,8 @@ function RegisterForm() {
                       className="w-full rounded-sm border border-hairline bg-surface px-3 py-2.5 text-base leading-relaxed text-ink outline-none placeholder:text-faint focus:border-focus"
                     />
                   </div>
-                  {/* 사진 첨부 — 카드 최하단으로 이동 */}
-                  <div>
+                  {/* 사진·링크 접힘 버튼 — 카드 최하단, press와 동일하게 한 줄 인라인(space-y-2로 그룹) */}
+                  <div className="space-y-2">
                     <CollapsedPhotos photoCount={h.photos.length}>
                       <p className="mb-1.5 text-sm text-mute">사진 (선택 · 최대 3장)</p>
                       <PhotoGrid
@@ -1613,8 +1616,6 @@ function RegisterForm() {
                         onReorder={(from, to) => moveHistPhoto(i, from, to)}
                       />
                     </CollapsedPhotos>
-                  </div>
-                  <div>
                     <CollapsedLink hasLink={!!h.link.trim()}>
                       <input
                         value={h.link}
@@ -2431,10 +2432,11 @@ function CollapsedPhotos({ children, photoCount }: { children: React.ReactNode; 
   }, [photoCount]);
   if (!open)
     return (
+      // press의 텍스트 버튼과 동일 스타일 — 두 버튼(사진·링크)이 한 줄에 인라인, mr-4로 간격
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="text-sm font-medium text-mute hover:text-ink"
+        className="mr-4 text-[14px] text-mute underline underline-offset-2"
       >
         ＋ 사진 추가 (선택)
       </button>
@@ -2455,7 +2457,7 @@ function CollapsedLink({ children, hasLink }: { children: React.ReactNode; hasLi
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="text-sm font-medium text-mute hover:text-ink"
+        className="mr-4 text-[14px] text-mute underline underline-offset-2"
       >
         ＋ 링크 추가 (선택)
       </button>

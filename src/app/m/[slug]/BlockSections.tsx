@@ -2,6 +2,7 @@ import { Fragment } from "react";
 import type { Block } from "@/lib/types";
 import { PhotoSlider } from "@/components/PhotoSlider";
 import { normalizeUrl, prettyUrl } from "@/lib/links";
+import { ViewLink } from "./ViewLink";
 
 const TITLES: Record<Block["type"], string> = {
   metrics: "우리의 숫자 지표",
@@ -93,10 +94,14 @@ function BlockBody({ b }: { b: Block }) {
         <div className="space-y-3">
           {b.items.map((it, i) => (
             <div key={i} className="print:break-inside-avoid">
-              <p className="text-[16px] text-body">
-                <span className="font-medium text-ink">{it.title}</span>
-                {it.year && <span className="text-mute"> · {it.year}</span>}
-              </p>
+              {/* 제목·연도 한 줄, 그 옆에 '소개 보기' 칩 인라인 */}
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                <p className="text-[16px] text-body">
+                  <span className="font-medium text-ink">{it.title}</span>
+                  {it.year && <span className="text-mute"> · {it.year}</span>}
+                </p>
+                {it.link && <ViewLink href={it.link} label="소개 보기" />}
+              </div>
               {it.desc && (
                 <p className="mt-0.5 text-[15px] leading-relaxed text-mute">{it.desc}</p>
               )}
@@ -104,16 +109,6 @@ function BlockBody({ b }: { b: Block }) {
                 <div className="mt-2 max-w-[460px] print:mx-auto">
                   <PhotoSlider photos={it.photos} />
                 </div>
-              )}
-              {it.link && (
-                <a
-                  href={normalizeUrl(it.link)}
-                  target="_blank"
-                  rel="noopener noreferrer nofollow"
-                  className="mt-1 inline-block text-[14px] font-medium text-primary-on underline underline-offset-2"
-                >
-                  소개 보기
-                </a>
               )}
             </div>
           ))}
