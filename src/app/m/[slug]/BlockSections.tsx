@@ -94,7 +94,7 @@ function BlockBody({ b }: { b: Block }) {
           {b.items.map((it, i) => (
             <div key={i} className="print:break-inside-avoid">
               {/* 제목·연도 한 줄, 그 오른쪽에 밑줄 텍스트 '소개 보기' + ↗ */}
-              <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
                 <p className="text-[16px] text-body">
                   <span className="font-medium text-ink">{it.title}</span>
                   {it.year && <span className="text-mute"> · {it.year}</span>}

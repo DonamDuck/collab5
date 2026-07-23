@@ -37,7 +37,7 @@ export function MakerArticle({ maker, isOwner, logoUrl, readOnly }: {
             {maker.activities.map((a, i) => (
               <div key={i} className="print:break-inside-avoid">
                 {(a.title || a.link) && (
-                  <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
                     {a.title && (
                       <p className="text-[18px] font-semibold leading-snug text-ink">{a.title}</p>
                     )}
@@ -80,7 +80,7 @@ export function MakerArticle({ maker, isOwner, logoUrl, readOnly }: {
             {maker.collabHistory.map((h, i) => (
               <div key={i} className="print:break-inside-avoid">
                 {/* 제목·타입·연도 한 줄, 그 오른쪽에 밑줄 텍스트 '아티클 보기'(헤더가 주인공, 링크는 가벼운 액센트) */}
-                <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
                   <p className="text-[16px] text-body">
                     <span className="font-semibold text-ink">{h.partner}</span>
                     {h.types.length > 0 && <span className="text-mute"> · {h.types.join("·")}</span>}
