@@ -137,9 +137,21 @@ export function MakerActionBar({
       {loginOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4">
           <ScrollLock />
-          <div className="w-full max-w-sm rounded-lg border border-hairline bg-surface p-6 text-center shadow-e2">
-            <p className="text-base font-bold text-ink">찜하려면 로그인이 필요해요</p>
-            <p className="mt-1.5 text-sm leading-relaxed text-mute">
+          <div className="relative w-full max-w-sm rounded-lg border border-hairline bg-surface p-6 text-center shadow-e2">
+            {/* 우측 상단 닫기 */}
+            <button
+              type="button"
+              onClick={() => setLoginOpen(false)}
+              aria-label="닫기"
+              className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-md text-faint hover:bg-surface-soft hover:text-ink"
+            >
+              <svg viewBox="0 0 20 20" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8">
+                <path d="M5 5l10 10M15 5L5 15" strokeLinecap="round" />
+              </svg>
+            </button>
+
+            <p className="text-xl font-bold text-ink">찜하려면 로그인이 필요해요</p>
+            <p className="mt-2 text-base leading-relaxed text-mute">
               관심 있는 곳을 저장해두고 언제든 다시 볼 수 있어요.
             </p>
             <div className="mt-5 flex gap-2">
@@ -157,6 +169,12 @@ export function MakerActionBar({
                 로그인
               </a>
             </div>
+            <p className="mt-4 text-[13px] text-mute">
+              아직 회원이 아니신가요?{" "}
+              <a href="/signup" className="font-medium text-ink underline underline-offset-2">
+                회원가입 하기
+              </a>
+            </p>
           </div>
         </div>
       )}
