@@ -3,9 +3,13 @@
 // 소개서 페이지 하단 고정 플로팅 액션바 — 방문자 액션 존.
 // [ ♡ 찜(작게) + 콜라보 시작하기(신설, 지금은 UI만) ] + 링크복사 pill(바 우측 위).
 // 백보드 = 흰 배경 + 상단 좌우 모서리만 둥근 바텀시트형.
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect } from "react";
 import { setMakerSavedAction } from "@/lib/actions";
 import { ScrollLock } from "@/components/ScrollLock";
+
+// 로그인/가입 전에 눌렀던 찜 의도를 보관하는 키(같은 탭 세션 한정).
+// 고객이 이미 하트를 눌렀으니, 로그인 후 이 페이지로 돌아오면 자동으로 찜 처리한다.
+const PENDING_SAVE_KEY = "collab5:pendingSave";
 
 export function MakerActionBar({
   slug,
@@ -23,6 +27,36 @@ export function MakerActionBar({
   const [toast, setToast] = useState(false);
   const [copied, setCopied] = useState(false);
   const [pending, start] = useTransition();
+
+  // 로그인/가입으로 떠나기 직전, 이 업체를 찜하려 했다는 의도를 남긴다.
+  const markPendingSave = () => {
+    try {
+      sessionStorage.setItem(PENDING_SAVE_KEY, String(makerId));
+    } catch {
+      /* 프라이빗 모드 등 — 실패해도 무해 */
+    }
+  };
+
+  // 로그인 후 이 페이지로 복귀 시: 보류해둔 찜 의도가 이 업체면 자동 저장(하트 채움).
+  useEffect(() => {
+    if (!loggedIn || saved) return;
+    let pendingId: string | null = null;
+    try {
+      pendingId = sessionStorage.getItem(PENDING_SAVE_KEY);
+    } catch {
+      return;
+    }
+    if (pendingId !== String(makerId)) return;
+    try {
+      sessionStorage.removeItem(PENDING_SAVE_KEY);
+    } catch {
+      /* noop */
+    }
+    setSaved(true); // 낙관적 — 고객은 이미 눌렀으니 즉시 채움
+    setMakerSavedAction(makerId, true).then((r) => {
+      if (r.error) setSaved(false); // 저장 실패 시 되돌림
+    });
+  }, [loggedIn, saved, makerId]);
 
   // 찜 토글 — 비로그인은 로그인 유도, 로그인은 낙관적 저장(실패 시 롤백).
   const toggleHeart = () => {
@@ -164,6 +198,7 @@ export function MakerActionBar({
               </button>
               <a
                 href={`/login?redirect=${encodeURIComponent(`/m/${slug}`)}`}
+                onClick={markPendingSave}
                 className="flex h-11 flex-1 items-center justify-center rounded-md bg-primary text-sm font-medium text-primary-on"
               >
                 로그인
@@ -171,7 +206,7 @@ export function MakerActionBar({
             </div>
             <p className="mt-4 text-[13px] text-mute">
               아직 회원이 아니신가요?{" "}
-              <a href="/signup" className="font-medium text-ink underline underline-offset-2">
+              <a href="/signup" onClick={markPendingSave} className="font-medium text-ink underline underline-offset-2">
                 회원가입 하기
               </a>
             </p>
