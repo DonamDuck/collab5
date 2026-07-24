@@ -12,7 +12,7 @@ const BIZ: { label: string; value: string }[] = [
 
 export function SiteFooter() {
   return (
-    <footer className="mt-16 border-t border-hairline bg-canvas px-4 py-10 text-mute sm:px-6 print:hidden">
+    <footer className="mt-16 border-t border-hairline bg-surface-soft px-4 py-10 text-mute sm:px-6 print:hidden">
       <div className="mx-auto flex max-w-[960px] flex-col gap-6">
         {/* 상단: 워드마크 + 보조 내비 */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
