@@ -105,9 +105,9 @@ export function MakerActionBar({
 
   return (
     <>
-      {/* 하단 고정 플로팅 — 640px 중앙, 모바일·데스크탑 공통 */}
+      {/* 하단 고정 플로팅 — 640px 중앙, 모바일·데스크탑 공통. 좌우 마진 없이 화면 끝까지(바텀시트) */}
       <div className="fixed inset-x-0 bottom-0 z-40 print:hidden">
-        <div className="relative mx-auto w-full max-w-[640px] px-4">
+        <div className="relative mx-auto w-full max-w-[640px]">
           {/* 링크복사 pill — 바 우측 위 */}
           <button
             type="button"
