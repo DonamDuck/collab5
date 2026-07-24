@@ -107,3 +107,14 @@ drop trigger if exists trg_profiles_updated on profiles;
 create trigger trg_profiles_updated before update on profiles
   for each row execute function set_updated_at();
 alter table profiles enable row level security;
+
+-- ── 찜(저장) — 로그인 유저가 관심 업체를 저장. (user_uuid, maker_id) 복합 PK로 중복 방지. ──
+-- 방향성 시그널(누가 누굴 찜했나) → 컨시어지 매칭·북극성 연료. 서버(service_role)만 접근.
+create table saved_makers (
+  user_uuid  uuid   not null references auth.users(id) on delete cascade,
+  maker_id   bigint not null references makers(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (user_uuid, maker_id)
+);
+create index idx_saved_makers_user on saved_makers(user_uuid, created_at desc);
+alter table saved_makers enable row level security;

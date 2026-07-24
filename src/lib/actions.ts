@@ -327,6 +327,21 @@ export async function updateMakerFlagsAction(
   return {};
 }
 
+/** 찜(저장) 토글 — 로그인만 하면 누구나 관심 업체 저장. 소유권 무관(방향성 시그널). */
+export async function setMakerSavedAction(
+  makerId: number,
+  saved: boolean
+): Promise<{ error?: string }> {
+  const user = await getSessionUser();
+  if (!user) return { error: "찜하려면 로그인이 필요해요." };
+  try {
+    await repo.setMakerSaved(user.id, makerId, saved);
+    return {};
+  } catch {
+    return { error: "저장에 실패했어요." };
+  }
+}
+
 /** 소개서 삭제 — 로그인 소유자만. /my에서 사용. 카드·지표는 FK CASCADE로 함께 삭제. */
 export async function deleteMakerAction(slug: string): Promise<{ error?: string }> {
   const maker = await repo.getMakerBySlug(slug);

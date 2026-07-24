@@ -25,6 +25,10 @@ export interface Repo {
   recordView(cardId: number, ref?: string): Promise<ViewEvent>;
   countViews(cardId: number): Promise<number>;
   recordReaction(cardId: number, type: Reaction["type"]): Promise<Reaction>;
+  // 찜(저장) — 로그인 유저별. 소유권/게이트 검증은 actions에서.
+  isMakerSaved(userUuid: string, makerId: number): Promise<boolean>;
+  setMakerSaved(userUuid: string, makerId: number, saved: boolean): Promise<void>;
+  listSavedMakers(userUuid: string): Promise<Maker[]>;
 }
 
 const now = () => new Date().toISOString();
@@ -377,6 +381,7 @@ class InMemoryRepo implements Repo {
   private cards: CollabCard[] = [...seedCards];
   private views: ViewEvent[] = [];
   private reactions: Reaction[] = [];
+  private saved: { userUuid: string; makerId: number; createdAt: string }[] = [];
   // 정수 시퀀스 카운터 (DB의 identity 흉내)
   private nextMakerId = this.makers.length + 1;
   private nextCardId = this.cards.length + 1;
@@ -459,6 +464,21 @@ class InMemoryRepo implements Repo {
     const r: Reaction = { id: this.nextReactionId++, cardId, type, createdAt: now() };
     this.reactions.push(r);
     return r;
+  }
+  async isMakerSaved(userUuid: string, makerId: number): Promise<boolean> {
+    return this.saved.some((s) => s.userUuid === userUuid && s.makerId === makerId);
+  }
+  async setMakerSaved(userUuid: string, makerId: number, saved: boolean): Promise<void> {
+    const has = this.saved.some((s) => s.userUuid === userUuid && s.makerId === makerId);
+    if (saved && !has) this.saved.push({ userUuid, makerId, createdAt: now() });
+    else if (!saved) this.saved = this.saved.filter((s) => !(s.userUuid === userUuid && s.makerId === makerId));
+  }
+  async listSavedMakers(userUuid: string): Promise<Maker[]> {
+    return this.saved
+      .filter((s) => s.userUuid === userUuid)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt)) // 최근 찜 먼저
+      .map((s) => this.makers.find((m) => m.id === s.makerId && m.status !== "inactive"))
+      .filter((m): m is Maker => !!m);
   }
 }
 
@@ -633,6 +653,38 @@ class SupabaseRepo implements Repo {
     if (error) throw error;
     const r = data as ReactionRow;
     return { id: r.id, cardId: r.card_id, type: r.type as Reaction["type"], createdAt: r.created_at };
+  }
+  async isMakerSaved(userUuid: string, makerId: number): Promise<boolean> {
+    const { data } = await this.db
+      .from("saved_makers")
+      .select("maker_id")
+      .eq("user_uuid", userUuid)
+      .eq("maker_id", makerId)
+      .maybeSingle();
+    return !!data;
+  }
+  async setMakerSaved(userUuid: string, makerId: number, saved: boolean): Promise<void> {
+    if (saved) {
+      // 복합 PK라 중복 저장은 무시(멱등)
+      await this.db
+        .from("saved_makers")
+        .upsert({ user_uuid: userUuid, maker_id: makerId }, { onConflict: "user_uuid,maker_id", ignoreDuplicates: true });
+    } else {
+      await this.db.from("saved_makers").delete().eq("user_uuid", userUuid).eq("maker_id", makerId);
+    }
+  }
+  async listSavedMakers(userUuid: string): Promise<Maker[]> {
+    // 1) 찜 순서(최근 먼저)로 maker_id 수집 → 2) makers 일괄 조회 후 그 순서로 재정렬
+    const { data: rows } = await this.db
+      .from("saved_makers")
+      .select("maker_id")
+      .eq("user_uuid", userUuid)
+      .order("created_at", { ascending: false });
+    const ids = (rows ?? []).map((r) => (r as { maker_id: number }).maker_id);
+    if (ids.length === 0) return [];
+    const { data } = await this.db.from("makers").select().in("id", ids).eq("status", "active");
+    const byId = new Map((data ?? []).map((r) => [(r as MakerRow).id, rowToMaker(r as MakerRow)]));
+    return ids.map((id) => byId.get(id)).filter((m): m is Maker => !!m);
   }
 }
 
