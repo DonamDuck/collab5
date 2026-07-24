@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { SiteHeader } from "@/components/SiteHeader";
+import { SiteFooter } from "@/components/SiteFooter";
 
 export const metadata: Metadata = {
   title: "collab5 — 마음 맞는 메이커들의 콜라보 플랫폼",
@@ -23,6 +24,7 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col">
         <SiteHeader />
         <div className="flex-1">{children}</div>
+        <SiteFooter />
       </body>
     </html>
   );
