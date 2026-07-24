@@ -71,7 +71,7 @@ export default function SignupPage() {
     if (password !== password2) return "비밀번호가 서로 달라요.";
     if (!phone.trim()) return "휴대폰번호를 입력해주세요.";
     if (!brandName.trim()) return "브랜드명을 입력해주세요.";
-    if (!agree) return "개인정보 수집 및 이용에 동의해주세요.";
+    if (!agree) return "서비스 이용약관에 동의해주세요.";
     return "";
   };
 
@@ -174,17 +174,28 @@ export default function SignupPage() {
             )}
           </div>
         </Field>
-        <label className="flex cursor-pointer items-start gap-2 text-sm text-body">
-          <input
-            type="checkbox"
-            checked={agree}
-            onChange={(e) => setAgree(e.target.checked)}
-            className="mt-0.5 h-4 w-4 accent-[var(--color-primary,theme(colors.lime.400))]"
-          />
-          <span>
-            개인정보 수집 및 이용에 동의합니다. <span className="text-faint">(필수)</span>
-          </span>
-        </label>
+        <div className="flex items-center justify-between gap-2">
+          <label className="flex cursor-pointer items-start gap-2 text-sm text-body">
+            <input
+              type="checkbox"
+              checked={agree}
+              onChange={(e) => setAgree(e.target.checked)}
+              className="mt-0.5 h-4 w-4 accent-[var(--color-primary,theme(colors.lime.400))]"
+            />
+            <span>
+              서비스 이용약관을 확인했고 동의합니다. <span className="text-faint">(필수)</span>
+            </span>
+          </label>
+          {/* 약관 전문 — 새 탭으로 열어 폼 입력 보존 */}
+          <Link
+            href="/terms"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="shrink-0 rounded-md border border-hairline bg-surface px-2.5 py-1 text-[13px] font-medium text-mute hover:text-ink"
+          >
+            보기
+          </Link>
+        </div>
       </div>
 
       {err && <p className="mt-3 text-sm text-red-600">{err}</p>}

@@ -27,6 +27,9 @@ export function SiteFooter() {
             <Link href="/register" className="hover:text-ink">
               브랜드 소개서
             </Link>
+            <Link href="/terms" className="hover:text-ink">
+              이용약관
+            </Link>
             <Link href="/privacy" className="font-medium hover:text-ink">
               개인정보처리방침
             </Link>
