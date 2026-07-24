@@ -159,9 +159,7 @@ export default function Home() {
       <Reveal as="section" eager className="mt-14 text-center">
         {/* 미션 한 줄 — 소개서가 쌓이면 발견으로 이어진다(BM 발굴 방향을 고객 언어로, 대표 확정 2026-07-23) */}
         <p className="mx-auto max-w-[440px] break-keep text-xl font-bold leading-snug tracking-tight text-ink">
-          좋은 소개는 쌓일수록 힘이 돼요.
-          <br />
-          다음 콜라보가 우리를 먼저 찾아오도록.
+          매력적인 콜라보를 만들어보세요.
         </p>
         <Link
           href="/register"
