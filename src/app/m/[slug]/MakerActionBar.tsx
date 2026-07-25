@@ -20,6 +20,7 @@ export function MakerActionBar({
   loggedIn,
   instagram,
   homepage,
+  contactEmail,
   senderName,
   senderSlug,
 }: {
@@ -30,6 +31,7 @@ export function MakerActionBar({
   loggedIn: boolean;
   instagram?: string;
   homepage?: string;
+  contactEmail?: string; // 소유자 가입 이메일 — 채널(인스타/홈피) 없을 때 이메일 폴백
   senderName?: string; // 제안자(로그인 유저) 상호 — 추천 메시지 인사말
   senderSlug?: string; // 제안자의 첫 소개서 slug — 있으면 소개 링크 첨부
 }) {
@@ -38,8 +40,7 @@ export function MakerActionBar({
   const [loginReason, setLoginReason] = useState<"save" | "propose">("save");
   const [proposeOpen, setProposeOpen] = useState(false);
   const [message, setMessage] = useState(""); // 추천 메시지(수정 가능)
-  const [msgCopied, setMsgCopied] = useState(false);
-  const [copied, setCopied] = useState(false);
+  const [toast, setToast] = useState<string | null>(null); // 복사 완료 토스트(3종 통일)
   const [pending, start] = useTransition();
 
   // 콜라보 연락 채널(인스타 DM 우선 → 홈페이지/카톡 → 없으면 null)
@@ -156,15 +157,17 @@ export function MakerActionBar({
     }
   };
 
-  const flashMsgCopied = () => {
-    setMsgCopied(true);
-    window.setTimeout(() => setMsgCopied(false), 2000);
+  // 복사 완료 토스트 3종 통일 — 어디서 복사하든 이 헬퍼로.
+  const flash = (m: string) => {
+    setToast(m);
+    window.setTimeout(() => setToast(null), 2000);
   };
 
   // Primary — 메시지 복사 + 상대 채널 오픈(제스처 내 즉시, 팝업 차단 회피) + 계측(best-effort) + 닫기.
   const proposeAndSend = () => {
     if (!channel) return;
     copyText(message);
+    flash("✓ 메시지를 복사했어요.");
     window.open(channel.url, "_blank", "noopener,noreferrer");
     recordCollabRequestAction(makerId, channel.channel).catch(() => {});
     setProposeOpen(false);
@@ -173,32 +176,24 @@ export function MakerActionBar({
   // Secondary — 메시지만 복사(시트 유지 + 토스트).
   const copyMessageOnly = () => {
     copyText(message);
-    flashMsgCopied();
+    flash("✓ 메시지를 복사했어요.");
+  };
+
+  // 이메일 폴백 Primary — 이메일 주소만 복사(채널 오픈 없음, 시트 유지 + 토스트).
+  const copyEmailOnly = () => {
+    if (!contactEmail) return;
+    copyText(contactEmail);
+    flash("✓ 이메일 주소를 복사했어요.");
   };
 
   const isInstagram = channel?.channel === "instagram";
   const proposePrimaryLabel = isInstagram ? "메시지 복사하고 인스타 DM 보내기" : "메시지 복사하고 채널 열기";
 
-  const copy = async () => {
+  // 소개서 링크 복사 — copyText + flash로 정리(pill 라벨은 정적 고정).
+  const copy = () => {
     const url = typeof window !== "undefined" ? window.location.href : "";
-    try {
-      await navigator.clipboard.writeText(url);
-    } catch {
-      const ta = document.createElement("textarea");
-      ta.value = url;
-      ta.style.position = "fixed";
-      ta.style.left = "-9999px";
-      document.body.appendChild(ta);
-      ta.select();
-      try {
-        document.execCommand("copy");
-      } catch {
-        /* noop */
-      }
-      document.body.removeChild(ta);
-    }
-    setCopied(true);
-    window.setTimeout(() => setCopied(false), 1800);
+    copyText(url);
+    flash("✓ 소개서 링크를 복사했어요.");
   };
 
   const loginTitle = loginReason === "propose" ? "콜라보를 시작하려면 로그인이 필요해요" : "찜하려면 로그인이 필요해요";
@@ -219,7 +214,7 @@ export function MakerActionBar({
             aria-label="링크 복사"
             className="absolute -top-[52px] right-4 flex h-10 items-center gap-1.5 rounded-pill bg-primary px-4 text-sm font-medium text-primary-on shadow-e2 transition-colors"
           >
-            {copied ? "✓ 복사됐어요" : "🔗 링크 복사"}
+            🔗 링크 복사
           </button>
 
           {/* 백보드 바 — 흰 배경 + 상단 좌우 라운드 */}
@@ -314,6 +309,36 @@ export function MakerActionBar({
                   메시지 복사하기
                 </button>
               </>
+            ) : contactEmail ? (
+              <>
+                <p className="mt-2 text-[15px] leading-relaxed text-mute">
+                  아직 앱 내 채팅은 준비 중이에요.
+                  <br />
+                  그전까지는 아래 이메일로 연락해보세요.
+                </p>
+                <p className="mt-3 text-[14px] text-body break-all select-all">{contactEmail}</p>
+                <label className="mt-4 block text-[13px] font-medium text-body">메시지 초안 (자유롭게 수정해보세요)</label>
+                <textarea
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                  rows={7}
+                  className="mt-1.5 w-full resize-none rounded-md border border-border-strong bg-surface-soft p-3 text-[14px] leading-relaxed text-ink focus:border-primary focus:outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={copyEmailOnly}
+                  className="mt-4 flex h-12 w-full items-center justify-center rounded-md bg-primary text-base font-medium text-primary-on"
+                >
+                  이메일 주소 복사하기
+                </button>
+                <button
+                  type="button"
+                  onClick={copyMessageOnly}
+                  className="mt-2 flex h-12 w-full items-center justify-center rounded-md border border-border-strong bg-surface text-base font-medium text-ink"
+                >
+                  메시지 복사하기
+                </button>
+              </>
             ) : (
               <p className="mt-2 text-[15px] leading-relaxed text-mute">
                 아직 {makerName}님의 연락처가 준비되지 않았어요.
@@ -325,10 +350,10 @@ export function MakerActionBar({
         </div>
       )}
 
-      {/* 메시지 복사 완료 토스트 (제안 시트 위) */}
-      {msgCopied && (
+      {/* 복사 완료 토스트 (3종 통일 — 링크/메시지/이메일 주소) */}
+      {toast && (
         <div className="fixed bottom-[92px] left-1/2 z-[60] -translate-x-1/2 rounded-pill bg-ink px-4 py-2.5 text-[13px] font-medium text-surface shadow-e2 print:hidden">
-          ✓ 메시지를 복사했어요.
+          {toast}
         </div>
       )}
 

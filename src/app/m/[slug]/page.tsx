@@ -75,6 +75,7 @@ export default async function MakerPage({
         loggedIn={!!user}
         instagram={maker.trust.instagram}
         homepage={maker.trust.homepage}
+        contactEmail={ownerProfile?.email || undefined}
         senderName={senderName}
         senderSlug={senderSlug}
       />

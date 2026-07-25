@@ -8,6 +8,7 @@ export interface Profile {
   uuid: string; // auth.users(id)
   brandName: string;
   phone: string;
+  email: string; // 가입 이메일 ('' = 없음)
   profileImage: string; // 리사이즈 base64 data URL ('' = 없음)
 }
 
@@ -96,7 +97,7 @@ export async function getProfile(authUuid: string): Promise<Profile | null> {
   if (!client) return null;
   const { data } = await client
     .from("profiles")
-    .select("user_id, uuid, brand_name, phone, profile_image")
+    .select("user_id, uuid, brand_name, phone, email, profile_image")
     .eq("uuid", authUuid)
     .maybeSingle();
   if (!data) return null;
@@ -105,6 +106,7 @@ export async function getProfile(authUuid: string): Promise<Profile | null> {
     uuid: data.uuid,
     brandName: data.brand_name,
     phone: data.phone ?? "",
+    email: data.email ?? "",
     profileImage: data.profile_image ?? "",
   };
 }
