@@ -37,9 +37,15 @@ export const DNA_REFRESH_BEFORE = "2026-07-25T00:00:00Z"; // 이 날짜 이전 d
 // stale 판정은 `brands.updated_at > dna.updated_at + SLACK` 으로 허용 오차를 둔다.
 export const DNA_STALE_SLACK_MS = 5000;
 
-/** 서버 화이트리스트 검증 — 근거 없는 항목·Pool 밖 창작어를 탈락시킨다(사실 게이트). */
-export function filterPoolValid(items: DnaItem[]): DnaItem[] {
-  return items.filter((it) => (DNA_POOL[it.type] ?? []).includes(it.value) && it.evidence?.trim());
+/** 서버 화이트리스트 검증 — 근거 없는 항목·Pool 밖 창작어·입력에 없던 source 필드명을 탈락시킨다(사실 게이트).
+ *  allowedSources = 이번 생성 때 실제로 입력에 넣은 필드 라벨 목록(=BrandDna.input_fields).
+ *  source는 필드명까지만 기록(테이블 단일이라 생략, 값은 evidence가 그 역할 — 대표 확정 07-26). */
+export function filterPoolValid(items: DnaItem[], allowedSources: string[]): DnaItem[] {
+  return items
+    .map((it) => ({ ...it, source: (it.source ?? []).filter((s) => allowedSources.includes(s)) }))
+    .filter(
+      (it) => (DNA_POOL[it.type] ?? []).includes(it.value) && it.evidence?.trim() && it.source.length > 0
+    );
 }
 
 export function distinctTypeCount(items: DnaItem[]): number { return new Set(items.map((i) => i.type)).size; }
