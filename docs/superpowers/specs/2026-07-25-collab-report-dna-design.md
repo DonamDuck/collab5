@@ -63,7 +63,9 @@ alter table collab_reports enable row level security;
 ```
 
 - append-only(재생성=새 행) — 품질 추적·A/B 데이터가 공짜로 쌓임.
-- **캐시 히트** = 같은 (from,to) 쌍의 최신 행이 존재하고, 양쪽 `dna.updated_at`이 그 행의 `created_at`보다 옛것 → 저장본 즉시 반환(0콜).
+- **캐시 히트(3조건 모두)**: ①같은 (from,to) 쌍의 최신 행 존재 ②**양쪽 DNA가 non-stale**(`brands.updated_at ≤ dna.updated_at` — 소개서가 DNA보다 새로우면 캐시 무효) ③행 `created_at`이 양쪽 `dna.updated_at`보다 최신. → 저장본 즉시 반환(0콜). ⚠️②가 없으면 소개서를 수정해도 옛 리포트가 영원히 반환되는 교착이 생긴다(레드팀 C1).
+- **방향성은 의도적**: (A→B)와 (B→A)는 별개 리포트다 — 리포트는 제안자 관점 문서라 방향마다 내용이 다른 게 맞다.
+- **동시 생성 레이스**: append-only라 무해(중복 1행·~₩40) — 클라이언트에서 생성 중 버튼 비활성만 하면 충분, 락 불필요.
 - ⚠️ SQL 실행은 대표 (코드보다 SQL 먼저 — 07-25 마이그레이션 철칙).
 
 ### 2-3. DNA Pool (`src/lib/dna-pool.ts`, 코드 정본)
@@ -99,16 +101,23 @@ alter table collab_reports enable row level security;
  ├─ 비로그인 → 로그인 유도 얼럿(기존 패턴) + pendingReport 복귀(로그인 후 리포트 시트 자동 오픈)
  ├─ 내 소개서 없음 → 샘플 리포트 티저 화면 (§4-④)
  └─ POST /api/collab-report  (maxDuration 60 — enrich 관례: 무거운 AI 호출=라우트)
-      0. 캐시 체크(서버): 최신 (from,to) 행이 있고 양쪽 dna.updated_at이 그보다 옛것 → 저장본 반환(Gemini 0콜)
+      0. 캐시 체크(서버): §2-2의 3조건(최신 행 + 양쪽 DNA non-stale + 행이 DNA보다 최신) 충족 → 저장본 반환(Gemini 0콜)
       1. A·B DNA stale 체크 → 필요분만 병렬 생성(Gemini flash, responseSchema 구조화)
          · 사실 게이트 3중: ①모든 pick에 evidence(소개서 실제 문구) 의무 — 근거 없으면 선택 금지,
            "빈 DNA가 틀린 DNA보다 낫다" 명시 ②서버가 Pool 화이트리스트 검증(밖 어휘 드롭)
            ③고위험 type(customer의 연령·성별)은 명시적 근거 없으면 생략
-         · thin 가드: B의 근거픽 < 4개 → 리포트 생성 중단, "정보가 아직 적어요" 상태 반환(임계 튜닝 가능)
+         · thin 가드(**양쪽 검사**, 레드팀 C3): 기준 = **서로 다른 type 수 ≥ 4**(`THIN_MIN_TYPES` 코드 상수 —
+           raw pick 수 아님: mood만 4개여도 thin). A가 thin → "내 소개서를 보강하면 분석이 더 정확해져요"
+           + [소개서 보강하기] CTA(본인 수정 진입 — 자기개선 퍼널). B가 thin → "○○님의 소개서 정보가
+           아직 적어요". 둘 다 thin → A 안내 우선. 차단 시 `report_thin_blocked`(side, distinct_types)
+           계측 — 임계 튜닝의 근거 데이터
       2. 리포트 콜 1회 (A DB+DNA + B DB+DNA):
          · 접점 후보 6~8개 넓게 캐기(내부) → 4기준 채점: 희소성(바꿔치기 테스트, 최고 가중)·
            구체성·실행 연결성·상호성 → 후보 전체+점수를 JSON으로 출력, 상위 선발은 서버 코드가
            (탈락 후보도 데이터로 축적 — 기준 튜닝 재료)
+         · **선발 규칙**(레드팀 C2): 최소 점수 `MIN_MATCH_SCORE` 코드 상수 미달은 탈락. 동점은
+           (희소성→구체성→실행 연결성) 사전순. **통과 접점 < 2개면 리포트 미생성** —
+           "아직 뚜렷한 접점을 찾지 못했어요" 상태 반환(억지 리포트보다 정직한 빈손. thin 가드와 같은 UX 계열)
          · 출력 = 카드형 6조각 구조화 JSON (§5)
       3. collab_reports insert → 반환
 ```
@@ -130,6 +139,8 @@ alter table collab_reports enable row level security;
 ```
 기존 하트의 찜 동작·로그인 게이트·pending 복귀는 그대로(위치만 이동).
 
+**pending 메커니즘 공유(레드팀 C4)**: `pendingReport`는 기존 `pendingSave`/`pendingPropose`와 **같은 sessionStorage 패턴의 세 번째 키**로 추가(별도 메커니즘 금지 — `markPending` 확장). 복수 pending 동시 존재 시: 찜은 조용히 자동 실행, **시트는 report > propose 우선순위로 1개만 오픈**(리포트 CTA가 어차피 제안 시트로 이어짐). Phase 1 QA에 하트 회귀 체크리스트 필수: ①찜/해제 토글 ②비로그인 하트→로그인 복귀 자동찜 ③제안 pending 복귀 ④찜 계측 — 전부 이사 후 재검증.
+
 ### 4-② 리포트 시트
 풀하이트 바텀시트(제안 시트 패턴 재사용). 6조각 순서 렌더 → §5. 하단 CTA **[이 내용으로 협업 제안 보내기]** → 리포트 시트 닫고 기존 제안 시트 오픈(메시지 주입 없음). 재열람=캐시 즉시.
 
@@ -150,7 +161,7 @@ alter table collab_reports enable row level security;
 | # | 조각 | 규칙 |
 |---|---|---|
 | 1 | 한 줄 결론 | 5초 안에 "왜 둘이 잘 맞는지" — 리포트에서 가장 중요 |
-| 2 | 이런 점이 잘 어울려요 | ✔ 3~4개. **접점 채점 통과분만**(§3). 근거는 두 소개서의 실제 내용에서 |
+| 2 | 이런 점이 잘 어울려요 | ✔ **2~4개**(채점 통과분만, §3 선발 규칙 — 2개 미만이면 리포트 자체를 안 만듦). 근거는 두 소개서의 실제 내용에서 |
 | 3 | 추천 콜라보 아이디어 1~3개 ⭐ | 각 1~2줄 설명 + **형태 태그**(collabMethod 어휘). 억지 3개보다 진짜 1~2개. 당장 실행 가능한 수준 |
 | 4 | 실행 플랜 | 최대 4스텝 고정: DM → 30분 미팅 → 작은 실행 → 후기/콘텐츠. "생각보다 할 만한데" |
 | 5 | 기대 효과 | 불릿 2~3줄(별점 없음 — 별점 시각화는 기획서형 전용) |
@@ -170,6 +181,8 @@ alter table collab_reports enable row level security;
 | `report_generated` | duration_ms, model, dna_calls | 생성 성능·비용 추적 |
 | `report_cta_propose` | — | **리포트→제안 전환 = P1→P3 퍼널 핵심 지표** |
 | `report_locked_view` / `wizard_start_from_report` | — | 무소개서 퍼널(샘플→위저드) 전환율 |
+| `report_thin_blocked` | side(A\|B), distinct_types | thin 가드 발동 — 임계 튜닝 근거 |
+| `report_no_match` | — | 접점 <2로 미생성 — 채점 기준 튜닝 근거 |
 
 유저별 일일 생성 카운터(제한 없음, 유료화 대비 계측만).
 
@@ -178,6 +191,7 @@ alter table collab_reports enable row level security;
 - **Phase 1 (이번)**: 바 개편 + `brands.dna`/`collab_reports`(대표 SQL) + dna-pool.ts + DNA 엔진(사실게이트·thin가드) + `/api/collab-report` + 리포트 시트 + 샘플 퍼널 + 보조 진입 + 계측 + 킬스위치 + **flash/pro 블라인드 A/B**(QA)
 - **Phase 2 (백로그)**: 기획서형(유료 딥) · 횟수 제한 집행 · DM 첨부/공유 페이지(리포트 id 기반 라우트 — 저장 구조가 이미 대비됨) · 찜 목록 진입 · "N개 브랜드가 당신을 분석" 노출(별도 설계+프라이버시 재검토) · 스트리밍
 - **런치**: 별도 플래그 없이 배포 → 대표 즉시 QA → 이상 시 `REPORT_DISABLED`. (소프트런치 인프라는 과함)
+- **커밋 전략**: 플로팅바 개편(하트 이사)은 **독립 커밋**으로 분리 — 문제 시 단독 리버트 가능하게(레드팀 권고)
 
 ## 8. 리스크 & 완화
 
