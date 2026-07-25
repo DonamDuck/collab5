@@ -1,7 +1,7 @@
 "use client";
 
 // 소개서 페이지 하단 고정 플로팅 액션바 — 방문자 액션 존.
-// [ ♡ 찜(작게) + 콜라보 시작하기 ] + 링크복사 pill(바 우측 위). 백보드 = 흰 배경 + 상단 좌우 라운드.
+// [🔗 링크복사 + ♡ 찜] = 바 위 유틸 줄(우측 정렬) / 바 안 = [콜라보 시작하기] 액션 전용. 백보드 = 흰 배경 + 상단 좌우 라운드.
 // 찜·콜라보 시작 둘 다 로그인 필수 — 비로그인은 로그인 유도 후, 복귀 시 원래 의도를 자동 재개.
 import { useState, useTransition, useEffect } from "react";
 import { setMakerSavedAction, recordCollabRequestAction } from "@/lib/actions";
@@ -246,19 +246,18 @@ export function MakerActionBar({
       {/* 하단 고정 플로팅 — 640px 중앙, 모바일·데스크탑 공통. 좌우 마진 없이 화면 끝까지(바텀시트) */}
       <div className="fixed inset-x-0 bottom-0 z-40 print:hidden">
         <div className="relative mx-auto w-full max-w-[640px]">
-          {/* 링크복사 pill — 바 우측 위 */}
-          <button
-            type="button"
-            onClick={copy}
-            aria-label="링크 복사"
-            className="absolute -top-[52px] right-4 flex h-10 items-center gap-1.5 rounded-pill bg-primary px-4 text-sm font-medium text-primary-on shadow-e2 transition-colors"
-          >
-            🔗 링크 복사
-          </button>
+          {/* 유틸 줄 — 바 위 우측. [🔗 링크 복사][♡ 찜] */}
+          <div className="absolute -top-[52px] right-4 flex items-center gap-2">
+            <button
+              type="button"
+              onClick={copy}
+              aria-label="링크 복사"
+              className="flex h-10 items-center gap-1.5 rounded-pill bg-primary px-4 text-sm font-medium text-primary-on shadow-e2 transition-colors"
+            >
+              🔗 링크 복사
+            </button>
 
-          {/* 백보드 바 — 흰 배경 + 상단 좌우 라운드 */}
-          <div className="flex items-center gap-2.5 rounded-t-2xl border border-b-0 border-hairline bg-surface px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 shadow-e2">
-            {/* 찜 하트 — 작게, 좌측. 빈 → 채워진 빨강 토글 */}
+            {/* 찜 하트 — 빈 → 채워진 빨강 토글 */}
             <button
               type="button"
               onClick={toggleHeart}
@@ -266,13 +265,13 @@ export function MakerActionBar({
               role="switch"
               aria-checked={saved}
               aria-label={saved ? "찜 해제" : "찜하기"}
-              className={`flex h-12 w-12 shrink-0 items-center justify-center transition-colors ${
+              className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-pill border border-hairline bg-surface shadow-e2 transition-colors ${
                 saved ? "text-red-500" : "text-faint hover:text-body"
               }`}
             >
               <svg
                 viewBox="0 0 24 24"
-                className="h-8 w-8"
+                className="h-5 w-5"
                 fill={saved ? "currentColor" : "none"}
                 stroke="currentColor"
                 strokeWidth="1.8"
@@ -283,8 +282,11 @@ export function MakerActionBar({
                 />
               </svg>
             </button>
+          </div>
 
-            {/* 콜라보 시작하기 — primary, 나머지 폭 */}
+          {/* 백보드 바 — 흰 배경 + 상단 좌우 라운드. 콜라보 액션 전용 */}
+          <div className="flex items-center gap-2.5 rounded-t-2xl border border-b-0 border-hairline bg-surface px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 shadow-e2">
+            {/* 콜라보 시작하기 — primary, 풀폭 */}
             <button
               type="button"
               onClick={handlePropose}
