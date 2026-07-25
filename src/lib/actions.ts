@@ -139,7 +139,7 @@ export async function createMakerAction(
 }
 
 export interface CardInput {
-  fromMakerId: number;
+  fromBrandId: number;
   fromSlug: string;
   toName: string;
   why: string;
@@ -153,7 +153,7 @@ export async function createCardAction(
   const slug = `${input.fromSlug}-${Math.random().toString(36).slice(2, 7)}`;
   const card = await repo.createCard({
     slug,
-    fromMakerId: input.fromMakerId,
+    fromBrandId: input.fromBrandId,
     proposal: {
       toName: input.toName.trim(),
       why: input.why.trim(),
@@ -346,13 +346,13 @@ export async function setMakerSavedAction(
 
 /** 콜라보 제안 인텐트 기록 — "콜라보 시작하기" 계측. 로그인 필수(누가→누구 방향 시그널). */
 export async function recordCollabRequestAction(
-  toMakerId: number,
+  toBrandId: number,
   channel: string
 ): Promise<{ error?: string }> {
   const sessionUserId = await getSessionUserId();
   if (!sessionUserId) return { error: "콜라보를 시작하려면 로그인이 필요해요." };
   try {
-    await repo.recordCollabRequest(sessionUserId, toMakerId, channel);
+    await repo.recordCollabRequest(sessionUserId, toBrandId, channel);
     return {};
   } catch {
     return { error: "기록에 실패했어요." };
