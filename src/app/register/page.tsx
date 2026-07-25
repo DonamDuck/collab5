@@ -1821,7 +1821,7 @@ function RegisterForm() {
             <div>
               <p className="text-base font-medium text-ink">콜라보 받는 중</p>
               <p className="text-sm text-mute">
-                켜두면 다른 메이커가 먼저 콜라보를 제안할 수 있어요.
+                켜두면 다른 브랜드가 먼저 콜라보를 제안할 수 있어요.
               </p>
             </div>
             <button

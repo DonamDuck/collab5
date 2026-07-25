@@ -64,7 +64,7 @@ export default function SearchPage() {
 
   return (
     <main className="mx-auto w-full max-w-[640px] px-4 py-8 sm:px-6 lg:max-w-4xl">
-      <h1 className="text-[28px] font-bold tracking-tight text-ink sm:text-[32px]">메이커 찾기</h1>
+      <h1 className="text-[28px] font-bold tracking-tight text-ink sm:text-[32px]">브랜드 찾기</h1>
       <p className="mt-2 text-[17px] leading-relaxed text-body">잘 맞는 콜라보 파트너를 찾아보세요.</p>
 
       {/* 검색바 — 데스크탑 폭 캡(QA P2) */}
@@ -74,7 +74,7 @@ export default function SearchPage() {
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder="상호, 분위기, 콜라보 유형으로 검색"
-          aria-label="메이커 검색"
+          aria-label="브랜드 검색"
           className="h-full flex-1 bg-transparent text-base text-ink outline-none placeholder:text-faint"
         />
       </div>
@@ -121,7 +121,7 @@ export default function SearchPage() {
               href="/register"
               className="mt-4 inline-flex h-10 items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-on"
             >
-              메이커 등록하기
+              브랜드 등록하기
             </Link>
           </div>
         )}

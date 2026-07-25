@@ -2,10 +2,10 @@
 version: v1.0
 name: collab5-design-system
 description: >
-  결 있는 로컬·인디 메이커들이 서로를 알아보고 콜라보하게 잇는 "콜라보 프로토콜". 멘탈모델은 모바일 청첩장 + 명함앱.
+  결 있는 로컬·인디 브랜드들이 서로를 알아보고 콜라보하게 잇는 "콜라보 프로토콜". 멘탈모델은 모바일 청첩장 + 명함앱.
   단단하지만 다정한(warm-premium) 캔버스 위에, 단 하나의 비비드 형광 Kiwi(#98FF5C)를 "스파크"로 아껴 쓴다 —
   Airbnb Rausch·Wise green처럼 단일 브랜드 컬러를 희소하게. Pretendard를 한글 우선 본문으로, 형태는 살짝 둥글게.
-  핵심 원칙은 "무대지 주인공이 아니다(stage, not spotlight)": collab5 비주얼은 절제하고 주인공 자리는 메이커 콘텐츠에 내준다.
+  핵심 원칙은 "무대지 주인공이 아니다(stage, not spotlight)": collab5 비주얼은 절제하고 주인공 자리는 브랜드 콘텐츠에 내준다.
 
 # ─────────────────────────────────────────────
 # TOKENS (machine-readable contract)
@@ -181,7 +181,7 @@ components:
     rounded: "{rounded.pill}"   # shape=square(브랜드 로고 맥락)는 {rounded.md}
     sizes: "24 / 32 / 40 / 48 / 56 / 64"
     fallback: "4색 로테이션(kiwi/mint/lemon/corn pale + 각 -on, 이름 해시 결정론) + 이니셜 1자"
-    note: "메이커 로고 우선(우리 색 입히지 않음). 폴백은 Kiwi 틴트 '고정' 금지 → 4색 로테이션으로 Kiwi는 ≈25%만 등장(브랜드색 살리되 그리드 도배 회피, 2026-07-05 확정). 컴포넌트 = src/components/Avatar.tsx"
+    note: "브랜드 로고 우선(우리 색 입히지 않음). 폴백은 Kiwi 틴트 '고정' 금지 → 4색 로테이션으로 Kiwi는 ≈25%만 등장(브랜드색 살리되 그리드 도배 회피, 2026-07-05 확정). 컴포넌트 = src/components/Avatar.tsx"
   card:
     backgroundColor: "{colors.surface}"
     textColor: "{colors.ink}"
@@ -200,7 +200,7 @@ components:
     textColor: "{colors.ink}"
     typography: "{typography.body}"
     hover: "{colors.surface-soft}"
-    note: "썸네일=메이커 이미지(무대) + 상호 + 결 한줄 + '콜라보 열림' 뱃지."
+    note: "썸네일=브랜드 이미지(무대) + 상호 + 결 한줄 + '콜라보 열림' 뱃지."
   search-bar:
     backgroundColor: "{colors.surface-soft}"
     textColor: "{colors.ink}"
@@ -257,7 +257,7 @@ components:
     maxWidth: 420px
     anatomy:
       - "상단 리본: '콜라보 제안' 캡션 + {colors.primary} 점 (collab5 존재감은 여기까지)"
-      - "히어로(무대): 메이커 커버 이미지 + 로고 + 상호 + 결 한 줄 — 화면의 주인공"
+      - "히어로(무대): 브랜드 커버 이미지 + 로고 + 상호 + 결 한 줄 — 화면의 주인공"
       - "신뢰 시그널: {components.tag-trust} 행 (검증 정보만)"
       - "제안 본문 + 하드축 {components.chip-choice}"
       - "RSVP: [관심 있어요]={components.button-primary} · [다음에요]={components.button-ghost}"
@@ -280,7 +280,7 @@ components:
 
 ## 소개
 
-collab5 디자인 시스템은 **결 있는 로컬·인디 메이커**가 서로를 알아보고 콜라보하도록 잇는 제품의 시각 언어다. 지향은 3가지:
+collab5 디자인 시스템은 **결 있는 로컬·인디 브랜드**가 서로를 알아보고 콜라보하도록 잇는 제품의 시각 언어다. 지향은 3가지:
 
 1. **최소 품질 보장** — 어떤 화면을 누가 만들어도 warm-premium 무드가 유지된다.
 2. **생산성** — 토큰·컴포넌트 재사용으로 새 화면을 빠르게 조립한다.
@@ -298,8 +298,8 @@ collab5 디자인 시스템은 **결 있는 로컬·인디 메이커**가 서로
 - **살짝 둥근 형태(라운드 강도 B)** — 친근하되 절제. 보더 0.5px.
 
 ### 타깃 페르소나 (톤의 기준)
-- **자기 개성에 확신이 있는** 메이커(솔리드한 자기 무대 위 개성 표현).
-- **결이 맞는 다른 메이커와의 콜라보를 기대**하는 사람 → "끼리끼리 알아보는" 큐레이션된 신뢰감.
+- **자기 개성에 확신이 있는** 브랜드(솔리드한 자기 무대 위 개성 표현).
+- **결이 맞는 다른 브랜드와의 콜라보를 기대**하는 사람 → "끼리끼리 알아보는" 큐레이션된 신뢰감.
 - 함의: 제너릭·코퍼릿 금지. 표현적·크래프트한 손맛 OK(무대 원칙 내 절제).
 
 ---
@@ -369,7 +369,7 @@ html{font-size:17px} /* 루트 17px — rem 기준. 가독성 확대 확정 */
 
 - **Pretendard** 한 패밀리로 한글·숫자·영문 모두. 웨이트 3개만 **400/500/700**. 문장형(sentence case).
 - **루트 font-size 17px** — 모든 rem의 기준. 하드코딩 px 대신 토큰·유틸을 쓴다.
-- **타입은 절제, 콘텐츠가 무게를 짊어진다.** 단, 시그니처 큰 타입 = **메이커명/카드 제목**을 크게(주인공은 메이커).
+- **타입은 절제, 콘텐츠가 무게를 짊어진다.** 단, 시그니처 큰 타입 = **브랜드명/카드 제목**을 크게(주인공은 브랜드).
 
 토큰 표 (Token | size | LH | 용도):
 
@@ -499,8 +499,8 @@ html{font-size:17px} /* 루트 17px — rem 기준. 가독성 확대 확정 */
 - **구성하기** — 아톰 아이콘(44px, 흐림) → 제목(15~17px/700) → 보조설명(12~13px mute) → primary CTA(+선택 ghost). 가운데 정렬, `px-4 py-10`.
 - **아이콘 상태로 의미 표현하기** — 무결과=아웃라인(opacity .4) / 콜드스타트=키위 핵 살아있음(희망) / 404·만료=점선(`stroke-dasharray:3 3`, opacity .3).
 - **3종 카피(확정)**:
-  - 검색 무결과: "결이 맞는 곳을 아직 못 찾았어요" / CTA `메이커 등록하기` + ghost `필터 초기화`
-  - 콜드스타트: "이곳의 첫 메이커가 되어보세요" / CTA `30초 만에 등록하기`
+  - 검색 무결과: "결이 맞는 곳을 아직 못 찾았어요" / CTA `브랜드 등록하기` + ghost `필터 초기화`
+  - 콜드스타트: "이곳의 첫 브랜드가 되어보세요" / CTA `30초 만에 등록하기`
   - 404·만료: "사라졌거나 없는 카드예요" / CTA `collab5 둘러보기`(secondary)
 
 인터페이스: `rounded-lg border border-hairline bg-surface px-4 py-10 text-center`. 아이콘 = `logo-mark-mono.svg`(currentColor).
@@ -519,7 +519,7 @@ html{font-size:17px} /* 루트 17px — rem 기준. 가독성 확대 확정 */
 
 목록의 한 행을 표시할 때 사용해요. (검색 결과 등)
 
-인터페이스: `block rounded-lg border border-hairline bg-surface px-4 py-3 transition-colors hover:bg-surface-soft`. 구성 = 썸네일(메이커 이미지) + 상호 + 결 한줄 + '콜라보 열림' Badge. 그리드 배치 `grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3`.
+인터페이스: `block rounded-lg border border-hairline bg-surface px-4 py-3 transition-colors hover:bg-surface-soft`. 구성 = 썸네일(브랜드 이미지) + 상호 + 결 한줄 + '콜라보 열림' Badge. 그리드 배치 `grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3`.
 
 ### Loader (로딩 오버레이)
 
@@ -576,7 +576,7 @@ html{font-size:17px} /* 루트 17px — rem 기준. 가독성 확대 확정 */
 
 ### Tag 이해하기
 
-메이커에 대한 부가 정보를 표시할 때 사용해요. **신뢰층 vs 보조층을 시각적으로 반드시 구분**한다:
+브랜드에 대한 부가 정보를 표시할 때 사용해요. **신뢰층 vs 보조층을 시각적으로 반드시 구분**한다:
 
 | 타입 | 층 | 시그니처 |
 |---|---|---|
@@ -621,11 +621,11 @@ html{font-size:17px} /* 루트 17px — rem 기준. 가독성 확대 확정 */
 
 ### P1. ★ 청첩장 콜라보 카드 (히어로) — v1 확정
 
-**무대 원칙 최우선** — 받는 사람에게 보이는 건 *그 메이커*. 라이트=따뜻·접근 / 다크(Night×Kiwi)=임팩트(공유 썸네일 추천). 카드는 **시안이 아니라 템플릿(시스템)** — 슬롯에 메이커 데이터가 바인딩된다.
+**무대 원칙 최우선** — 받는 사람에게 보이는 건 *그 브랜드*. 라이트=따뜻·접근 / 다크(Night×Kiwi)=임팩트(공유 썸네일 추천). 카드는 **시안이 아니라 템플릿(시스템)** — 슬롯에 브랜드 데이터가 바인딩된다.
 
 **구조(세로, 모바일 max 420, radius 24, padding 20, e3):**
 1. 상단 라벨 — `● 콜라보 제안`(키위 점 + caption 11px). collab5 존재감은 여기까지만. *(상태배지 없음)*
-2. 커버(무대) — 메이커 이미지(radius 16). **없으면** 브랜드 틴트 + 이니셜 아바타 폴백.
+2. 커버(무대) — 브랜드 이미지(radius 16). **없으면** 브랜드 틴트 + 이니셜 아바타 폴백.
 3. 상호명(23px/700, -0.03em) + 결 한줄(13~15px body) — **같은 그룹(간격 4px)**.
 4. 신뢰 시그널 행 — tag-trust(검증만). 0개면 행 숨김.
 5. 구분선(0.5px hairline).
@@ -639,7 +639,7 @@ html{font-size:17px} /* 루트 17px — rem 기준. 가독성 확대 확정 */
 
 | 슬롯 | 변하는 것 | 규칙/폴백 |
 |---|---|---|
-| 커버 | 메이커 사진 | 없으면 브랜드틴트+이니셜 |
+| 커버 | 브랜드 사진 | 없으면 브랜드틴트+이니셜 |
 | 상호명 | 텍스트 | 2줄까지, 초과 말줄임 |
 | 결 한줄 | 소개 | 1~2줄 말줄임 |
 | 신뢰 시그널 | 0~N | **검증된 것만**, 0개면 숨김 |
@@ -648,7 +648,7 @@ html{font-size:17px} /* 루트 17px — rem 기준. 가독성 확대 확정 */
 | 결 칩 | 0~N | 파스텔(보조층), 신뢰와 시각 구분 |
 | RSVP | 고정 | 관심(키위)/다음에요(ghost) |
 
-- ✅ 메이커 이미지·브랜드색 최대 노출 · 콘텐츠 길이/유무에 레이아웃 안 깨짐(스트레스 테스트 통과).
+- ✅ 브랜드 이미지·브랜드색 최대 노출 · 콘텐츠 길이/유무에 레이아웃 안 깨짐(스트레스 테스트 통과).
 - ❌ Kiwi로 카드 전체 칠하기 · AI 결 칩을 검증처럼 · 상태배지 추가.
 
 ### P2. 등록 폼 (9섹션 소개서 폼)
@@ -718,7 +718,7 @@ SearchField + 필터 Chip → ListRow 그리드. 개별 상세는 공개, '전�
 
 ## 로고 (Brand Mark)
 
-- **마크 = "아톰(Atom)".** Kiwi 핵(=공유 기반=collab5) + 교차 궤도 2개 + 전자 3개(홀수). 의미 = *서로 다른 메이커(전자)가 하나의 중심을 공유하며 함께 돈다* = 콜라보.
+- **마크 = "아톰(Atom)".** Kiwi 핵(=공유 기반=collab5) + 교차 궤도 2개 + 전자 3개(홀수). 의미 = *서로 다른 브랜드(전자)가 하나의 중심을 공유하며 함께 돈다* = 콜라보.
 - **잉크 = 딥블랙 `#111111`** (로고 전용 — UI 본문 잉크는 Night `#222` 유지). 핵 = Kiwi.
 - **워드마크 = Pretendard 700, letter-spacing -0.03em, 소문자 `collab5`**, 딥블랙.
 - **에셋** (`assets/` · `public/`): `logo-mark.svg`(라이트) · `logo-mark-dark.svg`(다크) · `logo-mark-mono.svg`(currentColor) · `logo-lockup.svg` · `favicon.svg`
@@ -729,7 +729,7 @@ SearchField + 필터 Chip → ListRow 그리드. 개별 상세는 공개, '전�
 
 ## Do & Don't 총칙
 
-**Do** — Kiwi는 primary 행동에만 희소하게 · 뉴트럴 위에 색을 얹기 · 다크는 면 대비로 깊이 · 메이커 콘텐츠를 주인공으로 · 문장 2개 이상 기대되는 입력은 TextArea.
+**Do** — Kiwi는 primary 행동에만 희소하게 · 뉴트럴 위에 색을 얹기 · 다크는 면 대비로 깊이 · 브랜드 콘텐츠를 주인공으로 · 문장 2개 이상 기대되는 입력은 TextArea.
 **Don't** — 두 번째 브랜드 색 도입 · Kiwi를 성공색/배경 대면적/글자색으로 · 한 화면 primary 여러 개 · AI 결 칩을 검증처럼 강조 · 임의 hex/px 하드코딩.
 
 ## Known Gaps / TODO

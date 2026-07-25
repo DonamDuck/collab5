@@ -60,7 +60,7 @@ export function RsvpBar({ cardId }: { cardId: number }) {
     return (
       <div className="mt-5 rounded-md bg-surface-soft px-4 py-3 text-center text-sm text-body">
         {done === "관심"
-          ? "관심을 전했어요 🌱 메이커에게 마음이 닿았어요."
+          ? "관심을 전했어요 🌱 브랜드에게 마음이 닿았어요."
           : "마음 전했어요. 다음에 더 좋은 인연으로 만나요."}
       </div>
     );

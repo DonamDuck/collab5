@@ -35,7 +35,7 @@ export default function PrivacyPage() {
         <Article title="2. 개인정보의 수집 및 이용 목적">
           <ul className="list-disc space-y-1 pl-5">
             <li>회원 식별 및 로그인, 본인 확인</li>
-            <li>브랜드 소개서 생성·공유 및 메이커 간 콜라보 연결 서비스 제공</li>
+            <li>브랜드 소개서 생성·공유 및 브랜드 간 콜라보 연결 서비스 제공</li>
             <li>고객 문의 응대 및 공지 전달</li>
             <li>서비스 개선 및 부정 이용 방지</li>
           </ul>

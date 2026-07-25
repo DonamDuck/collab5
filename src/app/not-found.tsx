@@ -18,7 +18,7 @@ export default function NotFound() {
           href="/search"
           className="flex h-12 w-full items-center justify-center rounded-md bg-primary text-base font-medium text-primary-on"
         >
-          메이커 찾아보기
+          브랜드 찾아보기
         </Link>
         <Link
           href="/"

@@ -22,7 +22,7 @@ export function SiteFooter() {
           </Link>
           <nav className="flex flex-wrap items-center gap-x-4 gap-y-2 text-[14px]">
             <Link href="/search" className="hover:text-ink">
-              메이커 찾기
+              브랜드 찾기
             </Link>
             <Link href="/register" className="hover:text-ink">
               브랜드 소개서
