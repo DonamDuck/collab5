@@ -76,6 +76,8 @@ create table brands (
   seeks_description  text    not null default '',    -- 찾는 파트너 서술 (구 seeks_note)
   trust              jsonb   not null default '{}',  -- 채널·위치 {instagram?, homepage?, address?, mapUrl?} — description은 위 컬럼으로 분리됨
   enrichment         jsonb,                          -- AI 크롤 스냅샷(고객이 선택한 칩만). 생성 시 기록·수정 시 보존
+  dna                jsonb,                          -- Brand DNA(파생 해석층) {summary, items:[{type,value,evidence}], created_at, updated_at}
+                                                     -- 리포트 요청 시 lazy 생성·갱신(stale = brands.updated_at > dna.updated_at). 사람이 직접 수정 안 함. 스펙 2026-07-25
   intro_file_url     text,                           -- 소개자료 PDF URL
   collab_open        boolean not null default true,  -- 콜라보 열림/닫힘
   search_visible     boolean not null default true,  -- 검색 노출 on/off
@@ -151,9 +153,24 @@ create index idx_collab_requests_brand on collab_requests(to_brand_id, created_a
 create index idx_collab_requests_from_brand on collab_requests(from_brand_id);
 alter table collab_requests enable row level security;
 
+-- ── AI 콜라보 분석 리포트 (append-only, 쌍 캐시) ──
+-- A(제안자)→B(상대) 관점 문서라 (A→B)와 (B→A)는 별개 리포트. 재생성 시 새 행(품질·A/B 추적).
+-- ⚠️ 프라이버시: 리포트는 요청자 전용 — RLS 잠금 + 앱에서 from=내 브랜드만 허용(대표 비준 07-25).
+create table collab_reports (
+  id            bigint generated always as identity primary key,
+  from_brand_id bigint not null references brands(id) on delete cascade,   -- 제안하는 쪽(요청자 소유)
+  to_brand_id   bigint not null references brands(id) on delete cascade,   -- 분석 대상
+  requested_by  bigint references users(user_id) on delete set null,
+  report        jsonb not null,                  -- 카드형 6조각 {oneLiner, matchPoints, ideas, steps, effects}
+  model         text not null,                   -- "gemini-2.5-flash" | "gemini-2.5-pro" (A/B 추적)
+  created_at    timestamptz not null default now()
+);
+create index idx_collab_reports_pair on collab_reports(from_brand_id, to_brand_id, created_at desc);
+alter table collab_reports enable row level security;
+
 -- ── 삭제 전파(CASCADE) 체인 ──
 --   auth.users ──CASCADE──▶ users ──CASCADE──▶ saved_brands
---                                 └─SET NULL─▶ brands.owner_user_id / collab_requests.from_user_id
+--                                 └─SET NULL─▶ brands.owner_user_id / collab_requests.from_user_id / collab_reports.requested_by
 --   brands ──CASCADE──▶ collab_cards ──CASCADE──▶ card_view_events / reactions
---          └─CASCADE──▶ saved_brands / collab_requests
+--          └─CASCADE──▶ saved_brands / collab_requests / collab_reports(from·to 양쪽)
 -- ⚠️ /my 삭제는 하드 DELETE가 아니라 status='inactive' 소프트 삭제라 CASCADE가 발동하지 않는다.
