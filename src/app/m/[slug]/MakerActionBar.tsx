@@ -22,7 +22,7 @@ export function MakerActionBar({
   homepage,
   contactEmail,
   senderName,
-  senderSlug,
+  viewerBrands = [],
 }: {
   slug: string;
   makerId: number;
@@ -32,8 +32,8 @@ export function MakerActionBar({
   instagram?: string;
   homepage?: string;
   contactEmail?: string; // 소유자 가입 이메일 — 채널(인스타/홈피) 없을 때 이메일 폴백
-  senderName?: string; // 제안자(로그인 유저) 상호 — 추천 메시지 인사말
-  senderSlug?: string; // 제안자의 첫 소개서 slug — 있으면 소개 링크 첨부
+  senderName?: string; // 제안자 상호 — 소개서 0개일 때 인사말 폴백
+  viewerBrands?: { id: number; slug: string; name: string }[]; // 제안자의 소개서들 — 어떤 걸로 제안할지 칩 선택
 }) {
   const [saved, setSaved] = useState(initialSaved);
   const [loginOpen, setLoginOpen] = useState(false);
@@ -41,21 +41,23 @@ export function MakerActionBar({
   const [proposeOpen, setProposeOpen] = useState(false);
   const [message, setMessage] = useState(""); // 추천 메시지(수정 가능)
   const [toast, setToast] = useState<string | null>(null); // 복사 완료 토스트(3종 통일)
+  const [selectedSlug, setSelectedSlug] = useState(viewerBrands[0]?.slug); // 함께 보낼 내 소개서
   const [pending, start] = useTransition();
 
   // 콜라보 연락 채널(인스타 DM 우선 → 홈페이지/카톡 → 없으면 null)
   const channel = resolveCollabChannel({ instagram, homepage });
+  const selectedBrand = viewerBrands.find((b) => b.slug === selectedSlug) ?? viewerBrands[0];
 
-  // 추천 메시지 기본값 — 제안자 상호로 인사, 소개서 있으면 링크 첨부. 시트 열릴 때 채운다.
+  // 추천 메시지 기본값 — 선택한 소개서 이름으로 인사·링크 첨부. 시트 열릴 때 / 소개서 바꿀 때 다시 채운다.
   useEffect(() => {
     if (!proposeOpen) return;
-    const hello = senderName ? `안녕하세요, ${senderName}입니다.` : "안녕하세요!";
+    const hello = selectedBrand ? `안녕하세요, ${selectedBrand.name}입니다.` : senderName ? `안녕하세요, ${senderName}입니다.` : "안녕하세요!";
     let msg = `${hello}\ncollab5에서 소개서를 보고 함께 재미있는 콜라보를 만들어볼 수 있을 것 같아 먼저 연락드렸어요.\n관심 있으시다면 편하실 때 답장 주시면 감사하겠습니다. 😊`;
-    if (senderSlug && typeof window !== "undefined") {
-      msg += `\n\n저희 소개도 함께 보내드려요.\n${window.location.origin}/m/${senderSlug}`;
+    if (selectedBrand && typeof window !== "undefined") {
+      msg += `\n\n저희 소개도 함께 보내드려요.\n${window.location.origin}/m/${selectedBrand.slug}`;
     }
     setMessage(msg);
-  }, [proposeOpen, senderName, senderSlug]);
+  }, [proposeOpen, senderName, selectedBrand?.slug, selectedBrand?.name]);
 
   // 로그인/가입으로 떠나기 직전, 무슨 의도였는지(찜/제안) 이 업체 기준으로 남긴다.
   const markPending = () => {
@@ -169,7 +171,7 @@ export function MakerActionBar({
     copyText(message);
     flash("✓ 메시지를 복사했어요.");
     window.open(channel.url, "_blank", "noopener,noreferrer");
-    recordCollabRequestAction(makerId, channel.channel).catch(() => {});
+    recordCollabRequestAction(makerId, channel.channel, selectedBrand?.id).catch(() => {});
     setProposeOpen(false);
   };
 
@@ -179,11 +181,12 @@ export function MakerActionBar({
     flash("✓ 메시지를 복사했어요.");
   };
 
-  // 이메일 폴백 Primary — 이메일 주소만 복사(채널 오픈 없음, 시트 유지 + 토스트).
+  // 이메일 폴백 Primary — 이메일 주소 복사(채널 오픈 없음, 시트 유지 + 토스트) + 계측.
   const copyEmailOnly = () => {
     if (!contactEmail) return;
     copyText(contactEmail);
     flash("✓ 이메일 주소를 복사했어요.");
+    recordCollabRequestAction(makerId, "email", selectedBrand?.id).catch(() => {});
   };
 
   const isInstagram = channel?.channel === "instagram";
@@ -201,6 +204,42 @@ export function MakerActionBar({
     loginReason === "propose"
       ? "로그인하면 마음에 드는 브랜드와 콜라보를 시작할 수 있어요."
       : "마음에 드는 브랜드를 저장해두고 언제든 다시 만나보세요.";
+
+  // 함께 보낼 내 소개서 — 0개=섹션 없음 / 1개=명시 / 2개+=브랜드명 칩 선택
+  const brandPicker =
+    viewerBrands.length === 0 ? null : (
+      <div className="mt-4 rounded-md border border-hairline bg-surface-soft p-3">
+        <p className="text-[13px] font-medium text-body">
+          함께 보낼 내 소개서{viewerBrands.length > 1 ? " (하나만 골라요)" : ""}
+        </p>
+        {viewerBrands.length > 1 ? (
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {viewerBrands.map((b) => {
+              const on = b.slug === selectedBrand?.slug;
+              return (
+                <button
+                  key={b.slug}
+                  type="button"
+                  onClick={() => setSelectedSlug(b.slug)}
+                  className={`h-8 rounded-pill px-3 text-[13px] font-medium transition-colors ${
+                    on ? "bg-primary text-primary-on" : "border border-border-strong bg-surface text-body"
+                  }`}
+                >
+                  {b.name}
+                </button>
+              );
+            })}
+          </div>
+        ) : (
+          <p className="mt-1 text-[15px] font-medium text-ink">🏷 {selectedBrand?.name}</p>
+        )}
+        {selectedBrand && (
+          <p className="mt-2 text-[12px] text-faint break-all">
+            {typeof window !== "undefined" ? window.location.origin : ""}/m/{selectedBrand.slug}
+          </p>
+        )}
+      </div>
+    );
 
   return (
     <>
@@ -292,6 +331,7 @@ export function MakerActionBar({
                   rows={7}
                   className="mt-1.5 w-full resize-none rounded-md border border-border-strong bg-surface-soft p-3 text-[14px] leading-relaxed text-ink focus:border-primary focus:outline-none"
                 />
+                {brandPicker}
                 <button
                   type="button"
                   onClick={proposeAndSend}
@@ -322,6 +362,7 @@ export function MakerActionBar({
                   rows={7}
                   className="mt-1.5 w-full resize-none rounded-md border border-border-strong bg-surface-soft p-3 text-[14px] leading-relaxed text-ink focus:border-primary focus:outline-none"
                 />
+                {brandPicker}
                 <button
                   type="button"
                   onClick={copyEmailOnly}

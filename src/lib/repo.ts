@@ -30,7 +30,7 @@ export interface Repo {
   setMakerSaved(userId: number, makerId: number, saved: boolean): Promise<void>;
   listSavedMakers(userId: number): Promise<Maker[]>;
   // 콜라보 제안 인텐트(append-only) — "콜라보 시작하기" 계측
-  recordCollabRequest(fromUserId: number | null, toBrandId: number, channel: string): Promise<void>;
+  recordCollabRequest(fromUserId: number | null, toBrandId: number, channel: string, fromBrandId?: number | null): Promise<void>;
 }
 
 const now = () => new Date().toISOString();
@@ -354,7 +354,7 @@ class InMemoryRepo implements Repo {
   private views: ViewEvent[] = [];
   private reactions: Reaction[] = [];
   private saved: { userId: number; makerId: number; createdAt: string }[] = [];
-  private collabRequests: { fromUserId: number | null; toBrandId: number; channel: string; createdAt: string }[] = [];
+  private collabRequests: { fromUserId: number | null; toBrandId: number; channel: string; fromBrandId: number | null; createdAt: string }[] = [];
   // 정수 시퀀스 카운터 (DB의 identity 흉내)
   private nextMakerId = this.makers.length + 1;
   private nextCardId = this.cards.length + 1;
@@ -453,8 +453,8 @@ class InMemoryRepo implements Repo {
       .map((s) => this.makers.find((m) => m.id === s.makerId && m.status !== "inactive"))
       .filter((m): m is Maker => !!m);
   }
-  async recordCollabRequest(fromUserId: number | null, toBrandId: number, channel: string): Promise<void> {
-    this.collabRequests.push({ fromUserId, toBrandId, channel, createdAt: now() });
+  async recordCollabRequest(fromUserId: number | null, toBrandId: number, channel: string, fromBrandId: number | null = null): Promise<void> {
+    this.collabRequests.push({ fromUserId, toBrandId, channel, fromBrandId, createdAt: now() });
   }
 }
 
@@ -667,8 +667,8 @@ class SupabaseRepo implements Repo {
     const byId = new Map((data ?? []).map((r) => [(r as MakerRow).id, rowToMaker(r as MakerRow)]));
     return ids.map((id) => byId.get(id)).filter((m): m is Maker => !!m);
   }
-  async recordCollabRequest(fromUserId: number | null, toBrandId: number, channel: string): Promise<void> {
-    await this.db.from("collab_requests").insert({ from_user_id: fromUserId, to_brand_id: toBrandId, channel });
+  async recordCollabRequest(fromUserId: number | null, toBrandId: number, channel: string, fromBrandId: number | null = null): Promise<void> {
+    await this.db.from("collab_requests").insert({ from_user_id: fromUserId, to_brand_id: toBrandId, channel, from_brand_id: fromBrandId });
   }
 }
 

@@ -140,13 +140,15 @@ alter table saved_brands enable row level security;
 -- ── 콜라보 제안 인텐트 (append-only) ──
 -- "콜라보 시작하기" 클릭 계측. P3(연락) 선행지표 = 북극성 퍼널 첫 계측 지점.
 create table collab_requests (
-  id           bigint generated always as identity primary key,
-  from_user_id bigint references users(user_id) on delete set null,          -- 구 from_user_uuid (비로그인 null)
-  to_brand_id  bigint not null references brands(id) on delete cascade,      -- 구 to_maker_id
-  channel      text not null,                   -- "instagram" | "homepage"
-  created_at   timestamptz not null default now()
+  id            bigint generated always as identity primary key,
+  from_user_id  bigint references users(user_id) on delete set null,          -- 구 from_user_uuid (비로그인 null)
+  from_brand_id bigint references brands(id) on delete set null,              -- 어떤 소개서로 제안했나(제안자 여럿일 때 선택값, nullable)
+  to_brand_id   bigint not null references brands(id) on delete cascade,      -- 구 to_maker_id
+  channel       text not null,                   -- "instagram" | "homepage" | "email"
+  created_at    timestamptz not null default now()
 );
 create index idx_collab_requests_brand on collab_requests(to_brand_id, created_at desc);
+create index idx_collab_requests_from_brand on collab_requests(from_brand_id);
 alter table collab_requests enable row level security;
 
 -- ── 삭제 전파(CASCADE) 체인 ──

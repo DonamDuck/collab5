@@ -30,8 +30,9 @@ export default async function MakerPage({
   ]);
   const isOwner = !!viewerUserId && maker.ownerUserId === viewerUserId;
   const logoUrl = ownerProfile?.profileImage || undefined;
-  const senderName = viewerProfile?.brandName || undefined; // 제안자 상호
-  const senderSlug = viewerMakers[0]?.slug; // 제안자의 첫 소개서(있으면 링크 첨부)
+  const senderName = viewerProfile?.brandName || undefined; // 제안자 상호(소개서 0개일 때 인사말 폴백)
+  // 제안자의 소개서들(이름+slug) — 제안 시트에서 "어떤 소개서로 보낼지" 칩 선택용
+  const viewerBrands = viewerMakers.map((m) => ({ id: m.id, slug: m.slug, name: m.name }));
   // 점유 가능 = 아직 소유 계정 없음(비회원 생성) + 관리 비번 존재(비번으로 점유 검증 가능).
   // 이미 소유(회원 생성 or 점유됨)면 버튼 미노출. 비번 없는 익명 소개서는 점유 불가라 미노출.
   const claimable = !maker.ownerUserId && !!maker.editPasswordHash;
@@ -79,7 +80,7 @@ export default async function MakerPage({
         homepage={maker.trust.homepage}
         contactEmail={ownerProfile?.email || undefined}
         senderName={senderName}
-        senderSlug={senderSlug}
+        viewerBrands={viewerBrands}
       />
     </main>
   );

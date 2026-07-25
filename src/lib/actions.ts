@@ -347,12 +347,13 @@ export async function setMakerSavedAction(
 /** 콜라보 제안 인텐트 기록 — "콜라보 시작하기" 계측. 로그인 필수(누가→누구 방향 시그널). */
 export async function recordCollabRequestAction(
   toBrandId: number,
-  channel: string
+  channel: string,
+  fromBrandId?: number // 어떤 소개서로 제안했나(제안자가 여럿일 때 선택값)
 ): Promise<{ error?: string }> {
   const sessionUserId = await getSessionUserId();
   if (!sessionUserId) return { error: "콜라보를 시작하려면 로그인이 필요해요." };
   try {
-    await repo.recordCollabRequest(sessionUserId, toBrandId, channel);
+    await repo.recordCollabRequest(sessionUserId, toBrandId, channel, fromBrandId ?? null);
     return {};
   } catch {
     return { error: "기록에 실패했어요." };
