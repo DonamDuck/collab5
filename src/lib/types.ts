@@ -132,3 +132,19 @@ export interface Reaction {
   type: "관심" | "패스";
   createdAt: string;
 }
+
+/** Brand DNA — 소개서에서 뽑아낸 파생 해석층(사실 원본 아님), lazy 생성·캐싱.
+ *  value는 반드시 dna-pool.ts의 Pool 어휘 안에서만. evidence=소개서 실제 문구 인용. 스펙 2026-07-25 */
+export interface DnaItem { type: string; value: string; evidence: string; }
+export interface BrandDna { summary: string; items: DnaItem[]; created_at: string; updated_at: string; }
+
+/** AI 콜라보 분석 리포트 — 카드형 6조각(⑥ CTA는 UI 고정 문구라 데이터 없음) */
+export interface ReportMatchPoint { text: string; }           // ② 접점 (선발 통과분)
+export interface ReportIdea { title: string; desc: string; method: string; } // ③ method=collabMethod 어휘
+export interface CollabReportData {
+  oneLiner: string;                 // ① 한 줄 결론
+  matchPoints: ReportMatchPoint[];  // ② 2~4개
+  ideas: ReportIdea[];              // ③ 1~3개
+  steps: string[];                  // ④ 최대 4
+  effects: string[];                // ⑤ 2~3개
+}
