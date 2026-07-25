@@ -37,6 +37,12 @@ MODIFY src/app/m/[slug]/page.tsx                 (ReportSheet용 props)
 
 공통 규칙: 커밋은 만진 파일만 `git add <경로>`. push 전 `npx tsc --noEmit` + `npm run build`. 각 커밋 끝에 `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`.
 
+**⚠️브랜치 격리(레드팀 Gate3-C1)**: T2 시작 전 `git checkout -b feat/collab-report` — **전 태스크를 이 브랜치에서** 진행(main은 push=deploy 공유라 미푸시 커밋 장기 체류 금지 — 중간 핫픽스 시 반쪽 기능 유출·2팀 병합 리베이스 충돌 방지). T12에서 main 리베이스 병합 후 push. T1(schema.sql)만 main 직커밋 가능(즉시 push하는 문서 변경).
+
+**게이트 대기 중 병행(레드팀 Gate3-N4)**: T4 대표 리뷰 대기 동안 프롬프트 비의존 태스크(T5 repo·T8 시트 골격·T10 계측) 선진행 가능 — T6·T7만 프롬프트 확정 후.
+
+**대표 접점 3회로 압축**: ①T1 SQL ②T4 프롬프트 리뷰 ③T12 배포 QA(+샘플 품질 확인 — T11의 품질 확인을 여기로 흡수)·T13 A/B 판정.
+
 ---
 
 ## Task 1: DB — 대표 SQL 게이트 + schema.sql 갱신
@@ -62,6 +68,7 @@ alter table collab_reports enable row level security;
 ```
 2. `supabase/schema.sql`: brands 테이블 정의에 `dna jsonb,` 컬럼(주석: "Brand DNA — 파생 해석층, lazy 생성. 스펙 2026-07-25") 추가 + 파일 끝 collab_requests 블록 아래에 위 collab_reports 블록 추가.
 3. Verify: 대표 "실행 완료" 회신 + `grep -c "collab_reports\|dna jsonb" supabase/schema.sql` ≥ 2.
+   **✅프라이버시 집행 체크(레드팀 Gate3-C3)**: SQL에 `alter table collab_reports enable row level security;` 포함 확인(정책 0 = anon 전면 잠금 = 서버만 접근) + T7의 "from은 내 브랜드만" 검증이 앱 레이어 집행 — 이 두 줄이 비준된 "요청자 전용" 약속의 실제 집행 지점.
 4. Commit: `docs(db): brands.dna + collab_reports — 콜라보 리포트 스키마 (대표 SQL 실행 완료)`
 
 **Expected output:** prod에 두 스키마 존재, schema.sql 정본 일치.
@@ -356,8 +363,9 @@ export function track(event: string, params?: Record<string, string | number | b
 **Goal:** 무소개서 티저용 고정본.
 
 **Steps:**
-1. `scripts/generate-sample-report.ts` — `repo.getMakerBySlug(DEMO_SLUG_PHOTO)`·`(DEMO_SLUG_NONE)` 두 데모를 A·B로 `generateDna`+`generateReport` 실행, 결과를 `src/lib/sample-report.json`에 `{ fromName, toName, report }`로 저장. 실행: `npx tsx scripts/generate-sample-report.ts`(env에 `GEMINI_API_KEY`·`SUPABASE_URL`·`SUPABASE_SERVICE_ROLE_KEY` 필요 — `.env.local`에 없으면 대표에게 실행 요청).
-2. 생성물 품질을 채팅으로 대표에게 1회 확인(예시로 부끄럽지 않은지). 어색하면 재실행.
+1. **사전 검증(레드팀 Gate3-C2)**: 스크립트가 먼저 두 데모의 DNA를 생성해 thin 가드 통과 여부 출력 — `m-demo-none`(사진 없는 데모)이 thin이면 **폴백 쌍 = 캔버스가든(1호 테스트베드) × 호락호락 도서관**(둘 다 리치 실브랜드)으로 자동 전환.
+2. `scripts/generate-sample-report.ts` — 선정 쌍을 A·B로 `generateDna`+`generateReport` 실행, 결과를 `src/lib/sample-report.json`에 `{ fromName, toName, report }`로 저장. 실행: `npx tsx scripts/generate-sample-report.ts`(env에 `GEMINI_API_KEY`·`SUPABASE_URL`·`SUPABASE_SERVICE_ROLE_KEY` 필요 — `.env.local`에 없으면 대표에게 실행 요청). **이 실행이 배포 전 유일한 실 Gemini 스모크 테스트**이므로 반드시 T12 이전에.
+3. 생성물 품질 확인은 T12 대표 QA 세션에 흡수(별도 STOP 아님).
 3. Commit: `feat(report): 샘플 리포트 고정본 (데모 쌍, 예시 라벨용)`
 
 **Expected output:** sample-report.json 커밋됨, ReportSheet sampleMode가 이를 렌더.
