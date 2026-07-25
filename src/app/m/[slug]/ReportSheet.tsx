@@ -6,6 +6,7 @@
 // 스펙: docs/superpowers/specs/2026-07-25-collab-report-dna-design.md §4·§5
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ScrollLock } from "@/components/ScrollLock";
+import { track } from "@/lib/track";
 import type { CollabReportData } from "@/lib/types";
 import sampleData from "@/lib/sample-report.json";
 
@@ -71,13 +72,25 @@ export function ReportSheet({
           if (!res.ok || !data || typeof data.state !== "string") {
             setPhase("error");
           } else if (data.state === "thin") {
-            setThin({ side: data.side === "to" ? "to" : "from", distinctTypes: data.distinctTypes });
+            const side: "from" | "to" = data.side === "to" ? "to" : "from";
+            setThin({ side, distinctTypes: data.distinctTypes });
             setPhase("thin");
+            track("report_thin_blocked", { side, distinct_types: data.distinctTypes ?? 0 });
           } else if (data.state === "no_match") {
             setPhase("no_match");
+            track("report_no_match");
           } else if (data.state === "ok" && data.report) {
-            setResult(data as OkPayload);
+            const ok = data as OkPayload;
+            setResult(ok);
             setPhase("ok");
+            track("report_view", { cache_hit: ok.cached });
+            if (ok.cached === false) {
+              track("report_generated", {
+                duration_ms: ok.durationMs ?? 0,
+                model: ok.model,
+                dna_calls: ok.dnaCalls ?? 0,
+              });
+            }
           } else {
             setPhase("error");
           }
@@ -98,6 +111,11 @@ export function ReportSheet({
     if (!open || sampleMode || !selected?.slug) return;
     run(selected.slug);
   }, [open, sampleMode, selected?.slug, run]);
+
+  // 샘플 모드(잠금 티저) 오픈 계측 — 무소개서 퍼널 시작점
+  useEffect(() => {
+    if (open && sampleMode) track("report_locked_view");
+  }, [open, sampleMode]);
 
   // 로딩 카피 3단 순환(4초 간격)
   useEffect(() => {
@@ -182,7 +200,10 @@ export function ReportSheet({
           <p className="text-center text-[15px] font-medium text-ink">이 제안이 마음에 드셨나요? ✨</p>
           <button
             type="button"
-            onClick={onPropose}
+            onClick={() => {
+              track("report_cta_propose"); // 리포트→제안 전환 = P1→P3 퍼널 핵심 지표
+              onPropose();
+            }}
             className="mt-3 flex h-12 w-full items-center justify-center rounded-md bg-primary text-base font-medium text-primary-on"
           >
             이 내용으로 협업 제안 보내기
@@ -253,6 +274,7 @@ export function ReportSheet({
               </p>
               <a
                 href="/register"
+                onClick={() => track("wizard_start_from_report")}
                 className="mt-3 flex h-12 w-full items-center justify-center rounded-md bg-primary text-base font-medium text-primary-on"
               >
                 내 소개서 만들기
