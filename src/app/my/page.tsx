@@ -19,10 +19,11 @@ export default async function MyPage({ searchParams }: { searchParams: Promise<{
   const initialTab = tab === "saved" ? "saved" : "mine";
 
   // 프로필·내 소개서·찜 목록은 서로 독립 조회 — 병렬로 가져와 왕복 단축
-  const [profile, makers, saved] = await Promise.all([
-    getProfile(user.id),
-    repo.listMakersByOwner(user.id),
-    repo.listSavedMakers(user.id),
+  // 소유·찜 조회는 정수 profiles.user_id 기준(07-25 전환) — 프로필을 먼저 풀고 목록을 병렬 조회.
+  const profile = await getProfile(user.id);
+  const [makers, saved] = await Promise.all([
+    profile ? repo.listMakersByOwner(profile.id) : Promise.resolve([]),
+    profile ? repo.listSavedMakers(profile.id) : Promise.resolve([]),
   ]);
   const displayName = profile?.brandName || user.email?.split("@")[0] || "내 브랜드";
 

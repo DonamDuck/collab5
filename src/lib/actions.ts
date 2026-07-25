@@ -4,6 +4,7 @@ import { createClient } from "@supabase/supabase-js";
 import { repo } from "./repo";
 import { deriveRegion } from "./region";
 import { getSessionUser } from "./supabase/server";
+import { getSessionUserId } from "./profiles";
 import { updateProfileImage } from "./profiles";
 import { sha256 } from "./hash";
 import { mapLinkLabel } from "./links";
@@ -87,7 +88,8 @@ export async function createMakerAction(
   input: RegisterInput
 ): Promise<{ slug: string }> {
   const user = await getSessionUser();
-  const ownerUserId = user?.id;
+  // 소유권은 정수 profiles.user_id 기준(07-25 전환). profiles 없으면 미소유로 떨어진다.
+  const ownerUserId = (await getSessionUserId()) ?? undefined;
   const editPasswordHash =
     !user && input.editPassword?.trim() ? sha256(input.editPassword.trim()) : undefined;
   const maker = await repo.createMaker({
@@ -183,10 +185,10 @@ export async function searchAction(q: string): Promise<Maker[]> {
 /** 등록 폼 '사진 없는 소개서 예시보기' 바텀시트용 — 텍스트 데모 소개서(고정 slug) 조회. 유료 콜 없음(DB 1회). */
 export async function getPreviewDemoNoneAction(): Promise<{ maker: Maker; logoUrl: string | null } | null> {
   const { DEMO_SLUG_NONE } = await import("./demo");
-  const { getProfile } = await import("./profiles");
+  const { getProfileById } = await import("./profiles");
   const maker = await repo.getMakerBySlug(DEMO_SLUG_NONE);
   if (!maker) return null;
-  const logoUrl = maker.ownerUserId ? (await getProfile(maker.ownerUserId))?.profileImage ?? null : null;
+  const logoUrl = maker.ownerUserId ? (await getProfileById(maker.ownerUserId))?.profileImage ?? null : null;
   return { maker, logoUrl };
 }
 
@@ -211,8 +213,8 @@ export async function verifyMakerPasswordAction(
 ): Promise<{ ok: boolean }> {
   const maker = await repo.getMakerBySlug(slug);
   if (!maker) return { ok: false };
-  const user = await getSessionUser();
-  if (user && maker.ownerUserId === user.id) return { ok: true };
+  const sessionUserId = await getSessionUserId();
+  if (sessionUserId && maker.ownerUserId === sessionUserId) return { ok: true };
   if (maker.editPasswordHash && sha256(password.trim()) === maker.editPasswordHash) return { ok: true };
   return { ok: false };
 }
@@ -222,16 +224,16 @@ export async function claimMakerAction(
   slug: string,
   password: string
 ): Promise<{ error?: string }> {
-  const user = await getSessionUser();
-  if (!user) return { error: "로그인이 필요해요." };
+  const sessionUserId = await getSessionUserId();
+  if (!sessionUserId) return { error: "로그인이 필요해요." };
   const maker = await repo.getMakerBySlug(slug);
   if (!maker) return { error: "소개서를 찾을 수 없어요." };
-  if (maker.ownerUserId && maker.ownerUserId !== user.id)
+  if (maker.ownerUserId && maker.ownerUserId !== sessionUserId)
     return { error: "이미 다른 계정에 연결된 소개서예요." };
   if (!maker.ownerUserId) {
     if (!maker.editPasswordHash || sha256(password.trim()) !== maker.editPasswordHash)
       return { error: "비밀번호가 일치하지 않아요." };
-    await repo.setMakerOwner(slug, user.id);
+    await repo.setMakerOwner(slug, sessionUserId);
   }
   return {};
 }
@@ -257,8 +259,8 @@ export async function updateMakerAction(
 ): Promise<{ error?: string; slug?: string }> {
   const maker = await repo.getMakerBySlug(slug);
   if (!maker) return { error: "소개서를 찾을 수 없어요." };
-  const user = await getSessionUser();
-  const isOwner = !!user && maker.ownerUserId === user.id;
+  const sessionUserId = await getSessionUserId();
+  const isOwner = !!sessionUserId && maker.ownerUserId === sessionUserId;
   const pwOk =
     !!maker.editPasswordHash && !!password && sha256(password.trim()) === maker.editPasswordHash;
   if (!isOwner && !pwOk) return { error: "수정 권한이 없어요." };
@@ -317,11 +319,11 @@ export async function updateMakerFlagsAction(
   slug: string,
   flags: { collabOpen?: boolean; searchVisible?: boolean }
 ): Promise<{ error?: string }> {
-  const user = await getSessionUser();
-  if (!user) return { error: "로그인이 필요해요." };
+  const sessionUserId = await getSessionUserId();
+  if (!sessionUserId) return { error: "로그인이 필요해요." };
   const maker = await repo.getMakerBySlug(slug);
   if (!maker) return { error: "소개서를 찾을 수 없어요." };
-  if (maker.ownerUserId !== user.id) return { error: "권한이 없어요." };
+  if (maker.ownerUserId !== sessionUserId) return { error: "권한이 없어요." };
   const updated = await repo.setMakerFlags(slug, flags);
   if (!updated) return { error: "저장에 실패했어요." };
   return {};
@@ -332,10 +334,10 @@ export async function setMakerSavedAction(
   makerId: number,
   saved: boolean
 ): Promise<{ error?: string }> {
-  const user = await getSessionUser();
-  if (!user) return { error: "찜하려면 로그인이 필요해요." };
+  const sessionUserId = await getSessionUserId();
+  if (!sessionUserId) return { error: "찜하려면 로그인이 필요해요." };
   try {
-    await repo.setMakerSaved(user.id, makerId, saved);
+    await repo.setMakerSaved(sessionUserId, makerId, saved);
     return {};
   } catch {
     return { error: "저장에 실패했어요." };
@@ -347,10 +349,10 @@ export async function recordCollabRequestAction(
   toMakerId: number,
   channel: string
 ): Promise<{ error?: string }> {
-  const user = await getSessionUser();
-  if (!user) return { error: "콜라보를 시작하려면 로그인이 필요해요." };
+  const sessionUserId = await getSessionUserId();
+  if (!sessionUserId) return { error: "콜라보를 시작하려면 로그인이 필요해요." };
   try {
-    await repo.recordCollabRequest(user.id, toMakerId, channel);
+    await repo.recordCollabRequest(sessionUserId, toMakerId, channel);
     return {};
   } catch {
     return { error: "기록에 실패했어요." };
@@ -361,8 +363,8 @@ export async function recordCollabRequestAction(
 export async function deleteMakerAction(slug: string): Promise<{ error?: string }> {
   const maker = await repo.getMakerBySlug(slug);
   if (!maker) return { error: "소개서를 찾을 수 없어요." };
-  const user = await getSessionUser();
-  if (!user || maker.ownerUserId !== user.id) return { error: "삭제 권한이 없어요." };
+  const sessionUserId = await getSessionUserId();
+  if (!sessionUserId || maker.ownerUserId !== sessionUserId) return { error: "삭제 권한이 없어요." };
   await repo.deleteMaker(slug);
   return {};
 }

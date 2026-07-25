@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { headers } from "next/headers";
 import { repo } from "@/lib/repo";
 import { getSessionUser } from "@/lib/supabase/server";
-import { getProfile } from "@/lib/profiles";
+import { getProfile, getProfileById } from "@/lib/profiles";
 import { MakerArticle } from "./MakerArticle";
 import { ConnectProfileButton } from "./ConnectProfileButton";
 import { MakerActionBar } from "./MakerActionBar";
@@ -20,13 +20,15 @@ export default async function MakerPage({
   const user = await getSessionUser();
   // 소유 계정 프로필(로고) + 찜 여부 + 제안자(로그인 유저) 본인 프로필·소개서를 병렬 조회.
   // 제안자 상호·소개 링크 = 콜라보 제안 시트의 추천 메시지 프리필용.
-  const [ownerProfile, initialSaved, viewerProfile, viewerMakers] = await Promise.all([
-    maker.ownerUserId ? getProfile(maker.ownerUserId) : Promise.resolve(null),
-    user ? repo.isMakerSaved(user.id, maker.id) : Promise.resolve(false),
-    user ? getProfile(user.id) : Promise.resolve(null),
-    user ? repo.listMakersByOwner(user.id) : Promise.resolve([]),
+  // 소유권·찜은 정수 profiles.user_id 기준(07-25 전환) — 세션 프로필을 먼저 풀고 나머지를 병렬 조회.
+  const viewerProfile = user ? await getProfile(user.id) : null;
+  const viewerUserId = viewerProfile?.id;
+  const [ownerProfile, initialSaved, viewerMakers] = await Promise.all([
+    maker.ownerUserId ? getProfileById(maker.ownerUserId) : Promise.resolve(null),
+    viewerUserId ? repo.isMakerSaved(viewerUserId, maker.id) : Promise.resolve(false),
+    viewerUserId ? repo.listMakersByOwner(viewerUserId) : Promise.resolve([]),
   ]);
-  const isOwner = !!user && maker.ownerUserId === user.id;
+  const isOwner = !!viewerUserId && maker.ownerUserId === viewerUserId;
   const logoUrl = ownerProfile?.profileImage || undefined;
   const senderName = viewerProfile?.brandName || undefined; // 제안자 상호
   const senderSlug = viewerMakers[0]?.slug; // 제안자의 첫 소개서(있으면 링크 첨부)

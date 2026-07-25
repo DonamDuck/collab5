@@ -93,7 +93,7 @@ export interface Maker {
   collabOpen: boolean; // 콜라보 열림/닫힘 토글
   searchVisible: boolean; // 검색 결과 노출 on/off (DB=search_visible, 기본 true)
   status: MakerStatus; // active=정상 / inactive=소프트 삭제(전 노출면 비노출, DB 보관). DB=status, 기본 active
-  ownerUserId?: string; // 소유 계정(로그인 생성/연결 시) — auth.users UUID
+  ownerUserId?: number; // 소유 계정 = profiles.user_id(정수). 07-25 auth uuid→user_id 전환
   editPasswordHash?: string; // 수정 비밀번호 해시(비회원 생성 시). DB=claim_token_hash
   createdAt: string; // ISO (DB timestamptz)
   updatedAt?: string; // ISO (수정 시 자동 갱신)
