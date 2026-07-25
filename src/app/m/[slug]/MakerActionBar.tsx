@@ -227,15 +227,13 @@ export function MakerActionBar({
               role="switch"
               aria-checked={saved}
               aria-label={saved ? "찜 해제" : "찜하기"}
-              className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-md border transition-colors ${
-                saved
-                  ? "border-red-200 bg-red-50 text-red-500"
-                  : "border-border-strong bg-surface text-faint hover:text-body"
+              className={`flex h-12 w-12 shrink-0 items-center justify-center transition-colors ${
+                saved ? "text-red-500" : "text-faint hover:text-body"
               }`}
             >
               <svg
                 viewBox="0 0 24 24"
-                className="h-6 w-6"
+                className="h-8 w-8"
                 fill={saved ? "currentColor" : "none"}
                 stroke="currentColor"
                 strokeWidth="1.8"
