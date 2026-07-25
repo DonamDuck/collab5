@@ -702,17 +702,23 @@ class SupabaseRepo implements Repo {
     return (data?.dna as BrandDna) ?? null;
   }
   async setBrandDna(brandId: number, dna: BrandDna): Promise<void> {
-    await this.db.from("brands").update({ dna }).eq("id", brandId); // ⚠️ updated_at 트리거가 brands를 건드리므로
-  }                                                                //    stale 판정은 DNA_STALE_SLACK_MS 허용 오차로 비교
+    // ⚠️ updated_at 트리거가 brands를 건드리므로 stale 판정은 DNA_STALE_SLACK_MS 허용 오차로 비교.
+    // 쓰기 실패를 삼키면 "DNA가 매번 없음 → 매 요청 재생성 → 캐시 영구 미스"가 조용히 성립한다.
+    const { error } = await this.db.from("brands").update({ dna }).eq("id", brandId);
+    if (error) console.error(`[repo] setBrandDna failed brand=${brandId}: ${error.message}`);
+  }
   async getLatestCollabReport(fromBrandId: number, toBrandId: number) {
-    const { data } = await this.db.from("collab_reports").select("report, model, created_at")
+    const { data, error } = await this.db.from("collab_reports").select("report, model, created_at")
       .eq("from_brand_id", fromBrandId).eq("to_brand_id", toBrandId)
       .order("created_at", { ascending: false }).limit(1).maybeSingle();
+    if (error) console.error(`[repo] getLatestCollabReport failed ${fromBrandId}→${toBrandId}: ${error.message}`);
     return data ? { report: data.report as CollabReportData, model: data.model as string, createdAt: data.created_at as string } : null;
   }
   async insertCollabReport(r: { fromBrandId: number; toBrandId: number; requestedBy: number | null; report: CollabReportData; model: string }): Promise<void> {
-    await this.db.from("collab_reports").insert({ from_brand_id: r.fromBrandId, to_brand_id: r.toBrandId,
+    // 실패를 삼키면 캐시 행이 영영 안 쌓여 매 요청이 풀 생성이 된다(느림의 유력 원인).
+    const { error } = await this.db.from("collab_reports").insert({ from_brand_id: r.fromBrandId, to_brand_id: r.toBrandId,
       requested_by: r.requestedBy, report: r.report, model: r.model });
+    if (error) console.error(`[repo] insertCollabReport failed ${r.fromBrandId}→${r.toBrandId}: ${error.message}`);
   }
 }
 

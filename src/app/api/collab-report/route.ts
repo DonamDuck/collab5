@@ -93,6 +93,12 @@ export async function POST(req: Request) {
       });
     }
 
+    // 캐시 미스 사유 관측 — "저장본 없음"인지 "DNA가 리포트보다 최신"인지 로그로 즉시 구분.
+    console.log(
+      `[collab-report] cache-miss ${from.slug}→${to.slug} force=${force} ` +
+        `latest=${latest?.createdAt ?? "none"} fromDna=${fromDna.updated_at} toDna=${toDna.updated_at} dnaCalls=${dnaCalls}`
+    );
+
     // ⑦ 리포트 생성 → 접점<2 또는 아이디어 0개면 no_match(정직한 빈손)
     const model = modelOverride || REPORT_MODEL();
     const { report, candidates } = await generateReport(from, fromDna, to, toDna, model);
