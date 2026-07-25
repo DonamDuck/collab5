@@ -5,7 +5,7 @@
 import { NextResponse } from "next/server";
 import { repo } from "@/lib/repo";
 import { getSessionUserId } from "@/lib/profiles";
-import { generateDna, generateReport, isDnaStale, isThin } from "@/lib/collab-report";
+import { generateDna, generateReport, isDnaStale, isThin, REPORT_MODEL } from "@/lib/collab-report";
 import { distinctTypeCount } from "@/lib/dna-pool";
 import type { BrandDna, Maker } from "@/lib/types";
 
@@ -94,7 +94,7 @@ export async function POST(req: Request) {
     }
 
     // ⑦ 리포트 생성 → 접점<2 또는 아이디어 0개면 no_match(정직한 빈손)
-    const model = modelOverride || process.env.REPORT_MODEL || "gemini-2.5-flash";
+    const model = modelOverride || REPORT_MODEL();
     const { report, candidates } = await generateReport(from, fromDna, to, toDna, model);
     // 관측 로그(Vercel stdout) — 후보 전체+점수·선발 결과. 채점 기준 튜닝 근거(스펙 "탈락 후보 축적"의 v1).
     console.log(

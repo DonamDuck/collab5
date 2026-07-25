@@ -19,8 +19,10 @@ import {
 } from "./dna-pool";
 import type { Block, BrandDna, CollabReportData, DnaItem, Maker } from "./types";
 
-const REPORT_MODEL = () => process.env.REPORT_MODEL || "gemini-2.5-flash";
-const DNA_MODEL = "gemini-2.5-flash"; // DNA는 flash 고정(스펙)
+// 리포트 모델: 대표 블라인드 A/B(07-26)에서 3.6-flash가 2.5-flash·3.1-pro를 모두 이김.
+// ⚠️ 3.x 계열은 temperature/top_p/top_k 지원 중단 — 리포트 호출에는 샘플링 파라미터를 넘기지 않는다.
+export const REPORT_MODEL = () => process.env.REPORT_MODEL || "gemini-3.6-flash";
+const DNA_MODEL = "gemini-2.5-flash"; // DNA는 flash 고정(스펙) — 2.5 계열이라 temperature 유지
 const ai = () => new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
 const hasKey = () => !!process.env.GEMINI_API_KEY;
 
@@ -330,7 +332,6 @@ export async function generateReport(
       systemInstruction: REPORT_SYSTEM,
       responseMimeType: "application/json",
       responseSchema: REPORT_SCHEMA,
-      temperature: 0.6,
     },
   });
   const p = JSON.parse(res.text ?? "{}") as {
