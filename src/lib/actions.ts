@@ -50,15 +50,15 @@ export interface RegisterInput {
   oneLiner: string;
   offers: CollabType[];
   seeks: CollabType[];
-  values: string[]; // 분위기칩(우리를 표현하는 말)
+  keywords: string[]; // 브랜드를 표현하는 키워드 칩
   targetAudience: string[]; // 이런 분들과 만나요
   collabHistory: HistoryWire[]; // 함께한 콜라보
   story?: string;
   activities?: ActivityWire[];
-  offersNote?: string;
-  seeksNote?: string;
+  offersDescription?: string;
+  seeksDescription?: string;
   photos?: PhotoWire[]; // 브랜드 사진(리사이즈 data URL, 객체 래핑)
-  blocks?: Block[]; // 선택 블록(사진=Storage URL이라 그대로 전송)
+  showcases?: Block[]; // 선택 블록(사진=Storage URL이라 그대로 전송)
   introFileUrl?: string; // 소개자료 PDF URL
   collabOpen: boolean;
   searchVisible: boolean; // 검색 결과 노출 on/off
@@ -113,12 +113,12 @@ export async function createMakerAction(
       photos: unwrapPhotos(a.photos),
       link: sanitizePressLink(a.link),
     })),
-    offersNote: input.offersNote?.trim() ?? "",
-    seeksNote: input.seeksNote?.trim() ?? "",
+    offersDescription: input.offersDescription?.trim() ?? "",
+    seeksDescription: input.seeksDescription?.trim() ?? "",
     photos: unwrapPhotos(input.photos),
-    blocks: sanitizeBlocks(input.blocks),
+    showcases: sanitizeBlocks(input.showcases),
     introFileUrl: input.introFileUrl?.trim() || undefined,
-    soul: { values: input.values },
+    keywords: input.keywords,
     trust: {
       instagram: input.instagram?.trim() || undefined,
       homepage: input.homepage?.trim() || undefined,
@@ -279,12 +279,12 @@ export async function updateMakerAction(
     activities: (input.activities ?? []).map((a) => ({
       title: a.title, desc: a.desc, photos: unwrapPhotos(a.photos), link: sanitizePressLink(a.link),
     })),
-    offersNote: input.offersNote?.trim() ?? "",
-    seeksNote: input.seeksNote?.trim() ?? "",
+    offersDescription: input.offersDescription?.trim() ?? "",
+    seeksDescription: input.seeksDescription?.trim() ?? "",
     photos: unwrapPhotos(input.photos),
-    blocks: sanitizeBlocks(input.blocks),
+    showcases: sanitizeBlocks(input.showcases),
     introFileUrl: input.introFileUrl?.trim() || undefined,
-    soul: { values: input.values },
+    keywords: input.keywords,
     trust: {
       instagram: input.instagram?.trim() || undefined,
       homepage: input.homepage?.trim() || undefined,

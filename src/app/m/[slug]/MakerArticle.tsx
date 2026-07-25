@@ -107,12 +107,12 @@ export function MakerArticle({ maker, isOwner, logoUrl, readOnly }: {
       )}
 
       {/* 선택 블록 — 배열 순서대로 렌더 */}
-      {maker.blocks.length > 0 && <BlockSections blocks={maker.blocks} Section={Section} />}
+      {maker.showcases.length > 0 && <BlockSections blocks={maker.showcases} Section={Section} />}
 
       {/* ⑤⑥ 통폐합(2026-07-22) — 콜라보 3형제: 기대(통합 칩)·제공·파트너를 같은 타이틀 위계로.
           제공·파트너 제목도 Section h2와 동일 스타일(대표 확정), 블록 간격은 활동 아이템 간격(space-y-6).
           기존 소개서도 합집합 읽기로 그대로 정상 렌더(분기 없음). */}
-      {(maker.offers.length > 0 || maker.seeks.length > 0 || maker.offersNote || maker.seeksNote) && (
+      {(maker.offers.length > 0 || maker.seeks.length > 0 || maker.offersDescription || maker.seeksDescription) && (
         <Section title="이런 콜라보를 기대하고 있어요">
           <div className="space-y-6">
             {(maker.offers.length > 0 || maker.seeks.length > 0) && (
@@ -122,19 +122,19 @@ export function MakerArticle({ maker, isOwner, logoUrl, readOnly }: {
                 ))}
               </div>
             )}
-            {maker.offersNote && (
+            {maker.offersDescription && (
               <div className="print:break-inside-avoid">
                 <h2 className="mb-4 text-[21px] font-bold leading-snug tracking-tight text-ink print:break-after-avoid-page">이런 콜라보를 제공할 수 있어요</h2>
                 <p className="whitespace-pre-line text-[17px] leading-relaxed text-body">
-                  {maker.offersNote}
+                  {maker.offersDescription}
                 </p>
               </div>
             )}
-            {maker.seeksNote && (
+            {maker.seeksDescription && (
               <div className="print:break-inside-avoid">
                 <h2 className="mb-4 text-[21px] font-bold leading-snug tracking-tight text-ink print:break-after-avoid-page">이런 파트너를 찾고 있어요</h2>
                 <p className="whitespace-pre-line text-[17px] leading-relaxed text-body">
-                  {maker.seeksNote}
+                  {maker.seeksDescription}
                 </p>
               </div>
             )}
@@ -154,10 +154,10 @@ export function MakerArticle({ maker, isOwner, logoUrl, readOnly }: {
       )}
 
       {/* ⑧ 우리를 표현하는 키워드에요 — values */}
-      {maker.soul.values.length > 0 && (
+      {maker.keywords.length > 0 && (
         <Section title="우리를 표현하는 키워드에요">
           <div className="flex flex-wrap gap-2">
-            {maker.soul.values.map((v) => (
+            {maker.keywords.map((v) => (
               <span
                 key={v}
                 className="inline-flex h-9 items-center rounded-sm bg-mint-pale px-3 text-[15px] font-medium text-mint-on"

@@ -846,7 +846,7 @@ function RegisterForm() {
       setOneLiner(m.oneLiner);
       setDescription(m.trust.description ?? "");
       setStory(m.story ?? "");
-      setValues(m.soul.values ?? []);
+      setValues(m.keywords ?? []);
       setActivities(
         (m.activities.length ? m.activities : [{ title: "", desc: "", photos: [] }]).map((a) => ({
           title: a.title, desc: a.desc, photos: a.photos.map((u) => ({ url: u })), link: a.link ?? "",
@@ -855,8 +855,8 @@ function RegisterForm() {
       // 통합 마이그레이션(2026-07-22): 기존 소개서의 seeks 칩을 offers에 흡수해 로드 → 저장 시 자연 수렴
       setOffers([...new Set([...m.offers, ...m.seeks])] as CollabType[]);
       setSeeks([]);
-      setOffersNote(m.offersNote ?? "");
-      setSeeksNote(m.seeksNote ?? "");
+      setOffersNote(m.offersDescription ?? "");
+      setSeeksNote(m.seeksDescription ?? "");
       setTargetAudience(m.targetAudience ?? []);
       setCollabHistory(
         (m.collabHistory.length
@@ -874,7 +874,7 @@ function RegisterForm() {
       setCollabOpen(m.collabOpen);
       setSearchVisible(m.searchVisible ?? true);
       setPhotos(m.photos.map((u) => ({ url: u })));
-      setBlocks((m.blocks ?? []).map((b) => ({ ...b, uid: crypto.randomUUID() })));
+      setBlocks((m.showcases ?? []).map((b) => ({ ...b, uid: crypto.randomUUID() })));
       setIntroFileUrl(m.introFileUrl ?? "");
       // 생성 때 저장한 크롤 스냅샷 → 다시받기 재료·버튼 게이트(크롤한 소개서만 노출)
       setEnrichment(m.enrichment);
@@ -883,10 +883,10 @@ function RegisterForm() {
       if ((m.story ?? "").trim()) open.add("story");
       if (m.activities.length) open.add("activities");
       if (m.collabHistory.length) open.add("collabs");
-      if ((m.soul.values ?? []).length) open.add("keywords");
+      if ((m.keywords ?? []).length) open.add("keywords");
       if ((m.targetAudience ?? []).length) open.add("customers");
-      if ((m.offersNote ?? "").trim()) open.add("offersNote");
-      if (m.seeks.length || (m.seeksNote ?? "").trim()) open.add("seeks");
+      if ((m.offersDescription ?? "").trim()) open.add("offersNote");
+      if (m.seeks.length || (m.seeksDescription ?? "").trim()) open.add("seeks");
       setOpenSections(open);
       setEditBooting(false);
     }).catch(() => setEditBooting(false));
@@ -941,14 +941,14 @@ function RegisterForm() {
         oneLiner,
         offers,
         seeks: [], // 구 seeks 칩 은퇴(통합) — 유형은 offers 1세트가 정본. 저장 시 항상 비워 자연 수렴
-        values: hasKeywords ? values : [],
+        keywords: hasKeywords ? values : [],
         targetAudience: hasCustomers ? targetAudience : [],
         collabHistory: hasCollabs ? historyOut.map((h) => ({ ...h, photos: wrap(h.photos) })) : [],
         story: hasStory ? story.trim() : "",
         activities: hasActivities ? activityOut.map((a) => ({ ...a, photos: wrap(a.photos) })) : [],
-        offersNote: hasOffersNote ? offersNote : "",
-        seeksNote: hasSeeks ? seeksNote : "",
-        blocks,
+        offersDescription: hasOffersNote ? offersNote : "",
+        seeksDescription: hasSeeks ? seeksNote : "",
+        showcases: blocks,
         introFileUrl: introFileUrl || undefined,
         photos: wrap(photoUrls),
         collabOpen,

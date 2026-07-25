@@ -36,7 +36,7 @@ export default function SearchPage() {
     const t = q.trim().toLowerCase();
     if (t) {
       r = r.filter((m) =>
-        [m.name, m.oneLiner, ...m.soul.values, ...m.offers, ...m.seeks]
+        [m.name, m.oneLiner, ...m.keywords, ...m.offers, ...m.seeks]
           .join(" ")
           .toLowerCase()
           .includes(t)
@@ -164,9 +164,9 @@ export default function SearchPage() {
                   {m.oneLiner && (
                     <p className="mt-0.5 line-clamp-1 text-sm text-body">{m.oneLiner}</p>
                   )}
-                  {m.soul.values.length > 0 && (
+                  {m.keywords.length > 0 && (
                     <div className="mt-2 flex flex-wrap gap-1.5">
-                      {m.soul.values.slice(0, 3).map((v) => (
+                      {m.keywords.slice(0, 3).map((v) => (
                         <span
                           key={v}
                           className="rounded-sm bg-mint-pale px-1.5 py-0.5 text-[11px] font-medium text-mint-on"

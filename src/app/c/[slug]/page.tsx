@@ -36,7 +36,7 @@ export default async function CardPage({
   ].filter(Boolean) as { icon: string; label: string; href?: string }[];
 
   // 제안 본문: 키워드 1개만 키위 하이라이트
-  const keywords = [...maker.offers, ...maker.seeks, ...maker.soul.values];
+  const keywords = [...maker.offers, ...maker.seeks, ...maker.keywords];
 
   return (
     <main className="mx-auto w-full max-w-[420px] px-4 py-8">
@@ -219,14 +219,14 @@ export default async function CardPage({
           )}
 
           {/* 협업 직접 설명 — 제공 칩 위 문구 */}
-          {maker.offersNote && (
+          {maker.offersDescription && (
             <p className="mt-4 whitespace-pre-line text-[15px] leading-relaxed text-body">
-              {maker.offersNote}
+              {maker.offersDescription}
             </p>
           )}
 
           {/* 하드축 칩(키위틴트) + 결 칩(파스텔, 보조층) */}
-          {(maker.offers.length > 0 || maker.soul.values.length > 0) && (
+          {(maker.offers.length > 0 || maker.keywords.length > 0) && (
             <div className="mt-4 flex flex-wrap gap-1.5">
               {[...new Set([...maker.offers, ...maker.seeks])].map((o) => (
                 <span
@@ -236,7 +236,7 @@ export default async function CardPage({
                   {o}
                 </span>
               ))}
-              {maker.soul.values.map((v) => (
+              {maker.keywords.map((v) => (
                 <span
                   key={`v-${v}`}
                   className="inline-flex h-7 items-center rounded-pill bg-mint-pale px-2.5 text-[12px] font-medium text-mint-on"
@@ -248,9 +248,9 @@ export default async function CardPage({
           )}
 
           {/* 파트너 직접 설명 — 찾는 콜라보 칩 위 문구 */}
-          {maker.seeksNote && (
+          {maker.seeksDescription && (
             <p className="mt-4 whitespace-pre-line text-[15px] leading-relaxed text-body">
-              {maker.seeksNote}
+              {maker.seeksDescription}
             </p>
           )}
 
