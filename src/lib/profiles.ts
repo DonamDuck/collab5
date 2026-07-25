@@ -2,6 +2,7 @@
 // profiles.user_id = 정수 PK(1,2,3), profiles.uuid = auth.users(id) 링크.
 // 앱은 세션의 auth UUID(authUuid)로 조회한다.
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { getSessionUser } from "./supabase/server";
 
 export interface Profile {
   id: number; // 정수 user_id (1,2,3)
@@ -90,6 +91,35 @@ export async function updateProfileImage(uuid: string, imageUrl: string): Promis
   if (!client) return; // 로컬 mock
   const { error } = await client.from("profiles").update({ profile_image: imageUrl }).eq("uuid", uuid);
   if (error) throw new Error(error.message);
+}
+
+/** 정수 user_id로 프로필 조회 — 소개서 소유자 표시(로고 등)용.
+ *  세션 → 프로필은 `getProfile(authUuid)`, 소유자 id → 프로필은 이 함수. */
+export async function getProfileById(userId: number): Promise<Profile | null> {
+  const client = db();
+  if (!client) return null;
+  const { data } = await client
+    .from("profiles")
+    .select("user_id, uuid, brand_name, phone, email, profile_image")
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (!data) return null;
+  return {
+    id: data.user_id,
+    uuid: data.uuid,
+    brandName: data.brand_name,
+    phone: data.phone ?? "",
+    email: data.email ?? "",
+    profileImage: data.profile_image ?? "",
+  };
+}
+
+/** ⭐ 세션 → 정수 user_id 중앙 리졸버. 소유권·찜·제안 판정은 전부 이걸 거친다(07-25 uuid→user_id 전환).
+ *  profiles 행이 없으면 null(= 소유권 없음)로 안전하게 떨어진다. */
+export async function getSessionUserId(): Promise<number | null> {
+  const user = await getSessionUser();
+  if (!user) return null;
+  return (await getProfile(user.id))?.id ?? null;
 }
 
 export async function getProfile(authUuid: string): Promise<Profile | null> {

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { repo } from "@/lib/repo";
-import { getProfile } from "@/lib/profiles";
+import { getProfileById } from "@/lib/profiles";
 import { DEMO_SLUG_PHOTO, DEMO_SLUG_NONE } from "@/lib/demo";
 import { PreviewTabs } from "./PreviewTabs";
 
@@ -18,8 +18,8 @@ export default async function PreviewPage({ searchParams }: { searchParams: Prom
     repo.getMakerBySlug(DEMO_SLUG_NONE),
   ]);
   const [photoLogo, noneLogo] = await Promise.all([
-    photoMaker?.ownerUserId ? getProfile(photoMaker.ownerUserId).then((p) => p?.profileImage || undefined) : undefined,
-    noneMaker?.ownerUserId ? getProfile(noneMaker.ownerUserId).then((p) => p?.profileImage || undefined) : undefined,
+    photoMaker?.ownerUserId ? getProfileById(photoMaker.ownerUserId).then((p) => p?.profileImage || undefined) : undefined,
+    noneMaker?.ownerUserId ? getProfileById(noneMaker.ownerUserId).then((p) => p?.profileImage || undefined) : undefined,
   ]);
 
   return (
