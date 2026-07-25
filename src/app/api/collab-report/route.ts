@@ -87,7 +87,12 @@ export async function POST(req: Request) {
 
     // ⑦ 리포트 생성 → 접점<2 또는 아이디어 0개면 no_match(정직한 빈손)
     const model = process.env.REPORT_MODEL || "gemini-2.5-flash";
-    const { report } = await generateReport(from, fromDna, to, toDna);
+    const { report, candidates } = await generateReport(from, fromDna, to, toDna);
+    // 관측 로그(Vercel stdout) — 후보 전체+점수·선발 결과. 채점 기준 튜닝 근거(스펙 "탈락 후보 축적"의 v1).
+    console.log(
+      `[collab-report] ${from.slug}→${to.slug} model=${model} dnaCalls=${dnaCalls} ` +
+        `candidates=${JSON.stringify(candidates ?? [])} picked=${report?.matchPoints.length ?? 0} ideas=${report?.ideas.length ?? 0}`
+    );
     if (!report) return NextResponse.json({ state: "no_match" });
 
     await repo.insertCollabReport({

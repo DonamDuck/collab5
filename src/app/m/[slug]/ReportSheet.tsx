@@ -1,7 +1,8 @@
 "use client";
 
 // AI 콜라보 분석 리포트 시트 — 풀하이트 바텀시트(제안 시트 패턴 재사용).
-// 상태 머신: idle → loading(카피 3단 순환) → ok(6조각) | thin | no_match | error(재시도).
+// 상태 머신: idle → (select: 소개서 2개+ 첫 depth 선택) → loading(카피 3단 순환) → ok(6조각) | thin | no_match | error(재시도).
+// 멀티 소개서는 칩 선택 + [분석하기]를 눌러야 fetch — 자동 생성으로 콜 낭비하지 않는다(대표 QA 07-26).
 // sampleMode = 무소개서 유저 티저: fetch 없이 sample-report.json 렌더 + 위저드 CTA.
 // 스펙: docs/superpowers/specs/2026-07-25-collab-report-dna-design.md §4·§5
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -12,7 +13,7 @@ import sampleData from "@/lib/sample-report.json";
 
 const LOADING_COPY = ["두 소개서를 읽고 있어요…", "접점을 찾는 중…", "콜라보를 상상하는 중…"];
 
-type Phase = "idle" | "loading" | "ok" | "thin" | "no_match" | "error";
+type Phase = "idle" | "select" | "loading" | "ok" | "thin" | "no_match" | "error";
 
 // /api/collab-report 200 응답(state 있는 형태)
 type OkPayload = {
@@ -106,11 +107,17 @@ export function ReportSheet({
     [toSlug]
   );
 
-  // 열릴 때 + 선택 소개서가 바뀔 때 fetch(캐시면 서버가 즉시 반환). 샘플 모드는 fetch 없음.
+  // 열릴 때: 소개서 1개면 바로 fetch(캐시면 서버가 즉시 반환), 2개+면 선택(select)이 첫 depth.
+  // 칩 변경만으로는 fetch하지 않는다 — [분석하기]를 눌러야 실행(콜 낭비 방지).
   useEffect(() => {
-    if (!open || sampleMode || !selected?.slug) return;
-    run(selected.slug);
-  }, [open, sampleMode, selected?.slug, run]);
+    if (!open || sampleMode) return;
+    if (fromBrands.length > 1) {
+      setPhase("select");
+      return;
+    }
+    if (selected?.slug) run(selected.slug);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, sampleMode]);
 
   // 샘플 모드(잠금 티저) 오픈 계측 — 무소개서 퍼널 시작점
   useEffect(() => {
@@ -135,11 +142,23 @@ export function ReportSheet({
   // ── 6조각 렌더(ok·샘플 공용) ──
   const pieces = report && (
     <div>
-      {/* ① 타이틀 줄 — 작은 라벨 + 한 줄 결론 */}
-      <p className="text-[13px] font-medium text-mute">
-        우리({fromName}) × {reportToName}
-      </p>
-      <p className="mt-1.5 text-xl font-bold leading-snug break-keep text-ink">{report.oneLiner}</p>
+      {/* ① 타이틀 줄 + 콜라보 한줄 요약(섹션) */}
+      <div className="flex items-center justify-between gap-2 pr-8">
+        <p className="text-[15px] font-bold break-keep text-ink">
+          {fromName} × {reportToName}
+        </p>
+        {!sampleMode && fromBrands.length > 1 && (
+          <button
+            type="button"
+            onClick={() => setPhase("select")}
+            className="shrink-0 text-[12px] font-medium text-mute underline underline-offset-2"
+          >
+            다른 소개서로 분석
+          </button>
+        )}
+      </div>
+      <p className="mt-5 text-[15px] font-bold text-ink">콜라보 한줄 요약</p>
+      <p className="mt-1.5 text-[17px] font-semibold leading-snug break-keep text-ink">{report.oneLiner}</p>
 
       {/* ② 이런 점이 잘 어울려요 — ✔ 리스트 */}
       <p className="mt-6 text-[15px] font-bold text-ink">이런 점이 잘 어울려요</p>
@@ -239,30 +258,6 @@ export function ReportSheet({
           </div>
         )}
 
-        {/* 멀티 소개서 — 브랜드명 칩 셀렉터(2개+일 때만. 1개면 타이틀 줄에 명시, 0개=샘플 모드) */}
-        {!sampleMode && fromBrands.length > 1 && (
-          <div className="mb-4 pr-8">
-            <p className="text-[13px] font-medium text-body">어떤 소개서로 분석할까요</p>
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              {fromBrands.map((b) => {
-                const on = b.slug === selected?.slug;
-                return (
-                  <button
-                    key={b.slug}
-                    type="button"
-                    onClick={() => setSelectedSlug(b.slug)}
-                    className={`h-8 rounded-pill px-3 text-[13px] font-medium transition-colors ${
-                      on ? "bg-primary text-primary-on" : "border border-border-strong bg-surface text-body"
-                    }`}
-                  >
-                    {b.name}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
         {/* ── 상태별 본문 ── */}
         {sampleMode ? (
           <>
@@ -281,6 +276,37 @@ export function ReportSheet({
               </a>
             </div>
           </>
+        ) : phase === "select" ? (
+          /* 멀티 소개서 — 선택이 첫 depth. 칩 고르고 [분석하기]를 눌러야 생성(대표 QA 07-26) */
+          <div className="pr-8">
+            <p className="text-xl font-bold break-keep text-ink">어떤 소개서로 분석할까요</p>
+            <p className="mt-1.5 text-[14px] text-mute">{toName}님과의 콜라보를 분석할 내 소개서를 골라주세요.</p>
+            <div className="mt-4 flex flex-wrap gap-1.5">
+              {fromBrands.map((b) => {
+                const on = b.slug === selected?.slug;
+                return (
+                  <button
+                    key={b.slug}
+                    type="button"
+                    onClick={() => setSelectedSlug(b.slug)}
+                    className={`h-9 rounded-pill px-3.5 text-[14px] font-medium transition-colors ${
+                      on ? "bg-primary text-primary-on" : "border border-border-strong bg-surface text-body"
+                    }`}
+                  >
+                    {b.name}
+                  </button>
+                );
+              })}
+            </div>
+            <button
+              type="button"
+              disabled={!selected?.slug}
+              onClick={() => selected?.slug && run(selected.slug)}
+              className="mt-6 flex h-12 w-full items-center justify-center rounded-md bg-primary text-base font-medium text-primary-on disabled:opacity-50"
+            >
+              분석하기
+            </button>
+          </div>
         ) : phase === "loading" || phase === "idle" ? (
           <div className="flex flex-col items-center justify-center py-16">
             <div className="h-8 w-8 animate-spin rounded-pill border-2 border-hairline border-t-primary-strong" />
