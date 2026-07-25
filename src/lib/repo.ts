@@ -3,7 +3,7 @@
 // (DB는 '공유 → 타인 열람(view) 루프 = 배포 시점'에 투입 — masterbrain 2026-06-21 결정)
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import type { CollabCard, CollabType, Maker, MakerStatus, Reaction, ViewEvent } from "./types";
+import type { BrandDna, CollabCard, CollabReportData, CollabType, Maker, MakerStatus, Reaction, ViewEvent } from "./types";
 
 export interface Repo {
   // 업체
@@ -31,6 +31,11 @@ export interface Repo {
   listSavedMakers(userId: number): Promise<Maker[]>;
   // 콜라보 제안 인텐트(append-only) — "콜라보 시작하기" 계측
   recordCollabRequest(fromUserId: number | null, toBrandId: number, channel: string, fromBrandId?: number | null): Promise<void>;
+  // Brand DNA(brands.dna, 파생 해석층) + 콜라보 리포트(collab_reports, append-only 쌍 캐시) — 스펙 2026-07-25
+  getBrandDna(brandId: number): Promise<BrandDna | null>;
+  setBrandDna(brandId: number, dna: BrandDna): Promise<void>;
+  getLatestCollabReport(fromBrandId: number, toBrandId: number): Promise<{ report: CollabReportData; model: string; createdAt: string } | null>;
+  insertCollabReport(r: { fromBrandId: number; toBrandId: number; requestedBy: number | null; report: CollabReportData; model: string }): Promise<void>;
 }
 
 const now = () => new Date().toISOString();
@@ -456,6 +461,25 @@ class InMemoryRepo implements Repo {
   async recordCollabRequest(fromUserId: number | null, toBrandId: number, channel: string, fromBrandId: number | null = null): Promise<void> {
     this.collabRequests.push({ fromUserId, toBrandId, channel, fromBrandId, createdAt: now() });
   }
+  // ── Brand DNA + 콜라보 리포트 (Map 기반 — Supabase와 동일 시그니처) ──
+  private dnaByBrand = new Map<number, BrandDna>();
+  private reportsByPair = new Map<string, { report: CollabReportData; model: string; createdAt: string }[]>();
+  async getBrandDna(brandId: number): Promise<BrandDna | null> {
+    return this.dnaByBrand.get(brandId) ?? null;
+  }
+  async setBrandDna(brandId: number, dna: BrandDna): Promise<void> {
+    this.dnaByBrand.set(brandId, dna);
+  }
+  async getLatestCollabReport(fromBrandId: number, toBrandId: number) {
+    const list = this.reportsByPair.get(`${fromBrandId}:${toBrandId}`) ?? [];
+    return list.length > 0 ? list[list.length - 1] : null; // append-only — 마지막 = 최신
+  }
+  async insertCollabReport(r: { fromBrandId: number; toBrandId: number; requestedBy: number | null; report: CollabReportData; model: string }): Promise<void> {
+    const key = `${r.fromBrandId}:${r.toBrandId}`;
+    const list = this.reportsByPair.get(key) ?? [];
+    list.push({ report: r.report, model: r.model, createdAt: now() });
+    this.reportsByPair.set(key, list);
+  }
 }
 
 // ── Supabase DB row shapes (snake_case → camelCase 매핑용) ──
@@ -476,6 +500,8 @@ interface MakerRow {
   // 수정 비밀번호 해시 — 07-25 claim_token_hash → edit_password_hash 이사(옛 컬럼 폴백)
   edit_password_hash: string | null; claim_token_hash?: string | null;
   enrichment: Maker["enrichment"] | null;
+  // Brand DNA — 파생 해석층(rowToMaker에 싣지 않음: 도메인 객체 비노출, API가 repo로 직접 읽음)
+  dna: BrandDna | null;
 }
 interface CardRow {
   id: number; slug: string;
@@ -669,6 +695,24 @@ class SupabaseRepo implements Repo {
   }
   async recordCollabRequest(fromUserId: number | null, toBrandId: number, channel: string, fromBrandId: number | null = null): Promise<void> {
     await this.db.from("collab_requests").insert({ from_user_id: fromUserId, to_brand_id: toBrandId, channel, from_brand_id: fromBrandId });
+  }
+  // ── Brand DNA + 콜라보 리포트 ──
+  async getBrandDna(brandId: number): Promise<BrandDna | null> {
+    const { data } = await this.db.from("brands").select("dna").eq("id", brandId).maybeSingle();
+    return (data?.dna as BrandDna) ?? null;
+  }
+  async setBrandDna(brandId: number, dna: BrandDna): Promise<void> {
+    await this.db.from("brands").update({ dna }).eq("id", brandId); // ⚠️ updated_at 트리거가 brands를 건드리므로
+  }                                                                //    stale 판정은 DNA_STALE_SLACK_MS 허용 오차로 비교
+  async getLatestCollabReport(fromBrandId: number, toBrandId: number) {
+    const { data } = await this.db.from("collab_reports").select("report, model, created_at")
+      .eq("from_brand_id", fromBrandId).eq("to_brand_id", toBrandId)
+      .order("created_at", { ascending: false }).limit(1).maybeSingle();
+    return data ? { report: data.report as CollabReportData, model: data.model as string, createdAt: data.created_at as string } : null;
+  }
+  async insertCollabReport(r: { fromBrandId: number; toBrandId: number; requestedBy: number | null; report: CollabReportData; model: string }): Promise<void> {
+    await this.db.from("collab_reports").insert({ from_brand_id: r.fromBrandId, to_brand_id: r.toBrandId,
+      requested_by: r.requestedBy, report: r.report, model: r.model });
   }
 }
 
