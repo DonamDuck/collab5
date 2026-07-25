@@ -499,6 +499,8 @@ interface MakerRow {
   photos: string[] | null;
   blocks: Maker["blocks"] | null; intro_file_url: string | null;
   soul: Maker["soul"]; trust: Maker["trust"];
+  // 자세히 소개 — trust.description(jsonb)에서 최상위 컬럼으로 이사 중(07-25). 컬럼 없는 환경에선 undefined.
+  description?: string | null;
   collab_open: boolean; search_visible: boolean | null; status: string | null; created_at: string; updated_at: string | null;
   owner_uuid: string | null; claim_token_hash: string | null;
   enrichment: Maker["enrichment"] | null;
@@ -527,7 +529,9 @@ function rowToMaker(r: MakerRow): Maker {
     photos: r.photos ?? [],
     blocks: (r.blocks ?? []).map((b) => ({ ...b, photos: b.photos ?? [], links: b.links ?? [] })),
     introFileUrl: r.intro_file_url ?? undefined,
-    soul: r.soul, trust: r.trust,
+    soul: r.soul,
+    // 자세히 소개 이사(07-25): jsonb에 남아 있으면 그쪽이 최신(수정 경로가 아직 jsonb에 씀), 없으면 이사된 컬럼에서 읽는다.
+    trust: { ...r.trust, description: r.trust?.description ?? r.description ?? undefined },
     collabOpen: r.collab_open, searchVisible: r.search_visible ?? true,
     status: (r.status as MakerStatus) ?? "active",
     createdAt: r.created_at,
