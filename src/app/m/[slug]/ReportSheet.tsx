@@ -142,9 +142,10 @@ export function ReportSheet({
   // ── 6조각 렌더(ok·샘플 공용) ──
   const pieces = report && (
     <div>
-      {/* ① 타이틀 줄 + 콜라보 한줄 요약(섹션) */}
+      {/* ① 식별 메타(캡션) → 핵심 요약 박스 — 3역할을 크기·굵기·색으로 벌린다(디자인팀 07-26).
+          before: 헤더/라벨/결론이 전부 15~17px 볼드·text-ink라 뭉쳐 보였음(결론이 라벨보다 오히려 얇았음) */}
       <div className="flex items-center justify-between gap-2 pr-8">
-        <p className="text-[15px] font-bold break-keep text-ink">
+        <p className="text-[13px] font-medium break-keep text-mute">
           {fromName} × {reportToName}
         </p>
         {!sampleMode && fromBrands.length > 1 && (
@@ -157,11 +158,14 @@ export function ReportSheet({
           </button>
         )}
       </div>
-      <p className="mt-5 text-[15px] font-bold text-ink">콜라보 한줄 요약</p>
-      <p className="mt-1.5 text-[17px] font-semibold leading-snug break-keep text-ink">{report.oneLiner}</p>
+      {/* 핵심 요약 박스 — 형광 대신 뉴트럴 면으로 독립(무대 원칙) */}
+      <div className="mt-4 rounded-lg bg-surface-soft p-4">
+        <p className="text-[12px] font-medium tracking-wide text-mute">콜라보 한줄 요약</p>
+        <p className="mt-1.5 text-[20px] font-bold leading-snug text-balance break-keep text-ink">{report.oneLiner}</p>
+      </div>
 
       {/* ② 이런 점이 잘 어울려요 — ✔ 리스트 */}
-      <p className="mt-6 text-[15px] font-bold text-ink">이런 점이 잘 어울려요</p>
+      <p className="mt-7 text-[15px] font-bold text-ink">이런 점이 잘 어울려요</p>
       <ul className="mt-2 space-y-2">
         {report.matchPoints.map((p, i) => (
           <li key={i} className="flex gap-2 text-[14px] leading-relaxed text-body">
@@ -177,7 +181,7 @@ export function ReportSheet({
         {report.ideas.map((idea, i) => (
           <div key={i} className="rounded-md border border-hairline p-4">
             <div className="flex items-start justify-between gap-2">
-              <p className="text-[15px] font-bold break-keep text-ink">{idea.title}</p>
+              <p className="text-[14px] font-bold break-keep text-ink">{idea.title}</p>
               {idea.method && (
                 <span className="shrink-0 rounded-pill bg-surface-soft px-2 py-0.5 text-[12px] text-body">
                   {idea.method}
