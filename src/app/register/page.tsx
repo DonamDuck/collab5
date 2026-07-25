@@ -844,7 +844,7 @@ function RegisterForm() {
       } catch {}
       setName(m.name);
       setOneLiner(m.oneLiner);
-      setDescription(m.trust.description ?? "");
+      setDescription(m.description ?? "");
       setStory(m.story ?? "");
       setValues(m.keywords ?? []);
       setActivities(

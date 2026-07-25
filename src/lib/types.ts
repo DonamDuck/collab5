@@ -18,9 +18,9 @@ export interface TrustSignals {
   instagram?: string;
   address?: string;
   /** 지도 링크(네이버 지도·카카오맵 등). 홈페이지 없는 동네 가게의 사실상 대체 홈페이지 —
-   *  주소·영업시간·전화·사진·후기가 한 번에 딸려온다. trust가 jsonb라 마이그레이션 불필요. */
+   *  주소·영업시간·전화·사진·후기가 한 번에 딸려온다. trust가 jsonb라 마이그레이션 불필요.
+   *  ※ 자세히 소개(description)는 07-25에 최상위 컬럼으로 분리됨 — 여긴 채널·위치만. */
   mapUrl?: string;
-  description?: string; // 본인 작성(폴리셔 보정)
 }
 
 /** 함께한 콜라보 이력 — 자기보고(말랑한 층). ✓검증마크 X. 수신자 신뢰의 결정타. */
@@ -80,6 +80,7 @@ export interface Maker {
   seeks: CollabType[]; // 희망
   targetAudience: string[];
   collabHistory: CollabHistory[]; // 함께한 콜라보 이력
+  description: string;    // 자세히 소개 "우리는 이런 브랜드에요" (DB=description, 구 trust.description)
   story: string;          // 왜 시작했나
   activities: Activity[];  // 대표 활동 최대 3
   offersDescription: string; // 협업 직접 설명 (DB=offers_description, 구 offers_note)
@@ -94,7 +95,7 @@ export interface Maker {
   searchVisible: boolean; // 검색 결과 노출 on/off (DB=search_visible, 기본 true)
   status: MakerStatus; // active=정상 / inactive=소프트 삭제(전 노출면 비노출, DB 보관). DB=status, 기본 active
   ownerUserId?: number; // 소유 계정 = profiles.user_id(정수). 07-25 auth uuid→user_id 전환
-  editPasswordHash?: string; // 수정 비밀번호 해시(비회원 생성 시). DB=claim_token_hash
+  editPasswordHash?: string; // 수정 비밀번호 해시(비회원 생성 시). DB=edit_password_hash
   createdAt: string; // ISO (DB timestamptz)
   updatedAt?: string; // ISO (수정 시 자동 갱신)
 }

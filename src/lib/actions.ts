@@ -108,6 +108,7 @@ export async function createMakerAction(
       photos: unwrapPhotos(h.photos),
       link: sanitizePressLink(h.link),
     })),
+    description: input.description?.trim() ?? "",
     story: input.story?.trim() ?? "",
     activities: (input.activities ?? []).map((a) => ({
       title: a.title,
@@ -127,7 +128,6 @@ export async function createMakerAction(
       // 지도 칩이 "네이버 지도"라 써놓고 딴 데로 가면 안 되니 서버에서도 서비스 검증(클라 우회 차단)
       mapUrl: mapLinkLabel(input.mapUrl) ? input.mapUrl!.trim() : undefined,
       address: input.address?.trim() || undefined,
-      description: input.description?.trim() || undefined,
     },
     collabOpen: input.collabOpen,
     searchVisible: input.searchVisible,
@@ -277,6 +277,7 @@ export async function updateMakerAction(
       desc: h.desc?.trim() || undefined, year: h.year, photos: unwrapPhotos(h.photos),
       link: sanitizePressLink(h.link),
     })),
+    description: input.description?.trim() ?? "",
     story: input.story?.trim() ?? "",
     activities: (input.activities ?? []).map((a) => ({
       title: a.title, desc: a.desc, photos: unwrapPhotos(a.photos), link: sanitizePressLink(a.link),
@@ -293,7 +294,6 @@ export async function updateMakerAction(
       // 지도 칩이 "네이버 지도"라 써놓고 딴 데로 가면 안 되니 서버에서도 서비스 검증(클라 우회 차단)
       mapUrl: mapLinkLabel(input.mapUrl) ? input.mapUrl!.trim() : undefined,
       address: input.address?.trim() || undefined,
-      description: input.description?.trim() || undefined,
     },
     collabOpen: input.collabOpen,
     searchVisible: input.searchVisible,
