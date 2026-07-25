@@ -63,8 +63,8 @@ export function EditButton({
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4">
           <ScrollLock />
           <div className="w-full max-w-sm rounded-lg border border-hairline bg-surface p-6 shadow-e2">
-            <p className="text-base font-bold text-ink">로그인이 필요해요</p>
-            <p className="mt-1.5 text-sm leading-relaxed text-mute">
+            <p className="text-base font-bold break-keep text-ink">로그인이 필요해요</p>
+            <p className="mt-1.5 text-sm leading-relaxed break-keep text-mute">
               이 소개서는 회원 계정으로 만들어졌어요. 수정하려면 만든 계정으로 로그인해주세요.
             </p>
             <div className="mt-4 flex gap-2">

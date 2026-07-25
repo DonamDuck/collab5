@@ -228,7 +228,7 @@ export function MakerActionBar({
               </svg>
             </button>
 
-            <p className="pr-8 text-xl font-bold text-ink">{makerName}님께 콜라보 제안하기</p>
+            <p className="pr-8 text-xl font-bold break-keep text-ink">{makerName}님께 콜라보 제안하기</p>
             {channel ? (
               <>
                 <p className="mt-2 text-[15px] leading-relaxed text-mute">
@@ -268,8 +268,8 @@ export function MakerActionBar({
               </svg>
             </button>
 
-            <p className="px-6 text-xl font-bold leading-snug text-ink">{loginTitle}</p>
-            <p className="mt-2 text-base leading-relaxed text-mute">{loginSub}</p>
+            <p className="px-6 text-xl font-bold leading-snug text-balance break-keep text-ink">{loginTitle}</p>
+            <p className="mt-2 text-base leading-relaxed text-balance break-keep text-mute">{loginSub}</p>
             <div className="mt-5 flex gap-2">
               <button
                 type="button"

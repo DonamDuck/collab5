@@ -65,8 +65,8 @@ export function ConnectProfileButton({ slug, loggedIn }: { slug: string; loggedI
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4">
           <ScrollLock />
           <div className="w-full max-w-sm rounded-lg border border-hairline bg-surface p-6 shadow-e2">
-            <p className="text-base font-bold text-ink">프로필에 연결하기</p>
-            <p className="mt-1.5 text-sm leading-relaxed text-mute">
+            <p className="text-base font-bold break-keep text-ink">프로필에 연결하기</p>
+            <p className="mt-1.5 text-sm leading-relaxed break-keep text-mute">
               이 소개서의 관리 비밀번호를 입력하면 지금 로그인한 계정에 연결돼요.
             </p>
             <PasswordInput
@@ -105,8 +105,8 @@ export function ConnectProfileButton({ slug, loggedIn }: { slug: string; loggedI
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4">
           <ScrollLock />
           <div className="w-full max-w-sm rounded-lg border border-hairline bg-surface p-6 text-center shadow-e2">
-            <p className="text-base font-bold text-ink">🎉 소개서 연결 완료</p>
-            <p className="mt-1.5 text-sm leading-relaxed text-mute">
+            <p className="text-base font-bold text-balance break-keep text-ink">🎉 소개서 연결 완료</p>
+            <p className="mt-1.5 text-sm leading-relaxed break-keep text-mute">
               프로필 메뉴에서 언제든 내 소개서를 확인할 수 있어요.
             </p>
             <button

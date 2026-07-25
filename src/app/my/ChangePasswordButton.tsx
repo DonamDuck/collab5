@@ -75,8 +75,8 @@ export function ChangePasswordButton({ email }: { email: string }) {
       {done && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 p-4 sm:items-center">
           <div className="w-full max-w-sm rounded-lg border border-hairline bg-surface p-6 text-center shadow-e2">
-            <p className="text-lg font-bold text-ink">📧 메일을 보냈어요</p>
-            <p className="mt-2 text-[15px] leading-relaxed text-body">
+            <p className="text-lg font-bold text-balance break-keep text-ink">📧 메일을 보냈어요</p>
+            <p className="mt-2 text-[15px] leading-relaxed break-keep text-body">
               {email}로 비밀번호 변경 링크를 보냈어요. 메일함을 확인해주세요.
             </p>
             <button
