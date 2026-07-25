@@ -12,8 +12,9 @@ import type { BrandDna, Maker } from "@/lib/types";
 // 무거운 AI 호출=라우트(enrich 관례): DNA 최대 2콜 + 리포트 1콜 여유
 export const maxDuration = 60;
 
-// 리포트 모델 A/B 화이트리스트 — 클라가 임의 모델명을 넣지 못하게(비용·오작동 차단)
-const MODEL_WHITELIST = ["gemini-2.5-flash", "gemini-2.5-pro"];
+// 리포트 모델 A/B 화이트리스트 — 클라가 임의 모델명을 넣지 못하게(비용·오작동 차단).
+// ⚠️ gemini-2.5-pro는 신규 사용자에게 404("no longer available") — 실측 07-26. 신형 3.x 계열로 대체.
+const MODEL_WHITELIST = ["gemini-2.5-flash", "gemini-3.6-flash", "gemini-3.1-pro-preview"];
 
 export async function POST(req: Request) {
   try {
