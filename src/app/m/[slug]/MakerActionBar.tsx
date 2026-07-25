@@ -20,6 +20,8 @@ export function MakerActionBar({
   loggedIn,
   instagram,
   homepage,
+  senderName,
+  senderSlug,
 }: {
   slug: string;
   makerId: number;
@@ -28,16 +30,31 @@ export function MakerActionBar({
   loggedIn: boolean;
   instagram?: string;
   homepage?: string;
+  senderName?: string; // 제안자(로그인 유저) 상호 — 추천 메시지 인사말
+  senderSlug?: string; // 제안자의 첫 소개서 slug — 있으면 소개 링크 첨부
 }) {
   const [saved, setSaved] = useState(initialSaved);
   const [loginOpen, setLoginOpen] = useState(false);
   const [loginReason, setLoginReason] = useState<"save" | "propose">("save");
   const [proposeOpen, setProposeOpen] = useState(false);
+  const [message, setMessage] = useState(""); // 추천 메시지(수정 가능)
+  const [msgCopied, setMsgCopied] = useState(false);
   const [copied, setCopied] = useState(false);
   const [pending, start] = useTransition();
 
   // 콜라보 연락 채널(인스타 DM 우선 → 홈페이지/카톡 → 없으면 null)
   const channel = resolveCollabChannel({ instagram, homepage });
+
+  // 추천 메시지 기본값 — 제안자 상호로 인사, 소개서 있으면 링크 첨부. 시트 열릴 때 채운다.
+  useEffect(() => {
+    if (!proposeOpen) return;
+    const hello = senderName ? `안녕하세요, ${senderName}입니다.` : "안녕하세요!";
+    let msg = `${hello}\ncollab5에서 소개서를 보고 함께 재미있는 콜라보를 만들어볼 수 있을 것 같아 먼저 연락드렸어요.\n관심 있으시다면 편하실 때 답장 주시면 감사하겠습니다. 😊`;
+    if (senderSlug && typeof window !== "undefined") {
+      msg += `\n\n저희 소개도 함께 보내드려요.\n${window.location.origin}/m/${senderSlug}`;
+    }
+    setMessage(msg);
+  }, [proposeOpen, senderName, senderSlug]);
 
   // 로그인/가입으로 떠나기 직전, 무슨 의도였는지(찜/제안) 이 업체 기준으로 남긴다.
   const markPending = () => {
@@ -115,13 +132,52 @@ export function MakerActionBar({
     setProposeOpen(true);
   };
 
-  // 제안 시트 CTA — 사용자 제스처 내 즉시 채널 오픈(팝업 차단 회피), 계측은 best-effort.
-  const doPropose = () => {
+  // 텍스트 복사 — clipboard API 우선, 실패 시 레거시 execCommand. (제스처 내 동기 실행 가능)
+  const copyText = (text: string) => {
+    const legacy = () => {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.style.position = "fixed";
+      ta.style.left = "-9999px";
+      document.body.appendChild(ta);
+      ta.select();
+      try {
+        document.execCommand("copy");
+      } catch {
+        /* noop */
+      }
+      document.body.removeChild(ta);
+    };
+    try {
+      if (navigator.clipboard?.writeText) navigator.clipboard.writeText(text).catch(legacy);
+      else legacy();
+    } catch {
+      legacy();
+    }
+  };
+
+  const flashMsgCopied = () => {
+    setMsgCopied(true);
+    window.setTimeout(() => setMsgCopied(false), 2000);
+  };
+
+  // Primary — 메시지 복사 + 상대 채널 오픈(제스처 내 즉시, 팝업 차단 회피) + 계측(best-effort) + 닫기.
+  const proposeAndSend = () => {
     if (!channel) return;
+    copyText(message);
     window.open(channel.url, "_blank", "noopener,noreferrer");
     recordCollabRequestAction(makerId, channel.channel).catch(() => {});
     setProposeOpen(false);
   };
+
+  // Secondary — 메시지만 복사(시트 유지 + 토스트).
+  const copyMessageOnly = () => {
+    copyText(message);
+    flashMsgCopied();
+  };
+
+  const isInstagram = channel?.channel === "instagram";
+  const proposePrimaryLabel = isInstagram ? "메시지 복사하고 인스타 DM 보내기" : "메시지 복사하고 채널 열기";
 
   const copy = async () => {
     const url = typeof window !== "undefined" ? window.location.href : "";
@@ -148,8 +204,8 @@ export function MakerActionBar({
   const loginTitle = loginReason === "propose" ? "콜라보를 시작하려면 로그인이 필요해요" : "찜하려면 로그인이 필요해요";
   const loginSub =
     loginReason === "propose"
-      ? "로그인하면 마음에 든 곳에 콜라보를 제안할 수 있어요."
-      : "관심 있는 곳을 저장해두고 언제든 다시 볼 수 있어요.";
+      ? "로그인하면 마음에 드는 브랜드와 콜라보를 시작할 수 있어요."
+      : "마음에 드는 브랜드를 저장해두고 언제든 다시 만나보세요.";
 
   return (
     <>
@@ -228,26 +284,51 @@ export function MakerActionBar({
               </svg>
             </button>
 
-            <p className="pr-8 text-xl font-bold break-keep text-ink">{makerName}님께 콜라보 제안하기</p>
+            <p className="pr-8 text-xl font-bold break-keep text-ink">{makerName}님과 콜라보 시작하기</p>
             {channel ? (
               <>
                 <p className="mt-2 text-[15px] leading-relaxed text-mute">
-                  앱 내 채팅 기능을 준비 중이에요. 그전까지는 아래 방법으로 콜라보 연락을 해보세요.
+                  아직 앱 내 채팅은 준비 중이에요.
+                  <br />
+                  그전까지는 아래 메시지를 복사해 {isInstagram ? "인스타그램으로" : "아래 채널로"} 연락해보세요.
                 </p>
+                <label className="mt-4 block text-[13px] font-medium text-body">메시지 초안 (자유롭게 수정해보세요)</label>
+                <textarea
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                  rows={7}
+                  className="mt-1.5 w-full resize-none rounded-md border border-border-strong bg-surface-soft p-3 text-[14px] leading-relaxed text-ink focus:border-primary focus:outline-none"
+                />
                 <button
                   type="button"
-                  onClick={doPropose}
-                  className="mt-5 flex h-12 w-full items-center justify-center rounded-md bg-primary text-base font-medium text-primary-on"
+                  onClick={proposeAndSend}
+                  className="mt-4 flex h-12 w-full items-center justify-center rounded-md bg-primary text-base font-medium text-primary-on"
                 >
-                  {channel.label}
+                  {proposePrimaryLabel}
+                </button>
+                <button
+                  type="button"
+                  onClick={copyMessageOnly}
+                  className="mt-2 flex h-12 w-full items-center justify-center rounded-md border border-border-strong bg-surface text-base font-medium text-ink"
+                >
+                  메시지 복사하기
                 </button>
               </>
             ) : (
               <p className="mt-2 text-[15px] leading-relaxed text-mute">
-                아직 {makerName}님의 연락처가 등록되지 않았어요. 조금만 기다려 주세요.
+                아직 {makerName}님의 연락처가 준비되지 않았어요.
+                <br />
+                조금만 기다려 주세요.
               </p>
             )}
           </div>
+        </div>
+      )}
+
+      {/* 메시지 복사 완료 토스트 (제안 시트 위) */}
+      {msgCopied && (
+        <div className="fixed bottom-[92px] left-1/2 z-[60] -translate-x-1/2 rounded-pill bg-ink px-4 py-2.5 text-[13px] font-medium text-surface shadow-e2 print:hidden">
+          ✓ 메시지를 복사했어요.
         </div>
       )}
 

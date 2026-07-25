@@ -17,15 +17,19 @@ export default async function MakerPage({
   const maker = await repo.getMakerBySlug(slug);
   if (!maker) notFound();
 
-  // 세션 유저 + 소유 계정 프로필(로고용)을 병렬 조회 — 왕복 안 늘림
-  const [user, ownerProfile] = await Promise.all([
-    getSessionUser(),
+  const user = await getSessionUser();
+  // 소유 계정 프로필(로고) + 찜 여부 + 제안자(로그인 유저) 본인 프로필·소개서를 병렬 조회.
+  // 제안자 상호·소개 링크 = 콜라보 제안 시트의 추천 메시지 프리필용.
+  const [ownerProfile, initialSaved, viewerProfile, viewerMakers] = await Promise.all([
     maker.ownerUserId ? getProfile(maker.ownerUserId) : Promise.resolve(null),
+    user ? repo.isMakerSaved(user.id, maker.id) : Promise.resolve(false),
+    user ? getProfile(user.id) : Promise.resolve(null),
+    user ? repo.listMakersByOwner(user.id) : Promise.resolve([]),
   ]);
   const isOwner = !!user && maker.ownerUserId === user.id;
   const logoUrl = ownerProfile?.profileImage || undefined;
-  // 로그인 상태면 이 업체를 이미 찜했는지 초기 상태로 전달(플로팅 하트 초기값)
-  const initialSaved = user ? await repo.isMakerSaved(user.id, maker.id) : false;
+  const senderName = viewerProfile?.brandName || undefined; // 제안자 상호
+  const senderSlug = viewerMakers[0]?.slug; // 제안자의 첫 소개서(있으면 링크 첨부)
   // 점유 가능 = 아직 소유 계정 없음(비회원 생성) + 관리 비번 존재(비번으로 점유 검증 가능).
   // 이미 소유(회원 생성 or 점유됨)면 버튼 미노출. 비번 없는 익명 소개서는 점유 불가라 미노출.
   const claimable = !maker.ownerUserId && !!maker.editPasswordHash;
@@ -71,6 +75,8 @@ export default async function MakerPage({
         loggedIn={!!user}
         instagram={maker.trust.instagram}
         homepage={maker.trust.homepage}
+        senderName={senderName}
+        senderSlug={senderSlug}
       />
     </main>
   );
