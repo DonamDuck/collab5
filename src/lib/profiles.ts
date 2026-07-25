@@ -1,4 +1,5 @@
 // 계정 프로필 — 서버 전용(service_role). RLS 잠금이라 anon으로 접근 불가.
+// DB 테이블 = public.users (07-25 profiles→users 개명). auth.users(인증)와는 다른 테이블.
 // profiles.user_id = 정수 PK(1,2,3), profiles.uuid = auth.users(id) 링크.
 // 앱은 세션의 auth UUID(authUuid)로 조회한다.
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
@@ -30,7 +31,7 @@ export async function upsertProfile(p: {
 }): Promise<void> {
   const client = db();
   if (!client) return; // 로컬 mock — DB 없음
-  const { error } = await client.from("profiles").upsert(
+  const { error } = await client.from("users").upsert(
     {
       uuid: p.uuid,
       brand_name: p.brandName,
@@ -62,7 +63,7 @@ export async function findDuplicates(p: {
 
   const exists = async (column: string, value: string, ci = false): Promise<boolean> => {
     let q = client
-      .from("profiles")
+      .from("users")
       .select("user_id", { count: "exact", head: true });
     q = ci ? q.ilike(column, value) : q.eq(column, value);
     if (p.excludeUuid) q = q.neq("uuid", p.excludeUuid);
@@ -89,7 +90,7 @@ export async function findDuplicates(p: {
 export async function updateProfileImage(uuid: string, imageUrl: string): Promise<void> {
   const client = db();
   if (!client) return; // 로컬 mock
-  const { error } = await client.from("profiles").update({ profile_image: imageUrl }).eq("uuid", uuid);
+  const { error } = await client.from("users").update({ profile_image: imageUrl }).eq("uuid", uuid);
   if (error) throw new Error(error.message);
 }
 
@@ -99,7 +100,7 @@ export async function getProfileById(userId: number): Promise<Profile | null> {
   const client = db();
   if (!client) return null;
   const { data } = await client
-    .from("profiles")
+    .from("users")
     .select("user_id, uuid, brand_name, phone, email, profile_image")
     .eq("user_id", userId)
     .maybeSingle();
@@ -126,7 +127,7 @@ export async function getProfile(authUuid: string): Promise<Profile | null> {
   const client = db();
   if (!client) return null;
   const { data } = await client
-    .from("profiles")
+    .from("users")
     .select("user_id, uuid, brand_name, phone, email, profile_image")
     .eq("uuid", authUuid)
     .maybeSingle();

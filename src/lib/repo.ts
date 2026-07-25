@@ -540,17 +540,17 @@ class SupabaseRepo implements Repo {
       enrichment: input.enrichment ?? null,
       owner_user_id: input.ownerUserId ?? null, claim_token_hash: input.editPasswordHash ?? null,
     };
-    const { data, error } = await this.db.from("makers").insert(row).select().single();
+    const { data, error } = await this.db.from("brands").insert(row).select().single();
     if (error) throw error;
     return rowToMaker(data as MakerRow);
   }
   async getMakerBySlug(slug: string) {
     // status='active'만 — inactive(소프트 삭제)는 /m·수정·검증 전 경로에서 비노출(원천 차단)
-    const { data } = await this.db.from("makers").select().eq("slug", slug).eq("status", "active").maybeSingle();
+    const { data } = await this.db.from("brands").select().eq("slug", slug).eq("status", "active").maybeSingle();
     return data ? rowToMaker(data as MakerRow) : null;
   }
   async getMakerById(id: number) {
-    const { data } = await this.db.from("makers").select().eq("id", id).eq("status", "active").maybeSingle();
+    const { data } = await this.db.from("brands").select().eq("id", id).eq("status", "active").maybeSingle();
     return data ? rowToMaker(data as MakerRow) : null;
   }
   async updateMakerContent(
@@ -567,32 +567,32 @@ class SupabaseRepo implements Repo {
       keywords: c.keywords, trust: c.trust, collab_open: c.collabOpen,
       search_visible: c.searchVisible,
     };
-    const { data } = await this.db.from("makers").update(patch).eq("slug", slug).select().maybeSingle();
+    const { data } = await this.db.from("brands").update(patch).eq("slug", slug).select().maybeSingle();
     return data ? rowToMaker(data as MakerRow) : null;
   }
   async setMakerOwner(slug: string, ownerUserId: number): Promise<void> {
-    await this.db.from("makers").update({ owner_user_id: ownerUserId }).eq("slug", slug);
+    await this.db.from("brands").update({ owner_user_id: ownerUserId }).eq("slug", slug);
   }
   async setMakerPasswordHash(slug: string, hash: string): Promise<void> {
-    await this.db.from("makers").update({ claim_token_hash: hash }).eq("slug", slug);
+    await this.db.from("brands").update({ claim_token_hash: hash }).eq("slug", slug);
   }
   async deleteMaker(slug: string): Promise<void> {
     // 소프트 삭제(2026-07-22): 하드 delete 대신 status=inactive. DB 행·카드·지표는 보관, 전 노출면에서만 사라짐.
-    await this.db.from("makers").update({ status: "inactive" }).eq("slug", slug);
+    await this.db.from("brands").update({ status: "inactive" }).eq("slug", slug);
   }
   async listMakersByOwner(ownerUserId: number): Promise<Maker[]> {
     // /my — 소프트 삭제분은 목록에서 제외(status='active'만)
-    const { data } = await this.db.from("makers").select().eq("owner_user_id", ownerUserId).eq("status", "active").order("created_at", { ascending: false });
+    const { data } = await this.db.from("brands").select().eq("owner_user_id", ownerUserId).eq("status", "active").order("created_at", { ascending: false });
     return (data ?? []).map((r) => rowToMaker(r as MakerRow));
   }
   async listMakers() {
-    const { data } = await this.db.from("makers").select().order("created_at", { ascending: false });
+    const { data } = await this.db.from("brands").select().order("created_at", { ascending: false });
     return (data ?? []).map((r) => rowToMaker(r as MakerRow));
   }
   async searchMakers(q: string) {
     const t = q.trim();
     // 검색은 search_visible=true + status='active' 만 노출(소유자의 /my 목록은 별도라 여기 필터 무관).
-    let query = this.db.from("makers").select().eq("search_visible", true).eq("status", "active");
+    let query = this.db.from("brands").select().eq("search_visible", true).eq("status", "active");
     if (t) query = query.or(`name.ilike.%${t}%,one_liner.ilike.%${t}%,region.ilike.%${t}%`);
     const { data } = await query.order("created_at", { ascending: false });
     return (data ?? []).map((r) => rowToMaker(r as MakerRow));
@@ -606,7 +606,7 @@ class SupabaseRepo implements Repo {
     if (flags.collabOpen !== undefined) patch.collab_open = flags.collabOpen;
     if (flags.searchVisible !== undefined) patch.search_visible = flags.searchVisible;
     if (Object.keys(patch).length === 0) return this.getMakerBySlug(slug);
-    const { data } = await this.db.from("makers").update(patch).eq("slug", slug).select().maybeSingle();
+    const { data } = await this.db.from("brands").update(patch).eq("slug", slug).select().maybeSingle();
     return data ? rowToMaker(data as MakerRow) : null;
   }
 
@@ -623,13 +623,13 @@ class SupabaseRepo implements Repo {
 
   async recordView(cardId: number, ref?: string): Promise<ViewEvent> {
     const row = { card_id: cardId, ref: ref ?? null };
-    const { data, error } = await this.db.from("view_events").insert(row).select().single();
+    const { data, error } = await this.db.from("card_view_events").insert(row).select().single();
     if (error) throw error;
     const r = data as ViewRow;
     return { id: r.id, cardId: r.card_id, createdAt: r.created_at, ref: r.ref ?? undefined };
   }
   async countViews(cardId: number) {
-    const { count } = await this.db.from("view_events").select("*", { count: "exact", head: true }).eq("card_id", cardId);
+    const { count } = await this.db.from("card_view_events").select("*", { count: "exact", head: true }).eq("card_id", cardId);
     return count ?? 0;
   }
   async recordReaction(cardId: number, type: Reaction["type"]): Promise<Reaction> {
@@ -641,10 +641,10 @@ class SupabaseRepo implements Repo {
   }
   async isMakerSaved(userId: number, makerId: number): Promise<boolean> {
     const { data } = await this.db
-      .from("saved_makers")
-      .select("maker_id")
+      .from("saved_brands")
+      .select("brand_id")
       .eq("user_id", userId)
-      .eq("maker_id", makerId)
+      .eq("brand_id", makerId)
       .maybeSingle();
     return !!data;
   }
@@ -652,22 +652,22 @@ class SupabaseRepo implements Repo {
     if (saved) {
       // 복합 PK라 중복 저장은 무시(멱등)
       await this.db
-        .from("saved_makers")
-        .upsert({ user_id: userId, maker_id: makerId }, { onConflict: "user_id,maker_id", ignoreDuplicates: true });
+        .from("saved_brands")
+        .upsert({ user_id: userId, brand_id: makerId }, { onConflict: "user_id,brand_id", ignoreDuplicates: true });
     } else {
-      await this.db.from("saved_makers").delete().eq("user_id", userId).eq("maker_id", makerId);
+      await this.db.from("saved_brands").delete().eq("user_id", userId).eq("brand_id", makerId);
     }
   }
   async listSavedMakers(userId: number): Promise<Maker[]> {
-    // 1) 찜 순서(최근 먼저)로 maker_id 수집 → 2) makers 일괄 조회 후 그 순서로 재정렬
+    // 1) 찜 순서(최근 먼저)로 brand_id 수집 → 2) brands 일괄 조회 후 그 순서로 재정렬
     const { data: rows } = await this.db
-      .from("saved_makers")
-      .select("maker_id")
+      .from("saved_brands")
+      .select("brand_id")
       .eq("user_id", userId)
       .order("created_at", { ascending: false });
-    const ids = (rows ?? []).map((r) => (r as { maker_id: number }).maker_id);
+    const ids = (rows ?? []).map((r) => (r as { brand_id: number }).brand_id);
     if (ids.length === 0) return [];
-    const { data } = await this.db.from("makers").select().in("id", ids).eq("status", "active");
+    const { data } = await this.db.from("brands").select().in("id", ids).eq("status", "active");
     const byId = new Map((data ?? []).map((r) => [(r as MakerRow).id, rowToMaker(r as MakerRow)]));
     return ids.map((id) => byId.get(id)).filter((m): m is Maker => !!m);
   }
