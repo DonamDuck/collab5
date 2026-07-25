@@ -118,3 +118,15 @@ create table saved_makers (
 );
 create index idx_saved_makers_user on saved_makers(user_uuid, created_at desc);
 alter table saved_makers enable row level security;
+
+-- ── 콜라보 제안 인텐트 (append-only) — "콜라보 시작하기" 클릭 계측. P3(연락) 선행지표. ──
+-- 로그인 유저가 대상 업체에게 제안 시도(인스타/홈피 채널로 핸드오프)한 이벤트. 서버만 접근.
+create table collab_requests (
+  id             bigint generated always as identity primary key,
+  from_user_uuid uuid references auth.users(id) on delete set null,
+  to_maker_id    bigint not null references makers(id) on delete cascade,
+  channel        text not null,
+  created_at     timestamptz not null default now()
+);
+create index idx_collab_requests_to on collab_requests(to_maker_id, created_at desc);
+alter table collab_requests enable row level security;

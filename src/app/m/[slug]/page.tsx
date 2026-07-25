@@ -63,7 +63,15 @@ export default async function MakerPage({
       )}
 
       {/* 하단 고정 플로팅 액션바 — 찜 + 콜라보 시작하기(UI) + 링크복사 */}
-      <MakerActionBar slug={slug} makerId={maker.id} initialSaved={initialSaved} loggedIn={!!user} />
+      <MakerActionBar
+        slug={slug}
+        makerId={maker.id}
+        makerName={maker.name}
+        initialSaved={initialSaved}
+        loggedIn={!!user}
+        instagram={maker.trust.instagram}
+        homepage={maker.trust.homepage}
+      />
     </main>
   );
 }

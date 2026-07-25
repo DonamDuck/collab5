@@ -29,6 +29,8 @@ export interface Repo {
   isMakerSaved(userUuid: string, makerId: number): Promise<boolean>;
   setMakerSaved(userUuid: string, makerId: number, saved: boolean): Promise<void>;
   listSavedMakers(userUuid: string): Promise<Maker[]>;
+  // 콜라보 제안 인텐트(append-only) — "콜라보 시작하기" 계측
+  recordCollabRequest(fromUserUuid: string | null, toMakerId: number, channel: string): Promise<void>;
 }
 
 const now = () => new Date().toISOString();
@@ -382,6 +384,7 @@ class InMemoryRepo implements Repo {
   private views: ViewEvent[] = [];
   private reactions: Reaction[] = [];
   private saved: { userUuid: string; makerId: number; createdAt: string }[] = [];
+  private collabRequests: { fromUserUuid: string | null; toMakerId: number; channel: string; createdAt: string }[] = [];
   // 정수 시퀀스 카운터 (DB의 identity 흉내)
   private nextMakerId = this.makers.length + 1;
   private nextCardId = this.cards.length + 1;
@@ -479,6 +482,9 @@ class InMemoryRepo implements Repo {
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt)) // 최근 찜 먼저
       .map((s) => this.makers.find((m) => m.id === s.makerId && m.status !== "inactive"))
       .filter((m): m is Maker => !!m);
+  }
+  async recordCollabRequest(fromUserUuid: string | null, toMakerId: number, channel: string): Promise<void> {
+    this.collabRequests.push({ fromUserUuid, toMakerId, channel, createdAt: now() });
   }
 }
 
@@ -685,6 +691,9 @@ class SupabaseRepo implements Repo {
     const { data } = await this.db.from("makers").select().in("id", ids).eq("status", "active");
     const byId = new Map((data ?? []).map((r) => [(r as MakerRow).id, rowToMaker(r as MakerRow)]));
     return ids.map((id) => byId.get(id)).filter((m): m is Maker => !!m);
+  }
+  async recordCollabRequest(fromUserUuid: string | null, toMakerId: number, channel: string): Promise<void> {
+    await this.db.from("collab_requests").insert({ from_user_uuid: fromUserUuid, to_maker_id: toMakerId, channel });
   }
 }
 

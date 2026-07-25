@@ -342,6 +342,21 @@ export async function setMakerSavedAction(
   }
 }
 
+/** 콜라보 제안 인텐트 기록 — "콜라보 시작하기" 계측. 로그인 필수(누가→누구 방향 시그널). */
+export async function recordCollabRequestAction(
+  toMakerId: number,
+  channel: string
+): Promise<{ error?: string }> {
+  const user = await getSessionUser();
+  if (!user) return { error: "콜라보를 시작하려면 로그인이 필요해요." };
+  try {
+    await repo.recordCollabRequest(user.id, toMakerId, channel);
+    return {};
+  } catch {
+    return { error: "기록에 실패했어요." };
+  }
+}
+
 /** 소개서 삭제 — 로그인 소유자만. /my에서 사용. 카드·지표는 FK CASCADE로 함께 삭제. */
 export async function deleteMakerAction(slug: string): Promise<{ error?: string }> {
   const maker = await repo.getMakerBySlug(slug);

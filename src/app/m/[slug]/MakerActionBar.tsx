@@ -1,43 +1,54 @@
 "use client";
 
 // 소개서 페이지 하단 고정 플로팅 액션바 — 방문자 액션 존.
-// [ ♡ 찜(작게) + 콜라보 시작하기(신설, 지금은 UI만) ] + 링크복사 pill(바 우측 위).
-// 백보드 = 흰 배경 + 상단 좌우 모서리만 둥근 바텀시트형.
+// [ ♡ 찜(작게) + 콜라보 시작하기 ] + 링크복사 pill(바 우측 위). 백보드 = 흰 배경 + 상단 좌우 라운드.
+// 찜·콜라보 시작 둘 다 로그인 필수 — 비로그인은 로그인 유도 후, 복귀 시 원래 의도를 자동 재개.
 import { useState, useTransition, useEffect } from "react";
-import { setMakerSavedAction } from "@/lib/actions";
+import { setMakerSavedAction, recordCollabRequestAction } from "@/lib/actions";
+import { resolveCollabChannel } from "@/lib/links";
 import { ScrollLock } from "@/components/ScrollLock";
 
-// 로그인/가입 전에 눌렀던 찜 의도를 보관하는 키(같은 탭 세션 한정).
-// 고객이 이미 하트를 눌렀으니, 로그인 후 이 페이지로 돌아오면 자동으로 찜 처리한다.
+// 로그인/가입 전에 눌렀던 의도를 보관하는 키(같은 탭 세션 한정) — 복귀 시 자동 재개.
 const PENDING_SAVE_KEY = "collab5:pendingSave";
+const PENDING_PROPOSE_KEY = "collab5:pendingPropose";
 
 export function MakerActionBar({
   slug,
   makerId,
+  makerName,
   initialSaved,
   loggedIn,
+  instagram,
+  homepage,
 }: {
   slug: string;
   makerId: number;
+  makerName: string;
   initialSaved: boolean;
   loggedIn: boolean;
+  instagram?: string;
+  homepage?: string;
 }) {
   const [saved, setSaved] = useState(initialSaved);
   const [loginOpen, setLoginOpen] = useState(false);
-  const [toast, setToast] = useState(false);
+  const [loginReason, setLoginReason] = useState<"save" | "propose">("save");
+  const [proposeOpen, setProposeOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const [pending, start] = useTransition();
 
-  // 로그인/가입으로 떠나기 직전, 이 업체를 찜하려 했다는 의도를 남긴다.
-  const markPendingSave = () => {
+  // 콜라보 연락 채널(인스타 DM 우선 → 홈페이지/카톡 → 없으면 null)
+  const channel = resolveCollabChannel({ instagram, homepage });
+
+  // 로그인/가입으로 떠나기 직전, 무슨 의도였는지(찜/제안) 이 업체 기준으로 남긴다.
+  const markPending = () => {
     try {
-      sessionStorage.setItem(PENDING_SAVE_KEY, String(makerId));
+      sessionStorage.setItem(loginReason === "propose" ? PENDING_PROPOSE_KEY : PENDING_SAVE_KEY, String(makerId));
     } catch {
       /* 프라이빗 모드 등 — 실패해도 무해 */
     }
   };
 
-  // 로그인 후 이 페이지로 복귀 시: 보류해둔 찜 의도가 이 업체면 자동 저장(하트 채움).
+  // 복귀 시 보류해둔 찜 의도가 이 업체면 자동 저장(하트 채움).
   useEffect(() => {
     if (!loggedIn || saved) return;
     let pendingId: string | null = null;
@@ -54,13 +65,32 @@ export function MakerActionBar({
     }
     setSaved(true); // 낙관적 — 고객은 이미 눌렀으니 즉시 채움
     setMakerSavedAction(makerId, true).then((r) => {
-      if (r.error) setSaved(false); // 저장 실패 시 되돌림
+      if (r.error) setSaved(false);
     });
   }, [loggedIn, saved, makerId]);
+
+  // 복귀 시 보류해둔 제안 의도가 이 업체면 제안 시트 자동 오픈.
+  useEffect(() => {
+    if (!loggedIn) return;
+    let pendingId: string | null = null;
+    try {
+      pendingId = sessionStorage.getItem(PENDING_PROPOSE_KEY);
+    } catch {
+      return;
+    }
+    if (pendingId !== String(makerId)) return;
+    try {
+      sessionStorage.removeItem(PENDING_PROPOSE_KEY);
+    } catch {
+      /* noop */
+    }
+    setProposeOpen(true);
+  }, [loggedIn, makerId]);
 
   // 찜 토글 — 비로그인은 로그인 유도, 로그인은 낙관적 저장(실패 시 롤백).
   const toggleHeart = () => {
     if (!loggedIn) {
+      setLoginReason("save");
       setLoginOpen(true);
       return;
     }
@@ -75,10 +105,22 @@ export function MakerActionBar({
     });
   };
 
-  // 콜라보 시작하기 — UI만(기능 나중). 죽은 버튼처럼 안 보이게 잠깐 안내.
-  const startCollab = () => {
-    setToast(true);
-    window.setTimeout(() => setToast(false), 2200);
+  // 콜라보 시작하기 — 비로그인은 로그인 유도, 로그인은 제안 시트.
+  const handlePropose = () => {
+    if (!loggedIn) {
+      setLoginReason("propose");
+      setLoginOpen(true);
+      return;
+    }
+    setProposeOpen(true);
+  };
+
+  // 제안 시트 CTA — 사용자 제스처 내 즉시 채널 오픈(팝업 차단 회피), 계측은 best-effort.
+  const doPropose = () => {
+    if (!channel) return;
+    window.open(channel.url, "_blank", "noopener,noreferrer");
+    recordCollabRequestAction(makerId, channel.channel).catch(() => {});
+    setProposeOpen(false);
   };
 
   const copy = async () => {
@@ -102,6 +144,12 @@ export function MakerActionBar({
     setCopied(true);
     window.setTimeout(() => setCopied(false), 1800);
   };
+
+  const loginTitle = loginReason === "propose" ? "콜라보를 시작하려면 로그인이 필요해요" : "찜하려면 로그인이 필요해요";
+  const loginSub =
+    loginReason === "propose"
+      ? "로그인하면 마음에 든 곳에 콜라보를 제안할 수 있어요."
+      : "관심 있는 곳을 저장해두고 언제든 다시 볼 수 있어요.";
 
   return (
     <>
@@ -148,10 +196,10 @@ export function MakerActionBar({
               </svg>
             </button>
 
-            {/* 콜라보 시작하기 — primary, 나머지 폭. 지금은 UI만 */}
+            {/* 콜라보 시작하기 — primary, 나머지 폭 */}
             <button
               type="button"
-              onClick={startCollab}
+              onClick={handlePropose}
               className="flex h-12 flex-1 items-center justify-center rounded-md bg-primary text-base font-medium text-primary-on transition-colors"
             >
               콜라보 시작하기
@@ -160,14 +208,50 @@ export function MakerActionBar({
         </div>
       </div>
 
-      {/* 콜라보 시작하기 안내 토스트 */}
-      {toast && (
-        <div className="fixed bottom-[92px] left-1/2 z-50 -translate-x-1/2 rounded-pill bg-ink px-4 py-2.5 text-[13px] font-medium text-surface shadow-e2 print:hidden">
-          열심히 준비 중이에요!
+      {/* 콜라보 제안 시트 — 앱 내 채팅 준비 전까지 인스타 등으로 핸드오프 */}
+      {proposeOpen && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 print:hidden" onClick={() => setProposeOpen(false)}>
+          <ScrollLock />
+          <div
+            className="relative w-full max-w-[640px] rounded-t-2xl border border-b-0 border-hairline bg-surface p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] shadow-e2"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* 우측 상단 닫기 */}
+            <button
+              type="button"
+              onClick={() => setProposeOpen(false)}
+              aria-label="닫기"
+              className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-md text-faint hover:bg-surface-soft hover:text-ink"
+            >
+              <svg viewBox="0 0 20 20" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8">
+                <path d="M5 5l10 10M15 5L5 15" strokeLinecap="round" />
+              </svg>
+            </button>
+
+            <p className="pr-8 text-xl font-bold text-ink">{makerName}님께 콜라보 제안하기</p>
+            {channel ? (
+              <>
+                <p className="mt-2 text-[15px] leading-relaxed text-mute">
+                  앱 내 채팅 기능을 준비 중이에요. 그전까지는 아래 방법으로 콜라보 연락을 해보세요.
+                </p>
+                <button
+                  type="button"
+                  onClick={doPropose}
+                  className="mt-5 flex h-12 w-full items-center justify-center rounded-md bg-primary text-base font-medium text-primary-on"
+                >
+                  {channel.label}
+                </button>
+              </>
+            ) : (
+              <p className="mt-2 text-[15px] leading-relaxed text-mute">
+                아직 {makerName}님의 연락처가 등록되지 않았어요. 조금만 기다려 주세요.
+              </p>
+            )}
+          </div>
         </div>
       )}
 
-      {/* 비로그인 찜 → 로그인 유도 얼럿 */}
+      {/* 비로그인 → 로그인 유도 얼럿 (찜/제안 공용) */}
       {loginOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4">
           <ScrollLock />
@@ -184,10 +268,8 @@ export function MakerActionBar({
               </svg>
             </button>
 
-            <p className="text-xl font-bold text-ink">찜하려면 로그인이 필요해요</p>
-            <p className="mt-2 text-base leading-relaxed text-mute">
-              관심 있는 곳을 저장해두고 언제든 다시 볼 수 있어요.
-            </p>
+            <p className="px-6 text-xl font-bold leading-snug text-ink">{loginTitle}</p>
+            <p className="mt-2 text-base leading-relaxed text-mute">{loginSub}</p>
             <div className="mt-5 flex gap-2">
               <button
                 type="button"
@@ -198,7 +280,7 @@ export function MakerActionBar({
               </button>
               <a
                 href={`/login?redirect=${encodeURIComponent(`/m/${slug}`)}`}
-                onClick={markPendingSave}
+                onClick={markPending}
                 className="flex h-11 flex-1 items-center justify-center rounded-md bg-primary text-sm font-medium text-primary-on"
               >
                 로그인
@@ -206,8 +288,8 @@ export function MakerActionBar({
             </div>
             <p className="mt-4 text-[13px] text-mute">
               아직 회원이 아니신가요?{" "}
-              <a href="/signup" onClick={markPendingSave} className="font-medium text-ink underline underline-offset-2">
-                회원가입 하기
+              <a href="/signup" onClick={markPending} className="font-medium text-ink underline underline-offset-2">
+                회원가입
               </a>
             </p>
           </div>

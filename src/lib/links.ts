@@ -24,6 +24,27 @@ export function instagramHandle(handle: string): string {
   return `@${instagramSlug(handle)}`;
 }
 
+/** 인스타 DM 딥링크 — ig.me/m/{핸들}은 프로필이 아니라 DM 창을 연다(콜라보 연락용).
+ *  ⚠️인스타는 DM 텍스트 프리필 파라미터가 없다 → 문구는 별도로 복사해 붙여넣어야 함. */
+export function instagramDmUrl(handle: string): string {
+  return `https://ig.me/m/${instagramSlug(handle)}`;
+}
+
+/** 콜라보 연락 채널 결정 — 인스타 DM 우선, 없으면 홈페이지/카톡채널 등, 둘 다 없으면 null.
+ *  label은 버튼 문구, channel은 계측용 태그. */
+export function resolveCollabChannel(trust?: { instagram?: string; homepage?: string }):
+  | { label: string; url: string; channel: "instagram" | "homepage" }
+  | null {
+  const ig = trust?.instagram?.trim();
+  if (ig) return { label: "인스타그램으로 연락하기", url: instagramDmUrl(ig), channel: "instagram" };
+  const hp = trust?.homepage?.trim();
+  if (hp) {
+    const svc = channelLabel(hp);
+    return { label: `${svc ?? "홈페이지"}로 연락하기`, url: normalizeUrl(hp), channel: "homepage" };
+  }
+  return null;
+}
+
 /** 홈페이지 href — 프로토콜 없으면 https 붙임 */
 export function normalizeUrl(url: string): string {
   const u = url.trim();
