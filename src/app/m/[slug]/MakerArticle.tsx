@@ -22,10 +22,10 @@ export function MakerArticle({ maker, isOwner, logoUrl, readOnly }: {
       )}
 
       {/* ① 우리는 이런 브랜드에요 — 자세히 소개 */}
-      {maker.trust.description && (
+      {maker.description && (
         <Section title="우리는 이런 브랜드에요">
           <p className="whitespace-pre-line text-[17px] leading-relaxed text-body">
-            {maker.trust.description}
+            {maker.description}
           </p>
         </Section>
       )}

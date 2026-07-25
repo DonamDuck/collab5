@@ -59,6 +59,7 @@ const seedMakers: Maker[] = [
       },
       { partner: "스톤브루", types: ["제품콜라보"], photos: [] },
     ],
+    description: "버려지는 천에 새 이야기를 입히는 패브릭 브랜드.",
     story:
       "버려지는 원단이 아까워 시작한 취미가 브랜드가 됐어요.\n한 조각씩 이어 붙이다 보니, 사람들도 하나둘 모이더라고요.",
     activities: [
@@ -138,7 +139,6 @@ const seedMakers: Maker[] = [
       homepage: "https://www.canvasgarden.shop",
       instagram: "@canvasgarden",
       address: "서울 성동구 성수이로 88 2층 캔버스가든",
-      description: "버려지는 천에 새 이야기를 입히는 패브릭 브랜드.",
     },
     collabOpen: true,
     searchVisible: true,
@@ -155,6 +155,7 @@ const seedMakers: Maker[] = [
     seeks: ["워크숍", "제품콜라보"],
     targetAudience: ["빈티지 애호가", "동네 단골", "감성 공간 탐방러"],
     collabHistory: [],
+    description: "오래된 물건에 다시 온기를 더하는 편집숍.",
     story: "",
     activities: [],
     offersDescription: "",
@@ -165,7 +166,6 @@ const seedMakers: Maker[] = [
     trust: {
       instagram: "@owol.forest",
       address: "서울 마포구 연남동",
-      description: "오래된 물건에 다시 온기를 더하는 편집숍.",
     },
     collabOpen: true,
     searchVisible: true,
@@ -182,6 +182,7 @@ const seedMakers: Maker[] = [
     seeks: ["제품콜라보", "팝업"],
     targetAudience: ["커피 애호가", "로컬 워커", "여행자"],
     collabHistory: [],
+    description: "영도 바다를 닮은 깊고 진한 한 잔.",
     story: "",
     activities: [],
     offersDescription: "",
@@ -192,7 +193,6 @@ const seedMakers: Maker[] = [
     trust: {
       instagram: "@stonebrew.coffee",
       address: "부산 영도구",
-      description: "영도 바다를 닮은 깊고 진한 한 잔.",
     },
     collabOpen: true,
     searchVisible: true,
@@ -209,6 +209,7 @@ const seedMakers: Maker[] = [
     seeks: ["공동콘텐츠", "공동굿즈"],
     targetAudience: ["그림책 애호가", "아이와 부모", "여행자"],
     collabHistory: [],
+    description: "천천히 머물다 가는 그림책 책방.",
     story: "",
     activities: [],
     offersDescription: "",
@@ -219,7 +220,6 @@ const seedMakers: Maker[] = [
     trust: {
       instagram: "@horak.lib",
       address: "제주시",
-      description: "천천히 머물다 가는 그림책 책방.",
     },
     collabOpen: false,
     searchVisible: true,
@@ -245,6 +245,7 @@ const seedMakers: Maker[] = [
         photos: ["https://picsum.photos/seed/demo-p-collab1/900/700"],
       },
     ],
+    description: "쌀과 계절 곡물로만 굽는 작은 비건 베이커리.",
     story: "할머니 부엌에서 배운 쌀 반죽이 시작이었어요.",
     activities: [
       {
@@ -274,7 +275,6 @@ const seedMakers: Maker[] = [
     trust: {
       instagram: "@morucho.studio",
       address: "전북 전주시 완산구 한옥마을길 12",
-      description: "쌀과 계절 곡물로만 굽는 작은 비건 베이커리.",
     },
     collabOpen: false,
     searchVisible: false,
@@ -299,6 +299,7 @@ const seedMakers: Maker[] = [
         photos: [],
       },
     ],
+    description: "밑줄 그은 문장을 매개로 사람을 잇는 책방.",
     story: "좋아하는 문장에 밑줄을 긋다가, 밑줄을 나누는 가게를 열었어요.",
     activities: [
       {
@@ -323,7 +324,6 @@ const seedMakers: Maker[] = [
     trust: {
       instagram: "@midnight.underline",
       address: "대구 중구 종로 24 1층",
-      description: "밑줄 그은 문장을 매개로 사람을 잇는 책방.",
     },
     collabOpen: false,
     searchVisible: false,
@@ -468,21 +468,18 @@ interface MakerRow {
   photos: string[] | null;
   intro_file_url: string | null;
   trust: Maker["trust"];
-  // 07-25 이사 컬럼 — 옛 컬럼(soul·blocks·*_note)은 백필 후 곧 drop 예정이라 선택적으로 읽어 폴백만 한다.
   keywords: string[] | null; showcases: Maker["showcases"] | null;
   offers_description: string | null; seeks_description: string | null;
-  soul?: { values?: string[] } | null; blocks?: Maker["showcases"] | null;
-  offers_note?: string | null; seeks_note?: string | null;
-  // 자세히 소개 — trust.description(jsonb)에서 최상위 컬럼으로 이사 중(07-25). 컬럼 없는 환경에선 undefined.
-  description?: string | null;
+  description: string | null; // 자세히 소개(07-25 trust.description에서 분리 완료)
   collab_open: boolean; search_visible: boolean | null; status: string | null; created_at: string; updated_at: string | null;
-  owner_user_id: number | null; claim_token_hash: string | null;
+  owner_user_id: number | null;
+  // 수정 비밀번호 해시 — 07-25 claim_token_hash → edit_password_hash 이사(옛 컬럼 폴백)
+  edit_password_hash: string | null; claim_token_hash?: string | null;
   enrichment: Maker["enrichment"] | null;
 }
 interface CardRow {
   id: number; slug: string;
-  // 07-25 이사: 새 컬럼 우선, 백필 누락 대비로 옛 컬럼 폴백
-  from_brand_id: number | null; from_maker_id?: number | null;
+  from_brand_id: number | null;
   proposal: CollabCard["proposal"]; created_at: string;
 }
 interface ViewRow { id: number; card_id: number; created_at: string; ref: string | null; }
@@ -497,26 +494,25 @@ function rowToMaker(r: MakerRow): Maker {
     collabHistory: (r.collab_history ?? []).map((h) => ({ ...h, photos: h.photos ?? [] })),
     story: r.story ?? "",
     activities: r.activities ?? [],
-    // 07-25 이사: 새 컬럼 우선, 아직 옛 컬럼만 있는 행은 폴백으로 읽는다(백필 누락 대비).
-    offersDescription: r.offers_description ?? r.offers_note ?? "",
-    seeksDescription: r.seeks_description ?? r.seeks_note ?? "",
+    offersDescription: r.offers_description ?? "",
+    seeksDescription: r.seeks_description ?? "",
     photos: r.photos ?? [],
-    showcases: (r.showcases ?? r.blocks ?? []).map((b) => ({ ...b, photos: b.photos ?? [], links: b.links ?? [] })),
+    showcases: (r.showcases ?? []).map((b) => ({ ...b, photos: b.photos ?? [], links: b.links ?? [] })),
     introFileUrl: r.intro_file_url ?? undefined,
-    keywords: r.keywords ?? r.soul?.values ?? [],
-    // 자세히 소개 이사(07-25): jsonb에 남아 있으면 그쪽이 최신(수정 경로가 아직 jsonb에 씀), 없으면 이사된 컬럼에서 읽는다.
-    trust: { ...r.trust, description: r.trust?.description ?? r.description ?? undefined },
+    keywords: r.keywords ?? [],
+    description: r.description ?? "",
+    trust: r.trust,
     collabOpen: r.collab_open, searchVisible: r.search_visible ?? true,
     status: (r.status as MakerStatus) ?? "active",
     createdAt: r.created_at,
     updatedAt: r.updated_at ?? undefined,
     ownerUserId: r.owner_user_id ?? undefined,
-    editPasswordHash: r.claim_token_hash ?? undefined,
+    editPasswordHash: r.edit_password_hash ?? r.claim_token_hash ?? undefined,
     enrichment: r.enrichment ?? undefined,
   };
 }
 function rowToCard(r: CardRow): CollabCard {
-  return { id: r.id, slug: r.slug, fromBrandId: r.from_brand_id ?? r.from_maker_id ?? 0, proposal: r.proposal, createdAt: r.created_at };
+  return { id: r.id, slug: r.slug, fromBrandId: r.from_brand_id ?? 0, proposal: r.proposal, createdAt: r.created_at };
 }
 
 class SupabaseRepo implements Repo {
@@ -530,7 +526,7 @@ class SupabaseRepo implements Repo {
       region: input.region ?? null,
       offers: input.offers, seeks: input.seeks, target_audience: input.targetAudience,
       collab_history: input.collabHistory,
-      story: input.story, activities: input.activities,
+      description: input.description, story: input.story, activities: input.activities,
       offers_description: input.offersDescription, seeks_description: input.seeksDescription,
       photos: input.photos,
       showcases: input.showcases, intro_file_url: input.introFileUrl ?? null,
@@ -538,7 +534,7 @@ class SupabaseRepo implements Repo {
       search_visible: input.searchVisible,
       status: "active", // 생성 default = active (소프트 삭제 시에만 inactive)
       enrichment: input.enrichment ?? null,
-      owner_user_id: input.ownerUserId ?? null, claim_token_hash: input.editPasswordHash ?? null,
+      owner_user_id: input.ownerUserId ?? null, edit_password_hash: input.editPasswordHash ?? null,
     };
     const { data, error } = await this.db.from("brands").insert(row).select().single();
     if (error) throw error;
@@ -561,7 +557,7 @@ class SupabaseRepo implements Repo {
       name: c.name, one_liner: c.oneLiner,
       region: c.region ?? null, offers: c.offers, seeks: c.seeks,
       target_audience: c.targetAudience, collab_history: c.collabHistory,
-      story: c.story, activities: c.activities,
+      description: c.description, story: c.story, activities: c.activities,
       offers_description: c.offersDescription, seeks_description: c.seeksDescription,
       photos: c.photos, showcases: c.showcases, intro_file_url: c.introFileUrl ?? null,
       keywords: c.keywords, trust: c.trust, collab_open: c.collabOpen,
@@ -574,7 +570,7 @@ class SupabaseRepo implements Repo {
     await this.db.from("brands").update({ owner_user_id: ownerUserId }).eq("slug", slug);
   }
   async setMakerPasswordHash(slug: string, hash: string): Promise<void> {
-    await this.db.from("brands").update({ claim_token_hash: hash }).eq("slug", slug);
+    await this.db.from("brands").update({ edit_password_hash: hash }).eq("slug", slug);
   }
   async deleteMaker(slug: string): Promise<void> {
     // 소프트 삭제(2026-07-22): 하드 delete 대신 status=inactive. DB 행·카드·지표는 보관, 전 노출면에서만 사라짐.

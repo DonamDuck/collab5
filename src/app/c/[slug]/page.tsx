@@ -102,11 +102,11 @@ export default async function CardPage({
         )}
 
         {/* 브랜드 소개 — 등록 때 작성한 소개(정리되어 카드에 노출) */}
-        {maker.trust.description && (
+        {maker.description && (
           <div className="mt-5">
             <p className="text-[12px] font-medium tracking-wide text-faint">소개</p>
             <p className="mt-2 whitespace-pre-line text-[15px] leading-relaxed text-body">
-              {maker.trust.description}
+              {maker.description}
             </p>
           </div>
         )}
