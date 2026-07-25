@@ -11,13 +11,10 @@ export type CollabType =
   | "행사참여"
   | "공간대여";
 
-export type BusinessSize = "1인" | "소규모" | "중간" | "대형";
-
-/** AI distill 결(結) 층 — 보조, 사용자가 칩으로 교정 */
+/** 브랜드를 표현하는 키워드 칩 — 사용자가 직접 고른다(구 SoulLayer.values).
+ *  구 tone·trajectory는 생성 시 항상 빈 문자열로만 박히고 읽는 곳이 없어 07-25 정리에서 제거. */
 export interface SoulLayer {
-  values: string[]; // 핵심 가치 (예: ["친환경", "손맛", "느린 호흡"])
-  tone: string; // 톤·무드 한 줄
-  trajectory: string; // 브랜드 행보 한 줄
+  values: string[]; // 키워드 (예: ["친환경", "손맛", "느린 호흡"])
 }
 
 /** 검증 가능한 신뢰 시그널 — 표시층(사람이 다각도 검토) */
@@ -83,10 +80,7 @@ export interface Maker {
   slug: string; // 공개 URL 용
   name: string;
   oneLiner: string; // 한 줄 정체성
-  coverImageUrl?: string;
-  logoUrl?: string;
   region?: string;
-  size?: BusinessSize;
   offers: CollabType[]; // 제공 가능
   seeks: CollabType[]; // 희망
   targetAudience: string[];

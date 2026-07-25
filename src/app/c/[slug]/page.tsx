@@ -52,27 +52,18 @@ export default async function CardPage({
           </span>
         </div>
 
-        {/* 2. 커버(무대) — 사진 있으면 스와이프 슬라이드, 없으면 커버/이니셜 폴백 */}
+        {/* 2. 커버(무대) — 사진 있으면 스와이프 슬라이드, 없으면 이니셜 폴백 */}
         {maker.photos.length > 0 ? (
           <div className="mt-5">
             <PhotoSlider photos={maker.photos} rounded="rounded-md" />
           </div>
         ) : (
           <div className="mt-5 h-[108px] overflow-hidden rounded-md">
-            {maker.coverImageUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={maker.coverImageUrl}
-                alt={maker.name}
-                className="h-full w-full object-cover"
-              />
-            ) : (
-              <div className="flex h-full w-full items-center justify-center bg-primary-pale">
-                <span className="text-[40px] font-bold leading-none text-primary-on">
-                  {initial}
-                </span>
-              </div>
-            )}
+            <div className="flex h-full w-full items-center justify-center bg-primary-pale">
+              <span className="text-[40px] font-bold leading-none text-primary-on">
+                {initial}
+              </span>
+            </div>
           </div>
         )}
 

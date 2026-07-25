@@ -3,7 +3,7 @@
 // (DB는 '공유 → 타인 열람(view) 루프 = 배포 시점'에 투입 — masterbrain 2026-06-21 결정)
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import type { BusinessSize, CollabCard, CollabType, Maker, MakerStatus, Reaction, ViewEvent } from "./types";
+import type { CollabCard, CollabType, Maker, MakerStatus, Reaction, ViewEvent } from "./types";
 
 export interface Repo {
   // 업체
@@ -43,7 +43,6 @@ const seedMakers: Maker[] = [
     name: "캔버스가든",
     oneLiner: "패브릭으로 짓는 친환경 가방과 조각 워크숍",
     region: "서울",
-    size: "소규모",
     offers: ["워크숍", "제품콜라보", "팝업"],
     seeks: ["공간대여", "행사참여", "공동콘텐츠"],
     targetAudience: ["20-30대 여성", "친환경 라이프스타일", "핸드메이드 애호가"],
@@ -136,8 +135,6 @@ const seedMakers: Maker[] = [
     ],
     soul: {
       values: ["친환경", "손맛", "느린 호흡"],
-      tone: "단단하지만 다정한, 정성스러운",
-      trajectory: "작은 가방에서 시작해 사람을 모으는 워크숍으로 자라는 중",
     },
     trust: {
       homepage: "https://www.canvasgarden.shop",
@@ -156,7 +153,6 @@ const seedMakers: Maker[] = [
     name: "오월의숲",
     oneLiner: "계절을 담는 빈티지 편집숍 & 작은 전시 공간",
     region: "서울 연남",
-    size: "소규모",
     offers: ["공간대여", "팝업", "행사참여"],
     seeks: ["워크숍", "제품콜라보"],
     targetAudience: ["빈티지 애호가", "동네 단골", "감성 공간 탐방러"],
@@ -169,8 +165,6 @@ const seedMakers: Maker[] = [
     blocks: [],
     soul: {
       values: ["빈티지", "큐레이션", "계절감"],
-      tone: "조용하고 단정한, 취향이 또렷한",
-      trajectory: "작은 편집숍에서 동네의 사랑방으로",
     },
     trust: {
       instagram: "@owol.forest",
@@ -188,7 +182,6 @@ const seedMakers: Maker[] = [
     name: "스톤브루",
     oneLiner: "직접 로스팅하는 동네 스페셜티 카페",
     region: "부산 영도",
-    size: "소규모",
     offers: ["공간대여", "공동콘텐츠", "공동굿즈"],
     seeks: ["제품콜라보", "팝업"],
     targetAudience: ["커피 애호가", "로컬 워커", "여행자"],
@@ -201,8 +194,6 @@ const seedMakers: Maker[] = [
     blocks: [],
     soul: {
       values: ["로컬", "정성", "느긋함"],
-      tone: "투박하지만 따뜻한",
-      trajectory: "영도 골목의 작은 로스터리에서 시작",
     },
     trust: {
       instagram: "@stonebrew.coffee",
@@ -220,7 +211,6 @@ const seedMakers: Maker[] = [
     name: "호락호락 도서관",
     oneLiner: "그림책과 손글씨가 머무는 작은 동네 책방",
     region: "제주",
-    size: "1인",
     offers: ["워크숍", "행사참여", "공간대여"],
     seeks: ["공동콘텐츠", "공동굿즈"],
     targetAudience: ["그림책 애호가", "아이와 부모", "여행자"],
@@ -233,8 +223,6 @@ const seedMakers: Maker[] = [
     blocks: [],
     soul: {
       values: ["다정함", "느린 호흡", "손글씨"],
-      tone: "포근하고 말랑한",
-      trajectory: "혼자 꾸리는 책방에서 동네 아지트로",
     },
     trust: {
       instagram: "@horak.lib",
@@ -253,7 +241,6 @@ const seedMakers: Maker[] = [
     name: "모루초 스튜디오",
     oneLiner: "쌀로 굽는 비건 구움과자와 시골 부엌 클래스",
     region: "전주",
-    size: "1인",
     offers: ["제품콜라보", "워크숍"],
     seeks: ["팝업", "공간대여"],
     targetAudience: ["비건 지향", "디저트 애호가"],
@@ -293,8 +280,6 @@ const seedMakers: Maker[] = [
     ],
     soul: {
       values: ["비건", "로컬", "수작업"],
-      tone: "소박하고 정직한",
-      trajectory: "시골 부엌에서 도시의 식탁으로",
     },
     trust: {
       instagram: "@morucho.studio",
@@ -312,7 +297,6 @@ const seedMakers: Maker[] = [
     name: "밑줄서점",
     oneLiner: "문장을 수집하는 심야 책방",
     region: "대구",
-    size: "1인",
     offers: ["행사참여", "공동콘텐츠"],
     seeks: ["워크숍", "공동굿즈"],
     targetAudience: ["책 애호가", "글 쓰는 사람"],
@@ -347,8 +331,6 @@ const seedMakers: Maker[] = [
     ],
     soul: {
       values: ["문장", "밤", "다정함"],
-      tone: "낮게 가라앉은, 그러나 따뜻한",
-      trajectory: "혼자 읽던 밤에서 함께 읽는 밤으로",
     },
     trust: {
       instagram: "@midnight.underline",
@@ -491,8 +473,7 @@ class InMemoryRepo implements Repo {
 // ── Supabase DB row shapes (snake_case → camelCase 매핑용) ──
 interface MakerRow {
   id: number; slug: string; name: string; one_liner: string;
-  cover_image_url: string | null; logo_url: string | null;
-  region: string | null; size: string | null;
+  region: string | null;
   offers: string[]; seeks: string[]; target_audience: string[];
   collab_history: Maker["collabHistory"];
   story: string; activities: Maker["activities"]; offers_note: string; seeks_note: string;
@@ -515,10 +496,7 @@ interface ReactionRow { id: number; card_id: number; type: string; created_at: s
 function rowToMaker(r: MakerRow): Maker {
   return {
     id: r.id, slug: r.slug, name: r.name, oneLiner: r.one_liner,
-    coverImageUrl: r.cover_image_url ?? undefined,
-    logoUrl: r.logo_url ?? undefined,
     region: r.region ?? undefined,
-    size: (r.size as BusinessSize) ?? undefined,
     offers: r.offers as CollabType[], seeks: r.seeks as CollabType[],
     targetAudience: r.target_audience,
     collabHistory: (r.collab_history ?? []).map((h) => ({ ...h, photos: h.photos ?? [] })),
@@ -553,8 +531,7 @@ class SupabaseRepo implements Repo {
     // id·created_at·updated_at 은 DB가 자동 부여
     const row = {
       slug: input.slug, name: input.name, one_liner: input.oneLiner,
-      cover_image_url: input.coverImageUrl ?? null, logo_url: input.logoUrl ?? null,
-      region: input.region ?? null, size: input.size ?? null,
+      region: input.region ?? null,
       offers: input.offers, seeks: input.seeks, target_audience: input.targetAudience,
       collab_history: input.collabHistory,
       story: input.story, activities: input.activities, offers_note: input.offersNote, seeks_note: input.seeksNote,

@@ -118,7 +118,7 @@ export async function createMakerAction(
     photos: unwrapPhotos(input.photos),
     blocks: sanitizeBlocks(input.blocks),
     introFileUrl: input.introFileUrl?.trim() || undefined,
-    soul: { values: input.values, tone: "", trajectory: "" },
+    soul: { values: input.values },
     trust: {
       instagram: input.instagram?.trim() || undefined,
       homepage: input.homepage?.trim() || undefined,
@@ -284,7 +284,7 @@ export async function updateMakerAction(
     photos: unwrapPhotos(input.photos),
     blocks: sanitizeBlocks(input.blocks),
     introFileUrl: input.introFileUrl?.trim() || undefined,
-    soul: { values: input.values, tone: "", trajectory: "" },
+    soul: { values: input.values },
     trust: {
       instagram: input.instagram?.trim() || undefined,
       homepage: input.homepage?.trim() || undefined,
