@@ -111,7 +111,7 @@ export interface Proposal {
 export interface CollabCard {
   id: number; // 정수 시퀀스 PK
   slug: string; // 공유 링크 경로
-  fromMakerId: number;
+  fromBrandId: number; // 보내는 브랜드 (DB=from_brand_id, 구 from_maker_id)
   proposal: Proposal;
   createdAt: string;
 }

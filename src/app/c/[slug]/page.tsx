@@ -16,7 +16,7 @@ export default async function CardPage({
   const isNew = (await searchParams)?.new === "1";
   const card = await repo.getCardBySlug(slug);
   if (!card) notFound();
-  const maker = await repo.getMakerById(card.fromMakerId);
+  const maker = await repo.getMakerById(card.fromBrandId);
   if (!maker) notFound();
 
   const p = card.proposal;

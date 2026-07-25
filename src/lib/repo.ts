@@ -30,7 +30,7 @@ export interface Repo {
   setMakerSaved(userId: number, makerId: number, saved: boolean): Promise<void>;
   listSavedMakers(userId: number): Promise<Maker[]>;
   // 콜라보 제안 인텐트(append-only) — "콜라보 시작하기" 계측
-  recordCollabRequest(fromUserId: number | null, toMakerId: number, channel: string): Promise<void>;
+  recordCollabRequest(fromUserId: number | null, toBrandId: number, channel: string): Promise<void>;
 }
 
 const now = () => new Date().toISOString();
@@ -337,7 +337,7 @@ const seedCards: CollabCard[] = [
   {
     id: 1,
     slug: "canvasgarden-demo",
-    fromMakerId: 1,
+    fromBrandId: 1,
     proposal: {
       toName: "오월의숲",
       why: "오월의숲의 빈티지 큐레이션이 저희 워크숍 무드와 정말 잘 맞아요. 결이 닿는 공간이라고 느꼈어요.",
@@ -354,7 +354,7 @@ class InMemoryRepo implements Repo {
   private views: ViewEvent[] = [];
   private reactions: Reaction[] = [];
   private saved: { userId: number; makerId: number; createdAt: string }[] = [];
-  private collabRequests: { fromUserId: number | null; toMakerId: number; channel: string; createdAt: string }[] = [];
+  private collabRequests: { fromUserId: number | null; toBrandId: number; channel: string; createdAt: string }[] = [];
   // 정수 시퀀스 카운터 (DB의 identity 흉내)
   private nextMakerId = this.makers.length + 1;
   private nextCardId = this.cards.length + 1;
@@ -453,8 +453,8 @@ class InMemoryRepo implements Repo {
       .map((s) => this.makers.find((m) => m.id === s.makerId && m.status !== "inactive"))
       .filter((m): m is Maker => !!m);
   }
-  async recordCollabRequest(fromUserId: number | null, toMakerId: number, channel: string): Promise<void> {
-    this.collabRequests.push({ fromUserId, toMakerId, channel, createdAt: now() });
+  async recordCollabRequest(fromUserId: number | null, toBrandId: number, channel: string): Promise<void> {
+    this.collabRequests.push({ fromUserId, toBrandId, channel, createdAt: now() });
   }
 }
 
@@ -480,7 +480,9 @@ interface MakerRow {
   enrichment: Maker["enrichment"] | null;
 }
 interface CardRow {
-  id: number; slug: string; from_maker_id: number;
+  id: number; slug: string;
+  // 07-25 이사: 새 컬럼 우선, 백필 누락 대비로 옛 컬럼 폴백
+  from_brand_id: number | null; from_maker_id?: number | null;
   proposal: CollabCard["proposal"]; created_at: string;
 }
 interface ViewRow { id: number; card_id: number; created_at: string; ref: string | null; }
@@ -514,7 +516,7 @@ function rowToMaker(r: MakerRow): Maker {
   };
 }
 function rowToCard(r: CardRow): CollabCard {
-  return { id: r.id, slug: r.slug, fromMakerId: r.from_maker_id, proposal: r.proposal, createdAt: r.created_at };
+  return { id: r.id, slug: r.slug, fromBrandId: r.from_brand_id ?? r.from_maker_id ?? 0, proposal: r.proposal, createdAt: r.created_at };
 }
 
 class SupabaseRepo implements Repo {
@@ -609,7 +611,7 @@ class SupabaseRepo implements Repo {
   }
 
   async createCard(input: Omit<CollabCard, "id" | "createdAt">): Promise<CollabCard> {
-    const row = { slug: input.slug, from_maker_id: input.fromMakerId, proposal: input.proposal };
+    const row = { slug: input.slug, from_brand_id: input.fromBrandId, proposal: input.proposal };
     const { data, error } = await this.db.from("collab_cards").insert(row).select().single();
     if (error) throw error;
     return rowToCard(data as CardRow);
@@ -669,8 +671,8 @@ class SupabaseRepo implements Repo {
     const byId = new Map((data ?? []).map((r) => [(r as MakerRow).id, rowToMaker(r as MakerRow)]));
     return ids.map((id) => byId.get(id)).filter((m): m is Maker => !!m);
   }
-  async recordCollabRequest(fromUserId: number | null, toMakerId: number, channel: string): Promise<void> {
-    await this.db.from("collab_requests").insert({ from_user_id: fromUserId, to_maker_id: toMakerId, channel });
+  async recordCollabRequest(fromUserId: number | null, toBrandId: number, channel: string): Promise<void> {
+    await this.db.from("collab_requests").insert({ from_user_id: fromUserId, to_brand_id: toBrandId, channel });
   }
 }
 

@@ -28,7 +28,7 @@ export default function CardCreator({
   const submit = () => {
     startTransition(async () => {
       const { slug } = await createCardAction({
-        fromMakerId: makerId,
+        fromBrandId: makerId,
         fromSlug,
         toName,
         why,
