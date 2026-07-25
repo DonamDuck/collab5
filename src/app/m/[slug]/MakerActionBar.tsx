@@ -7,10 +7,12 @@ import { useState, useTransition, useEffect } from "react";
 import { setMakerSavedAction, recordCollabRequestAction } from "@/lib/actions";
 import { resolveCollabChannel } from "@/lib/links";
 import { ScrollLock } from "@/components/ScrollLock";
+import { ReportSheet } from "./ReportSheet";
 
 // 로그인/가입 전에 눌렀던 의도를 보관하는 키(같은 탭 세션 한정) — 복귀 시 자동 재개.
 const PENDING_SAVE_KEY = "collab5:pendingSave";
 const PENDING_PROPOSE_KEY = "collab5:pendingPropose";
+const PENDING_REPORT_KEY = "collab5:pendingReport";
 
 export function MakerActionBar({
   slug,
@@ -37,8 +39,10 @@ export function MakerActionBar({
 }) {
   const [saved, setSaved] = useState(initialSaved);
   const [loginOpen, setLoginOpen] = useState(false);
-  const [loginReason, setLoginReason] = useState<"save" | "propose">("save");
+  const [loginReason, setLoginReason] = useState<"save" | "propose" | "report">("save");
   const [proposeOpen, setProposeOpen] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reportSample, setReportSample] = useState(false); // 소개서 0개 유저 — 샘플 리포트 티저
   const [message, setMessage] = useState(""); // 추천 메시지(수정 가능)
   const [toast, setToast] = useState<string | null>(null); // 복사 완료 토스트(3종 통일)
   const [selectedSlug, setSelectedSlug] = useState(viewerBrands[0]?.slug); // 함께 보낼 내 소개서
@@ -59,10 +63,12 @@ export function MakerActionBar({
     setMessage(msg);
   }, [proposeOpen, senderName, selectedBrand?.slug, selectedBrand?.name]);
 
-  // 로그인/가입으로 떠나기 직전, 무슨 의도였는지(찜/제안) 이 업체 기준으로 남긴다.
+  // 로그인/가입으로 떠나기 직전, 무슨 의도였는지(찜/제안/분석) 이 업체 기준으로 남긴다.
   const markPending = () => {
     try {
-      sessionStorage.setItem(loginReason === "propose" ? PENDING_PROPOSE_KEY : PENDING_SAVE_KEY, String(makerId));
+      const key =
+        loginReason === "propose" ? PENDING_PROPOSE_KEY : loginReason === "report" ? PENDING_REPORT_KEY : PENDING_SAVE_KEY;
+      sessionStorage.setItem(key, String(makerId));
     } catch {
       /* 프라이빗 모드 등 — 실패해도 무해 */
     }
@@ -89,23 +95,34 @@ export function MakerActionBar({
     });
   }, [loggedIn, saved, makerId]);
 
-  // 복귀 시 보류해둔 제안 의도가 이 업체면 제안 시트 자동 오픈.
+  // 복귀 시 보류해둔 시트 의도(분석/제안)가 이 업체면 자동 오픈 — 하나의 effect로 순서 보장.
+  // 우선순위 report > propose: 둘 다 이 업체면 report만 열고, propose 키도 함께 소비(리포트 CTA가 제안으로 이어짐).
   useEffect(() => {
     if (!loggedIn) return;
-    let pendingId: string | null = null;
+    let pendingReport: string | null = null;
+    let pendingPropose: string | null = null;
     try {
-      pendingId = sessionStorage.getItem(PENDING_PROPOSE_KEY);
+      pendingReport = sessionStorage.getItem(PENDING_REPORT_KEY);
+      pendingPropose = sessionStorage.getItem(PENDING_PROPOSE_KEY);
     } catch {
       return;
     }
-    if (pendingId !== String(makerId)) return;
+    const wantReport = pendingReport === String(makerId);
+    const wantPropose = pendingPropose === String(makerId);
+    if (!wantReport && !wantPropose) return;
     try {
-      sessionStorage.removeItem(PENDING_PROPOSE_KEY);
+      if (wantReport) sessionStorage.removeItem(PENDING_REPORT_KEY);
+      if (wantPropose) sessionStorage.removeItem(PENDING_PROPOSE_KEY);
     } catch {
       /* noop */
     }
-    setProposeOpen(true);
-  }, [loggedIn, makerId]);
+    if (wantReport) {
+      setReportSample(viewerBrands.length === 0); // 로그인했지만 소개서 0개 → 샘플 티저
+      setReportOpen(true);
+    } else {
+      setProposeOpen(true);
+    }
+  }, [loggedIn, makerId, viewerBrands.length]);
 
   // 찜 토글 — 비로그인은 로그인 유도, 로그인은 낙관적 저장(실패 시 롤백).
   const toggleHeart = () => {
@@ -133,6 +150,17 @@ export function MakerActionBar({
       return;
     }
     setProposeOpen(true);
+  };
+
+  // 콜라보 분석 — 비로그인=로그인 유도 / 소개서 0개=샘플 티저 / 그 외=정상 분석 시트.
+  const handleReport = () => {
+    if (!loggedIn) {
+      setLoginReason("report");
+      setLoginOpen(true);
+      return;
+    }
+    setReportSample(viewerBrands.length === 0);
+    setReportOpen(true);
   };
 
   // 텍스트 복사 — clipboard API 우선, 실패 시 레거시 execCommand. (제스처 내 동기 실행 가능)
@@ -199,11 +227,18 @@ export function MakerActionBar({
     flash("✓ 소개서 링크를 복사했어요.");
   };
 
-  const loginTitle = loginReason === "propose" ? "콜라보를 시작하려면 로그인이 필요해요" : "찜하려면 로그인이 필요해요";
+  const loginTitle =
+    loginReason === "report"
+      ? "콜라보 분석을 보려면 로그인이 필요해요"
+      : loginReason === "propose"
+        ? "콜라보를 시작하려면 로그인이 필요해요"
+        : "찜하려면 로그인이 필요해요";
   const loginSub =
-    loginReason === "propose"
-      ? "로그인하면 마음에 드는 브랜드와 콜라보를 시작할 수 있어요."
-      : "마음에 드는 브랜드를 저장해두고 언제든 다시 만나보세요.";
+    loginReason === "report"
+      ? "로그인하면 두 브랜드의 콜라보 가능성을 AI가 분석해드려요."
+      : loginReason === "propose"
+        ? "로그인하면 마음에 드는 브랜드와 콜라보를 시작할 수 있어요."
+        : "마음에 드는 브랜드를 저장해두고 언제든 다시 만나보세요.";
 
   // 함께 보낼 내 소개서 — 0개=섹션 없음 / 1개=명시 / 2개+=브랜드명 칩 선택
   const brandPicker =
@@ -240,6 +275,20 @@ export function MakerActionBar({
         )}
       </div>
     );
+
+  // 제안 시트 안 보조 진입 — 논블로킹 한 줄 링크(제안 시트는 로그인 후에만 열리므로 비로그인 노출 없음).
+  const reportLink = (
+    <button
+      type="button"
+      onClick={() => {
+        setProposeOpen(false);
+        handleReport();
+      }}
+      className="mt-4 block text-[13px] font-medium text-ink underline underline-offset-2"
+    >
+      제안 전에 콜라보 분석을 볼까요? →
+    </button>
+  );
 
   return (
     <>
@@ -286,7 +335,15 @@ export function MakerActionBar({
 
           {/* 백보드 바 — 흰 배경 + 상단 좌우 라운드. 콜라보 액션 전용 */}
           <div className="flex items-center gap-2.5 rounded-t-2xl border border-b-0 border-hairline bg-surface px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 shadow-e2">
-            {/* 콜라보 시작하기 — primary, 풀폭 */}
+            {/* 콜라보 분석 — 고스트(왼쪽) */}
+            <button
+              type="button"
+              onClick={handleReport}
+              className="flex h-12 flex-[0.8] items-center justify-center rounded-md border border-border-strong bg-surface text-base font-medium text-ink transition-colors"
+            >
+              콜라보 분석
+            </button>
+            {/* 콜라보 시작하기 — primary */}
             <button
               type="button"
               onClick={handlePropose}
@@ -326,7 +383,8 @@ export function MakerActionBar({
                   <br />
                   그전까지는 아래 메시지를 복사해 {isInstagram ? "인스타그램으로" : "아래 채널로"} 연락해보세요.
                 </p>
-                <label className="mt-4 block text-[13px] font-medium text-body">메시지 초안 (자유롭게 수정해보세요)</label>
+                {reportLink}
+                <label className="mt-3 block text-[13px] font-medium text-body">메시지 초안 (자유롭게 수정해보세요)</label>
                 <textarea
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
@@ -357,7 +415,8 @@ export function MakerActionBar({
                   그전까지는 아래 이메일로 연락해보세요.
                 </p>
                 <p className="mt-3 text-[14px] text-body break-all select-all">{contactEmail}</p>
-                <label className="mt-4 block text-[13px] font-medium text-body">메시지 초안 (자유롭게 수정해보세요)</label>
+                {reportLink}
+                <label className="mt-3 block text-[13px] font-medium text-body">메시지 초안 (자유롭게 수정해보세요)</label>
                 <textarea
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
@@ -390,6 +449,20 @@ export function MakerActionBar({
           </div>
         </div>
       )}
+
+      {/* AI 콜라보 분석 리포트 시트 — CTA는 리포트 닫고 제안 시트로 */}
+      <ReportSheet
+        open={reportOpen}
+        onClose={() => setReportOpen(false)}
+        fromBrands={viewerBrands}
+        toSlug={slug}
+        toName={makerName}
+        sampleMode={reportSample}
+        onPropose={() => {
+          setReportOpen(false);
+          setProposeOpen(true);
+        }}
+      />
 
       {/* 복사 완료 토스트 (3종 통일 — 링크/메시지/이메일 주소) */}
       {toast && (
