@@ -11,11 +11,6 @@ export type CollabType =
   | "행사참여"
   | "공간대여";
 
-/** 브랜드를 표현하는 키워드 칩 — 사용자가 직접 고른다(구 SoulLayer.values).
- *  구 tone·trajectory는 생성 시 항상 빈 문자열로만 박히고 읽는 곳이 없어 07-25 정리에서 제거. */
-export interface SoulLayer {
-  values: string[]; // 키워드 (예: ["친환경", "손맛", "느린 호흡"])
-}
 
 /** 검증 가능한 신뢰 시그널 — 표시층(사람이 다각도 검토) */
 export interface TrustSignals {
@@ -87,13 +82,13 @@ export interface Maker {
   collabHistory: CollabHistory[]; // 함께한 콜라보 이력
   story: string;          // 왜 시작했나
   activities: Activity[];  // 대표 활동 최대 3
-  offersNote: string;      // 협업 직접 설명
-  seeksNote: string;       // 파트너 직접 설명
+  offersDescription: string; // 협업 직접 설명 (DB=offers_description, 구 offers_note)
+  seeksDescription: string;  // 파트너 직접 설명 (DB=seeks_description, 구 seeks_note)
   photos: string[]; // 브랜드 사진(카드·프로필 슬라이드용). MVP=리사이즈 data URL
-  blocks: Block[]; // 선택 블록(순서 보존)
+  showcases: Block[]; // 선택 블록(순서 보존) (DB=showcases, 구 blocks)
   enrichment?: Enrichment; // 크롤 스냅샷(생성 시 기록, 수정 시 보존). 없으면 undefined
   introFileUrl?: string; // 소개자료 PDF(코어 위계)
-  soul: SoulLayer;
+  keywords: string[]; // 브랜드를 표현하는 키워드 칩 (DB=keywords, 구 soul.values)
   trust: TrustSignals;
   collabOpen: boolean; // 콜라보 열림/닫힘 토글
   searchVisible: boolean; // 검색 결과 노출 on/off (DB=search_visible, 기본 true)

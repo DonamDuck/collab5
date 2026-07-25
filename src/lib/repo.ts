@@ -76,14 +76,14 @@ const seedMakers: Maker[] = [
         photos: [],
       },
     ],
-    offersNote: "저희 공간·재료·커리큘럼을 들고 어디든 갈 수 있어요. 브랜드 결이 맞다면 형태는 함께 정해요.",
-    seeksNote: "손으로 만드는 일의 가치를 아는 분들과 느슨하고 길게 협업하고 싶어요.",
+    offersDescription: "저희 공간·재료·커리큘럼을 들고 어디든 갈 수 있어요. 브랜드 결이 맞다면 형태는 함께 정해요.",
+    seeksDescription: "손으로 만드는 일의 가치를 아는 분들과 느슨하고 길게 협업하고 싶어요.",
     photos: [
       "https://picsum.photos/seed/canvasgarden1/900/700",
       "https://picsum.photos/seed/canvasgarden2/900/700",
       "https://picsum.photos/seed/canvasgarden3/900/700",
     ],
-    blocks: [
+    showcases: [
       {
         type: "metrics",
         items: [
@@ -133,9 +133,7 @@ const seedMakers: Maker[] = [
         links: [{ url: "https://example.com/canvasgarden-sustainability" }],
       },
     ],
-    soul: {
-      values: ["친환경", "손맛", "느린 호흡"],
-    },
+    keywords: ["친환경", "손맛", "느린 호흡"],
     trust: {
       homepage: "https://www.canvasgarden.shop",
       instagram: "@canvasgarden",
@@ -159,13 +157,11 @@ const seedMakers: Maker[] = [
     collabHistory: [],
     story: "",
     activities: [],
-    offersNote: "",
-    seeksNote: "",
+    offersDescription: "",
+    seeksDescription: "",
     photos: [],
-    blocks: [],
-    soul: {
-      values: ["빈티지", "큐레이션", "계절감"],
-    },
+    showcases: [],
+    keywords: ["빈티지", "큐레이션", "계절감"],
     trust: {
       instagram: "@owol.forest",
       address: "서울 마포구 연남동",
@@ -188,13 +184,11 @@ const seedMakers: Maker[] = [
     collabHistory: [],
     story: "",
     activities: [],
-    offersNote: "",
-    seeksNote: "",
+    offersDescription: "",
+    seeksDescription: "",
     photos: [],
-    blocks: [],
-    soul: {
-      values: ["로컬", "정성", "느긋함"],
-    },
+    showcases: [],
+    keywords: ["로컬", "정성", "느긋함"],
     trust: {
       instagram: "@stonebrew.coffee",
       address: "부산 영도구",
@@ -217,13 +211,11 @@ const seedMakers: Maker[] = [
     collabHistory: [],
     story: "",
     activities: [],
-    offersNote: "",
-    seeksNote: "",
+    offersDescription: "",
+    seeksDescription: "",
     photos: [],
-    blocks: [],
-    soul: {
-      values: ["다정함", "느린 호흡", "손글씨"],
-    },
+    showcases: [],
+    keywords: ["다정함", "느린 호흡", "손글씨"],
     trust: {
       instagram: "@horak.lib",
       address: "제주시",
@@ -264,13 +256,13 @@ const seedMakers: Maker[] = [
         ],
       },
     ],
-    offersNote: "레시피 개발부터 소량 생산까지 같이 할 수 있어요.",
-    seeksNote: "로컬 재료를 쓰는 공간·브랜드를 만나고 싶어요.",
+    offersDescription: "레시피 개발부터 소량 생산까지 같이 할 수 있어요.",
+    seeksDescription: "로컬 재료를 쓰는 공간·브랜드를 만나고 싶어요.",
     photos: [
       "https://picsum.photos/seed/demo-photo1/900/700",
       "https://picsum.photos/seed/demo-photo2/900/700",
     ],
-    blocks: [
+    showcases: [
       {
         type: "reviews",
         items: [{ quote: "쌀로 만든 게 맞나 싶게 촉촉해요.", source: "단골 손님" }],
@@ -278,9 +270,7 @@ const seedMakers: Maker[] = [
         links: [],
       },
     ],
-    soul: {
-      values: ["비건", "로컬", "수작업"],
-    },
+    keywords: ["비건", "로컬", "수작업"],
     trust: {
       instagram: "@morucho.studio",
       address: "전북 전주시 완산구 한옥마을길 12",
@@ -317,10 +307,10 @@ const seedMakers: Maker[] = [
         photos: [],
       },
     ],
-    offersNote: "글과 목소리로 하는 협업이라면 무엇이든 열려 있어요.",
-    seeksNote: "책과 어울리는 물성을 만드는 분들을 찾고 있어요.",
+    offersDescription: "글과 목소리로 하는 협업이라면 무엇이든 열려 있어요.",
+    seeksDescription: "책과 어울리는 물성을 만드는 분들을 찾고 있어요.",
     photos: [],
-    blocks: [
+    showcases: [
       {
         type: "custom",
         title: "이달의 밑줄",
@@ -329,9 +319,7 @@ const seedMakers: Maker[] = [
         links: [],
       },
     ],
-    soul: {
-      values: ["문장", "밤", "다정함"],
-    },
+    keywords: ["문장", "밤", "다정함"],
     trust: {
       instagram: "@midnight.underline",
       address: "대구 중구 종로 24 1층",
@@ -421,7 +409,7 @@ class InMemoryRepo implements Repo {
     const visible = this.makers.filter((m) => m.searchVisible && m.status !== "inactive");
     if (!t) return visible;
     return visible.filter((m) =>
-      [m.name, m.oneLiner, ...m.soul.values, ...m.offers, ...m.seeks]
+      [m.name, m.oneLiner, ...m.keywords, ...m.offers, ...m.seeks]
         .join(" ")
         .toLowerCase()
         .includes(t)
@@ -476,10 +464,15 @@ interface MakerRow {
   region: string | null;
   offers: string[]; seeks: string[]; target_audience: string[];
   collab_history: Maker["collabHistory"];
-  story: string; activities: Maker["activities"]; offers_note: string; seeks_note: string;
+  story: string; activities: Maker["activities"];
   photos: string[] | null;
-  blocks: Maker["blocks"] | null; intro_file_url: string | null;
-  soul: Maker["soul"]; trust: Maker["trust"];
+  intro_file_url: string | null;
+  trust: Maker["trust"];
+  // 07-25 이사 컬럼 — 옛 컬럼(soul·blocks·*_note)은 백필 후 곧 drop 예정이라 선택적으로 읽어 폴백만 한다.
+  keywords: string[] | null; showcases: Maker["showcases"] | null;
+  offers_description: string | null; seeks_description: string | null;
+  soul?: { values?: string[] } | null; blocks?: Maker["showcases"] | null;
+  offers_note?: string | null; seeks_note?: string | null;
   // 자세히 소개 — trust.description(jsonb)에서 최상위 컬럼으로 이사 중(07-25). 컬럼 없는 환경에선 undefined.
   description?: string | null;
   collab_open: boolean; search_visible: boolean | null; status: string | null; created_at: string; updated_at: string | null;
@@ -502,12 +495,13 @@ function rowToMaker(r: MakerRow): Maker {
     collabHistory: (r.collab_history ?? []).map((h) => ({ ...h, photos: h.photos ?? [] })),
     story: r.story ?? "",
     activities: r.activities ?? [],
-    offersNote: r.offers_note ?? "",
-    seeksNote: r.seeks_note ?? "",
+    // 07-25 이사: 새 컬럼 우선, 아직 옛 컬럼만 있는 행은 폴백으로 읽는다(백필 누락 대비).
+    offersDescription: r.offers_description ?? r.offers_note ?? "",
+    seeksDescription: r.seeks_description ?? r.seeks_note ?? "",
     photos: r.photos ?? [],
-    blocks: (r.blocks ?? []).map((b) => ({ ...b, photos: b.photos ?? [], links: b.links ?? [] })),
+    showcases: (r.showcases ?? r.blocks ?? []).map((b) => ({ ...b, photos: b.photos ?? [], links: b.links ?? [] })),
     introFileUrl: r.intro_file_url ?? undefined,
-    soul: r.soul,
+    keywords: r.keywords ?? r.soul?.values ?? [],
     // 자세히 소개 이사(07-25): jsonb에 남아 있으면 그쪽이 최신(수정 경로가 아직 jsonb에 씀), 없으면 이사된 컬럼에서 읽는다.
     trust: { ...r.trust, description: r.trust?.description ?? r.description ?? undefined },
     collabOpen: r.collab_open, searchVisible: r.search_visible ?? true,
@@ -534,10 +528,11 @@ class SupabaseRepo implements Repo {
       region: input.region ?? null,
       offers: input.offers, seeks: input.seeks, target_audience: input.targetAudience,
       collab_history: input.collabHistory,
-      story: input.story, activities: input.activities, offers_note: input.offersNote, seeks_note: input.seeksNote,
+      story: input.story, activities: input.activities,
+      offers_description: input.offersDescription, seeks_description: input.seeksDescription,
       photos: input.photos,
-      blocks: input.blocks, intro_file_url: input.introFileUrl ?? null,
-      soul: input.soul, trust: input.trust, collab_open: input.collabOpen,
+      showcases: input.showcases, intro_file_url: input.introFileUrl ?? null,
+      keywords: input.keywords, trust: input.trust, collab_open: input.collabOpen,
       search_visible: input.searchVisible,
       status: "active", // 생성 default = active (소프트 삭제 시에만 inactive)
       enrichment: input.enrichment ?? null,
@@ -564,9 +559,10 @@ class SupabaseRepo implements Repo {
       name: c.name, one_liner: c.oneLiner,
       region: c.region ?? null, offers: c.offers, seeks: c.seeks,
       target_audience: c.targetAudience, collab_history: c.collabHistory,
-      story: c.story, activities: c.activities, offers_note: c.offersNote, seeks_note: c.seeksNote,
-      photos: c.photos, blocks: c.blocks, intro_file_url: c.introFileUrl ?? null,
-      soul: c.soul, trust: c.trust, collab_open: c.collabOpen,
+      story: c.story, activities: c.activities,
+      offers_description: c.offersDescription, seeks_description: c.seeksDescription,
+      photos: c.photos, showcases: c.showcases, intro_file_url: c.introFileUrl ?? null,
+      keywords: c.keywords, trust: c.trust, collab_open: c.collabOpen,
       search_visible: c.searchVisible,
     };
     const { data } = await this.db.from("makers").update(patch).eq("slug", slug).select().maybeSingle();
