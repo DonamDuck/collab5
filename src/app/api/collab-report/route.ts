@@ -12,6 +12,9 @@ import type { BrandDna, Maker } from "@/lib/types";
 // 무거운 AI 호출=라우트(enrich 관례): DNA 최대 2콜 + 리포트 1콜 여유
 export const maxDuration = 60;
 
+// 리포트 모델 A/B 화이트리스트 — 클라가 임의 모델명을 넣지 못하게(비용·오작동 차단)
+const MODEL_WHITELIST = ["gemini-2.5-flash", "gemini-2.5-pro"];
+
 export async function POST(req: Request) {
   try {
     // ① 킬스위치
@@ -19,7 +22,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "disabled" }, { status: 503 });
     }
 
-    let body: { fromSlug?: unknown; toSlug?: unknown };
+    let body: { fromSlug?: unknown; toSlug?: unknown; model?: unknown; force?: unknown };
     try {
       body = await req.json();
     } catch {
@@ -27,6 +30,10 @@ export async function POST(req: Request) {
     }
     const fromSlug = String(body.fromSlug ?? "");
     const toSlug = String(body.toSlug ?? "");
+    // A/B 실험용(로그인 필수라 외부 남용 불가): 모델은 화이트리스트만, force는 캐시 우회.
+    // 일반 UI는 둘 다 안 보내므로 기본 경로 무영향. 모델 확정 후 제거 가능.
+    const modelOverride = MODEL_WHITELIST.includes(String(body.model ?? "")) ? String(body.model) : null;
+    const force = body.force === true;
 
     // ② 로그인 필수
     const userId = await getSessionUserId();
@@ -71,7 +78,7 @@ export async function POST(req: Request) {
 
     // ⑥ 캐시 3조건(스펙 §2-2): 최신 행 존재 + 양쪽 DNA non-stale(④ 후 항상 참)
     //    + 행 created_at이 양쪽 dna.updated_at보다 최신 → 저장본 즉시 반환(Gemini 0콜)
-    const latest = await repo.getLatestCollabReport(from.id, to.id);
+    const latest = force ? null : await repo.getLatestCollabReport(from.id, to.id);
     if (
       latest &&
       Date.parse(latest.createdAt) > Date.parse(fromDna.updated_at) &&
@@ -86,8 +93,8 @@ export async function POST(req: Request) {
     }
 
     // ⑦ 리포트 생성 → 접점<2 또는 아이디어 0개면 no_match(정직한 빈손)
-    const model = process.env.REPORT_MODEL || "gemini-2.5-flash";
-    const { report, candidates } = await generateReport(from, fromDna, to, toDna);
+    const model = modelOverride || process.env.REPORT_MODEL || "gemini-2.5-flash";
+    const { report, candidates } = await generateReport(from, fromDna, to, toDna, model);
     // 관측 로그(Vercel stdout) — 후보 전체+점수·선발 결과. 채점 기준 튜닝 근거(스펙 "탈락 후보 축적"의 v1).
     console.log(
       `[collab-report] ${from.slug}→${to.slug} model=${model} dnaCalls=${dnaCalls} ` +

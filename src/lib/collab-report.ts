@@ -298,7 +298,8 @@ export async function generateReport(
   a: Maker,
   aDna: BrandDna,
   b: Maker,
-  bDna: BrandDna
+  bDna: BrandDna,
+  modelOverride?: string // A/B 실험 — 라우트가 화이트리스트 검증 후 전달
 ): Promise<{ report: CollabReportData | null; candidates: ReportCandidate[] }> {
   if (!hasKey()) return { report: MOCK_REPORT, candidates: [] };
 
@@ -323,7 +324,7 @@ export async function generateReport(
   ].join("\n");
 
   const res = await ai().models.generateContent({
-    model: REPORT_MODEL(),
+    model: modelOverride || REPORT_MODEL(),
     contents,
     config: {
       systemInstruction: REPORT_SYSTEM,
