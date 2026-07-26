@@ -19,6 +19,7 @@ import {
 } from "./dna-pool";
 import type { Block, BrandDna, CollabReportData, DnaItem, Maker } from "./types";
 import { kstIso } from "./time";
+import { meter, logMeter, type CallMeter } from "./ai-cost";
 
 // 리포트 모델: 대표 블라인드 A/B(07-26)에서 3.6-flash가 2.5-flash·3.1-pro를 모두 이김.
 // ⚠️ 3.x 계열은 temperature/top_p/top_k 지원 중단 — 리포트 호출에는 샘플링 파라미터를 넘기지 않는다.
@@ -194,7 +195,7 @@ function mockDna(m: Maker): BrandDna {
 
 /** Brand DNA 생성(flash 고정·중립 — 비교 상대 무관 재사용 자산).
  *  prev = 갱신 재생성 시 기존 DNA — created_at을 보존한다(최초 생성 시각). */
-export async function generateDna(m: Maker, prev?: BrandDna): Promise<BrandDna> {
+export async function generateDna(m: Maker, prev?: BrandDna, meters?: CallMeter[]): Promise<BrandDna> {
   const digest = brandDigest(m);
   if (!hasKey()) {
     const mock = mockDna(m);
@@ -203,6 +204,7 @@ export async function generateDna(m: Maker, prev?: BrandDna): Promise<BrandDna> 
   const poolText = Object.entries(DNA_POOL)
     .map(([t, vs]) => `${t}: ${vs.join(", ")}`)
     .join("\n");
+  const t0 = Date.now();
   const res = await ai().models.generateContent({
     model: DNA_MODEL,
     contents: `[Pool]\n${poolText}\n\n[소개서]\n${digest.text}`,
@@ -213,6 +215,9 @@ export async function generateDna(m: Maker, prev?: BrandDna): Promise<BrandDna> 
       temperature: 0.2,
     },
   });
+  const dnaMeter = meter(`dna(${m.slug})`, DNA_MODEL, Date.now() - t0, res.usageMetadata);
+  logMeter(dnaMeter);
+  meters?.push(dnaMeter);
   const parsed = JSON.parse(res.text ?? "{}") as { summary?: unknown; items?: DnaItem[] };
   // 화이트리스트 서버 검증(사실 게이트 ②) — Pool 밖 어휘·근거 없음·입력에 없던 source 탈락
   const items = filterPoolValid(parsed.items ?? [], digest.fields);
@@ -315,7 +320,8 @@ export async function generateReport(
   aDna: BrandDna,
   b: Maker,
   bDna: BrandDna,
-  modelOverride?: string // A/B 실험 — 라우트가 화이트리스트 검증 후 전달
+  modelOverride?: string, // A/B 실험 — 라우트가 화이트리스트 검증 후 전달
+  meters?: CallMeter[] // 원가·토큰 실측 누적기(선택)
 ): Promise<{ report: CollabReportData | null; candidates: ReportCandidate[] }> {
   if (!hasKey()) return { report: MOCK_REPORT, candidates: [] };
 
@@ -339,8 +345,10 @@ export async function generateReport(
     methodPoolText,
   ].join("\n");
 
+  const reportModel = modelOverride || REPORT_MODEL();
+  const t0 = Date.now();
   const res = await ai().models.generateContent({
-    model: modelOverride || REPORT_MODEL(),
+    model: reportModel,
     contents,
     config: {
       systemInstruction: REPORT_SYSTEM,
@@ -348,6 +356,9 @@ export async function generateReport(
       responseSchema: REPORT_SCHEMA,
     },
   });
+  const reportMeter = meter("report", reportModel, Date.now() - t0, res.usageMetadata);
+  logMeter(reportMeter);
+  meters?.push(reportMeter);
   const p = JSON.parse(res.text ?? "{}") as {
     oneLiner?: unknown;
     candidates?: ReportCandidate[];
