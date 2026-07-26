@@ -14,11 +14,12 @@ import Link from "next/link";
 import { track } from "@/lib/track";
 import type { CollabReportListItem } from "@/lib/types";
 
-/** 리포트 축 미리보기 한 행 — 라벨(작게 faint) 위, 내용 아래. */
+/** 리포트 축 미리보기 한 행 — 라벨(13 bold ink) 위, 내용(14 body) 아래.
+ *  라벨을 미니 섹션 헤더로 세운다(대표 07-26). 본문이 한 단계 크므로 위계는 크기로 유지. */
 function PreviewRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <p className="text-[13px] font-medium text-faint">{label}</p>
+      <p className="text-[13px] font-bold text-ink">{label}</p>
       <div className="mt-1">{children}</div>
     </div>
   );
@@ -41,7 +42,7 @@ export function ReportArchiveCard({ item }: { item: CollabReportListItem }) {
         <span className="min-w-0 truncate rounded-pill bg-primary-pale px-2.5 py-1 text-[13px] font-semibold text-primary-on">
           {item.fromName} × {item.toName}
         </span>
-        {item.toRegion && <span className="shrink-0 text-[13px] text-faint">{item.toRegion}</span>}
+        {item.toRegion && <span className="shrink-0 text-[13px] font-semibold text-mute">{item.toRegion}</span>}
       </div>
 
       {/* 주인공 — 무엇을 상상했는지 */}
