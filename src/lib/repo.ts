@@ -502,7 +502,7 @@ class InMemoryRepo implements Repo {
         toRegion: topRegion(to.region),
         oneLiner: latest.report.oneLiner,
         matchPoint: latest.report.matchPoints?.[0]?.text,
-        ideaTitle: latest.report.ideas?.[0]?.title,
+        ideaTitles: (latest.report.ideas ?? []).map((i) => i.title).filter(Boolean).slice(0, 3),
         effect: latest.report.effects?.[0],
         createdAt: latest.createdAt,
       });
@@ -787,7 +787,7 @@ class SupabaseRepo implements Repo {
         toRegion: topRegion(r.to_brand.region),
         oneLiner: r.report?.oneLiner ?? "",
         matchPoint: r.report?.matchPoints?.[0]?.text,
-        ideaTitle: r.report?.ideas?.[0]?.title,
+        ideaTitles: (r.report?.ideas ?? []).map((i) => i.title).filter(Boolean).slice(0, 3),
         effect: r.report?.effects?.[0],
         createdAt: r.created_at,
       });

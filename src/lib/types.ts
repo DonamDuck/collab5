@@ -162,7 +162,7 @@ export interface CollabReportListItem {
   toRegion?: string;                    // 상대 지역(상위 2토막) — 날짜보다 재인식에 쓸모 있는 축
   oneLiner: string;                     // 카드의 주인공 — "어떤 콜라보를 상상했는지"
   matchPoint?: string;                  // 잘 어울리는 점 1개(채점 1위)
-  ideaTitle?: string;                   // 추천 콜라보 제목 1개
+  ideaTitles: string[];                 // 추천 콜라보 제목 최대 3개(라벨 아래 칩으로 열거)
   effect?: string;                      // 기대 효과 1개
   createdAt: string;                    // 정렬용(카드에는 노출 안 함)
 }
