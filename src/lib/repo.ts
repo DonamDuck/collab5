@@ -512,25 +512,27 @@ class InMemoryRepo implements Repo {
 }
 
 // ── Supabase DB row shapes (snake_case → camelCase 매핑용) ──
+// ⚠️ `?`가 붙은 필드 = 부분 select(SEARCH_CARD_COLS 등)에서 빠질 수 있는 컬럼.
+//    rowToMaker가 전부 기본값으로 메우므로, 새 필드를 넣을 땐 여기 optional + rowToMaker 기본값을 같이 둘 것.
 interface MakerRow {
   id: number; slug: string; name: string; one_liner: string;
   region: string | null;
-  offers: string[]; seeks: string[]; target_audience: string[];
-  collab_history: Maker["collabHistory"];
-  story: string; activities: Maker["activities"];
+  offers?: string[]; seeks?: string[]; target_audience?: string[];
+  collab_history?: Maker["collabHistory"];
+  story?: string; activities?: Maker["activities"];
   photos: string[] | null;
-  intro_file_url: string | null;
-  trust: Maker["trust"];
-  keywords: string[] | null; showcases: Maker["showcases"] | null;
-  offers_description: string | null; seeks_description: string | null;
-  description: string | null; // 자세히 소개(07-25 trust.description에서 분리 완료)
+  intro_file_url?: string | null;
+  trust?: Maker["trust"];
+  keywords: string[] | null; showcases?: Maker["showcases"] | null;
+  offers_description?: string | null; seeks_description?: string | null;
+  description?: string | null; // 자세히 소개(07-25 trust.description에서 분리 완료)
   collab_open: boolean; search_visible: boolean | null; status: string | null; created_at: string; updated_at: string | null;
-  owner_user_id: number | null;
+  owner_user_id?: number | null;
   // 수정 비밀번호 해시 — 07-25 claim_token_hash → edit_password_hash 이사(옛 컬럼 폴백)
-  edit_password_hash: string | null; claim_token_hash?: string | null;
-  enrichment: Maker["enrichment"] | null;
+  edit_password_hash?: string | null; claim_token_hash?: string | null;
+  enrichment?: Maker["enrichment"] | null;
   // Brand DNA — 파생 해석층(rowToMaker에 싣지 않음: 도메인 객체 비노출, API가 repo로 직접 읽음)
-  dna: BrandDna | null;
+  dna?: BrandDna | null;
 }
 interface CardRow {
   id: number; slug: string;
@@ -540,12 +542,16 @@ interface CardRow {
 interface ViewRow { id: number; card_id: number; created_at: string; ref: string | null; }
 interface ReactionRow { id: number; card_id: number; type: string; created_at: string; }
 
+/** /search 카드가 실제로 읽는 컬럼만(썸네일=photos[0]·필터=offers/seeks). 나머지는 rowToMaker가 기본값으로 채운다. */
+const SEARCH_CARD_COLS =
+  "id, slug, name, one_liner, region, photos, keywords, offers, seeks, collab_open, search_visible, status, created_at";
+
 function rowToMaker(r: MakerRow): Maker {
   return {
     id: r.id, slug: r.slug, name: r.name, oneLiner: r.one_liner,
     region: r.region ?? undefined,
-    offers: r.offers as CollabType[], seeks: r.seeks as CollabType[],
-    targetAudience: r.target_audience,
+    offers: (r.offers ?? []) as CollabType[], seeks: (r.seeks ?? []) as CollabType[],
+    targetAudience: r.target_audience ?? [],
     collabHistory: (r.collab_history ?? []).map((h) => ({ ...h, photos: h.photos ?? [] })),
     story: r.story ?? "",
     activities: r.activities ?? [],
@@ -556,7 +562,7 @@ function rowToMaker(r: MakerRow): Maker {
     introFileUrl: r.intro_file_url ?? undefined,
     keywords: r.keywords ?? [],
     description: r.description ?? "",
-    trust: r.trust,
+    trust: r.trust ?? {},
     collabOpen: r.collab_open, searchVisible: r.search_visible ?? true,
     status: (r.status as MakerStatus) ?? "active",
     createdAt: r.created_at,
@@ -643,7 +649,9 @@ class SupabaseRepo implements Repo {
   async searchMakers(q: string) {
     const t = q.trim();
     // 검색은 search_visible=true + status='active' 만 노출(소유자의 /my 목록은 별도라 여기 필터 무관).
-    let query = this.db.from("brands").select().eq("search_visible", true).eq("status", "active");
+    // ⚡카드에 필요한 컬럼만 — select()는 곧 select('*')라 dna·showcases·activities·collab_history·
+    //   enrichment·description·story까지 통째로 끌어왔다(카드는 하나도 안 쓴다). 목록 페이로드의 대부분.
+    let query = this.db.from("brands").select(SEARCH_CARD_COLS).eq("search_visible", true).eq("status", "active");
     if (t) query = query.or(`name.ilike.%${t}%,one_liner.ilike.%${t}%,region.ilike.%${t}%`);
     const { data } = await query.order("created_at", { ascending: false });
     return (data ?? []).map((r) => rowToMaker(r as MakerRow));
