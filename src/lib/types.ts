@@ -145,6 +145,7 @@ export interface BrandDna {
   summary: string;
   items: DnaItem[];
   input_fields: string[]; // 이번 생성 때 입력으로 넣은 필드 라벨 목록 — 서버가 기록(AI 출력 아님)
+  input_hash?: string;    // 이 DNA를 만든 소개서 다이제스트의 지문 — stale 판정 기준(시각 비교 대체). 없으면 구버전=1회 재생성
   created_at: string;
   updated_at: string;
 }

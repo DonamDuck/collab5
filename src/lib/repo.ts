@@ -702,7 +702,8 @@ class SupabaseRepo implements Repo {
     return (data?.dna as BrandDna) ?? null;
   }
   async setBrandDna(brandId: number, dna: BrandDna): Promise<void> {
-    // ⚠️ updated_at 트리거가 brands를 건드리므로 stale 판정은 DNA_STALE_SLACK_MS 허용 오차로 비교.
+    // ⚠️ 이 update는 brands의 updated_at 트리거를 발화시킨다 — 그래서 stale 판정은 시각이 아니라
+    //    dna.input_hash(내용 지문)로 한다(collab-report.ts isDnaStale). 시각 비교는 영구 stale이 된다.
     // 쓰기 실패를 삼키면 "DNA가 매번 없음 → 매 요청 재생성 → 캐시 영구 미스"가 조용히 성립한다.
     const { error } = await this.db.from("brands").update({ dna }).eq("id", brandId);
     if (error) console.error(`[repo] setBrandDna failed brand=${brandId}: ${error.message}`);

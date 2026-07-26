@@ -54,10 +54,10 @@ export async function POST(req: Request) {
     const startedAt = Date.now();
     let dnaCalls = 0;
 
-    // ④ DNA 확보(양쪽 병렬, stale만 재생성 — DNA_STALE_SLACK_MS·DNA_REFRESH_BEFORE 반영)
+    // ④ DNA 확보(양쪽 병렬, stale만 재생성 — 소개서 '내용 지문' 변화 + DNA_REFRESH_BEFORE 기준)
     const ensureDna = async (m: Maker): Promise<BrandDna> => {
       const prev = await repo.getBrandDna(m.id);
-      if (prev && !isDnaStale(prev, m.updatedAt)) return prev;
+      if (prev && !isDnaStale(prev, m)) return prev;
       dnaCalls += 1;
       const dna = await generateDna(m, prev ?? undefined); // 재생성 시 created_at 보존
       await repo.setBrandDna(m.id, dna);

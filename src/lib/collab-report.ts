@@ -4,6 +4,7 @@
 // 스펙: docs/superpowers/specs/2026-07-25-collab-report-dna-design.md
 // 플랜: docs/superpowers/plans/2026-07-25-collab-report-dna.md Task 6
 
+import { createHash } from "node:crypto";
 import { GoogleGenAI, Type } from "@google/genai";
 import { DNA_SYSTEM, REPORT_SYSTEM } from "./collab-report-prompts";
 import {
@@ -15,7 +16,6 @@ import {
   THIN_MIN_TYPES,
   MIN_MATCH_SCORE,
   DNA_REFRESH_BEFORE,
-  DNA_STALE_SLACK_MS,
 } from "./dna-pool";
 import type { Block, BrandDna, CollabReportData, DnaItem, Maker } from "./types";
 
@@ -195,7 +195,6 @@ function mockDna(m: Maker): BrandDna {
  *  prev = 갱신 재생성 시 기존 DNA — created_at을 보존한다(최초 생성 시각). */
 export async function generateDna(m: Maker, prev?: BrandDna): Promise<BrandDna> {
   const digest = brandDigest(m);
-  const nowIso = new Date().toISOString();
   if (!hasKey()) {
     const mock = mockDna(m);
     return prev ? { ...mock, created_at: prev.created_at } : mock;
@@ -216,10 +215,14 @@ export async function generateDna(m: Maker, prev?: BrandDna): Promise<BrandDna> 
   const parsed = JSON.parse(res.text ?? "{}") as { summary?: unknown; items?: DnaItem[] };
   // 화이트리스트 서버 검증(사실 게이트 ②) — Pool 밖 어휘·근거 없음·입력에 없던 source 탈락
   const items = filterPoolValid(parsed.items ?? [], digest.fields);
+  // ⚠️ 시각은 반드시 모델 호출 '이후'에 찍는다. 호출 전에 찍으면 10~20초 과거가 기록돼
+  //    직후 DB 쓰기가 발화시키는 brands.updated_at 트리거보다 뒤처진다(구 stale 로직의 무한 재생성 원인).
+  const nowIso = new Date().toISOString();
   return {
     summary: String(parsed.summary ?? "").slice(0, 80),
     items,
     input_fields: digest.fields,
+    input_hash: hashText(digest.text),
     created_at: prev?.created_at ?? nowIso,
     updated_at: nowIso,
   };
@@ -227,20 +230,28 @@ export async function generateDna(m: Maker, prev?: BrandDna): Promise<BrandDna> 
 
 // ── 판정 헬퍼 ─────────────────────────────────────────────────
 
+/** DNA 입력(소개서 다이제스트)의 지문. stale 판정 기준 — 시각이 아니라 '내용이 바뀌었나'로 본다. */
+const hashText = (s: string) => createHash("sha1").update(s).digest("hex").slice(0, 16);
+const digestHash = (m: Maker) => hashText(brandDigest(m).text);
+
 /** thin 가드 — 서로 다른 type 수 미달(raw pick 수 아님: mood만 4개여도 thin). */
 export const isThin = (dna: BrandDna) => distinctTypeCount(dna.items) < THIN_MIN_TYPES;
 
-/** stale 판정 — ①DNA 없음 ②Pool 대개정 이전 생성분(DNA_REFRESH_BEFORE)
- *  ③소개서가 DNA보다 새로움(setBrandDna의 update가 brands.updated_at 트리거를 발화시키므로
- *   DNA_STALE_SLACK_MS 허용 오차를 둔다). */
-export function isDnaStale(dna: BrandDna | null, brandUpdatedAt?: string): boolean {
+/** stale 판정 — ①DNA 없음 ②Pool 대개정 이전 생성분(DNA_REFRESH_BEFORE) ③소개서 내용이 바뀜.
+ *
+ *  ③은 **시각 비교가 아니라 내용 지문(input_hash) 비교**다. 시각 비교를 쓰면 안 되는 이유:
+ *  setBrandDna의 update가 brands의 updated_at 트리거를 발화시켜 brands.updated_at이 항상
+ *  dna.updated_at보다 뒤가 된다 → 모든 DNA가 영구 stale → 매 요청 재생성 → 리포트 캐시도 영구 미스.
+ *  (2026-07-27 실측 원인. 허용 오차 상수로 막으려 했으나 DNA 생성이 10~20초라 오차를 넘겼다.)
+ *  지문 비교는 클럭 스큐·트리거·대량 마이그레이션(전 행 updated_at 갱신)에도 흔들리지 않는다. */
+export function isDnaStale(dna: BrandDna | null, brand?: Maker): boolean {
   if (!dna) return true;
   const dnaTime = Date.parse(dna.updated_at);
   if (!Number.isFinite(dnaTime)) return true;
   if (dnaTime < Date.parse(DNA_REFRESH_BEFORE)) return true;
-  if (brandUpdatedAt) {
-    const brandTime = Date.parse(brandUpdatedAt);
-    if (Number.isFinite(brandTime) && brandTime > dnaTime + DNA_STALE_SLACK_MS) return true;
+  if (brand) {
+    if (!dna.input_hash) return true;                       // 지문 없는 구버전 → 1회 재생성 후 안정화
+    if (dna.input_hash !== digestHash(brand)) return true;   // 소개서 내용이 실제로 바뀜
   }
   return false;
 }
