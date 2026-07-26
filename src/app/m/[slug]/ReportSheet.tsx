@@ -37,6 +37,7 @@ export function ReportSheet({
   toName,
   sampleMode,
   onPropose,
+  initialFromSlug = null,
 }: {
   open: boolean;
   onClose: () => void;
@@ -45,6 +46,7 @@ export function ReportSheet({
   toName: string;
   sampleMode: boolean; // 소개서 0개 유저 — 샘플 리포트 티저
   onPropose: () => void; // CTA — 리포트 닫고 제안 시트 오픈(부모가 처리)
+  initialFromSlug?: string | null; // /my 아카이브 딥링크 — 이 slug로 선택 스텝 없이 바로 실행
 }) {
   const [phase, setPhase] = useState<Phase>("idle");
   const [result, setResult] = useState<OkPayload | null>(null);
@@ -124,13 +126,19 @@ export function ReportSheet({
   // 칩 변경만으로는 fetch하지 않는다 — [분석하기]를 눌러야 실행(콜 낭비 방지).
   useEffect(() => {
     if (!open || sampleMode) return;
+    // 아카이브 딥링크 — 쌍이 이미 정해져 있으니 선택 스텝을 건너뛰고 바로 실행(캐시면 즉시)
+    if (initialFromSlug && fromBrands.some((b) => b.slug === initialFromSlug)) {
+      setSelectedSlug(initialFromSlug);
+      run(initialFromSlug);
+      return;
+    }
     if (fromBrands.length > 1) {
       setPhase("select");
       return;
     }
     if (selected?.slug) run(selected.slug);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, sampleMode]);
+  }, [open, sampleMode, initialFromSlug]);
 
   // 샘플 모드(잠금 티저) 오픈 계측 — 무소개서 퍼널 시작점
   useEffect(() => {

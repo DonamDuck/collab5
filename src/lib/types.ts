@@ -153,6 +153,15 @@ export interface BrandDna {
 /** AI 콜라보 분석 리포트 — 카드형 6조각(⑥ CTA는 UI 고정 문구라 데이터 없음) */
 export interface ReportMatchPoint { text: string; }           // ② 접점 (선발 통과분)
 export interface ReportIdea { title: string; desc: string; method: string; } // ③ method=collabMethod 어휘
+
+/** /my 리포트 아카이브 목록 행 — 쌍별 최신 1건, 요청자 본인 것만(프라이버시 원칙). */
+export interface CollabReportListItem {
+  fromSlug: string; fromName: string;   // 내 소개서(제안자)
+  toSlug: string; toName: string;       // 상상해 본 상대
+  oneLiner: string;                     // 카드의 주인공 — "어떤 콜라보를 상상했는지"
+  ideaTitles: string[];                 // 아이디어 제목 칩(최대 3)
+  createdAt: string;
+}
 export interface CollabReportData {
   oneLiner: string;                 // ① 한 줄 결론
   matchPoints: ReportMatchPoint[];  // ② 2~4개

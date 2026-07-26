@@ -3,7 +3,7 @@
 // (DB는 '공유 → 타인 열람(view) 루프 = 배포 시점'에 투입 — masterbrain 2026-06-21 결정)
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import type { BrandDna, CollabCard, CollabReportData, CollabType, Maker, MakerStatus, Reaction, ViewEvent } from "./types";
+import type { BrandDna, CollabCard, CollabReportData, CollabReportListItem, CollabType, Maker, MakerStatus, Reaction, ViewEvent } from "./types";
 import { kstIso } from "./time";
 
 export interface Repo {
@@ -37,6 +37,7 @@ export interface Repo {
   setBrandDna(brandId: number, dna: BrandDna): Promise<void>;
   getLatestCollabReport(fromBrandId: number, toBrandId: number): Promise<{ report: CollabReportData; model: string; createdAt: string } | null>;
   insertCollabReport(r: { fromBrandId: number; toBrandId: number; requestedBy: number | null; report: CollabReportData; model: string }): Promise<void>;
+  listCollabReportsByUser(userId: number): Promise<CollabReportListItem[]>; // /my 아카이브 — 쌍별 최신 1건
 }
 
 const now = () => kstIso(); // 시각 표기 = KST(+09:00), lib/time.ts
@@ -481,6 +482,23 @@ class InMemoryRepo implements Repo {
     list.push({ report: r.report, model: r.model, createdAt: now() });
     this.reportsByPair.set(key, list);
   }
+  async listCollabReportsByUser(): Promise<CollabReportListItem[]> {
+    // mock은 requested_by를 저장하지 않으므로 전 쌍의 최신 1건씩 반환(로컬 UI 확인용으로 충분)
+    const items: CollabReportListItem[] = [];
+    for (const [key, list] of this.reportsByPair) {
+      const latest = list[list.length - 1];
+      const [fromId, toId] = key.split(":").map(Number);
+      const from = this.makers.find((m) => m.id === fromId);
+      const to = this.makers.find((m) => m.id === toId);
+      if (!latest || !from || !to) continue;
+      items.push({
+        fromSlug: from.slug, fromName: from.name, toSlug: to.slug, toName: to.name,
+        oneLiner: latest.report.oneLiner, ideaTitles: latest.report.ideas.map((i) => i.title).slice(0, 3),
+        createdAt: latest.createdAt,
+      });
+    }
+    return items.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+  }
 }
 
 // ── Supabase DB row shapes (snake_case → camelCase 매핑용) ──
@@ -721,6 +739,47 @@ class SupabaseRepo implements Repo {
     const { error } = await this.db.from("collab_reports").insert({ from_brand_id: r.fromBrandId, to_brand_id: r.toBrandId,
       requested_by: r.requestedBy, report: r.report, model: r.model });
     if (error) console.error(`[repo] insertCollabReport failed ${r.fromBrandId}→${r.toBrandId}: ${error.message}`);
+  }
+  async listCollabReportsByUser(userId: number): Promise<CollabReportListItem[]> {
+    // 내가 요청한 것만(요청자 전용 원칙) + 브랜드명·slug를 FK 임베드로 한 방에.
+    // append-only라 같은 쌍이 여러 행 — 최신순으로 읽어 JS에서 쌍별 첫 행만 취한다(수십 건 규모라 충분).
+    const { data, error } = await this.db
+      .from("collab_reports")
+      .select(
+        "from_brand_id, to_brand_id, report, created_at, " +
+          "from_brand:brands!collab_reports_from_brand_id_fkey(slug, name, status), " +
+          "to_brand:brands!collab_reports_to_brand_id_fkey(slug, name, status)"
+      )
+      .eq("requested_by", userId)
+      .order("created_at", { ascending: false })
+      .limit(200);
+    if (error) {
+      console.error(`[repo] listCollabReportsByUser failed user=${userId}: ${error.message}`);
+      return [];
+    }
+    type Row = {
+      from_brand_id: number; to_brand_id: number; report: CollabReportData; created_at: string;
+      from_brand: { slug: string; name: string; status: string | null } | null;
+      to_brand: { slug: string; name: string; status: string | null } | null;
+    };
+    const seen = new Set<string>();
+    const items: CollabReportListItem[] = [];
+    for (const r of (data ?? []) as unknown as Row[]) {
+      const key = `${r.from_brand_id}:${r.to_brand_id}`;
+      if (seen.has(key)) continue; // 최신순이라 첫 행 = 그 쌍의 최신 리포트
+      seen.add(key);
+      // 어느 쪽이든 소프트 삭제(inactive)면 숨김 — 카드를 눌러도 /m이 404라 막다른 길
+      if (!r.from_brand || !r.to_brand) continue;
+      if (r.from_brand.status === "inactive" || r.to_brand.status === "inactive") continue;
+      items.push({
+        fromSlug: r.from_brand.slug, fromName: r.from_brand.name,
+        toSlug: r.to_brand.slug, toName: r.to_brand.name,
+        oneLiner: r.report?.oneLiner ?? "",
+        ideaTitles: (r.report?.ideas ?? []).map((i) => i.title).filter(Boolean).slice(0, 3),
+        createdAt: r.created_at,
+      });
+    }
+    return items;
   }
 }
 

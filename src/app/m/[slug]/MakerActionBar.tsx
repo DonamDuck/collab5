@@ -43,6 +43,7 @@ export function MakerActionBar({
   const [proposeOpen, setProposeOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const [reportSample, setReportSample] = useState(false); // 소개서 0개 유저 — 샘플 리포트 티저
+  const [reportInitialFrom, setReportInitialFrom] = useState<string | null>(null); // /my 아카이브 딥링크(?report=fromSlug) — 선택 스텝 건너뛰고 그 쌍을 바로 연다
   const [message, setMessage] = useState(""); // 추천 메시지(수정 가능)
   const [toast, setToast] = useState<string | null>(null); // 복사 완료 토스트(3종 통일)
   const [selectedSlug, setSelectedSlug] = useState(viewerBrands[0]?.slug); // 함께 보낼 내 소개서
@@ -123,6 +124,28 @@ export function MakerActionBar({
       setProposeOpen(true);
     }
   }, [loggedIn, makerId, viewerBrands.length]);
+
+  // /my 리포트 아카이브 딥링크 — ?report={fromSlug}면 그 쌍의 시트를 바로 연다(캐시면 즉시·0콜).
+  // window.location으로 1회만 읽고 URL에서 지운다(useSearchParams+Suspense 불필요, 새로고침 재발동 방지).
+  // 비로그인이거나 fromSlug가 내 소개서가 아니면 조용히 무시(링크 공유·소개서 연결 해제 케이스).
+  useEffect(() => {
+    if (!loggedIn) return;
+    let fromSlug: string | null = null;
+    try {
+      const url = new URL(window.location.href);
+      fromSlug = url.searchParams.get("report");
+      if (!fromSlug) return;
+      url.searchParams.delete("report");
+      window.history.replaceState(null, "", url.pathname + url.search);
+    } catch {
+      return;
+    }
+    if (!viewerBrands.some((b) => b.slug === fromSlug)) return;
+    setReportInitialFrom(fromSlug);
+    setReportSample(false);
+    setReportOpen(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loggedIn]);
 
   // 찜 토글 — 비로그인은 로그인 유도, 로그인은 낙관적 저장(실패 시 롤백).
   const toggleHeart = () => {
@@ -453,7 +476,11 @@ export function MakerActionBar({
       {/* AI 콜라보 분석 리포트 시트 — CTA는 리포트 닫고 제안 시트로 */}
       <ReportSheet
         open={reportOpen}
-        onClose={() => setReportOpen(false)}
+        onClose={() => {
+          setReportOpen(false);
+          setReportInitialFrom(null); // 딥링크 소비 후엔 일반 동선으로 복귀(다음 오픈은 선택 스텝부터)
+        }}
+        initialFromSlug={reportInitialFrom}
         fromBrands={viewerBrands}
         toSlug={slug}
         toName={makerName}
