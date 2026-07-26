@@ -87,6 +87,9 @@ export function PhotoSlider({
   return (
     <div className="select-none">
       <div className={`relative overflow-hidden ${rounded}`}>
+        {/* ⚠️ 원본 보기 클릭은 <img>가 아니라 이 컨테이너에 건다.
+            데스크탑 드래그용 setPointerCapture가 걸리면 click 이벤트가 캡처 대상(이 div)으로 가서
+            이미지에 붙인 onClick은 아예 안 불린다(모바일은 터치라 캡처를 안 걸어 정상 동작 → 데스크탑만 실패). */}
         <div
           ref={ref}
           onScroll={onScroll}
@@ -94,10 +97,11 @@ export function PhotoSlider({
           onPointerMove={onPointerMove}
           onPointerUp={onPointerEnd}
           onPointerCancel={onPointerEnd}
+          onClick={(e) => openZoom(idx, e)}
           className={`no-scrollbar flex ${
             multi ? "overflow-x-auto" : "overflow-hidden"
           } ${multi && !dragging ? "snap-x snap-mandatory" : ""} ${
-            multi ? (dragging ? "cursor-grabbing" : "cursor-grab") : ""
+            multi ? (dragging ? "cursor-grabbing" : "cursor-grab") : "cursor-zoom-in"
           }`}
         >
           {photos.map((src, i) => (
@@ -107,8 +111,7 @@ export function PhotoSlider({
                 src={src}
                 alt={`브랜드 사진 ${i + 1}`}
                 draggable={false}
-                onClick={(e) => openZoom(i, e)}
-                className="absolute inset-0 h-full w-full cursor-zoom-in object-cover"
+                className="absolute inset-0 h-full w-full object-cover"
               />
             </div>
           ))}
