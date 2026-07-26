@@ -6,8 +6,7 @@
 //   → 매 요청 DNA 2콜 재생성 → dna.updated_at이 항상 now → 리포트 캐시도 영구 미스
 //   → 같은 쌍인데 리포트 행이 계속 새로 쌓임(13번 다음 14번) + 생성 30~60초.
 //   지금은 시각이 아니라 **소개서 내용 지문(input_hash)**으로 판정한다. ⑥이 그 회귀 가드다.
-import { createHash } from "node:crypto";
-import { brandDigest, isDnaStale } from "../src/lib/collab-report";
+import { digestHash, isDnaStale } from "../src/lib/collab-report";
 import type { BrandDna, Maker } from "../src/lib/types";
 
 const brand = {
@@ -17,8 +16,8 @@ const brand = {
   updatedAt: "2026-07-26T00:00:00.000Z",
 } as unknown as Maker;
 
-/** generateDna가 저장하는 것과 동일한 지문 */
-const hashOf = (m: Maker) => createHash("sha1").update(brandDigest(m).text).digest("hex").slice(0, 16);
+/** generateDna가 저장하는 것과 동일한 지문 — 재구현하지 않고 실제 함수를 그대로 쓴다(로직 이탈 방지) */
+const hashOf = (m: Maker) => digestHash(m);
 
 const dna = (input_hash: string | undefined, updated = "2026-07-26T10:00:00.000Z"): BrandDna =>
   ({ summary: "s", items: [], input_fields: [], input_hash, created_at: updated, updated_at: updated });
@@ -26,6 +25,8 @@ const dna = (input_hash: string | undefined, updated = "2026-07-26T10:00:00.000Z
 const fresh = dna(hashOf(brand));
 const bumped = { ...brand, updatedAt: "2026-07-27T09:00:00.000Z" } as Maker; // 트리거로 시각만 밀림
 const edited = { ...brand, oneLiner: "소개서를 실제로 고쳤다" } as Maker;
+// 공백만 달라진 수정 — 뒤 공백·이중 공백·줄바꿈 추가 (내용은 동일)
+const spacey = { ...brand, oneLiner: "한 줄  소개 \n", story: "브랜드 이야기  " } as Maker;
 
 const cases: [string, boolean, boolean][] = [
   ["① DNA 없음 → stale", isDnaStale(null, brand), true],
@@ -35,6 +36,7 @@ const cases: [string, boolean, boolean][] = [
   ["⑤ 내용 동일 → not stale", isDnaStale(fresh, brand), false],
   ["⑥ ⭐트리거로 brands.updated_at만 밀림 → not stale", isDnaStale(fresh, bumped), false],
   ["⑦ 소개서 실제 수정 → stale", isDnaStale(fresh, edited), true],
+  ["⑧ 공백·줄바꿈만 변경 → not stale(정규화)", isDnaStale(fresh, spacey), false],
 ];
 
 let failed = 0;

@@ -230,9 +230,11 @@ export async function generateDna(m: Maker, prev?: BrandDna): Promise<BrandDna> 
 
 // ── 판정 헬퍼 ─────────────────────────────────────────────────
 
-/** DNA 입력(소개서 다이제스트)의 지문. stale 판정 기준 — 시각이 아니라 '내용이 바뀌었나'로 본다. */
-const hashText = (s: string) => createHash("sha1").update(s).digest("hex").slice(0, 16);
-const digestHash = (m: Maker) => hashText(brandDigest(m).text);
+/** DNA 입력(소개서 다이제스트)의 지문. stale 판정 기준 — 시각이 아니라 '내용이 바뀌었나'로 본다.
+ *  공백·줄바꿈은 지문 전에 정규화 — 눈에 안 보이는 수정(뒤 공백, 줄바꿈 수)으로 재생성되지 않게(대표 07-27). */
+const hashText = (s: string) =>
+  createHash("sha1").update(s.replace(/\s+/g, " ").trim()).digest("hex").slice(0, 16);
+export const digestHash = (m: Maker) => hashText(brandDigest(m).text);
 
 /** thin 가드 — 서로 다른 type 수 미달(raw pick 수 아님: mood만 4개여도 thin). */
 export const isThin = (dna: BrandDna) => distinctTypeCount(dna.items) < THIN_MIN_TYPES;
