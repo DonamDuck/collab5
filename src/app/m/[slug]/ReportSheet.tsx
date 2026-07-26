@@ -393,9 +393,13 @@ export function ReportSheet({
             ) : phase === "loading" || phase === "idle" ? (
               <div className="flex flex-col items-center justify-center py-16">
                 <div className="h-8 w-8 animate-spin rounded-pill border-2 border-hairline border-t-primary-strong" />
+                {/* 회전 문구 = '지금 뭘 하는 중' / 아래 시간 안내 = '언제 끝나는지'. 역할이 달라 둘 다 둔다.
+                    기다림에서 힘든 건 길이가 아니라 끝을 모르는 것 — 위저드의 "1~2분 걸릴 수 있어요"와 같은 계열.
+                    실측 25~28초라 30초는 살짝 넉넉하게 부른 값(약속을 넘기지 않게). ⏱ 파이프라인이 빨라지면 같이 낮출 것. */}
                 <p className="mt-4 animate-pulse text-[15px] text-mute">
                   {LOADING_COPY[copyIdx]}
                 </p>
+                <p className="mt-2 text-[13px] text-faint">보통 30초 정도 걸려요</p>
               </div>
             ) : phase === "ok" ? (
               pieces
