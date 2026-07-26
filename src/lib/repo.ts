@@ -516,17 +516,17 @@ class InMemoryRepo implements Repo {
 //    rowToMaker가 전부 기본값으로 메우므로, 새 필드를 넣을 땐 여기 optional + rowToMaker 기본값을 같이 둘 것.
 interface MakerRow {
   id: number; slug: string; name: string; one_liner: string;
-  region: string | null;
+  region?: string | null;
   offers?: string[]; seeks?: string[]; target_audience?: string[];
   collab_history?: Maker["collabHistory"];
   story?: string; activities?: Maker["activities"];
-  photos: string[] | null;
+  photos?: string[] | null;
   intro_file_url?: string | null;
   trust?: Maker["trust"];
-  keywords: string[] | null; showcases?: Maker["showcases"] | null;
+  keywords?: string[] | null; showcases?: Maker["showcases"] | null;
   offers_description?: string | null; seeks_description?: string | null;
   description?: string | null; // 자세히 소개(07-25 trust.description에서 분리 완료)
-  collab_open: boolean; search_visible: boolean | null; status: string | null; created_at: string; updated_at: string | null;
+  collab_open: boolean; search_visible: boolean | null; status: string | null; created_at: string; updated_at?: string | null;
   owner_user_id?: number | null;
   // 수정 비밀번호 해시 — 07-25 claim_token_hash → edit_password_hash 이사(옛 컬럼 폴백)
   edit_password_hash?: string | null; claim_token_hash?: string | null;
@@ -545,6 +545,13 @@ interface ReactionRow { id: number; card_id: number; type: string; created_at: s
 /** /search 카드가 실제로 읽는 컬럼만(썸네일=photos[0]·필터=offers/seeks). 나머지는 rowToMaker가 기본값으로 채운다. */
 const SEARCH_CARD_COLS =
   "id, slug, name, one_liner, region, photos, keywords, offers, seeks, collab_open, search_visible, status, created_at";
+
+/** /my 목록(내 소개서·찜)과 /m 제안시트의 브랜드 칩이 읽는 컬럼만.
+ *  카드가 쓰는 건 slug·name·oneLiner·collabOpen·searchVisible(+칩은 id)뿐인데 전체 select를 하면
+ *  dna(브랜드당 수 KB)·showcases·activities·collab_history·enrichment·구 base64 photos까지 딸려온다.
+ *  썸네일을 안 그리므로 photos·keywords·region도 제외. */
+const LIST_CARD_COLS =
+  "id, slug, name, one_liner, collab_open, search_visible, status, created_at";
 
 function rowToMaker(r: MakerRow): Maker {
   return {
@@ -639,7 +646,7 @@ class SupabaseRepo implements Repo {
   }
   async listMakersByOwner(ownerUserId: number): Promise<Maker[]> {
     // /my — 소프트 삭제분은 목록에서 제외(status='active'만)
-    const { data } = await this.db.from("brands").select().eq("owner_user_id", ownerUserId).eq("status", "active").order("created_at", { ascending: false });
+    const { data } = await this.db.from("brands").select(LIST_CARD_COLS).eq("owner_user_id", ownerUserId).eq("status", "active").order("created_at", { ascending: false });
     return (data ?? []).map((r) => rowToMaker(r as MakerRow));
   }
   async listMakers() {
@@ -726,7 +733,7 @@ class SupabaseRepo implements Repo {
       .order("created_at", { ascending: false });
     const ids = (rows ?? []).map((r) => (r as { brand_id: number }).brand_id);
     if (ids.length === 0) return [];
-    const { data } = await this.db.from("brands").select().in("id", ids).eq("status", "active");
+    const { data } = await this.db.from("brands").select(LIST_CARD_COLS).in("id", ids).eq("status", "active");
     const byId = new Map((data ?? []).map((r) => [(r as MakerRow).id, rowToMaker(r as MakerRow)]));
     return ids.map((id) => byId.get(id)).filter((m): m is Maker => !!m);
   }
