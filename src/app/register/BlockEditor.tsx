@@ -121,7 +121,7 @@ export function BlockEditor({ blocks, onChange, onUploadingChange, onSheetOpenCh
     patch(i, { links: blocks[i].links.map((l, x) => (x === k ? { ...l, ...p } : l)) });
   const removeLink = (i: number, k: number) =>
     patch(i, { links: blocks[i].links.filter((_, x) => x !== k) });
-  // ── press item별 사진(최대 3) — 블록 공유 사진 대신 item 위계로(대표 지시) ──
+  // ── press item별 사진(최대 5) — 블록 공유 사진 대신 item 위계로(대표 지시) ──
   const addPressItemPhotos = async (i: number, k: number, files: FileList | null) => {
     const b = blocks[i];
     if (b.type !== "press") return;
@@ -564,7 +564,7 @@ function BlockAttachments({
     <div className="space-y-3 border-t border-hairline pt-3">
       {photosOpen && (
         <div>
-          <p className="mb-1.5 text-sm text-mute">사진 추가 (선택 · 최대 3장)</p>
+          <p className="mb-1.5 text-sm text-mute">사진 추가 (선택 · 최대 5장)</p>
           <div className="flex flex-wrap gap-2">
             {photos.map((url, k) => (
               <div key={k} className="relative h-20 w-20 shrink-0 overflow-hidden rounded-md border border-hairline">
@@ -580,7 +580,7 @@ function BlockAttachments({
                 </button>
               </div>
             ))}
-            {photos.length < 3 && (
+            {photos.length < 5 && (
               <label className="flex h-20 w-20 shrink-0 cursor-pointer flex-col items-center justify-center rounded-md border border-dashed border-border-strong bg-surface text-mute">
                 <span className="text-xl leading-none">＋</span>
                 <span className="mt-1 text-[11px]">사진(선택)</span>
