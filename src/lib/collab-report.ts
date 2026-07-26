@@ -205,6 +205,12 @@ export async function generateDna(m: Maker, prev?: BrandDna, meters?: CallMeter[
     .map(([t, vs]) => `${t}: ${vs.join(", ")}`)
     .join("\n");
   const t0 = Date.now();
+  // ⚡DNA는 사고를 끈다(기본) — DNA는 창작이 아니라 '소개서에서 Pool 어휘 뽑기'라 사고가 거의 불필요.
+  // A/B 실측(07-26): 사고 켬 29.6s/23.7원 → 끔 6.3s/6.3원. **4.7배 빠르고 3.8배 싸다.**
+  // 품질 저하 없음 — evidence 원문 일치 33/33 유지, 서로 다른 type 13→11(thin 하한 4 대비 여유).
+  // 항목 수가 조금 줄지만 근거 있는 것만 남는 쪽이라 사실게이트 취지에 부합.
+  // enrich 검색 단계 thinkingBudget:0과 같은 계열의 판단. `DNA_THINKING=1`로 복구 가능.
+  const budget = process.env.DNA_THINKING === "1" ? undefined : (process.env.DNA_THINKING_BUDGET ?? "0");
   const res = await ai().models.generateContent({
     model: DNA_MODEL,
     contents: `[Pool]\n${poolText}\n\n[소개서]\n${digest.text}`,
@@ -213,6 +219,7 @@ export async function generateDna(m: Maker, prev?: BrandDna, meters?: CallMeter[
       responseMimeType: "application/json",
       responseSchema: DNA_SCHEMA,
       temperature: 0.2,
+      ...(budget !== undefined ? { thinkingConfig: { thinkingBudget: Number(budget) } } : {}),
     },
   });
   const dnaMeter = meter(`dna(${m.slug})`, DNA_MODEL, Date.now() - t0, res.usageMetadata);
