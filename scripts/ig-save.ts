@@ -34,16 +34,19 @@ async function printBookmarklet(): Promise<void> {
   console.log("\n설치: 북마크바 우클릭 → 페이지 추가 → 이름·URL 입력\n");
 }
 
-/** 클립보드(macOS pbpaste)에서 인스타 CDN URL만 추출 + 리사이즈 중복 제거 */
-function readUrls(): string[] {
+/** 클립보드(macOS pbpaste)에서 인스타 CDN URL만 추출 + 리사이즈 중복 제거.
+ *  ⚠️ 못 찾았을 때 "왜"를 말해줘야 한다 — 조용히 빈손이면 클립보드가 빈 건지,
+ *     엉뚱한 게 들어있는 건지, URL 형식이 안 맞는 건지 구분이 안 된다. */
+function readUrls(): { urls: string[]; raw: string; clipboardError?: string } {
   let raw = "";
+  let clipboardError: string | undefined;
   try {
     raw = execFileSync("pbpaste", { encoding: "utf8" });
-  } catch {
-    /* 클립보드를 못 읽으면 빈손 — 아래에서 안내 */
+  } catch (e) {
+    clipboardError = (e as Error).message;
   }
   const seen = new Set<string>();
-  return raw
+  const urls = raw
     .split(/\s+/)
     .map((s) => s.trim())
     // 인스타 CDN + 일반 이미지 URL도 허용(다른 채널 사진도 같은 흐름으로 받을 수 있게)
@@ -54,6 +57,7 @@ function readUrls(): string[] {
       seen.add(key);
       return true;
     });
+  return { urls, raw, clipboardError };
 }
 
 /** 폴더 선택 화면 — 기존 폴더를 번호로 고르거나 새로 만든다(숫자 하나면 끝) */
@@ -103,11 +107,22 @@ const extOf = (ct: string): string =>
 async function main() {
   if (process.argv.includes("--bookmarklet")) return printBookmarklet();
 
-  const urls = readUrls();
+  const { urls, raw, clipboardError } = readUrls();
   if (urls.length === 0) {
-    console.error("\n클립보드에서 사진 URL을 못 찾았어요.");
-    console.error("→ 인스타 게시물 페이지에서 북마클릿을 먼저 눌러주세요.");
-    console.error("   (설치 안 했으면: npx tsx scripts/ig-save.ts --bookmarklet)\n");
+    console.error("\n클립보드에서 사진 URL을 못 찾았어요.\n");
+    if (clipboardError) {
+      console.error(`  원인: 클립보드를 읽지 못했어요 — ${clipboardError}`);
+    } else if (!raw.trim()) {
+      console.error("  원인: 클립보드가 비어 있어요.");
+      console.error("  → 북마클릿 패널의 [복사하기] 버튼을 눌렀는지 확인해주세요(자동 복사 아님).");
+    } else {
+      // 뭐가 들어있는지 보여줘야 원인이 잡힌다(URL이 잘렸는지, 엉뚱한 텍스트인지)
+      const preview = raw.trim().replace(/\s+/g, " ").slice(0, 120);
+      console.error(`  클립보드에 ${raw.trim().length}자가 있는데 사진 URL 형식이 아니에요:`);
+      console.error(`    "${preview}${raw.trim().length > 120 ? "…" : ""}"`);
+      console.error("  → 인스타 사진 URL은 https://…cdninstagram.com/… 형태여야 해요.");
+    }
+    console.error("\n  설치 안 했으면: npm run ig:setup\n");
     process.exit(1);
   }
   console.log(`\n클립보드에서 사진 ${urls.length}장 찾았어요.`);

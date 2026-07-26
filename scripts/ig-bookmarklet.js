@@ -1,19 +1,20 @@
 // 인스타 게시물의 사진 URL을 한 번에 긁어 클립보드로 복사하는 북마클릿 (소스).
 //
-// 설치: `npx tsx scripts/ig-save.ts --bookmarklet` 실행 → 출력된 javascript: 한 줄을
-//       크롬 북마크의 URL 칸에 붙여넣기(이름은 "인스타 사진 긁기" 등 아무거나).
-// 사용: 인스타 게시물 페이지에서 북마크 클릭 → 캐러셀을 자동으로 넘기며 전부 수집 → 클립보드 복사
-//       → 터미널에서 `npx tsx scripts/ig-save.ts "두더지요가원" "토우 워크숍"`
+// 설치: `npm run ig:setup` → 출력된 javascript: 한 줄을 크롬 북마크의 URL 칸에 붙여넣기
+// 사용: 인스타 게시물에서 북마크 클릭 → 패널의 [복사하기] → 터미널에서 `npm run ig`
 //
-// ⚠️ 왜 브라우저에서 URL만 긁고 다운로드는 터미널에서 하나:
-//    ① 인스타 CDN은 교차출처라 <a download>가 무시된다(저장이 아니라 새 탭 열림).
-//    ② 브라우저 다운로드는 폴더를 매번 고르거나 기본 폴더로만 떨어진다 — 대표가 원한 건
-//       "업체 폴더에 이름 붙여서" 저장이라, 그건 파일시스템을 만질 수 있는 터미널 쪽이 맞다.
+// ⚠️ 왜 자동 복사가 아니라 버튼을 한 번 누르게 하나 (2026-07-26 실패에서 배움):
+//    브라우저는 clipboard.writeText를 "클릭 직후 몇 초"(transient user activation) 안에서만 허용한다.
+//    캐러셀을 넘기며 0.7초씩 기다리면 그 시간이 만료돼 **조용히 실패**한다.
+//    패널의 버튼 클릭이 새 activation을 주므로 이 방식은 항상 성공한다.
+//    (textarea도 미리 선택해둬서 ⌘C로도 복사된다 — 이중 안전장치)
+//
+// ⚠️ 다운로드를 브라우저가 아니라 터미널에서 하는 이유: 인스타 CDN은 교차출처라
+//    <a download>가 무시되고(새 탭 열림), 브라우저는 폴더를 매번 고르게 한다.
 (async () => {
   const SEL_IMG = 'img[src*="cdninstagram"], img[srcset*="cdninstagram"]';
-  const found = new Map(); // url(파라미터 제거 키) → 최대해상도 원본 url
+  const found = new Map();
 
-  /** srcset에서 가장 큰 후보를 고른다(없으면 src) */
   const bestFrom = (img) => {
     const set = (img.getAttribute("srcset") || "").trim();
     if (!set) return img.src;
@@ -28,11 +29,9 @@
 
   const collect = () => {
     for (const img of document.querySelectorAll(SEL_IMG)) {
-      // 프로필 사진·아바타 제외(작은 정사각형)
       if (img.naturalWidth && img.naturalWidth < 320) continue;
       const url = bestFrom(img);
       if (!url || !url.includes("cdninstagram")) continue;
-      // 같은 사진의 다른 리사이즈본이 중복되지 않게 경로만으로 키를 잡는다
       const key = url.split("?")[0];
       if (!found.has(key)) found.set(key, url);
     }
@@ -44,35 +43,76 @@
       (b) => /다음|Next/.test(b.getAttribute("aria-label") || "")
     );
 
-  // 캐러셀 자동 순회 — 다음 버튼이 사라질 때까지(최대 20장) 넘기며 수집
   collect();
   for (let i = 0; i < 20; i++) {
     const btn = nextBtn();
     if (!btn) break;
     btn.click();
-    await new Promise((r) => setTimeout(r, 700)); // 로드 대기
+    await new Promise((r) => setTimeout(r, 700));
     collect();
   }
 
   const urls = [...found.values()];
-  const toast = (msg, ok) => {
-    const d = document.createElement("div");
-    d.textContent = msg;
-    d.style.cssText =
-      "position:fixed;left:50%;top:24px;transform:translateX(-50%);z-index:2147483647;" +
-      "padding:12px 18px;border-radius:999px;font:600 14px/1.4 -apple-system,sans-serif;" +
-      "box-shadow:0 6px 24px rgba(0,0,0,.2);color:#fff;background:" + (ok ? "#1f5c00" : "#b00020");
-    document.body.appendChild(d);
-    setTimeout(() => d.remove(), 3500);
-  };
+  const box = document.createElement("div");
+  box.style.cssText =
+    "position:fixed;inset:auto 16px 16px auto;z-index:2147483647;width:340px;padding:16px;" +
+    "border-radius:14px;background:#fff;box-shadow:0 10px 40px rgba(0,0,0,.28);" +
+    "font:14px/1.5 -apple-system,BlinkMacSystemFont,sans-serif;color:#222";
 
-  if (!urls.length) return toast("사진을 못 찾았어요 — 게시물 페이지에서 눌러주세요", false);
-  try {
-    await navigator.clipboard.writeText(urls.join("\n"));
-    toast(`사진 ${urls.length}장 복사됨 — 터미널에서 ig-save 실행`, true);
-  } catch {
-    // 클립보드 권한이 막힌 경우: 콘솔에 뿌려서 수동 복사
-    console.log(urls.join("\n"));
-    toast(`사진 ${urls.length}장 — 콘솔에 출력했어요(복사해서 쓰세요)`, false);
+  if (!urls.length) {
+    box.innerHTML =
+      '<b style="font-size:15px">사진을 못 찾았어요</b>' +
+      '<p style="margin:8px 0 0;color:#666">게시물 상세 페이지에서 눌러주세요. ' +
+      "피드·프로필 목록에서는 원본이 안 잡혀요.</p>";
+    const c = document.createElement("button");
+    c.textContent = "닫기";
+    c.style.cssText =
+      "margin-top:12px;width:100%;height:38px;border:0;border-radius:9px;background:#eee;cursor:pointer;font-weight:600";
+    c.onclick = () => box.remove();
+    box.appendChild(c);
+    document.body.appendChild(box);
+    return;
   }
+
+  const text = urls.join("\n");
+  box.innerHTML =
+    '<b style="font-size:15px">사진 ' + urls.length + "장 찾았어요</b>" +
+    '<p style="margin:6px 0 10px;color:#666">아래 버튼을 누른 뒤 터미널에서 <b>npm run ig</b></p>';
+
+  const ta = document.createElement("textarea");
+  ta.value = text;
+  ta.readOnly = true;
+  ta.style.cssText =
+    "width:100%;height:64px;font:11px/1.4 ui-monospace,monospace;color:#888;" +
+    "border:1px solid #ddd;border-radius:8px;padding:6px;resize:none;box-sizing:border-box";
+  box.appendChild(ta);
+
+  const btn = document.createElement("button");
+  btn.textContent = "복사하기";
+  btn.style.cssText =
+    "margin-top:10px;width:100%;height:42px;border:0;border-radius:9px;background:#1f5c00;" +
+    "color:#fff;font-weight:700;font-size:15px;cursor:pointer";
+  // 이 클릭이 새 user activation → 여기서의 클립보드 쓰기는 만료되지 않는다
+  btn.onclick = async () => {
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      ta.select();               // 폴백 ①: 구식 execCommand
+      document.execCommand("copy");
+    }
+    btn.textContent = "✓ 복사됐어요 — 터미널에서 npm run ig";
+    btn.style.background = "#0b3d00";
+    setTimeout(() => box.remove(), 1800);
+  };
+  box.appendChild(btn);
+
+  const close = document.createElement("button");
+  close.textContent = "닫기";
+  close.style.cssText =
+    "margin-top:6px;width:100%;height:32px;border:0;border-radius:9px;background:transparent;color:#888;cursor:pointer";
+  close.onclick = () => box.remove();
+  box.appendChild(close);
+
+  document.body.appendChild(box);
+  ta.select();                   // 폴백 ②: 패널이 뜨자마자 ⌘C로도 복사 가능
 })();
