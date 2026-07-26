@@ -17,7 +17,6 @@ export interface Repo {
   setMakerPasswordHash(slug: string, hash: string): Promise<void>;
   deleteMaker(slug: string): Promise<void>;
   listMakersByOwner(ownerUserId: number): Promise<Maker[]>;
-  listMakers(): Promise<Maker[]>;
   searchMakers(q: string): Promise<Maker[]>;
   // 카드
   createCard(input: Omit<CollabCard, "id" | "createdAt">): Promise<CollabCard>;
@@ -414,9 +413,6 @@ class InMemoryRepo implements Repo {
   async listMakersByOwner(ownerUserId: number): Promise<Maker[]> {
     return this.makers.filter((x) => x.ownerUserId === ownerUserId && x.status !== "inactive");
   }
-  async listMakers() {
-    return [...this.makers];
-  }
   async searchMakers(q: string) {
     const t = q.trim().toLowerCase();
     const visible = this.makers.filter((m) => m.searchVisible && m.status !== "inactive");
@@ -647,10 +643,6 @@ class SupabaseRepo implements Repo {
   async listMakersByOwner(ownerUserId: number): Promise<Maker[]> {
     // /my — 소프트 삭제분은 목록에서 제외(status='active'만)
     const { data } = await this.db.from("brands").select(LIST_CARD_COLS).eq("owner_user_id", ownerUserId).eq("status", "active").order("created_at", { ascending: false });
-    return (data ?? []).map((r) => rowToMaker(r as MakerRow));
-  }
-  async listMakers() {
-    const { data } = await this.db.from("brands").select().order("created_at", { ascending: false });
     return (data ?? []).map((r) => rowToMaker(r as MakerRow));
   }
   async searchMakers(q: string) {
