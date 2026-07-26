@@ -211,17 +211,30 @@ export async function generateDna(m: Maker, prev?: BrandDna, meters?: CallMeter[
   // 항목 수가 조금 줄지만 근거 있는 것만 남는 쪽이라 사실게이트 취지에 부합.
   // enrich 검색 단계 thinkingBudget:0과 같은 계열의 판단. `DNA_THINKING=1`로 복구 가능.
   const budget = process.env.DNA_THINKING === "1" ? undefined : (process.env.DNA_THINKING_BUDGET ?? "0");
-  const res = await ai().models.generateContent({
-    model: DNA_MODEL,
-    contents: `[Pool]\n${poolText}\n\n[소개서]\n${digest.text}`,
-    config: {
-      systemInstruction: DNA_SYSTEM,
-      responseMimeType: "application/json",
-      responseSchema: DNA_SCHEMA,
-      temperature: 0.2,
-      ...(budget !== undefined ? { thinkingConfig: { thinkingBudget: Number(budget) } } : {}),
-    },
-  });
+  const call = (withBudget: boolean) =>
+    ai().models.generateContent({
+      model: DNA_MODEL,
+      contents: `[Pool]\n${poolText}\n\n[소개서]\n${digest.text}`,
+      config: {
+        systemInstruction: DNA_SYSTEM,
+        responseMimeType: "application/json",
+        responseSchema: DNA_SCHEMA,
+        temperature: 0.2,
+        ...(withBudget && budget !== undefined ? { thinkingConfig: { thinkingBudget: Number(budget) } } : {}),
+      },
+    });
+  // ⚠️ thinkingBudget 수용 범위는 모델 세대마다 다르다 — 실측(07-26): 2.5-flash는 0 허용,
+  //    3.6-flash는 0을 400으로 거부(대신 thinkingLevel:'low'). DNA_MODEL을 3.x로 바꾸는 순간
+  //    DNA가 통째로 죽으므로, 400이면 옵션 없이 1회 재시도한다(enrich 검색단계와 동일 패턴).
+  let res;
+  try {
+    res = await call(true);
+  } catch (e) {
+    const status = (e as { status?: number; code?: number })?.status ?? (e as { code?: number })?.code;
+    if (budget === undefined || status !== 400) throw e;
+    console.warn(`[collab-report] ${DNA_MODEL} thinkingBudget=${budget} 거부(400) → 옵션 없이 재시도`);
+    res = await call(false);
+  }
   const dnaMeter = meter(`dna(${m.slug})`, DNA_MODEL, Date.now() - t0, res.usageMetadata);
   logMeter(dnaMeter);
   meters?.push(dnaMeter);
