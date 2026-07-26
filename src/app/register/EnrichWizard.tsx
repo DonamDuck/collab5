@@ -22,6 +22,7 @@ import { josa } from "@/lib/josa";
 import { blendDescriptions, canRegenDesc, noteRegenDesc } from "@/lib/enrichBlend";
 import { buildEnrichment } from "@/lib/enrichment";
 import { instagramSlug } from "@/lib/links";
+import { kstIso } from "@/lib/time";
 import type { Enrichment } from "@/lib/types";
 
 export type WizardFill = {
@@ -355,7 +356,7 @@ export function EnrichWizard({
       setFactualOk(new Set());
       setIgPick(EMPTY_PICK);
       setHpPick(EMPTY_PICK);
-      setCreatedAtIso(new Date().toISOString());
+      setCreatedAtIso(kstIso());
       setKind("chips");
     } catch {
       // 크롤 실패여도 막다른 길 없음 — 스타터 칩 + 직접 추가로 진행
@@ -364,7 +365,7 @@ export function EnrichWizard({
       setTier("thin");
       setLinks({});
       setResearch("");
-      setCreatedAtIso(new Date().toISOString());
+      setCreatedAtIso(kstIso());
       setKind("chips");
     }
   };
@@ -537,7 +538,7 @@ export function EnrichWizard({
       region: regionInput,
       businessType: btype,
       tier,
-      createdAt: createdAtIso || new Date().toISOString(),
+      createdAt: createdAtIso || kstIso(),
       selected,
       starred,
       confirmed: factualOk,

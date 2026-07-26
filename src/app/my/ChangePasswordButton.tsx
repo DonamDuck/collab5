@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { requestPasswordResetAction } from "@/lib/auth-actions";
 import { LoadingOverlay } from "@/components/LoadingOverlay";
+import { kstDateKey } from "@/lib/time";
 
 // 비밀번호 변경 — 비밀번호 찾기와 동일하게 이메일로 변경 링크 발송.
 // 하루 최대 5회 제한(브라우저 로컬 기준, 소프트 제한). Supabase 자체 서버 레이트리밋도 존재.
@@ -10,7 +11,7 @@ const DAILY_LIMIT = 5;
 const LS_KEY = "pw_change_count";
 
 function today(): string {
-  return new Date().toISOString().slice(0, 10);
+  return kstDateKey(); // KST 자정 기준 — UTC로 자르면 한국에서 하루가 오전 9시에 바뀐다
 }
 function remaining(): number {
   try {

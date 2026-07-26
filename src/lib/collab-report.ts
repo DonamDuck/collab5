@@ -18,6 +18,7 @@ import {
   DNA_REFRESH_BEFORE,
 } from "./dna-pool";
 import type { Block, BrandDna, CollabReportData, DnaItem, Maker } from "./types";
+import { kstIso } from "./time";
 
 // 리포트 모델: 대표 블라인드 A/B(07-26)에서 3.6-flash가 2.5-flash·3.1-pro를 모두 이김.
 // ⚠️ 3.x 계열은 temperature/top_p/top_k 지원 중단 — 리포트 호출에는 샘플링 파라미터를 넘기지 않는다.
@@ -174,7 +175,7 @@ const REPORT_SCHEMA = {
 /** 키 없는 로컬용 mock DNA — 실제 스키마와 동일 형태(캔버스가든 소재). thin 아님(type 6종). */
 function mockDna(m: Maker): BrandDna {
   const { fields } = brandDigest(m);
-  const nowIso = new Date().toISOString();
+  const nowIso = kstIso();
   return {
     summary: (m.oneLiner || m.name).slice(0, 80),
     items: [
@@ -217,7 +218,7 @@ export async function generateDna(m: Maker, prev?: BrandDna): Promise<BrandDna> 
   const items = filterPoolValid(parsed.items ?? [], digest.fields);
   // ⚠️ 시각은 반드시 모델 호출 '이후'에 찍는다. 호출 전에 찍으면 10~20초 과거가 기록돼
   //    직후 DB 쓰기가 발화시키는 brands.updated_at 트리거보다 뒤처진다(구 stale 로직의 무한 재생성 원인).
-  const nowIso = new Date().toISOString();
+  const nowIso = kstIso();
   return {
     summary: String(parsed.summary ?? "").slice(0, 80),
     items,

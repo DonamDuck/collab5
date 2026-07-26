@@ -4,6 +4,7 @@
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { BrandDna, CollabCard, CollabReportData, CollabType, Maker, MakerStatus, Reaction, ViewEvent } from "./types";
+import { kstIso } from "./time";
 
 export interface Repo {
   // 업체
@@ -38,7 +39,7 @@ export interface Repo {
   insertCollabReport(r: { fromBrandId: number; toBrandId: number; requestedBy: number | null; report: CollabReportData; model: string }): Promise<void>;
 }
 
-const now = () => new Date().toISOString();
+const now = () => kstIso(); // 시각 표기 = KST(+09:00), lib/time.ts
 
 // ── 시드: 캔버스가든 = 1호 등록(테스트베드) ──
 const seedMakers: Maker[] = [
