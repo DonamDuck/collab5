@@ -210,9 +210,7 @@ export async function generateDna(m: Maker, prev?: BrandDna, meters?: CallMeter[
   // 품질 저하 없음 — evidence 원문 일치 33/33 유지, 서로 다른 type 13→11(thin 하한 4 대비 여유).
   // 항목 수가 조금 줄지만 근거 있는 것만 남는 쪽이라 사실게이트 취지에 부합.
   // enrich 검색 단계 thinkingBudget:0과 같은 계열의 판단. `DNA_THINKING=1`로 복구 가능.
-  // 🚧 임시(07-26 비교 측정): 기본값을 '사고 켬'으로 뒤집어 둠. 측정 끝나면 아래 줄로 복구할 것.
-  //    복구: const budget = process.env.DNA_THINKING === "1" ? undefined : (process.env.DNA_THINKING_BUDGET ?? "0");
-  const budget = process.env.DNA_THINKING === "0" ? "0" : process.env.DNA_THINKING_BUDGET;
+  const budget = process.env.DNA_THINKING === "1" ? undefined : (process.env.DNA_THINKING_BUDGET ?? "0");
   const call = (withBudget: boolean) =>
     ai().models.generateContent({
       model: DNA_MODEL,
