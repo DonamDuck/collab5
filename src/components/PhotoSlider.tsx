@@ -2,7 +2,10 @@
 
 // 브랜드 사진 스와이프 슬라이드 — 자동재생 없음. 모바일=손가락 스와이프(스크롤스냅),
 // 데스크탑=마우스 드래그(잡고 끌기) + 화살표. 인디케이터 점으로 위치 표시.
-import { useRef, useState } from "react";
+// 사진 탭/클릭 = 원본 보기(라이트박스). 목록은 4:3 object-cover라 잘려 보이지만,
+// 저장본은 비율 유지 축소본(크롭 아님)이라 라이트박스에서 object-contain으로 전체가 보인다.
+import { useEffect, useRef, useState } from "react";
+import { ScrollLock } from "./ScrollLock";
 
 export function PhotoSlider({
   photos,
@@ -15,6 +18,11 @@ export function PhotoSlider({
   const [idx, setIdx] = useState(0);
   const [dragging, setDragging] = useState(false);
   const drag = useRef({ active: false, startX: 0, startLeft: 0 });
+  // 원본 보기 — 열린 사진 index(null=닫힘)
+  const [zoom, setZoom] = useState<number | null>(null);
+  // "클릭 vs 스와이프/드래그" 구분용 누른 지점 + 그때 스크롤 위치.
+  // null = 기록 없음 → 막지 않는다(기본 허용). 기록이 있을 때만 이동량으로 판정.
+  const press = useRef<{ x: number; y: number; left: number } | null>(null);
 
   const onScroll = () => {
     const el = ref.current;
@@ -30,6 +38,8 @@ export function PhotoSlider({
   // 데스크탑 마우스 드래그(잡고 끌기). 터치는 네이티브 스크롤스냅에 맡김(pointerType 분기).
   const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     const el = ref.current;
+    // 클릭/스와이프 판정용 — 포인터 종류 무관하게 기록
+    press.current = { x: e.clientX, y: e.clientY, left: el?.scrollLeft ?? 0 };
     if (photos.length <= 1 || e.pointerType !== "mouse" || !el) return;
     drag.current = { active: true, startX: e.clientX, startLeft: el.scrollLeft };
     setDragging(true);
@@ -60,6 +70,17 @@ export function PhotoSlider({
     goTo(Math.max(0, Math.min(photos.length - 1, target)));
   };
 
+  // 누른 지점에서 8px 이상 움직였거나 그 사이 슬라이드가 넘어갔으면 스와이프/드래그로 보고 열지 않는다.
+  const openZoom = (i: number, e: React.MouseEvent) => {
+    const p = press.current;
+    if (p) {
+      const movedPx = Math.hypot(e.clientX - p.x, e.clientY - p.y);
+      const scrolled = Math.abs((ref.current?.scrollLeft ?? 0) - p.left);
+      if (movedPx > 8 || scrolled > 8) return;
+    }
+    setZoom(i);
+  };
+
   if (!photos.length) return null;
   const multi = photos.length > 1;
 
@@ -86,7 +107,8 @@ export function PhotoSlider({
                 src={src}
                 alt={`브랜드 사진 ${i + 1}`}
                 draggable={false}
-                className="absolute inset-0 h-full w-full object-cover"
+                onClick={(e) => openZoom(i, e)}
+                className="absolute inset-0 h-full w-full cursor-zoom-in object-cover"
               />
             </div>
           ))}
@@ -137,6 +159,93 @@ export function PhotoSlider({
             />
           ))}
         </div>
+      )}
+
+      {zoom !== null && (
+        <Lightbox photos={photos} index={zoom} onIndex={setZoom} onClose={() => setZoom(null)} />
+      )}
+    </div>
+  );
+}
+
+/** 원본 보기 — 목록은 4:3 크롭이지만 여기선 object-contain으로 잘린 부분까지 전부 보여준다.
+ *  닫기 = X·배경 탭·Esc / 이동 = 좌우 화살표·키보드 ←→ (사진 여러 장일 때만). */
+function Lightbox({
+  photos,
+  index,
+  onIndex,
+  onClose,
+}: {
+  photos: string[];
+  index: number;
+  onIndex: (i: number) => void;
+  onClose: () => void;
+}) {
+  const multi = photos.length > 1;
+  const prev = () => onIndex((index - 1 + photos.length) % photos.length);
+  const next = () => onIndex((index + 1) % photos.length);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+      else if (multi && e.key === "ArrowLeft") onIndex((index - 1 + photos.length) % photos.length);
+      else if (multi && e.key === "ArrowRight") onIndex((index + 1) % photos.length);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [index, multi, photos.length, onIndex, onClose]);
+
+  return (
+    <div
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-ink/90 p-4 print:hidden"
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-label="사진 원본 보기"
+    >
+      <ScrollLock />
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={photos[index]}
+        alt={`사진 원본 ${index + 1}`}
+        draggable={false}
+        onClick={(e) => e.stopPropagation()}
+        className="max-h-full max-w-full cursor-default object-contain"
+      />
+
+      <button
+        type="button"
+        onClick={onClose}
+        aria-label="닫기"
+        className="absolute right-3 top-[calc(0.75rem+env(safe-area-inset-top))] flex h-10 w-10 items-center justify-center rounded-pill bg-ink/60 text-on-dark hover:bg-ink/80"
+      >
+        <svg viewBox="0 0 20 20" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8">
+          <path d="M5 5l10 10M15 5L5 15" strokeLinecap="round" />
+        </svg>
+      </button>
+
+      {multi && (
+        <>
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); prev(); }}
+            aria-label="이전 사진"
+            className="absolute left-3 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-pill bg-ink/60 text-[20px] text-on-dark hover:bg-ink/80"
+          >
+            ‹
+          </button>
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); next(); }}
+            aria-label="다음 사진"
+            className="absolute right-3 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-pill bg-ink/60 text-[20px] text-on-dark hover:bg-ink/80"
+          >
+            ›
+          </button>
+          <span className="pointer-events-none absolute bottom-[calc(1rem+env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 rounded-pill bg-ink/60 px-3 py-1 text-[13px] font-medium text-on-dark">
+            {index + 1} / {photos.length}
+          </span>
+        </>
       )}
     </div>
   );
