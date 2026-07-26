@@ -13,6 +13,11 @@ import { ReportArchiveCard } from "./ReportArchiveCard";
 import { MyTabs } from "./MyTabs";
 import { ProfileAvatarEditor } from "./ProfileAvatarEditor";
 
+// 🚨 로그인 사용자별 화면이라 절대 프리렌더되면 안 된다.
+// 쿠키 접근으로 자동 dynamic이 되긴 하지만, 그 판정이 "빌드 시점에 auth env가 있느냐"에 달려 있어
+// env 없는 빌드에선 정적(○)으로 잡힌다(실측). 명시 선언으로 고정. (1팀 /search 사례와 동일 함정)
+export const dynamic = "force-dynamic";
+
 export default async function MyPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
   const user = await getSessionUser();
   if (!user) redirect("/login?redirect=%2Fmy"); // 로그인 후 원래 가려던 /my로 복귀
