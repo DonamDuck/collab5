@@ -182,7 +182,7 @@ export async function searchAction(q: string): Promise<Maker[]> {
   return repo.searchMakers(q);
 }
 
-/** 등록 폼 '사진 없는 소개서 예시보기' 바텀시트용 — 텍스트 데모 소개서(고정 slug) 조회. 유료 콜 없음(DB 1회). */
+/** 등록 폼 '텍스트형 소개서 예시' 바텀시트용 — 텍스트 데모 소개서(고정 slug) 조회. 유료 콜 없음(DB 1회). */
 export async function getPreviewDemoNoneAction(): Promise<{ maker: Maker; logoUrl: string | null } | null> {
   const { DEMO_SLUG_NONE } = await import("./demo");
   const { getProfileById } = await import("./profiles");

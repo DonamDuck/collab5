@@ -1170,13 +1170,13 @@ function RegisterForm() {
             </label>
             {/* 사진 불안 완화 — 사진 없이도 완성 예시를 그 자리에서 확인(바텀시트, 폼 이탈 없음) */}
             <p className="mb-2.5 text-[14px] leading-relaxed text-body">
-              지금 사진이 없다면 우선, 텍스트형 소개서를 만들어보세요.{" "}
+              지금 사진이 없다면 우선, 텍스트형 소개서로 시작해보세요.{" "}
               <button
                 type="button"
                 onClick={openPreview}
                 className="text-primary-on underline underline-offset-2"
               >
-                사진 없는 소개서 예시보기
+                텍스트형 소개서 예시
               </button>
             </p>
             <PhotoGrid
