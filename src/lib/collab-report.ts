@@ -232,7 +232,7 @@ export async function generateDna(m: Maker, prev?: BrandDna): Promise<BrandDna> 
 // ── 판정 헬퍼 ─────────────────────────────────────────────────
 
 /** DNA 입력(소개서 다이제스트)의 지문. stale 판정 기준 — 시각이 아니라 '내용이 바뀌었나'로 본다.
- *  공백·줄바꿈은 지문 전에 정규화 — 눈에 안 보이는 수정(뒤 공백, 줄바꿈 수)으로 재생성되지 않게(대표 07-27). */
+ *  공백·줄바꿈은 지문 전에 정규화 — 눈에 안 보이는 수정(뒤 공백, 줄바꿈 수)으로 재생성되지 않게(대표 07-26). */
 const hashText = (s: string) =>
   createHash("sha1").update(s.replace(/\s+/g, " ").trim()).digest("hex").slice(0, 16);
 export const digestHash = (m: Maker) => hashText(brandDigest(m).text);
@@ -245,7 +245,7 @@ export const isThin = (dna: BrandDna) => distinctTypeCount(dna.items) < THIN_MIN
  *  ③은 **시각 비교가 아니라 내용 지문(input_hash) 비교**다. 시각 비교를 쓰면 안 되는 이유:
  *  setBrandDna의 update가 brands의 updated_at 트리거를 발화시켜 brands.updated_at이 항상
  *  dna.updated_at보다 뒤가 된다 → 모든 DNA가 영구 stale → 매 요청 재생성 → 리포트 캐시도 영구 미스.
- *  (2026-07-27 실측 원인. 허용 오차 상수로 막으려 했으나 DNA 생성이 10~20초라 오차를 넘겼다.)
+ *  (2026-07-26 실측 원인. 허용 오차 상수로 막으려 했으나 DNA 생성이 10~20초라 오차를 넘겼다.)
  *  지문 비교는 클럭 스큐·트리거·대량 마이그레이션(전 행 updated_at 갱신)에도 흔들리지 않는다. */
 export function isDnaStale(dna: BrandDna | null, brand?: Maker): boolean {
   if (!dna) return true;

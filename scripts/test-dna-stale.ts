@@ -1,6 +1,6 @@
 // DNA stale 판정 회귀 테스트 — 오프라인(Gemini 콜 0). `npx tsx scripts/test-dna-stale.ts`
 //
-// 왜 이 테스트가 있나 (2026-07-27 실장애):
+// 왜 이 테스트가 있나 (2026-07-26 실장애):
 //   stale 판정이 "brands.updated_at > dna.updated_at"이던 시절, setBrandDna의 update가
 //   brands의 updated_at 트리거를 발화시켜 **모든 DNA가 영구 stale**이 됐다.
 //   → 매 요청 DNA 2콜 재생성 → dna.updated_at이 항상 now → 리포트 캐시도 영구 미스
@@ -23,7 +23,7 @@ const dna = (input_hash: string | undefined, updated = "2026-07-26T10:00:00.000Z
   ({ summary: "s", items: [], input_fields: [], input_hash, created_at: updated, updated_at: updated });
 
 const fresh = dna(hashOf(brand));
-const bumped = { ...brand, updatedAt: "2026-07-27T09:00:00.000Z" } as Maker; // 트리거로 시각만 밀림
+const bumped = { ...brand, updatedAt: "2026-07-26T09:00:00.000Z" } as Maker; // 트리거로 시각만 밀림
 const edited = { ...brand, oneLiner: "소개서를 실제로 고쳤다" } as Maker;
 // 공백만 달라진 수정 — 뒤 공백·이중 공백·줄바꿈 추가 (내용은 동일)
 const spacey = { ...brand, oneLiner: "한 줄  소개 \n", story: "브랜드 이야기  " } as Maker;

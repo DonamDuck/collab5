@@ -33,7 +33,7 @@ export const HEAVY_METHODS = ["공동 상품","공동 브랜딩","입점 판매"
 export const THIN_MIN_TYPES = 4;      // 서로 다른 type 수 미달 = thin
 export const MIN_MATCH_SCORE = 7;     // 접점 채점 통과 하한(10점 만점 합산 기준, A/B로 튜닝)
 export const DNA_REFRESH_BEFORE = "2026-07-25T00:00:00Z"; // 이 날짜 이전 dna는 stale 취급
-// (은퇴 2026-07-27) DNA_STALE_SLACK_MS 삭제 — stale 판정을 시각 비교에서 내용 지문(input_hash)
+// (은퇴 2026-07-26) DNA_STALE_SLACK_MS 삭제 — stale 판정을 시각 비교에서 내용 지문(input_hash)
 // 비교로 바꿨다. setBrandDna가 brands.updated_at 트리거를 발화시켜 시각 비교는 구조적으로 성립하지
 // 않았고(모든 DNA 영구 stale), 허용 오차로 막으려 해도 DNA 생성 10~20초가 오차를 넘겼다.
 
