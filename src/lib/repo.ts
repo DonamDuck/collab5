@@ -42,6 +42,12 @@ export interface Repo {
 
 const now = () => kstIso(); // 시각 표기 = KST(+09:00), lib/time.ts
 
+/** 지역의 상위 2토막만 — "서울 마포구 연남동" → "서울 마포구". 카드 한 줄에 들어가는 식별 단위. */
+const topRegion = (region?: string | null): string | undefined => {
+  const t = (region ?? "").trim().split(/\s+/).filter(Boolean).slice(0, 2).join(" ");
+  return t || undefined;
+};
+
 // ── 시드: 캔버스가든 = 1호 등록(테스트베드) ──
 const seedMakers: Maker[] = [
   {
@@ -493,7 +499,11 @@ class InMemoryRepo implements Repo {
       if (!latest || !from || !to) continue;
       items.push({
         fromSlug: from.slug, fromName: from.name, toSlug: to.slug, toName: to.name,
-        oneLiner: latest.report.oneLiner, ideaTitles: latest.report.ideas.map((i) => i.title).slice(0, 3),
+        toRegion: topRegion(to.region),
+        oneLiner: latest.report.oneLiner,
+        matchPoint: latest.report.matchPoints?.[0]?.text,
+        ideaTitle: latest.report.ideas?.[0]?.title,
+        effect: latest.report.effects?.[0],
         createdAt: latest.createdAt,
       });
     }
@@ -748,7 +758,7 @@ class SupabaseRepo implements Repo {
       .select(
         "from_brand_id, to_brand_id, report, created_at, " +
           "from_brand:brands!collab_reports_from_brand_id_fkey(slug, name, status), " +
-          "to_brand:brands!collab_reports_to_brand_id_fkey(slug, name, status)"
+          "to_brand:brands!collab_reports_to_brand_id_fkey(slug, name, status, region)"
       )
       .eq("requested_by", userId)
       .order("created_at", { ascending: false })
@@ -760,7 +770,7 @@ class SupabaseRepo implements Repo {
     type Row = {
       from_brand_id: number; to_brand_id: number; report: CollabReportData; created_at: string;
       from_brand: { slug: string; name: string; status: string | null } | null;
-      to_brand: { slug: string; name: string; status: string | null } | null;
+      to_brand: { slug: string; name: string; status: string | null; region: string | null } | null;
     };
     const seen = new Set<string>();
     const items: CollabReportListItem[] = [];
@@ -774,8 +784,11 @@ class SupabaseRepo implements Repo {
       items.push({
         fromSlug: r.from_brand.slug, fromName: r.from_brand.name,
         toSlug: r.to_brand.slug, toName: r.to_brand.name,
+        toRegion: topRegion(r.to_brand.region),
         oneLiner: r.report?.oneLiner ?? "",
-        ideaTitles: (r.report?.ideas ?? []).map((i) => i.title).filter(Boolean).slice(0, 3),
+        matchPoint: r.report?.matchPoints?.[0]?.text,
+        ideaTitle: r.report?.ideas?.[0]?.title,
+        effect: r.report?.effects?.[0],
         createdAt: r.created_at,
       });
     }

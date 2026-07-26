@@ -154,13 +154,17 @@ export interface BrandDna {
 export interface ReportMatchPoint { text: string; }           // ② 접점 (선발 통과분)
 export interface ReportIdea { title: string; desc: string; method: string; } // ③ method=collabMethod 어휘
 
-/** /my 리포트 아카이브 목록 행 — 쌍별 최신 1건, 요청자 본인 것만(프라이버시 원칙). */
+/** /my 리포트 아카이브 목록 행 — 쌍별 최신 1건, 요청자 본인 것만(프라이버시 원칙).
+ *  리포트 6조각에서 **각 축의 대표 1개씩만** 뽑는다(카드는 미리보기지 축약본이 아니다). */
 export interface CollabReportListItem {
   fromSlug: string; fromName: string;   // 내 소개서(제안자)
   toSlug: string; toName: string;       // 상상해 본 상대
+  toRegion?: string;                    // 상대 지역(상위 2토막) — 날짜보다 재인식에 쓸모 있는 축
   oneLiner: string;                     // 카드의 주인공 — "어떤 콜라보를 상상했는지"
-  ideaTitles: string[];                 // 아이디어 제목 칩(최대 3)
-  createdAt: string;
+  matchPoint?: string;                  // 잘 어울리는 점 1개(채점 1위)
+  ideaTitle?: string;                   // 추천 콜라보 제목 1개
+  effect?: string;                      // 기대 효과 1개
+  createdAt: string;                    // 정렬용(카드에는 노출 안 함)
 }
 export interface CollabReportData {
   oneLiner: string;                 // ① 한 줄 결론

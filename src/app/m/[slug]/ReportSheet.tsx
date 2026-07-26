@@ -312,7 +312,9 @@ export function ReportSheet({
           <>
             {/* 고정 유틸 바 — 리포트가 길어 스크롤해도 닫기가 항상 잡힌다(대표 요청 07-26) */}
             <div className="flex shrink-0 items-center justify-between gap-2 border-b border-hairline px-4 py-2.5">
-              <p className="min-w-0 flex-1 truncate text-[13px] font-medium text-mute">
+              {/* 고정 바의 유일한 텍스트라 13→15px로 키움(대표 07-26). 색은 body 유지 —
+                  ink로 올리면 스크롤 영역의 결론(20 bold ink)과 경쟁해 3층 위계가 다시 뭉갠다. */}
+              <p className="min-w-0 flex-1 truncate text-[15px] font-semibold text-body">
                 {fromName} × {reportToName}
               </p>
               <div className="flex shrink-0 items-center gap-3">
