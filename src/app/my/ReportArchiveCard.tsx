@@ -18,7 +18,7 @@ import type { CollabReportListItem } from "@/lib/types";
 function PreviewRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <p className="text-[11px] font-medium tracking-wide text-faint">{label}</p>
+      <p className="text-[13px] font-medium text-faint">{label}</p>
       <div className="mt-1">{children}</div>
     </div>
   );
@@ -33,16 +33,19 @@ export function ReportArchiveCard({ item }: { item: CollabReportListItem }) {
       onClick={() => track("report_archive_open")}
       className="block rounded-md border border-hairline bg-surface p-4 transition-colors hover:border-border-strong"
     >
-      {/* 쌍 캡션 + 상대 지역 — 날짜보다 "어디 브랜드였지"가 재인식에 쓸모 있다(대표 07-26) */}
-      <div className="flex items-baseline justify-between gap-2">
-        <p className="min-w-0 truncate text-[13px] font-medium text-mute">
+      {/* 쌍 캡션(칩) + 상대 지역 — 날짜보다 "어디 브랜드였지"가 재인식에 쓸모 있다(대표 07-26).
+          ⚠️ 비비드 Kiwi(bg-primary) 대신 **primary-pale**: Kiwi를 면으로 쓰는 곳은 primary CTA 하나뿐이고
+          (design.md 희소 원칙), 목록 카드마다 형광이 깔리면 CTA에서 힘을 잃는다.
+          라이트 배경에 Kiwi를 '텍스트'로 쓰는 것도 대비 부족으로 금지 → 글자는 primary-on(진초록). */}
+      <div className="flex items-center justify-between gap-2">
+        <span className="min-w-0 truncate rounded-pill bg-primary-pale px-2.5 py-1 text-[13px] font-semibold text-primary-on">
           {item.fromName} × {item.toName}
-        </p>
-        {item.toRegion && <p className="shrink-0 text-[12px] text-faint">{item.toRegion}</p>}
+        </span>
+        {item.toRegion && <span className="shrink-0 text-[13px] text-faint">{item.toRegion}</span>}
       </div>
 
       {/* 주인공 — 무엇을 상상했는지 */}
-      <p className="mt-1.5 line-clamp-2 text-[15px] font-semibold leading-snug break-keep text-ink">
+      <p className="mt-2 line-clamp-2 text-[15px] font-semibold leading-snug break-keep text-ink">
         {item.oneLiner}
       </p>
 
@@ -50,7 +53,7 @@ export function ReportArchiveCard({ item }: { item: CollabReportListItem }) {
         <div className="mt-3 space-y-2.5 border-t border-hairline pt-3">
           {item.matchPoint && (
             <PreviewRow label="잘 어울리는 점">
-              <p className="line-clamp-2 text-[13px] leading-relaxed break-keep text-body">
+              <p className="line-clamp-2 text-[14px] leading-relaxed break-keep text-body">
                 {item.matchPoint}
               </p>
             </PreviewRow>
@@ -58,13 +61,13 @@ export function ReportArchiveCard({ item }: { item: CollabReportListItem }) {
           {item.ideaTitles.length > 0 && (
             <PreviewRow label="추천 콜라보">
               {/* 이 축만 칩 — 여러 개를 나란히 보여주는 게 목적이라 열거형이 맞다.
-                  면은 surface-soft 유지(primary-pale=클릭 가능, mint-pale=브랜드 키워드로 이미 배정된 색이라
-                  의미가 섞인다) + 글자를 ink medium으로 올려 다른 두 축보다 앞으로 나오게. */}
+                  면은 surface-soft(뉴트럴) — 위 쌍 캡션이 primary-pale이라 여기까지 색을 쓰면
+                  한 카드에 색 면이 둘이 되어 시선이 갈린다. 대비는 글자 ink medium으로. */}
               <div className="flex flex-wrap gap-1.5">
                 {item.ideaTitles.map((t) => (
                   <span
                     key={t}
-                    className="rounded-pill bg-surface-soft px-2.5 py-1 text-[12px] font-medium break-keep text-ink"
+                    className="rounded-pill bg-surface-soft px-2.5 py-1 text-[13px] font-medium break-keep text-ink"
                   >
                     {t}
                   </span>
@@ -74,7 +77,7 @@ export function ReportArchiveCard({ item }: { item: CollabReportListItem }) {
           )}
           {item.effect && (
             <PreviewRow label="기대 효과">
-              <p className="line-clamp-2 text-[13px] leading-relaxed break-keep text-body">
+              <p className="line-clamp-2 text-[14px] leading-relaxed break-keep text-body">
                 {item.effect}
               </p>
             </PreviewRow>
