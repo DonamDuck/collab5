@@ -132,13 +132,12 @@ export function PhotoSlider({
           type="button"
           onClick={() => setZoom(idx)}
           aria-label="사진 원본 보기"
-          className="absolute bottom-2 right-2 inline-flex items-center gap-1 rounded-pill bg-ink/55 px-2 py-1 text-[11px] font-medium text-white hover:bg-ink/75 print:hidden"
+          className="absolute bottom-2 right-2 flex h-7 w-7 items-center justify-center rounded-pill bg-ink/55 text-white hover:bg-ink/75 print:hidden"
         >
-          <svg viewBox="0 0 20 20" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.8">
+          <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8">
             <circle cx="8.5" cy="8.5" r="5.5" />
             <path d="m13 13 4 4M8.5 6.5v4M6.5 8.5h4" strokeLinecap="round" />
           </svg>
-          확대
         </button>
 
         {/* 데스크탑 화살표(모바일은 스와이프) */}
