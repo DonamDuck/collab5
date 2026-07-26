@@ -1,12 +1,13 @@
 // 인스타 사진 저장기 — 클립보드의 이미지 URL들을 "폴더만 고르면" 한 번에 내려받는다.
 //
-//   npx tsx scripts/ig-save.ts               # 폴더 선택 화면 → 저장
-//   npx tsx scripts/ig-save.ts 두더지요가원     # 폴더를 알면 바로
-//   npx tsx scripts/ig-save.ts --bookmarklet  # 북마클릿 한 줄 출력(최초 1회 설치)
+//   npm run ig                              # 폴더 선택 → 이름 입력 → 저장
+//   npm run ig -- 두더지요가원 "토우 워크숍"      # 둘 다 알면 바로
+//   npm run ig:setup                        # 북마클릿 한 줄 출력(최초 1회 설치)
 //
-// 흐름: [인스타 게시물에서 북마클릿 클릭 → URL 전부 클립보드] → [이 스크립트 → 폴더 고르면 끝]
-// 파일명은 붙이지 않는다(대표가 매번 다르게 씀) — `1.jpg, 2.jpg…`로 떨어뜨리고,
-// 폴더에 이미 번호가 있으면 이어서 매긴다. 이름은 Finder에서 한 번에 바꾸는 게 빠르다.
+// 흐름: [인스타 게시물에서 북마클릿 → [복사하기]] → [이 스크립트 → 폴더·이름 → 저장]
+// 파일명 = `{입력한 이름} 1.jpg, {이름} 2.jpg…` — **한 배치는 항상 1번부터**.
+// 배치마다 이름을 새로 받으므로 과거 저장분과 번호를 이어붙이지 않는다(대표 07-26).
+// 단, 같은 폴더에 같은 이름이 이미 있으면 덮어쓰지 않고 뒤 번호로 피한다(사고 방지).
 import { mkdir, readdir, writeFile, readFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { execFileSync } from "node:child_process";
@@ -61,7 +62,7 @@ function readUrls(): { urls: string[]; raw: string; clipboardError?: string } {
 }
 
 /** 폴더 선택 화면 — 기존 폴더를 번호로 고르거나 새로 만든다(숫자 하나면 끝) */
-async function pickFolder(): Promise<string> {
+async function pickFolder(rl: ReturnType<typeof createInterface>): Promise<string> {
   const dirs = existsSync(ROOT)
     ? (await readdir(ROOT, { withFileTypes: true }))
         .filter((d) => d.isDirectory() && !d.name.startsWith("."))
@@ -73,32 +74,31 @@ async function pickFolder(): Promise<string> {
   for (const [i, name] of dirs.entries()) console.log(`  ${i + 1}. ${name}`);
   console.log(`  ${dirs.length + 1}. + 새 폴더 만들기\n`);
 
-  const rl = createInterface({ input: process.stdin, output: process.stdout });
-  try {
-    const answer = (await rl.question("번호 입력: ")).trim();
-    const n = Number(answer);
-    if (n >= 1 && n <= dirs.length) return dirs[n - 1];
-    if (n === dirs.length + 1 || !answer) {
-      const name = (await rl.question("새 폴더 이름: ")).trim();
-      if (!name) throw new Error("폴더 이름이 비었어요");
-      return name;
-    }
-    // 숫자가 아니면 폴더명을 직접 친 것으로 본다
-    return answer;
-  } finally {
-    rl.close();
+  const answer = (await rl.question("번호 입력: ")).trim();
+  const n = Number(answer);
+  if (n >= 1 && n <= dirs.length) return dirs[n - 1];
+  if (n === dirs.length + 1 || !answer) {
+    const name = (await rl.question("새 폴더 이름: ")).trim();
+    if (!name) throw new Error("폴더 이름이 비었어요");
+    return name;
   }
+  // 숫자가 아니면 폴더명을 직접 친 것으로 본다
+  return answer;
 }
 
-/** 폴더에 있는 `N.jpg` 중 최대 N — 재실행 시 이어서 번호를 매긴다 */
-async function nextIndex(dir: string): Promise<number> {
-  if (!existsSync(dir)) return 1;
+/** 이 배치는 1번부터 시작한다. 단 같은 이름이 이미 있으면 **덮어쓰지 않고** 뒤 번호로 피한다.
+ *  (이름을 매번 새로 받으니 충돌은 드물지만, 실수로 같은 이름을 쳤을 때 기존 사진이 날아가면 안 된다) */
+async function startIndex(dir: string, label: string): Promise<{ from: number; collided: boolean }> {
+  if (!existsSync(dir)) return { from: 1, collided: false };
   const files = await readdir(dir);
+  // 라벨이 비면 `1.jpg` 형태, 있으면 `이름 1.jpg` 형태를 찾는다
+  const esc = label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const re = new RegExp(`^${esc ? esc + " " : ""}(\\d+)\\.[a-z]+$`, "i");
   const max = files.reduce((m, f) => {
-    const hit = f.match(/^(\d+)\.[a-z]+$/i);
+    const hit = f.match(re);
     return hit ? Math.max(m, Number(hit[1])) : m;
   }, 0);
-  return max + 1;
+  return max === 0 ? { from: 1, collided: false } : { from: max + 1, collided: true };
 }
 
 const extOf = (ct: string): string =>
@@ -127,12 +127,35 @@ async function main() {
   }
   console.log(`\n클립보드에서 사진 ${urls.length}장 찾았어요.`);
 
-  const brand = process.argv[2] || (await pickFolder());
-  const dir = path.join(ROOT, brand);
-  await mkdir(dir, { recursive: true });
-  let n = await nextIndex(dir);
+  const argBrand = process.argv[2];
+  const argLabel = process.argv[3];
+  let brand = argBrand;
+  let label = argLabel ?? "";
+  if (!argBrand || argLabel === undefined) {
+    const rl = createInterface({ input: process.stdin, output: process.stdout });
+    try {
+      brand = argBrand || (await pickFolder(rl));
+      if (argLabel === undefined) {
+        label = (await rl.question("\n사진 이름 (그냥 엔터 = 숫자만): ")).trim();
+      }
+    } finally {
+      rl.close();
+    }
+  }
+  // 파일명에 못 쓰는 문자만 정리(/ 는 경로가 되고 : 는 Finder에서 깨진다)
+  label = label.replace(/[/:\\]/g, "-").trim();
 
-  console.log(`\n→ 업체사진정리/${brand}/ 에 ${n}번부터 저장합니다\n`);
+  const dir = path.join(ROOT, brand!);
+  await mkdir(dir, { recursive: true });
+  const { from, collided } = await startIndex(dir, label);
+  let n = from;
+
+  const sample = label ? `${label} ${n}.jpg` : `${n}.jpg`;
+  console.log(`\n→ 업체사진정리/${brand}/${sample} 부터 저장합니다`);
+  if (collided) {
+    console.log(`   (같은 이름이 이미 있어서 ${from}번부터 — 기존 사진은 덮어쓰지 않아요)`);
+  }
+  console.log("");
   let ok = 0;
   for (const url of urls) {
     try {
@@ -143,7 +166,8 @@ async function main() {
         continue;
       }
       const buf = Buffer.from(await res.arrayBuffer());
-      const name = `${n}.${extOf(res.headers.get("content-type") ?? "")}`;
+      const ext = extOf(res.headers.get("content-type") ?? "");
+      const name = label ? `${label} ${n}.${ext}` : `${n}.${ext}`;
       await writeFile(path.join(dir, name), buf);
       console.log(`  ✓ ${name}  (${Math.round(buf.length / 1024)}KB)`);
       n++;
