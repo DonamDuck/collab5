@@ -104,8 +104,10 @@ export function PhotoSlider({
             multi ? (dragging ? "cursor-grabbing" : "cursor-grab") : "cursor-zoom-in"
           }`}
         >
+          {/* 비율 실험(2026-07-26): 세로 사진(3:4)이 많아 4:3에선 심하게 잘려 정방형 1:1로 시험 중.
+              가로(w-full) 기준 유지라 높이만 늘어난다. 되돌리려면 aspect-square → aspect-[4/3]. */}
           {photos.map((src, i) => (
-            <div key={i} className="relative aspect-[4/3] w-full shrink-0 snap-center bg-surface-soft [&:not(:first-child)]:print:hidden">
+            <div key={i} className="relative aspect-square w-full shrink-0 snap-center bg-surface-soft [&:not(:first-child)]:print:hidden">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={src}
