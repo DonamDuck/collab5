@@ -18,12 +18,17 @@ const ROOT = path.resolve(import.meta.dirname, "..", "업체사진정리");
 /** 북마클릿 소스를 javascript: 한 줄로 — 주석·개행을 걷어낸 뒤 URL 인코딩 */
 async function printBookmarklet(): Promise<void> {
   const src = await readFile(path.resolve(import.meta.dirname, "ig-bookmarklet.js"), "utf8");
+  // ⚠️ 줄 **끝**의 주석까지 반드시 걷어내야 한다 — 한 줄로 합치는 순간 그 뒤 코드가
+  //    전부 주석이 되어 북마클릿이 조용히 죽는다(따옴표 안의 //는 없다고 전제).
   const body = src
     .split("\n")
-    .filter((l) => !l.trim().startsWith("//"))
+    .map((l) => l.replace(/\/\/.*$/, ""))
+    .filter((l) => l.trim())
     .join("\n")
     .replace(/\s+/g, " ")
     .trim();
+  // 문법이 깨지지 않았는지 확인 후에만 출력(깨진 한 줄을 붙여넣게 두지 않는다)
+  new Function(body);
   console.log("\n아래 한 줄을 크롬 북마크의 URL 칸에 붙여넣으세요 (이름: 인스타 사진 긁기)\n");
   console.log("javascript:" + encodeURI(body).replace(/#/g, "%23"));
   console.log("\n설치: 북마크바 우클릭 → 페이지 추가 → 이름·URL 입력\n");
