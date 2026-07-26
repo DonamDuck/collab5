@@ -1412,9 +1412,10 @@ function RegisterForm() {
               {/* 사진·링크 접힘 버튼 — press와 동일하게 한 줄 인라인(space-y-2로 그룹) */}
               <div className="space-y-2">
                 <CollapsedPhotos photoCount={act.photos.length}>
+                  <p className="mb-1.5 text-sm text-mute">사진 (선택 · 최대 5장)</p>
                   <PhotoGrid
                     items={act.photos}
-                    max={3}
+                    max={5}
                     onAdd={(files) => addActPhotos(i, files)}
                     onRemove={(k) => removeActPhoto(i, k)}
                     onReorder={(from, to) => moveActPhoto(i, from, to)}
@@ -1607,10 +1608,10 @@ function RegisterForm() {
                   {/* 사진·링크 접힘 버튼 — 카드 최하단, press와 동일하게 한 줄 인라인(space-y-2로 그룹) */}
                   <div className="space-y-2">
                     <CollapsedPhotos photoCount={h.photos.length}>
-                      <p className="mb-1.5 text-sm text-mute">사진 (선택 · 최대 3장)</p>
+                      <p className="mb-1.5 text-sm text-mute">사진 (선택 · 최대 5장)</p>
                       <PhotoGrid
                         items={h.photos}
-                        max={3}
+                        max={5}
                         onAdd={(files) => addHistPhotos(i, files)}
                         onRemove={(k) => removeHistPhoto(i, k)}
                         onReorder={(from, to) => moveHistPhoto(i, from, to)}
