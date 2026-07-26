@@ -96,7 +96,7 @@ export function BlockEditor({ blocks, onChange, onUploadingChange, onSheetOpenCh
     onChange(blocks.map((b, k) => (k === i ? nb : b)));
   const addPhotos = async (i: number, files: FileList | null) => {
     const uid = blocks[i].uid; // await 후 배열이 바뀌어도 이 블록을 정확히 찾도록 캡처
-    const room = 3 - blocks[i].photos.length;
+    const room = 5 - blocks[i].photos.length;
     const list = Array.from(files ?? []).filter((f) => f.type.startsWith("image/")).slice(0, room);
     if (!list.length) return;
     setUploading((n) => { const v = n + 1; onUploadingChange?.(v > 0); return v; });
@@ -126,7 +126,7 @@ export function BlockEditor({ blocks, onChange, onUploadingChange, onSheetOpenCh
     const b = blocks[i];
     if (b.type !== "press") return;
     const uid = b.uid; // await 후 배열이 바뀌어도 이 블록을 정확히 찾도록 캡처
-    const room = 3 - (b.items[k].photos?.length ?? 0);
+    const room = 5 - (b.items[k].photos?.length ?? 0);
     const list = Array.from(files ?? []).filter((f) => f.type.startsWith("image/")).slice(0, room);
     if (!list.length) return;
     setUploading((n) => { const v = n + 1; onUploadingChange?.(v > 0); return v; });
@@ -298,7 +298,7 @@ export function BlockEditor({ blocks, onChange, onUploadingChange, onSheetOpenCh
                             </button>
                           </div>
                         ))}
-                        {(it.photos?.length ?? 0) < 3 && (
+                        {(it.photos?.length ?? 0) < 5 && (
                           <label className="flex h-20 w-20 shrink-0 cursor-pointer flex-col items-center justify-center rounded-md border border-dashed border-border-strong bg-surface text-mute">
                             <span className="text-xl leading-none">＋</span>
                             <span className="mt-1 text-[11px]">사진(선택)</span>

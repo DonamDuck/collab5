@@ -388,7 +388,7 @@ function RegisterForm() {
   };
 
   const addHistPhotos = (i: number, files: FileList | null) =>
-    uploadInto(files, 3 - (collabHistory[i]?.photos.length ?? 0), 800, (f) =>
+    uploadInto(files, 5 - (collabHistory[i]?.photos.length ?? 0), 800, (f) =>
       setCollabHistory((p) => p.map((h, j) => (j === i ? { ...h, photos: f(h.photos) } : h)))
     );
   const removeHistPhoto = (i: number, k: number) =>
@@ -410,7 +410,7 @@ function RegisterForm() {
   const setAct = (i: number, patch: Partial<{ title: string; desc: string; link: string }>) =>
     setActivities((p) => p.map((a, j) => (j === i ? { ...a, ...patch } : a)));
   const addActPhotos = (i: number, files: FileList | null) =>
-    uploadInto(files, 3 - (activities[i]?.photos.length ?? 0), 800, (f) =>
+    uploadInto(files, 5 - (activities[i]?.photos.length ?? 0), 800, (f) =>
       setActivities((p) => p.map((a, j) => (j === i ? { ...a, photos: f(a.photos) } : a)))
     );
   const removeActPhoto = (i: number, k: number) =>
