@@ -18,6 +18,7 @@ export interface Repo {
   deleteMaker(slug: string): Promise<void>;
   listMakersByOwner(ownerUserId: number): Promise<Maker[]>;
   searchMakers(q: string): Promise<Maker[]>;
+  listCollabOpenMakers(limit: number): Promise<Maker[]>; // 홈 캐러셀 — 콜라보 받는 중 + 검색 노출, 등록순
   // 카드
   createCard(input: Omit<CollabCard, "id" | "createdAt">): Promise<CollabCard>;
   getCardBySlug(slug: string): Promise<CollabCard | null>;
@@ -424,6 +425,12 @@ class InMemoryRepo implements Repo {
         .includes(t)
     );
   }
+  async listCollabOpenMakers(limit: number): Promise<Maker[]> {
+    return this.makers
+      .filter((m) => m.collabOpen && m.searchVisible && m.status !== "inactive")
+      .sort((a, b) => (a.createdAt < b.createdAt ? -1 : 1))
+      .slice(0, limit);
+  }
 
   async createCard(input: Omit<CollabCard, "id" | "createdAt">): Promise<CollabCard> {
     const card: CollabCard = { ...input, id: this.nextCardId++, createdAt: now() };
@@ -653,6 +660,19 @@ class SupabaseRepo implements Repo {
     let query = this.db.from("brands").select(SEARCH_CARD_COLS).eq("search_visible", true).eq("status", "active");
     if (t) query = query.or(`name.ilike.%${t}%,one_liner.ilike.%${t}%,region.ilike.%${t}%`);
     const { data } = await query.order("created_at", { ascending: false });
+    return (data ?? []).map((r) => rowToMaker(r as MakerRow));
+  }
+  /** 홈 "콜라보 가능한 브랜드" 캐러셀 — 콜라보 받는 중 + 검색 노출 + active, **등록 오래된 순**으로 limit개.
+   *  먼저 등록한 브랜드가 앞에 오는 게 맞다는 대표 판단(07-27). 검색(최신순)과 정렬이 반대라 별도 메서드. */
+  async listCollabOpenMakers(limit: number): Promise<Maker[]> {
+    const { data } = await this.db
+      .from("brands")
+      .select(SEARCH_CARD_COLS)
+      .eq("collab_open", true)
+      .eq("search_visible", true)
+      .eq("status", "active")
+      .order("created_at", { ascending: true })
+      .limit(limit);
     return (data ?? []).map((r) => rowToMaker(r as MakerRow));
   }
   // /my 토글 — 소유자 검증은 actions에서. collab_open·search_visible 만 부분 갱신.
