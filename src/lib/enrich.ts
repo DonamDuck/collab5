@@ -7,7 +7,7 @@
 //
 // ⚠️ 서버 전용 모듈. 클라이언트(register/page.tsx)는 `import type`로 타입만 가져간다.
 import Anthropic from "@anthropic-ai/sdk";
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenAI, Type, type ThinkingLevel } from "@google/genai";
 import { z } from "zod";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { josa } from "./josa";
@@ -1244,10 +1244,15 @@ class NaverGeminiProvider implements SearchProvider {
     const genModels = process.env.ENRICH_GEN_MODEL
       ? [process.env.ENRICH_GEN_MODEL]
       : NaverGeminiProvider.GEMINI_MODELS;
+    // ENRICH_GEN_THINKING: 사고량 조절(minimal|low|medium|high). 실측상 사고 토큰이 과금 출력의
+    // 절반을 넘어(3.6-flash 2449/4362) 원가·지연의 최대 변수다. 미설정=모델 기본.
+    // ⚠️수용 범위는 세대별로 다르다 — 2.5 계열은 thinkingLevel을 400으로 거부하므로 옵션 없이 1회 재시도.
+    // (SDK 열거값은 대문자 — env는 low/LOW 아무 표기나 받는다)
+    const level = process.env.ENRICH_GEN_THINKING?.toUpperCase() as ThinkingLevel | undefined;
     for (const model of genModels) {
       const t0 = Date.now();
-      try {
-        const response = await this.ai().models.generateContent({
+      const call = (withLevel: boolean) =>
+        this.ai().models.generateContent({
           model,
           contents,
           config: {
@@ -1255,8 +1260,19 @@ class NaverGeminiProvider implements SearchProvider {
             responseMimeType: "application/json",
             responseSchema,
             temperature,
+            ...(withLevel && level ? { thinkingConfig: { thinkingLevel: level } } : {}),
           },
         });
+      try {
+        let response;
+        try {
+          response = await call(true);
+        } catch (e) {
+          const st = (e as { status?: number; code?: number })?.status ?? (e as { code?: number })?.code;
+          if (!level || st !== 400) throw e;
+          console.warn(`[enrich] ${model} thinkingLevel=${level} 거부(400) → 옵션 없이 재시도`);
+          response = await call(false);
+        }
         logMeter(meter(label, model, Date.now() - t0, response.usageMetadata));
         return response.text ?? "";
       } catch (e) {
