@@ -3,11 +3,16 @@
 //
 // 하는 일:
 //  1. 원본 소개서(m-ofjghi 하나)를 조회 — 사진본·무사진본 둘 다 같은 원본에서 뜬다
-//  2. jsonb 안 사진 URL 전부(photos·activities[].photos·collab_history[].photos·blocks[].photos)를
+//  2. jsonb 안 사진 URL 전부(photos·activities[].photos·collab_history[].photos·showcases[].photos)를
 //     "maker-photos" 버킷의 demo/<slug>/ 경로로 복사(동결) → 공개 URL로 교체
 //     (원본 사진이 지워져도 데모는 깨지지 않음. storage upsert → 재실행 시 덮어쓰기, 고아 없음)
 //  3. search_visible=false·collab_open=false·intro_file_url=null·slug 교체 후 upsert(onConflict: slug)
-//     (로고는 profiles 소속 → URL 그대로 복사, 동결하지 않음)
+//
+// ⚠️07-25 DB 전면 개명 반영(07-28) — 이 스크립트만 옛 이름을 쓰다가 실행이 통째로 죽었다
+//   ("Could not find the table 'public.makers'"). 대조표:
+//     makers→brands · soul→keywords · blocks→showcases · owner_uuid→owner_user_id(정수)
+//     offers_note→offers_description · seeks_note→seeks_description · claim_token_hash→edit_password_hash
+//   그리고 status 컬럼이 생겼다 — **'active'로 안 넣으면 읽기 함수가 전부 걸러내 데모가 404가 된다.**
 import { createClient } from "@supabase/supabase-js";
 
 const BUCKET = "maker-photos";
@@ -34,18 +39,20 @@ interface PhotoHolder {
   photos?: string[] | null;
   [k: string]: unknown;
 }
-interface MakerRow {
+interface BrandRow {
   id: number; slug: string; name: string; one_liner: string;
-  cover_image_url: string | null; logo_url: string | null;
-  region: string | null; size: string | null;
+  region: string | null;
   offers: string[]; seeks: string[]; target_audience: string[];
   collab_history: PhotoHolder[] | null;
-  story: string; activities: PhotoHolder[] | null; offers_note: string; seeks_note: string;
+  story: string; activities: PhotoHolder[] | null;
+  offers_description: string | null; seeks_description: string | null;
+  description: string | null;
   photos: string[] | null;
-  blocks: PhotoHolder[] | null; intro_file_url: string | null;
-  soul: unknown; trust: unknown;
-  collab_open: boolean; search_visible: boolean | null; created_at: string; updated_at: string | null;
-  owner_uuid: string | null; claim_token_hash: string | null;
+  showcases: PhotoHolder[] | null; intro_file_url: string | null;
+  keywords: string[] | null; trust: unknown; enrichment: unknown;
+  collab_open: boolean; search_visible: boolean | null; status: string | null;
+  created_at: string; updated_at: string | null;
+  owner_user_id: number | null; edit_password_hash: string | null;
 }
 
 // 공개 URL에서 받아 → demo/<slug>/ 에 upsert 업로드 → 새 공개 URL 반환.
@@ -88,13 +95,13 @@ async function freezeHolders(holders: PhotoHolder[] | null, demoSlug: string, fi
 async function cloneOne({ from, to, stripPhotos }: { from: string; to: string; stripPhotos: boolean }) {
   console.log(`\n▶ ${from} → ${to}${stripPhotos ? " (사진 제거)" : ""}`);
 
-  const { data: src, error: selErr } = await sb.from("makers").select().eq("slug", from).maybeSingle();
+  const { data: src, error: selErr } = await sb.from("brands").select().eq("slug", from).maybeSingle();
   if (selErr) throw new Error(`[${to}] 원본(${from}) 조회 실패: ${selErr.message}`);
   if (!src) throw new Error(`[${to}] 원본 소개서(${from})가 없어요 — slug를 확인해 주세요.`);
-  const row = src as MakerRow;
+  const row = src as BrandRow;
 
   // 멱등: 기존 데모 행이 있으면 그 id 재사용(upsert가 같은 행을 갱신), 없으면 DB가 새로 부여.
-  const { data: existing, error: exErr } = await sb.from("makers").select("id").eq("slug", to).maybeSingle();
+  const { data: existing, error: exErr } = await sb.from("brands").select("id").eq("slug", to).maybeSingle();
   if (exErr) throw new Error(`[${to}] 기존 데모 행 조회 실패: ${exErr.message}`);
   if (existing) console.log(`   ↻ 기존 데모 행(id=${existing.id}) 갱신`);
 
@@ -109,37 +116,37 @@ async function cloneOne({ from, to, stripPhotos }: { from: string; to: string; s
   const collab_history = stripPhotos
     ? strip(row.collab_history)
     : await freezeHolders(row.collab_history, to, "collab_history", c);
-  const blocks = stripPhotos ? strip(row.blocks) : await freezeHolders(row.blocks, to, "blocks", c);
+  const showcases = stripPhotos ? strip(row.showcases) : await freezeHolders(row.showcases, to, "showcases", c);
 
   const demoRow: Record<string, unknown> = {
     ...(existing ? { id: existing.id } : {}), // id·created_at·updated_at은 신규면 DB 자동 부여
     slug: to,
     name: row.name,
     one_liner: row.one_liner,
-    cover_image_url: stripPhotos ? null : row.cover_image_url,
-    logo_url: row.logo_url, // 로고는 profiles 소속 — 동결하지 않고 URL 그대로
     region: row.region,
-    size: row.size,
     offers: row.offers,
     seeks: row.seeks,
     target_audience: row.target_audience,
     collab_history,
     story: row.story,
     activities,
-    offers_note: row.offers_note,
-    seeks_note: row.seeks_note,
+    offers_description: row.offers_description,
+    seeks_description: row.seeks_description,
+    description: row.description,
     photos,
-    blocks,
+    showcases,
     intro_file_url: null, // 소개자료 파일은 데모에서 제외
-    soul: row.soul,
+    keywords: row.keywords,
     trust: row.trust,
+    enrichment: row.enrichment,
     collab_open: false, // 데모는 콜라보 제안 비활성
-    search_visible: false, // 검색 미노출 (이미 배포된 필터가 처리)
-    owner_uuid: row.owner_uuid,
-    claim_token_hash: row.claim_token_hash,
+    search_visible: false, // 검색 미노출
+    status: "active", // ⚠️필수 — 없으면 읽기 함수(status='active' 필터)가 걸러내 404가 된다
+    owner_user_id: row.owner_user_id,
+    edit_password_hash: row.edit_password_hash,
   };
 
-  const { error: upErr } = await sb.from("makers").upsert(demoRow, { onConflict: "slug" });
+  const { error: upErr } = await sb.from("brands").upsert(demoRow, { onConflict: "slug" });
   if (upErr) throw new Error(`[${to}] upsert 실패: ${upErr.message}`);
   console.log(stripPhotos ? `✅ ${to} 저장 완료 — 사진 0장(전부 제거)` : `✅ ${to} 저장 완료 — 사진 ${c.n}장 동결`);
 }
