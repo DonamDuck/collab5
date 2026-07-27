@@ -7,6 +7,7 @@ import { BrandCarousel } from "@/components/BrandCarousel";
 import { repo } from "@/lib/repo";
 
 const CAROUSEL_LIMIT = 10; // 홈 캐러셀 노출 개수(대표 지시). 나머지는 '더 많은 브랜드 보기' 카드로.
+const MIN_CAROUSEL = 3; // 이보다 적으면 섹션을 아예 안 그린다(디자인팀 07-27).
 
 // ⚠️ 이 한 줄이 없으면 목록이 **배포 시점에 얼어붙는다**(서버 컴포넌트 프리렌더 함정, /search·/my와 동일).
 // 다만 홈은 최다 트래픽 랜딩이라 매 요청 조회(force-dynamic) 대신 ISR로 둔다 —
@@ -82,9 +83,21 @@ export default async function Home() {
 
       {/* 콜라보 가능한 브랜드 — /search의 세미 버전 캐러셀(대표 지시 2026-07-27).
           노출 조건 = 콜라보 받는 중 + 검색 노출 ON, 등록 오래된 순 10개(repo.listCollabOpenMakers).
-          0곳이면 섹션을 통째로 감춘다 — 빈 캐러셀은 "아무도 안 쓰는 서비스"로 읽힌다. */}
-      {collabBrands.length > 0 && (
-        <section className="mt-16">
+          3곳 미만이면 섹션을 통째로 감춘다(디자인팀) — 캐러셀은 "여러 개 넘겨보는" UI라
+          1~2장이면 초라하고, "콜라보 가능한 브랜드"인데 2곳이면 오히려 역효과다. */}
+      {collabBrands.length >= MIN_CAROUSEL && (
+        // 흰 캔버스가 이어지는 홈에 soft 밴드를 하나 넣어 리듬(흰→soft→흰)을 주고,
+        // "좌우로 미는 영역"을 시각적으로 못박는다(디자인팀 07-27).
+        // ⚠️ 풀블리드에 `w-screen`/`100vw`를 쓰면 세로 스크롤바 폭만큼 가로 스크롤이 생긴다.
+        //    대신 **레이아웃을 안 건드리는** 방식 — 거대한 box-shadow로 좌우를 칠하고
+        //    clip-path로 위아래만 잘라낸다(가로는 -100vmax로 열어둠).
+        <section
+          className="mt-16 -mx-4 bg-surface-soft px-4 py-14 sm:-mx-6 sm:px-6"
+          style={{
+            boxShadow: "0 0 0 100vmax var(--surface-soft)",
+            clipPath: "inset(0 -100vmax)",
+          }}
+        >
           <Reveal>
             <h2 className="text-center text-2xl font-bold tracking-tight text-ink sm:text-[28px]">
               콜라보 가능한 브랜드
