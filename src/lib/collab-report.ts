@@ -23,7 +23,10 @@ import { kstIso } from "./time";
 import { meter, logMeter, type CallMeter } from "./ai-cost";
 
 // 리포트 모델: 대표 블라인드 A/B(07-26)에서 3.6-flash가 2.5-flash·3.1-pro를 모두 이김.
-// ⚠️ 3.x 계열은 temperature/top_p/top_k 지원 중단 — 리포트 호출에는 샘플링 파라미터를 넘기지 않는다.
+// 리포트 호출에는 샘플링 파라미터를 넘기지 않는다(3.x 계열 temperature 지원 중단 공지 대응).
+// ⚠️ 단 **실측(07-27)으로는 3.6-flash가 temperature를 400으로 거부하지 않는다** — 0.4·1.0·1.4 모두 통과했고
+//    1.4에서 출력 변동성도 늘었다(반영되는 것으로 보임). 즉 "3.x라 temperature를 못 쓴다"를 전제로
+//    다른 단계(enrich 생성 등)의 모델 교체를 포기할 근거는 없다. 넘겨도 죽지 않는다.
 export const REPORT_MODEL = () => process.env.REPORT_MODEL || "gemini-3.6-flash";
 const DNA_MODEL = "gemini-2.5-flash"; // DNA는 flash 고정(스펙) — 2.5 계열이라 temperature 유지
 const ai = () => new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
