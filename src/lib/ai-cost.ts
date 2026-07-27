@@ -48,11 +48,13 @@ export function meter(label: string, model: string, ms: number, usage?: GeminiUs
 }
 
 const won = (krw: number) => `${krw.toFixed(1)}원`;
+/** 사람이 읽는 단위는 초다 — ms는 자릿수를 세게 만든다(대표 지시 07-27). 측정·저장은 그대로 ms. */
+export const secs = (ms: number) => `${(ms / 1000).toFixed(1)}초`;
 
 /** 콜 1회 로그 — 콜이 끝나는 즉시 찍는다(뒤 단계가 실패해도 앞 원가는 남게). */
 export function logMeter(m: CallMeter): void {
   console.log(
-    `[cost] ${m.label} model=${m.model} ${m.ms}ms ` +
+    `[cost] ${m.label} model=${m.model} ${secs(m.ms)} ` +
       `in=${m.inTok} out=${m.outTok} think=${m.thinkTok} ` +
       `= ${won(m.krw)}${m.priced ? "" : " ⚠️단가표에 없는 모델(0원 처리)"}`
   );
@@ -64,9 +66,11 @@ export function logTotal(tag: string, meters: CallMeter[]): void {
   const krw = meters.reduce((s, m) => s + m.krw, 0);
   const think = meters.reduce((s, m) => s + m.thinkTok, 0);
   const out = meters.reduce((s, m) => s + m.outTok, 0);
-  const breakdown = meters.map((m) => `${m.label}:${m.ms}ms/${won(m.krw)}`).join(" + ");
+  const ms = meters.reduce((s, m) => s + m.ms, 0);
+  const breakdown = meters.map((m) => `${m.label}:${secs(m.ms)}/${won(m.krw)}`).join(" + ");
   console.log(
     `[cost] TOTAL ${tag} calls=${meters.length} ${breakdown} ` +
-      `→ ${won(krw)} (think=${think}/out=${out}, 사고비중 ${out + think > 0 ? Math.round((think / (out + think)) * 100) : 0}%)`
+      `→ ${won(krw)} / ${secs(ms)} ` +
+      `(think=${think}/out=${out}, 사고비중 ${out + think > 0 ? Math.round((think / (out + think)) * 100) : 0}%)`
   );
 }

@@ -13,6 +13,7 @@ import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { josa } from "./josa";
 import { regionConflict, regionMatches } from "./regionSynonyms";
 import { DESC_ANCHOR_COUNT } from "./enrichBlend";
+import { meter, logMeter, logTotal, type CallMeter } from "./ai-cost";
 
 /** 검증가능 신뢰 시그널 필드 — 못 찾으면 missing, 찾으면 sources에 출처 */
 export type EnrichField = "instagram" | "homepage" | "address";
@@ -599,7 +600,7 @@ const GEMINI_OPTIONS_SCHEMA = {
         },
         required: ["title", "desc", "source"],
       },
-      description: "조사 메모에 실제 언급된 활동(대표 메뉴·정기 프로그램·상시 서비스·워크숍·클래스·제품라인 등 '반복되는 것') 흔적 0~5건. 메모에 없으면 빈 배열 — 창작 금지",
+      description: "조사 메모에 실제 언급된 활동(대표 메뉴·정기 프로그램·상시 서비스·워크숍·클래스·제품라인 등 '반복되는 것') 흔적 0~5건. ⛔협업·공동제작·입점·팝업처럼 상대가 있어야 성립하는 일은 여기가 아니라 collabHints. 메모에 없으면 빈 배열 — 창작 금지",
     },
     collabHints: {
       type: Type.ARRAY,
@@ -721,7 +722,18 @@ ${BRAND_VOICE}
 - ⭐가중 키워드가 주어지면 그 방향을 최우선으로 반영해 모든 후보를 그 결에 맞춘다. 단 키워드를 나열하지 말고 문장에 녹여라 — 키워드를 따옴표로 감싸 티 내지도 마라.
 - 조사 메모 안의 사실만 쓴다. 창작·과장 금지. identity(주소·홈피 등)는 확인된 것만, 없으면 빈 문자열.
 - 인스타: 실제 확인된 핸들만 identity.instagram에 넣는다(추측 금지). ⭐메모의 "[홈페이지 직접 확인]" 또는 "[웹 텍스트에서 발견된 인스타 핸들]"에 있는 값은 웹에서 실제로 확인된 것이니 브랜드 것이 맞다고 판단되면 채워도 된다(sources에 출처 남기기). 확정 못 하면 identity.instagram은 빈 문자열로 두고, 대신 instagramCandidates에 도메인·브랜드명 기반 그럴듯한 추정 핸들 2~4개를 제시한다(사장이 직접 고를 후보용). 예: 도메인이 canvasgarden.shop이면 @canvasgarden, @canvasgarden_official, @canvasgarden.shop 등.
-- activityHints: 조사 메모에 실제로 언급된 이 브랜드의 활동만 0~5건 — '반복되는 것'이 기준이다: 대표 메뉴·정기 프로그램·상시 서비스·워크숍·클래스·제품라인·매달 반복되는 기획(일반화해서). 일회성 행사는 활동이 아니다(콜라보·소개 재료). 음식점·바라면 대표 메뉴와 즐기는 방식도 훌륭한 활동이다 — 소극적으로 굴지 말고 메모에 근거가 있으면 적극 추출해라. collabHints: 메모에 파트너명이 드러난 협업 소식만 0~3건. 각 항목의 source는 그 정보가 나온 출처 유형(네이버 블로그 후기/카페글/웹 검색/인스타그램)으로. ⚠️메모에 없으면 절대 만들지 말고 빈 배열로 둬라(참고용 힌트라 사실만).
+- activityHints: 조사 메모에 실제로 언급된 이 브랜드의 활동만 0~5건 — '반복되는 것'이 기준이다: 대표 메뉴·정기 프로그램·상시 서비스·워크숍·클래스·제품라인·매달 반복되는 기획(일반화해서). 일회성 행사는 활동이 아니다(콜라보·소개 재료). 음식점·바라면 대표 메뉴와 즐기는 방식도 훌륭한 활동이다 — 소극적으로 굴지 말고 메모에 근거가 있으면 적극 추출해라.
+  ⛔단 **상대가 있는 일은 활동이 아니라 콜라보다** — activityHints에 넣지 말고 collabHints로 보내라(대표 지시 07-27, 실제로 샌 케이스):
+  · 다른 브랜드·작가·기관과의 협업 / 공동 제작·공동 기획 상품 / 협업으로 낸 제품 라인
+  · 백화점·편집숍·마켓 입점, 팝업스토어 참여·개최, 페어·행사 참가
+  · 판별법: "누구와 함께"가 붙어야 성립하면 콜라보다. 그 상대가 없어도 늘 하는 일이어야 활동이다.
+  ⛔그리고 **협업으로 만든 물건을 이 브랜드가 상시 갖춘 제품처럼 쓰지 마라**(descriptions에도 동일 적용).
+  예) 팝업에서 협업으로 낸 향수를 "향수까지 폭넓게 갖추고 있습니다"라고 쓰면 틀린 문장이다 — "○○와 함께 향수를 선보였어요"처럼 협업이었다는 맥락을 살려라.
+  ⛔⛔**주체를 확인해라 — 남이 한 일을 이 브랜드가 한 일로 쓰지 마라**(실측된 오류, 07-27):
+  이 브랜드를 '소재로' 만들어진 것(제3자가 쓴 책·소설, 기사, 방송, 다큐, 남의 리뷰)은 이 브랜드의 활동도 제품도 아니다.
+  예) 다른 작가가 이 가게를 소재로 소설을 냈다 → "서적 출간을 병행합니다"❌ / 그건 [알려짐]이라 blockHints(press)로 간다.
+  문장을 쓰기 전에 "이 일을 한 주어가 누구인가"를 조사 메모에서 확인하고, 브랜드가 아니면 활동·제품으로 쓰지 마라.
+  collabHints: 메모에 파트너명이 드러난 협업 소식만 0~3건. 각 항목의 source는 그 정보가 나온 출처 유형(네이버 블로그 후기/카페글/웹 검색/인스타그램)으로. ⚠️메모에 없으면 절대 만들지 말고 빈 배열로 둬라(참고용 힌트라 사실만).
 - blockHints: 조사에서 근거가 뚜렷할 때만 추천 블록 최대 2개.
   공개 수치 발견(팔로워·서포터·펀딩액·판매량·매출·운영 연차·직원 규모·입점처 수 등, ⚠️후기 수·별점은 제외) → metrics(items에 label·value 밑그림) /
   언론·수상·방송 → press(items에 label=매체·수상명, year, desc=그 매체가 이 브랜드를 소개한 내용 한 줄 요약 "해요체", url=그 기사 원문 링크. ⭐label·desc·url 셋 다 조사 메모에 실제로 드러난 것만 — 없으면 빈 문자열, 창작·추측 금지. ⚠️특히 label(매체명)은 조사 자료의 표기를 글자 그대로 옮겨라. 비슷한 이름으로 바꾸거나 "○○매거진·○○뉴스"처럼 그럴싸한 이름을 지어내지 마라 — 매체명을 정확히 모르면 그 항목 자체를 빼라. ⚠️지역 지류신문·사보처럼 웹 링크가 없는 매체도 많다 — url이 없다고 해서 그 소개가 가짜인 건 아니니, 매체명이 자료에 분명하면 url은 비운 채로 항목을 남겨라) /
@@ -734,8 +746,8 @@ ${BRAND_VOICE}
 조사 메모 → 출력 매핑(각 항목의 근거 섹션. 해당 섹션이 없거나 "확인 안 됨"이면 그 출력은 빈 값/빈 배열/null로 둔다):
 - [브랜드가 직접 쓴 소개] 메타 → oneLiners·descriptions의 사실 근거(사장 직접 설명 다음 순위)
 - [정체]의 창업 배경·철학 → descriptions의 스토리 앵글 근거
-- [활동] + [네이버 표적검색] + 블로그·카페 후기 → activityHints
-- [콜라보] + [네이버 표적검색]의 콜라보 흔적 → collabHints (파트너명 명시된 것만)
+- [활동] + [네이버 표적검색] + 블로그·카페 후기 → activityHints (⛔협업·입점·팝업·공동제작은 여기 말고 collabHints)
+- [콜라보] + [네이버 표적검색]의 콜라보 흔적 → collabHints (파트너명 명시된 것만). ⭐[활동]에 적혀 있어도 상대가 있는 일이면 이쪽으로 옮겨라 — 조사 메모의 소제목이 아니라 '상대가 있는가'로 판단한다.
 - [원하는 협업] → seeksHint
 - [숫자] → blockHints(metrics) / [알려짐] → blockHints(press) / [공간] → blockHints(space) (⚠️후기는 지금 다루지 않음 — reviews 블록 생성 금지)
 - [고객] → descriptions에서 고객 맥락으로 활용
@@ -1198,10 +1210,19 @@ class NaverGeminiProvider implements SearchProvider {
   //   3.1-flash-lite 대비 토큰 2.5배↓ & grounding 무료 9배↑(일1500 vs 월5000). 구조화·검색엔 이 품질로 충분.
   //   폴백 2.0-flash-lite(토큰 최저 $0.075/$0.30) → 2.5-flash(더 똑똑, 안전망).
   // ⚠️gemini-2.0-flash-lite는 2026-07 기준 404(서비스 종료) — 제거함
-  // 생성(구조화) 모델 최종 판정(대표 블라인드 A/B 2026-07-19): flash 승 — lite는 상투 마무리·안내멘트
-  // 잦고, flash는 조사 구체사실(책 낭독 모임·살구 팝업·협업 지향)을 살림. lite = 과부하 폴백으로 강등.
-  // 콜당 토큰비 ~1.5원 → ~10원. 임시 실험·롤백은 ENRICH_GEN_MODEL env로.
-  private static readonly GEMINI_MODELS = ["gemini-2.5-flash", "gemini-2.5-flash-lite"];
+  // 생성(구조화) 모델 판정 이력 — **같은 축에서 두 번 갈렸다**: '조사 메모의 구체 사실을 문장으로
+  // 끌어올리느냐 vs 상투어로 뭉개느냐'.
+  //   07-19 lite vs flash → flash 승(lite는 상투 마무리·안내멘트).
+  //   07-27 flash vs 3.6-flash → **3.6 승**(글월 실쌍 블라인드). 둘 다 collabHints엔 kado.·문학동네·
+  //     현대백화점을 정확히 담았는데, 그걸 소개 문장에 넣은 건 3.6뿐이었다(2.5는 "다양한 분야의
+  //     창작자와 협업"으로 뭉갬). 구체 사실 반영 2/9 → 7/9, 대신 +9.8초.
+  // ⚠️폴백은 503/429일 때만 — 낙차를 줄이려고 2.5-flash를 중간에 뒀다(3.6 → 2.5 → lite).
+  // 임시 실험·롤백은 ENRICH_GEN_MODEL env로(배포 없이 되돌릴 수 있다).
+  private static readonly GEMINI_MODELS = [
+    "gemini-3.6-flash",
+    "gemini-2.5-flash",
+    "gemini-2.5-flash-lite",
+  ];
   // 검색 모델 최종 판정(대표 A/B 체감 2026-07-19): flash 1콜 승 — lite 병렬 3콜 병합보다 체감 우위.
   // 기본 1콜(ENRICH_SEARCH_RUNS로 병렬 늘리기 가능), 비접지 시 검색전략 변형 프롬프트로 flash 1회 재시도.
   // 콜당 토큰비 ~6원. lite 병합으로 되돌리기 = PRIMARY를 lite로 + ENRICH_SEARCH_RUNS=3.
@@ -1215,7 +1236,8 @@ class NaverGeminiProvider implements SearchProvider {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     responseSchema: any = GEMINI_RESULT_SCHEMA,
     systemInstruction: string = ENRICH_SYSTEM,
-    temperature = 0.4
+    temperature = 0.4,
+    label = "enrich:gen"
   ): Promise<string> {
     let lastErr: unknown;
     // ENRICH_GEN_MODEL: 생성(구조화) 모델 강제 지정 — A/B 실험·모델 전환용(기본 lite→flash 폴백 체인)
@@ -1223,6 +1245,7 @@ class NaverGeminiProvider implements SearchProvider {
       ? [process.env.ENRICH_GEN_MODEL]
       : NaverGeminiProvider.GEMINI_MODELS;
     for (const model of genModels) {
+      const t0 = Date.now();
       try {
         const response = await this.ai().models.generateContent({
           model,
@@ -1234,6 +1257,7 @@ class NaverGeminiProvider implements SearchProvider {
             temperature,
           },
         });
+        logMeter(meter(label, model, Date.now() - t0, response.usageMetadata));
         return response.text ?? "";
       } catch (e) {
         lastErr = e;
@@ -1320,17 +1344,21 @@ class NaverGeminiProvider implements SearchProvider {
     //   ⭐안전망(비접지 시 재검색)은 은퇴(2026-07-20 대표 설계): 비접지 결과는 폐기되므로 네이버 칩만 남고,
     //     그러면 칩<10이 되어 재시도가 자동으로 걸린다 — 안전망이 하던 일을 재시도가 더 잘한다(전략 2종).
     const plan = rounds?.length ? rounds : [1];
+    const meters: CallMeter[] = [];
     const attempts = await Promise.all(
       plan.map((r, i) =>
         this.searchAttempt(
           NaverGeminiProvider.SEARCH_PRIMARY,
           promptFor(r),
-          `라운드${r}${plan.length > 1 ? `(${i + 1}/${plan.length})` : ""}`
+          `라운드${r}${plan.length > 1 ? `(${i + 1}/${plan.length})` : ""}`,
+          meters
         )
       )
     );
     const grounded = attempts.filter((t) => t);
     console.log("[enrich] search", JSON.stringify({ plan, grounded: grounded.length }));
+    // 병렬이라 합계 시간은 실제 대기시간이 아니다(대기 = 가장 느린 1콜) — 원가 합계를 보려는 로그.
+    logTotal("enrich:search", meters);
     if (!grounded.length) return "";
     if (grounded.length === 1) return grounded[0];
     return grounded
@@ -1339,7 +1367,13 @@ class NaverGeminiProvider implements SearchProvider {
   }
 
   /** 검색 1시도(모델·프롬프트 지정) — 접지 성공 시 텍스트, 실패·비접지·에러는 ""(슬롯만 조용히 실패). */
-  private async searchAttempt(model: string, prompt: string, tag: string): Promise<string> {
+  private async searchAttempt(
+    model: string,
+    prompt: string,
+    tag: string,
+    meters?: CallMeter[]
+  ): Promise<string> {
+    const t0 = Date.now();
     try {
       // ⚡생각(thinking) 끄기 — 2.5-flash는 기본이 dynamic thinking이라 lite 대비 체감이 느려졌던 원인.
       //   이 단계는 "검색해서 본 것만 정리"라 추론 여지가 거의 없어 품질 손실 없이 지연만 줄인다.
@@ -1367,6 +1401,8 @@ class NaverGeminiProvider implements SearchProvider {
         response = await call(false);
       }
       // ⭐그라운딩 근거 체크 — 근거 없으면 웹을 안 보고 지어낸 답변(캔버스가든 상상업체 사고 이후 도입) → 폐기.
+      // 계량은 접지 판정 '전에' — 폐기해도 토큰은 이미 과금됐다(버린 콜의 원가가 안 보이면 실측이 아니다).
+      meters?.push(meter(`enrich:search:${tag}`, model, Date.now() - t0, response.usageMetadata));
       const gm = response.candidates?.[0]?.groundingMetadata;
       const grounded = !!(gm?.groundingChunks?.length || gm?.groundingSupports?.length);
       if (!grounded) {
@@ -1577,7 +1613,13 @@ class NaverGeminiProvider implements SearchProvider {
   // 5지선다 생성 공용 — Gemini 우선, 전멸 시 Haiku.
   private async generateOptions(prompt: string, temperature: number): Promise<EnrichOptions> {
     try {
-      const text = await this.generate(prompt, GEMINI_OPTIONS_SCHEMA, OPTIONS_SYSTEM, temperature);
+      const text = await this.generate(
+        prompt,
+        GEMINI_OPTIONS_SCHEMA,
+        OPTIONS_SYSTEM,
+        temperature,
+        "enrich:소개서초안"
+      );
       return this.normalizeOptions(JSON.parse(text) as EnrichOptions);
     } catch (e) {
       console.warn(`[options] gemini 실패 → Haiku 폴백`, (e as { status?: number })?.status);
