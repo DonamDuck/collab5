@@ -87,7 +87,21 @@ async function freezeList(urls: string[] | null | undefined, demoSlug: string, f
 async function freezeHolders(holders: PhotoHolder[] | null, demoSlug: string, field: string, c: { n: number }): Promise<PhotoHolder[]> {
   const out: PhotoHolder[] = [];
   for (const [idx, h] of (holders ?? []).entries()) {
-    out.push({ ...h, photos: await freezeList(h.photos, demoSlug, `${field}[${idx}].photos`, c) });
+    const frozen: PhotoHolder = { ...h, photos: await freezeList(h.photos, demoSlug, `${field}[${idx}].photos`, c) };
+    // press 블록은 기사별 사진을 items[].photos에 담는다 — 여기도 동결해야 원본이 지워질 때 안 깨진다.
+    if (Array.isArray(h.items)) {
+      const items: Record<string, unknown>[] = [];
+      for (const [j, it] of (h.items as Record<string, unknown>[]).entries()) {
+        items.push({
+          ...it,
+          ...(Array.isArray(it.photos)
+            ? { photos: await freezeList(it.photos as string[], demoSlug, `${field}[${idx}].items[${j}].photos`, c) }
+            : {}),
+        });
+      }
+      frozen.items = items;
+    }
+    out.push(frozen);
   }
   return out;
 }
@@ -110,7 +124,16 @@ async function cloneOne({ from, to, stripPhotos }: { from: string; to: string; s
   //   cover_image_url도 함께 비운다(상단 카드의 대표 사진이라 남기면 "사진 없는 소개서"가 안 된다).
   //   logo_url은 유지 — 로고는 사진이 아니라 계정 프로필 소속이다.
   const c = { n: 0 };
-  const strip = (hs: PhotoHolder[] | null) => (hs ?? []).map((h) => ({ ...h, photos: [] }));
+  // ⚠️사진은 두 층에 있다 — 항목의 photos + **items[].photos**(press 블록이 기사별 사진을 여기 담는다).
+  //   최상위만 비웠다가 소개된 곳들에 사진 3장이 살아남았다(대표 QA 07-28). 두 층 다 비운다.
+  const strip = (hs: PhotoHolder[] | null) =>
+    (hs ?? []).map((h) => ({
+      ...h,
+      photos: [],
+      ...(Array.isArray(h.items)
+        ? { items: (h.items as Record<string, unknown>[]).map((it) => ({ ...it, photos: [] })) }
+        : {}),
+    }));
   const photos = stripPhotos ? [] : await freezeList(row.photos, to, "photos", c);
   const activities = stripPhotos ? strip(row.activities) : await freezeHolders(row.activities, to, "activities", c);
   const collab_history = stripPhotos
