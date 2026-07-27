@@ -11,6 +11,13 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import type { Maker } from "@/lib/types";
 
+/** 카드 폭 — 디자인팀 스펙(07-27) = 모바일 카드 ~82vw + 다음 카드 ~14vw peek(밀 수 있다는 신호),
+ *  데스크탑(960 컨테이너)은 3.3장이 걸치게 280px.
+ *  ⚠️ `%`는 뷰포트가 아니라 **레일의 콘텐츠 박스**(뷰포트 − 좌우 패딩 32) 기준으로 풀린다.
+ *     그래서 스펙의 82vw를 그대로 82%로 쓰면 실제론 75vw밖에 안 나온다 → 86%로 보정(실측 peek 14%).
+ *  640~ 구간에서 %가 과하게 커지지 않도록 상한도 둔다. */
+const CARD_W = "w-[86%] max-w-[300px] shrink-0 sm:w-[280px] sm:max-w-none";
+
 export function BrandCarousel({ brands }: { brands: Maker[] }) {
   const ref = useRef<HTMLDivElement>(null);
   const [atStart, setAtStart] = useState(true);
@@ -85,13 +92,15 @@ export function BrandCarousel({ brands }: { brands: Maker[] }) {
   );
 }
 
-/** 검색 카드의 세미 버전 — 썸네일 3:2(검색과 동일) + 상호·지역 + 한 줄 소개 + 키워드 2개.
- *  `콜라보 받는 중` 뱃지는 뺐다: 이 섹션 자체가 콜라보 가능한 브랜드만 모은 곳이라 전 카드에 붙어 중복. */
+/** 검색 카드의 세미 버전 — 썸네일 3:2(검색과 동일) + 상호 + 한 줄 소개 + 키워드 2개.
+ *  디자인팀 "무대 원칙"(07-27): 주인공은 썸네일·상호, collab5 크롬은 덜어낸다.
+ *  - `콜라보 받는 중` 뱃지 제거 = 섹션 자체가 그 조건이라 전 카드에 붙어 중복.
+ *  - 지역 제거 = 홈은 맛보기라 노이즈. (검색 카드는 여러 상태가 섞이므로 둘 다 그대로 유지) */
 function BrandCard({ m }: { m: Maker }) {
   return (
     <Link
       href={`/m/${m.slug}`}
-      className="block w-[264px] shrink-0 snap-start overflow-hidden rounded-lg border border-hairline bg-surface transition-colors hover:bg-surface-soft sm:w-[280px]"
+      className={`block shrink-0 snap-start overflow-hidden rounded-lg border border-hairline bg-surface transition-colors hover:bg-surface-soft ${CARD_W}`}
     >
       <div className="aspect-[3/2] w-full overflow-hidden bg-surface-soft">
         {m.photos[0] ? (
@@ -105,10 +114,7 @@ function BrandCard({ m }: { m: Maker }) {
         )}
       </div>
       <div className="px-4 py-3">
-        <div className="flex min-w-0 items-center gap-1.5">
-          <span className="min-w-0 truncate text-base font-medium text-ink">{m.name}</span>
-          {m.region && <span className="shrink-0 text-xs text-mute">· {m.region}</span>}
-        </div>
+        <p className="truncate text-base font-medium text-ink">{m.name}</p>
         {m.oneLiner && <p className="mt-0.5 line-clamp-1 text-sm text-body">{m.oneLiner}</p>}
         {/* 키워드는 2개까지 — 카드 폭이 검색(3열 그리드)보다 좁아 3개면 줄바꿈이 난다 */}
         <div className="mt-2 flex h-5 flex-wrap gap-1.5 overflow-hidden">
@@ -126,20 +132,23 @@ function BrandCard({ m }: { m: Maker }) {
   );
 }
 
-/** 마지막 슬라이드 = 찾기 페이지로 넘기는 카드. 카드와 같은 폭·높이라 스냅 리듬이 안 깨진다. */
+/** 마지막 슬라이드 = 찾기 페이지로 넘기는 카드. 브랜드 카드와 **같은 폭**이라 스냅 리듬이 안 깨진다.
+ *  디자인팀 스펙(07-27): 헤더 우측 '전체 보기' 링크는 두지 않고 이 카드 하나로 통일(둘 다는 과하다),
+ *  "N곳 더" 같은 개수 표기도 뺀다(데이터가 적을 때 "3곳 더"가 오히려 빈약해 보임).
+ *  ⚠️ 섹션 밴드가 `bg-surface-soft`라 카드까지 soft면 배경에 묻힌다 → 카드 면은 흰색 유지하고
+ *     점선 테두리로 "다른 종류의 카드"임을 표시. */
 function MoreCard() {
   return (
     <Link
       href="/search"
-      className="flex w-[264px] shrink-0 snap-start flex-col items-center justify-center rounded-lg border border-dashed border-border-strong bg-surface-soft px-4 text-center transition-colors hover:bg-primary-pale sm:w-[280px]"
+      className={`flex snap-start flex-col items-center justify-center rounded-lg border border-dashed border-border-strong bg-surface px-4 text-center transition-colors hover:bg-primary-pale ${CARD_W}`}
     >
-      <span className="flex h-11 w-11 items-center justify-center rounded-pill bg-surface text-ink shadow-e1">
+      <span className="flex h-11 w-11 items-center justify-center rounded-pill bg-surface-soft text-primary-on">
         <svg viewBox="0 0 20 20" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8">
           <path d="M4 10h12m0 0-4.5-4.5M16 10l-4.5 4.5" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       </span>
       <span className="mt-3 text-[15px] font-medium text-ink">더 많은 브랜드 보기</span>
-      <span className="mt-1 text-[13px] text-mute">브랜드 찾기로 이동해요</span>
     </Link>
   );
 }
