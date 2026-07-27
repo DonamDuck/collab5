@@ -1,10 +1,21 @@
-// 홈 랜딩 — 발신자(보내는 쪽) 여정 중심. MVP: 업체 리스트 노출 X (cold-start).
-// 등록 → 카드 만들기 → 공유. design.md §9.6 온보딩 3스텝.
+// 홈 랜딩 — 발신자(보내는 쪽) 여정 중심. 등록 → 카드 만들기 → 공유. design.md §9.6 온보딩 3스텝.
+// 2026-07-27: cold-start를 벗어나 "콜라보 가능한 브랜드" 캐러셀 신설(/search의 세미 버전).
 import Link from "next/link";
 import { PreviewPhones } from "./PreviewPhones";
 import { Reveal } from "@/components/Reveal";
+import { BrandCarousel } from "@/components/BrandCarousel";
+import { repo } from "@/lib/repo";
 
-export default function Home() {
+const CAROUSEL_LIMIT = 10; // 홈 캐러셀 노출 개수(대표 지시). 나머지는 '더 많은 브랜드 보기' 카드로.
+
+// ⚠️ 이 한 줄이 없으면 목록이 **배포 시점에 얼어붙는다**(서버 컴포넌트 프리렌더 함정, /search·/my와 동일).
+// 다만 홈은 최다 트래픽 랜딩이라 매 요청 조회(force-dynamic) 대신 ISR로 둔다 —
+// 캐러셀은 '등록 오래된 순 10개'라 신규 등록이 앞자리를 밀어내는 일이 거의 없어 5분 지연이 문제되지 않는다.
+export const revalidate = 300;
+
+export default async function Home() {
+  const collabBrands = await repo.listCollabOpenMakers(CAROUSEL_LIMIT);
+
   return (
     <main className="mx-auto w-full max-w-[960px] px-4 py-12 sm:px-6">
       {/* 온로드 라이즈 키프레임 — 서버가 <style>로 직접 렌더(React 19 head 호이스트).
@@ -64,10 +75,30 @@ export default function Home() {
             href="/preview"
             className="flex h-12 items-center justify-center rounded-md border border-border-strong bg-surface px-7 text-base font-medium text-ink"
           >
-            브랜드 소개서 둘러보기
+            브랜드 소개서 작성 예시
           </Link>
         </div>
       </section>
+
+      {/* 콜라보 가능한 브랜드 — /search의 세미 버전 캐러셀(대표 지시 2026-07-27).
+          노출 조건 = 콜라보 받는 중 + 검색 노출 ON, 등록 오래된 순 10개(repo.listCollabOpenMakers).
+          0곳이면 섹션을 통째로 감춘다 — 빈 캐러셀은 "아무도 안 쓰는 서비스"로 읽힌다. */}
+      {collabBrands.length > 0 && (
+        <section className="mt-16">
+          <Reveal>
+            <h2 className="text-center text-2xl font-bold tracking-tight text-ink sm:text-[28px]">
+              콜라보 가능한 브랜드
+            </h2>
+            <p className="mx-auto mt-2 max-w-[440px] break-keep text-center text-base leading-relaxed text-body">
+              지금 함께할 파트너를 찾고 있는 브랜드예요.
+            </p>
+          </Reveal>
+          {/* Reveal 밖 — 캐러셀은 가장자리로 넘치는데(-mx-4) 리빌 래퍼가 감싸면 잘릴 여지가 있다 */}
+          <div className="mt-8">
+            <BrandCarousel brands={collabBrands} />
+          </div>
+        </section>
+      )}
 
       {/* §9.6 온보딩 3스텝 */}
       <section className="mt-16">
