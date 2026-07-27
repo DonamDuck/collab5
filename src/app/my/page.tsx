@@ -93,7 +93,7 @@ export default async function MyPage({ searchParams }: { searchParams: Promise<{
   // 콜라보 리포트 탭 콘텐츠 — 카드 = /m 딥링크(리포트는 자기 집에서 렌더, 캐시면 즉시·0콜)
   const reportList =
     reports.length === 0 ? (
-      <div className="flex flex-col items-center rounded-2xl bg-surface-soft px-6 py-14 text-center">
+      <div className="flex flex-col items-center px-6 py-16 text-center">
         <svg width="56" height="56" viewBox="0 0 56 56" fill="none" className="text-faint" aria-hidden="true">
           <ellipse cx="28" cy="28" rx="23" ry="9" stroke="currentColor" strokeWidth="2" opacity="0.45" transform="rotate(28 28 28)" />
           <ellipse cx="28" cy="28" rx="23" ry="9" stroke="currentColor" strokeWidth="2" opacity="0.45" transform="rotate(-28 28 28)" />
