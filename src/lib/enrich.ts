@@ -2235,11 +2235,13 @@ export function extractChipsFromResearch(
       if (!line || /확인\s*안\s*됨|해당\s*없음/.test(line)) continue;
       if (!isKwSec && line.length <= lineMax) {
         if (push(line, sec)) count++;
-      } else if (!isKwSec && /^[^:：]{2,28}[:：]/.test(line)) {
+      } else if (!isKwSec && /^[^:：—–]{2,28}\s*[:：—–]/.test(line)) {
         // 🚨긴 줄이면 '이름: 긴 설명' 형태가 대부분인데, 조각화로는 이름이 안 남는다(07-27 실장애).
         //   "성동글로벌고등학교 패션과 가방 프리디자인 수업: 중소기업청 지원사업으로…" 전체가 28자를 넘어
         //   버려졌고, 그 메모의 콜라보 4건이 통째로 증발했다. → 콜론 앞의 '이름'만이라도 먼저 건진다.
-        const head = line.split(/[:：]/)[0].trim();
+        // ⚠️구분자는 콜론만이 아니다 — 프롬프트가 "이름 — 짧은 설명" 형식을 지시하므로 em-dash가 흔하다.
+        //   (07-27: 콜론만 보다가 "업사이클 가방 — 빈티지 의류와…" 6줄이 통째로 버려졌다)
+        const head = line.split(/[:：—–]/)[0].trim();
         if (push(head, sec)) count++;
       } else {
         // 긴 문장·콤마 나열 → 조각 단위(실메모는 문단·나열형이 흔함).
