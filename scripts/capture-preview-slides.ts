@@ -55,7 +55,9 @@ const PLANS: Record<string, { slug: string; shots: Shot[] }> = {
       { file: "photo-1.jpg", anchor: null }, // 상단: 브랜드 카드 + 대표 사진
       { file: "photo-2.jpg", anchor: "우리는 이런 일을 하고 있어요" },
       { file: "photo-3.jpg", anchor: "함께한 콜라보" },
-      { file: "photo-4.jpg", anchor: "이런 곳에 소개됐어요" },
+      // ⭐사진본도 3장(대표 지시 07-28) — 무사진본과 3:3 대칭. 넣었다 뺀 4번째는 "이런 곳에 소개됐어요"였다:
+      //   무사진본에 대응 장면이 없고(none-3은 콜라보 기대), 언론 노출은 모든 브랜드가 갖는 게 아니라
+      //   "사진이 있으면 이렇게 보인다"의 대표 장면으로는 약하다.
     ],
   },
   none: {
