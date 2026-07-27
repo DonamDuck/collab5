@@ -135,13 +135,15 @@ function BrandCard({ m }: { m: Maker }) {
 /** 마지막 슬라이드 = 찾기 페이지로 넘기는 카드. 브랜드 카드와 **같은 폭**이라 스냅 리듬이 안 깨진다.
  *  디자인팀 스펙(07-27): 헤더 우측 '전체 보기' 링크는 두지 않고 이 카드 하나로 통일(둘 다는 과하다),
  *  "N곳 더" 같은 개수 표기도 뺀다(데이터가 적을 때 "3곳 더"가 오히려 빈약해 보임).
- *  ⚠️ 섹션 밴드가 `bg-surface-soft`라 카드까지 soft면 배경에 묻힌다 → 카드 면은 흰색 유지하고
- *     점선 테두리로 "다른 종류의 카드"임을 표시. */
+ *  ⚠️ 섹션 밴드가 `bg-surface-soft`라 카드까지 soft면 배경에 묻힌다 → 카드 면은 흰색 유지.
+ *  ⚠️ 테두리는 **실선 hairline**. 점선(`border-dashed`)은 07-26 `/my` 빈 화면에서 대표가
+ *     "옛날 스타일"이라며 전부 걷어낸 표현이라 쓰지 않는다(플레이스홀더·미완성 느낌).
+ *     실카드는 썸네일이 있어 저절로 구분되고, 여긴 흰 면 + 얇은 실선 + 중앙 배지로 충분하다. */
 function MoreCard() {
   return (
     <Link
       href="/search"
-      className={`flex snap-start flex-col items-center justify-center rounded-lg border border-dashed border-border-strong bg-surface px-4 text-center transition-colors hover:bg-primary-pale ${CARD_W}`}
+      className={`flex snap-start flex-col items-center justify-center rounded-lg border border-hairline bg-surface px-4 text-center transition-colors hover:bg-primary-pale ${CARD_W}`}
     >
       <span className="flex h-11 w-11 items-center justify-center rounded-pill bg-surface-soft text-primary-on">
         <svg viewBox="0 0 20 20" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8">
