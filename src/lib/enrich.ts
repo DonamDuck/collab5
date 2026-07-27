@@ -1244,12 +1244,18 @@ class NaverGeminiProvider implements SearchProvider {
     const genModels = process.env.ENRICH_GEN_MODEL
       ? [process.env.ENRICH_GEN_MODEL]
       : NaverGeminiProvider.GEMINI_MODELS;
-    // ENRICH_GEN_THINKING: 사고량 조절(minimal|low|medium|high). 실측상 사고 토큰이 과금 출력의
-    // 절반을 넘어(3.6-flash 2449/4362) 원가·지연의 최대 변수다. 미설정=모델 기본.
-    // ⚠️수용 범위는 세대별로 다르다 — 2.5 계열은 thinkingLevel을 400으로 거부하므로 옵션 없이 1회 재시도.
-    // (SDK 열거값은 대문자 — env는 low/LOW 아무 표기나 받는다)
-    const level = process.env.ENRICH_GEN_THINKING?.toUpperCase() as ThinkingLevel | undefined;
+    // 사고량 = **high 고정**(대표 확정 07-27, 레이지오터 3파전 실측).
+    //   low  9.3초/37.2원 — 빠르고 싸지만 규칙을 흘린다(금지된 '~바랍니다' 마무리, 문단이 전부 3문장 하한).
+    //   high 23.8초/70.6원 — **규칙 위반 0건**, 다섯 줄이 서로 다른 앵글로 가장 고르게 갈렸다.
+    //   (참고: 2.5-flash는 31.6초/27.0원으로 **제일 느리고** 상투어 '특별한'을 2회 썼다 — 싼 게 빠른 게 아니다.)
+    // 사고 토큰은 화면에 안 보이지만 출력 단가로 과금된다 → 원가·지연의 최대 변수. 실험·롤백은 env로.
+    // ⚠️thinkingLevel 수용은 3.x 계열만 — 2.5는 400으로 거부한다. 폴백 체인이 2.5로 내려가면
+    //    옵션을 아예 안 붙인다(400 재시도로 콜을 한 번 버리지 않게). 그래도 400이 나면 아래에서 재시도.
+    const GEN_THINKING_DEFAULT = "HIGH";
+    const level = (process.env.ENRICH_GEN_THINKING?.toUpperCase() ??
+      GEN_THINKING_DEFAULT) as ThinkingLevel;
     for (const model of genModels) {
+      const levelOk = model.startsWith("gemini-3");
       const t0 = Date.now();
       const call = (withLevel: boolean) =>
         this.ai().models.generateContent({
@@ -1260,7 +1266,7 @@ class NaverGeminiProvider implements SearchProvider {
             responseMimeType: "application/json",
             responseSchema,
             temperature,
-            ...(withLevel && level ? { thinkingConfig: { thinkingLevel: level } } : {}),
+            ...(withLevel && levelOk ? { thinkingConfig: { thinkingLevel: level } } : {}),
           },
         });
       try {
@@ -1269,7 +1275,7 @@ class NaverGeminiProvider implements SearchProvider {
           response = await call(true);
         } catch (e) {
           const st = (e as { status?: number; code?: number })?.status ?? (e as { code?: number })?.code;
-          if (!level || st !== 400) throw e;
+          if (!levelOk || st !== 400) throw e;
           console.warn(`[enrich] ${model} thinkingLevel=${level} 거부(400) → 옵션 없이 재시도`);
           response = await call(false);
         }
