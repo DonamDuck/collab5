@@ -12,12 +12,13 @@ import {
   LIGHT_METHODS,
   HEAVY_METHODS,
   filterPoolValid,
+  filterSignatures,
   distinctTypeCount,
   THIN_MIN_TYPES,
   MIN_MATCH_SCORE,
   DNA_REFRESH_BEFORE,
 } from "./dna-pool";
-import type { Block, BrandDna, CollabReportData, DnaItem, Maker } from "./types";
+import type { Block, BrandDna, CollabReportData, DnaItem, DnaSignature, Maker } from "./types";
 import { kstIso } from "./time";
 import { meter, logMeter, type CallMeter } from "./ai-cost";
 
@@ -99,9 +100,16 @@ export function brandDigest(m: Maker): { text: string; fields: string[] } {
   };
 }
 
-/** DNA를 리포트 입력용 텍스트로 — summary + `value(type) — evidence` 줄들. */
+/** DNA를 리포트 입력용 텍스트로 — summary + ⭐이 브랜드만의 것 + `value(type) — evidence` 줄들.
+ *  signature를 Pool 항목보다 **먼저** 놓는다: Pool 어휘는 브랜드끼리 겹치라고 만든 축이라 그것만 보면
+ *  희소성 점수(rarity)가 안 나온다. 리포트가 제일 먼저 봐야 하는 재료가 '이 브랜드만의 것'이다. */
 function dnaText(dna: BrandDna): string {
-  return [dna.summary, ...dna.items.map((it) => `${it.value}(${it.type}) — ${it.evidence}`)]
+  const sig = (dna.signature ?? []).map((s) => `· ${s.text} (근거: "${s.evidence}")`);
+  return [
+    dna.summary,
+    ...(sig.length ? ["[이 브랜드만의 것]", ...sig] : []),
+    ...dna.items.map((it) => `${it.value}(${it.type}) — ${it.evidence}`),
+  ]
     .filter(Boolean)
     .join("\n");
 }
@@ -129,8 +137,25 @@ const DNA_SCHEMA = {
         required: ["type", "value", "evidence", "source"],
       },
     },
+    signature: {
+      type: Type.ARRAY,
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          text: { type: Type.STRING, description: "이 브랜드에만 해당하는 특징 한 조각(15~40자)" },
+          evidence: { type: Type.STRING, description: "소개서 실제 문구 인용(10~30자)" },
+          source: {
+            type: Type.ARRAY,
+            items: { type: Type.STRING },
+            description: "근거가 된 입력 [필드명] 라벨들",
+          },
+        },
+        required: ["text", "evidence", "source"],
+      },
+      description: "이 브랜드만의 것 0~3개(없으면 빈 배열)",
+    },
   },
-  required: ["summary", "items"],
+  required: ["summary", "items", "signature"],
 };
 
 const REPORT_SCHEMA = {
@@ -187,6 +212,9 @@ function mockDna(m: Maker): BrandDna {
       { type: "audienceAsset", value: "수강생 풀", evidence: "워크숍 누적 수강생 640명", source: ["showcases"] },
       { type: "mood", value: "따뜻함", evidence: "느슨하고 길게 협업하고 싶어요", source: ["seeks_description"] },
     ],
+    signature: [
+      { text: "버려지는 헌 옷 천을 이어 붙여 소품을 만드는 공방", evidence: "버려지는 천에 새 이야기를 입히는", source: ["description"] },
+    ],
     input_fields: fields,
     created_at: nowIso,
     updated_at: nowIso,
@@ -238,15 +266,22 @@ export async function generateDna(m: Maker, prev?: BrandDna, meters?: CallMeter[
   const dnaMeter = meter(`dna(${m.slug})`, DNA_MODEL, Date.now() - t0, res.usageMetadata);
   logMeter(dnaMeter);
   meters?.push(dnaMeter);
-  const parsed = JSON.parse(res.text ?? "{}") as { summary?: unknown; items?: DnaItem[] };
+  const parsed = JSON.parse(res.text ?? "{}") as {
+    summary?: unknown;
+    items?: DnaItem[];
+    signature?: DnaSignature[];
+  };
   // 화이트리스트 서버 검증(사실 게이트 ②) — Pool 밖 어휘·근거 없음·입력에 없던 source 탈락
   const items = filterPoolValid(parsed.items ?? [], digest.fields);
+  // signature는 Pool 밖 자유 서술이라 화이트리스트를 못 쓴다 → 인용문이 소개서에 실제로 있는지 원문 대조
+  const signature = filterSignatures(parsed.signature ?? [], digest.fields, digest.text);
   // ⚠️ 시각은 반드시 모델 호출 '이후'에 찍는다. 호출 전에 찍으면 10~20초 과거가 기록돼
   //    직후 DB 쓰기가 발화시키는 brands.updated_at 트리거보다 뒤처진다(구 stale 로직의 무한 재생성 원인).
   const nowIso = kstIso();
   return {
     summary: String(parsed.summary ?? "").slice(0, 80),
     items,
+    signature,
     input_fields: digest.fields,
     input_hash: hashText(digest.text),
     created_at: prev?.created_at ?? nowIso,

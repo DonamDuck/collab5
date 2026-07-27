@@ -19,7 +19,7 @@ const brand = {
 /** generateDna가 저장하는 것과 동일한 지문 — 재구현하지 않고 실제 함수를 그대로 쓴다(로직 이탈 방지) */
 const hashOf = (m: Maker) => digestHash(m);
 
-const dna = (input_hash: string | undefined, updated = "2026-07-26T10:00:00.000Z"): BrandDna =>
+const dna = (input_hash: string | undefined, updated = "2026-07-27T10:00:00.000Z"): BrandDna =>
   ({ summary: "s", items: [], input_fields: [], input_hash, created_at: updated, updated_at: updated });
 
 const fresh = dna(hashOf(brand));
@@ -32,7 +32,9 @@ const cases: [string, boolean, boolean][] = [
   ["① DNA 없음 → stale", isDnaStale(null, brand), true],
   ["② 지문 불일치 → stale", isDnaStale(dna("deadbeefdeadbeef"), brand), true],
   ["③ 지문 없는 구버전 → stale(1회 재생성 후 안정화)", isDnaStale(dna(undefined), brand), true],
-  ["④ Pool 대개정 이전 생성분 → stale", isDnaStale(dna(hashOf(brand), "2026-07-01T00:00:00.000Z"), brand), true],
+  // ④ 스키마·프롬프트 개정 컷오프(DNA_REFRESH_BEFORE) 이전 생성분 — 소개서가 그대로여도 재생성해야 한다.
+  //    (07-27 signature 신설처럼 '출력 항목이 늘어난' 개정은 입력 지문이 안 바뀌어 이 규칙 없이는 영원히 빈칸)
+  ["④ 개정 컷오프 이전 생성분 → stale", isDnaStale(dna(hashOf(brand), "2026-07-01T00:00:00.000Z"), brand), true],
   ["⑤ 내용 동일 → not stale", isDnaStale(fresh, brand), false],
   ["⑥ ⭐트리거로 brands.updated_at만 밀림 → not stale", isDnaStale(fresh, bumped), false],
   ["⑦ 소개서 실제 수정 → stale", isDnaStale(fresh, edited), true],

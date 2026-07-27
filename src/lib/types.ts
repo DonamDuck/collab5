@@ -141,9 +141,19 @@ export interface DnaItem {
   evidence: string;  // 소개서 원문 인용(10~30자) — 값의 발췌 그 자체라 별도 값 저장 안 함
   source: string[];  // 근거가 된 입력 필드명(실제 DB 컬럼명, 입력 라벨 화이트리스트 검증)
 }
+/** ⭐이 브랜드만의 것 — Pool 밖 자유 서술(고유성).
+ *  Pool은 브랜드끼리 비교하려고 어휘를 통제하는 대신, "LP를 트는 카페"·"버려진 헌옷으로 만드는 워크숍"처럼
+ *  **그 브랜드를 그 브랜드이게 하는 조각**을 통째로 잃는다(레이지오터도 캔버스가든도 space:"카페"·"공방"으로
+ *  수렴). 그 손실을 메우는 필드라, 화이트리스트가 아니라 **원문 인용 검증**으로 사실을 막는다. */
+export interface DnaSignature {
+  text: string;      // 이 브랜드에만 해당하는 한 조각(15~40자)
+  evidence: string;  // 소개서 원문 인용 — 서버가 다이제스트에 실제로 있는 문구인지 대조한다
+  source: string[];  // 근거가 된 입력 필드명(입력 라벨 화이트리스트 검증)
+}
 export interface BrandDna {
   summary: string;
   items: DnaItem[];
+  signature?: DnaSignature[]; // 0~3개. optional = 이 필드 도입 이전에 저장된 DNA가 있어서(재생성되면 채워짐)
   input_fields: string[]; // 이번 생성 때 입력으로 넣은 필드 라벨 목록 — 서버가 기록(AI 출력 아님)
   input_hash?: string;    // 이 DNA를 만든 소개서 다이제스트의 지문 — stale 판정 기준(시각 비교 대체). 없으면 구버전=1회 재생성
   created_at: string;

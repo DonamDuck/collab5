@@ -5,7 +5,7 @@
 // (이미 캐싱된 brands.dna의 옛 value는 다음 재생성까지 남는다는 점도 함께 고려).
 // 스펙: docs/superpowers/specs/2026-07-25-collab-report-dna-design.md §2-3
 
-import type { DnaItem } from "./types";
+import type { DnaItem, DnaSignature } from "./types";
 
 export const DNA_POOL: Record<string, readonly string[]> = {
   philosophy: ["지속가능성","자기표현","지역성","교육","사회적 가치","장인정신","취향 중심","경험 중심","사람 중심","커뮤니티"],
@@ -32,7 +32,11 @@ export const HEAVY_METHODS = ["공동 상품","공동 브랜딩","입점 판매"
 
 export const THIN_MIN_TYPES = 4;      // 서로 다른 type 수 미달 = thin
 export const MIN_MATCH_SCORE = 7;     // 접점 채점 통과 하한(10점 만점 합산 기준, A/B로 튜닝)
-export const DNA_REFRESH_BEFORE = "2026-07-25T00:00:00Z"; // 이 날짜 이전 dna는 stale 취급
+export const SIGNATURE_MAX = 3;       // 이 브랜드만의 것 최대 개수(많아지면 '특별함'이 아니라 목록이 된다)
+// 이 시각 이전 dna는 stale 취급 — **DNA 스키마·프롬프트를 바꾸면 여기를 올려야 실제로 재생성된다.**
+// 지문(input_hash)은 '소개서가 바뀌었나'만 보므로, 소개서가 그대로면 새 필드가 영원히 빈 채로 캐시된다.
+//  2026-07-25: Pool 대개정  /  2026-07-27: signature(이 브랜드만의 것) 신설
+export const DNA_REFRESH_BEFORE = "2026-07-27T03:00:00Z";
 // (은퇴 2026-07-26) DNA_STALE_SLACK_MS 삭제 — stale 판정을 시각 비교에서 내용 지문(input_hash)
 // 비교로 바꿨다. setBrandDna가 brands.updated_at 트리거를 발화시켜 시각 비교는 구조적으로 성립하지
 // 않았고(모든 DNA 영구 stale), 허용 오차로 막으려 해도 DNA 생성 10~20초가 오차를 넘겼다.
@@ -49,3 +53,45 @@ export function filterPoolValid(items: DnaItem[], allowedSources: string[]): Dna
 }
 
 export function distinctTypeCount(items: DnaItem[]): number { return new Set(items.map((i) => i.type)).size; }
+
+const squash = (s: string) => s.replace(/\s+/g, " ").trim();
+
+/** 인용문이 소개서에 실제로 있는가. 통째로 없으면 문장 단위로 쪼개 **조각 전부**가 있는지 본다.
+ *  왜 쪼개나(실측 07-27, 스톤브루): 모델이 [one_liner]와 [description]에서 한 문장씩 가져와
+ *  하나의 evidence로 이어 붙인다("…깊고 진한 한 잔. 직접 로스팅하는 …카페"). 통짜 대조만 하면
+ *  **창작이 아닌데도 폐기**된다. 조각을 **전부** 요구하므로 "진짜 인용 + 지어낸 말" 조합은 여전히 걸린다. */
+function quoted(evidence: string, hay: string): boolean {
+  if (hay.includes(evidence)) return true;
+  const parts = evidence.split(/[.·,;/]|\s—\s/).map(squash).filter((p) => p.length >= MIN_QUOTE_LEN);
+  return parts.length > 0 && parts.every((p) => hay.includes(p));
+}
+
+const MIN_QUOTE_LEN = 6; // 이보다 짧은 인용은 아무 문장에나 걸려 근거 구실을 못 한다
+
+/** signature(자유 서술) 사실 게이트 — Pool 화이트리스트를 쓸 수 없는 필드라 **원문 대조**로 막는다.
+ *  ①source가 실제 입력 필드일 것 ②evidence가 다이제스트에 **문자 그대로 있을 것**(공백 정규화 후 부분일치)
+ *  ③너무 짧은 인용은 아무 데나 걸리므로 6자 이상 ④최대 SIGNATURE_MAX개.
+ *  ②가 이 필드의 핵심 방어선이다 — 여기가 없으면 "이 브랜드만의 것"은 창작 허가증이 된다.
+ *  (DNA_SYSTEM이 원문 인용을 요구하고 실측 준수율도 높지만(evidence 일치 33/33), 프롬프트는 규칙이지 보장이 아니다.) */
+export function filterSignatures(
+  sigs: DnaSignature[],
+  allowedSources: string[],
+  digestText: string
+): DnaSignature[] {
+  const hay = squash(digestText);
+  return sigs
+    .map((s) => ({
+      text: squash(String(s?.text ?? "")),
+      evidence: squash(String(s?.evidence ?? "")),
+      source: (s?.source ?? []).filter((f) => allowedSources.includes(f)),
+    }))
+    .filter((s) => {
+      if (!s.text || s.source.length === 0) return false;
+      if (s.evidence.length < MIN_QUOTE_LEN || !quoted(s.evidence, hay)) {
+        console.warn(`[dna] signature 원문 대조 실패 → 폐기: "${s.text}" (evidence="${s.evidence}")`);
+        return false;
+      }
+      return true;
+    })
+    .slice(0, SIGNATURE_MAX);
+}
