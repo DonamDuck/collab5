@@ -93,16 +93,26 @@ export default async function MyPage({ searchParams }: { searchParams: Promise<{
   // 콜라보 리포트 탭 콘텐츠 — 카드 = /m 딥링크(리포트는 자기 집에서 렌더, 캐시면 즉시·0콜)
   const reportList =
     reports.length === 0 ? (
-      <div className="rounded-md border border-dashed border-border-strong bg-surface px-4 py-8 text-center">
-        <p className="text-[15px] text-mute">아직 만든 콜라보 리포트가 없어요.</p>
-        <p className="mt-1.5 text-sm text-faint">
-          궁금한 브랜드 소개서에서 [콜라보 분석]을 누르면 여기에 모여요.
+      <div className="flex flex-col items-center rounded-2xl bg-surface-soft px-6 py-14 text-center">
+        <svg width="56" height="56" viewBox="0 0 56 56" fill="none" className="text-faint" aria-hidden="true">
+          <ellipse cx="28" cy="28" rx="23" ry="9" stroke="currentColor" strokeWidth="2" opacity="0.45" transform="rotate(28 28 28)" />
+          <ellipse cx="28" cy="28" rx="23" ry="9" stroke="currentColor" strokeWidth="2" opacity="0.45" transform="rotate(-28 28 28)" />
+          <circle cx="28" cy="28" r="6" fill="#98ff5c" />
+          <circle cx="6.5" cy="32" r="2.4" fill="currentColor" opacity="0.55" />
+          <circle cx="49.5" cy="24" r="2.4" fill="currentColor" opacity="0.55" />
+          <circle cx="33" cy="6.5" r="2.2" fill="currentColor" opacity="0.55" />
+        </svg>
+        <p className="mt-5 text-[17px] font-bold break-keep text-ink">아직 콜라보 리포트가 없어요</p>
+        <p className="mt-2 text-[14px] leading-relaxed break-keep text-mute">
+          콜라보하고 싶은 브랜드를 찾아
+          <br />
+          콜라보 분석 리포트를 만들어보세요.
         </p>
         <Link
           href="/search"
-          className="mt-4 inline-flex h-11 items-center justify-center rounded-md border border-border-strong bg-surface px-5 text-sm font-medium text-ink"
+          className="mt-6 inline-flex h-12 items-center justify-center rounded-md bg-primary px-6 text-base font-medium text-primary-on"
         >
-          브랜드 둘러보기
+          브랜드 소개서 둘러보기
         </Link>
       </div>
     ) : (
