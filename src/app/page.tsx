@@ -106,10 +106,14 @@ export default async function Home() {
               지금 함께할 파트너를 찾고 있는 브랜드예요.
             </p>
           </Reveal>
-          {/* Reveal 밖 — 캐러셀은 가장자리로 넘치는데(-mx-4) 리빌 래퍼가 감싸면 잘릴 여지가 있다 */}
-          <div className="mt-8">
+          {/* 제목과 같은 리듬으로 함께 올라온다 — 제목만 리빌이고 카드는 박혀 있으면 섹션이 따로 노는
+              느낌이 난다(대표 QA 07-27, 실제로 "UX가 깨진 느낌"으로 보고됨).
+              ⚠️전엔 "-mx-4 풀블리드가 리빌 래퍼에 잘릴까봐" 밖에 뒀는데, Reveal은 transform·opacity만
+                 쓰고 overflow를 자르지 않는다 — 가장자리로 흐르는 건 그대로다(실측 확인).
+              delay 90ms = 아래 온보딩 카드 스태거와 같은 간격(제목 → 카드 순서로 읽히게). */}
+          <Reveal delay={90} className="mt-8">
             <BrandCarousel brands={collabBrands} />
-          </div>
+          </Reveal>
         </section>
       )}
 
