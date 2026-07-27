@@ -1226,8 +1226,9 @@ class NaverGeminiProvider implements SearchProvider {
   // 검색 모델 최종 판정(대표 A/B 체감 2026-07-19): flash 1콜 승 — lite 병렬 3콜 병합보다 체감 우위.
   // 기본 1콜(ENRICH_SEARCH_RUNS로 병렬 늘리기 가능), 비접지 시 검색전략 변형 프롬프트로 flash 1회 재시도.
   // 콜당 토큰비 ~6원. lite 병합으로 되돌리기 = PRIMARY를 lite로 + ENRICH_SEARCH_RUNS=3.
-  private static readonly SEARCH_PRIMARY = "gemini-2.5-flash";
-  private static readonly SEARCH_RESCUE = "gemini-2.5-flash";
+  // ENRICH_SEARCH_MODEL로 교체 가능(A/B·롤백을 배포 없이).
+  private static readonly SEARCH_PRIMARY = process.env.ENRICH_SEARCH_MODEL || "gemini-2.5-flash";
+  private static readonly SEARCH_RESCUE = process.env.ENRICH_SEARCH_MODEL || "gemini-2.5-flash";
 
   // 모델당 1회 시도(무료 티어 RPM 절약) → 503/429면 즉시 다음 모델로. 전부 실패하면 throw.
   // schema/system을 인자로 받아 구조화 호출을 재사용(구조화·5지선다 공용).
@@ -1400,26 +1401,34 @@ class NaverGeminiProvider implements SearchProvider {
       // ⚡생각(thinking) 끄기 — 2.5-flash는 기본이 dynamic thinking이라 lite 대비 체감이 느려졌던 원인.
       //   이 단계는 "검색해서 본 것만 정리"라 추론 여지가 거의 없어 품질 손실 없이 지연만 줄인다.
       //   (생성 단계는 글맛이 걸려 있어 그대로 둠 — 대표 블라인드 A/B로 고른 flash 품질 유지)
-      //   ENRICH_SEARCH_THINKING=1이면 다시 켜서 비교 가능.
-      const thinking = process.env.ENRICH_SEARCH_THINKING === "1";
-      const call = (withThinkingOff: boolean) =>
+      //   ENRICH_SEARCH_THINKING으로 조절: "1"=끄기 해제(2.5 레거시) / minimal·low·medium·high=레벨 지정.
+      // ⚠️세대별로 받는 인자가 다르다 — 2.5는 thinkingBudget(0 허용), **3.x는 0을 400으로 거부**하고
+      //   thinkingLevel만 받는다. 그래서 모델 계열로 갈라 붙인다(3.x 기본 LOW = '끄기'에 가장 가까운 값).
+      const raw = process.env.ENRICH_SEARCH_THINKING;
+      const is3x = model.startsWith("gemini-3");
+      const thinkCfg = is3x
+        ? { thinkingLevel: ((raw && raw !== "1" ? raw : "low").toUpperCase() as ThinkingLevel) }
+        : raw === "1"
+          ? undefined
+          : { thinkingBudget: 0 };
+      const call = (withThink: boolean) =>
         this.ai().models.generateContent({
           model,
           contents: prompt,
           config: {
             tools: [{ googleSearch: {} }],
             temperature: 0.2,
-            ...(withThinkingOff ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
+            ...(withThink && thinkCfg ? { thinkingConfig: thinkCfg } : {}),
           },
         });
       let response;
       try {
-        response = await call(!thinking);
+        response = await call(true);
       } catch (e) {
-        // 모델이 thinkingBudget을 안 받으면(400) 옵션 없이 1회 재시도 — 검색이 통째로 죽는 것 방지.
+        // 모델이 사고 옵션을 안 받으면(400) 옵션 없이 1회 재시도 — 검색이 통째로 죽는 것 방지.
         const status = (e as { status?: number; code?: number })?.status ?? (e as { code?: number })?.code;
-        if (thinking || status !== 400) throw e;
-        console.warn(`[enrich] ${model} thinkingBudget 거부(400) → 옵션 없이 재시도`);
+        if (!thinkCfg || status !== 400) throw e;
+        console.warn(`[enrich] ${model} 사고 옵션 거부(400) → 옵션 없이 재시도`);
         response = await call(false);
       }
       // ⭐그라운딩 근거 체크 — 근거 없으면 웹을 안 보고 지어낸 답변(캔버스가든 상상업체 사고 이후 도입) → 폐기.
