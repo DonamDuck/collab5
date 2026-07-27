@@ -2,7 +2,7 @@
 // 실행: SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... npx tsx scripts/clone-demo-makers.ts
 //
 // 하는 일:
-//  1. 원본 소개서 2종(m-ofjghi·m-ay6uve)을 조회
+//  1. 원본 소개서(m-ofjghi 하나)를 조회 — 사진본·무사진본 둘 다 같은 원본에서 뜬다
 //  2. jsonb 안 사진 URL 전부(photos·activities[].photos·collab_history[].photos·blocks[].photos)를
 //     "maker-photos" 버킷의 demo/<slug>/ 경로로 복사(동결) → 공개 URL로 교체
 //     (원본 사진이 지워져도 데모는 깨지지 않음. storage upsert → 재실행 시 덮어쓰기, 고아 없음)
@@ -11,9 +11,12 @@
 import { createClient } from "@supabase/supabase-js";
 
 const BUCKET = "maker-photos";
+// ⭐둘 다 같은 원본(m-ofjghi)에서 뜬다(대표 지시 07-28) — 예전엔 사진 없는 쪽을 다른 소개서
+//   (m-ay6uve)에서 떠와서 "같은 브랜드의 사진 유/무 비교"가 아니라 그냥 다른 두 브랜드였다.
+//   같은 내용을 놓고 "사진이 있으면 이렇고, 없어도 이 정도"를 보여주는 게 이 데모의 목적이다.
 const PAIRS = [
-  { from: "m-ofjghi", to: "m-demo-photo" },
-  { from: "m-ay6uve", to: "m-demo-none" },
+  { from: "m-ofjghi", to: "m-demo-photo", stripPhotos: false },
+  { from: "m-ofjghi", to: "m-demo-none", stripPhotos: true },
 ] as const;
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
@@ -82,8 +85,8 @@ async function freezeHolders(holders: PhotoHolder[] | null, demoSlug: string, fi
   return out;
 }
 
-async function cloneOne({ from, to }: { from: string; to: string }) {
-  console.log(`\n▶ ${from} → ${to}`);
+async function cloneOne({ from, to, stripPhotos }: { from: string; to: string; stripPhotos: boolean }) {
+  console.log(`\n▶ ${from} → ${to}${stripPhotos ? " (사진 제거)" : ""}`);
 
   const { data: src, error: selErr } = await sb.from("makers").select().eq("slug", from).maybeSingle();
   if (selErr) throw new Error(`[${to}] 원본(${from}) 조회 실패: ${selErr.message}`);
@@ -95,18 +98,25 @@ async function cloneOne({ from, to }: { from: string; to: string }) {
   if (exErr) throw new Error(`[${to}] 기존 데모 행 조회 실패: ${exErr.message}`);
   if (existing) console.log(`   ↻ 기존 데모 행(id=${existing.id}) 갱신`);
 
+  // 사진 제거본은 동결(다운로드·업로드)을 아예 건너뛴다 — 어차피 안 쓸 파일을 버킷에 쌓지 않게.
+  //   ⚠️사진 '만' 지운다 — 글·활동·콜라보·블록 항목은 전부 그대로 남는다(사진 칸만 빈 배열).
+  //   cover_image_url도 함께 비운다(상단 카드의 대표 사진이라 남기면 "사진 없는 소개서"가 안 된다).
+  //   logo_url은 유지 — 로고는 사진이 아니라 계정 프로필 소속이다.
   const c = { n: 0 };
-  const photos = await freezeList(row.photos, to, "photos", c);
-  const activities = await freezeHolders(row.activities, to, "activities", c);
-  const collab_history = await freezeHolders(row.collab_history, to, "collab_history", c);
-  const blocks = await freezeHolders(row.blocks, to, "blocks", c);
+  const strip = (hs: PhotoHolder[] | null) => (hs ?? []).map((h) => ({ ...h, photos: [] }));
+  const photos = stripPhotos ? [] : await freezeList(row.photos, to, "photos", c);
+  const activities = stripPhotos ? strip(row.activities) : await freezeHolders(row.activities, to, "activities", c);
+  const collab_history = stripPhotos
+    ? strip(row.collab_history)
+    : await freezeHolders(row.collab_history, to, "collab_history", c);
+  const blocks = stripPhotos ? strip(row.blocks) : await freezeHolders(row.blocks, to, "blocks", c);
 
   const demoRow: Record<string, unknown> = {
     ...(existing ? { id: existing.id } : {}), // id·created_at·updated_at은 신규면 DB 자동 부여
     slug: to,
     name: row.name,
     one_liner: row.one_liner,
-    cover_image_url: row.cover_image_url,
+    cover_image_url: stripPhotos ? null : row.cover_image_url,
     logo_url: row.logo_url, // 로고는 profiles 소속 — 동결하지 않고 URL 그대로
     region: row.region,
     size: row.size,
@@ -131,7 +141,7 @@ async function cloneOne({ from, to }: { from: string; to: string }) {
 
   const { error: upErr } = await sb.from("makers").upsert(demoRow, { onConflict: "slug" });
   if (upErr) throw new Error(`[${to}] upsert 실패: ${upErr.message}`);
-  console.log(`✅ ${to} 저장 완료 — 사진 ${c.n}장 동결`);
+  console.log(stripPhotos ? `✅ ${to} 저장 완료 — 사진 0장(전부 제거)` : `✅ ${to} 저장 완료 — 사진 ${c.n}장 동결`);
 }
 
 async function main() {
