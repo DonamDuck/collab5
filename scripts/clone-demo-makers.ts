@@ -103,7 +103,7 @@ async function cloneOne({ from, to, stripPhotos }: { from: string; to: string; s
   // 멱등: 기존 데모 행이 있으면 그 id 재사용(upsert가 같은 행을 갱신), 없으면 DB가 새로 부여.
   const { data: existing, error: exErr } = await sb.from("brands").select("id").eq("slug", to).maybeSingle();
   if (exErr) throw new Error(`[${to}] 기존 데모 행 조회 실패: ${exErr.message}`);
-  if (existing) console.log(`   ↻ 기존 데모 행(id=${existing.id}) 갱신`);
+  if (existing) console.log(`   ↻ 기존 데모 행(id=${existing.id}) 갱신 — slug 충돌로 update`);
 
   // 사진 제거본은 동결(다운로드·업로드)을 아예 건너뛴다 — 어차피 안 쓸 파일을 버킷에 쌓지 않게.
   //   ⚠️사진 '만' 지운다 — 글·활동·콜라보·블록 항목은 전부 그대로 남는다(사진 칸만 빈 배열).
@@ -119,7 +119,9 @@ async function cloneOne({ from, to, stripPhotos }: { from: string; to: string; s
   const showcases = stripPhotos ? strip(row.showcases) : await freezeHolders(row.showcases, to, "showcases", c);
 
   const demoRow: Record<string, unknown> = {
-    ...(existing ? { id: existing.id } : {}), // id·created_at·updated_at은 신규면 DB 자동 부여
+    // ⚠️id는 절대 넘기지 않는다 — 07-25 개명 후 `GENERATED ALWAYS AS IDENTITY`라
+    //   값을 주면 "cannot insert a non-DEFAULT value into column id"로 거부된다(대표 실행 실패).
+    //   멱등성은 id 재사용이 아니라 onConflict:"slug"가 담당한다(slug UNIQUE) — 기존 행이 갱신된다.
     slug: to,
     name: row.name,
     one_liner: row.one_liner,
