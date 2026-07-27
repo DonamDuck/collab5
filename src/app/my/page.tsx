@@ -74,13 +74,7 @@ export default async function MyPage({ searchParams }: { searchParams: Promise<{
     saved.length === 0 ? (
       <EmptyState
         title="아직 찜한 브랜드가 없어요"
-        desc={
-          <>
-            마음에 드는 브랜드 소개서에서 하트를 누르면
-            <br />
-            여기에 모여요.
-          </>
-        }
+        desc="마음에 드는 브랜드 소개서를 찜해보세요."
         ctaLabel="브랜드 소개서 둘러보기"
         ctaHref="/search"
       />
