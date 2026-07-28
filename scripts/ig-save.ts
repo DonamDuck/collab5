@@ -101,6 +101,9 @@ async function startIndex(dir: string, label: string): Promise<{ from: number; c
   return max === 0 ? { from: 1, collided: false } : { from: max + 1, collided: true };
 }
 
+/** 확장자는 **서버가 준 Content-Type을 그대로** 따른다 — 우리가 포맷을 고르는 게 아니다.
+ *  인스타 CDN은 URL에 포맷이 박혀 나오므로(`dst-jpg` vs `dst-webp`) 배치마다 .jpg/.webp가 갈린다.
+ *  둘 다 정상이다: 폼이 `image/*`를 받고 `lib/image.ts`가 올리기 전에 jpeg로 재인코딩한다. */
 const extOf = (ct: string): string =>
   ct.includes("png") ? "png" : ct.includes("webp") ? "webp" : "jpg";
 
