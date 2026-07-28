@@ -61,8 +61,10 @@ export function SearchClient({ all }: { all: Maker[] }) {
       <h1 className="text-[28px] font-bold tracking-tight text-ink sm:text-[32px]">브랜드 찾기</h1>
       <p className="mt-2 text-[17px] leading-relaxed text-body">잘 맞는 콜라보 파트너를 찾아보세요.</p>
 
-      {/* 검색바 — 데스크탑 폭 캡(QA P2) */}
-      <div className="mt-5 flex h-11 max-w-xl items-center gap-2 rounded-pill bg-surface-soft px-4">
+      {/* 검색바 — 데스크탑 폭 캡(QA P2)
+          포커스 표시는 파란 outline 대신 **테두리 하나가 은은히 뜨는 것**으로(07-28 대표 지시).
+          이 입력칸엔 자체 테두리가 없어서, 전역 링을 뺀 뒤 여기서 focus-within으로 대신한다. */}
+      <div className="mt-5 flex h-11 max-w-xl items-center gap-2 rounded-pill bg-surface-soft px-4 ring-1 ring-transparent transition-[box-shadow] duration-[var(--dur-fast)] focus-within:ring-border-strong">
         <span className="text-faint" aria-hidden="true">🔎</span>
         <input
           value={q}
