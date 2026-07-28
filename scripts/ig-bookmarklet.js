@@ -79,9 +79,19 @@
   //    캐러셀에서 아직 안 뜬 슬라이드는 저해상 placeholder만 들고 있다. 예전 코드는 그걸 그대로
   //    확정해버려서 **9장 중 7장이 480×600으로 저장됐다**(원본 1080×1350). 슬라이드가 실제로
   //    떠서 고해상 srcset이 붙으면 다음 훑기에서 갈아끼워야 한다.
+  // ⭐**링크 안에 있는 사진은 이 게시물이 아니다** (대표 제보 07-28 → 로그인 DOM 실측으로 확정).
+  //    단독 페이지 하단의 "○○님의 게시물 더 보기" 그리드는 각 썸네일이 `<a href="/user/p/코드/">`로
+  //    **다른 게시물로 가는 링크**다. 반면 지금 보고 있는 게시물의 캐러셀 사진은 링크가 아니다.
+  //    실측: 이 필터 하나로 8장 → 2장(캐러셀만). 크기·위치로는 못 가른다 —
+  //    하단 그리드도 1440 원본으로 오기 때문(‼️예전 s640x640 가정은 틀렸다).
+  //    보너스: 모달 뒤에 남는 프로필 그리드도 같은 이유로 걸러져서 스코프 로직의 2중 안전망이 된다.
+  const isOtherPost = (img) => !!img.closest("a[href]");
+  let strict = true;   // 아래 안전망에서만 꺼진다
+
   const collect = () => {
     for (const img of scope().querySelectorAll(SEL_IMG)) {
       if (img.naturalWidth && img.naturalWidth < 320) continue;
+      if (strict && isOtherPost(img)) continue;
       const pick = bestFrom(img);
       if (!pick.url || !pick.url.includes("cdninstagram")) continue;
       const k = keyOf(pick.url);
@@ -112,6 +122,11 @@
   // 마지막 정착 훑기 — 끝 슬라이드는 클릭 직후 한 번밖에 못 봐서 저해상으로 굳기 쉽다
   await new Promise((r) => setTimeout(r, 1200));
   collect();
+
+  // 안전망: 인스타 DOM이 바뀌어 캐러셀까지 링크로 감싸이면 위 필터가 **전부** 걸러 0장이 된다.
+  // 그땐 필터를 끄고 다시 훑어 사람 눈(썸네일 미리보기)에 맡긴다 —
+  // "아무것도 못 받음"보다 "많이 받아놓고 눈으로 거름"이 낫다.
+  if (!found.size) { strict = false; collect(); }
 
   const picks = [...found.values()];
   const urls = picks.map((p) => p.url);
