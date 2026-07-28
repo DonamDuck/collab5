@@ -145,12 +145,21 @@
 
   // ⚠️ 저해상도 경고 — 크기는 조용히 작아지는 종류의 사고라 **복사 전에 말해줘야 한다**.
   //    (07-28: 9장 중 7장이 480px로 저장된 걸 나중에 파일 열어보고서야 알았다)
+  //
+  // ⭐진짜 원인은 **레이어(모달) 렌더**다(대표 실측 07-28). 게시물이 피드·프로필 위에 모달로 뜨면
+  //   이미지 열이 좁아서 인스타가 작은 후보를 물린다 — 같은 주소라도 **주소창에 직접 붙여넣어
+  //   단독 페이지로 열면 원본(1440)** 이 온다. 페이지 URL 형태(/p/ vs /{user}/p/)와는 무관.
+  //   → 그래서 처방을 상황별로 갈라준다. 틀린 처방("캐러셀을 넘겨보세요")은 시간만 버리게 한다.
   if (small) {
+    const inLayer = !!document.querySelector('div[role="dialog"] article');
     const warn = document.createElement("p");
     warn.style.cssText =
       "margin:0 0 8px;padding:8px 10px;border-radius:8px;background:#fff4e5;color:#8a5300;font-size:13px";
-    warn.textContent =
-      small + "장이 원본보다 작아요. 캐러셀을 손으로 끝까지 한 번 넘긴 뒤 다시 눌러보세요.";
+    warn.textContent = inLayer
+      ? small +
+        "장이 작아요. 게시물이 레이어로 떠 있어서예요 — 지금 주소를 복사해 " +
+        "주소창에 붙여넣고 엔터로 다시 열면 원본이 옵니다."
+      : small + "장이 원본보다 작아요. 캐러셀을 손으로 끝까지 한 번 넘긴 뒤 다시 눌러보세요.";
     box.appendChild(warn);
   }
 
