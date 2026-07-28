@@ -18,7 +18,9 @@
   --canvas: #fbfaf6; --surface: #ffffff; --surface-soft: #f4f2ec; --surface-dark: #2c2c2a;
   --hairline: #e7e4da; --border-strong: #d8d5cb;
   --success: #3b6d11; --warning: #ba7517; --danger: #e24b4a; --info: #378add;
-  --focus: #6e86d6; --scrim: #222222;
+  /* 포커스 = 잉크(대표 확정 07-28). 원래 콘플라워 블루(#6e86d6)였는데 "브라우저 기본값" 같아 보였다.
+     var()로 걸어둬서 다크 테마에선 --ink가 밝은 값으로 바뀌며 자동으로 따라간다. */
+  --focus: var(--ink); --scrim: #222222;
   --r-sm: 10px; --r-md: 16px; --r-lg: 22px; --r-xl: 28px; --r-pill: 9999px;
   --e1: 0 1px 2px rgba(34,34,34,.06);
   --e2: 0 4px 16px rgba(34,34,34,.10);
@@ -30,7 +32,8 @@
 [data-theme="dark"] {
   --canvas: #222222; --surface: #2c2c2a; --surface-soft: #33332f;
   --ink: #fbfaf6; --body: #b4b2a9; --mute: #888780; --faint: #6b6a63;
-  --hairline: #3a3a36; --border-strong: #4a4a45; --primary-on: #222222; --focus: #9db3f0;
+  --hairline: #3a3a36; --border-strong: #4a4a45; --primary-on: #222222;
+  /* --focus는 :root에서 var(--ink)라 여기서 다시 안 잡는다 — 위 --ink 재정의를 그대로 따라간다. */
 }
 
 /* ── Tailwind v4 매핑: 유틸(bg-primary, text-ink, rounded-lg, shadow-e2 …) ← 토큰 ── */
