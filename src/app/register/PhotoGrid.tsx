@@ -45,20 +45,23 @@ export function PhotoGrid({
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={it.url} alt="" className="pointer-events-none h-full w-full object-cover" />
             {it.uploading && (
-              <span className="absolute inset-0 flex items-center justify-center bg-ink/30">
+              // pointer-events-none — 이 덮개가 아래 ✕ 버튼의 클릭을 먹으면 안 된다
+              <span className="pointer-events-none absolute inset-0 flex items-center justify-center bg-ink/30">
                 <span className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
               </span>
             )}
-            {!it.uploading && (
-              <button
-                type="button"
-                onClick={() => onRemove(i)}
-                aria-label="사진 삭제"
-                className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-pill bg-ink/60 text-[11px] text-white"
-              >
-                ✕
-              </button>
-            )}
+            {/* ✕는 **업로드 중에도 보인다**(2026-07-29, 대표 지시).
+                전엔 업로드 중이면 ✕를 안 그려서, 업로드가 멈추면 그 사진을 지울 방법이 없었다
+                → 제출 버튼이 `some(p => p.uploading)`으로 잠긴 채 폼에서 못 빠져나갔다.
+                지운 뒤 늦게 응답이 와도 안전하다: 완료 콜백은 url로 항목을 찾는데 이미 없어서 아무 일도 안 한다. */}
+            <button
+              type="button"
+              onClick={() => onRemove(i)}
+              aria-label={it.uploading ? "업로드 취소" : "사진 삭제"}
+              className="absolute right-1 top-1 z-10 flex h-5 w-5 items-center justify-center rounded-pill bg-ink/60 text-[11px] text-white"
+            >
+              ✕
+            </button>
           </div>
         ))}
         {items.length < max && (

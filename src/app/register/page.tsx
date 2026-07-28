@@ -372,6 +372,7 @@ function RegisterForm() {
     maxDim: number,
     update: (f: (p: Ph[]) => Ph[]) => void
   ) => {
+    let alerted = false; // 한 번에 여러 장이 실패해도 알럿은 한 번만(알럿 폭탄 방지)
     Array.from(files ?? [])
       .filter((f) => f.type.startsWith("image/"))
       .slice(0, Math.max(0, room))
@@ -379,10 +380,21 @@ function RegisterForm() {
         const preview = URL.createObjectURL(f);
         update((p) => [...p, { url: preview, uploading: true }]);
         uploadPhoto(f, maxDim)
+          // 사용자가 먼저 ✕로 지웠으면 이 map은 찾을 항목이 없어 아무 일도 안 한다(안전)
           .then((url) => update((p) => p.map((x) => (x.url === preview ? { url } : x))))
-          .catch(() => {
+          .catch((e: unknown) => {
             update((p) => p.filter((x) => x.url !== preview));
-            alert("사진 업로드에 실패했어요. 다시 시도해주세요.");
+            // ⭐어느 단계에서 멈췄는지 콘솔에 남긴다(timeout:sign|resize|upload).
+            //   다음에 또 멈추면 이 한 줄이 원인 특정의 출발점이다 — 지금은 트리거를 모른다.
+            console.warn("[photo-upload]", (e as Error)?.message, f.name, f.size, f.type);
+            if (alerted) return;
+            alerted = true;
+            // 왜 실패했는지 구분해서 말해준다 — "다시 시도"만으론 같은 상황이 반복된다
+            alert(
+              String((e as Error)?.message).startsWith("timeout")
+                ? "사진 업로드가 너무 오래 걸려 취소했어요. 네트워크 상태를 확인하고 다시 올려주세요."
+                : "사진 업로드에 실패했어요. 다시 시도해주세요."
+            );
           });
       });
   };
