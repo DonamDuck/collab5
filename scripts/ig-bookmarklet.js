@@ -48,16 +48,20 @@
     }
   };
 
-  // URL이 스스로 밝히는 가로폭(p480x600·s640x640). srcset·naturalWidth가 없을 때의 마지막 수단.
-  // ⚠️ `?` 뒤 서명 문자열엔 우연히 비슷한 패턴이 있을 수 있어 **경로 + stp 값에서만** 찾는다.
-  const urlWidth = (u) => {
+  // URL이 스스로 밝히는 크기 꼬리표(p480x600·s640x640)를 찾는다.
+  // ⚠️ `?` 뒤 서명 문자열엔 우연히 비슷한 패턴이 있을 수 있어 **경로 + stp 값에서만** 본다.
+  const sizeTag = (u) => {
     const stp = (u.match(/[?&]stp=([^&]*)/) || [])[1] || "";
-    const hay = u.split("?")[0] + " " + decodeURIComponent(stp);
-    const m = hay.match(/[sp](\d{3,4})x\d{3,4}/i);
-    return m ? parseInt(m[1], 10) : 0;
+    return (u.split("?")[0] + " " + decodeURIComponent(stp)).match(/[sp](\d{3,4})x\d{3,4}/i);
   };
+  const urlWidth = (u) => { const m = sizeTag(u); return m ? parseInt(m[1], 10) : 0; };
+  // ⭐꼬리표가 **없으면 원본**이다 — 07-28 실측: 게시물 사진은 `stp=dst-jpg_e35_tt6`처럼
+  //   크기 없이 오고 1440×1920이었다(꼬리표 붙은 건 전부 리사이즈본). 그래서 폭을 몰라도
+  //   원본은 리사이즈본을 언제나 이겨야 한다 — 안 그러면 **아직 안 뜬 원본(naturalWidth 0)이
+  //   480 썸네일한테 밀려 다운그레이드된다.**
+  const isOrig = (u) => !sizeTag(u);
 
-  // 가장 큰 후보 + 그 가로폭. 폭 출처 우선순위 = srcset 디스크립터 > naturalWidth > URL 패턴.
+  // 가장 큰 후보. 폭 출처 우선순위 = srcset 디스크립터 > naturalWidth > URL 꼬리표.
   const bestFrom = (img) => {
     let best = img.src, bestW = img.naturalWidth || 0;
     for (const part of (img.getAttribute("srcset") || "").split(",")) {
@@ -65,8 +69,11 @@
       const w = parseInt(d || "0", 10);
       if (u && w > bestW) { best = u; bestW = w; }
     }
-    return { url: best, w: bestW || urlWidth(best) };
+    return { url: best, w: bestW || urlWidth(best), orig: isOrig(best) };
   };
+
+  // 원본 > 리사이즈본, 같은 급이면 큰 쪽
+  const better = (a, b) => (a.orig !== b.orig ? a.orig : a.w > b.w);
 
   // ⭐먼저 본 걸 고수하지 않고 **더 큰 걸로 교체**한다 (2026-07-28 수정).
   //    캐러셀에서 아직 안 뜬 슬라이드는 저해상 placeholder만 들고 있다. 예전 코드는 그걸 그대로
@@ -75,11 +82,11 @@
   const collect = () => {
     for (const img of scope().querySelectorAll(SEL_IMG)) {
       if (img.naturalWidth && img.naturalWidth < 320) continue;
-      const { url, w } = bestFrom(img);
-      if (!url || !url.includes("cdninstagram")) continue;
-      const k = keyOf(url);
+      const pick = bestFrom(img);
+      if (!pick.url || !pick.url.includes("cdninstagram")) continue;
+      const k = keyOf(pick.url);
       const prev = found.get(k);
-      if (!prev || w > prev.w) found.set(k, { url, w });
+      if (!prev || better(pick, prev)) found.set(k, pick);
     }
   };
 
@@ -108,7 +115,8 @@
 
   const picks = [...found.values()];
   const urls = picks.map((p) => p.url);
-  const small = picks.filter((p) => p.w && p.w < 1000).length;
+  // 원본(꼬리표 없음)은 폭을 몰라도 작다고 보지 않는다 — 리사이즈본만 1000px 기준으로 센다
+  const small = picks.filter((p) => !p.orig && p.w && p.w < 1000).length;
   const box = document.createElement("div");
   box.style.cssText =
     "position:fixed;inset:auto 16px 16px auto;z-index:2147483647;width:340px;padding:16px;" +
@@ -157,11 +165,11 @@
     const im = document.createElement("img");
     im.src = p.url;
     im.style.cssText = "width:62px;height:62px;object-fit:cover;border-radius:6px;background:#f0f0f0";
-    const tag = document.createElement("div");   // 장별 가로폭 — 어느 장이 작은지 눈으로 짚인다
-    tag.textContent = p.w ? p.w + "px" : "?";
+    const tag = document.createElement("div");   // 장별 크기 — 어느 장이 작은지 눈으로 짚인다
+    tag.textContent = p.w ? p.w + "px" : p.orig ? "원본" : "?";
     tag.style.cssText =
       "text-align:center;font-size:10px;line-height:14px;color:" +
-      (p.w && p.w < 1000 ? "#c26a00;font-weight:700" : "#999");
+      (!p.orig && p.w && p.w < 1000 ? "#c26a00;font-weight:700" : "#999");
     cell.appendChild(im);
     cell.appendChild(tag);
     grid.appendChild(cell);
