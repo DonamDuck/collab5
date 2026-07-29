@@ -81,6 +81,38 @@ export function PhotoGrid({
             >
               ✕
             </button>
+            {/* ⭐첫 장이 대표 사진 = 검색 결과 썸네일. 어느 게 대표인지 화면에 안 적혀 있어서
+                순서를 바꿔야 할 이유조차 모르고 지나쳤다(QA #9). */}
+            {i === 0 && items.length > 1 && (
+              <span className="absolute left-1 top-1 z-10 rounded-pill bg-ink/60 px-1.5 text-[10px] font-medium text-white">
+                대표
+              </span>
+            )}
+            {/* ⭐순서 바꾸기 ← → — **HTML5 드래그는 터치에서 아예 안 먹는다.**
+                모바일에선 전부 지우고 다시 올리는 것 말곤 방법이 없었다(QA #9).
+                데스크탑에도 같이 둔다 — 드래그가 되더라도 한 칸씩 옮기는 건 버튼이 정확하다. */}
+            {items.length > 1 && (
+              <div className="absolute inset-x-0 bottom-0 z-10 flex justify-center gap-0.5 bg-ink/55 py-0.5">
+                <button
+                  type="button"
+                  onClick={() => onReorder(i, i - 1)}
+                  disabled={i === 0}
+                  aria-label={`${i + 1}번째 사진을 앞으로`}
+                  className="flex h-7 w-7 items-center justify-center rounded-sm text-[13px] leading-none text-white disabled:opacity-30"
+                >
+                  ←
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onReorder(i, i + 1)}
+                  disabled={i === items.length - 1}
+                  aria-label={`${i + 1}번째 사진을 뒤로`}
+                  className="flex h-7 w-7 items-center justify-center rounded-sm text-[13px] leading-none text-white disabled:opacity-30"
+                >
+                  →
+                </button>
+              </div>
+            )}
           </div>
         ))}
         {items.length < max && (
@@ -97,8 +129,17 @@ export function PhotoGrid({
           </label>
         )}
       </div>
+      {/* ⚠️ 안내를 기기별로 가른다 — 전엔 "끌어서 순서를 바꿀 수 있어요"가 모바일에도 떠서
+          **되지 않는 조작을 반복하게** 만들었다(QA #9). 드래그 안내는 데스크탑에만. */}
       {items.length > 1 && (
-        <p className="mt-1.5 text-[12px] text-faint">끌어서 순서를 바꿀 수 있어요.</p>
+        <>
+          <p className="mt-1.5 hidden text-[12px] text-faint sm:block">
+            끌어서, 또는 ← → 버튼으로 순서를 바꿀 수 있어요. 첫 번째 사진이 대표로 보여요.
+          </p>
+          <p className="mt-1.5 text-[12px] text-faint sm:hidden">
+            ← → 버튼으로 순서를 바꿀 수 있어요. 첫 번째 사진이 대표로 보여요.
+          </p>
+        </>
       )}
     </div>
   );
