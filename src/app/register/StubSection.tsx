@@ -16,16 +16,26 @@ export function StubSection({
   badge?: React.ReactNode; // 라벨 옆 표시(예: AI가 미리 채운 섹션이면 ✨배지)
 }) {
   if (!expanded) {
-    if (hiddenWhenCollapsed) return null;
+    // ⚠️ hiddenWhenCollapsed(시트 출신 섹션)라도 **값이 있으면 스텁을 반드시 남긴다**.
+    //    전엔 통째로 사라져서 폼에서 보지도·고치지도·지우지도 못하는데, 그 내용은
+    //    소개서에 실려 외부에 계속 공개됐다(QA 07-29, 데이터 손실). 재진입 경로가 없으면 안 된다.
+    //    아래 '담김' 배지도 그동안 이 return null에 막혀 도달조차 못 하던 코드다.
+    if (hiddenWhenCollapsed && !hasData) return null;
     return (
       <button
         type="button"
         id={id}
         onClick={onExpand}
-        className="w-full rounded-md border border-dashed border-border-strong bg-surface px-4 py-3.5 text-left scroll-mt-4"
+        // 빈 스텁 = 점선(‘여기 채우세요’ 입력 어피던스) / 담긴 스텁 = 실선(‘내용 있음, 탭하면 편집’).
+        // 정적 장식 점선은 지양하되 어피던스 점선은 유지 — 디자인 시스템 §점선 규칙.
+        className={`w-full rounded-md px-4 py-3.5 text-left scroll-mt-4 bg-surface ${
+          hasData ? "border border-hairline" : "border border-dashed border-border-strong"
+        }`}
       >
         <span className="text-[15px] font-medium text-body">
-          <span className="mr-1 font-semibold text-primary-on">+</span> {label}
+          {/* 이미 담긴 섹션에 '+'(추가) 기호는 뜻이 어긋난다 — 빈 상태에만 붙인다 */}
+          {!hasData && <span className="mr-1 font-semibold text-primary-on">+</span>}
+          {label}
         </span>
         {badge && <span className="ml-2 align-middle">{badge}</span>}
         {hasData && (
