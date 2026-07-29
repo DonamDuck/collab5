@@ -6,7 +6,7 @@
 import { useState, useTransition, useEffect, useRef } from "react";
 import { setMakerSavedAction, recordCollabRequestAction } from "@/lib/actions";
 import { resolveCollabChannel } from "@/lib/links";
-import { ScrollLock } from "@/components/ScrollLock";
+import { useDismissable } from "@/components/useDismissable";
 import { ReportSheet } from "./ReportSheet";
 
 // 로그인/가입 전에 눌렀던 의도를 보관하는 키(같은 탭 세션 한정) — 복귀 시 자동 재개.
@@ -48,6 +48,14 @@ export function MakerActionBar({
   const [toast, setToast] = useState<string | null>(null); // 복사 완료 토스트(3종 통일)
   const [selectedSlug, setSelectedSlug] = useState(viewerBrands[0]?.slug); // 함께 보낼 내 소개서
   const [pending, start] = useTransition();
+
+  // 오버레이 공통 동작(ESC·딤클릭·스크롤잠금·포커스 트랩·aria-modal) — 시트별로 정책이 다르다.
+  //  · 제안 시트 = 딤 클릭 허용(기존 동작). 훅이 "누르기 시작한 지점도 배경이어야 닫힘"으로 판정해,
+  //    메시지를 드래그로 선택하다 배경에서 손을 떼면 닫히던 사고는 사라진다(QA 07-29).
+  //  · 로그인 유도 얼럿 = 딤 클릭으로 안 닫힘(대표 정책). 단 ESC는 허용 — 키보드·스크린리더
+  //    사용자에겐 ESC가 사실상 유일한 탈출구다(대표 확정 07-29).
+  const proposeDialog = useDismissable(proposeOpen, { onClose: () => setProposeOpen(false) });
+  const loginDialog = useDismissable(loginOpen, { onClose: () => setLoginOpen(false), overlayClose: false });
 
   // 콜라보 연락 채널(인스타 DM 우선 → 홈페이지/카톡 → 없으면 null)
   const channel = resolveCollabChannel({ instagram, homepage });
@@ -395,11 +403,12 @@ export function MakerActionBar({
 
       {/* 콜라보 제안 시트 — 앱 내 채팅 준비 전까지 인스타 등으로 핸드오프 */}
       {proposeOpen && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 print:hidden" onClick={() => setProposeOpen(false)}>
-          <ScrollLock />
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 print:hidden" {...proposeDialog.overlayProps}>
+          {/* ⚠️ max-h(dvh)+스크롤 — 없으면 내용이 뷰포트보다 길 때 시트가 위로 넘쳐 제목과 닫기 X가
+              화면 밖으로 밀리는데, 배경 스크롤은 잠겨 있어 도달할 방법이 없다(QA 07-29). */}
           <div
-            className="relative w-full max-w-[640px] rounded-t-2xl border border-b-0 border-hairline bg-surface p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] shadow-e2"
-            onClick={(e) => e.stopPropagation()}
+            {...proposeDialog.panelProps}
+            className="relative max-h-[85dvh] w-full max-w-[640px] overflow-y-auto rounded-t-2xl border border-b-0 border-hairline bg-surface p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] shadow-e2"
           >
             {/* 우측 상단 닫기 */}
             <button
@@ -522,9 +531,11 @@ export function MakerActionBar({
 
       {/* 비로그인 → 로그인 유도 얼럿 (찜/제안 공용) */}
       {loginOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4">
-          <ScrollLock />
-          <div className="relative w-full max-w-sm rounded-lg border border-hairline bg-surface p-6 text-center shadow-e2">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4" {...loginDialog.overlayProps}>
+          <div
+            {...loginDialog.panelProps}
+            className="relative w-full max-w-sm rounded-lg border border-hairline bg-surface p-6 text-center shadow-e2"
+          >
             {/* 우측 상단 닫기 */}
             <button
               type="button"

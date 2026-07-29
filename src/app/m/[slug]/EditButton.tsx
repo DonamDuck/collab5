@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { verifyMakerPasswordAction } from "@/lib/actions";
-import { ScrollLock } from "@/components/ScrollLock";
+import { useDismissable } from "@/components/useDismissable";
 import { PasswordInput } from "@/components/PasswordInput";
 
 // 우상단 수정 버튼 — 소유자면 바로 / 비회원생성(비번 있음)이면 비번 모달 / 회원생성(비번 없음)이면 로그인 필요 얼럿.
@@ -21,6 +21,10 @@ export function EditButton({
   const [loginNeeded, setLoginNeeded] = useState(false);
   const [pw, setPw] = useState("");
   const [err, setErr] = useState("");
+  // 얼럿·비번 확인창 — 딤 클릭으론 안 닫힘(대표 정책), ESC는 허용.
+  // initialFocus: 열자마자 비번 칸에 커서가 들어간다(전엔 마우스로 칸을 한 번 눌러야 했다).
+  const loginDialog = useDismissable(loginNeeded, { onClose: () => setLoginNeeded(false), overlayClose: false });
+  const pwDialog = useDismissable(open, { onClose: () => setOpen(false), overlayClose: false, initialFocus: 'input[type="password"]' });
   const [pending, start] = useTransition();
 
   const go = () =>
@@ -60,9 +64,8 @@ export function EditButton({
         수정
       </button>
       {loginNeeded && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4">
-          <ScrollLock />
-          <div className="w-full max-w-sm rounded-lg border border-hairline bg-surface p-6 shadow-e2">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4" {...loginDialog.overlayProps}>
+          <div {...loginDialog.panelProps} className="w-full max-w-sm rounded-lg border border-hairline bg-surface p-6 shadow-e2">
             <p className="text-base font-bold break-keep text-ink">로그인이 필요해요</p>
             <p className="mt-1.5 text-sm leading-relaxed break-keep text-mute">
               이 소개서는 회원 계정으로 만들어졌어요. 수정하려면 만든 계정으로 로그인해주세요.
@@ -88,9 +91,8 @@ export function EditButton({
         </div>
       )}
       {open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4">
-          <ScrollLock />
-          <div className="w-full max-w-sm rounded-lg border border-hairline bg-surface p-6 shadow-e2">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4" {...pwDialog.overlayProps}>
+          <div {...pwDialog.panelProps} className="w-full max-w-sm rounded-lg border border-hairline bg-surface p-6 shadow-e2">
             <p className="text-base font-bold text-ink">소개서 수정</p>
             <p className="mt-1.5 text-sm text-mute">소개서 관리 비밀번호를 입력해주세요.</p>
             <PasswordInput

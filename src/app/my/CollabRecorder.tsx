@@ -12,6 +12,7 @@
 import { useState, useTransition } from "react";
 import { searchAction, recordCollabAction } from "@/lib/actions";
 import { uploadPhoto } from "@/lib/upload";
+import { useDismissable } from "@/components/useDismissable";
 import { PhotoGrid } from "../register/PhotoGrid";
 
 type MyBrand = { id: number; name: string };
@@ -23,6 +24,10 @@ const PHOTO_MAX = 5;
 
 export function CollabRecorder({ myBrands }: { myBrands: MyBrand[] }) {
   const [open, setOpen] = useState(false);
+  // 작성 중인 폼(8칸)이라 딤 클릭으로 닫지 않는다 — 배경을 실수로 터치하면 쓰던 내용이
+  // 확인 없이 통째로 사라졌다(대표 정책 + QA 07-29). 닫기는 ESC 또는 X 버튼으로.
+  // 훅이 배경 스크롤 잠금도 함께 건다(전엔 없어서 뒤 페이지가 같이 스크롤됐다).
+  const dialog = useDismissable(open, { onClose: () => setOpen(false), overlayClose: false });
   const [brandAId, setBrandAId] = useState<number>(myBrands[0]?.id ?? 0);
   const [q, setQ] = useState("");
   const [hits, setHits] = useState<Hit[]>([]);
@@ -119,13 +124,11 @@ export function CollabRecorder({ myBrands }: { myBrands: MyBrand[] }) {
       </button>
 
       {open && (
-        <div
-          className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 sm:items-center"
-          onClick={() => setOpen(false)}
-        >
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 sm:items-center" {...dialog.overlayProps}>
+          {/* max-h는 dvh — iOS Safari의 vh는 'URL바 숨은 큰 뷰포트' 기준이라 URL바가 떠 있으면 상단이 밀린다. */}
           <div
-            className="max-h-[88vh] w-full max-w-[520px] overflow-y-auto rounded-t-xl bg-surface p-5 sm:rounded-xl"
-            onClick={(e) => e.stopPropagation()}
+            {...dialog.panelProps}
+            className="max-h-[88dvh] w-full max-w-[520px] overflow-y-auto rounded-t-xl bg-surface p-5 sm:rounded-xl"
           >
             <div className="flex items-start justify-between gap-3">
               <div>

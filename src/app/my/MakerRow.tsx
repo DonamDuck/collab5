@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { deleteMakerAction, updateMakerFlagsAction } from "@/lib/actions";
 import { isDemoSlug } from "@/lib/demo";
-import { ScrollLock } from "@/components/ScrollLock";
+import { useDismissable } from "@/components/useDismissable";
 
 // /my 소개서 행 — 카드 클릭 시 소개서로 이동, 수정·삭제 + 검색노출·콜라보 토글(즉시 저장).
 export function MakerRow({
@@ -23,6 +23,9 @@ export function MakerRow({
 }) {
   const router = useRouter();
   const [confirming, setConfirming] = useState(false);
+  // 삭제 확인 얼럿 — 딤 클릭으론 안 닫힘(실수 방지, 대표 정책). ESC는 허용(잃을 내용이 없고
+  // 키보드·스크린리더 사용자에겐 사실상 유일한 탈출구).
+  const dialog = useDismissable(confirming, { onClose: () => setConfirming(false), overlayClose: false });
   const [pending, start] = useTransition();
 
   const del = () =>
@@ -79,9 +82,11 @@ export function MakerRow({
       </div>
 
       {confirming && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4">
-          <ScrollLock />
-          <div className="w-full max-w-sm rounded-lg border border-hairline bg-surface p-6 text-center shadow-e2">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4" {...dialog.overlayProps}>
+          <div
+            {...dialog.panelProps}
+            className="w-full max-w-sm rounded-lg border border-hairline bg-surface p-6 text-center shadow-e2"
+          >
             <p className="text-lg font-bold text-balance break-keep text-ink">소개서를 삭제할까요?</p>
             <p className="mt-2 text-[15px] leading-relaxed break-keep text-body">
               ‘{name}’ 소개서가 영구히 삭제돼요. 되돌릴 수 없어요.

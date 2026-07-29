@@ -6,7 +6,7 @@
 // sampleMode = 무소개서 유저 티저: fetch 없이 sample-report.json 렌더 + 위저드 CTA.
 // 스펙: docs/superpowers/specs/2026-07-25-collab-report-dna-design.md §4·§5
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ScrollLock } from "@/components/ScrollLock";
+import { useDismissable } from "@/components/useDismissable";
 import { track } from "@/lib/track";
 import type { CollabReportData } from "@/lib/types";
 import sampleData from "@/lib/sample-report.json";
@@ -156,6 +156,10 @@ export function ReportSheet({
     return () => window.clearInterval(t);
   }, [phase]);
 
+  // 오버레이 공통 동작(ESC·딤클릭·스크롤잠금·포커스 트랩·aria-modal) — 훅 규칙상 early return보다 위에서 호출.
+  // 리포트는 읽는 시트라 딤 클릭·ESC 둘 다 허용(작성 중인 내용이 없다).
+  const { overlayProps, panelProps } = useDismissable(open, { onClose });
+
   if (!open) return null;
 
   const sampleReport = sampleData.report as CollabReportData;
@@ -293,20 +297,16 @@ export function ReportSheet({
   );
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 print:hidden"
-      onClick={onClose}
-    >
-      <ScrollLock />
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 print:hidden" {...overlayProps}>
       {/* ⚠️ max-h는 **dvh** — iOS Safari의 vh는 'URL바 숨은 큰 뷰포트' 기준이라 URL바가 떠 있으면
           시트 상단(=닫기 버튼)이 URL바 아래로 밀려 안 눌린다(대표 제보 07-26). */}
       <div
+        {...panelProps}
         className={`relative max-h-[85dvh] w-full max-w-[640px] rounded-t-2xl border border-b-0 border-hairline bg-surface shadow-e2 ${
           isReportView
             ? "flex flex-col" // 고정 바 + 스크롤 영역 — overflow는 아래 스크롤 영역에만 준다
             : "overflow-y-auto p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))]"
         }`}
-        onClick={(e) => e.stopPropagation()}
       >
         {isReportView ? (
           <>

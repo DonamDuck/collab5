@@ -6,7 +6,7 @@
 import { useState, useEffect, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { claimMakerAction } from "@/lib/actions";
-import { ScrollLock } from "@/components/ScrollLock";
+import { useDismissable } from "@/components/useDismissable";
 import { PasswordInput } from "@/components/PasswordInput";
 
 export function ConnectProfileButton({ slug, loggedIn }: { slug: string; loggedIn: boolean }) {
@@ -16,6 +16,11 @@ export function ConnectProfileButton({ slug, loggedIn }: { slug: string; loggedI
   const [done, setDone] = useState(false);
   const [pw, setPw] = useState("");
   const [err, setErr] = useState("");
+  // 비번 입력창 = 딤 클릭 차단(대표 정책) + 열자마자 비번 칸 포커스. 완료 얼럿도 동일 정책, ESC는 허용.
+  const pwDialog = useDismissable(open, { onClose: () => setOpen(false), overlayClose: false, initialFocus: 'input[type="password"]' });
+  // ⚠️ 완료 얼럿은 setDone(false)만으론 부족하다 — closeDone이 URL의 ?connect=1을 정리하고
+  //    소유자 전환(연결 버튼 사라짐·수정 세션 인증)을 반영한다. ESC로 닫아도 같은 경로를 타야 한다.
+  const doneDialog = useDismissable(done, { onClose: () => closeDone(), overlayClose: false });
   const [pending, start] = useTransition();
 
   // 로그인 후 `?connect=1`로 복귀 → 로그인 상태면 비번 얼럿 자동 오픈.
@@ -62,9 +67,8 @@ export function ConnectProfileButton({ slug, loggedIn }: { slug: string; loggedI
       </button>
 
       {open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4">
-          <ScrollLock />
-          <div className="w-full max-w-sm rounded-lg border border-hairline bg-surface p-6 shadow-e2">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4" {...pwDialog.overlayProps}>
+          <div {...pwDialog.panelProps} className="w-full max-w-sm rounded-lg border border-hairline bg-surface p-6 shadow-e2">
             <p className="text-base font-bold break-keep text-ink">프로필에 연결하기</p>
             <p className="mt-1.5 text-sm leading-relaxed break-keep text-mute">
               이 소개서의 관리 비밀번호를 입력하면 지금 로그인한 계정에 연결돼요.
@@ -102,9 +106,8 @@ export function ConnectProfileButton({ slug, loggedIn }: { slug: string; loggedI
       )}
 
       {done && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4">
-          <ScrollLock />
-          <div className="w-full max-w-sm rounded-lg border border-hairline bg-surface p-6 text-center shadow-e2">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4" {...doneDialog.overlayProps}>
+          <div {...doneDialog.panelProps} className="w-full max-w-sm rounded-lg border border-hairline bg-surface p-6 text-center shadow-e2">
             <p className="text-base font-bold text-balance break-keep text-ink">🎉 소개서 연결 완료</p>
             <p className="mt-1.5 text-sm leading-relaxed break-keep text-mute">
               프로필 메뉴에서 언제든 내 소개서를 확인할 수 있어요.
