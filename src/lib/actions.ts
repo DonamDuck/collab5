@@ -363,6 +363,52 @@ export async function recordCollabRequestAction(
   }
 }
 
+/** ⭐성사된 콜라보 기록 — 북극성을 실제로 세는 자리. 스펙 = Obsidian [[성사-기록-계측]]
+ *
+ *  권한 규칙: **A(제안한 쪽)는 내 소개서여야 한다.** 이렇게 두면
+ *   ① 아무나 남의 브랜드끼리 성사를 지어낼 수 없고
+ *   ② 나중에 채팅에서 자동 기록될 때도 같은 규칙이 그대로 성립한다(각자 자기 쪽을 소유).
+ *  ⚠️ 대표가 **양쪽 다 소유하지 않은 쌍**(이미 지인에게 넘긴 소개서끼리)은 여기로 못 넣는다 →
+ *     그 경우는 Supabase에서 INSERT. 운영 노트에 템플릿을 둔다.
+ */
+export async function recordCollabAction(input: {
+  brandAId: number;
+  brandBId: number;
+  origin: "product" | "concierge";
+  title: string;
+  happenedOn?: string;
+  note?: string;
+}): Promise<{ error?: string }> {
+  const sessionUserId = await getSessionUserId();
+  if (!sessionUserId) return { error: "로그인이 필요해요." };
+  if (input.brandAId === input.brandBId) return { error: "서로 다른 두 브랜드를 골라주세요." };
+  const title = input.title.trim();
+  if (!title) return { error: "어떤 콜라보였는지 한 줄만 적어주세요." };
+
+  const a = await repo.getMakerById(input.brandAId);
+  if (!a || a.ownerUserId !== sessionUserId) return { error: "내 소개서 중에서 골라주세요." };
+  const b = await repo.getMakerById(input.brandBId);
+  if (!b) return { error: "상대 브랜드를 찾을 수 없어요." };
+
+  try {
+    await repo.recordCollab(
+      {
+        brandAId: a.id,
+        brandBId: b.id,
+        origin: input.origin,
+        title,
+        happenedOn: input.happenedOn || null,
+        note: (input.note ?? "").trim(),
+      },
+      sessionUserId
+    );
+    return {};
+  } catch {
+    // 조용히 성공한 척하면 북극성이 유실된다 — 실패는 반드시 화면에 띄운다.
+    return { error: "기록에 실패했어요. 표가 아직 없으면 SQL을 먼저 실행해주세요." };
+  }
+}
+
 /** 소개서 삭제 — 로그인 소유자만. /my에서 사용. 카드·지표는 FK CASCADE로 함께 삭제. */
 export async function deleteMakerAction(slug: string): Promise<{ error?: string }> {
   const maker = await repo.getMakerBySlug(slug);

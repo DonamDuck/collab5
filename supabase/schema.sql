@@ -168,6 +168,37 @@ create table collab_reports (
 create index idx_collab_reports_pair on collab_reports(from_brand_id, to_brand_id, created_at desc);
 alter table collab_reports enable row level security;
 
+-- ── ⭐성사된 콜라보 (북극성을 실제로 세는 자리) ──
+-- 왜 collab_requests의 컬럼이 아니라 별도 테이블인가:
+--   ① **컨시어지 성사는 요청 행이 아예 없다**(대표가 직접 소개해서 성사) — 컬럼이면 담을 곳이 없는데,
+--      미션상 첫 1~3건은 대부분 이 경우다.
+--   ② 요청 3번 끝에 성사되기도 한다 — 요청:성사가 1:1이 아니다.
+-- 스펙 = Obsidian [[성사-기록-계측]]
+create table collabs (
+  id           bigint generated always as identity primary key,
+  brand_a_id   bigint not null references brands(id) on delete cascade,   -- 먼저 제안한 쪽(기록자 소유)
+  brand_b_id   bigint not null references brands(id) on delete cascade,   -- 받은 쪽
+  status       text not null default 'agreed' check (status in ('agreed','done','cancelled')),
+                                              -- agreed=하기로 함 / done=실제로 함.
+                                              -- 지금 안 나누면 나중에 "합의 대비 실행률"을 소급할 수 없다.
+  origin       text not null check (origin in ('product','concierge')),
+                                              -- ⭐지표 순도 규칙([[미션-문제정의]]) — 이 태그가 이 표의 존재 이유.
+                                              -- 안 나누면 "성사 5건"이 전부 대표 주선이어도 제품 성과처럼 보인다.
+  request_id   bigint references collab_requests(id) on delete set null,  -- 이어진 제안(있으면). v1은 비워둠
+  title        text not null default '',      -- "무슨 콜라보였나" 한 줄
+  happened_on  date,                          -- 언제 (합의만 한 시점엔 null)
+  note         text not null default '',
+  recorded_by  bigint references users(user_id) on delete set null,
+  created_at   timestamptz not null default now(),
+  updated_at   timestamptz not null default now()
+);
+create index idx_collabs_pair   on collabs(brand_a_id, brand_b_id);
+create index idx_collabs_origin on collabs(origin, created_at desc);
+drop trigger if exists trg_collabs_updated on collabs;
+create trigger trg_collabs_updated before update on collabs
+  for each row execute function set_updated_at();
+alter table collabs enable row level security;
+
 -- ── 삭제 전파(CASCADE) 체인 ──
 --   auth.users ──CASCADE──▶ users ──CASCADE──▶ saved_brands
 --                                 └─SET NULL─▶ brands.owner_user_id / collab_requests.from_user_id / collab_reports.requested_by

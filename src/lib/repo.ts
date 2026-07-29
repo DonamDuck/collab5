@@ -3,7 +3,7 @@
 // (DB는 '공유 → 타인 열람(view) 루프 = 배포 시점'에 투입 — masterbrain 2026-06-21 결정)
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import type { BrandDna, CollabCard, CollabReportData, CollabReportListItem, CollabType, Maker, MakerStatus, Reaction, ViewEvent } from "./types";
+import type { BrandDna, Collab, CollabCard, CollabInput, CollabOrigin, CollabReportData, CollabReportListItem, CollabStatus, CollabType, Maker, MakerStatus, Reaction, ViewEvent } from "./types";
 import { kstIso } from "./time";
 
 export interface Repo {
@@ -38,6 +38,9 @@ export interface Repo {
   getLatestCollabReport(fromBrandId: number, toBrandId: number): Promise<{ report: CollabReportData; model: string; createdAt: string } | null>;
   insertCollabReport(r: { fromBrandId: number; toBrandId: number; requestedBy: number | null; report: CollabReportData; model: string }): Promise<void>;
   listCollabReportsByUser(userId: number): Promise<CollabReportListItem[]>; // /my 아카이브 — 쌍별 최신 1건
+  // ⭐성사된 콜라보 = 북극성. 스펙 = Obsidian [[성사-기록-계측]]
+  recordCollab(input: CollabInput, recordedBy: number | null): Promise<void>;
+  listCollabsForBrands(brandIds: number[]): Promise<Collab[]>; // /my — 내 소개서가 한쪽이라도 낀 성사
 }
 
 const now = () => kstIso(); // 시각 표기 = KST(+09:00), lib/time.ts
@@ -512,6 +515,31 @@ class InMemoryRepo implements Repo {
     }
     return items.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
   }
+  // ── 성사된 콜라보 ──
+  private collabs: (Collab & { recordedBy: number | null })[] = [];
+  async recordCollab(input: CollabInput, recordedBy: number | null): Promise<void> {
+    const a = this.makers.find((m) => m.id === input.brandAId);
+    const b = this.makers.find((m) => m.id === input.brandBId);
+    if (!a || !b) throw new Error("brand-not-found");
+    this.collabs.push({
+      id: this.collabs.length + 1,
+      brandAId: a.id, brandAName: a.name, brandASlug: a.slug,
+      brandBId: b.id, brandBName: b.name, brandBSlug: b.slug,
+      status: input.status ?? "agreed",
+      origin: input.origin,
+      title: input.title,
+      happenedOn: input.happenedOn ?? undefined,
+      note: input.note ?? "",
+      createdAt: now(),
+      recordedBy,
+    });
+  }
+  async listCollabsForBrands(brandIds: number[]): Promise<Collab[]> {
+    const set = new Set(brandIds);
+    return this.collabs
+      .filter((c) => set.has(c.brandAId) || set.has(c.brandBId))
+      .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+  }
 }
 
 // ── Supabase DB row shapes (snake_case → camelCase 매핑용) ──
@@ -820,6 +848,60 @@ class SupabaseRepo implements Repo {
       });
     }
     return items;
+  }
+  // ── 성사된 콜라보 ──
+  async recordCollab(input: CollabInput, recordedBy: number | null): Promise<void> {
+    // ⚠️ 여기서 실패를 삼키면 북극성이 조용히 유실된다 — 던져서 UI가 "기록 실패"를 말하게 한다.
+    const { error } = await this.db.from("collabs").insert({
+      brand_a_id: input.brandAId,
+      brand_b_id: input.brandBId,
+      status: input.status ?? "agreed",
+      origin: input.origin,
+      title: input.title,
+      happened_on: input.happenedOn || null,
+      note: input.note ?? "",
+      recorded_by: recordedBy,
+    });
+    if (error) {
+      console.error(`[repo] recordCollab failed ${input.brandAId}↔${input.brandBId}: ${error.message}`);
+      throw new Error(error.message);
+    }
+  }
+  async listCollabsForBrands(brandIds: number[]): Promise<Collab[]> {
+    if (brandIds.length === 0) return [];
+    const ids = brandIds.join(",");
+    const { data, error } = await this.db
+      .from("collabs")
+      .select(
+        "id, brand_a_id, brand_b_id, status, origin, title, happened_on, note, created_at, " +
+          "brand_a:brands!collabs_brand_a_id_fkey(slug, name), " +
+          "brand_b:brands!collabs_brand_b_id_fkey(slug, name)"
+      )
+      .or(`brand_a_id.in.(${ids}),brand_b_id.in.(${ids})`)
+      .order("created_at", { ascending: false })
+      .limit(200);
+    // 읽기는 **부드럽게 실패**한다 — 테이블이 아직 없어도(SQL 실행 전 배포) /my 전체가 깨지면 안 된다.
+    if (error) {
+      console.error(`[repo] listCollabsForBrands failed: ${error.message}`);
+      return [];
+    }
+    type Row = {
+      id: number; brand_a_id: number; brand_b_id: number; status: CollabStatus; origin: CollabOrigin;
+      title: string; happened_on: string | null; note: string | null; created_at: string;
+      brand_a: { slug: string; name: string } | null;
+      brand_b: { slug: string; name: string } | null;
+    };
+    return ((data ?? []) as unknown as Row[])
+      .filter((r) => r.brand_a && r.brand_b)
+      .map((r) => ({
+        id: r.id,
+        brandAId: r.brand_a_id, brandAName: r.brand_a!.name, brandASlug: r.brand_a!.slug,
+        brandBId: r.brand_b_id, brandBName: r.brand_b!.name, brandBSlug: r.brand_b!.slug,
+        status: r.status, origin: r.origin, title: r.title,
+        happenedOn: r.happened_on ?? undefined,
+        note: r.note ?? "",
+        createdAt: r.created_at,
+      }));
   }
 }
 
