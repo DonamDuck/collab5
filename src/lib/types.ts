@@ -82,7 +82,7 @@ export interface Maker {
   collabHistory: CollabHistory[]; // 함께한 콜라보 이력
   description: string;    // 자세히 소개 "우리는 이런 브랜드에요" (DB=description, 구 trust.description)
   story: string;          // 왜 시작했나
-  activities: Activity[];  // 대표 활동 최대 3
+  activities: Activity[];  // 대표 활동 최대 5 (register 폼 상한. 콜라보 이력도 동일하게 5)
   offersDescription: string; // 협업 직접 설명 (DB=offers_description, 구 offers_note)
   seeksDescription: string;  // 파트너 직접 설명 (DB=seeks_description, 구 seeks_note)
   photos: string[]; // 브랜드 사진(카드·프로필 슬라이드용). MVP=리사이즈 data URL

@@ -334,7 +334,7 @@ function RegisterForm() {
     setCustomAudience("");
   };
 
-  // ── 콜라보 이력 (활동과 동일한 인라인 카드 패턴, 최대 3세트) ──
+  // ── 콜라보 이력 (활동과 동일한 인라인 카드 패턴, 최대 5세트) ──
   // 카드 순서변경(↑↓·드래그) 후 이동한 자리로 부드럽게 스크롤 — 수동 스크롤 불필요.
   // id는 위치 기반(`${idBase}-${to}`)이라 재정렬 후 그 자리에 이동한 카드가 있음.
   const scrollCardTo = (idBase: string, to: number) => {
@@ -446,7 +446,7 @@ function RegisterForm() {
       setCollabHistory((p) => p.map((h, j) => (j === i ? { ...h, photos: f(h.photos) } : h)))
     );
 
-  // ── 대표 활동 (최대 3세트) ──
+  // ── 대표 활동 (최대 5세트) ──
   const addActivity = () =>
     setActivities((p) => (p.length >= 5 ? p : [...p, { title: "", desc: "", photos: [], link: "" }]));
   const moveActivity = (from: number, to: number) => {
@@ -641,7 +641,7 @@ function RegisterForm() {
     setWizardOpen(true);
   };
 
-  // 힌트 '이 내용으로 시작하기' — 빈 카드 우선 채움, 없으면 새 카드(최대 3), 꽉 차면 불가.
+  // 힌트 '이 내용으로 시작하기' — 빈 카드 우선 채움, 없으면 새 카드(최대 5), 꽉 차면 불가.
   // inject* = 힌트 값 직접 주입: 위저드 ⑤스텝 즉시 적용은 setActHints 직후라 state 힌트를
   // 못 읽는 타이밍이므로 값 기반으로 분리(functional setState라 연속 주입도 안전).
   const injectActHint = (h: ActivityHint) => {
@@ -682,7 +682,7 @@ function RegisterForm() {
   const canApplyCollabHint =
     collabHistory.some(
       (c) => !c.partner.trim() && !c.desc.trim() && !c.types.length && !c.photos.length
-    ) || collabHistory.length < 3;
+    ) || collabHistory.length < 5; // ⚠️ 상한(5)과 같아야 한다 — injectCollabHint도 `< 5`로 새 카드를 붙인다
 
   // 위저드가 고른 항목만 폼에 반영(검수 게이트). AI는 '초안'만 — 사용자가 확인·수정 후 저장.
   // ⑤스텝(찾은 이야기)에서 체크한 힌트(fill.selectedHints)는 즉시 적용 — never-overwrite:
@@ -1661,7 +1661,7 @@ function RegisterForm() {
           onExpand={() => openSection("collabs")}
           onCollapse={() => closeSection("collabs")}
         >
-          <p className="mb-4 -mt-4 text-sm text-mute">선택 · 최대 3개 · 지난 콜라보를 더하면 “검증된 파트너”라는 신호가 돼요.</p>
+          <p className="mb-4 -mt-4 text-sm text-mute">선택 · 최대 5개 · 지난 콜라보를 더하면 “검증된 파트너”라는 신호가 돼요.</p>
           <div>
 
             {/* [비활성] 미선택 콜라보 힌트 재노출 배너 — AI 플로우에서 안 고른 추천은 부정확할 수
