@@ -52,14 +52,21 @@ function balanceQuotes(s: string): string {
   return out.replace(/\s{2,}/g, " ").trim();
 }
 
+// 폼이 들고 있는 사진 한 장. 선택 즉시 Storage 업로드 → 제출 시 URL만 전송.
+//   uploading = 올리는 중(objectURL 프리뷰)  /  failed = 실패 사유(타일에 그대로 보여줄 짧은 말)
+//   file      = 재시도용 원본 핸들. 실패해도 파일을 다시 고르지 않게.
+// ⚠️ `failed`인 항목의 url은 **blob:** 이다 — 제출·임시저장에 절대 섞이면 안 된다(`uploadedUrls`·`keepPhotos`).
+type Ph = { url: string; uploading?: boolean; failed?: string; file?: File };
+const uploadedUrls = (ps: Ph[]) => ps.filter((p) => !p.uploading && !p.failed).map((p) => p.url);
+
 // 편집 중 콜라보 이력 — 활동(activities)과 동일한 인라인 카드 패턴.
-// photos는 {url,uploading?} — 선택 즉시 Storage 업로드, 제출 시 URL만 전송. typeInput·typeInputOpen은 UI 로컬 상태(전송 제외).
+// typeInput·typeInputOpen은 UI 로컬 상태(전송 제외).
 type HistItem = {
   partner: string;
   types: string[];
   desc: string;
   year: string;
-  photos: { url: string; uploading?: boolean }[];
+  photos: Ph[];
   link: string; // 관련 링크(블로그·후기 등, 선택)
   typeInput: string;
   typeInputOpen: boolean; // '+ 유형 직접 추가' 토글(입력창 노출 여부)
@@ -182,11 +189,11 @@ function RegisterForm() {
   const [mapUrlEditing, setMapUrlEditing] = useState(false);
   const [description, setDescription] = useState("");
   const [address, setAddress] = useState("");
-  const [photos, setPhotos] = useState<{ url: string; uploading?: boolean }[]>([]);
+  const [photos, setPhotos] = useState<Ph[]>([]);
   // ── 소개서 개편 신규 필드 ──
   const [story, setStory] = useState("");
   const [activities, setActivities] = useState<
-    { title: string; desc: string; photos: { url: string; uploading?: boolean }[]; link: string }[]
+    { title: string; desc: string; photos: Ph[]; link: string }[]
   >([{ title: "", desc: "", photos: [], link: "" }]);
   // 카드 순서변경(드래그·↑↓) 상태 — 활동·콜라보 각각.
   const [actDnd, setActDnd] = useState<DndState>(emptyDnd);
@@ -365,39 +372,61 @@ function RegisterForm() {
           : { ...h, typeInput: "" };
       })
     );
-  // 선택 즉시 업로드: objectURL 프리뷰+스피너 → 완료 시 publicUrl로 교체, 실패 시 제거
-  type Ph = { url: string; uploading?: boolean };
+  // 선택 즉시 업로드: objectURL 프리뷰+스피너 → 완료 시 publicUrl로 교체, 실패 시 **실패 타일로 남긴다**.
+  //
+  // ⚠️ 전엔 실패하면 타일을 지우고 알럿만 띄웠다 — 여러 장을 한꺼번에 올리면
+  //    "몇 번째 사진이 실패했는지"를 알 길이 없고, 사용자는 다시 파일 고르기부터 해야 했다.
+  //    이제 그 자리에 실패 타일이 남고 [다시 올리기]로 그 파일만 재시도한다(파일 핸들 보관).
   const uploadInto = (
     files: FileList | null,
     room: number,
     maxDim: number,
     update: (f: (p: Ph[]) => Ph[]) => void
   ) => {
-    let alerted = false; // 한 번에 여러 장이 실패해도 알럿은 한 번만(알럿 폭탄 방지)
     Array.from(files ?? [])
       .filter((f) => f.type.startsWith("image/"))
       .slice(0, Math.max(0, room))
       .forEach((f) => {
         const preview = URL.createObjectURL(f);
-        update((p) => [...p, { url: preview, uploading: true }]);
-        uploadPhoto(f, maxDim)
-          // 사용자가 먼저 ✕로 지웠으면 이 map은 찾을 항목이 없어 아무 일도 안 한다(안전)
-          .then((url) => update((p) => p.map((x) => (x.url === preview ? { url } : x))))
-          .catch((e: unknown) => {
-            update((p) => p.filter((x) => x.url !== preview));
-            // ⭐어느 단계에서 멈췄는지 콘솔에 남긴다(timeout:sign|resize|upload).
-            //   다음에 또 멈추면 이 한 줄이 원인 특정의 출발점이다 — 지금은 트리거를 모른다.
-            console.warn("[photo-upload]", (e as Error)?.message, f.name, f.size, f.type);
-            if (alerted) return;
-            alerted = true;
-            // 왜 실패했는지 구분해서 말해준다 — "다시 시도"만으론 같은 상황이 반복된다
-            alert(
-              String((e as Error)?.message).startsWith("timeout")
-                ? "사진 업로드가 너무 오래 걸려 취소했어요. 네트워크 상태를 확인하고 다시 올려주세요."
-                : "사진 업로드에 실패했어요. 다시 시도해주세요."
-            );
-          });
+        update((p) => [...p, { url: preview, uploading: true, file: f }]);
+        runUpload(f, preview, maxDim, update);
       });
+  };
+  // 한 장 올리기 — 최초 업로드와 '다시 올리기'가 같은 경로를 탄다.
+  const runUpload = (
+    file: File,
+    preview: string,
+    maxDim: number,
+    update: (f: (p: Ph[]) => Ph[]) => void
+  ) => {
+    uploadPhoto(file, maxDim)
+      // 사용자가 먼저 ✕로 지웠으면 이 map은 찾을 항목이 없어 아무 일도 안 한다(안전)
+      .then((url) => update((p) => p.map((x) => (x.url === preview ? { url } : x))))
+      .catch((e: unknown) => {
+        const msg = String((e as Error)?.message ?? "");
+        // ⭐어느 단계에서 멈췄는지 콘솔에 남긴다(timeout:sign|resize|upload).
+        //   다음에 또 멈추면 이 한 줄이 원인 특정의 출발점이다 — 지금은 트리거를 모른다.
+        console.warn("[photo-upload]", msg, file.name, file.size, file.type);
+        update((p) =>
+          p.map((x) =>
+            x.url === preview
+              ? {
+                  ...x,
+                  uploading: false,
+                  // 왜 실패했는지 타일에 적는다 — "실패"만으론 같은 상황이 반복된다
+                  failed: msg.startsWith("timeout") ? "시간 초과" : "업로드 실패",
+                }
+              : x
+          )
+        );
+      });
+  };
+  // 실패 타일 재시도 — 보관해둔 File로 같은 자리에서 다시 올린다.
+  const retryPhoto = (ps: Ph[], i: number, maxDim: number, update: (f: (p: Ph[]) => Ph[]) => void) => {
+    const it = ps[i];
+    if (!it?.file) return;
+    update((p) => p.map((x, j) => (j === i ? { ...x, uploading: true, failed: undefined } : x)));
+    runUpload(it.file, it.url, maxDim, update);
   };
 
   const addHistPhotos = (i: number, files: FileList | null) =>
@@ -411,6 +440,10 @@ function RegisterForm() {
   const moveHistPhoto = (i: number, from: number, to: number) =>
     setCollabHistory((p) =>
       p.map((h, j) => (j === i ? { ...h, photos: reorder(h.photos, from, to) } : h))
+    );
+  const retryHistPhoto = (i: number, k: number) =>
+    retryPhoto(collabHistory[i]?.photos ?? [], k, 800, (f) =>
+      setCollabHistory((p) => p.map((h, j) => (j === i ? { ...h, photos: f(h.photos) } : h)))
     );
 
   // ── 대표 활동 (최대 3세트) ──
@@ -433,6 +466,10 @@ function RegisterForm() {
   const moveActPhoto = (i: number, from: number, to: number) =>
     setActivities((p) =>
       p.map((a, j) => (j === i ? { ...a, photos: reorder(a.photos, from, to) } : a))
+    );
+  const retryActPhoto = (i: number, k: number) =>
+    retryPhoto(activities[i]?.photos ?? [], k, 800, (f) =>
+      setActivities((p) => p.map((a, j) => (j === i ? { ...a, photos: f(a.photos) } : a)))
     );
   const removeActivity = (i: number) =>
     setActivities((p) => p.filter((_, j) => j !== i));
@@ -878,7 +915,7 @@ function RegisterForm() {
   // ── 임시저장(localStorage) ── 대표 확정 A안(2026-07-29). 훅 = ./useDraftAutosave
   //    새로고침·뒤로가기·탭 닫기로 초안이 통째로 날아가던 걸 막는다. **자동 복구는 안 한다**(배너로 물음).
   //    사진은 이미 Storage에 올라가 URL만 남으므로 가볍다 — 단 data URL(로컬 mock)은 걸러야 5MB 쿼터를 안 터뜨린다.
-  const keepPhotos = (ps: { url: string; uploading?: boolean }[]) =>
+  const keepPhotos = (ps: Ph[]) =>
     ps.filter((x) => !x.uploading && /^https?:\/\//.test(x.url)).map((x) => ({ url: x.url }));
   const draftSnapshot = {
     name, oneLiner, description, story, offersNote, seeksNote,
@@ -1008,13 +1045,13 @@ function RegisterForm() {
       const filledHist = collabHistory.filter(
         (h) => h.partner.trim() || h.types.length || h.desc.trim() || h.photos.length || h.link.trim()
       );
-      const photoUrls = photos.filter((p) => !p.uploading).map((p) => p.url);
+      const photoUrls = uploadedUrls(photos);
       const activityOut = activities
         .filter((a) => a.title.trim() || a.desc.trim() || a.photos.length || a.link.trim())
         .map((a) => ({
           title: a.title.trim(),
           desc: a.desc.trim(),
-          photos: a.photos.filter((p) => !p.uploading).map((p) => p.url),
+          photos: uploadedUrls(a.photos),
           link: a.link.trim() || undefined,
         }));
       const historyOut = filledHist.map((h) => ({
@@ -1022,7 +1059,7 @@ function RegisterForm() {
         types: h.types,
         desc: h.desc.trim(),
         year: h.year || undefined,
-        photos: h.photos.filter((p) => !p.uploading).map((p) => p.url),
+        photos: uploadedUrls(h.photos),
         link: h.link.trim() || undefined,
       }));
       // 사진 base64는 배열에 문자열로 담으면 React Flight 배열 한도(1e6)에 걸린다.
@@ -1331,6 +1368,7 @@ function RegisterForm() {
               onAdd={onPhotos}
               onRemove={(i) => setPhotos((ps) => ps.filter((_, j) => j !== i))}
               onReorder={(from, to) => setPhotos((ps) => reorder(ps, from, to))}
+              onRetry={(i) => retryPhoto(photos, i, 1000, setPhotos)}
             />
           </div>
 
@@ -1565,6 +1603,7 @@ function RegisterForm() {
                     onAdd={(files) => addActPhotos(i, files)}
                     onRemove={(k) => removeActPhoto(i, k)}
                     onReorder={(from, to) => moveActPhoto(i, from, to)}
+                    onRetry={(k) => retryActPhoto(i, k)}
                   />
                 </CollapsedPhotos>
                 <CollapsedLink hasLink={!!act.link.trim()}>
@@ -1761,6 +1800,7 @@ function RegisterForm() {
                         onAdd={(files) => addHistPhotos(i, files)}
                         onRemove={(k) => removeHistPhoto(i, k)}
                         onReorder={(from, to) => moveHistPhoto(i, from, to)}
+                        onRetry={(k) => retryHistPhoto(i, k)}
                       />
                     </CollapsedPhotos>
                     <CollapsedLink hasLink={!!h.link.trim()}>

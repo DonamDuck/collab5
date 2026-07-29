@@ -9,12 +9,15 @@ export function PhotoGrid({
   onAdd,
   onRemove,
   onReorder,
+  onRetry,
 }: {
-  items: { url: string; uploading?: boolean }[];
+  items: { url: string; uploading?: boolean; failed?: string }[];
   max: number;
   onAdd: (files: FileList | null) => void;
   onRemove: (i: number) => void;
   onReorder: (from: number, to: number) => void;
+  /** 실패한 사진 다시 올리기 — 보관해둔 원본 파일로 재시도한다. */
+  onRetry?: (i: number) => void;
 }) {
   const [drag, setDrag] = useState<number | null>(null);
 
@@ -39,11 +42,27 @@ export function PhotoGrid({
               setDrag(null);
             }}
             className={`relative h-20 w-20 shrink-0 cursor-grab overflow-hidden rounded-md border transition-colors active:cursor-grabbing ${
-              drag === i ? "border-primary opacity-40" : "border-hairline"
+              drag === i
+                ? "border-primary opacity-40"
+                : it.failed
+                  ? "border-red-400"
+                  : "border-hairline"
             }`}
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={it.url} alt="" className="pointer-events-none h-full w-full object-cover" />
+            {/* 실패 타일 — 자리를 지키고 '다시 올리기'를 준다. 여러 장을 올렸을 때
+                **어느 사진이 실패했는지**가 보이는 게 핵심(전엔 타일이 사라져 알 수 없었다). */}
+            {it.failed && (
+              <button
+                type="button"
+                onClick={() => onRetry?.(i)}
+                className="absolute inset-0 flex flex-col items-center justify-center gap-0.5 bg-ink/65 px-1 text-center text-white"
+              >
+                <span className="text-[11px] font-semibold leading-tight">{it.failed}</span>
+                <span className="text-[11px] underline underline-offset-2">다시 올리기</span>
+              </button>
+            )}
             {it.uploading && (
               // pointer-events-none — 이 덮개가 아래 ✕ 버튼의 클릭을 먹으면 안 된다
               <span className="pointer-events-none absolute inset-0 flex items-center justify-center bg-ink/30">
