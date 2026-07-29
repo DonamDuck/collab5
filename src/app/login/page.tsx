@@ -62,33 +62,44 @@ function LoginForm() {
           로그인 설정이 아직 준비되지 않았어요. (로컬 환경)
         </p>
       )}
-      <div className="mt-6 space-y-3">
-        <input
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="이메일"
-          className="h-11 w-full rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
-        />
-        <PasswordInput
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.nativeEvent.isComposing) submit();
-          }}
-          placeholder="비밀번호"
-          className="h-11 w-full rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
-        />
-      </div>
-      {err && <p className="mt-2 text-sm text-red-600">{err}</p>}
-      <button
-        type="button"
-        onClick={submit}
-        disabled={pending}
-        className="mt-4 h-12 w-full rounded-md bg-primary text-base font-medium text-primary-on disabled:opacity-50"
+      {/* ⭐<form>으로 감싸는 이유(07-29): ①Enter로 제출 ②비밀번호 매니저(1Password·iCloud·크롬)가
+          '로그인 폼'으로 인식해 저장·자동입력이 뜬다 ③모바일 키보드에 '이동' 키가 생긴다.
+          autoComplete 토큰이 없으면 매니저가 필드를 못 알아본다 — username/current-password가 그 계약이다.
+          ⚠️form 안 <button>은 기본 type=submit이라, 제출이 아닌 버튼은 반드시 type="button"(아래 카카오). */}
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (!pending) submit(); // 연타·IME 확정 Enter가 이중 제출로 새지 않게
+        }}
       >
-        {pending ? "로그인 중…" : "로그인"}
-      </button>
+        <div className="mt-6 space-y-3">
+          <input
+            type="email"
+            name="email"
+            autoComplete="username"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="이메일"
+            className="h-11 w-full rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
+          />
+          <PasswordInput
+            name="password"
+            autoComplete="current-password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="비밀번호"
+            className="h-11 w-full rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
+          />
+        </div>
+        {err && <p className="mt-2 text-sm text-red-600">{err}</p>}
+        <button
+          type="submit"
+          disabled={pending}
+          className="mt-4 h-12 w-full rounded-md bg-primary text-base font-medium text-primary-on disabled:opacity-50"
+        >
+          {pending ? "로그인 중…" : "로그인"}
+        </button>
+      </form>
       {KAKAO_ON && (
         <button
           type="button"

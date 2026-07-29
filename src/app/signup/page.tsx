@@ -103,10 +103,20 @@ export default function SignupPage() {
       <h1 className="text-2xl font-bold tracking-tight text-ink">회원가입</h1>
       <p className="mt-2 text-[15px] text-mute">브랜드 계정을 만들고 소개서를 관리해보세요.</p>
 
+      {/* ⭐<form> — Enter 제출 + 비밀번호 매니저가 '가입 폼'으로 인식(new-password면 '강력한 비번 제안'이 뜬다).
+          ⚠️form 안 <button>은 기본 submit이라 '지우기'·'보기' 같은 건 type="button"이어야 한다(확인 완료). */}
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (!pending && !imgUploading && !hasDup) submit();
+        }}
+      >
       <div className="mt-6 space-y-4">
         <Field label="이메일">
           <input
             type="email"
+            name="email"
+            autoComplete="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="you@brand.com"
@@ -116,6 +126,8 @@ export default function SignupPage() {
         </Field>
         <Field label="비밀번호">
           <PasswordInput
+            name="new-password"
+            autoComplete="new-password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="8자 이상, 특수문자 1개 이상"
@@ -123,7 +135,10 @@ export default function SignupPage() {
           />
         </Field>
         <Field label="비밀번호 확인">
+          {/* 확인칸도 new-password — 매니저가 '같은 새 비번'으로 인식해 양쪽에 함께 채워준다 */}
           <PasswordInput
+            name="new-password-confirm"
+            autoComplete="new-password"
             value={password2}
             onChange={(e) => setPassword2(e.target.value)}
             placeholder="한 번 더 입력해주세요"
@@ -133,6 +148,8 @@ export default function SignupPage() {
         <Field label="휴대폰번호">
           <input
             type="tel"
+            name="phone"
+            autoComplete="tel"
             inputMode="numeric"
             value={phone}
             onChange={(e) => setPhone(formatPhone(e.target.value))}
@@ -144,6 +161,8 @@ export default function SignupPage() {
         </Field>
         <Field label="브랜드명">
           <input
+            name="organization"
+            autoComplete="organization"
             value={brandName}
             onChange={(e) => setBrandName(e.target.value)}
             placeholder="예: 캔버스가든"
@@ -200,13 +219,13 @@ export default function SignupPage() {
 
       {err && <p className="mt-3 text-sm text-red-600">{err}</p>}
       <button
-        type="button"
-        onClick={submit}
+        type="submit"
         disabled={pending || imgUploading || hasDup}
         className="mt-5 h-12 w-full rounded-md bg-primary text-base font-medium text-primary-on disabled:opacity-50"
       >
         {pending ? "가입 중…" : "가입하기"}
       </button>
+      </form>
       <p className="mt-4 text-center text-sm text-mute">
         이미 계정이 있나요?{" "}
         <Link href="/login" className="font-medium text-primary-on underline-offset-2 hover:underline">

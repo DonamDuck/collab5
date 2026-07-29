@@ -33,25 +33,31 @@ export default function ResetPasswordPage() {
           <p className="mt-2 text-[15px] text-mute">
             가입한 이메일을 입력하면 재설정 링크를 보내드려요.
           </p>
+          {/* <form> — Enter 제출 + 매니저가 저장된 계정 이메일을 채워준다(username 토큰) */}
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (!pending && email.trim()) submit();
+            }}
+          >
           <input
             type="email"
+            name="email"
+            autoComplete="username"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.nativeEvent.isComposing) submit();
-            }}
             placeholder="이메일"
             className="mt-5 h-11 w-full rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
           />
           {err && <p className="mt-2 text-sm text-red-600">{err}</p>}
           <button
-            type="button"
-            onClick={submit}
+            type="submit"
             disabled={pending || !email.trim()}
             className="mt-4 h-12 w-full rounded-md bg-primary text-base font-medium text-primary-on disabled:opacity-50"
           >
             {pending ? "보내는 중…" : "재설정 링크 보내기"}
           </button>
+          </form>
         </>
       )}
       <p className="mt-4 text-center text-sm">

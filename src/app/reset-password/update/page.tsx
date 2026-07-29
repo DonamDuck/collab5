@@ -39,14 +39,25 @@ export default function UpdatePasswordPage() {
   return (
     <main className="mx-auto w-full max-w-[400px] px-4 py-14 sm:px-6">
       <h1 className="text-2xl font-bold tracking-tight text-ink">새 비밀번호 설정</h1>
+      {/* <form> — Enter 제출 + 매니저의 '강력한 비번 제안'·저장 갱신이 동작(new-password 토큰) */}
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (!pending && pw && pw2) submit();
+        }}
+      >
       <div className="mt-5 space-y-3">
         <PasswordInput
+          name="new-password"
+          autoComplete="new-password"
           value={pw}
           onChange={(e) => setPw(e.target.value)}
           placeholder="새 비밀번호 (8자 이상, 특수문자 포함)"
           className="h-11 w-full rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
         />
         <PasswordInput
+          name="new-password-confirm"
+          autoComplete="new-password"
           value={pw2}
           onChange={(e) => setPw2(e.target.value)}
           placeholder="새 비밀번호 확인"
@@ -55,13 +66,13 @@ export default function UpdatePasswordPage() {
       </div>
       {err && <p className="mt-2 text-sm text-red-600">{err}</p>}
       <button
-        type="button"
-        onClick={submit}
+        type="submit"
         disabled={pending || !pw || !pw2}
         className="mt-4 h-12 w-full rounded-md bg-primary text-base font-medium text-primary-on disabled:opacity-50"
       >
         {pending ? "저장 중…" : "비밀번호 변경"}
       </button>
+      </form>
     </main>
   );
 }
