@@ -14,6 +14,16 @@ const PENDING_SAVE_KEY = "collab5:pendingSave";
 const PENDING_PROPOSE_KEY = "collab5:pendingPropose";
 const PENDING_REPORT_KEY = "collab5:pendingReport";
 
+// 🚧🚧 임시 스위치 (2026-07-29, 대표 콜라보 분석 테스트) 🚧🚧
+//   내 소개서 페이지에서도 [콜라보 분석]·[콜라보 시작하기]가 보이게 소유자 모드를 잠시 끈다.
+//   ⭐**되돌릴 때는 이 한 줄만 `true`로** — 아래 두 군데(하트 숨김·액션 분기)가 이 값을 본다.
+//
+//   ⚠️ 지표는 안전하다: 자기 자신에게 제안해도 `recordCollabRequestAction`의 서버 가드(`ownsBrand`)가
+//      no-op이라 `collab_requests`엔 안 쌓인다. **UI만 열고 서버 안전망은 그대로 둔 것**이다.
+//   ⚠️ 다만 **리포트는 진짜로 생성된다**(유료 콜 + `collab_reports`에 캐시 + `/my` 아카이브에 노출).
+//      테스트로 만든 쌍은 나중에 대표가 직접 지우거나 그대로 둘지 판단할 것.
+const OWNER_MODE = false; // ← 테스트 끝나면 true
+
 export function MakerActionBar({
   slug,
   makerId,
@@ -41,6 +51,8 @@ export function MakerActionBar({
    *  (07-29 디자인팀 QA 지적). 서버에도 같은 가드가 있고 여긴 화면 층. */
   isOwner?: boolean;
 }) {
+  // 🚧 위 OWNER_MODE 스위치를 통과시킨 값 — 화면 분기는 전부 이걸 본다(원래는 isOwner 그대로였다)
+  const ownerUi = isOwner && OWNER_MODE;
   const [saved, setSaved] = useState(initialSaved);
   const [loginOpen, setLoginOpen] = useState(false);
   const [loginReason, setLoginReason] = useState<"save" | "propose" | "report">("save");
@@ -357,7 +369,7 @@ export function MakerActionBar({
             </button>
 
             {/* 찜 하트 — 빈 → 채워진 빨강 토글. 내 소개서면 숨김(내가 나를 찜하는 건 신호가 아니다) */}
-            {!isOwner && (
+            {!ownerUi && (
             <button
               type="button"
               onClick={toggleHeart}
@@ -387,7 +399,7 @@ export function MakerActionBar({
 
           {/* 백보드 바 — 흰 배경 + 상단 좌우 라운드. 콜라보 액션 전용 */}
           <div className="flex items-center gap-2.5 rounded-t-2xl border border-b-0 border-hairline bg-surface px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 shadow-e2">
-            {isOwner ? (
+            {ownerUi ? (
               /* 내 소개서 모드 — 제안·분석은 자기 자신 대상이라 말이 안 된다. 여기서 할 일은 '고치기'다. */
               <a
                 href={`/register?edit=${slug}`}
