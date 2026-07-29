@@ -350,8 +350,11 @@ export async function recordCollabRequestAction(
   channel: string,
   fromBrandId?: number // 어떤 소개서로 제안했나(제안자가 여럿일 때 선택값)
 ): Promise<{ error?: string }> {
+  // ⚠️ 로그인은 계측의 조건이 아니다(2026-07-29 수정). 전엔 비로그인이면 여기서 조기 반환해
+  //    **연락 시도가 통째로 유실**됐다 — 호출부는 에러를 무시하고 복사·채널 오픈은 그대로 되므로
+  //    사용자는 멀쩡히 연락했는데 북극성 퍼널엔 안 잡혔다. 무계정 열람이 제품 컨셉이라 더 컸다.
+  //    스키마도 이미 `from_user_id` nullable("비로그인 null")로 이 경우를 전제하고 있었다.
   const sessionUserId = await getSessionUserId();
-  if (!sessionUserId) return { error: "콜라보를 시작하려면 로그인이 필요해요." };
   try {
     await repo.recordCollabRequest(sessionUserId, toBrandId, channel, fromBrandId ?? null);
     return {};

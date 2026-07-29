@@ -3,7 +3,7 @@
 // 소개서 페이지 하단 고정 플로팅 액션바 — 방문자 액션 존.
 // [🔗 링크복사 + ♡ 찜] = 바 위 유틸 줄(우측 정렬) / 바 안 = [콜라보 시작하기] 액션 전용. 백보드 = 흰 배경 + 상단 좌우 라운드.
 // 찜·콜라보 시작 둘 다 로그인 필수 — 비로그인은 로그인 유도 후, 복귀 시 원래 의도를 자동 재개.
-import { useState, useTransition, useEffect } from "react";
+import { useState, useTransition, useEffect, useRef } from "react";
 import { setMakerSavedAction, recordCollabRequestAction } from "@/lib/actions";
 import { resolveCollabChannel } from "@/lib/links";
 import { ScrollLock } from "@/components/ScrollLock";
@@ -216,20 +216,35 @@ export function MakerActionBar({
     window.setTimeout(() => setToast(null), 2000);
   };
 
+  // ⭐북극성 계측 = "연락 시도" 1건. **시트를 여는 게 아니라 실제로 연락 수단을 손에 쥔 순간**을 센다
+  //   (대표 확정 2026-07-29). 그래서 DM 열기·메시지 복사·이메일 복사 셋 다 여기로 들어온다.
+  //   ⚠️ 시트 한 번 열림당 1건만 — 복사하고 나서 DM 열기까지 누르면 한 사람이 2건으로 부풀기 때문.
+  const recordedRef = useRef(false);
+  const recordOnce = (ch: string) => {
+    if (recordedRef.current) return;
+    recordedRef.current = true;
+    recordCollabRequestAction(makerId, ch, selectedBrand?.id).catch(() => {});
+  };
+  useEffect(() => {
+    if (proposeOpen) recordedRef.current = false; // 시트를 새로 열면 다시 셀 수 있게
+  }, [proposeOpen]);
+
   // Primary — 메시지 복사 + 상대 채널 오픈(제스처 내 즉시, 팝업 차단 회피) + 계측(best-effort) + 닫기.
   const proposeAndSend = () => {
     if (!channel) return;
     copyText(message);
     flash("✓ 메시지를 복사했어요.");
     window.open(channel.url, "_blank", "noopener,noreferrer");
-    recordCollabRequestAction(makerId, channel.channel, selectedBrand?.id).catch(() => {});
+    recordOnce(channel.channel);
     setProposeOpen(false);
   };
 
   // Secondary — 메시지만 복사(시트 유지 + 토스트).
+  // 여기도 계측한다 — 복사만 하고 인스타 앱에서 직접 보내는 사람이 실제로 많은데, 전엔 통째로 안 세어졌다.
   const copyMessageOnly = () => {
     copyText(message);
     flash("✓ 메시지를 복사했어요.");
+    recordOnce(channel?.channel ?? "copy");
   };
 
   // 이메일 폴백 Primary — 이메일 주소 복사(채널 오픈 없음, 시트 유지 + 토스트) + 계측.
@@ -237,7 +252,7 @@ export function MakerActionBar({
     if (!contactEmail) return;
     copyText(contactEmail);
     flash("✓ 이메일 주소를 복사했어요.");
-    recordCollabRequestAction(makerId, "email", selectedBrand?.id).catch(() => {});
+    recordOnce("email");
   };
 
   const isInstagram = channel?.channel === "instagram";
