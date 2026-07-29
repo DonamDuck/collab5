@@ -9,7 +9,7 @@
 //
 // 지금은 사실상 대표 운영 도구지만, 채팅에 "콜라보 하기로 했어요"가 붙으면
 // **같은 테이블에 origin만 다르게** 쌓인다 → "제품이 언제부터 스스로 돌기 시작했나"가 한 목록에 보인다.
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { searchAction, recordCollabAction } from "@/lib/actions";
 import { uploadPhoto } from "@/lib/upload";
 import { useDismissable } from "@/components/useDismissable";
@@ -34,6 +34,7 @@ export function CollabRecorder({ myBrands }: { myBrands: MyBrand[] }) {
   const [picked, setPicked] = useState<Hit | null>(null);
   const [origin, setOrigin] = useState<"product" | "concierge">("concierge");
   const [title, setTitle] = useState("");
+  const titleRef = useRef<HTMLInputElement>(null);
   const [year, setYear] = useState("");
   const [desc, setDesc] = useState("");
   const [photos, setPhotos] = useState<Ph[]>([]);
@@ -92,6 +93,14 @@ export function CollabRecorder({ myBrands }: { myBrands: MyBrand[] }) {
   const submit = () => {
     setErr(null);
     if (!picked) return setErr("함께한 브랜드를 골라주세요.");
+    // ⚠️ 제목은 서버도 막지만 **여기서 먼저 잡는다** — 서버까지 갔다 오면 왕복 뒤에 실패하고,
+    //    그 에러는 폼 맨 아래에 뜨는데 정작 비어 있는 칸은 스크롤 한참 위에 있다(QA #18).
+    if (!title.trim()) {
+      setErr("콜라보 제목을 적어주세요.");
+      titleRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      setTimeout(() => titleRef.current?.focus({ preventScroll: true }), 320);
+      return;
+    }
     startSave(async () => {
       const res = await recordCollabAction({
         brandAId,
@@ -219,7 +228,14 @@ export function CollabRecorder({ myBrands }: { myBrands: MyBrand[] }) {
             {/* ④~⑦ 여기부터는 소개서 "함께한 콜라보" 카드와 같은 필드 */}
             <label className="mt-4 block">
               <span className="text-sm font-medium text-body">콜라보 제목</span>
-              <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="예: 여름 팝업 같이 열기" className={field} />
+              <input
+                ref={titleRef}
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="예: 여름 팝업 같이 열기"
+                aria-invalid={!!err && !title.trim() ? true : undefined}
+                className={`${field} ${!!err && !title.trim() ? "border-danger" : ""}`}
+              />
             </label>
 
             <label className="mt-4 block">
@@ -283,7 +299,12 @@ export function CollabRecorder({ myBrands }: { myBrands: MyBrand[] }) {
               </span>
             </label>
 
-            {err && <p className="mt-4 rounded-sm bg-danger/10 px-3 py-2 text-[13px] text-danger">{err}</p>}
+            {/* role=alert — 지금까진 에러가 라이브 리전이 아니라 스크린리더가 아무 안내도 못 들었다(QA #16·#18) */}
+            {err && (
+              <p role="alert" className="mt-4 rounded-sm bg-danger/10 px-3 py-2 text-[13px] text-danger">
+                {err}
+              </p>
+            )}
 
             <button
               type="button"

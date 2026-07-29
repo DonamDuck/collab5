@@ -843,12 +843,23 @@ function RegisterForm() {
     if (toastTimer.current) clearTimeout(toastTimer.current);
     toastTimer.current = setTimeout(() => setToast(""), 2500);
   };
-  // 첫 미입력 필수 항목 앵커(상호→name-field, 협업칩→offers-chips) — 다 채웠으면 null
-  const firstMissingRequired = (): string | null => {
-    if (!name.trim()) return "name-field";
-    if (!offers.length) return "offers-chips";
+  // 첫 미입력 필수 항목 — 앵커 + **무엇이 빠졌는지 이름을 부르는 문구**를 같이 준다(QA #18).
+  // "필수 정보 작성이 필요해요"만 2.5초 띄우면 토스트가 사라진 뒤엔 이유가 아무 데도 안 남는다.
+  const firstMissingRequired = (): { anchor: string; msg: string } | null => {
+    if (!name.trim()) return { anchor: "name-field", msg: "브랜드 이름을 알려주세요." };
+    if (!offers.length)
+      return { anchor: "offers-chips", msg: "함께하고 싶은 콜라보를 하나 이상 골라주세요." };
     return null;
   };
+  // 스크롤이 멈춘 그 자리에 표시를 남긴다 — 토스트는 사라져도 이건 고칠 때까지 남는다.
+  const [errField, setErrField] = useState<{ anchor: string; msg: string } | null>(null);
+
+  // 채우는 즉시 빨간 표시를 거둔다 — 고쳤는데도 계속 빨가면 그게 더 혼란스럽다.
+  useEffect(() => {
+    if (!errField) return;
+    if (errField.anchor === "name-field" && name.trim()) setErrField(null);
+    if (errField.anchor === "offers-chips" && offers.length) setErrField(null);
+  }, [errField, name, offers.length]);
 
   // ── 초본 완성 얼럿(AI 크롤 직후 사진 유도 · 세션 1회) ──
   const draftDoneShownRef = useRef(false); // '다시 받기'로 applyWizard 재호출돼도 처음 1번만
@@ -1033,8 +1044,12 @@ function RegisterForm() {
     // 1) 필수(상호·협업칩) 미입력 → 토스트 + 첫 미입력 항목으로 스크롤. 버튼은 항상 활성.
     const missing = firstMissingRequired();
     if (missing) {
-      showToast("필수 정보 작성이 필요해요!");
-      document.getElementById(missing)?.scrollIntoView({ behavior: "smooth", block: "center" });
+      setErrField(missing);
+      showToast(missing.msg);
+      const el = document.getElementById(missing.anchor);
+      el?.scrollIntoView({ behavior: "smooth", block: "center" });
+      // 상호처럼 입력칸이면 커서까지 데려간다 — 스크롤만 하면 "여기서 뭘 하라는 건지"가 한 박자 늦다.
+      if (el instanceof HTMLInputElement) setTimeout(() => el.focus({ preventScroll: true }), 320);
       return;
     }
     // 2) 등록 직전 1회 인터셉트 — 소개가 얇으면 추천 모달로 이야기 더하기 제안
@@ -1317,8 +1332,14 @@ function RegisterForm() {
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="예: 캔버스가든"
-              className="h-11 w-full scroll-mt-20 rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
+              aria-invalid={errField?.anchor === "name-field" || undefined}
+              className={`h-11 w-full scroll-mt-20 rounded-sm border bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus ${
+                errField?.anchor === "name-field" ? "border-danger" : "border-hairline"
+              }`}
             />
+            {errField?.anchor === "name-field" && (
+              <p className="mt-1.5 text-sm text-danger">{errField.msg}</p>
+            )}
           </Field>
           <Field label="한두 문장 소개 (선택)" hint={hintFor("oneLiner")}>
             {/* 한두 문장이라 멀티라인 — 한 줄 input이면 두 번째 문장이 가로로 밀려 안 보임. 길이 제한 없음(대표 확정) */}
@@ -1417,6 +1438,9 @@ function RegisterForm() {
                 selected={offers}
                 onToggle={(t) => toggle(offers, setOffers, t)}
               />
+              {errField?.anchor === "offers-chips" && (
+                <p className="mt-2 text-sm text-danger">{errField.msg}</p>
+              )}
               {/* 구 sec-offersNote(시트) → ① 칩 하단 상시 노출로 이사. 칩과 한 세트 */}
               <div className="mt-4">
                 <p className="mb-1.5 flex items-center gap-2 text-sm text-mute">이런 콜라보를 제공할 수 있어요 (선택){aiFilled.has("offersNote") ? <AiBadge /> : null}</p>
@@ -2102,8 +2126,10 @@ function RegisterForm() {
       {/* 필수 미입력 토스트 — 화면 하단 중앙, 2.5초 후 자동 사라짐 */}
       {toast && (
         <div className="pointer-events-none fixed inset-x-0 bottom-6 z-[60] flex justify-center px-4">
+          {/* assertive — 제출이 막혔다는 건 지금 당장 알아야 하는 말이다(polite면 읽던 걸 다 읽고 나서야 온다) */}
           <div
-            role="status"
+            role="alert"
+            aria-live="assertive"
             className="max-w-[90%] rounded-pill bg-ink px-4 py-2.5 text-center text-sm font-medium text-on-dark shadow-e2"
           >
             {toast}
