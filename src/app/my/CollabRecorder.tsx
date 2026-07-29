@@ -118,7 +118,9 @@ export function CollabRecorder({ myBrands }: { myBrands: MyBrand[] }) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="rounded-pill border border-border-strong px-3 py-1.5 text-[13px] font-medium text-body"
+        // ⭐북극성 탭의 **유일한 행동 버튼**인데 높이가 31px이라 44px 규칙에 한참 못 미쳤다(QA #21).
+        //    ConnectMaker와 같은 시그니처로 맞춰 손가락으로 누를 수 있게 한다.
+        className="inline-flex h-11 shrink-0 items-center rounded-md border border-border-strong bg-surface px-4 text-sm font-medium text-ink"
       >
         + 성사 기록
       </button>

@@ -173,7 +173,10 @@ export function PhotoSlider({
               type="button"
               onClick={() => goTo(i)}
               aria-label={`${i + 1}번째 사진`}
-              className={`h-1.5 rounded-pill transition-all ${
+              // 점 자체는 6.4px이라 44px 규칙의 1/7이었다 — 원하는 사진으로 넘어가질 못한다(QA #21).
+              // ⚠️ 점을 키우면 디자인이 무너지니 **시각 픽셀은 그대로 두고 히트영역만** pseudo로 넓힌다.
+              //    -inset-y-4(≈40px 세로) + 좌우 3px → 인접 점과 겹치지 않는 선에서 최대치.
+              className={`relative h-1.5 rounded-pill transition-all after:absolute after:-inset-x-[3px] after:-inset-y-4 after:content-[''] ${
                 i === idx ? "w-4 bg-primary" : "w-1.5 bg-border-strong"
               }`}
             />

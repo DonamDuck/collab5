@@ -317,16 +317,20 @@ export function ReportSheet({
               <p className="min-w-0 flex-1 truncate text-[15px] font-semibold text-body">
                 {fromName} × {reportToName}
               </p>
-              <div className="flex shrink-0 items-center gap-3">
+              <div className="flex shrink-0 items-center gap-2">
                 {!sampleMode && fromBrands.length > 1 && (
                   <button
                     type="button"
                     onClick={() => setPhase("select")}
-                    className="text-[12px] font-medium text-mute underline underline-offset-2"
+                    // 높이가 14px이라 44px 규칙에 한참 못 미쳤고, 12.75px 옆이 닫기 ✕라
+                    // 엄지로 노리면 리포트가 통째로 닫혔다(QA #21). 글자 크기는 유지하고 히트영역만 넓힌다.
+                    className="-my-1 flex h-9 items-center rounded-md px-2 text-[12px] font-medium text-mute underline underline-offset-2 hover:bg-surface-soft"
                   >
                     다른 소개서로 분석
                   </button>
                 )}
+                {/* 두 버튼 사이 시각적 구분선 — 붙어 있으면 잘못 누르기 쉽다 */}
+                {!sampleMode && fromBrands.length > 1 && <span aria-hidden="true" className="h-4 w-px bg-hairline" />}
                 {closeButton("")}
               </div>
             </div>
@@ -401,14 +405,20 @@ export function ReportSheet({
                 </button>
               </div>
             ) : phase === "loading" || phase === "idle" ? (
-              <div className="flex flex-col items-center justify-center py-16">
-                <div className="h-8 w-8 animate-spin rounded-pill border-2 border-hairline border-t-primary-strong" />
-                {/* 회전 문구 = '지금 뭘 하는 중' / 아래 시간 안내 = '언제 끝나는지'. 역할이 달라 둘 다 둔다.
+              // ⚠️ 스피너를 쓰지 않는다 — design.md Loader 원칙: "움직임은 텍스트 순환만, 회전 금지"
+              //    (브랜드 정체성 + 어지럼 방지). 여기만 `animate-spin`+`animate-pulse`로 어기고 있었다(QA #25).
+              //    정적 아톰 마크 + 순환 문구가 기준 구현(EnrichWizard LoadingView)과 같은 얼굴이다.
+              <div role="status" aria-live="polite" className="flex flex-col items-center justify-center py-16">
+                <svg width="44" height="44" viewBox="0 0 56 56" fill="none" className="text-faint" aria-hidden="true">
+                  <ellipse cx="28" cy="28" rx="23" ry="9" stroke="currentColor" strokeWidth="2" opacity="0.45" transform="rotate(28 28 28)" />
+                  <ellipse cx="28" cy="28" rx="23" ry="9" stroke="currentColor" strokeWidth="2" opacity="0.45" transform="rotate(-28 28 28)" />
+                  <circle cx="28" cy="28" r="6" fill="#98ff5c" />
+                </svg>
+                {/* 순환 문구 = '지금 뭘 하는 중' / 아래 시간 안내 = '언제 끝나는지'. 역할이 달라 둘 다 둔다.
                     기다림에서 힘든 건 길이가 아니라 끝을 모르는 것 — 위저드의 "1~2분 걸릴 수 있어요"와 같은 계열.
-                    실측 25~28초라 30초는 살짝 넉넉하게 부른 값(약속을 넘기지 않게). ⏱ 파이프라인이 빨라지면 같이 낮출 것. */}
-                <p className="mt-4 animate-pulse text-[15px] text-mute">
-                  {LOADING_COPY[copyIdx]}
-                </p>
+                    실측 25~28초라 30초는 살짝 넉넉하게 부른 값(약속을 넘기지 않게). ⏱ 파이프라인이 빨라지면 같이 낮출 것.
+                    animate-pulse는 뺐다 — 문구가 4초마다 바뀌는 것 자체가 이미 '살아있음' 신호다. */}
+                <p className="mt-4 text-[15px] text-mute">{LOADING_COPY[copyIdx]}</p>
                 <p className="mt-2 text-[13px] text-faint">보통 30초 정도 걸려요</p>
               </div>
             ) : phase === "ok" ? (
