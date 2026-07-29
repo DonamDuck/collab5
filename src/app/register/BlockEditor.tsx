@@ -4,7 +4,7 @@
 import { useState, useRef, useEffect } from "react";
 import type { Block, BlockType, BlockLink } from "@/lib/types";
 import { uploadPhoto } from "@/lib/upload";
-import { ScrollLock } from "@/components/ScrollLock";
+import { useDismissable } from "@/components/useDismissable";
 import { SortableCard, emptyDnd, reorder, type DndState } from "./SortableCard";
 
 const CATALOG: { type: BlockType; label: string; hint: string }[] = [
@@ -52,6 +52,8 @@ export function BlockEditor({ blocks, onChange, onUploadingChange, onSheetOpenCh
   storyItems?: { key: string; label: string; hint: string; added: boolean; onAdd: () => void; group: "recommend" | "story" }[];
 }) {
   const [open, setOpen] = useState(false);
+  // 카탈로그는 고르기만 하는 시트라 딤 클릭·ESC 둘 다 열어 둔다(날아갈 입력이 없다).
+  const sheet = useDismissable(open, { onClose: () => setOpen(false) });
   // 시트 열림 상태를 page에 알림(플로팅 제출 바와 겹치지 않게).
   useEffect(() => {
     onSheetOpenChange?.(open);
@@ -450,10 +452,11 @@ export function BlockEditor({ blocks, onChange, onUploadingChange, onSheetOpenCh
 
       {/* ── 바텀시트 — 카탈로그 ── */}
       {open && (
-        <div className="fixed inset-0 z-50" role="dialog" aria-modal="true">
-          <ScrollLock />
-          <div className="absolute inset-0 bg-ink/40" onClick={() => setOpen(false)} />
-          <div className="absolute inset-x-0 bottom-0 mx-auto max-w-[640px] overflow-hidden rounded-t-2xl bg-surface shadow-xl">
+        <div className="fixed inset-0 z-50 bg-ink/40" {...sheet.overlayProps}>
+          <div
+            {...sheet.panelProps}
+            className="absolute inset-x-0 bottom-0 mx-auto max-w-[640px] overflow-hidden rounded-t-2xl bg-surface shadow-xl"
+          >
             <div
               style={{ paddingBottom: "calc(1.5rem + env(safe-area-inset-bottom))" }}
               className="max-h-[60vh] overflow-y-auto slim-scrollbar p-4 sm:max-h-[70vh]"

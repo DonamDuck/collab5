@@ -9,7 +9,7 @@
 //  ③ 생성(options 1콜 — 키워드 재료·별표 가중치·조사메모 재사용, 재크롤 없음)
 //  ④~ 기존 결과 스텝 승계: 정보 확인 → 한 줄 소개 → 브랜드 소개 → 찾은 이야기 체크리스트
 import { useEffect, useState } from "react";
-import { ScrollLock } from "@/components/ScrollLock";
+import { useDismissable } from "@/components/useDismissable";
 import type {
   ActivityHint,
   BlockHint,
@@ -209,6 +209,9 @@ export function EnrichWizard({
 }) {
   const [kind, setKind] = useState<Kind>("seed");
   const [errMsg, setErrMsg] = useState("");
+  // ESC로 나가려 할 때 한 번 물어보는 확인창(대표 확정 07-29).
+  // ⚠️ 위저드는 몇 스텝에 걸쳐 고른 게 쌓여 있고 되돌릴 방법이 없다 — ESC 한 번에 날리면 안 된다.
+  const [confirmClose, setConfirmClose] = useState(false);
 
   // ⓪ 씨앗 — 지역·업종 둘 다 필수(동명 구분 검증자 + 크롤 정확도)
   const [regionInput, setRegionInput] = useState("");
@@ -571,17 +574,29 @@ export function EnrichWizard({
     });
   };
 
+  // 아직 아무것도 안 쓴 첫 화면이면 물어볼 게 없다 — 그때만 ESC로 바로 닫는다.
+  const hasWork = kind !== "seed" || !!regionInput.trim() || !!btype.trim();
+  const wizard = useDismissable(true, {
+    onClose,
+    overlayClose: false, // 딤 클릭으로는 닫지 않는다 — 작성 내용 유실 방지(대표 정책)
+    onEscape: () => {
+      if (confirmClose) return setConfirmClose(false); // 확인창이 떠 있으면 그것만 닫는다
+      if (!hasWork) return onClose();
+      setConfirmClose(true);
+    },
+  });
+
   // 확인 화면에 보여줄 선택 칩(선택 순서 유지)
   const confirmList = selected.map((t) => chipOf(t)).filter((c): c is KeywordChip => !!c);
   const unconfirmedFactual = confirmList.filter((c) => c.factual && !factualOk.has(c.text));
 
   return (
-    // 딤(바깥) 클릭으로는 닫지 않는다 — 작성 내용 유실 방지. 닫기는 X 버튼으로만.
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 p-4 sm:items-center">
-      <ScrollLock />
+    // 딤(바깥) 클릭으로는 닫지 않는다 — 작성 내용 유실 방지. 닫기는 X 버튼 또는 ESC(확인 후).
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 p-4 sm:items-center" {...wizard.overlayProps}>
       <div
+        {...wizard.panelProps}
+        aria-label="AI 소개서 작성"
         className="relative flex max-h-[calc(100dvh-2rem)] w-full max-w-md flex-col rounded-lg border border-hairline bg-surface p-5 shadow-e2"
-        onClick={(e) => e.stopPropagation()}
       >
         <button
           type="button"
@@ -618,12 +633,24 @@ export function EnrichWizard({
           <div className="pt-4 text-center">
             <p className="text-lg font-bold text-ink">앗, 문제가 생겼어요</p>
             <p className="mt-1.5 text-[15px] leading-relaxed text-mute">{errMsg}</p>
-            <button
-              onClick={onClose}
-              className="mt-4 h-11 w-full rounded-md bg-primary text-sm font-medium text-primary-on"
-            >
-              직접 입력할게요
-            </button>
+            {/* 실패 원인 대부분이 일시적(네트워크·모델 혼잡)인데 전엔 나가는 길만 있었다.
+                고른 칩·확정한 링크가 그대로 남아 있으니 재시도가 먼저다(조사 메모 재사용 — 재크롤 없음). */}
+            <div className="mt-4 space-y-2">
+              <button
+                type="button"
+                onClick={generate}
+                className="h-11 w-full rounded-md bg-primary text-sm font-medium text-primary-on"
+              >
+                다시 시도
+              </button>
+              <button
+                type="button"
+                onClick={onClose}
+                className="h-11 w-full rounded-md border border-border-strong bg-surface text-sm font-medium text-ink"
+              >
+                직접 입력할게요
+              </button>
+            </div>
           </div>
         )}
 
@@ -1107,6 +1134,34 @@ export function EnrichWizard({
           </div>
         )}
         </div>
+
+        {/* ESC 확인 — 패널 안에 겹쳐 띄운다(포커스 트랩 안에 있어야 Tab이 새지 않는다) */}
+        {confirmClose && (
+          <div className="absolute inset-0 z-20 flex items-center justify-center rounded-lg bg-surface p-5">
+            <div className="w-full max-w-xs text-center">
+              <p className="text-base font-bold text-ink">작성을 그만둘까요?</p>
+              <p className="mt-1.5 text-[14px] leading-relaxed text-mute">
+                지금까지 고른 내용은 저장되지 않아요.
+              </p>
+              <div className="mt-4 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setConfirmClose(false)}
+                  className="h-11 flex-1 rounded-md bg-primary text-sm font-medium text-primary-on"
+                >
+                  계속 쓸게요
+                </button>
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="h-11 flex-1 rounded-md border border-border-strong bg-surface text-sm font-medium text-ink"
+                >
+                  그만두기
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

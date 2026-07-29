@@ -99,10 +99,12 @@ export function useDismissable(open: boolean, opts: DismissableOptions) {
     restoreRef.current = (document.activeElement as HTMLElement) ?? null;
     const panel = panelRef.current;
     if (panel) {
+      // 기본은 **패널 자신**(tabIndex=-1)에 포커스를 준다.
+      // ⚠️ 첫 컨트롤에 주면 안 된다 — 프로그램 포커스인데도 `:focus-visible`이 매칭돼서
+      //    마우스로 연 사람에게도 '닫기 ✕'에 잉크색 링이 씌워진다(실측 07-29).
+      //    패널 포커스면 스크린리더는 창 내용을 위에서부터 읽고, Tab은 첫 컨트롤로 자연히 들어간다.
       const wanted = initialFocus ? panel.querySelector<HTMLElement>(initialFocus) : null;
-      const target = wanted ?? panel.querySelector<HTMLElement>(FOCUSABLE) ?? panel;
-      // preventScroll: 포커스 때문에 배경이 튀는 것 방지
-      target.focus({ preventScroll: true });
+      (wanted ?? panel).focus({ preventScroll: true }); // preventScroll: 포커스 때문에 배경이 튀는 것 방지
     }
     return () => {
       const back = restoreRef.current;
@@ -121,7 +123,11 @@ export function useDismissable(open: boolean, opts: DismissableOptions) {
     if (items.length === 0) return;
     const first = items[0];
     const last = items[items.length - 1];
-    if (e.shiftKey && document.activeElement === first) {
+    // 패널 자신에 포커스가 있는 상태(열린 직후)에서 Shift+Tab을 누르면 시트 '앞'으로 새어나간다 → 끝으로 감는다.
+    if (e.shiftKey && document.activeElement === panel) {
+      e.preventDefault();
+      last.focus();
+    } else if (e.shiftKey && document.activeElement === first) {
       e.preventDefault();
       last.focus();
     } else if (!e.shiftKey && document.activeElement === last) {

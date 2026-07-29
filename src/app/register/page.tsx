@@ -16,7 +16,7 @@ import { deriveRegion } from "@/lib/region";
 import { isRichIntro } from "@/lib/completeness";
 import { uploadPhoto, uploadPdf } from "@/lib/upload";
 import { mapLinkLabel, instagramSlug } from "@/lib/links";
-import { ScrollLock } from "@/components/ScrollLock";
+import { useDismissable } from "@/components/useDismissable";
 import { PasswordInput } from "@/components/PasswordInput";
 import type { ActivityHint, CollabHint, EnrichField } from "@/lib/enrich";
 import { blendDescriptions, canRegenDesc, noteRegenDesc } from "@/lib/enrichBlend";
@@ -827,6 +827,31 @@ function RegisterForm() {
     setPreviewOpen(true);
     if (!demoMaker) getPreviewDemoNoneAction().then((d) => d && setDemoMaker(d));
   };
+
+  // ── 오버레이 공통 동작(ESC·딤·포커스 트랩·스크롤 잠금) ──
+  // ⚠️ 훅이라 JSX 조건부 안이 아니라 여기 최상위에서 부른다. props만 아래 시트에 꽂는다.
+  // 정책(대표 07-29): 내용이 날아갈 수 있는 창은 딤 클릭으로 닫지 않는다 → `overlayClose: false`.
+  const nudgeDismiss = () => {
+    setNudgeShown(true); // 딤·ESC·'다음에 하기' 전부 같은 경로 — 다시 뜨지 않게
+    setShowNudge(false);
+  };
+  // 초안받기: 후보를 버리고 닫으면 다시 열 때 **유료 콜이 다시 나간다** → 딤 클릭 금지, 생성 중엔 ESC도 잠금.
+  const draftDialog = useDismissable(descModalOpen, {
+    onClose: () => setDescModalOpen(false),
+    overlayClose: false,
+    escClose: !draftBusy && !descRegenBusy,
+  });
+  const draftDoneDialog = useDismissable(showDraftDone, { onClose: () => setShowDraftDone(false), overlayClose: false });
+  const nudgeDialog = useDismissable(showNudge, { onClose: nudgeDismiss });
+  // 등록 완료 얼럿은 **탈출구를 열지 않는다** — 비회원은 여기서 관리 비밀번호를 정해야 하고,
+  // 그냥 닫으면 저장된 소개서를 영영 수정하지 못한다(ESC·딤 둘 다 잠금, 포커스 트랩만 취함).
+  const portfolioDialog = useDismissable(portfolioOpen, {
+    onClose: () => setPortfolioOpen(false),
+    overlayClose: false,
+    escClose: false,
+  });
+  const previewDialog = useDismissable(previewOpen, { onClose: () => setPreviewOpen(false) });
+
   const [createdSlug, setCreatedSlug] = useState("");
   const [loggedIn, setLoggedIn] = useState(false);
   const [userId, setUserId] = useState<number | undefined>(undefined); // 임시저장 키를 계정별로 가르는 용도
@@ -2051,14 +2076,10 @@ function RegisterForm() {
 
       {/* 초안받기 2스텝 모달 — 스텝1 한 줄 소개 → 스텝2 자세히 소개 → [확인] 시 둘 다 채움 */}
       {descModalOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4"
-          onClick={() => !draftBusy && setDescModalOpen(false)}
-        >
-          <ScrollLock />
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4" {...draftDialog.overlayProps}>
           <div
+            {...draftDialog.panelProps}
             className="slim-scrollbar relative max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-y-auto rounded-lg border border-hairline bg-surface p-5 shadow-e2"
-            onClick={(e) => e.stopPropagation()}
           >
             <button
               type="button"
@@ -2166,14 +2187,11 @@ function RegisterForm() {
       {showDraftDone && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4"
-          role="dialog"
-          aria-modal="true"
-          onClick={() => setShowDraftDone(false)}
+          {...draftDoneDialog.overlayProps}
         >
-          <ScrollLock />
           <div
+            {...draftDoneDialog.panelProps}
             className="slim-scrollbar relative max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-y-auto rounded-lg border border-hairline bg-surface p-6 text-center shadow-e2"
-            onClick={(e) => e.stopPropagation()}
           >
             <div className="text-4xl leading-none" aria-hidden="true">🎉</div>
             <p className="mt-3 text-lg font-bold text-ink">소개서 초안이 준비됐어요!</p>
@@ -2197,7 +2215,7 @@ function RegisterForm() {
       )}
 
       {showNudge && (() => {
-        const dismissNudge = () => { setNudgeShown(true); setShowNudge(false); };
+        const dismissNudge = nudgeDismiss;
         const items = ([
           ["activities", "주로 어떤 활동을 하나요?", "대표 활동을 소개해주세요.", hasActivities],
           ["seeks", "이런 파트너를 찾고 있어요.", "어떤 파트너와 만나고 싶은지 알려주세요.", hasSeeks],
@@ -2205,10 +2223,11 @@ function RegisterForm() {
           ["customers", "저희는 주로 이런 고객과 함께하고 있어요.", "주요 고객을 알려주세요.", hasCustomers],
         ] as const).filter(([key, , , has]) => !has && !openSections.has(key));
         return (
-          <div className="fixed inset-0 z-50" role="dialog" aria-modal="true">
-            <ScrollLock />
-            <div className="absolute inset-0 bg-ink/40" onClick={dismissNudge} />
-            <div className="absolute inset-x-0 bottom-0 mx-auto max-w-[640px] overflow-hidden rounded-t-2xl bg-surface shadow-xl">
+          <div className="fixed inset-0 z-50 bg-ink/40" {...nudgeDialog.overlayProps}>
+            <div
+              {...nudgeDialog.panelProps}
+              className="absolute inset-x-0 bottom-0 mx-auto max-w-[640px] overflow-hidden rounded-t-2xl bg-surface shadow-xl"
+            >
               <div
                 style={{ paddingBottom: "calc(1.5rem + env(safe-area-inset-bottom))" }}
                 className="max-h-[60vh] overflow-y-auto slim-scrollbar p-4 sm:max-h-[70vh]"
@@ -2268,9 +2287,11 @@ function RegisterForm() {
 
       {/* 등록 완료 → 브랜드 소개서 얼럿 (소개서 페이지에서 확인·링크 공유) */}
       {portfolioOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4">
-          <ScrollLock />
-          <div className="slim-scrollbar max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-y-auto rounded-lg border border-hairline bg-surface p-6 text-center shadow-e2">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4" {...portfolioDialog.overlayProps}>
+          <div
+            {...portfolioDialog.panelProps}
+            className="slim-scrollbar max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-y-auto rounded-lg border border-hairline bg-surface p-6 text-center shadow-e2"
+          >
             <p className="text-lg font-bold text-ink">✨ 브랜드 소개서가 완성됐어요!</p>
             {loggedIn ? (
               <>
@@ -2320,10 +2341,11 @@ function RegisterForm() {
       {/* 소개서 미리보기 바텀시트 — ① 사진 섹션 링크에서 열림. 정적 이미지 2장(사진 없는 버전 먼저),
           외부 이동 링크 없음(폼 이탈 방지). 오버레이만 — 폼 상태·스크롤 비파괴. */}
       {previewOpen && (
-        <div className="fixed inset-0 z-50" role="dialog" aria-modal="true">
-          <ScrollLock />
-          <div className="absolute inset-0 bg-ink/40" onClick={() => setPreviewOpen(false)} />
-          <div className="absolute inset-x-0 bottom-0 mx-auto max-w-[640px] overflow-hidden rounded-t-2xl bg-surface shadow-xl">
+        <div className="fixed inset-0 z-50 bg-ink/40" {...previewDialog.overlayProps}>
+          <div
+            {...previewDialog.panelProps}
+            className="absolute inset-x-0 bottom-0 mx-auto max-w-[640px] overflow-hidden rounded-t-2xl bg-surface shadow-xl"
+          >
             <div
               style={{ paddingBottom: "calc(1.5rem + env(safe-area-inset-bottom))" }}
               className="max-h-[85vh] overflow-y-auto slim-scrollbar p-4 sm:max-h-[85vh]"

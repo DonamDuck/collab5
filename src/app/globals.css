@@ -94,7 +94,9 @@ body {
    입력칸의 포커스 표시는 **캐럿 + 각 컴포넌트의 테두리 강조(focus:border-*)**가 담당한다.
    ※ 이 규칙은 @layer 밖이라 Tailwind 유틸(`outline-none`)보다 우선한다 — 그래서 클래스로는 못 껐다.
      (위저드 두 곳의 `outline-none!` 땜빵이 그 흔적. 이제 불필요하지만 무해해서 둔다.) */
-:where(a, button, select, [role="switch"], [tabindex]):focus-visible {
+/* ⚠️ `[tabindex="-1"]`은 뺀다 — 키보드로 갈 수 없고 **코드가 포커스를 옮기는 그릇**(시트·모달 패널)이다.
+   빼지 않으면 시트를 열 때마다 패널 전체에 잉크색 테두리가 씌워진다(실측 07-29). */
+:where(a, button, select, [role="switch"], [tabindex]:not([tabindex="-1"])):focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: 2px;
 }
