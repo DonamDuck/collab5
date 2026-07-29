@@ -200,9 +200,13 @@ export interface Collab {
   brandBId: number; brandBName: string; brandBSlug: string; // 받은 쪽
   status: CollabStatus;
   origin: CollabOrigin;
-  title: string;         // "무슨 콜라보였나" 한 줄
-  happenedOn?: string;   // YYYY-MM-DD (합의만 한 시점엔 비움)
-  note: string;
+  // 아래 5개는 **소개서 "함께한 콜라보" 카드와 같은 모양**(대표 지시 07-29).
+  // 같은 모양이어야 성사 기록이 그대로 소개서 이력으로 흘러간다(F5 → F6).
+  title: string;
+  year: string;          // 이력 카드와 동일하게 date가 아니라 연도 문자열
+  description: string;
+  photos: string[];      // 최대 5
+  link: string;
   createdAt: string;
 }
 
@@ -213,6 +217,8 @@ export interface CollabInput {
   origin: CollabOrigin;
   status?: CollabStatus;
   title: string;
-  happenedOn?: string | null;
-  note?: string;
+  year?: string;
+  description?: string;
+  photos?: string[];
+  link?: string;
 }

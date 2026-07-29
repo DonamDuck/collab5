@@ -185,9 +185,13 @@ create table collabs (
                                               -- ⭐지표 순도 규칙([[미션-문제정의]]) — 이 태그가 이 표의 존재 이유.
                                               -- 안 나누면 "성사 5건"이 전부 대표 주선이어도 제품 성과처럼 보인다.
   request_id   bigint references collab_requests(id) on delete set null,  -- 이어진 제안(있으면). v1은 비워둠
-  title        text not null default '',      -- "무슨 콜라보였나" 한 줄
-  happened_on  date,                          -- 언제 (합의만 한 시점엔 null)
-  note         text not null default '',
+  -- 아래 5개는 **소개서 "함께한 콜라보" 카드와 같은 모양**이다(대표 지시 07-29).
+  -- 같은 모양이어야 성사 기록이 그대로 소개서 이력으로 흘러갈 수 있다(F5 → F6).
+  title        text not null default '',      -- 콜라보 제목
+  year         text not null default '',      -- 연도(이력 카드와 동일하게 date가 아니라 연도 문자열)
+  description  text not null default '',      -- 콜라보 설명
+  photos       jsonb not null default '[]',   -- Storage public URL 배열(최대 5)
+  link         text not null default '',
   recorded_by  bigint references users(user_id) on delete set null,
   created_at   timestamptz not null default now(),
   updated_at   timestamptz not null default now()

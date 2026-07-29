@@ -41,9 +41,14 @@ export interface Repo {
   // ⭐성사된 콜라보 = 북극성. 스펙 = Obsidian [[성사-기록-계측]]
   recordCollab(input: CollabInput, recordedBy: number | null): Promise<void>;
   listCollabsForBrands(brandIds: number[]): Promise<Collab[]>; // /my — 내 소개서가 한쪽이라도 낀 성사
+  /** 성사 기록을 소개서 "함께한 콜라보"에도 흘려보낸다(F5 → F6). 읽고-덧붙이고-쓴다. */
+  appendCollabHistory(brandId: number, item: Maker["collabHistory"][number]): Promise<void>;
 }
 
 const now = () => kstIso(); // 시각 표기 = KST(+09:00), lib/time.ts
+
+/** 소개서 "함께한 콜라보" 카드 상한 — register 폼(`collabHistory.length < 5`)과 같은 값이어야 한다. */
+const HISTORY_MAX = 5;
 
 /** 지역의 상위 2토막만 — "서울 마포구 연남동" → "서울 마포구". 카드 한 줄에 들어가는 식별 단위. */
 const topRegion = (region?: string | null): string | undefined => {
@@ -528,8 +533,10 @@ class InMemoryRepo implements Repo {
       status: input.status ?? "agreed",
       origin: input.origin,
       title: input.title,
-      happenedOn: input.happenedOn ?? undefined,
-      note: input.note ?? "",
+      year: input.year ?? "",
+      description: input.description ?? "",
+      photos: input.photos ?? [],
+      link: input.link ?? "",
       createdAt: now(),
       recordedBy,
     });
@@ -539,6 +546,11 @@ class InMemoryRepo implements Repo {
     return this.collabs
       .filter((c) => set.has(c.brandAId) || set.has(c.brandBId))
       .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+  }
+  async appendCollabHistory(brandId: number, item: Maker["collabHistory"][number]): Promise<void> {
+    const m = this.makers.find((x) => x.id === brandId);
+    if (!m || m.collabHistory.length >= HISTORY_MAX) return;
+    m.collabHistory = [...m.collabHistory, item];
   }
 }
 
@@ -858,8 +870,10 @@ class SupabaseRepo implements Repo {
       status: input.status ?? "agreed",
       origin: input.origin,
       title: input.title,
-      happened_on: input.happenedOn || null,
-      note: input.note ?? "",
+      year: input.year ?? "",
+      description: input.description ?? "",
+      photos: input.photos ?? [],
+      link: input.link ?? "",
       recorded_by: recordedBy,
     });
     if (error) {
@@ -873,7 +887,7 @@ class SupabaseRepo implements Repo {
     const { data, error } = await this.db
       .from("collabs")
       .select(
-        "id, brand_a_id, brand_b_id, status, origin, title, happened_on, note, created_at, " +
+        "id, brand_a_id, brand_b_id, status, origin, title, year, description, photos, link, created_at, " +
           "brand_a:brands!collabs_brand_a_id_fkey(slug, name), " +
           "brand_b:brands!collabs_brand_b_id_fkey(slug, name)"
       )
@@ -887,7 +901,7 @@ class SupabaseRepo implements Repo {
     }
     type Row = {
       id: number; brand_a_id: number; brand_b_id: number; status: CollabStatus; origin: CollabOrigin;
-      title: string; happened_on: string | null; note: string | null; created_at: string;
+      title: string; year: string | null; description: string | null; photos: string[] | null; link: string | null; created_at: string;
       brand_a: { slug: string; name: string } | null;
       brand_b: { slug: string; name: string } | null;
     };
@@ -898,10 +912,25 @@ class SupabaseRepo implements Repo {
         brandAId: r.brand_a_id, brandAName: r.brand_a!.name, brandASlug: r.brand_a!.slug,
         brandBId: r.brand_b_id, brandBName: r.brand_b!.name, brandBSlug: r.brand_b!.slug,
         status: r.status, origin: r.origin, title: r.title,
-        happenedOn: r.happened_on ?? undefined,
-        note: r.note ?? "",
+        year: r.year ?? "",
+        description: r.description ?? "",
+        photos: Array.isArray(r.photos) ? r.photos : [],
+        link: r.link ?? "",
         createdAt: r.created_at,
       }));
+  }
+  async appendCollabHistory(brandId: number, item: Maker["collabHistory"][number]): Promise<void> {
+    // 읽고-덧붙이고-쓴다. jsonb 통짜 컬럼이라 부분 append가 없다.
+    // ⚠️ 동시 편집과 겹치면 뒤 쓰기가 이긴다 — 대표 1인 운영 규모에선 감수(경합 확률 사실상 0).
+    const { data, error } = await this.db.from("brands").select("collab_history").eq("id", brandId).maybeSingle();
+    if (error || !data) {
+      console.error(`[repo] appendCollabHistory read failed brand=${brandId}: ${error?.message}`);
+      return;
+    }
+    const cur = Array.isArray(data.collab_history) ? (data.collab_history as unknown[]) : [];
+    if (cur.length >= HISTORY_MAX) return; // 폼 상한과 같은 5 — 넘치면 조용히 넘어간다(성사 기록 자체는 이미 됨)
+    const { error: wErr } = await this.db.from("brands").update({ collab_history: [...cur, item] }).eq("id", brandId);
+    if (wErr) console.error(`[repo] appendCollabHistory write failed brand=${brandId}: ${wErr.message}`);
   }
 }
 

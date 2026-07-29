@@ -376,8 +376,11 @@ export async function recordCollabAction(input: {
   brandBId: number;
   origin: "product" | "concierge";
   title: string;
-  happenedOn?: string;
-  note?: string;
+  year?: string;
+  description?: string;
+  photos?: PhotoWire[]; // 사진 URL은 짧지만 배열 한도 이슈를 피하려 다른 경로와 같은 래핑을 쓴다
+  link?: string;
+  alsoAddToProfile?: boolean; // 소개서 "함께한 콜라보"에도 남길지(기본 켬)
 }): Promise<{ error?: string }> {
   const sessionUserId = await getSessionUserId();
   if (!sessionUserId) return { error: "로그인이 필요해요." };
@@ -390,23 +393,39 @@ export async function recordCollabAction(input: {
   const b = await repo.getMakerById(input.brandBId);
   if (!b) return { error: "상대 브랜드를 찾을 수 없어요." };
 
+  const photos = (input.photos ?? []).map((p) => p.u).filter(Boolean).slice(0, 5);
+  const description = (input.description ?? "").trim();
+  const year = (input.year ?? "").trim();
+  const link = (input.link ?? "").trim();
+
   try {
     await repo.recordCollab(
-      {
-        brandAId: a.id,
-        brandBId: b.id,
-        origin: input.origin,
-        title,
-        happenedOn: input.happenedOn || null,
-        note: (input.note ?? "").trim(),
-      },
+      { brandAId: a.id, brandBId: b.id, origin: input.origin, title, year, description, photos, link },
       sessionUserId
     );
-    return {};
   } catch {
     // 조용히 성공한 척하면 북극성이 유실된다 — 실패는 반드시 화면에 띄운다.
     return { error: "기록에 실패했어요. 표가 아직 없으면 SQL을 먼저 실행해주세요." };
   }
+
+  // F5 → F6: 성사가 소개서 이력으로 흘러간다(대표 지시 07-29).
+  // ⚠️ 여기 실패는 **삼킨다** — 성사 기록(북극성)은 이미 남았고, 소개서 반영은 부가 효과다.
+  //    이걸로 전체를 실패 처리하면 "기록이 안 됐나?" 하고 다시 눌러 중복이 생긴다.
+  if (input.alsoAddToProfile !== false) {
+    try {
+      await repo.appendCollabHistory(a.id, {
+        partner: b.name,
+        types: [],
+        desc: description || title,
+        year: year || undefined,
+        photos,
+        link: link || undefined,
+      });
+    } catch {
+      /* 소개서 반영 실패는 무시 — 성사 기록은 살아 있다 */
+    }
+  }
+  return {};
 }
 
 /** 소개서 삭제 — 로그인 소유자만. /my에서 사용. 카드·지표는 FK CASCADE로 함께 삭제. */
