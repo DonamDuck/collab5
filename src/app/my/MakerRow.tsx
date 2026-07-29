@@ -43,7 +43,12 @@ export function MakerRow({
     <div className="rounded-md border border-hairline bg-surface">
       {/* 본문 + 수정·삭제 */}
       <div className="flex items-center gap-2 px-4 py-3">
-        <Link href={`/m/${slug}`} className="min-w-0 flex-1 text-left">
+        {/* hover 면색은 **실제 클릭 대상**에만 — 카드 전체에 주면 수정·삭제 영역까지 반응해
+            "여기 누르면 소개서로 간다"는 신호가 거짓이 된다(QA #31) */}
+        <Link
+          href={`/m/${slug}`}
+          className="-mx-2 min-w-0 flex-1 rounded-md px-2 py-1 text-left transition-colors hover:bg-surface-soft"
+        >
           <p className="flex items-center gap-1.5 text-[15px] font-medium text-ink">
             <span className="min-w-0 truncate">{name}</span>
             {isDemoSlug(slug) && (

@@ -113,22 +113,55 @@ export default async function MyPage({ searchParams }: { searchParams: Promise<{
     );
 
   // ⭐성사된 콜라보 탭 = 북극성. 스펙 = [[성사-기록-계측]]
-  const collabList = (
-    <div>
-      <div className="flex items-start justify-between gap-3">
-        <p className="text-[13px] leading-relaxed text-mute">
-          실제로 하기로 한 콜라보를 남겨두세요.
-          <br />
-          몇 건이 성사됐는지 세는 유일한 기록이에요.
-        </p>
-        <CollabRecorder myBrands={makers.map((m) => ({ id: m.id, name: m.name }))} />
+  //
+  // 빈 상태가 두 갈래다(디자인팀 QA #15):
+  //   ① 소개서가 아예 없다 → 기록 자체가 불가능(A는 반드시 내 소개서). 전엔 지시문만 남고 버튼이
+  //      조용히 사라져 **아무것도 할 수 없는 화면**이 됐다 → 왜 안 되는지 + 나가는 길을 준다.
+  //   ② 소개서는 있는데 기록만 없다 → 다른 3탭과 같은 격의 EmptyState로.
+  const collabList =
+    makers.length === 0 ? (
+      <EmptyState
+        title="소개서를 먼저 만들어주세요"
+        desc={
+          <>
+            콜라보는 <b className="font-medium text-body">내 소개서</b>와 상대 브랜드를 짝지어 기록해요.
+            <br />
+            소개서가 있어야 기록을 남길 수 있어요.
+          </>
+        }
+        ctaLabel="소개서 만들기"
+        ctaHref="/register"
+      >
+        <ConnectMaker />
+      </EmptyState>
+    ) : collabs.length === 0 ? (
+      <div>
+        <EmptyState
+          title="아직 기록된 콜라보가 없어요"
+          desc={
+            <>
+              실제로 하기로 한 콜라보를 남겨두세요.
+              <br />몇 건이 성사됐는지 세는 유일한 기록이에요.
+            </>
+          }
+        >
+          <CollabRecorder myBrands={makers.map((m) => ({ id: m.id, name: m.name }))} />
+        </EmptyState>
       </div>
-      {collabs.length === 0 ? (
-        <p className="mt-6 text-center text-[14px] text-faint">아직 기록된 콜라보가 없어요.</p>
-      ) : (
+    ) : (
+      <div>
+        <div className="flex items-start justify-between gap-3">
+          <p className="text-[13px] leading-relaxed text-mute">
+            실제로 하기로 한 콜라보를 남겨두세요.
+            <br />
+            몇 건이 성사됐는지 세는 유일한 기록이에요.
+          </p>
+          <CollabRecorder myBrands={makers.map((m) => ({ id: m.id, name: m.name }))} />
+        </div>
         <ul className="mt-4 space-y-2">
           {collabs.map((c) => (
-            <li key={c.id} className="rounded-md border border-hairline px-3.5 py-3">
+            // bg-surface — 이 카드만 면색이 없어 다크에서 캔버스가 비쳤다. px도 혼자 3.5였다(QA #31)
+            <li key={c.id} className="rounded-md border border-hairline bg-surface px-4 py-3">
               <div className="flex items-center gap-2">
                 <span className="truncate text-[15px] font-medium text-ink">
                   {c.brandAName} <span className="text-faint">×</span> {c.brandBName}
@@ -151,9 +184,8 @@ export default async function MyPage({ searchParams }: { searchParams: Promise<{
             </li>
           ))}
         </ul>
-      )}
-    </div>
-  );
+      </div>
+    );
 
   return (
     <main className="mx-auto w-full max-w-[640px] px-4 py-10 sm:px-6">
@@ -170,6 +202,7 @@ export default async function MyPage({ searchParams }: { searchParams: Promise<{
         <MyTabs
           initialTab={initialTab}
           mine={mine}
+          mineCount={makers.length}
           saved={savedList}
           savedCount={saved.length}
           reports={reportList}

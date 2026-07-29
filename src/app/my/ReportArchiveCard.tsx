@@ -32,7 +32,7 @@ export function ReportArchiveCard({ item }: { item: CollabReportListItem }) {
     <Link
       href={`/m/${item.toSlug}?report=${encodeURIComponent(item.fromSlug)}`}
       onClick={() => track("report_archive_open")}
-      className="block rounded-md border border-hairline bg-surface p-4 transition-colors hover:border-border-strong"
+      className="block rounded-md border border-hairline bg-surface p-4 transition-colors hover:bg-surface-soft"
     >
       {/* 쌍 캡션(칩) + 상대 지역 — 날짜보다 "어디 브랜드였지"가 재인식에 쓸모 있다(대표 07-26).
           ⚠️ 비비드 Kiwi(bg-primary) 대신 **primary-pale**: Kiwi를 면으로 쓰는 곳은 primary CTA 하나뿐이고

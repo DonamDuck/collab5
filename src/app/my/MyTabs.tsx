@@ -10,6 +10,7 @@ type Tab = "mine" | "saved" | "reports" | "collabs";
 export function MyTabs({
   initialTab,
   mine,
+  mineCount,
   saved,
   savedCount,
   reports,
@@ -19,6 +20,7 @@ export function MyTabs({
 }: {
   initialTab: Tab;
   mine: React.ReactNode;
+  mineCount: number;
   saved: React.ReactNode;
   savedCount: number;
   reports: React.ReactNode;
@@ -30,12 +32,17 @@ export function MyTabs({
 
   // 탭이 4개라 모바일에선 가로로 넘친다 → **활성 탭을 보이는 곳으로 끌어온다.**
   // 없으면 `?tab=collabs`로 들어왔을 때 정작 그 탭이 화면 밖에 잘려 있다(실측).
-  // block:"nearest" — 가로만 맞추고 세로 스크롤은 건드리지 않는다.
+  //
+  // ⚠️ `scrollIntoView`를 쓰지 않는다 — `block:"nearest"`를 줘도 **조상 중 스크롤 가능한 요소를
+  //    전부 훑으며 맞추는** 동작이라 문서 세로 스크롤이 딸려 움직일 수 있다(디자인팀 QA #31).
+  //    레일의 `scrollLeft`만 직접 옮기면 건드리는 축이 하나뿐이라 그 위험이 아예 없다.
+  //    좌표 차이로 계산 — offsetLeft는 offsetParent가 레일이라는 보장이 없어 못 쓴다.
   const rowRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    rowRef.current
-      ?.querySelector('[data-active="true"]')
-      ?.scrollIntoView({ inline: "nearest", block: "nearest" });
+    const row = rowRef.current;
+    const el = row?.querySelector<HTMLElement>('[data-active="true"]');
+    if (!row || !el) return;
+    row.scrollLeft += el.getBoundingClientRect().left - row.getBoundingClientRect().left - 16;
   }, [active]);
 
   const go = (tab: Tab) => {
@@ -46,19 +53,24 @@ export function MyTabs({
   return (
     <div>
       {/* 탭이 4개가 되며 모바일(375px)에서 한 줄에 안 들어간다 → 가로 스크롤 + 간격 축소.
-          no-scrollbar는 globals.css 유틸(스크롤바 숨김, 넘김 제스처만). */}
-      <div ref={rowRef} className="no-scrollbar flex gap-5 overflow-x-auto border-b border-hairline">
-        <TabButton active={active === "mine"} onClick={() => go("mine")}>
+          no-scrollbar는 globals.css 유틸(스크롤바 숨김, 넘김 제스처만).
+          overscroll-x-contain — 레일 끝에서 한 번 더 밀 때 넘침이 문서로 새어 **브라우저 뒤로가기가
+          발동**하던 것 차단(디자인팀 QA #12). 세로축은 건드리지 않는다. */}
+      <div
+        ref={rowRef}
+        className="no-scrollbar flex gap-5 overflow-x-auto overscroll-x-contain border-b border-hairline"
+      >
+        <TabButton active={active === "mine"} onClick={() => go("mine")} count={mineCount}>
           내 소개서
         </TabButton>
-        <TabButton active={active === "saved"} onClick={() => go("saved")}>
-          찜한 콜라보{savedCount > 0 ? ` ${savedCount}` : ""}
+        <TabButton active={active === "saved"} onClick={() => go("saved")} count={savedCount}>
+          찜한 콜라보
         </TabButton>
-        <TabButton active={active === "reports"} onClick={() => go("reports")}>
-          콜라보 리포트{reportCount > 0 ? ` ${reportCount}` : ""}
+        <TabButton active={active === "reports"} onClick={() => go("reports")} count={reportCount}>
+          콜라보 리포트
         </TabButton>
-        <TabButton active={active === "collabs"} onClick={() => go("collabs")}>
-          성사된 콜라보{collabCount > 0 ? ` ${collabCount}` : ""}
+        <TabButton active={active === "collabs"} onClick={() => go("collabs")} count={collabCount}>
+          성사된 콜라보
         </TabButton>
       </div>
       <div className="mt-6">
@@ -72,13 +84,17 @@ export function MyTabs({
 }
 
 // 언더라인 탭 — 선택 시 하단 라이닝(primary) + 볼드. (PreviewTabs와 동일 스타일)
+// 건수는 **라벨과 다른 서체 취급**(작게·mute·tabular-nums) — 라벨에 숫자를 문자열로 붙이면
+// 굵기·크기가 같아 이름의 일부처럼 읽힌다. 4탭 중 '내 소개서'만 건수가 없어 규칙도 깨져 있었다(QA #31).
 function TabButton({
   active,
   onClick,
+  count,
   children,
 }: {
   active: boolean;
   onClick: () => void;
+  count?: number;
   children: React.ReactNode;
 }) {
   return (
@@ -91,6 +107,7 @@ function TabButton({
       }`}
     >
       {children}
+      {!!count && count > 0 && <span className="ml-1 text-[13px] font-medium tabular-nums text-mute">{count}</span>}
     </button>
   );
 }
