@@ -46,6 +46,8 @@ export function SearchClient({ all }: { all: Maker[] }) {
 
   // 기본 = 등록된 전체 카드 노출. 검색/필터는 그 위에서 좁힘.
   const shown = results;
+  // 사용자가 좁혔는가 — 빈 화면의 말이 달라진다(필터 풀기 vs 첫 등록 권하기)
+  const narrowed = !!q.trim() || types.length > 0;
 
   // 검색어·필터 바뀌면 1페이지로
   useEffect(() => setPage(1), [q, types]);
@@ -100,21 +102,42 @@ export function SearchClient({ all }: { all: Maker[] }) {
       <div className="mt-6">
         {shown.length > 0 && <p className="mb-3 text-sm text-mute">총 {shown.length}곳</p>}
 
-        {/* Empty State — 등록 0건 또는 검색 무결과 공용 */}
+        {/* Empty State — **콜드스타트(등록 0건)와 무결과는 다른 상황이다**(QA #33).
+            전엔 한 문구로 뭉뚱그려서, 필터를 걸어 0건이 된 사람에게도 "직접 등록해보세요"라고 했다.
+            좁혀서 0건이면 할 일은 등록이 아니라 **필터를 푸는 것**이다. */}
         {shown.length === 0 && (
           <div className="rounded-lg border border-hairline bg-surface px-4 py-10 text-center">
-            <p className="text-base font-medium text-ink">
-              잘 맞는 곳을 아직 못 찾았어요
-            </p>
-            <p className="mt-1 text-sm text-mute">
-              검색어·필터를 바꿔보거나 직접 등록해도 좋아요.
-            </p>
-            <Link
-              href="/register"
-              className="mt-4 inline-flex h-10 items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-on"
-            >
-              브랜드 등록하기
-            </Link>
+            {narrowed ? (
+              <>
+                <p className="text-base font-medium text-ink">조건에 맞는 브랜드가 없어요</p>
+                <p className="mt-1 text-sm text-mute">
+                  검색어나 콜라보 유형을 바꾸면 더 많은 브랜드를 볼 수 있어요.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setQ("");
+                    setTypes([]);
+                  }}
+                  className="mt-4 inline-flex h-10 items-center rounded-md border border-border-strong bg-surface px-4 text-sm font-medium text-ink"
+                >
+                  검색·필터 초기화
+                </button>
+              </>
+            ) : (
+              <>
+                <p className="text-base font-medium text-ink">아직 등록된 브랜드가 없어요</p>
+                <p className="mt-1 text-sm text-mute">
+                  첫 소개서를 만들어 콜라보를 시작해보세요.
+                </p>
+                <Link
+                  href="/register"
+                  className="mt-4 inline-flex h-10 items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-on"
+                >
+                  브랜드 소개서 만들기
+                </Link>
+              </>
+            )}
           </div>
         )}
 

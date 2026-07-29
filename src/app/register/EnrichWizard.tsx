@@ -468,15 +468,11 @@ export function EnrichWizard({
   const storyItems = options ? storyItemsOf(options, recommendedValues) : [];
   const storyGroups = groupStoryItems(storyItems);
   const linksReady = isPickAnswered(igPick) && isPickAnswered(hpPick) && (!links.mapUrl || mapPick.ans !== null);
-  const steps: Kind[] = [
-    "chips",
-    "confirm",
-    "links",
-    "fields",
-    "oneLiner",
-    "desc",
-    ...(storyItems.length ? (["story"] as Kind[]) : []),
-  ];
+  // ⚠️ 스텝 목록을 **고정**한다(QA #33). 전엔 story를 조건부로 넣어서, 생성이 끝나 storyItems가
+  //    생기는 순간 분모가 **6 → 7로 늘어났다** — "3/6"을 보고 있던 사람에게 남은 양이 갑자기
+  //    불어나는 셈이라 진행 표시가 거짓말을 한다. 보여줄 게 없는 story는 desc에서 바로 apply로
+  //    건너뛴다(아래 버튼이 이미 그렇게 분기하고 있다).
+  const steps: Kind[] = ["chips", "confirm", "links", "fields", "oneLiner", "desc", "story"];
   const stepIdx = steps.indexOf(kind);
   const goNext = () => stepIdx >= 0 && stepIdx < steps.length - 1 && setKind(steps[stepIdx + 1]);
   const goBack = () => {
@@ -854,14 +850,14 @@ export function EnrichWizard({
                             onClick={() => confirmFactual(c.text)}
                             className="h-8 rounded-pill border border-border-strong bg-surface px-3 text-[13px] font-medium text-ink hover:border-primary"
                           >
-                            맞는 정보에요.
+                            맞아요
                           </button>
                           <button
                             type="button"
                             onClick={() => rejectFactual(c.text)}
                             className="h-8 rounded-pill border border-hairline bg-surface px-3 text-[13px] text-mute hover:border-border-strong hover:text-ink"
                           >
-                            아니에요, 삭제해주세요.
+                            아니에요, 지울게요
                           </button>
                         </div>
                       </div>
@@ -1078,7 +1074,7 @@ export function EnrichWizard({
               disabled={descRegenBusy}
               className="mt-4 h-11 w-full rounded-md bg-primary text-sm font-medium text-primary-on disabled:opacity-50"
             >
-              {storyItems.length ? "다음 · 찾은 이야기 고르기" : "선택한 내용으로 채우기"}
+              {storyItems.length ? "다음 · 찾은 이야기 고르기" : "이 내용으로 소개서 채우기"}
             </button>
           </div>
         )}
@@ -1135,7 +1131,7 @@ export function EnrichWizard({
               onClick={apply}
               className="mt-4 h-11 w-full rounded-md bg-primary text-sm font-medium text-primary-on"
             >
-              선택한 내용 담고 시작하기
+              이 내용으로 소개서 채우기
             </button>
           </div>
         )}

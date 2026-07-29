@@ -2,7 +2,7 @@
 // 접힌 스텁 — 탭하면 그 자리에서 기존 편집 UI가 펼쳐진다(시트 이동 없음).
 // 펼쳤지만 빈 채 = 추가 아님(제출 시 값 없으면 어차피 저장 안 됨 — 기존 sanitize/빈값 규칙 재사용).
 export function StubSection({
-  id, label, expanded, hasData, onExpand, onCollapse, onDelete, children, hiddenWhenCollapsed, badge,
+  id, label, expanded, hasData, onExpand, onCollapse, onDelete, children, sub, hiddenWhenCollapsed, badge,
 }: {
   id: string; // 완성도 칩 scroll+focus 타깃
   label: string; // 기존 질문 문장 그대로
@@ -12,6 +12,8 @@ export function StubSection({
   onCollapse: () => void;
   onDelete?: () => void; // 있으면 우상단 버튼이 "삭제"(데이터 비우고 시트로 복귀). 없으면 "접기".
   children: React.ReactNode;
+  /** 제목 아래 설명 한 줄. 정식 슬롯이다 — 호출부에서 `-mt-4` 음수마진으로 끼워 넣지 말 것(QA #33). */
+  sub?: React.ReactNode;
   hiddenWhenCollapsed?: boolean; // 시트 출신 섹션 — 접힌 상태에선 스텁조차 노출하지 않음
   badge?: React.ReactNode; // 라벨 옆 표시(예: AI가 미리 채운 섹션이면 ✨배지)
 }) {
@@ -46,7 +48,13 @@ export function StubSection({
   }
   return (
     <div id={id} className="scroll-mt-4">
-      <div className="mb-[23px] flex items-start justify-between gap-2 border-b border-hairline pb-2">
+      {/* 설명이 있으면 헤더 아래 여백을 줄인다 — 아래 sub가 그 자리를 채운다.
+          전엔 호출부가 `-mt-4`로 이 여백을 **되감아서** 끼워 넣었다(간격이 헤더와 설명 두 곳에 흩어짐). */}
+      <div
+        className={`flex items-start justify-between gap-2 border-b border-hairline pb-2 ${
+          sub ? "mb-3" : "mb-[23px]"
+        }`}
+      >
         {/* 모바일: 배지를 타이틀 위(왼쪽)에 스택 / 데스크탑: 타이틀 옆 인라인(줄바꿈 방지) */}
         <div className="flex min-w-0 flex-col items-start gap-1 sm:flex-row sm:items-center sm:gap-2">
           {badge && <span className="sm:order-2">{badge}</span>}
@@ -60,6 +68,7 @@ export function StubSection({
           {onDelete ? "삭제" : "접기"}
         </button>
       </div>
+      {sub && <p className="mb-4 text-sm leading-relaxed text-mute">{sub}</p>}
       {children}
     </div>
   );

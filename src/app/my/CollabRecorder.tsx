@@ -11,6 +11,7 @@
 // **같은 테이블에 origin만 다르게** 쌓인다 → "제품이 언제부터 스스로 돌기 시작했나"가 한 목록에 보인다.
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { searchAction, recordCollabAction } from "@/lib/actions";
 import { uploadPhoto } from "@/lib/upload";
 import { useDismissable } from "@/components/useDismissable";
@@ -220,8 +221,16 @@ export function CollabRecorder({ myBrands }: { myBrands: MyBrand[] }) {
                 <>
                   <input value={q} onChange={(e) => search(e.target.value)} placeholder="상호로 검색" className={field} />
                   {searching && <p className="mt-1.5 text-[13px] text-faint">찾는 중…</p>}
-                  {!searching && q.trim() && hits.length === 0 && (
-                    <p className="mt-1.5 text-[13px] text-faint">검색 결과가 없어요.</p>
+                  {/* ⚠️ "검색 결과가 없어요"만으론 **왜 없는지**를 모른다 — collab5에 소개서가 있는
+                      브랜드만 고를 수 있다는 게 이 화면의 규칙인데 어디에도 안 적혀 있었다(QA #33). */}
+                  {!searching && q.trim().length >= 2 && hits.length === 0 && (
+                    <p className="mt-1.5 text-[13px] leading-relaxed text-mute">
+                      collab5에 소개서가 있는 브랜드만 고를 수 있어요. 아직 없다면 상대에게{" "}
+                      <Link href="/register" className="font-medium text-primary-on underline underline-offset-2">
+                        소개서 만들기
+                      </Link>
+                      를 권해보세요.
+                    </p>
                   )}
                   {hits.length > 0 && (
                     <ul className="mt-1.5 space-y-1">

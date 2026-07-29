@@ -1566,13 +1566,13 @@ function RegisterForm() {
           id="sec-story"
           badge={aiFilled.has("story") ? <AiBadge /> : null}
           label="왜 이 브랜드를 시작하셨나요?"
+          sub="시작하게 된 계기를 편하게 적어주세요."
           hiddenWhenCollapsed
           expanded={openSections.has("story")}
           hasData={hasStory}
           onExpand={() => openSection("story")}
           onCollapse={() => closeSection("story")}
         >
-          <p className="mb-4 -mt-4 text-sm text-mute">시작하게 된 계기를 편하게 적어주세요.</p>
           <textarea
             value={story}
             onChange={(e) => setStory(e.target.value)}
@@ -1587,13 +1587,13 @@ function RegisterForm() {
           id="sec-activities"
           badge={aiFilled.has("activities") ? <AiBadge /> : null}
           label="주로 어떤 활동을 하나요?"
+          sub="대표 활동을 최대 5가지 소개해주세요. 사진도 담을 수 있어요."
           hiddenWhenCollapsed
           expanded={openSections.has("activities")}
           hasData={hasActivities}
           onExpand={() => openSection("activities")}
           onCollapse={() => closeSection("activities")}
         >
-          <p className="mb-4 -mt-4 text-sm text-mute">대표 활동을 최대 5가지 소개해주세요. 사진도 담을 수 있어요.</p>
           {/* [비활성] 미선택 활동 힌트 재노출 배너 — AI 플로우에서 사용자가 안 고른 추천은
               부정확할 수 있어 굳이 다시 띄우지 않음(대표 지시). 데이터(actHints/usedActHints)는
               보관 중이라, '선택한 것만·정확도 판단해 재노출' 고도화 시 여기 복원. → 백로그 [[위저드-힌트배너-재노출]] */}
@@ -1685,13 +1685,13 @@ function RegisterForm() {
           id="sec-collabs"
           badge={aiFilled.has("collabs") ? <AiBadge /> : null}
           label="이런 콜라보 경험이 있어요."
+          sub="선택 · 최대 5개 · 지난 콜라보를 더하면 “검증된 파트너”라는 신호가 돼요."
           hiddenWhenCollapsed
           expanded={openSections.has("collabs")}
           hasData={hasCollabs}
           onExpand={() => openSection("collabs")}
           onCollapse={() => closeSection("collabs")}
         >
-          <p className="mb-4 -mt-4 text-sm text-mute">선택 · 최대 5개 · 지난 콜라보를 더하면 “검증된 파트너”라는 신호가 돼요.</p>
           <div>
 
             {/* [비활성] 미선택 콜라보 힌트 재노출 배너 — AI 플로우에서 안 고른 추천은 부정확할 수
