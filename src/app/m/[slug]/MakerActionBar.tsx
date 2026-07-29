@@ -25,6 +25,7 @@ export function MakerActionBar({
   contactEmail,
   senderName,
   viewerBrands = [],
+  isOwner = false,
 }: {
   slug: string;
   makerId: number;
@@ -36,6 +37,9 @@ export function MakerActionBar({
   contactEmail?: string; // 소유자 가입 이메일 — 채널(인스타/홈피) 없을 때 이메일 폴백
   senderName?: string; // 제안자 상호 — 소개서 0개일 때 인사말 폴백
   viewerBrands?: { id: number; slug: string; name: string }[]; // 제안자의 소개서들 — 어떤 걸로 제안할지 칩 선택
+  /** 내가 이 소개서의 주인인가 — 주인에겐 '나에게 제안·찜'이 말이 안 되고, 눌리면 북극성 퍼널이 오염된다
+   *  (07-29 디자인팀 QA 지적). 서버에도 같은 가드가 있고 여긴 화면 층. */
+  isOwner?: boolean;
 }) {
   const [saved, setSaved] = useState(initialSaved);
   const [loginOpen, setLoginOpen] = useState(false);
@@ -352,7 +356,8 @@ export function MakerActionBar({
               🔗 링크 복사
             </button>
 
-            {/* 찜 하트 — 빈 → 채워진 빨강 토글 */}
+            {/* 찜 하트 — 빈 → 채워진 빨강 토글. 내 소개서면 숨김(내가 나를 찜하는 건 신호가 아니다) */}
+            {!isOwner && (
             <button
               type="button"
               onClick={toggleHeart}
@@ -377,26 +382,39 @@ export function MakerActionBar({
                 />
               </svg>
             </button>
+            )}
           </div>
 
           {/* 백보드 바 — 흰 배경 + 상단 좌우 라운드. 콜라보 액션 전용 */}
           <div className="flex items-center gap-2.5 rounded-t-2xl border border-b-0 border-hairline bg-surface px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 shadow-e2">
-            {/* 콜라보 분석 — 고스트(왼쪽) */}
-            <button
-              type="button"
-              onClick={handleReport}
-              className="flex h-12 flex-[0.8] items-center justify-center rounded-md border border-border-strong bg-surface text-base font-medium text-ink transition-colors"
-            >
-              콜라보 분석
-            </button>
-            {/* 콜라보 시작하기 — primary */}
-            <button
-              type="button"
-              onClick={handlePropose}
-              className="flex h-12 flex-1 items-center justify-center rounded-md bg-primary text-base font-medium text-primary-on transition-colors"
-            >
-              콜라보 시작하기
-            </button>
+            {isOwner ? (
+              /* 내 소개서 모드 — 제안·분석은 자기 자신 대상이라 말이 안 된다. 여기서 할 일은 '고치기'다. */
+              <a
+                href={`/register?edit=${slug}`}
+                className="flex h-12 flex-1 items-center justify-center rounded-md bg-primary text-base font-medium text-primary-on transition-colors"
+              >
+                소개서 수정하기
+              </a>
+            ) : (
+              <>
+                {/* 콜라보 분석 — 고스트(왼쪽) */}
+                <button
+                  type="button"
+                  onClick={handleReport}
+                  className="flex h-12 flex-[0.8] items-center justify-center rounded-md border border-border-strong bg-surface text-base font-medium text-ink transition-colors"
+                >
+                  콜라보 분석
+                </button>
+                {/* 콜라보 시작하기 — primary */}
+                <button
+                  type="button"
+                  onClick={handlePropose}
+                  className="flex h-12 flex-1 items-center justify-center rounded-md bg-primary text-base font-medium text-primary-on transition-colors"
+                >
+                  콜라보 시작하기
+                </button>
+              </>
+            )}
           </div>
         </div>
       </div>

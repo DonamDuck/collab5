@@ -330,12 +330,27 @@ export async function updateMakerFlagsAction(
 }
 
 /** 찜(저장) 토글 — 로그인만 하면 누구나 관심 업체 저장. 소유권 무관(방향성 시그널). */
+/** 이 브랜드가 내 것인가 — 자기 자신에게 하는 행동(찜·제안)을 서버에서 걸러내는 공용 판정.
+ *  ⭐**북극성 지표의 순도 장치다.** UI를 아무리 막아도 서버가 받아주면 언젠가 섞인다
+ *  (딥링크·구버전 화면·자동화). 실패는 조용히 no-op — 사용자에겐 아무 일도 아니어야 한다. */
+async function ownsBrand(sessionUserId: number, brandId: number): Promise<boolean> {
+  try {
+    const m = await repo.getMakerById(brandId);
+    return !!m && m.ownerUserId === sessionUserId;
+  } catch {
+    return false; // 판정 실패 시엔 막지 않는다 — 정상 사용자를 잠그는 게 더 나쁘다
+  }
+}
+
 export async function setMakerSavedAction(
   makerId: number,
   saved: boolean
 ): Promise<{ error?: string }> {
   const sessionUserId = await getSessionUserId();
   if (!sessionUserId) return { error: "찜하려면 로그인이 필요해요." };
+  // 내 소개서를 내가 찜하는 건 신호가 아니라 잡음이다 — 찜은 "누가 누굴 눈여겨보나"의 방향성 지표라서.
+  // UI에서도 막지만(소유자 모드) 서버가 마지막 관문이다(07-29, 디자인팀 QA 지적).
+  if (await ownsBrand(sessionUserId, makerId)) return {};
   try {
     await repo.setMakerSaved(sessionUserId, makerId, saved);
     return {};
@@ -355,6 +370,10 @@ export async function recordCollabRequestAction(
   //    사용자는 멀쩡히 연락했는데 북극성 퍼널엔 안 잡혔다. 무계정 열람이 제품 컨셉이라 더 컸다.
   //    스키마도 이미 `from_user_id` nullable("비로그인 null")로 이 경우를 전제하고 있었다.
   const sessionUserId = await getSessionUserId();
+  // 🚨 자기 자신에게 보내는 '연락 시도'는 북극성 퍼널을 오염시킨다(07-29, 디자인팀 QA 지적).
+  //    소유자가 자기 소개서에서 [콜라보 시작하기]를 누르면 자기→자기 1건이 그대로 쌓였다.
+  //    조용히 no-op — 사용자에겐 복사·채널 열기가 그대로 되고, 지표만 안 더럽힌다.
+  if (sessionUserId && (await ownsBrand(sessionUserId, toBrandId))) return {};
   try {
     await repo.recordCollabRequest(sessionUserId, toBrandId, channel, fromBrandId ?? null);
     return {};
