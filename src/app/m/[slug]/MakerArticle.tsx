@@ -51,7 +51,10 @@ export function MakerArticle({ maker, isOwner, logoUrl, readOnly }: {
                   </div>
                 )}
                 {a.desc && (
-                  <p className="mt-1 text-[16px] leading-relaxed text-mute">{a.desc}</p>
+                  // ⚠️ whitespace-pre-line — 폼이 textarea(멀티라인)라 줄바꿈·빈 줄로 문단을 나눠 쓰는데,
+                  //    이게 없으면 **전부 한 문단으로 뭉개진다**(대표 제보 07-29). 소개서의 다른 장문 필드
+                  //    (자세히소개·시작이야기·협업/파트너 서술·콜라보 내용)는 전부 갖고 있었고 활동만 빠져 있었다.
+                  <p className="mt-1 whitespace-pre-line text-[16px] leading-relaxed text-mute">{a.desc}</p>
                 )}
                 {a.photos.length > 0 && (
                   <div className="mt-3 max-w-[460px] print:mx-auto">
