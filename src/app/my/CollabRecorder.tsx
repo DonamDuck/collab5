@@ -9,7 +9,8 @@
 //
 // 지금은 사실상 대표 운영 도구지만, 채팅에 "콜라보 하기로 했어요"가 붙으면
 // **같은 테이블에 origin만 다르게** 쌓인다 → "제품이 언제부터 스스로 돌기 시작했나"가 한 목록에 보인다.
-import { useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { searchAction, recordCollabAction } from "@/lib/actions";
 import { uploadPhoto } from "@/lib/upload";
 import { useDismissable } from "@/components/useDismissable";
@@ -23,6 +24,7 @@ const YEARS = Array.from({ length: 2030 - 1991 + 1 }, (_, i) => String(2030 - i)
 const PHOTO_MAX = 5;
 
 export function CollabRecorder({ myBrands }: { myBrands: MyBrand[] }) {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   // 작성 중인 폼(8칸)이라 딤 클릭으로 닫지 않는다 — 배경을 실수로 터치하면 쓰던 내용이
   // 확인 없이 통째로 사라졌다(대표 정책 + QA 07-29). 닫기는 ESC 또는 X 버튼으로.
@@ -41,30 +43,50 @@ export function CollabRecorder({ myBrands }: { myBrands: MyBrand[] }) {
   const [link, setLink] = useState("");
   const [alsoAdd, setAlsoAdd] = useState(true);
   const [err, setErr] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false); // 완료 안내 — 전엔 새로고침만 되고 아무 말이 없었다
   const [searching, startSearch] = useTransition();
   const [saving, startSave] = useTransition();
 
-  if (myBrands.length === 0) return null; // 내 소개서가 없으면 A(제안한 쪽)를 고를 수 없다
 
   const reset = () => {
     setQ(""); setHits([]); setPicked(null); setTitle(""); setYear(""); setDesc("");
     setPhotos([]); setLink(""); setOrigin("concierge"); setAlsoAdd(true); setErr(null);
   };
 
+  // 브랜드 검색 — 타이핑마다 서버로 나가던 것을 디바운스 + 응답 경쟁 차단으로 정리(QA #20).
+  //   ⚠️ '캔버스가든'을 치면 조회가 6~7번 나갔고, 더 나쁜 건 **먼저 보낸 짧은 질의의 응답이
+  //      늦게 도착하면 그 결과가 최신 목록을 덮었다**(경쟁 상태). 한 글자 질의는 결과가 많아
+  //      느리기 쉬워서 실제로 잘 일어난다.
+  //   → `seq`로 "내가 마지막으로 쏜 요청"만 반영한다. 최소 2자(1자는 후보가 너무 넓다).
+  const seq = useRef(0);
   const search = (text: string) => {
     setQ(text);
     setPicked(null);
-    if (text.trim().length < 1) return setHits([]);
-    startSearch(async () => {
-      const rows = await searchAction(text);
-      setHits(
-        rows
-          .filter((m) => m.id !== brandAId) // 나 자신은 상대 후보에서 뺀다
-          .slice(0, 6)
-          .map((m) => ({ id: m.id, name: m.name, oneLiner: m.oneLiner, region: m.region }))
-      );
-    });
   };
+  useEffect(() => {
+    if (q.trim().length < 2) {
+      setHits([]);
+      return;
+    }
+    const mine = ++seq.current;
+    const t = setTimeout(() => {
+      startSearch(async () => {
+        const rows = await searchAction(q);
+        if (mine !== seq.current) return; // 더 최근 질의가 이미 나갔다 — 이 응답은 버린다
+        setHits(
+          rows
+            .filter((m) => m.id !== brandAId) // 나 자신은 상대 후보에서 뺀다
+            .slice(0, 6)
+            .map((m) => ({ id: m.id, name: m.name, oneLiner: m.oneLiner, region: m.region }))
+        );
+      });
+    }, 280);
+    return () => clearTimeout(t);
+  }, [q, brandAId]);
+
+  // ⚠️ 조기 반환은 **훅을 전부 부른 뒤**에 — 위에 두면 myBrands가 비었을 때 훅 개수가 달라져
+  //    Rules of Hooks를 어긴다(디바운스 useEffect를 추가하며 드러남).
+  if (myBrands.length === 0) return null; // 내 소개서가 없으면 A(제안한 쪽)를 고를 수 없다
 
   // 사진 업로드 — register와 같은 규율: 선택 즉시 업로드, 실패하면 지우고 한 번만 알린다.
   // uploadPhoto에 단계별 타임아웃이 있어 무한 스피너로 갇히지 않는다(07-29 수정).
@@ -116,7 +138,12 @@ export function CollabRecorder({ myBrands }: { myBrands: MyBrand[] }) {
       if (res.error) return setErr(res.error);
       reset();
       setOpen(false);
-      window.location.reload(); // 목록은 서버 렌더 — 가장 단순하고 확실한 갱신
+      // ⚠️ `window.location.reload()`였다 — 흰 화면이 깜빡이고 **완료 안내가 없어서**
+      //    목록을 눈으로 뒤져야 했다(못 찾으면 같은 걸 또 기록한다). `router.refresh()`는
+      //    서버 컴포넌트만 다시 받아 화면이 유지된다(MakerRow와 같은 패턴).
+      router.refresh();
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2600);
     });
   };
 
@@ -133,6 +160,20 @@ export function CollabRecorder({ myBrands }: { myBrands: MyBrand[] }) {
       >
         + 성사 기록
       </button>
+
+      {/* 완료 안내 — 전엔 새로고침만 되고 아무 말이 없어서 **목록을 눈으로 뒤져야** 했다.
+          못 찾으면 같은 콜라보를 또 기록하게 된다(북극성 숫자가 부풀어 오른다). */}
+      {saved && (
+        <div className="pointer-events-none fixed inset-x-0 bottom-6 z-[60] flex justify-center px-4">
+          <p
+            role="status"
+            aria-live="polite"
+            className="rounded-pill bg-ink px-4 py-2.5 text-sm font-medium text-on-dark shadow-e2"
+          >
+            성사 기록을 남겼어요.
+          </p>
+        </div>
+      )}
 
       {open && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 sm:items-center" {...dialog.overlayProps}>
