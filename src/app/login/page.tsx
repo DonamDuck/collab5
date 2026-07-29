@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { signInAction } from "@/lib/auth-actions";
 import { authEnvReady, createBrowserAuthClient } from "@/lib/supabase/client";
 import { LoadingOverlay } from "@/components/LoadingOverlay";
+import { Field, authInputCls } from "@/components/Field";
 import { PasswordInput } from "@/components/PasswordInput";
 
 const KAKAO_ON = process.env.NEXT_PUBLIC_KAKAO_ENABLED === "1";
@@ -72,24 +73,31 @@ function LoginForm() {
           if (!pending) submit(); // 연타·IME 확정 Enter가 이중 제출로 새지 않게
         }}
       >
-        <div className="mt-6 space-y-3">
-          <input
-            type="email"
-            name="email"
-            autoComplete="username"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="이메일"
-            className="h-11 w-full rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
-          />
-          <PasswordInput
-            name="password"
-            autoComplete="current-password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="비밀번호"
-            className="h-11 w-full rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
-          />
+        {/* 라벨은 글자를 쳐도 남는다 — placeholder만 쓰면 입력 시작과 동시에 무슨 칸인지 사라진다(QA #19) */}
+        <div className="mt-6 space-y-4">
+          <Field label="이메일" htmlFor="login-email">
+            <input
+              id="login-email"
+              type="email"
+              name="email"
+              autoComplete="username"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="you@brand.com"
+              className={authInputCls}
+            />
+          </Field>
+          <Field label="비밀번호" htmlFor="login-password">
+            <PasswordInput
+              id="login-password"
+              name="password"
+              autoComplete="current-password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="비밀번호를 입력해주세요"
+              className={authInputCls}
+            />
+          </Field>
         </div>
         {err && <p className="mt-2 text-sm text-red-600">{err}</p>}
         <button

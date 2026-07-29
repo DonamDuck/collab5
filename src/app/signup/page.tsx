@@ -7,6 +7,7 @@ import { signUpAction, checkSignupDuplicatesAction } from "@/lib/auth-actions";
 import { uploadPhoto } from "@/lib/upload";
 import { Avatar } from "@/components/Avatar";
 import { LoadingOverlay } from "@/components/LoadingOverlay";
+import { Field, authInputCls } from "@/components/Field";
 import { PasswordInput } from "@/components/PasswordInput";
 import { validatePassword, formatPhone } from "@/lib/validation";
 
@@ -71,6 +72,11 @@ export default function SignupPage() {
     if (password !== password2) return "비밀번호가 서로 달라요.";
     if (!phone.trim()) return "휴대폰번호를 입력해주세요.";
     if (!brandName.trim()) return "브랜드명을 입력해주세요.";
+    // 중복은 버튼을 잠그는 대신 여기서 잡는다 — 각 칸 옆 안내는 스크롤을 내리면 안 보인다(QA #17).
+    // 에러 문구는 제출 버튼 바로 위에 뜨므로 "왜 안 되는지"가 누른 자리에서 보인다.
+    if (dup.email) return DUP_MSG.email;
+    if (dup.phone) return DUP_MSG.phone;
+    if (dup.brandName) return DUP_MSG.brandName;
     if (!agree) return "서비스 이용약관에 동의해주세요.";
     return "";
   };
@@ -108,45 +114,49 @@ export default function SignupPage() {
       <form
         onSubmit={(e) => {
           e.preventDefault();
-          if (!pending && !imgUploading && !hasDup) submit();
+          if (!pending && !imgUploading) submit();
         }}
       >
       <div className="mt-6 space-y-4">
-        <Field label="이메일">
+        <Field label="이메일" htmlFor="signup-email">
           <input
+            id="signup-email"
             type="email"
             name="email"
             autoComplete="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="you@brand.com"
-            className={inputCls}
+            className={authInputCls}
           />
           {dup.email && <p className="mt-1.5 text-sm text-red-600">{DUP_MSG.email}</p>}
         </Field>
-        <Field label="비밀번호">
+        <Field label="비밀번호" htmlFor="signup-password">
           <PasswordInput
+            id="signup-password"
             name="new-password"
             autoComplete="new-password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="8자 이상, 특수문자 1개 이상"
-            className={inputCls}
+            className={authInputCls}
           />
         </Field>
-        <Field label="비밀번호 확인">
+        <Field label="비밀번호 확인" htmlFor="signup-password2">
           {/* 확인칸도 new-password — 매니저가 '같은 새 비번'으로 인식해 양쪽에 함께 채워준다 */}
           <PasswordInput
+            id="signup-password2"
             name="new-password-confirm"
             autoComplete="new-password"
             value={password2}
             onChange={(e) => setPassword2(e.target.value)}
             placeholder="한 번 더 입력해주세요"
-            className={inputCls}
+            className={authInputCls}
           />
         </Field>
-        <Field label="휴대폰번호">
+        <Field label="휴대폰번호" htmlFor="signup-phone">
           <input
+            id="signup-phone"
             type="tel"
             name="phone"
             autoComplete="tel"
@@ -155,18 +165,19 @@ export default function SignupPage() {
             onChange={(e) => setPhone(formatPhone(e.target.value))}
             placeholder="010-0000-0000"
             maxLength={13}
-            className={inputCls}
+            className={authInputCls}
           />
           {dup.phone && <p className="mt-1.5 text-sm text-red-600">{DUP_MSG.phone}</p>}
         </Field>
-        <Field label="브랜드명">
+        <Field label="브랜드명" htmlFor="signup-brand">
           <input
+            id="signup-brand"
             name="organization"
             autoComplete="organization"
             value={brandName}
             onChange={(e) => setBrandName(e.target.value)}
             placeholder="예: 캔버스가든"
-            className={inputCls}
+            className={authInputCls}
           />
           {dup.brandName && <p className="mt-1.5 text-sm text-red-600">{DUP_MSG.brandName}</p>}
         </Field>
@@ -220,7 +231,9 @@ export default function SignupPage() {
       {err && <p className="mt-3 text-sm text-red-600">{err}</p>}
       <button
         type="submit"
-        disabled={pending || imgUploading || hasDup}
+        // disabled는 pending/업로드 계열만 — 중복(hasDup)으로 막으면 안내가 화면 위쪽이라
+        // 스크롤을 내린 상태에선 "왜 안 눌리지"만 남는다. 제출 앞단에서 잡아 말해준다(QA #17).
+        disabled={pending || imgUploading}
         className="mt-5 h-12 w-full rounded-md bg-primary text-base font-medium text-primary-on disabled:opacity-50"
       >
         {pending ? "가입 중…" : "가입하기"}
@@ -238,25 +251,4 @@ export default function SignupPage() {
   );
 }
 
-const inputCls =
-  "h-11 w-full rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus";
 
-function Field({
-  label,
-  optional,
-  children,
-}: {
-  label: string;
-  optional?: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <div>
-      <label className="mb-1.5 block text-[15px] font-medium text-body">
-        {label}
-        {optional && <span className="ml-1 font-normal text-faint">· 선택</span>}
-      </label>
-      {children}
-    </div>
-  );
-}

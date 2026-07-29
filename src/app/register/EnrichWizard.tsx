@@ -212,6 +212,9 @@ export function EnrichWizard({
   // ESC로 나가려 할 때 한 번 물어보는 확인창(대표 확정 07-29).
   // ⚠️ 위저드는 몇 스텝에 걸쳐 고른 게 쌓여 있고 되돌릴 방법이 없다 — ESC 한 번에 날리면 안 된다.
   const [confirmClose, setConfirmClose] = useState(false);
+  // 버튼을 잠그는 대신 눌렀을 때 띄우는 안내(QA #17) — 조건이 채워지면 자연히 사라진다.
+  const [seedErr, setSeedErr] = useState("");
+  const [linkErr, setLinkErr] = useState("");
 
   // ⓪ 씨앗 — 지역·업종 둘 다 필수(동명 구분 검증자 + 크롤 정확도)
   const [regionInput, setRegionInput] = useState("");
@@ -692,13 +695,15 @@ export function EnrichWizard({
                 「{query} · {regionInput.trim()} · {btype.trim()}」(으)로 웹에서 찾아볼게요.
               </p>
             )}
+            {/* 눌리게 두고 무엇이 빠졌는지 말해준다 — 회색 버튼은 이유를 안 남긴다(QA #17) */}
             <button
-              onClick={runCrawl}
-              disabled={!seedReady}
-              className="mt-5 h-11 w-full rounded-md bg-primary text-sm font-medium text-primary-on disabled:opacity-40"
+              type="button"
+              onClick={() => (seedReady ? runCrawl() : setSeedErr("지역과 어떤 브랜드인지를 모두 알려주세요."))}
+              className="mt-5 h-11 w-full rounded-md bg-primary text-sm font-medium text-primary-on"
             >
               ✨ 이 정보로 찾아보기
             </button>
+            {seedErr && !seedReady && <p className="mt-2 text-center text-sm text-red-600">{seedErr}</p>}
           </div>
         )}
 
@@ -970,12 +975,13 @@ export function EnrichWizard({
               )}
             </div>
             <button
-              onClick={generate}
-              disabled={!linksReady}
-              className="mt-4 h-11 w-full rounded-md bg-primary text-sm font-medium text-primary-on disabled:opacity-40"
+              type="button"
+              onClick={() => (linksReady ? generate() : setLinkErr("SNS와 홈페이지 항목에 모두 답해주세요."))}
+              className="mt-4 h-11 w-full rounded-md bg-primary text-sm font-medium text-primary-on"
             >
               ✨ 작성한 정보들로 소개서 작성 시작
             </button>
+            {linkErr && !linksReady && <p className="mt-2 text-center text-sm text-red-600">{linkErr}</p>}
             {!linksReady && (
               <p className="mt-1.5 text-center text-[13px] text-faint">
                 SNS와 홈페이지 모두 답해주시면 시작할 수 있어요.

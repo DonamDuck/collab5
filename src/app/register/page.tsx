@@ -636,8 +636,14 @@ function RegisterForm() {
   };
 
   // ── enrich: 업체명 → 위저드 오픈(불러오기) ──
+  // ⭐AI 플로우의 **첫 관문**이라 disabled로 막으면 진입 자체가 봉쇄된다 — 눌리게 두고 왜 안 되는지 말해준다(QA #17).
+  const [queryErr, setQueryErr] = useState("");
   const openWizard = () => {
-    if (!query.trim()) return;
+    if (!query.trim()) {
+      setQueryErr("브랜드 이름을 알려주세요.");
+      return;
+    }
+    setQueryErr("");
     setWizardOpen(true);
   };
 
@@ -1203,12 +1209,12 @@ function RegisterForm() {
           <button
             type="button"
             onClick={openWizard}
-            disabled={!query.trim()}
-            className="h-11 shrink-0 rounded-md bg-primary px-4 text-sm font-medium text-primary-on disabled:opacity-40"
+            className="h-11 shrink-0 rounded-md bg-primary px-4 text-sm font-medium text-primary-on"
           >
             ✨ 시작하기
           </button>
         </div>
+        {queryErr && <p className="mt-2 text-sm text-red-600">{queryErr}</p>}
       </div>
 
       {/* AI 불러오기(위) ↔ 직접 입력(아래) 구분 소제목 */}
@@ -1296,7 +1302,7 @@ function RegisterForm() {
               <button
                 type="button"
                 onClick={draftDescription}
-                disabled={!name.trim() || draftBusy}
+                disabled={draftBusy}
                 className="inline-flex h-8 shrink-0 items-center gap-1 rounded-pill border border-primary bg-primary-pale px-3 text-sm font-medium text-primary-on disabled:opacity-40"
               >
                 {draftBusy ? "쓰는 중…" : "✨ 초안 다시 받기"}

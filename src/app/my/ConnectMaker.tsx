@@ -16,7 +16,10 @@ export function ConnectMaker({ label = "기존 소개서 연결하기" }: { labe
   const [err, setErr] = useState("");
   const [pending, start] = useTransition();
 
-  const submit = () =>
+  const submit = () => {
+    // 빈 칸으로 눌러도 **무엇이 빠졌는지 말해준다** — disabled로 막으면 이유가 안 남는다(QA #17)
+    if (!link.trim()) return setErr("소개서 링크나 주소(m-xxxxxx)를 입력해주세요.");
+    if (!pw.trim()) return setErr("소개서 관리 비밀번호를 입력해주세요.");
     start(async () => {
       setErr("");
       const r = await claimBySlugAction(link, pw);
@@ -27,6 +30,7 @@ export function ConnectMaker({ label = "기존 소개서 연결하기" }: { labe
       setOpen(false);
       router.refresh();
     });
+  };
 
   if (!open)
     return (
@@ -70,7 +74,7 @@ export function ConnectMaker({ label = "기존 소개서 연결하기" }: { labe
         <button
           type="button"
           onClick={submit}
-          disabled={pending || !link.trim() || !pw.trim()}
+          disabled={pending}
           className="h-11 flex-1 rounded-md bg-primary text-sm font-medium text-primary-on disabled:opacity-50"
         >
           {pending ? "연결 중…" : "연결하기"}
