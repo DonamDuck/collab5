@@ -458,9 +458,13 @@ export async function deleteMakerAction(slug: string): Promise<{ error?: string 
 }
 
 /** register 완료 얼럿 버전 분기용 */
-export async function getAuthStateAction(): Promise<{ loggedIn: boolean }> {
+export async function getAuthStateAction(): Promise<{ loggedIn: boolean; userId?: number }> {
   const user = await getSessionUser();
-  return { loggedIn: !!user };
+  if (!user) return { loggedIn: false };
+  // userId는 임시저장 키를 계정별로 가르는 데 쓴다 — 안 가르면 A가 로그아웃하고 B가 로그인했을 때
+  // **B의 폼에 A의 브랜드 초안이 복구된다**(공용 PC 사고). 민감정보가 아니라 정수 PK다.
+  const userId = (await getSessionUserId()) ?? undefined;
+  return { loggedIn: true, userId };
 }
 
 /** edit 모드 프리필 데이터 — 공개 데이터(/m과 동일)라 게이트 없이 반환.

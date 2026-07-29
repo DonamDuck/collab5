@@ -20,6 +20,7 @@ import { ScrollLock } from "@/components/ScrollLock";
 import { PasswordInput } from "@/components/PasswordInput";
 import type { ActivityHint, CollabHint, EnrichField } from "@/lib/enrich";
 import { blendDescriptions, canRegenDesc, noteRegenDesc } from "@/lib/enrichBlend";
+import { useDraftAutosave, draftKey, agoLabel } from "./useDraftAutosave";
 import { EnrichWizard, type WizardFill } from "./EnrichWizard";
 import { SortableCard, emptyDnd, type DndState } from "./SortableCard";
 import { BlockEditor, emptyBlock } from "./BlockEditor";
@@ -828,6 +829,10 @@ function RegisterForm() {
   };
   const [createdSlug, setCreatedSlug] = useState("");
   const [loggedIn, setLoggedIn] = useState(false);
+  const [userId, setUserId] = useState<number | undefined>(undefined); // 임시저장 키를 계정별로 가르는 용도
+  // ⚠️ 인증 응답 전엔 임시저장을 켜지 않는다 — 로그인 유저가 그 사이에 타이핑하면 anon 키에 쓰이고,
+  //    잠시 뒤 키가 u{id}로 바뀌며 "방금 쓰던 내용"이 복구 배너로 뜨는 기괴한 상황이 된다.
+  const [authResolved, setAuthResolved] = useState(false);
   const [editPw, setEditPw] = useState("");
   const [savingPw, setSavingPw] = useState(false);
   const [pwErr, setPwErr] = useState("");
@@ -839,8 +844,60 @@ function RegisterForm() {
   const [editBooting, setEditBooting] = useState(!!editParam);
 
   useEffect(() => {
-    getAuthStateAction().then((s) => setLoggedIn(s.loggedIn)).catch(() => {});
+    getAuthStateAction()
+      .then((s) => { setLoggedIn(s.loggedIn); setUserId(s.userId); })
+      .catch(() => {})
+      .finally(() => setAuthResolved(true));
   }, []);
+
+  // ── 임시저장(localStorage) ── 대표 확정 A안(2026-07-29). 훅 = ./useDraftAutosave
+  //    새로고침·뒤로가기·탭 닫기로 초안이 통째로 날아가던 걸 막는다. **자동 복구는 안 한다**(배너로 물음).
+  //    사진은 이미 Storage에 올라가 URL만 남으므로 가볍다 — 단 data URL(로컬 mock)은 걸러야 5MB 쿼터를 안 터뜨린다.
+  const keepPhotos = (ps: { url: string; uploading?: boolean }[]) =>
+    ps.filter((x) => !x.uploading && /^https?:\/\//.test(x.url)).map((x) => ({ url: x.url }));
+  const draftSnapshot = {
+    name, oneLiner, description, story, offersNote, seeksNote,
+    offers, values, targetAudience, collabOpen, searchVisible,
+    instagram, homepage, mapUrl, address, introFileUrl, blocks,
+    photos: keepPhotos(photos),
+    activities: activities.map((a) => ({ title: a.title, desc: a.desc, link: a.link, photos: keepPhotos(a.photos) })),
+    collabHistory: collabHistory.map((h) => ({
+      partner: h.partner, types: h.types, desc: h.desc, year: h.year, link: h.link, photos: keepPhotos(h.photos),
+    })),
+    openSections: [...openSections],
+  };
+  type DraftShape = typeof draftSnapshot;
+  const hasDraftContent = !!(
+    name.trim() || oneLiner.trim() || description.trim() || story.trim() ||
+    offersNote.trim() || seeksNote.trim() || offers.length || values.length ||
+    targetAudience.length || blocks.length || photos.length ||
+    activities.some((a) => a.title.trim() || a.desc.trim() || a.photos.length) ||
+    collabHistory.some((h) => h.partner.trim() || h.desc.trim() || h.types.length || h.photos.length)
+  );
+  const draft = useDraftAutosave<DraftShape>({
+    key: editBooting || !authResolved ? null : draftKey(userId, editSlug),
+    snapshot: draftSnapshot,
+    hasContent: hasDraftContent,
+  });
+  /** 저장본을 폼에 얹는다 — 사용자가 [이어서 쓰기]를 눌렀을 때만.
+   *  (위쪽 applyDraft는 AI 초안 적용용이라 이름을 나눈다) */
+  const restoreDraft = (d: DraftShape) => {
+    setName(d.name); setOneLiner(d.oneLiner); setDescription(d.description); setStory(d.story);
+    setOffersNote(d.offersNote); setSeeksNote(d.seeksNote);
+    setOffers(d.offers); setValues(d.values); setTargetAudience(d.targetAudience);
+    setCollabOpen(d.collabOpen); setSearchVisible(d.searchVisible);
+    setInstagram(d.instagram); setHomepage(d.homepage); setMapUrl(d.mapUrl); setAddress(d.address);
+    setIntroFileUrl(d.introFileUrl); setBlocks(d.blocks); setPhotos(d.photos);
+    setActivities(d.activities.map((a) => ({ title: a.title, desc: a.desc, link: a.link ?? "", photos: a.photos })));
+    setCollabHistory(
+      (d.collabHistory.length ? d.collabHistory : [emptyHist()]).map((h) => ({
+        partner: h.partner, types: h.types, desc: h.desc, year: h.year, link: h.link ?? "",
+        photos: h.photos, typeInput: "", typeInputOpen: false,
+      }))
+    );
+    setOpenSections(new Set(d.openSections));
+    draft.dismiss();
+  };
 
   useEffect(() => {
     const slug = editParam;
@@ -981,10 +1038,12 @@ function RegisterForm() {
         try {
           sessionStorage.removeItem(`edit_pw_${editSlug}`);
         } catch {}
+        draft.finish(); // 저장본 삭제 + 이탈 경고 해제 — 안 하면 이동하다 경고창이 뜬다
         router.push(`/m/${editSlug}`);
         return;
       }
       const { slug } = await createMakerAction(payload);
+      draft.finish();
       setCreatedSlug(slug);
       setPortfolioOpen(true); // redirect 대신 소개서 얼럿
     });
@@ -1102,6 +1161,56 @@ function RegisterForm() {
       )}
 
       <div className="mt-8 space-y-12">
+        {/* 이어서 쓰기 배너 — **자동 복구는 절대 하지 않는다.**
+            수정 모드에서 낡은 초안을 덜컥 얹으면 서버에 잘 저장해둔 내용을 되돌려버린다.
+            그래서 ①항상 물어보고 ②저장 시각을 보여주고 ③기본 강조를 모드별로 다르게 둔다
+            (생성=이어서 쓰기 / 수정=서버 내용 유지). */}
+        {draft.found && (
+          <div className="rounded-lg border border-border-strong bg-surface px-4 py-3 shadow-e1">
+            <p className="text-[15px] font-medium text-ink">
+              {agoLabel(draft.found.savedAt)} 쓰시던 내용이 있어요.
+            </p>
+            <p className="mt-0.5 text-sm text-mute">
+              {editSlug
+                ? "지금 화면은 저장된 소개서예요. 불러오면 그때 쓰던 내용으로 덮어써요."
+                : "이어서 쓰거나, 새로 시작할 수 있어요."}
+            </p>
+            <div className="mt-3 flex gap-2">
+              {(() => {
+                const cont = (
+                  <button
+                    key="cont"
+                    type="button"
+                    onClick={() => draft.found && restoreDraft(draft.found.data)}
+                    className={`h-10 rounded-md px-4 text-sm font-medium ${
+                      editSlug
+                        ? "border border-border-strong bg-surface text-ink"
+                        : "bg-primary text-primary-on"
+                    }`}
+                  >
+                    이어서 쓰기
+                  </button>
+                );
+                const fresh = (
+                  <button
+                    key="fresh"
+                    type="button"
+                    onClick={draft.clear}
+                    className={`h-10 rounded-md px-4 text-sm font-medium ${
+                      editSlug
+                        ? "bg-primary text-primary-on"
+                        : "border border-border-strong bg-surface text-mute"
+                    }`}
+                  >
+                    {editSlug ? "저장된 내용 그대로" : "새로 시작"}
+                  </button>
+                );
+                return editSlug ? [fresh, cont] : [cont, fresh];
+              })()}
+            </div>
+          </div>
+        )}
+
         {/* 검수 게이트 배너 — AI가 채운 직후 */}
         {reviewMode && (
           <div className="rounded-lg border border-primary bg-surface px-4 py-3 shadow-e1">
