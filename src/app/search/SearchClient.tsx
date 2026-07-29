@@ -176,7 +176,9 @@ export function SearchClient({ all }: { all: Maker[] }) {
 
         {/* 페이지네이션 — 결과가 있으면 1페이지여도 항상 노출(대표 지시). 0건은 위 빈 상태가 담당 */}
         {shown.length > 0 && (
-          <nav className="mt-6 flex items-center justify-center gap-1.5" aria-label="페이지">
+          // flex-wrap: 페이지 번호를 전부 그리는 구조라 375px·5페이지부터 '이전'이 화면 밖으로
+          //   밀려 누를 수 없었고 페이지 전체에 가로 스크롤이 생겼다(QA 07-29).
+          <nav className="mt-6 flex flex-wrap items-center justify-center gap-1.5" aria-label="페이지">
             <button
               type="button"
               onClick={() => setPage((p) => Math.max(1, p - 1))}

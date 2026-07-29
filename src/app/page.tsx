@@ -62,7 +62,7 @@ export default async function Home() {
           온로드 라이즈 2번(제목·섭타이틀·목업 통째로 세트). delay로 히어로(1번) 뒤에 이어 올라온다.
           데스크탑·모바일 동일 대응(스크롤 위치 무관, 로드 시 순차 재생). 대표 지시 2026-07-22. */}
       <section className="home-rise mt-16" style={{ animationDelay: "600ms" }}>
-        <h2 className="text-center text-2xl font-bold tracking-tight text-ink sm:text-[28px]">
+        <h2 className="text-balance break-keep text-center text-2xl font-bold tracking-tight text-ink sm:text-[28px]">
           3분이면 브랜드 소개서가 완성돼요.
         </h2>
         <p className="mx-auto mt-2 max-w-[440px] break-keep text-center text-base leading-relaxed text-body">
@@ -91,36 +91,32 @@ export default async function Home() {
         // ⚠️ 풀블리드에 `w-screen`/`100vw`를 쓰면 세로 스크롤바 폭만큼 가로 스크롤이 생긴다.
         //    대신 **레이아웃을 안 건드리는** 방식 — 거대한 box-shadow로 좌우를 칠하고
         //    clip-path로 위아래만 잘라낸다(가로는 -100vmax로 열어둠).
-        <section
-          className="mt-16 -mx-4 bg-surface-soft px-4 py-14 sm:-mx-6 sm:px-6"
-          style={{
-            boxShadow: "0 0 0 100vmax var(--surface-soft)",
-            clipPath: "inset(0 -100vmax)",
-          }}
+        /* ⚠️ 밴드를 '통째로' 리빌한다 — 배경과 내용이 같은 순간에 도착해야 한다.
+           전엔 section(회색 배경)이 Reveal 밖이라 배경만 먼저 그려지고, 안쪽 Reveal은
+           하단 컷(-22%) 때문에 반 화면(≈382px) 더 스크롤해야 터졌다 → "텅 빈 회색 띠"가
+           화면 1/3을 차지한 채 올라와 스크롤 흐름이 끊겼다(대표 QA 07-29, 실측 확인).
+           Reveal은 style prop을 안 받으므로(내부에서 transitionDelay 점유) 풀블리드
+           box-shadow·clip-path는 Tailwind 임의 속성으로 옮긴다. */
+        <Reveal
+          as="section"
+          className="mt-16 -mx-4 bg-surface-soft px-4 py-14 [box-shadow:0_0_0_100vmax_var(--surface-soft)] [clip-path:inset(0_-100vmax)] sm:-mx-6 sm:px-6"
         >
-          <Reveal>
-            <h2 className="text-center text-2xl font-bold tracking-tight text-ink sm:text-[28px]">
-              콜라보 가능한 브랜드
-            </h2>
-            <p className="mx-auto mt-2 max-w-[440px] break-keep text-center text-base leading-relaxed text-body">
-              지금 함께할 파트너를 찾고 있는 브랜드예요.
-            </p>
-          </Reveal>
-          {/* 제목과 같은 리듬으로 함께 올라온다 — 제목만 리빌이고 카드는 박혀 있으면 섹션이 따로 노는
-              느낌이 난다(대표 QA 07-27, 실제로 "UX가 깨진 느낌"으로 보고됨).
-              ⚠️전엔 "-mx-4 풀블리드가 리빌 래퍼에 잘릴까봐" 밖에 뒀는데, Reveal은 transform·opacity만
-                 쓰고 overflow를 자르지 않는다 — 가장자리로 흐르는 건 그대로다(실측 확인).
-              delay 90ms = 아래 온보딩 카드 스태거와 같은 간격(제목 → 카드 순서로 읽히게). */}
-          <Reveal delay={90} className="mt-8">
+          <h2 className="text-balance break-keep text-center text-2xl font-bold tracking-tight text-ink sm:text-[28px]">
+            콜라보 가능한 브랜드
+          </h2>
+          <p className="mx-auto mt-2 max-w-[440px] break-keep text-center text-base leading-relaxed text-body">
+            지금 함께할 파트너를 찾고 있는 브랜드예요.
+          </p>
+          <div className="mt-8">
             <BrandCarousel brands={collabBrands} />
-          </Reveal>
-        </section>
+          </div>
+        </Reveal>
       )}
 
       {/* §9.6 온보딩 3스텝 */}
       <section className="mt-16">
         <Reveal>
-          <h2 className="text-center text-2xl font-bold tracking-tight text-ink sm:text-[28px]">
+          <h2 className="text-balance break-keep text-center text-2xl font-bold tracking-tight text-ink sm:text-[28px]">
             브랜드 소개서, 이렇게 만들어요
           </h2>
         </Reveal>
@@ -156,7 +152,7 @@ export default async function Home() {
       {/* 왜 소개서? — DM vs 소개서 */}
       <section className="mt-16">
         <Reveal>
-          <h2 className="text-center text-2xl font-bold tracking-tight text-ink sm:text-[28px]">
+          <h2 className="text-balance break-keep text-center text-2xl font-bold tracking-tight text-ink sm:text-[28px]">
             브랜드 소개서는 이렇게 활용할 수 있어요.
           </h2>
         </Reveal>

@@ -59,7 +59,9 @@ export function BrandCarousel({ brands }: { brands: Maker[] }) {
         //   mandatory에선 끝에 얌전히 멈추질 못한다.
         // scroll-pl-* 없으면 snap-start가 패딩을 무시하고 카드를 스크롤포트 맨 끝에 붙여
         //   첫 장이 25px 밀린 채로 시작한다(왼쪽 여백 증발 + 화살표가 처음부터 뜸).
-        className="no-scrollbar -mx-4 flex snap-x snap-proximity gap-3 overflow-x-auto scroll-pl-4 px-4 pb-1 sm:-mx-6 sm:scroll-pl-6 sm:px-6"
+        // overscroll-x-contain: 레일 끝에서 한 번 더 밀면 오버스크롤이 문서로 새어
+        //   브라우저 뒤로가기가 발동한다(가장자리까지 붙은 레일이라 엣지 제스처와도 겹침). 세로축은 그대로.
+        className="no-scrollbar -mx-4 flex snap-x snap-proximity gap-3 overflow-x-auto overscroll-x-contain scroll-pl-4 px-4 pb-1 sm:-mx-6 sm:scroll-pl-6 sm:px-6"
       >
         {brands.map((m) => (
           <BrandCard key={m.id} m={m} />

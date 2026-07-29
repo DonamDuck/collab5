@@ -111,7 +111,8 @@ function PhoneGallery({ demo }: { demo: { key: string; slides: readonly { src: s
         onPointerCancel={endDrag}
         onDragStart={(e) => e.preventDefault()}
         style={{ gap: SLIDE_GAP_PX }}
-        className="flex snap-x snap-mandatory overflow-x-auto pl-[calc(6%+5px)] pr-[calc(13%+5px)] pb-2 cursor-grab select-none active:cursor-grabbing sm:snap-none sm:pl-1 sm:pr-[21px] [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        // overscroll-x-contain: 레일 끝에서 오버스크롤이 문서로 새면 브라우저 뒤로가기가 발동한다. 세로축은 그대로.
+        className="flex snap-x snap-mandatory overflow-x-auto overscroll-x-contain pl-[calc(6%+5px)] pr-[calc(13%+5px)] pb-2 cursor-grab select-none active:cursor-grabbing sm:snap-none sm:pl-1 sm:pr-[21px] [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         {demo.slides.map((s, i) => (
           <div

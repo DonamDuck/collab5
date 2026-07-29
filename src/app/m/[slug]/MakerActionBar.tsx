@@ -508,7 +508,14 @@ export function MakerActionBar({
 
       {/* 복사 완료 토스트 (3종 통일 — 링크/메시지/이메일 주소) */}
       {toast && (
-        <div className="fixed bottom-[92px] left-1/2 z-[60] -translate-x-1/2 rounded-pill bg-ink px-4 py-2.5 text-[13px] font-medium text-surface shadow-e2 print:hidden">
+        // pointer-events-none: 토스트가 링크복사·찜 버튼, 제안 시트 CTA와 겹치는 자리에 떠서
+        //   2초 동안 그 아래 버튼의 탭을 가로챘다(QA 07-29). 위치도 하단 UI 스택 위로 올린다.
+        // role=status: 스크린리더가 복사 완료를 읽도록(design.md 계약).
+        <div
+          role="status"
+          aria-live="polite"
+          className="pointer-events-none fixed bottom-[calc(9.5rem+env(safe-area-inset-bottom))] left-1/2 z-[60] -translate-x-1/2 rounded-pill bg-ink px-4 py-2.5 text-[13px] font-medium text-surface shadow-e2 print:hidden"
+        >
           {toast}
         </div>
       )}

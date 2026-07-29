@@ -11,9 +11,15 @@ export async function SiteHeader() {
 
   return (
     <header className="sticky top-0 z-10 flex h-14 items-center justify-between border-b border-hairline bg-canvas px-4 sm:px-6 print:hidden">
-      <Link href="/" className="flex items-center">
+      {/* ⚠️ 좁은 폰(375·360px)에서 워드마크(123px)+우측메뉴(244px)가 가용폭을 넘겨
+          페이지 전체에 가로 스크롤이 생겼다(전 페이지 공통이라 영향 큼, QA 07-29).
+          모바일은 심볼만, sm↑는 워드마크로 분기해 93.5px을 회수한다.
+          body/html에 overflow-x-hidden으로 덮으면 홈의 100vmax 풀블리드 밴드가 잘리므로 금지. */}
+      <Link href="/" className="flex min-w-0 items-center" aria-label="collab5 홈">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/logo-lockup.svg" alt="collab5" className="h-7 w-auto" />
+        <img src="/logo-mark.svg" alt="" aria-hidden="true" className="h-7 w-7 sm:hidden" />
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/logo-lockup.svg" alt="" aria-hidden="true" className="hidden h-7 w-auto sm:block" />
       </Link>
       <nav className="flex items-center gap-1.5 text-sm sm:gap-2">
         {/* 찾기 — 돋보기 아이콘 */}

@@ -98,8 +98,9 @@ export function PhotoSlider({
           onPointerUp={onPointerEnd}
           onPointerCancel={onPointerEnd}
           onClick={(e) => openZoom(idx, e)}
+          // overscroll-x-contain: 레일 끝에서 오버스크롤이 문서로 새면 브라우저 뒤로가기가 발동한다. 세로축은 그대로.
           className={`no-scrollbar flex ${
-            multi ? "overflow-x-auto" : "overflow-hidden"
+            multi ? "overflow-x-auto overscroll-x-contain" : "overflow-hidden"
           } ${multi && !dragging ? "snap-x snap-mandatory" : ""} ${
             multi ? (dragging ? "cursor-grabbing" : "cursor-grab") : "cursor-zoom-in"
           }`}
