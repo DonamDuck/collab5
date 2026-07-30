@@ -37,13 +37,13 @@ colors:
   faint: "#9b9a91"              # placeholder·disabled 텍스트
   on-dark: "#fbfaf6"            # 다크 위 텍스트
   # Surface
-  canvas: "#fbfaf6"             # 라이트 기본 배경 (웜 오프화이트)
-  surface: "#ffffff"            # 카드·패널
-  surface-soft: "#f4f2ec"       # 옅은 채움(인풋 disabled·검색바·hover)
+  canvas: "#ffffff"             # 라이트 기본 배경 (순백 — 07-31 웜 오프화이트에서 전환)
+  surface: "#ffffff"            # 카드·패널 (canvas와 동일 — 구분은 hairline이 담당)
+  surface-soft: "#f5f5f6"       # 옅은 채움(인풋 disabled·검색바·hover) · 중성 그레이
   surface-dark: "#2c2c2a"       # 다크 카드 표면
-  # Hairline / Border
-  hairline: "#e7e4da"           # 기본 0.5px 보더
-  border-strong: "#d8d5cb"      # 강조·hover 보더
+  # Hairline / Border — 중성 그레이. 웜톤이면 순백 위에서 탁하게 뜬다
+  hairline: "#eaeaec"           # 기본 0.5px 보더
+  border-strong: "#d7d7db"      # 강조·hover 보더
   # Semantic (브랜드색과 분리 — Kiwi를 성공색으로 재사용 금지)
   success: "#3b6d11"
   success-pale: "#eaf3de"
@@ -286,7 +286,9 @@ collab5 디자인 시스템은 **결 있는 로컬·인디 브랜드**가 서로
 2. **생산성** — 토큰·컴포넌트 재사용으로 새 화면을 빠르게 조립한다.
 3. **무대 원칙** — 사용자 콘텐츠(이미지·브랜드색·목소리)가 주인공. collab5 비주얼은 절제한다. *"stage, not spotlight."*
 
-기본 무드는 **"단단하지만 다정한(warm-premium)"** — 깔끔하고 절제된 프레임에 따뜻함·발랄함·약간의 귀여움을 얹는다(Airbnb의 따뜻한 마켓플레이스 감성 참고). 화면 대부분은 웜 오프화이트 `{colors.canvas}` 또는 Night `{colors.ink}` 위에 잉크 텍스트로 차분하게 깔리고, **단 하나의 비비드 형광 Kiwi `{colors.primary}`** 가 "스파크"로 아주 아껴서 등장한다.
+기본 무드는 **"단단하지만 다정한"** — 깔끔하고 절제된 프레임에 따뜻함·발랄함·약간의 귀여움을 얹는다(Airbnb의 따뜻한 마켓플레이스 감성 참고). 화면 대부분은 순백 `{colors.canvas}` 또는 Night `{colors.ink}` 위에 잉크 텍스트로 차분하게 깔리고, **단 하나의 비비드 형광 Kiwi `{colors.primary}`** 가 "스파크"로 아주 아껴서 등장한다.
+
+> **2026-07-31 전환** — 라이트 배경이 웜 오프화이트(#fbfaf6)에서 **순백(#ffffff)** 으로 바뀌었다(대표 확정). 예전 canvas는 카드(#ffffff)와 밝기 차가 1.6%뿐이라 구분 기능은 못 하고 크림빛 색조만 남았던 상태다. 이때 회색 계열(`hairline`·`surface-soft`·`border-strong`)도 **함께 중성화**했다 — 웜톤 회색만 남기면 순백 대비로 누렇게 뜬다. 따라서 "따뜻함"은 이제 **면색이 아니라 액센트(Kiwi·민트·레몬·콘)와 카피·일러스트**가 만든다.
 
 > **단일 브랜드 컬러 철학** — Airbnb(Rausch #ff385c)도 Wise(green #9fe870)도 *브랜드 색 하나를 희소하게* 써서 강력한 인지를 만든다. collab5의 Kiwi도 같다: 대부분 뉴트럴 + 한두 곳의 Kiwi 순간.
 
@@ -323,8 +325,8 @@ collab5 디자인 시스템은 **결 있는 로컬·인디 브랜드**가 서로
   --corn:#6e86d6; --corn-pale:#dce3f7; --corn-on:#1b2a5c;
   --mint:#b8e9c8; --mint-pale:#e3f6ea; --mint-on:#27500a;
   --ink:#222222; --body:#4a4a45; --mute:#6b6a63; --faint:#9b9a91; --on-dark:#fbfaf6;
-  --canvas:#fbfaf6; --surface:#ffffff; --surface-soft:#f4f2ec; --surface-dark:#2c2c2a;
-  --hairline:#e7e4da; --border-strong:#d8d5cb;
+  --canvas:#ffffff; --surface:#ffffff; --surface-soft:#f5f5f6; --surface-dark:#2c2c2a;
+  --hairline:#eaeaec; --border-strong:#d7d7db;
   --success:#3b6d11; --warning:#ba7517; --danger:#e24b4a; --info:#378add;
   --focus:#6e86d6; --scrim:#222222;
   --r-sm:10px; --r-md:16px; --r-lg:22px; --r-xl:28px; --r-pill:9999px;
@@ -356,7 +358,8 @@ html{font-size:17px} /* 루트 17px — rem 기준. 가독성 확대 확정 */
 - **Mint + `*-pale` 틴트** — 파스텔, **면적용**(넓은 배경·태그). 비비드와 같은 자리에 겹치지 않는다.
 
 **Surface**
-- `canvas`(웜 오프화이트) = 라이트 기본 배경. `surface` = 카드 흰색. `surface-soft` = 옅은 채움(검색바·hover·disabled).
+- `canvas`(순백) = 라이트 기본 배경. `surface` = 카드 — **canvas와 같은 #ffffff라 카드의 경계는 `hairline`(+필요시 `shadow-e1`)이 전담한다.** 배경만으로 카드를 띄우려 하지 말 것. `surface-soft` = 옅은 채움(검색바·hover·disabled)이자 섹션 밴드.
+- **회색 계열은 전부 중성(neutral) 그레이다.** 웜톤 회색을 넣으면 순백 위에서 누렇게 떠 보인다(07-31 실측). 따뜻함은 면색이 아니라 Kiwi·민트·레몬·콘 액센트가 담당한다.
 - **Night** `ink` #222 = 다크 기본/잉크. 다크는 collab5의 시그니처 무드(Kiwi 극대화).
 
 **Text** — `ink`(primary) → `body`(보조) → `mute`(캡션·메타) → `faint`(placeholder·disabled). 순서대로 옅어진다.

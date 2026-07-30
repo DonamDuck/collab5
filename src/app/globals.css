@@ -15,8 +15,13 @@
   --corn: #6e86d6; --corn-pale: #dce3f7; --corn-on: #1b2a5c;
   --mint: #b8e9c8; --mint-pale: #e3f6ea; --mint-on: #27500a;
   --ink: #222222; --body: #4a4a45; --mute: #6b6a63; --faint: #9b9a91; --on-dark: #fbfaf6;
-  --canvas: #fbfaf6; --surface: #ffffff; --surface-soft: #f4f2ec; --surface-dark: #2c2c2a;
-  --hairline: #e7e4da; --border-strong: #d8d5cb;
+  /* 라이트 배경 = 순백(대표 확정 07-31). 예전 canvas(#fbfaf6)는 카드(#ffffff)와 밝기 차가
+     1.6%뿐이라 '크림빛 색조'였을 뿐 도형 구분 기능은 거의 못 하고 있었다 → 없애도 잃는 게 없다.
+     ⚠️ 대신 회색 계열을 **같이** 중성화해야 한다. hairline·surface-soft가 웜톤(누런기)이면
+        순백 대비 때문에 탁하게 뜬다(실측 확인). 웜톤은 여기서 걷어내고, 브랜드의 따뜻함은
+        Kiwi/민트/레몬/콘 액센트가 담당한다. 다크 테마는 아래에서 따로 정의 — 영향 없음. */
+  --canvas: #ffffff; --surface: #ffffff; --surface-soft: #f5f5f6; --surface-dark: #2c2c2a;
+  --hairline: #eaeaec; --border-strong: #d7d7db;
   --success: #3b6d11; --warning: #ba7517; --danger: #e24b4a; --info: #378add;
   /* 성공 면색 — 성공 배너에 --primary-pale(Kiwi)을 쓰면 브랜드색이 '성공'을 뜻하게 되어
      Kiwi 희소성이 무너진다(디자인팀 QA #23). --success와 같은 계열의 옅은 면. */
