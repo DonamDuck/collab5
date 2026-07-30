@@ -8,6 +8,7 @@ import { authEnvReady, createBrowserAuthClient } from "@/lib/supabase/client";
 import { LoadingOverlay } from "@/components/LoadingOverlay";
 import { Field, authInputCls } from "@/components/Field";
 import { PasswordInput } from "@/components/PasswordInput";
+import { GoogleButton } from "@/components/GoogleButton";
 
 const KAKAO_ON = process.env.NEXT_PUBLIC_KAKAO_ENABLED === "1";
 
@@ -117,6 +118,8 @@ function LoginForm() {
           카카오로 시작하기
         </button>
       )}
+      {/* 플래그 off면 아무것도 안 그린다(기본 off 배포) — GoogleButton 내부에서 판정 */}
+      <GoogleButton className="mt-2" />
       <div className="mt-5 flex items-center justify-center gap-3 text-sm">
         <Link href="/signup" className="font-medium text-primary-on underline-offset-2 hover:underline">
           회원가입

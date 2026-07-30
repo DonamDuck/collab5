@@ -1,8 +1,8 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { authEnabled, createAuthClient } from "./supabase/server";
-import { upsertProfile, findDuplicates, type DuplicateFlags } from "./profiles";
+import { authEnabled, createAuthClient, getSessionUser } from "./supabase/server";
+import { upsertProfile, findDuplicates, getProfile, type DuplicateFlags } from "./profiles";
 import { validatePassword } from "./validation";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://collab5.vercel.app";
@@ -65,6 +65,82 @@ export async function signUpAction(input: SignUpInput): Promise<{ error?: string
   }
   // 스펙: 자동 로그인 X → 세션 정리 후 /login으로 보냄(클라에서 이동)
   await supabase.auth.signOut();
+  return {};
+}
+
+// ── 소셜 로그인 온보딩(/welcome) ─────────────────────────────────────────────
+// 구글은 이름·이메일만 준다. 우리 계정은 **브랜드명·휴대폰번호가 필수**이고, 특히 브랜드명은
+// 제안 시트의 인사말·발신자 표시에 그대로 쓰여서 비면 곧바로 화면에 티가 난다.
+// 그래서 "일단 통과시키고 나중에 채우기"가 아니라 들어오는 길목에서 한 번 받는다.
+
+export interface OnboardingState {
+  /** 서버가 세션을 확인했나 (쿠키 미도달 시 false) */
+  authed: boolean;
+  /** 브랜드명·휴대폰번호가 둘 다 있음 = 온보딩 불필요 → 곧장 홈으로 */
+  done: boolean;
+  email: string;
+  brandName: string;
+  phone: string;
+}
+
+// 해요체 — 사용자에게 보이는 문구는 이 저장소 톤을 따른다(위 DUP_MSG는 기존 가입 흐름 전용).
+const ONBOARD_DUP = {
+  phone: "이미 이 번호로 가입한 계정이 있어요.",
+  brandName: "이미 같은 이름으로 가입한 계정이 있어요.",
+} as const;
+const ONBOARD_EXPIRED = "로그인 정보를 확인하지 못했어요. 다시 로그인해주세요.";
+
+/** /welcome 진입 판정 — 세션 여부 + 프로필이 이미 채워졌는지. */
+export async function getOnboardingStateAction(): Promise<OnboardingState> {
+  const blank: OnboardingState = { authed: false, done: false, email: "", brandName: "", phone: "" };
+  if (!authEnabled()) return blank;
+  const user = await getSessionUser();
+  if (!user) return blank;
+  const profile = await getProfile(user.id);
+  const brandName = profile?.brandName?.trim() ?? "";
+  const phone = profile?.phone?.trim() ?? "";
+  return {
+    authed: true,
+    // ⭐ 둘 다 있어야 done — 다시 로그인할 때마다 온보딩이 뜨면 안 된다.
+    done: !!(brandName && phone),
+    email: profile?.email || user.email || "",
+    brandName,
+    phone,
+  };
+}
+
+/** /welcome 제출 — 중복 확인 후 프로필 채우기. 소유자는 세션에서만 얻는다(클라 값 신뢰 금지). */
+export async function completeOnboardingAction(input: {
+  brandName: string;
+  phone: string;
+}): Promise<{ error?: string }> {
+  if (!authEnabled()) return { error: NO_AUTH_MSG };
+  const user = await getSessionUser();
+  if (!user) return { error: ONBOARD_EXPIRED };
+
+  const brandName = input.brandName.trim();
+  const phone = input.phone.trim();
+  if (!brandName) return { error: "브랜드명을 입력해주세요." };
+  if (!phone) return { error: "휴대폰번호를 입력해주세요." };
+
+  // excludeUuid=본인 — 재시도로 다시 들어왔을 때 자기 값과 부딪히지 않게 한다.
+  const dup = await findDuplicates({ phone, brandName, excludeUuid: user.id });
+  if (dup.phone) return { error: ONBOARD_DUP.phone };
+  if (dup.brandName) return { error: ONBOARD_DUP.brandName };
+
+  // upsert라 email·profileImage를 안 넘기면 기존 값이 지워진다 — 있던 값을 그대로 다시 실어준다.
+  const existing = await getProfile(user.id);
+  try {
+    await upsertProfile({
+      uuid: user.id,
+      brandName,
+      phone,
+      email: existing?.email || user.email || "",
+      profileImage: existing?.profileImage || "",
+    });
+  } catch {
+    return { error: "저장에 실패했어요. 잠시 후 다시 시도해주세요." };
+  }
   return {};
 }
 

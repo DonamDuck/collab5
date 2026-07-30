@@ -9,6 +9,7 @@ import { Avatar } from "@/components/Avatar";
 import { LoadingOverlay } from "@/components/LoadingOverlay";
 import { Field, authInputCls } from "@/components/Field";
 import { PasswordInput } from "@/components/PasswordInput";
+import { GoogleButton } from "@/components/GoogleButton";
 import { validatePassword, formatPhone } from "@/lib/validation";
 
 export default function SignupPage() {
@@ -239,6 +240,8 @@ export default function SignupPage() {
         {pending ? "가입 중…" : "가입하기"}
       </button>
       </form>
+      {/* 플래그 off면 아무것도 안 그린다(기본 off 배포). <form> 밖이라 제출과 섞이지 않는다 */}
+      <GoogleButton className="mt-2" />
       <p className="mt-4 text-center text-sm text-mute">
         이미 계정이 있나요?{" "}
         <Link href="/login" className="font-medium text-primary-on underline-offset-2 hover:underline">
