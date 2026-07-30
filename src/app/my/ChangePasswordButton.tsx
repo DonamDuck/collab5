@@ -69,21 +69,21 @@ export function ChangePasswordButton({ email }: { email: string }) {
       >
         비밀번호 변경
       </button>
-      {err && <p className="mt-2 text-center text-sm text-red-600">{err}</p>}
+      {err && <p className="mt-2 text-center text-[13px] text-danger">{err}</p>}
 
       {pending && <LoadingOverlay label="메일 보내는 중이에요…" />}
 
       {done && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 p-4 sm:items-center">
           <div className="w-full max-w-sm rounded-lg border border-hairline bg-surface p-6 text-center shadow-e2">
-            <p className="text-lg font-bold text-balance break-keep text-ink">📧 메일을 보냈어요</p>
+            <p className="text-[18px] font-bold text-balance break-keep text-ink">📧 메일을 보냈어요</p>
             <p className="mt-2 text-[15px] leading-relaxed break-keep text-body">
               {email}로 비밀번호 변경 링크를 보냈어요. 메일함을 확인해주세요.
             </p>
             <button
               type="button"
               onClick={() => setDone(false)}
-              className="mt-5 h-12 w-full rounded-md bg-primary text-base font-medium text-primary-on"
+              className="mt-5 h-12 w-full rounded-md bg-primary text-[15px] font-medium text-primary-on"
             >
               닫기
             </button>

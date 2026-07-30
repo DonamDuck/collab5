@@ -36,6 +36,7 @@ export function MakerArticle({ maker, isOwner, logoUrl, readOnly }: {
           <div className="space-y-6">
             {maker.activities.map((a, i) => (
               <div key={i} className="print:break-inside-avoid">
+                <ItemLabel kind="활동" index={i} total={maker.activities.length} />
                 {(a.title || a.link) && (
                   <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
                     {a.title && (
@@ -82,6 +83,7 @@ export function MakerArticle({ maker, isOwner, logoUrl, readOnly }: {
           <div className="space-y-6">
             {maker.collabHistory.map((h, i) => (
               <div key={i} className="print:break-inside-avoid">
+                <ItemLabel kind="콜라보" index={i} total={maker.collabHistory.length} />
                 {/* 제목·타입·연도 한 줄, 그 오른쪽에 밑줄 텍스트 '아티클 보기'(헤더가 주인공, 링크는 가벼운 액센트) */}
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
                   <p className="text-[16px] text-body">
@@ -205,6 +207,24 @@ function Section({ title, children }: { title: string; children: React.ReactNode
       <h2 className="mb-4 text-[21px] font-bold leading-snug tracking-tight text-ink print:break-after-avoid-page">{title}</h2>
       {children}
     </section>
+  );
+}
+
+// 항목 아이브로우 — "활동 1" "콜라보 2"처럼 제목 위에 얹는 작은 길잡이.
+// 배경: 소개서를 쭉 읽다 보면 **지금 읽는 게 활동인지 콜라보인지 놓친다**는 제보(대표 지인, 07-31).
+//   섹션 타이틀은 스크롤로 올라가 버리는데 아이템은 계속 이어지기 때문.
+// · 숫자만(1. 2.) 붙이는 안은 순서만 주고 "무슨 섹션인지"는 여전히 안 알려줘서 기각.
+// · 제목 앞 인라인("콜라보 1 · 제목")은 사장님 제목과 섞여 길어지고 모바일에서 두 줄로 꺾인다 → 기각.
+// · 홈의 `STEP 1/2/3` 아이브로우와 같은 문법이라 시스템에 이미 있는 패턴을 재사용한다.
+// ⚠️ **2개 이상일 때만** — 1개뿐인데 "활동 1"만 뜨면 뒤에 뭔가 더 있는 줄 알게 된다.
+// ⚠️ 색은 faint(회색). 홈 STEP은 Kiwi지만 거긴 우리 마케팅 화면이고, 소개서는 **사장님 콘텐츠가 주인공**이라
+//    길잡이가 브랜드색으로 소리치면 안 된다(무대 원칙 · Kiwi 희소 원칙).
+function ItemLabel({ kind, index, total }: { kind: string; index: number; total: number }) {
+  if (total < 2) return null;
+  return (
+    <p className="mb-0.5 text-[12px] font-medium tracking-[0.04em] text-faint">
+      {kind} {index + 1}
+    </p>
   );
 }
 

@@ -157,7 +157,7 @@ export function CollabRecorder({ myBrands }: { myBrands: MyBrand[] }) {
         onClick={() => setOpen(true)}
         // ⭐북극성 탭의 **유일한 행동 버튼**인데 높이가 31px이라 44px 규칙에 한참 못 미쳤다(QA #21).
         //    ConnectMaker와 같은 시그니처로 맞춰 손가락으로 누를 수 있게 한다.
-        className="inline-flex h-11 shrink-0 items-center rounded-md border border-border-strong bg-surface px-4 text-sm font-medium text-ink"
+        className="inline-flex h-11 shrink-0 items-center rounded-md border border-border-strong bg-surface px-4 text-[15px] font-medium text-ink"
       >
         + 성사 기록
       </button>
@@ -169,7 +169,7 @@ export function CollabRecorder({ myBrands }: { myBrands: MyBrand[] }) {
           <p
             role="status"
             aria-live="polite"
-            className="rounded-pill bg-ink px-4 py-2.5 text-sm font-medium text-on-dark shadow-e2"
+            className="rounded-pill bg-ink px-4 py-2.5 text-[15px] font-medium text-on-dark shadow-e2"
           >
             성사 기록을 남겼어요.
           </p>
@@ -185,7 +185,7 @@ export function CollabRecorder({ myBrands }: { myBrands: MyBrand[] }) {
           >
             <div className="flex items-start justify-between gap-3">
               <div>
-                <h2 className="text-lg font-bold text-ink">콜라보 성사 기록</h2>
+                <h2 className="text-[18px] font-bold text-ink">콜라보 성사 기록</h2>
                 <p className="mt-1 text-[13px] leading-relaxed text-mute">
                   실제로 하기로 한 콜라보를 남겨두면, 나중에 몇 건이 성사됐는지 셀 수 있어요.
                 </p>
@@ -198,7 +198,7 @@ export function CollabRecorder({ myBrands }: { myBrands: MyBrand[] }) {
             {/* ① 내 소개서 — A(먼저 제안한 쪽). 소유 검증의 근거라 반드시 내 것 중에서 고른다 */}
             {myBrands.length > 1 && (
               <label className="mt-5 block">
-                <span className="text-sm font-medium text-body">내 소개서</span>
+                <span className="text-[15px] font-medium text-body">내 소개서</span>
                 <select value={brandAId} onChange={(e) => setBrandAId(Number(e.target.value))} className={field}>
                   {myBrands.map((b) => (
                     <option key={b.id} value={b.id}>{b.name}</option>
@@ -209,7 +209,7 @@ export function CollabRecorder({ myBrands }: { myBrands: MyBrand[] }) {
 
             {/* ② 함께한 브랜드 = 이력 카드의 '함께한 곳' */}
             <div className="mt-4">
-              <span className="text-sm font-medium text-body">함께한 브랜드</span>
+              <span className="text-[15px] font-medium text-body">함께한 브랜드</span>
               {picked ? (
                 <div className="mt-1.5 flex items-center justify-between gap-2 rounded-sm border border-primary bg-primary-pale px-3 py-2.5">
                   <span className="truncate text-base text-ink">{picked.name}</span>
@@ -255,7 +255,7 @@ export function CollabRecorder({ myBrands }: { myBrands: MyBrand[] }) {
                 미션의 '지표 순도 규칙': 컨시어지 성사만으로 승리 선언 금지.
                 자동 판정하지 않고 사람에게 묻는 이유 = 사실을 아는 건 기록하는 사람뿐이다. */}
             <div className="mt-4">
-              <span className="text-sm font-medium text-body">어떻게 시작됐나요?</span>
+              <span className="text-[15px] font-medium text-body">어떻게 시작됐나요?</span>
               <div className="mt-1.5 grid grid-cols-2 gap-2">
                 {([
                   { v: "product", label: "collab5 보고 연락", desc: "소개서·검색을 통해" },
@@ -277,7 +277,7 @@ export function CollabRecorder({ myBrands }: { myBrands: MyBrand[] }) {
 
             {/* ④~⑦ 여기부터는 소개서 "함께한 콜라보" 카드와 같은 필드 */}
             <label className="mt-4 block">
-              <span className="text-sm font-medium text-body">콜라보 제목</span>
+              <span className="text-[15px] font-medium text-body">콜라보 제목</span>
               <input
                 ref={titleRef}
                 value={title}
@@ -289,7 +289,7 @@ export function CollabRecorder({ myBrands }: { myBrands: MyBrand[] }) {
             </label>
 
             <label className="mt-4 block">
-              <span className="text-sm font-medium text-body">연도 (선택)</span>
+              <span className="text-[15px] font-medium text-body">연도 (선택)</span>
               <select value={year} onChange={(e) => setYear(e.target.value)} className={field}>
                 <option value="">아직 안 정했어요</option>
                 {YEARS.map((y) => (
@@ -299,7 +299,7 @@ export function CollabRecorder({ myBrands }: { myBrands: MyBrand[] }) {
             </label>
 
             <label className="mt-4 block">
-              <span className="text-sm font-medium text-body">콜라보 설명 (선택)</span>
+              <span className="text-[15px] font-medium text-body">콜라보 설명 (선택)</span>
               <textarea
                 value={desc}
                 onChange={(e) => setDesc(e.target.value)}
@@ -310,7 +310,7 @@ export function CollabRecorder({ myBrands }: { myBrands: MyBrand[] }) {
             </label>
 
             <div className="mt-4">
-              <span className="text-sm font-medium text-body">사진 (선택)</span>
+              <span className="text-[15px] font-medium text-body">사진 (선택)</span>
               <div className="mt-1.5">
                 <PhotoGrid
                   items={photos}
@@ -330,7 +330,7 @@ export function CollabRecorder({ myBrands }: { myBrands: MyBrand[] }) {
             </div>
 
             <label className="mt-4 block">
-              <span className="text-sm font-medium text-body">링크 (선택)</span>
+              <span className="text-[15px] font-medium text-body">링크 (선택)</span>
               <input value={link} onChange={(e) => setLink(e.target.value)} placeholder="https://" className={field} />
             </label>
 
@@ -360,7 +360,7 @@ export function CollabRecorder({ myBrands }: { myBrands: MyBrand[] }) {
               type="button"
               onClick={submit}
               disabled={saving || uploading}
-              className="mt-5 h-12 w-full rounded-md bg-primary text-base font-medium text-primary-on disabled:opacity-40"
+              className="mt-5 h-12 w-full rounded-md bg-primary text-[15px] font-medium text-primary-on disabled:opacity-40"
             >
               {uploading ? "사진 올리는 중…" : saving ? "기록 중…" : "기록하기"}
             </button>

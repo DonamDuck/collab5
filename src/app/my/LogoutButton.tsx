@@ -12,7 +12,7 @@ function Inner() {
       <button
         type="submit"
         disabled={pending}
-        className="inline-flex h-9 items-center gap-1.5 rounded-md border border-hairline bg-surface px-3 text-sm font-medium text-mute hover:border-border-strong hover:text-ink disabled:opacity-50"
+        className="inline-flex h-9 items-center gap-1.5 rounded-md border border-hairline bg-surface px-3 text-[13px] font-medium text-mute hover:border-border-strong hover:text-ink disabled:opacity-50"
       >
         <svg viewBox="0 0 20 20" className="h-[16px] w-[16px]" fill="none" stroke="currentColor" strokeWidth="1.7">
           <path d="M8 4H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3" strokeLinecap="round" />

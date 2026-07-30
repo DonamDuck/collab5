@@ -158,7 +158,7 @@ export function BlockEditor({ blocks, onChange, onUploadingChange, onSheetOpenCh
           <div key={b.uid ?? i} id={b.uid ? `block-${b.uid}` : undefined} className="space-y-4 rounded-md border border-hairline bg-surface p-3 scroll-mt-4">
             {/* 공통 헤더 — 라벨 + ↑ ↓ 삭제 */}
             <div className="flex items-center justify-between">
-              <span className="text-sm font-semibold text-body">{cat.label}</span>
+              <span className="text-[15px] font-semibold text-body">{cat.label}</span>
               <div className="flex items-center gap-1">
                 <button
                   type="button"
@@ -181,7 +181,7 @@ export function BlockEditor({ blocks, onChange, onUploadingChange, onSheetOpenCh
                 <button
                   type="button"
                   onClick={() => remove(i)}
-                  className="ml-1 text-sm text-faint hover:text-ink"
+                  className="ml-1 text-[13px] text-faint hover:text-ink"
                 >
                   삭제
                 </button>
@@ -227,7 +227,7 @@ export function BlockEditor({ blocks, onChange, onUploadingChange, onSheetOpenCh
                       <button
                         type="button"
                         onClick={() => setBlock(i, { ...b, items: b.items.filter((_, y) => y !== k) })}
-                        className="shrink-0 text-sm text-faint hover:text-ink"
+                        className="shrink-0 text-[13px] text-faint hover:text-ink"
                       >
                         삭제
                       </button>
@@ -238,7 +238,7 @@ export function BlockEditor({ blocks, onChange, onUploadingChange, onSheetOpenCh
                   <button
                     type="button"
                     onClick={() => setBlock(i, { ...b, items: [...b.items, { label: "", value: "" }] })}
-                    className="flex w-full items-center justify-center gap-1 rounded-sm border border-primary-tint bg-primary-pale py-1.5 text-sm font-medium text-primary-on transition-colors hover:bg-primary-tint"
+                    className="flex w-full items-center justify-center gap-1 rounded-sm border border-primary-tint bg-primary-pale py-1.5 text-[14px] font-medium text-primary-on transition-colors hover:bg-primary-tint"
                   >
                     ＋ 숫자 추가
                   </button>
@@ -329,7 +329,7 @@ export function BlockEditor({ blocks, onChange, onUploadingChange, onSheetOpenCh
                   <button
                     type="button"
                     onClick={() => setBlock(i, { ...b, items: [...b.items, { title: "", year: "", desc: "", link: "", photos: [] }] })}
-                    className="flex w-full items-center justify-center gap-1 rounded-sm border border-primary-tint bg-primary-pale py-1.5 text-sm font-medium text-primary-on transition-colors hover:bg-primary-tint"
+                    className="flex w-full items-center justify-center gap-1 rounded-sm border border-primary-tint bg-primary-pale py-1.5 text-[14px] font-medium text-primary-on transition-colors hover:bg-primary-tint"
                   >
                     ＋ 소개 추가
                   </button>
@@ -353,7 +353,7 @@ export function BlockEditor({ blocks, onChange, onUploadingChange, onSheetOpenCh
                         <button
                           type="button"
                           onClick={() => setBlock(i, { ...b, items: b.items.filter((_, y) => y !== k) })}
-                          className="mt-1 shrink-0 text-sm text-faint hover:text-ink"
+                          className="mt-1 shrink-0 text-[13px] text-faint hover:text-ink"
                         >
                           삭제
                         </button>
@@ -371,7 +371,7 @@ export function BlockEditor({ blocks, onChange, onUploadingChange, onSheetOpenCh
                   <button
                     type="button"
                     onClick={() => setBlock(i, { ...b, items: [...b.items, { quote: "", source: "" }] })}
-                    className="flex w-full items-center justify-center gap-1 rounded-sm border border-primary-tint bg-primary-pale py-1.5 text-sm font-medium text-primary-on transition-colors hover:bg-primary-tint"
+                    className="flex w-full items-center justify-center gap-1 rounded-sm border border-primary-tint bg-primary-pale py-1.5 text-[14px] font-medium text-primary-on transition-colors hover:bg-primary-tint"
                   >
                     ＋ 후기 추가
                   </button>
@@ -561,13 +561,13 @@ function BlockAttachments({
     prev.current = photos.length;
   }, [photos.length]);
 
-  const actionCls = "text-sm font-medium text-mute hover:text-ink";
+  const actionCls = "text-[13px] font-medium text-mute hover:text-ink";
 
   return (
     <div className="space-y-3 border-t border-hairline pt-3">
       {photosOpen && (
         <div>
-          <p className="mb-1.5 text-sm text-mute">사진 추가 (선택 · 최대 5장)</p>
+          <p className="mb-1.5 text-[13px] text-mute">사진 추가 (선택 · 최대 5장)</p>
           <div className="flex flex-wrap gap-2">
             {photos.map((url, k) => (
               <div key={k} className="relative h-20 w-20 shrink-0 overflow-hidden rounded-md border border-hairline">
@@ -605,19 +605,19 @@ function BlockAttachments({
             value={l.url}
             onChange={(e) => onSetLink(k, { url: e.target.value })}
             placeholder="https://"
-            className="h-9 min-w-0 flex-1 rounded-sm border border-hairline bg-surface px-3 text-sm text-ink outline-none placeholder:text-faint focus:border-focus"
+            className="h-9 min-w-0 flex-1 rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
           />
           <input
             value={l.label ?? ""}
             onChange={(e) => onSetLink(k, { label: e.target.value })}
             placeholder="링크 이름 (선택)"
-            className="h-9 w-32 shrink-0 rounded-sm border border-hairline bg-surface px-3 text-sm text-ink outline-none placeholder:text-faint focus:border-focus"
+            className="h-9 w-32 shrink-0 rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
           />
           <button
             type="button"
             onClick={() => onRemoveLink(k)}
             aria-label="링크 삭제"
-            className="shrink-0 text-sm text-faint hover:text-ink"
+            className="shrink-0 text-[13px] text-faint hover:text-ink"
           >
             ✕
           </button>
@@ -677,7 +677,7 @@ function FeatureChips({ features, onChange }: { features: string[]; onChange: (f
   const extras = features.filter((f) => !SPACE_FEATURES.includes(f));
   return (
     <div>
-      <p className="mb-1.5 text-sm text-mute">이 공간의 특징을 골라주세요.</p>
+      <p className="mb-1.5 text-[13px] text-mute">이 공간의 특징을 골라주세요.</p>
       <div className="flex flex-wrap gap-2">
         {SPACE_FEATURES.map((f) => {
           const on = features.includes(f);
@@ -686,7 +686,7 @@ function FeatureChips({ features, onChange }: { features: string[]; onChange: (f
               key={f}
               type="button"
               onClick={() => toggle(f)}
-              className={`inline-flex h-8 items-center rounded-pill border px-3 text-sm transition-colors ${
+              className={`inline-flex h-8 items-center rounded-pill border px-3 text-[14px] transition-colors ${
                 on
                   ? "border-primary bg-primary-tint text-primary-on"
                   : "border-hairline bg-surface text-mute"
@@ -702,7 +702,7 @@ function FeatureChips({ features, onChange }: { features: string[]; onChange: (f
             key={f}
             type="button"
             onClick={() => toggle(f)}
-            className="inline-flex h-8 items-center rounded-pill border border-primary bg-primary-tint px-3 text-sm text-primary-on"
+            className="inline-flex h-8 items-center rounded-pill border border-primary bg-primary-tint px-3 text-[14px] text-primary-on"
           >
             {f} ✕
           </button>
@@ -719,12 +719,12 @@ function FeatureChips({ features, onChange }: { features: string[]; onChange: (f
             }
           }}
           placeholder="직접 더하기 (예: 루프탑)"
-          className="h-9 min-w-0 flex-1 rounded-sm border border-hairline bg-surface px-3 text-sm text-ink outline-none placeholder:text-faint focus:border-focus"
+          className="h-9 min-w-0 flex-1 rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
         />
         <button
           type="button"
           onClick={addCustom}
-          className="h-9 shrink-0 whitespace-nowrap rounded-sm border border-border-strong bg-surface px-4 text-sm font-medium text-ink"
+          className="h-9 shrink-0 whitespace-nowrap rounded-sm border border-border-strong bg-surface px-4 text-[14px] font-medium text-ink"
         >
           추가
         </button>

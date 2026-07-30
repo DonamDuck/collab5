@@ -55,7 +55,7 @@ export function ProfileAvatarEditor({ image, name }: { image?: string; name: str
         type="button"
         onClick={pick}
         disabled={busy}
-        className="text-xs font-medium text-mute hover:text-ink disabled:opacity-60"
+        className="text-[12px] font-medium text-mute hover:text-ink disabled:opacity-60"
       >
         {busy ? "올리는 중…" : "변경"}
       </button>

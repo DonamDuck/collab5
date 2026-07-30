@@ -49,7 +49,9 @@ export function MakerRow({
           href={`/m/${slug}`}
           className="-mx-2 min-w-0 flex-1 rounded-md px-2 py-1 text-left transition-colors hover:bg-surface-soft"
         >
-          <p className="flex items-center gap-1.5 text-[15px] font-medium text-ink">
+          {/* 이 행의 주인공 = 소개서 이름. 전엔 15px인데 바로 아래 oneLiner가 14.875px라
+              **0.125px 차이**로 사실상 같은 크기였다 → /m 사다리(제목 17 / 보조 14)로 벌린다. */}
+          <p className="flex items-center gap-1.5 text-[17px] font-medium text-ink">
             <span className="min-w-0 truncate">{name}</span>
             {isDemoSlug(slug) && (
               <span className="inline-flex h-6 shrink-0 items-center rounded-pill bg-surface-soft px-2 text-[12px] font-medium text-mute">
@@ -57,13 +59,13 @@ export function MakerRow({
               </span>
             )}
           </p>
-          {oneLiner && <p className="truncate text-sm text-mute">{oneLiner}</p>}
+          {oneLiner && <p className="mt-0.5 truncate text-[14px] text-mute">{oneLiner}</p>}
         </Link>
 
         <div className="flex shrink-0 items-center gap-1">
           <Link
             href={`/register?edit=${slug}`}
-            className="rounded-md border border-border-strong bg-surface px-3 py-1.5 text-sm font-medium text-ink"
+            className="rounded-md border border-border-strong bg-surface px-3 py-1.5 text-[14px] font-medium text-ink"
           >
             수정
           </Link>
@@ -92,7 +94,7 @@ export function MakerRow({
             {...dialog.panelProps}
             className="w-full max-w-sm rounded-lg border border-hairline bg-surface p-6 text-center shadow-e2"
           >
-            <p className="text-lg font-bold text-balance break-keep text-ink">소개서를 삭제할까요?</p>
+            <p className="text-[18px] font-bold text-balance break-keep text-ink">소개서를 삭제할까요?</p>
             <p className="mt-2 text-[15px] leading-relaxed break-keep text-body">
               ‘{name}’ 소개서가 영구히 삭제돼요. 되돌릴 수 없어요.
             </p>
@@ -101,7 +103,7 @@ export function MakerRow({
                 type="button"
                 onClick={() => setConfirming(false)}
                 disabled={pending}
-                className="h-11 flex-1 rounded-md border border-border-strong bg-surface text-sm font-medium text-ink disabled:opacity-50"
+                className="h-11 flex-1 rounded-md border border-border-strong bg-surface text-[15px] font-medium text-ink disabled:opacity-50"
               >
                 취소
               </button>
@@ -109,7 +111,7 @@ export function MakerRow({
                 type="button"
                 onClick={del}
                 disabled={pending}
-                className="h-11 flex-1 rounded-md bg-red-600 text-sm font-medium text-white disabled:opacity-50"
+                className="h-11 flex-1 rounded-md bg-red-600 text-[15px] font-medium text-white disabled:opacity-50"
               >
                 {pending ? "삭제 중…" : "삭제"}
               </button>
@@ -169,7 +171,9 @@ function FlagToggle({
           }`}
         />
       </span>
-      <span className="text-[13px] font-medium text-body">{label}</span>
+      {/* 토글 라벨은 medium이 아니라 regular — 이 행에서 medium은 '이름'의 몫이다.
+          /my 전체에 font-medium이 34곳이라 아무것도 강조가 아닌 상태였다(07-31 정리). */}
+      <span className="text-[13px] text-mute">{label}</span>
     </button>
   );
 }

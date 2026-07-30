@@ -80,7 +80,7 @@ export function SortableCard({
               ⠿
             </span>
           )}
-          <span className="text-sm font-semibold text-body">{label}</span>
+          <span className="text-[15px] font-semibold text-body">{label}</span>
         </div>
         <div className="flex shrink-0 items-center gap-1">
           {sortable && (
@@ -109,7 +109,7 @@ export function SortableCard({
             <button
               type="button"
               onClick={onRemove}
-              className="ml-1 text-sm text-faint hover:text-ink"
+              className="ml-1 text-[13px] text-faint hover:text-ink"
             >
               삭제
             </button>

@@ -1182,7 +1182,7 @@ function RegisterForm() {
             <button
               type="button"
               onClick={() => router.push(`/m/${editSlug}`)}
-              className="mt-1.5 shrink-0 text-sm font-medium text-mute hover:text-ink"
+              className="mt-1.5 shrink-0 text-[13px] font-medium text-mute hover:text-ink"
             >
               취소
             </button>
@@ -1202,7 +1202,7 @@ function RegisterForm() {
 
       {/* ✨ 딸깍 자동완성 — 이름만 알려주면 채워드릴게요 */}
       <div className="mt-10 rounded-xl border border-primary bg-primary-pale px-5 py-5">
-        <p className="text-base font-bold text-ink">
+        <p className="text-[17px] font-bold text-ink">
           ✨ 브랜드 이름을 알려주세요. 나머지는 AI가 준비해드릴게요.
         </p>
         <p className="mt-1 text-[15px] leading-relaxed text-mute">
@@ -1224,18 +1224,18 @@ function RegisterForm() {
           <button
             type="button"
             onClick={openWizard}
-            className="h-11 shrink-0 rounded-md bg-primary px-4 text-sm font-medium text-primary-on"
+            className="h-11 shrink-0 rounded-md bg-primary px-4 text-[14px] font-medium text-primary-on"
           >
             ✨ 시작하기
           </button>
         </div>
-        {queryErr && <p className="mt-2 text-sm text-red-600">{queryErr}</p>}
+        {queryErr && <p className="mt-2 text-[13px] text-danger">{queryErr}</p>}
       </div>
 
       {/* AI 불러오기(위) ↔ 직접 입력(아래) 구분 소제목 */}
       <div className="mt-10 flex items-center gap-3">
         <div className="h-px flex-1 bg-hairline" />
-        <span className="shrink-0 text-sm font-medium text-mute">
+        <span className="shrink-0 text-[13px] font-medium text-mute">
           또는 아래에 직접 입력할 수 있어요.
         </span>
         <div className="h-px flex-1 bg-hairline" />
@@ -1253,7 +1253,7 @@ function RegisterForm() {
             <p className="text-[15px] font-medium text-ink">
               {agoLabel(draft.found.savedAt)} 쓰시던 내용이 있어요.
             </p>
-            <p className="mt-0.5 text-sm text-mute">
+            <p className="mt-0.5 text-[13px] text-mute">
               {editSlug
                 ? "지금 화면은 저장된 소개서예요. 불러오면 그때 쓰던 내용으로 덮어써요."
                 : "이어서 쓰거나, 새로 시작할 수 있어요."}
@@ -1265,7 +1265,7 @@ function RegisterForm() {
                     key="cont"
                     type="button"
                     onClick={() => draft.found && restoreDraft(draft.found.data)}
-                    className={`h-10 rounded-md px-4 text-sm font-medium ${
+                    className={`h-10 rounded-md px-4 text-[14px] font-medium ${
                       editSlug
                         ? "border border-border-strong bg-surface text-ink"
                         : "bg-primary text-primary-on"
@@ -1279,7 +1279,7 @@ function RegisterForm() {
                     key="fresh"
                     type="button"
                     onClick={draft.clear}
-                    className={`h-10 rounded-md px-4 text-sm font-medium ${
+                    className={`h-10 rounded-md px-4 text-[14px] font-medium ${
                       editSlug
                         ? "bg-primary text-primary-on"
                         : "border border-border-strong bg-surface text-mute"
@@ -1300,7 +1300,7 @@ function RegisterForm() {
             <p className="text-[15px] font-medium text-ink">
               ✨ 온라인 정보와 SNS를 참고해서 브랜드를 분석해봤어요.
             </p>
-            <p className="mt-0.5 text-sm text-mute">
+            <p className="mt-0.5 text-[13px] text-mute">
               맞는지 확인하고 자유롭게 고쳐주세요. 못 찾은 곳은 직접 채우면 돼요.
             </p>
           </div>
@@ -1318,7 +1318,7 @@ function RegisterForm() {
                 type="button"
                 onClick={draftDescription}
                 disabled={draftBusy}
-                className="inline-flex h-8 shrink-0 items-center gap-1 rounded-pill border border-primary bg-primary-pale px-3 text-sm font-medium text-primary-on disabled:opacity-40"
+                className="inline-flex h-8 shrink-0 items-center gap-1 rounded-pill border border-primary bg-primary-pale px-3 text-[14px] font-medium text-primary-on disabled:opacity-40"
               >
                 {draftBusy ? "쓰는 중…" : "✨ 초안 다시 받기"}
               </button>
@@ -1338,7 +1338,7 @@ function RegisterForm() {
               }`}
             />
             {errField?.anchor === "name-field" && (
-              <p className="mt-1.5 text-sm text-danger">{errField.msg}</p>
+              <p className="mt-1.5 text-[13px] text-danger">{errField.msg}</p>
             )}
           </Field>
           <Field label="한두 문장 소개 (선택)" hint={hintFor("oneLiner")}>
@@ -1354,7 +1354,7 @@ function RegisterForm() {
 
           {/* 자세히 소개 — 브랜드를 소개해주세요 (초안 받기 버튼은 ① 상호 옆으로 이사) */}
           <div>
-            <label className="mb-2 flex items-center gap-2 text-base font-medium text-body">
+            <label className="mb-2 flex items-center gap-2 text-[15px] font-medium text-body">
               <span>자세히 소개 (선택)</span>
               {aiFilled.has("description") && <AiBadge />}
             </label>
@@ -1367,7 +1367,7 @@ function RegisterForm() {
             />
             {/* 안내도 버튼과 같은 게이트 — 크롤 안 한 소개서엔 버튼이 없으니 문구도 숨김 */}
             {enrichment && (
-              <p className="mt-1.5 text-sm text-mute">
+              <p className="mt-1.5 text-[13px] text-mute">
                 ‘초안 다시 받기’를 누르면 다른 느낌의 소개로 새로 써드려요.
               </p>
             )}
@@ -1375,7 +1375,7 @@ function RegisterForm() {
 
           {/* 브랜드 사진 (선택) */}
           <div>
-            <label className="mb-1 block text-base font-medium text-body">
+            <label className="mb-1 block text-[15px] font-medium text-body">
               브랜드 사진 (선택, 최대 10장)
             </label>
             {/* 사진 불안 완화 — 사진 없이도 완성 예시를 그 자리에서 확인(바텀시트, 폼 이탈 없음) */}
@@ -1401,11 +1401,11 @@ function RegisterForm() {
 
           {/* 소개자료 PDF 첨부 (선택) — 구⑨에서 ① 브랜드 사진 아래로 이사 */}
           <div>
-            <label className="mb-2 block text-base font-medium text-body">
+            <label className="mb-2 block text-[15px] font-medium text-body">
               이미 소개서가 있나요? (선택)
             </label>
             <div className="flex items-center gap-3">
-              <label className="inline-flex h-9 cursor-pointer items-center rounded-md border border-border-strong bg-surface px-3 text-sm font-medium text-ink">
+              <label className="inline-flex h-9 cursor-pointer items-center rounded-md border border-border-strong bg-surface px-3 text-[14px] font-medium text-ink">
                 {pdfUploading ? "올리는 중…" : "파일 업로드"}
                 <input
                   type="file"
@@ -1416,11 +1416,11 @@ function RegisterForm() {
               </label>
               {introFileUrl && (
                 <>
-                  <span className="text-sm text-body">소개 자료 담김</span>
+                  <span className="text-[14px] text-body">소개 자료 담김</span>
                   <button
                     type="button"
                     onClick={() => setIntroFileUrl("")}
-                    className="text-sm text-faint hover:text-ink"
+                    className="text-[13px] text-faint hover:text-ink"
                   >
                     지우기
                   </button>
@@ -1439,11 +1439,11 @@ function RegisterForm() {
                 onToggle={(t) => toggle(offers, setOffers, t)}
               />
               {errField?.anchor === "offers-chips" && (
-                <p className="mt-2 text-sm text-danger">{errField.msg}</p>
+                <p className="mt-2 text-[13px] text-danger">{errField.msg}</p>
               )}
               {/* 구 sec-offersNote(시트) → ① 칩 하단 상시 노출로 이사. 칩과 한 세트 */}
               <div className="mt-4">
-                <p className="mb-1.5 flex items-center gap-2 text-sm text-mute">이런 콜라보를 제공할 수 있어요 (선택){aiFilled.has("offersNote") ? <AiBadge /> : null}</p>
+                <p className="mb-1.5 flex items-center gap-2 text-[13px] text-mute">이런 콜라보를 제공할 수 있어요 (선택){aiFilled.has("offersNote") ? <AiBadge /> : null}</p>
                 <textarea
                   value={offersNote}
                   onChange={(e) => setOffersNote(e.target.value)}
@@ -1477,7 +1477,7 @@ function RegisterForm() {
           <div>
             <div className="mb-4 flex items-center justify-between gap-2">
               <p className="text-[15px] text-mute">직접 추가도 가능해요. 최대 10개</p>
-              <span className="shrink-0 text-xs text-mute">
+              <span className="shrink-0 text-[12px] text-mute">
                 {values.length} / {MAX_VIBES}
               </span>
             </div>
@@ -1491,7 +1491,7 @@ function RegisterForm() {
                       key={v}
                       type="button"
                       onClick={() => toggleVibe(v)}
-                      className="inline-flex h-8 items-center rounded-pill border border-primary bg-primary-tint px-3 text-sm text-primary-on"
+                      className="inline-flex h-8 items-center rounded-pill border border-primary bg-primary-tint px-3 text-[14px] text-primary-on"
                     >
                       {v} ✕
                     </button>
@@ -1504,7 +1504,7 @@ function RegisterForm() {
                   key={cat.label}
                   className={i > 0 ? "border-t border-hairline pt-4" : ""}
                 >
-                  <p className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-body">
+                  <p className="mb-2 flex items-center gap-1.5 text-[15px] font-semibold text-body">
                     <span className="h-1.5 w-1.5 rounded-full bg-mint" />
                     {cat.label}
                   </p>
@@ -1518,7 +1518,7 @@ function RegisterForm() {
                           type="button"
                           onClick={() => toggleVibe(v)}
                           disabled={full}
-                          className={`inline-flex h-8 items-center rounded-pill border px-3 text-sm transition-colors ${
+                          className={`inline-flex h-8 items-center rounded-pill border px-3 text-[14px] transition-colors ${
                             on
                               ? "border-primary bg-primary-tint text-primary-on"
                               : "border-hairline bg-surface text-mute"
@@ -1545,13 +1545,13 @@ function RegisterForm() {
                 }}
                 placeholder="직접 더하기 (예: 아날로그)"
                 disabled={values.length >= MAX_VIBES}
-                className="h-10 min-w-0 flex-1 rounded-sm border border-hairline bg-surface px-3 text-sm text-ink outline-none placeholder:text-faint focus:border-focus disabled:opacity-40"
+                className="h-10 min-w-0 flex-1 rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus disabled:opacity-40"
               />
               <button
                 type="button"
                 onClick={addCustomVibe}
                 disabled={values.length >= MAX_VIBES}
-                className="h-10 shrink-0 whitespace-nowrap rounded-sm border border-border-strong bg-surface px-4 text-sm font-medium text-ink disabled:opacity-40"
+                className="h-10 shrink-0 whitespace-nowrap rounded-sm border border-border-strong bg-surface px-4 text-[14px] font-medium text-ink disabled:opacity-40"
               >
                 추가
               </button>
@@ -1626,7 +1626,7 @@ function RegisterForm() {
               {/* 사진·링크 접힘 버튼 — press와 동일하게 한 줄 인라인(space-y-2로 그룹) */}
               <div className="space-y-2">
                 <CollapsedPhotos photoCount={act.photos.length}>
-                  <p className="mb-1.5 text-sm text-mute">사진 (선택 · 최대 5장)</p>
+                  <p className="mb-1.5 text-[13px] text-mute">사진 (선택 · 최대 5장)</p>
                   <PhotoGrid
                     items={act.photos}
                     max={5}
@@ -1651,7 +1651,7 @@ function RegisterForm() {
             <button
               type="button"
               onClick={addActivity}
-              className="flex w-full items-center justify-center gap-1.5 rounded-md border border-primary-tint bg-primary-pale py-2.5 text-sm font-medium text-primary-on transition-colors hover:bg-primary-tint"
+              className="flex w-full items-center justify-center gap-1.5 rounded-md border border-primary-tint bg-primary-pale py-2.5 text-[14px] font-medium text-primary-on transition-colors hover:bg-primary-tint"
             >
               ＋ 활동 추가
             </button>
@@ -1723,7 +1723,7 @@ function RegisterForm() {
                       <select
                         value={h.year}
                         onChange={(e) => setHist(i, { year: e.target.value })}
-                        className="h-10 w-full appearance-none rounded-sm border border-hairline bg-surface py-2 pl-3 pr-8 text-sm text-ink outline-none focus:border-focus"
+                        className="h-10 w-full appearance-none rounded-sm border border-hairline bg-surface py-2 pl-3 pr-8 text-base text-ink outline-none focus:border-focus"
                       >
                         <option value="">시기</option>
                         {HISTORY_YEARS.map((y) => (
@@ -1744,7 +1744,7 @@ function RegisterForm() {
                     </div>
                   </div>
                   <div>
-                    <p className="mb-1.5 text-sm text-mute">어떤 타입의 콜라보였나요?</p>
+                    <p className="mb-1.5 text-[13px] text-mute">어떤 타입의 콜라보였나요?</p>
                     <div className="flex flex-wrap gap-1.5">
                       {COLLAB_TYPES.map((t) => {
                         const on = h.types.includes(t);
@@ -1753,7 +1753,7 @@ function RegisterForm() {
                             key={t}
                             type="button"
                             onClick={() => toggleHistType(i, t)}
-                            className={`inline-flex h-7 items-center rounded-pill border px-2.5 text-sm transition-colors ${
+                            className={`inline-flex h-7 items-center rounded-pill border px-2.5 text-[14px] transition-colors ${
                               on
                                 ? "border-primary bg-primary-tint text-primary-on"
                                 : "border-hairline bg-surface text-mute"
@@ -1771,7 +1771,7 @@ function RegisterForm() {
                             key={t}
                             type="button"
                             onClick={() => toggleHistType(i, t)}
-                            className="inline-flex h-7 items-center rounded-pill border border-primary bg-primary-tint px-2.5 text-sm text-primary-on"
+                            className="inline-flex h-7 items-center rounded-pill border border-primary bg-primary-tint px-2.5 text-[14px] text-primary-on"
                           >
                             {t} ✕
                           </button>
@@ -1790,12 +1790,12 @@ function RegisterForm() {
                             }
                           }}
                           placeholder="유형 직접 더하기"
-                          className="h-9 min-w-0 flex-1 rounded-sm border border-hairline bg-surface px-3 text-sm text-ink outline-none placeholder:text-faint focus:border-focus"
+                          className="h-9 min-w-0 flex-1 rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
                         />
                         <button
                           type="button"
                           onClick={() => addHistCustomType(i)}
-                          className="h-9 shrink-0 whitespace-nowrap rounded-sm border border-border-strong bg-surface px-4 text-sm font-medium text-ink"
+                          className="h-9 shrink-0 whitespace-nowrap rounded-sm border border-border-strong bg-surface px-4 text-[14px] font-medium text-ink"
                         >
                           추가
                         </button>
@@ -1804,14 +1804,14 @@ function RegisterForm() {
                       <button
                         type="button"
                         onClick={() => setHist(i, { typeInputOpen: true })}
-                        className="mt-2 text-sm font-medium text-mute hover:text-ink"
+                        className="mt-2 text-[13px] font-medium text-mute hover:text-ink"
                       >
                         + 유형 직접 추가
                       </button>
                     )}
                   </div>
                   <div>
-                    <p className="mb-1.5 text-sm text-mute">콜라보 내용을 간단히 알려주세요.</p>
+                    <p className="mb-1.5 text-[13px] text-mute">콜라보 내용을 간단히 알려주세요.</p>
                     <textarea
                       value={h.desc}
                       onChange={(e) => setHist(i, { desc: e.target.value })}
@@ -1823,7 +1823,7 @@ function RegisterForm() {
                   {/* 사진·링크 접힘 버튼 — 카드 최하단, press와 동일하게 한 줄 인라인(space-y-2로 그룹) */}
                   <div className="space-y-2">
                     <CollapsedPhotos photoCount={h.photos.length}>
-                      <p className="mb-1.5 text-sm text-mute">사진 (선택 · 최대 5장)</p>
+                      <p className="mb-1.5 text-[13px] text-mute">사진 (선택 · 최대 5장)</p>
                       <PhotoGrid
                         items={h.photos}
                         max={5}
@@ -1848,7 +1848,7 @@ function RegisterForm() {
                 <button
                   type="button"
                   onClick={addCollab}
-                  className="flex w-full items-center justify-center gap-1.5 rounded-md border border-primary-tint bg-primary-pale py-2.5 text-sm font-medium text-primary-on transition-colors hover:bg-primary-tint"
+                  className="flex w-full items-center justify-center gap-1.5 rounded-md border border-primary-tint bg-primary-pale py-2.5 text-[14px] font-medium text-primary-on transition-colors hover:bg-primary-tint"
                 >
                   ＋ 콜라보 추가
                 </button>
@@ -1896,7 +1896,7 @@ function RegisterForm() {
                     key={a}
                     type="button"
                     onClick={() => toggleAudience(a)}
-                    className={`inline-flex h-8 items-center rounded-pill border px-3 text-sm transition-colors ${
+                    className={`inline-flex h-8 items-center rounded-pill border px-3 text-[14px] transition-colors ${
                       on
                         ? "border-primary bg-primary-tint text-primary-on"
                         : "border-hairline bg-surface text-mute"
@@ -1914,7 +1914,7 @@ function RegisterForm() {
                     key={a}
                     type="button"
                     onClick={() => toggleAudience(a)}
-                    className="inline-flex h-8 items-center rounded-pill border border-primary bg-primary-tint px-3 text-sm text-primary-on"
+                    className="inline-flex h-8 items-center rounded-pill border border-primary bg-primary-tint px-3 text-[14px] text-primary-on"
                   >
                     {a} ✕
                   </button>
@@ -1931,12 +1931,12 @@ function RegisterForm() {
                   }
                 }}
                 placeholder="직접 더하기 (예: 신혼부부)"
-                className="h-10 min-w-0 flex-1 rounded-sm border border-hairline bg-surface px-3 text-sm text-ink outline-none placeholder:text-faint focus:border-focus"
+                className="h-10 min-w-0 flex-1 rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
               />
               <button
                 type="button"
                 onClick={addCustomAudience}
-                className="h-10 shrink-0 whitespace-nowrap rounded-sm border border-border-strong bg-surface px-4 text-sm font-medium text-ink"
+                className="h-10 shrink-0 whitespace-nowrap rounded-sm border border-border-strong bg-surface px-4 text-[14px] font-medium text-ink"
               >
                 추가
               </button>
@@ -1957,7 +1957,7 @@ function RegisterForm() {
               className="h-11 w-full rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
             />
             {region && (
-              <p className="mt-1 text-sm text-mute">
+              <p className="mt-1 text-[13px] text-mute">
                 지역 자동 인식: <span className="text-body">{region}</span>
               </p>
             )}
@@ -2003,14 +2003,14 @@ function RegisterForm() {
                   href={mapUrl}
                   target="_blank"
                   rel="noopener noreferrer nofollow"
-                  className="text-sm text-primary-on underline underline-offset-2"
+                  className="text-[14px] text-primary-on underline underline-offset-2"
                 >
                   열어보기 ↗
                 </a>
                 <button
                   type="button"
                   onClick={() => setMapUrlEditing(true)}
-                  className="ml-auto text-sm text-mute hover:text-ink"
+                  className="ml-auto text-[13px] text-mute hover:text-ink"
                 >
                   변경
                 </button>
@@ -2025,7 +2025,7 @@ function RegisterForm() {
               />
             )}
             {mapUrl.trim() && !mapLinkLabel(mapUrl) && (
-              <p className="mt-1 text-sm text-mute">
+              <p className="mt-1 text-[13px] text-mute">
                 네이버 지도·카카오맵·구글 지도 링크만 넣을 수 있어요. 지도 앱의 공유 버튼에서 복사해 주세요.
               </p>
             )}
@@ -2036,8 +2036,8 @@ function RegisterForm() {
         <div className="space-y-2">
           <div className="flex items-center justify-between rounded-lg border border-hairline bg-surface px-4 py-3">
             <div>
-              <p className="text-base font-medium text-ink">콜라보 받는 중</p>
-              <p className="text-sm text-mute">
+              <p className="text-[15px] font-medium text-ink">콜라보 받는 중</p>
+              <p className="text-[13px] text-mute">
                 켜두면 다른 브랜드가 먼저 콜라보를 제안할 수 있어요.
               </p>
             </div>
@@ -2061,8 +2061,8 @@ function RegisterForm() {
 
           <div className="flex items-center justify-between rounded-lg border border-hairline bg-surface px-4 py-3">
             <div>
-              <p className="text-base font-medium text-ink">검색에 보이기</p>
-              <p className="text-sm text-mute">
+              <p className="text-[15px] font-medium text-ink">검색에 보이기</p>
+              <p className="text-[13px] text-mute">
                 꺼두면 검색 결과에 노출되지 않아요. 링크로는 계속 공유할 수 있어요.
               </p>
             </div>
@@ -2130,7 +2130,7 @@ function RegisterForm() {
           <div
             role="alert"
             aria-live="assertive"
-            className="max-w-[90%] rounded-pill bg-ink px-4 py-2.5 text-center text-sm font-medium text-on-dark shadow-e2"
+            className="max-w-[90%] rounded-pill bg-ink px-4 py-2.5 text-center text-[14px] font-medium text-on-dark shadow-e2"
           >
             {toast}
           </div>
@@ -2157,25 +2157,25 @@ function RegisterForm() {
               type="button"
               onClick={() => setDescModalOpen(false)}
               aria-label="닫기"
-              className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-pill text-lg text-mute hover:bg-surface-soft hover:text-ink"
+              className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-pill text-[18px] text-mute hover:bg-surface-soft hover:text-ink"
             >
               ✕
             </button>
             {draftBusy ? (
               /* 로딩 — 기존 초안받기 로딩 문구·스피너 그대로 */
               <div className="flex min-h-[180px] items-center justify-center">
-                <p className="flex items-center gap-2 text-sm font-medium text-primary-on">
+                <p className="flex items-center gap-2 text-[14px] font-medium text-primary-on">
                   <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
                   온라인 정보를 살펴 소개를 쓰고 있어요…
                 </p>
               </div>
             ) : draftStep === 1 ? (
               <>
-                <p className="pr-8 text-base font-bold text-ink">
+                <p className="pr-8 text-[17px] font-bold text-ink">
                   마음에 드는 소개를 골라주세요{" "}
-                  <span className="text-sm font-medium text-mute">1/2</span>
+                  <span className="text-[13px] font-medium text-mute">1/2</span>
                 </p>
-                <p className="mt-1 text-sm text-mute">
+                <p className="mt-1 text-[13px] text-mute">
                   ‘수정’으로 다듬어도 되고, 맨 아래에 직접 입력해도 좋아요.
                 </p>
                 <div className="mt-4 max-h-[52vh] overflow-y-auto slim-scrollbar pr-0.5">
@@ -2196,7 +2196,7 @@ function RegisterForm() {
                 <button
                   type="button"
                   onClick={goToDescStep}
-                  className="mt-4 h-11 w-full rounded-md bg-primary text-sm font-medium text-primary-on"
+                  className="mt-4 h-11 w-full rounded-md bg-primary text-[14px] font-medium text-primary-on"
                 >
                   다음
                 </button>
@@ -2204,18 +2204,18 @@ function RegisterForm() {
             ) : descRegenBusy ? (
               /* 자세히 재생성 로딩 — 고른 한 줄을 관통 주제로 다시 쓰는 중 */
               <div className="flex min-h-[180px] items-center justify-center">
-                <p className="flex items-center gap-2 text-sm font-medium text-primary-on">
+                <p className="flex items-center gap-2 text-[14px] font-medium text-primary-on">
                   <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
                   고르신 소개에 맞춰 자세히 소개를 다시 쓰고 있어요…
                 </p>
               </div>
             ) : (
               <>
-                <p className="pr-8 text-base font-bold text-ink">
+                <p className="pr-8 text-[17px] font-bold text-ink">
                   마음에 드는 자세히 소개를 골라주세요{" "}
-                  <span className="text-sm font-medium text-mute">2/2</span>
+                  <span className="text-[13px] font-medium text-mute">2/2</span>
                 </p>
-                <p className="mt-1 text-sm text-mute">
+                <p className="mt-1 text-[13px] text-mute">
                   ‘수정’으로 다듬어도 되고, 맨 아래에 직접 입력해도 좋아요.
                 </p>
                 <div className="mt-4 max-h-[52vh] overflow-y-auto slim-scrollbar pr-0.5">
@@ -2236,14 +2236,14 @@ function RegisterForm() {
                   <button
                     type="button"
                     onClick={() => setDraftStep(1)}
-                    className="h-11 shrink-0 rounded-md border border-border-strong bg-surface px-4 text-sm font-medium text-ink"
+                    className="h-11 shrink-0 rounded-md border border-border-strong bg-surface px-4 text-[14px] font-medium text-ink"
                   >
                     ← 뒤로
                   </button>
                   <button
                     type="button"
                     onClick={applyDraft}
-                    className="h-11 flex-1 rounded-md bg-primary text-sm font-medium text-primary-on"
+                    className="h-11 flex-1 rounded-md bg-primary text-[14px] font-medium text-primary-on"
                   >
                     확인
                   </button>
@@ -2266,7 +2266,7 @@ function RegisterForm() {
             className="slim-scrollbar relative max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-y-auto rounded-lg border border-hairline bg-surface p-6 text-center shadow-e2"
           >
             <div className="text-4xl leading-none" aria-hidden="true">🎉</div>
-            <p className="mt-3 text-lg font-bold text-ink">소개서 초안이 준비됐어요!</p>
+            <p className="mt-3 text-[18px] font-bold text-ink">소개서 초안이 준비됐어요!</p>
             <p className="mt-1.5 text-[15px] leading-relaxed text-body">
               작성된 내용을 확인하고 완성해주세요.
             </p>
@@ -2278,7 +2278,7 @@ function RegisterForm() {
             <button
               type="button"
               onClick={() => setShowDraftDone(false)}
-              className="mt-5 h-11 w-full rounded-md bg-primary text-sm font-semibold text-primary-on"
+              className="mt-5 h-11 w-full rounded-md bg-primary text-[14px] font-semibold text-primary-on"
             >
               소개서 완성하러 가기
             </button>
@@ -2306,7 +2306,7 @@ function RegisterForm() {
               >
                 <div className="mb-3 flex items-start justify-between">
                   <div className="pr-8">
-                    <p className="text-[16px] font-bold text-ink">잠깐, 이런 소개를 더해보는 건 어때요?</p>
+                    <p className="text-[17px] font-bold text-ink">잠깐, 이런 소개를 더해보는 건 어때요?</p>
                     <p className="mt-1 text-[13px] leading-relaxed text-mute">이야기를 조금만 더하면 훨씬 단단한 소개서가 돼요.</p>
                   </div>
                   <button
@@ -2339,14 +2339,14 @@ function RegisterForm() {
                   <button
                     type="button"
                     onClick={dismissNudge}
-                    className="h-11 flex-1 rounded-md border border-border-strong bg-surface text-sm font-medium text-ink"
+                    className="h-11 flex-1 rounded-md border border-border-strong bg-surface text-[14px] font-medium text-ink"
                   >
                     다음에 하기
                   </button>
                   <button
                     type="button"
                     onClick={() => { setNudgeShown(true); setShowNudge(false); doSubmit(); }}
-                    className="h-11 flex-1 rounded-md bg-primary text-sm font-medium text-primary-on"
+                    className="h-11 flex-1 rounded-md bg-primary text-[14px] font-medium text-primary-on"
                   >
                     브랜드 소개서 등록하기
                   </button>
@@ -2364,7 +2364,7 @@ function RegisterForm() {
             {...portfolioDialog.panelProps}
             className="slim-scrollbar max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-y-auto rounded-lg border border-hairline bg-surface p-6 text-center shadow-e2"
           >
-            <p className="text-lg font-bold text-ink">✨ 브랜드 소개서가 완성됐어요!</p>
+            <p className="text-[18px] font-bold text-ink">✨ 브랜드 소개서가 완성됐어요!</p>
             {loggedIn ? (
               <>
                 <p className="mt-3 text-[15px] leading-relaxed text-body">
@@ -2380,7 +2380,7 @@ function RegisterForm() {
                   이제 링크를 복사해 협업을 제안해 볼 수 있어요! 비회원 상태라 관리용 비밀번호를 입력해주세요.
                 </p>
                 <div className="mt-7 text-left">
-                  <label className="mb-1.5 block text-sm font-medium text-body">
+                  <label className="mb-1.5 block text-[15px] font-medium text-body">
                     소개서 관리 비밀번호 <span className="text-red-500">*</span>{" "}
                     <span className="font-normal text-faint">(입력 규칙 없음)</span>
                   </label>
@@ -2424,7 +2424,7 @@ function RegisterForm() {
             >
               <div className="mb-4 flex items-start justify-between">
                 <div className="pr-8">
-                  <p className="text-[19px] font-bold text-ink">소개서 미리보기</p>
+                  <p className="text-[18px] font-bold text-ink">소개서 미리보기</p>
                   <p className="mt-1.5 text-[15px] leading-relaxed text-mute">
                     사진은 나중에 언제든 더할 수 있어요.
                   </p>
@@ -2442,12 +2442,12 @@ function RegisterForm() {
               {demoMaker ? (
                 <MakerArticle maker={demoMaker.maker} isOwner={false} logoUrl={demoMaker.logoUrl ?? undefined} />
               ) : (
-                <p className="py-10 text-center text-sm text-mute">불러오는 중이에요…</p>
+                <p className="py-10 text-center text-[13px] text-mute">불러오는 중이에요…</p>
               )}
               <button
                 type="button"
                 onClick={() => setPreviewOpen(false)}
-                className="mt-6 h-11 w-full rounded-md bg-primary text-sm font-medium text-primary-on"
+                className="mt-6 h-11 w-full rounded-md bg-primary text-[14px] font-medium text-primary-on"
               >
                 닫기
               </button>
@@ -2586,14 +2586,14 @@ function GroupHeader({
     <div className="mb-[23px] border-b border-hairline pb-2">
       <div className="flex items-center justify-between gap-2">
         <div className="flex min-w-0 items-baseline gap-2">
-          <span className="rounded-pill bg-primary-tint px-2 py-0.5 text-sm font-bold text-primary-on">
+          <span className="rounded-pill bg-primary-tint px-2 py-0.5 text-[14px] font-bold text-primary-on">
             {n}
           </span>
           <span className="text-[17px] font-bold text-ink">{title}</span>
         </div>
         {action}
       </div>
-      {sub && <p className="mt-1.5 text-sm leading-relaxed text-mute">{sub}</p>}
+      {sub && <p className="mt-1.5 text-[13px] leading-relaxed text-mute">{sub}</p>}
     </div>
   );
 }
@@ -2612,7 +2612,7 @@ function Field({
   return (
     <div>
       <div className="mb-2 flex items-center justify-between gap-2">
-        <label className="flex items-center gap-2 text-base font-medium text-body">
+        <label className="flex items-center gap-2 text-[15px] font-medium text-body">
           <span>{label}</span>
           {hint}
         </label>
@@ -2699,7 +2699,7 @@ function ChipRow({
             key={t}
             type="button"
             onClick={() => onToggle(t)}
-            className={`inline-flex h-8 items-center rounded-pill border px-3 text-sm transition-colors ${
+            className={`inline-flex h-8 items-center rounded-pill border px-3 text-[14px] transition-colors ${
               on
                 ? "border-primary bg-primary-tint text-primary-on"
                 : "border-hairline bg-surface text-mute"

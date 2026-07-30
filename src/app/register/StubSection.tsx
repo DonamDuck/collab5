@@ -41,7 +41,7 @@ export function StubSection({
         </span>
         {badge && <span className="ml-2 align-middle">{badge}</span>}
         {hasData && (
-          <span className="ml-2 rounded-pill bg-primary-tint px-2 py-0.5 text-xs font-medium text-primary-on">담김</span>
+          <span className="ml-2 rounded-pill bg-primary-tint px-2 py-0.5 text-[12px] font-medium text-primary-on">담김</span>
         )}
       </button>
     );
@@ -63,12 +63,12 @@ export function StubSection({
         <button
           type="button"
           onClick={onDelete ?? onCollapse}
-          className="shrink-0 text-sm text-faint hover:text-ink"
+          className="shrink-0 text-[13px] text-faint hover:text-ink"
         >
           {onDelete ? "삭제" : "접기"}
         </button>
       </div>
-      {sub && <p className="mb-4 text-sm leading-relaxed text-mute">{sub}</p>}
+      {sub && <p className="mb-4 text-[13px] leading-relaxed text-mute">{sub}</p>}
       {children}
     </div>
   );

@@ -163,7 +163,8 @@ export default async function MyPage({ searchParams }: { searchParams: Promise<{
             // bg-surface — 이 카드만 면색이 없어 다크에서 캔버스가 비쳤다. px도 혼자 3.5였다(QA #31)
             <li key={c.id} className="rounded-md border border-hairline bg-surface px-4 py-3">
               <div className="flex items-center gap-2">
-                <span className="truncate text-[15px] font-medium text-ink">
+                {/* 이 행의 주인공 = 콜라보 쌍. 다른 탭의 행 제목(17)과 같은 단으로 맞춘다 */}
+                <span className="truncate text-[17px] font-medium text-ink">
                   {c.brandAName} <span className="text-faint">×</span> {c.brandBName}
                 </span>
                 {/* origin 배지 — 지표 순도 규칙이 눈에 보이게. 컨시어지만 쌓이면 바로 티가 난다 */}
@@ -192,8 +193,10 @@ export default async function MyPage({ searchParams }: { searchParams: Promise<{
       <div className="flex items-center gap-3">
         <ProfileAvatarEditor image={profile?.profileImage || undefined} name={displayName} />
         <div className="min-w-0">
-          <h1 className="truncate text-2xl font-bold tracking-tight text-ink">{displayName}</h1>
-          <p className="truncate text-sm text-mute">{user.email}</p>
+          {/* 22 = /m 브랜드명과 같은 단(사내 기준 사다리). text-2xl(25.5px)은 루트 17px 때문에
+              생긴 분수 픽셀이었고, 아래 이메일(14.875)과의 간격만 크고 본문 단들은 평평했다. */}
+          <h1 className="truncate text-[22px] font-bold tracking-tight text-ink">{displayName}</h1>
+          <p className="truncate text-[13px] text-mute">{user.email}</p>
         </div>
         <LogoutButton />
       </div>

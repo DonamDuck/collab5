@@ -37,7 +37,7 @@ export function ConnectMaker({ label = "기존 소개서 연결하기" }: { labe
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="inline-flex h-11 items-center justify-center rounded-md border border-border-strong bg-surface px-5 text-sm font-medium text-ink"
+        className="inline-flex h-11 items-center justify-center rounded-md border border-border-strong bg-surface px-5 text-[15px] font-medium text-ink"
       >
         {label}
       </button>
@@ -45,7 +45,7 @@ export function ConnectMaker({ label = "기존 소개서 연결하기" }: { labe
 
   return (
     <div className="rounded-md border border-hairline bg-surface p-4 text-left">
-      <p className="text-sm font-medium text-body">소개서 링크와 관리 비밀번호를 입력해주세요.</p>
+      <p className="text-[15px] font-medium text-body">소개서 링크와 관리 비밀번호를 입력해주세요.</p>
       <input
         value={link}
         onChange={(e) => setLink(e.target.value)}
@@ -59,7 +59,7 @@ export function ConnectMaker({ label = "기존 소개서 연결하기" }: { labe
         wrapperClassName="mt-2"
         className="h-11 w-full rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
       />
-      {err && <p className="mt-2 text-sm text-red-600">{err}</p>}
+      {err && <p className="mt-2 text-[13px] text-danger">{err}</p>}
       <p className="mt-2 text-[13px] text-faint">
         링크를 모르겠다면 <Link href="/search" className="underline">찾기</Link>에서 내 브랜드를 검색해 링크를 확인해보세요.
       </p>
@@ -67,7 +67,7 @@ export function ConnectMaker({ label = "기존 소개서 연결하기" }: { labe
         <button
           type="button"
           onClick={() => setOpen(false)}
-          className="h-11 flex-1 rounded-md border border-border-strong bg-surface text-sm font-medium text-ink"
+          className="h-11 flex-1 rounded-md border border-border-strong bg-surface text-[15px] font-medium text-ink"
         >
           취소
         </button>
@@ -75,7 +75,7 @@ export function ConnectMaker({ label = "기존 소개서 연결하기" }: { labe
           type="button"
           onClick={submit}
           disabled={pending}
-          className="h-11 flex-1 rounded-md bg-primary text-sm font-medium text-primary-on disabled:opacity-50"
+          className="h-11 flex-1 rounded-md bg-primary text-[15px] font-medium text-primary-on disabled:opacity-50"
         >
           {pending ? "연결 중…" : "연결하기"}
         </button>
