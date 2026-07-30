@@ -14,13 +14,17 @@
   --lemon: #f2d81e; --lemon-pale: #fbf3b8; --lemon-on: #5c4a00;
   --corn: #6e86d6; --corn-pale: #dce3f7; --corn-on: #1b2a5c;
   --mint: #b8e9c8; --mint-pale: #e3f6ea; --mint-on: #27500a;
-  --ink: #222222; --body: #4a4a45; --mute: #6b6a63; --faint: #9b9a91; --on-dark: #fbfaf6;
+  /* 텍스트도 중성 그레이(07-31). 예전 값은 파랑 채널만 5~10 낮은 올리브빛이라
+     순백 배경에서 미세하게 누렇게 읽혔다. **명도는 그대로 두고 색조만 걷어냈다** —
+     대비비 변화 없음(body 8.7:1 · mute 5.2:1 · faint 2.8:1, faint는 placeholder 전용).
+     ink(#222222)는 원래부터 완전 중성이라 그대로. --focus가 var(--ink)로 물려 있기도 하다. */
+  --ink: #222222; --body: #4a4a4a; --mute: #6b6b6b; --faint: #9a9a9a; --on-dark: #fafafa;
   /* 라이트 배경 = 순백(대표 확정 07-31). 예전 canvas(#fbfaf6)는 카드(#ffffff)와 밝기 차가
      1.6%뿐이라 '크림빛 색조'였을 뿐 도형 구분 기능은 거의 못 하고 있었다 → 없애도 잃는 게 없다.
      ⚠️ 대신 회색 계열을 **같이** 중성화해야 한다. hairline·surface-soft가 웜톤(누런기)이면
         순백 대비 때문에 탁하게 뜬다(실측 확인). 웜톤은 여기서 걷어내고, 브랜드의 따뜻함은
         Kiwi/민트/레몬/콘 액센트가 담당한다. 다크 테마는 아래에서 따로 정의 — 영향 없음. */
-  --canvas: #ffffff; --surface: #ffffff; --surface-soft: #f5f5f6; --surface-dark: #2c2c2a;
+  --canvas: #ffffff; --surface: #ffffff; --surface-soft: #f5f5f6; --surface-dark: #2c2c2c;
   --hairline: #eaeaec; --border-strong: #d7d7db;
   --success: #3b6d11; --warning: #ba7517; --danger: #e24b4a; --info: #378add;
   /* 성공 면색 — 성공 배너에 --primary-pale(Kiwi)을 쓰면 브랜드색이 '성공'을 뜻하게 되어
@@ -38,9 +42,11 @@
     system-ui, "Apple SD Gothic Neo", sans-serif;
 }
 [data-theme="dark"] {
-  --canvas: #222222; --surface: #2c2c2a; --surface-soft: #33332f;
-  --ink: #fbfaf6; --body: #b4b2a9; --mute: #888780; --faint: #6b6a63;
-  --hairline: #3a3a36; --border-strong: #4a4a45; --primary-on: #222222;
+  /* 다크도 같은 원칙으로 중성화(명도 유지, 색조만 제거). 현재 앱에 테마 토글은 없어
+     휴면 상태지만, 켜졌을 때 라이트와 따로 놀지 않도록 함께 맞춰둔다. */
+  --canvas: #222222; --surface: #2c2c2c; --surface-soft: #333333;
+  --ink: #fafafa; --body: #b3b3b3; --mute: #878787; --faint: #6b6b6b;
+  --hairline: #3a3a3a; --border-strong: #4a4a4a; --primary-on: #222222;
   --success-pale: #2b3a1e; /* 다크에선 어두운 초록 면 — text-body(#b4b2a9)와 대비 확보 */
   /* --focus는 :root에서 var(--ink)라 여기서 다시 안 잡는다 — 위 --ink 재정의를 그대로 따라간다. */
 }

@@ -32,15 +32,15 @@ colors:
   mint-on: "#27500a"
   # Ink / Text
   ink: "#222222"                # Night — 텍스트 primary & 다크 서피스
-  body: "#4a4a45"               # 본문 보조
-  mute: "#6b6a63"               # 캡션·메타
-  faint: "#9b9a91"              # placeholder·disabled 텍스트
-  on-dark: "#fbfaf6"            # 다크 위 텍스트
+  body: "#4a4a4a"               # 본문 보조 (대비 8.7:1)
+  mute: "#6b6b6b"               # 캡션·메타 (대비 5.2:1)
+  faint: "#9a9a9a"              # placeholder·disabled 텍스트 (대비 2.8:1 — 본문 금지)
+  on-dark: "#fafafa"            # 다크 위 텍스트
   # Surface
   canvas: "#ffffff"             # 라이트 기본 배경 (순백 — 07-31 웜 오프화이트에서 전환)
   surface: "#ffffff"            # 카드·패널 (canvas와 동일 — 구분은 hairline이 담당)
   surface-soft: "#f5f5f6"       # 옅은 채움(인풋 disabled·검색바·hover) · 중성 그레이
-  surface-dark: "#2c2c2a"       # 다크 카드 표면
+  surface-dark: "#2c2c2c"       # 다크 카드 표면
   # Hairline / Border — 중성 그레이. 웜톤이면 순백 위에서 탁하게 뜬다
   hairline: "#eaeaec"           # 기본 0.5px 보더
   border-strong: "#d7d7db"      # 강조·hover 보더
@@ -324,8 +324,8 @@ collab5 디자인 시스템은 **결 있는 로컬·인디 브랜드**가 서로
   --lemon:#f2d81e; --lemon-pale:#fbf3b8; --lemon-on:#5c4a00;
   --corn:#6e86d6; --corn-pale:#dce3f7; --corn-on:#1b2a5c;
   --mint:#b8e9c8; --mint-pale:#e3f6ea; --mint-on:#27500a;
-  --ink:#222222; --body:#4a4a45; --mute:#6b6a63; --faint:#9b9a91; --on-dark:#fbfaf6;
-  --canvas:#ffffff; --surface:#ffffff; --surface-soft:#f5f5f6; --surface-dark:#2c2c2a;
+  --ink:#222222; --body:#4a4a4a; --mute:#6b6b6b; --faint:#9a9a9a; --on-dark:#fafafa;
+  --canvas:#ffffff; --surface:#ffffff; --surface-soft:#f5f5f6; --surface-dark:#2c2c2c;
   --hairline:#eaeaec; --border-strong:#d7d7db;
   --success:#3b6d11; --warning:#ba7517; --danger:#e24b4a; --info:#378add;
   --focus:#6e86d6; --scrim:#222222;
@@ -336,9 +336,9 @@ collab5 디자인 시스템은 **결 있는 로컬·인디 브랜드**가 서로
 }
 html{font-size:17px} /* 루트 17px — rem 기준. 가독성 확대 확정 */
 [data-theme="dark"]{
-  --canvas:#222222; --surface:#2c2c2a; --surface-soft:#33332f;
-  --ink:#fbfaf6; --body:#b4b2a9; --mute:#888780; --faint:#6b6a63;
-  --hairline:#3a3a36; --border-strong:#4a4a45; --primary-on:#222222; --focus:#9db3f0;
+  --canvas:#222222; --surface:#2c2c2c; --surface-soft:#333333;
+  --ink:#fafafa; --body:#b3b3b3; --mute:#878787; --faint:#6b6b6b;
+  --hairline:#3a3a3a; --border-strong:#4a4a4a; --primary-on:#222222; --focus:#9db3f0;
 }
 ```
 

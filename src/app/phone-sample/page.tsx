@@ -130,8 +130,9 @@ export default function PhoneSamplePage() {
       </section>
 
       {/* 실제 홈 배경 */}
-      <section className="mt-8 rounded-lg bg-canvas px-6 py-8">
-        <p className="mb-6 text-sm font-semibold text-mute">홈 배경 (--canvas #fbfaf6)</p>
+      {/* canvas가 순백이 된 뒤로 이 섹션은 페이지 배경과 같은 색이라, 영역 표시를 위해 hairline을 두른다 */}
+      <section className="mt-8 rounded-lg border border-hairline bg-canvas px-6 py-8">
+        <p className="mb-6 text-sm font-semibold text-mute">홈 배경 (--canvas #ffffff)</p>
         <div className="flex flex-wrap items-start gap-10">
           {ITEMS.map((it) => (
             <div key={"c" + it.label}>
