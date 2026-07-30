@@ -22,7 +22,7 @@ const PENDING_REPORT_KEY = "collab5:pendingReport";
 //      no-op이라 `collab_requests`엔 안 쌓인다. **UI만 열고 서버 안전망은 그대로 둔 것**이다.
 //   ⚠️ 다만 **리포트는 진짜로 생성된다**(유료 콜 + `collab_reports`에 캐시 + `/my` 아카이브에 노출).
 //      테스트로 만든 쌍은 나중에 대표가 직접 지우거나 그대로 둘지 판단할 것.
-const OWNER_MODE = false; // ← 테스트 끝나면 true
+const OWNER_MODE = true; // 정상값. 07-29~31 대표 콜라보 분석 테스트 동안만 false였다(07-31 복귀)
 
 export function MakerActionBar({
   slug,

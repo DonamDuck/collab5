@@ -130,7 +130,13 @@ function GoogleIdButton({ className }: { className: string }) {
     id.renderButton(box, {
       type: "standard",
       theme: "outline",
-      size: "large",
+      // ⚠️ size를 large가 아니라 **medium**으로 두는 건 크기 취향이 아니다(대표 지시 07-31).
+      //    large + 폭 200px 이상이면 구글이 **개인화 버튼**("○○ 계정 사용" + 내 이메일·프로필사진)을
+      //    자동으로 띄운다 — 우리 앱에 구글로 이미 로그인한 적 있는 사람에게만. 끄는 설정은 **없다**
+      //    (구글 문서 확인 07-31: 개인화를 막는 유일한 수단이 type=icon / size=medium·small / 폭<200px).
+      //    medium이면 글자만 작아지는데, 아래 [data-gsi] CSS가 높이를 어차피 51px로 늘리므로
+      //    옆 버튼과의 정합은 그대로다. 문구도 그대로 나온다(실측).
+      size: "medium",
       text: "continue_with",
       shape: "rectangular",
       logo_alignment: "left",
