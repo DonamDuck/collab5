@@ -158,7 +158,13 @@ function GoogleIdButton({ className }: { className: string }) {
           setPhase("ready");
           return;
         }
-        router.replace("/welcome"); // 온보딩 분기점 — 이미 채워졌으면 거기서 홈으로 넘긴다
+        // ⚠️ router.replace가 아니라 **하드 내비게이션**이다(07-31 실측 버그).
+        //    이 로그인은 서버액션을 거치지 않고 브라우저에서만 세션이 생긴다. 그래서 Next의
+        //    **클라이언트 라우터 캐시엔 로그인 전 RSC**가 그대로 남아 있고, router.replace로 가면
+        //    헤더(SiteHeader=서버 컴포넌트)가 **비로그인 상태로 그려진다.**
+        //    (이메일 로그인은 signInAction=서버액션이라 Next가 알아서 캐시를 무를 뿐, 우린 그 길이 없다.)
+        //    로그인은 세션 경계라 문서를 새로 받는 게 맞다 — 옛 리디렉션 방식도 전체 이동이었다.
+        window.location.replace("/welcome"); // 온보딩 분기점 — 이미 채워졌으면 거기서 홈으로 넘긴다
       } catch {
         setErr("구글 로그인에 실패했어요. 잠시 후 다시 시도해주세요.");
         setPhase("ready");
