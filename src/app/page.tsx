@@ -31,19 +31,22 @@ export default async function Home() {
       <section className="home-rise mx-auto max-w-[600px] text-center">
         <div className="mb-4 inline-flex items-center gap-1.5 rounded-pill bg-surface-soft px-3 py-1">
           <span className="h-2 w-2 rounded-pill bg-primary" />
-          <span className="text-xs font-medium text-mute">잘 맞는 콜라보</span>
+          <span className="text-[12px] font-medium text-mute">잘 맞는 콜라보</span>
         </div>
-        <h1 className="break-keep text-[32px] font-bold leading-tight tracking-[-0.02em] text-ink sm:text-[40px]">
+        {/* 타이포 개편(대표 QA 07-30) — 계단뿌셔클럽 실측 기반. 쟤네는 뷰포트 축소(0.635×) 때문에
+            선언 40px가 실제론 25.4px로 그려진다. 그 '실질 크기'를 기준으로 제목을 낮추고
+            (32→26 / 40→36), 자간 -0.03em·행간 1.3으로 조여 밀도를 맞춘다. */}
+        <h1 className="break-keep text-[26px] font-bold leading-[1.3] tracking-[-0.03em] text-ink sm:text-[36px]">
           좋은 협업은,
           <br />
           좋은 소개에서 시작돼요.
         </h1>
-        <p className="mx-auto mt-4 max-w-[460px] text-lg font-bold leading-snug text-primary-on">
+        <p className="mx-auto mt-4 max-w-[460px] text-[17px] font-bold leading-[1.5] text-primary-on sm:text-[18px]">
           AI와 함께 브랜드 소개서를 만들어보세요.
           <br />
           3분이면 충분해요.
         </p>
-        <p className="mx-auto mt-3 max-w-[460px] break-keep text-base leading-relaxed text-body">
+        <p className="mx-auto mt-3 max-w-[460px] break-keep text-[15px] leading-[1.65] text-body sm:text-[16px]">
           작은 가게도, 1인 브랜드도 괜찮아요.
           <br />
           몇 줄이면 소개서가 완성돼요. 무료로 시작해보세요.
@@ -51,7 +54,7 @@ export default async function Home() {
         <div className="mt-7 flex justify-center">
           <Link
             href="/register"
-            className="flex h-12 w-full items-center justify-center rounded-md bg-primary px-6 text-base font-medium text-primary-on sm:w-auto"
+            className="flex h-12 w-full items-center justify-center rounded-md bg-primary px-6 text-[16px] font-medium text-primary-on sm:w-auto"
           >
             브랜드 소개서 만들기
           </Link>
@@ -62,10 +65,10 @@ export default async function Home() {
           온로드 라이즈 2번(제목·섭타이틀·목업 통째로 세트). delay로 히어로(1번) 뒤에 이어 올라온다.
           데스크탑·모바일 동일 대응(스크롤 위치 무관, 로드 시 순차 재생). 대표 지시 2026-07-22. */}
       <section className="home-rise mt-16" style={{ animationDelay: "600ms" }}>
-        <h2 className="text-balance break-keep text-center text-2xl font-bold tracking-tight text-ink sm:text-[28px]">
+        <h2 className="text-balance break-keep text-center text-[22px] font-bold leading-[1.35] tracking-[-0.02em] text-ink sm:text-[26px]">
           3분이면 브랜드 소개서가 완성돼요.
         </h2>
-        <p className="mx-auto mt-2 max-w-[440px] break-keep text-center text-base leading-relaxed text-body">
+        <p className="mx-auto mt-2 max-w-[440px] break-keep text-center text-[15px] leading-[1.65] text-body sm:text-[16px]">
           몇 가지만 알려주시면, AI가 소개에 필요한 내용을 먼저 정리해드려요.
         </p>
         <div className="mt-8">
@@ -74,7 +77,7 @@ export default async function Home() {
         <div className="mt-8 flex justify-center">
           <Link
             href="/preview"
-            className="flex h-12 items-center justify-center rounded-md border border-border-strong bg-surface px-7 text-base font-medium text-ink"
+            className="flex h-12 items-center justify-center rounded-md border border-border-strong bg-surface px-7 text-[16px] font-medium text-ink"
           >
             브랜드 소개서 작성 예시
           </Link>
@@ -101,10 +104,10 @@ export default async function Home() {
           as="section"
           className="mt-16 -mx-4 bg-surface-soft px-4 py-14 [box-shadow:0_0_0_100vmax_var(--surface-soft)] [clip-path:inset(0_-100vmax)] sm:-mx-6 sm:px-6"
         >
-          <h2 className="text-balance break-keep text-center text-2xl font-bold tracking-tight text-ink sm:text-[28px]">
+          <h2 className="text-balance break-keep text-center text-[22px] font-bold leading-[1.35] tracking-[-0.02em] text-ink sm:text-[26px]">
             콜라보 가능한 브랜드
           </h2>
-          <p className="mx-auto mt-2 max-w-[440px] break-keep text-center text-base leading-relaxed text-body">
+          <p className="mx-auto mt-2 max-w-[440px] break-keep text-center text-[15px] leading-[1.65] text-body sm:text-[16px]">
             지금 함께할 파트너를 찾고 있는 브랜드예요.
           </p>
           <div className="mt-8">
@@ -116,7 +119,7 @@ export default async function Home() {
       {/* §9.6 온보딩 3스텝 */}
       <section className="mt-16">
         <Reveal>
-          <h2 className="text-balance break-keep text-center text-2xl font-bold tracking-tight text-ink sm:text-[28px]">
+          <h2 className="text-balance break-keep text-center text-[22px] font-bold leading-[1.35] tracking-[-0.02em] text-ink sm:text-[26px]">
             브랜드 소개서, 이렇게 만들어요
           </h2>
         </Reveal>
@@ -152,7 +155,7 @@ export default async function Home() {
       {/* 왜 소개서? — DM vs 소개서 */}
       <section className="mt-16">
         <Reveal>
-          <h2 className="text-balance break-keep text-center text-2xl font-bold tracking-tight text-ink sm:text-[28px]">
+          <h2 className="text-balance break-keep text-center text-[22px] font-bold leading-[1.35] tracking-[-0.02em] text-ink sm:text-[26px]">
             브랜드 소개서는 이렇게 활용할 수 있어요.
           </h2>
         </Reveal>
@@ -160,14 +163,14 @@ export default async function Home() {
           {/* 그냥 DM */}
           <Reveal delay={0} className="h-full">
             <div className="h-full rounded-xl border border-hairline bg-surface-soft p-6">
-              <p className="text-[17px] font-bold text-mute">이런 경험 있으셨나요?</p>
+              <p className="text-[16px] font-bold text-mute sm:text-[17px]">이런 경험 있으셨나요?</p>
               <ul className="mt-4 space-y-3">
                 {[
                   "내가 어떤 브랜드인지 하나씩 설명해야 해요.",
                   "상대는 내용을 이해하기 전부터 부담을 느껴요.",
                   "다른 메시지 사이에 금방 묻혀버려요.",
                 ].map((t) => (
-                  <li key={t} className="flex gap-2 text-base leading-relaxed text-body">
+                  <li key={t} className="flex gap-2 text-[15px] leading-[1.65] text-body sm:text-[16px]">
                     <span className="text-faint">·</span>
                     {t}
                   </li>
@@ -178,7 +181,7 @@ export default async function Home() {
           {/* 브랜드 소개서 */}
           <Reveal delay={110} className="h-full">
             <div className="h-full rounded-xl border border-primary bg-surface p-6 shadow-e1">
-              <p className="flex items-center gap-1.5 text-[17px] font-bold text-ink">
+              <p className="flex items-center gap-1.5 text-[16px] font-bold text-ink sm:text-[17px]">
                 <span className="h-2 w-2 rounded-pill bg-primary" />
                 이렇게 달라져요
               </p>
@@ -188,7 +191,7 @@ export default async function Home() {
                   "상대가 필요한 정보를 한눈에 이해할 수 있어요.",
                   "프로필 링크에 걸어두면 우리 브랜드의 포트폴리오가 돼요.",
                 ].map((t) => (
-                  <li key={t} className="flex gap-2 text-base leading-relaxed text-body">
+                  <li key={t} className="flex gap-2 text-[15px] leading-[1.65] text-body sm:text-[16px]">
                     <span className="font-bold text-primary-on">✓</span>
                     {t}
                   </li>
@@ -202,12 +205,12 @@ export default async function Home() {
       {/* 마무리 CTA — eager 필수: 페이지 맨 마지막 요소라 하단 -22% 데드존을 못 벗어나 리빌이 영영 안 터짐 */}
       <Reveal as="section" eager className="mt-14 text-center">
         {/* 미션 한 줄 — 소개서가 쌓이면 발견으로 이어진다(BM 발굴 방향을 고객 언어로, 대표 확정 2026-07-23) */}
-        <p className="mx-auto max-w-[440px] break-keep text-xl font-bold leading-snug tracking-tight text-ink">
+        <p className="mx-auto max-w-[440px] break-keep text-[20px] font-bold leading-[1.4] tracking-[-0.02em] text-ink sm:text-[22px]">
           매력적인 콜라보를 만들어보세요.
         </p>
         <Link
           href="/register"
-          className="mt-6 inline-flex h-12 items-center justify-center rounded-md bg-primary px-7 text-base font-medium text-primary-on"
+          className="mt-6 inline-flex h-12 items-center justify-center rounded-md bg-primary px-7 text-[16px] font-medium text-primary-on"
         >
           지금 시작하기
         </Link>
@@ -231,11 +234,11 @@ function StepCard({
     // h-full = Reveal 래퍼가 그리드 아이템이 돼도 카드 높이를 셀에 맞춰 균등하게(스태거 도입 후)
     <div className="h-full rounded-xl border border-hairline bg-surface p-6">
       <div className="flex h-12 w-12 items-center justify-center text-ink">{illu}</div>
-      <p className="mt-4 text-xs font-bold tracking-wide text-primary-on">
+      <p className="mt-4 text-[12px] font-bold tracking-wide text-primary-on">
         STEP {n}
       </p>
-      <h3 className="mt-1.5 text-[18px] font-bold leading-snug text-ink">{title}</h3>
-      <p className="mt-2 text-[15px] leading-relaxed text-mute">{desc}</p>
+      <h3 className="mt-1.5 text-[17px] font-bold leading-snug tracking-[-0.01em] text-ink">{title}</h3>
+      <p className="mt-2 text-[14px] leading-[1.6] text-mute sm:text-[15px]">{desc}</p>
     </div>
   );
 }
