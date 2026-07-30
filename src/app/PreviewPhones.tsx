@@ -119,17 +119,20 @@ function PhoneGallery({ demo }: { demo: { key: string; slides: readonly { src: s
         {demo.slides.map((s, i) => (
           // 폰 프레임(시안 A) — 검은 액자처럼 보이던 걸 실제 기기처럼. 값은 폭 280px 기준.
           // · bg-white: 다크 테마에서도 "기기 색"이라 흰색 고정(bg-surface 쓰면 테마 따라 변해 프레임이 사라진다)
-          // · 안쪽 라운드 = 바깥(50) − 베젤(9) = 41. 이 관계가 어긋나면 베젤 두께가 모서리에서 들쭉날쭉해 보인다
+          // · 안쪽 라운드 = 바깥(44) − 베젤(9) = 35. 이 관계가 어긋나면 베젤 두께가 모서리에서 들쭉날쭉해 보인다
+          // · ⚠️ 라운드는 px 고정이라 **폭이 줄면 상대적으로 더 둥글어진다**. 280px에서 50px이면 18%로 맞지만
+          //   모바일(≈200px)에선 25%까지 올라가 말랑해 보인다 → 양쪽 절충값 44. `sm:` 분기는 답이 아니다:
+          //   프레임은 뷰포트 639px에서 이미 280px 상한에 닿아 브레이크포인트와 실제 폭 변화 지점이 어긋난다.
           // · 그림자 3겹(접지 1px·몸통·확산): 한 겹짜리가 '허접해 보이던' 주 원인이라 꼭 3겹 유지
           <div
             key={s.src}
-            className="block w-[74%] max-w-[280px] shrink-0 snap-center rounded-[50px] bg-white p-[9px] sm:snap-start"
+            className="block w-[74%] max-w-[280px] shrink-0 snap-center rounded-[44px] bg-white p-[9px] sm:snap-start"
             style={{
               boxShadow:
                 "0 1px 2px rgba(24,24,22,.05), 0 10px 24px -8px rgba(24,24,22,.14), 0 32px 64px -20px rgba(24,24,22,.16)",
             }}
           >
-            <div className="overflow-hidden rounded-[41px] ring-1 ring-black/[.07]">
+            <div className="overflow-hidden rounded-[35px] ring-1 ring-black/[.07]">
               <Image
                 src={s.src}
                 alt={s.alt}
