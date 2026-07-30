@@ -543,7 +543,10 @@ html{font-size:17px} /* 루트 17px — rem 기준. 가독성 확대 확정 */
 
 등록·가입 폼의 골격이에요. 라벨/섹션 구조를 통일할 때 사용해요.
 
-- **Field** — 라벨 위·입력 아래·선택 표기: `label mb-1.5 text-[15px] font-medium text-body` + `· 선택`(optional, `text-faint`).
+- **Field** — 라벨 위·입력 아래·선택 표기: `label mb-1.5 text-[16px] font-medium text-body` + `· 선택`(optional, `text-faint`).
+  - **폼 사다리 = 섹션헤더 18 bold → 필드라벨 16 medium → 입력칸 17 regular → 힌트 13** (07-31 확정).
+    ⚠️ 라벨을 올릴 땐 **섹션 헤더도 같이** 올린다 — 둘이 1px 차이가 되면 위계가 굵기 하나에만 의존해 "섹션 제목"과 "필드 이름"이 같은 급으로 읽힌다. 라벨(16)과 입력칸(17)의 1px 차이는 무해하다: 굵기·색·테두리 박스로 이미 갈라져 있어 서로 경쟁하지 않는다.
+    ⚠️ **입력칸·select는 16px 미만 금지** — iOS Safari가 포커스 시 화면을 강제로 확대한다(07-31 실측 7건 수리).
 - **GroupHeader** — 폼 섹션 헤더(번호+타이틀+sub). 타이틀→첫 input 23px(`mb-[23px]`) 하드-룰.
 - **섹션 리듬** — 섹션 간 `space-y-12`. 카드 내 세트 간 `space-y-5`.
 

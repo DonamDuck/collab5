@@ -34,7 +34,7 @@ export function StubSection({
           hasData ? "border border-hairline" : "border border-dashed border-border-strong"
         }`}
       >
-        <span className="text-[15px] font-medium text-body">
+        <span className="text-[16px] font-medium text-body">
           {/* 이미 담긴 섹션에 '+'(추가) 기호는 뜻이 어긋난다 — 빈 상태에만 붙인다 */}
           {!hasData && <span className="mr-1 font-semibold text-primary-on">+</span>}
           {label}
@@ -58,7 +58,8 @@ export function StubSection({
         {/* 모바일: 배지를 타이틀 위(왼쪽)에 스택 / 데스크탑: 타이틀 옆 인라인(줄바꿈 방지) */}
         <div className="flex min-w-0 flex-col items-start gap-1 sm:flex-row sm:items-center sm:gap-2">
           {badge && <span className="sm:order-2">{badge}</span>}
-          <span className="text-[17px] font-bold leading-snug text-ink sm:order-1">{label}</span>
+          {/* 펼친 스텁의 제목은 SectionHeader와 같은 급 — 18로 함께 올린다(07-31) */}
+          <span className="text-[18px] font-bold leading-snug text-ink sm:order-1">{label}</span>
         </div>
         <button
           type="button"

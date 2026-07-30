@@ -302,7 +302,7 @@ export function BlockEditor({ blocks, onChange, onUploadingChange, onSheetOpenCh
                         ))}
                         {(it.photos?.length ?? 0) < 5 && (
                           <label className="flex h-20 w-20 shrink-0 cursor-pointer flex-col items-center justify-center rounded-md border border-dashed border-border-strong bg-surface text-mute">
-                            <span className="text-xl leading-none">＋</span>
+                            <span className="text-[21px] leading-none">＋</span>
                             <span className="mt-1 text-[11px]">사진(선택)</span>
                             <input
                               type="file"
@@ -585,7 +585,7 @@ function BlockAttachments({
             ))}
             {photos.length < 5 && (
               <label className="flex h-20 w-20 shrink-0 cursor-pointer flex-col items-center justify-center rounded-md border border-dashed border-border-strong bg-surface text-mute">
-                <span className="text-xl leading-none">＋</span>
+                <span className="text-[21px] leading-none">＋</span>
                 <span className="mt-1 text-[11px]">사진(선택)</span>
                 <input
                   type="file"

@@ -27,7 +27,9 @@ export async function SiteHeader() {
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/logo-lockup.svg" alt="" aria-hidden="true" className="h-6 w-auto sm:h-7" />
       </Link>
-      <nav className="flex min-w-0 items-center gap-1.5 text-sm sm:gap-2">
+      {/* 14px 정수 — text-sm은 루트 17px 탓에 14.875px(분수)가 된다. 헤더는 전 페이지 공통이라
+          여기 하나가 앱 전체에 분수 픽셀을 흩뿌리고 있었다(07-31 실측). */}
+      <nav className="flex min-w-0 items-center gap-1.5 text-[14px] sm:gap-2">
         {/* 콜라보 찾기 — '미니 검색창' 형태의 링크(대표 지시 07-31).
             돋보기 아이콘 + '브랜드 소개서' 버튼 2개를 이걸로 통합했다.
             ⚠️ 진짜 input이 아니라 Link다 — 눌러서 /search로 보내는 게 목적이고,

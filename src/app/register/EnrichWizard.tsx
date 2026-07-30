@@ -601,7 +601,7 @@ export function EnrichWizard({
           type="button"
           onClick={onClose}
           aria-label="닫기"
-          className="absolute right-3 top-3 z-10 flex h-8 w-8 items-center justify-center rounded-pill text-lg text-mute hover:bg-surface-soft hover:text-ink"
+          className="absolute right-3 top-3 z-10 flex h-8 w-8 items-center justify-center rounded-pill text-[18px] text-mute hover:bg-surface-soft hover:text-ink"
         >
           ✕
         </button>
@@ -614,11 +614,11 @@ export function EnrichWizard({
             <button
               type="button"
               onClick={goBack}
-              className="-ml-1 inline-flex items-center gap-1 text-xs font-medium text-mute hover:text-ink"
+              className="-ml-1 inline-flex items-center gap-1 text-[12px] font-medium text-mute hover:text-ink"
             >
               ← 뒤로
             </button>
-            <span className="ml-auto text-xs font-medium text-mute">
+            <span className="ml-auto text-[12px] font-medium text-mute">
               {stepIdx + 1} / {steps.length}
             </span>
           </div>
@@ -630,7 +630,7 @@ export function EnrichWizard({
 
         {kind === "error" && (
           <div className="pt-4 text-center">
-            <p className="text-lg font-bold text-ink">앗, 문제가 생겼어요</p>
+            <p className="text-[18px] font-bold text-ink">앗, 문제가 생겼어요</p>
             <p className="mt-1.5 text-[15px] leading-relaxed text-mute">{errMsg}</p>
             {/* 실패 원인 대부분이 일시적(네트워크·모델 혼잡)인데 전엔 나가는 길만 있었다.
                 고른 칩·확정한 링크가 그대로 남아 있으니 재시도가 먼저다(조사 메모 재사용 — 재크롤 없음). */}
@@ -638,14 +638,14 @@ export function EnrichWizard({
               <button
                 type="button"
                 onClick={generate}
-                className="h-11 w-full rounded-md bg-primary text-sm font-medium text-primary-on"
+                className="h-11 w-full rounded-md bg-primary text-[14px] font-medium text-primary-on"
               >
                 다시 시도
               </button>
               <button
                 type="button"
                 onClick={onClose}
-                className="h-11 w-full rounded-md border border-border-strong bg-surface text-sm font-medium text-ink"
+                className="h-11 w-full rounded-md border border-border-strong bg-surface text-[14px] font-medium text-ink"
               >
                 직접 입력할게요
               </button>
@@ -657,13 +657,13 @@ export function EnrichWizard({
         {kind === "seed" && (
           <div>
             <p className="pr-8 text-[13px] font-medium text-primary-on">AI 소개서 작성을 위해 정보가 필요해요.</p>
-            <p className="mt-1 pr-8 text-lg font-bold text-ink">어디에 있는, 어떤 브랜드인가요?</p>
+            <p className="mt-1 pr-8 text-[18px] font-bold text-ink">어디에 있는, 어떤 브랜드인가요?</p>
             <p className="mt-1.5 text-[15px] leading-relaxed text-mute">
               같은 이름의 다른 곳과 헷갈리지 않게, 딱 두 가지만 알려주세요.
             </p>
             <div className="mt-4 space-y-3">
               <div>
-                <label className="mb-1.5 block text-[15px] font-medium text-body">
+                <label className="mb-1.5 block text-[16px] font-medium text-body">
                   어떤 지역에 위치하고 있나요? <span className="text-primary-on">*</span>
                 </label>
                 <input
@@ -674,7 +674,7 @@ export function EnrichWizard({
                 />
               </div>
               <div>
-                <label className="mb-1.5 block text-[15px] font-medium text-body">
+                <label className="mb-1.5 block text-[16px] font-medium text-body">
                   어떤 브랜드인가요? <span className="text-primary-on">*</span>
                 </label>
                 <input
@@ -695,18 +695,18 @@ export function EnrichWizard({
             <button
               type="button"
               onClick={() => (seedReady ? runCrawl() : setSeedErr("지역과 어떤 브랜드인지를 모두 알려주세요."))}
-              className="mt-5 h-11 w-full rounded-md bg-primary text-sm font-medium text-primary-on"
+              className="mt-5 h-11 w-full rounded-md bg-primary text-[14px] font-medium text-primary-on"
             >
               ✨ 이 정보로 찾아보기
             </button>
-            {seedErr && !seedReady && <p className="mt-2 text-center text-sm text-red-600">{seedErr}</p>}
+            {seedErr && !seedReady && <p className="mt-2 text-center text-[13px] text-danger">{seedErr}</p>}
           </div>
         )}
 
         {/* ① 키워드 선택(넓게) */}
         {kind === "chips" && (
           <div>
-            <p className="pr-8 text-lg font-bold text-ink">
+            <p className="pr-8 text-[18px] font-bold text-ink">
               {tier === "thin" ? "찾은 건 적지만, 함께 채워봐요" : "이런 모습들을 찾았어요"}
             </p>
             {tier === "thin" && (
@@ -749,7 +749,7 @@ export function EnrichWizard({
                       key={c.text}
                       type="button"
                       onClick={() => toggleChip(c.text)}
-                      className={`inline-flex min-h-9 items-center rounded-pill border px-3.5 py-1.5 text-left text-sm leading-snug transition-colors ${
+                      className={`inline-flex min-h-9 items-center rounded-pill border px-3.5 py-1.5 text-left text-[14px] leading-snug transition-colors ${
                         on
                           ? "border-primary bg-primary-tint text-primary-on"
                           : "border-hairline bg-surface text-body"
@@ -780,14 +780,14 @@ export function EnrichWizard({
               <button
                 type="button"
                 onClick={addCustom}
-                className="h-11 shrink-0 rounded-md border border-border-strong bg-surface px-4 text-sm font-medium text-ink"
+                className="h-11 shrink-0 rounded-md border border-border-strong bg-surface px-4 text-[14px] font-medium text-ink"
               >
                 추가
               </button>
             </div>
             <button
               onClick={() => (selected.length ? setKind("confirm") : generate())}
-              className="mt-4 h-11 w-full rounded-md bg-primary text-sm font-medium text-primary-on"
+              className="mt-4 h-11 w-full rounded-md bg-primary text-[14px] font-medium text-primary-on"
             >
               {selected.length ? `고른 ${selected.length}개로 다음` : "키워드 없이 초안 받기"}
             </button>
@@ -797,7 +797,7 @@ export function EnrichWizard({
         {/* ② 확인·강조(좁게) — ⭐캡3 + 사실 게이트 + 링크 확인 */}
         {kind === "confirm" && (
           <div>
-            <p className="pr-8 text-lg font-bold text-ink">선택한 정보를 확인해주세요.</p>
+            <p className="pr-8 text-[18px] font-bold text-ink">선택한 정보를 확인해주세요.</p>
             <p className="mt-1.5 text-[15px] leading-relaxed text-mute">
               제일 중요한 것에 별표를 눌러주세요(최대 {MAX_STARS}개). 별표된 정보는 소개서
               작성에 더 중요한 정보로 사용돼요.
@@ -830,7 +830,7 @@ export function EnrichWizard({
                           onClick={() => toggleStar(c.text)}
                           disabled={!star && starred.length >= MAX_STARS}
                           aria-label={star ? "별표 해제" : "별표"}
-                          className={`shrink-0 text-xl leading-none ${
+                          className={`shrink-0 text-[21px] leading-none ${
                             star ? "" : "opacity-35"
                           } disabled:opacity-15`}
                         >
@@ -874,7 +874,7 @@ export function EnrichWizard({
 
             <button
               onClick={goNext}
-              className="mt-4 h-11 w-full rounded-md bg-primary text-sm font-medium text-primary-on"
+              className="mt-4 h-11 w-full rounded-md bg-primary text-[14px] font-medium text-primary-on"
             >
               다음
             </button>
@@ -885,7 +885,7 @@ export function EnrichWizard({
         {kind === "links" && (
           <div>
             <p className="pr-8 text-[13px] font-medium text-primary-on">사전 정보 마지막 확인!</p>
-            <p className="mt-1 pr-8 text-lg font-bold text-ink">이 링크가 맞나요?</p>
+            <p className="mt-1 pr-8 text-[18px] font-bold text-ink">이 링크가 맞나요?</p>
             <p className="mt-1.5 text-[15px] leading-relaxed text-mute">
               확인해주신 SNS, 홈페이지 정보를 소개서에 담아드릴게요. 홈페이지 링크가 있다면
               내용까지 직접 읽고 더 정확하게 써드려요.
@@ -973,11 +973,11 @@ export function EnrichWizard({
             <button
               type="button"
               onClick={() => (linksReady ? generate() : setLinkErr("SNS와 홈페이지 항목에 모두 답해주세요."))}
-              className="mt-4 h-11 w-full rounded-md bg-primary text-sm font-medium text-primary-on"
+              className="mt-4 h-11 w-full rounded-md bg-primary text-[14px] font-medium text-primary-on"
             >
               ✨ 작성한 정보들로 소개서 작성 시작
             </button>
-            {linkErr && !linksReady && <p className="mt-2 text-center text-sm text-red-600">{linkErr}</p>}
+            {linkErr && !linksReady && <p className="mt-2 text-center text-[13px] text-danger">{linkErr}</p>}
             {!linksReady && (
               <p className="mt-1.5 text-center text-[13px] text-faint">
                 SNS와 홈페이지 모두 답해주시면 시작할 수 있어요.
@@ -989,7 +989,7 @@ export function EnrichWizard({
         {/* 정보 확인·수정 */}
         {kind === "fields" && (
           <div>
-            <p className="pr-8 text-lg font-bold text-ink">이제 소개서 작성을 시작할게요!</p>
+            <p className="pr-8 text-[18px] font-bold text-ink">이제 소개서 작성을 시작할게요!</p>
             <p className="mt-1.5 text-[15px] leading-relaxed text-mute">정보가 틀렸다면 수정해주세요. 빈칸으로 건너뛰어도 돼요.</p>
             <div className="mt-4 space-y-3">
               <FieldEdit label="상호" value={fName} onChange={setFName} placeholder="예: 캔버스가든" />
@@ -1009,7 +1009,7 @@ export function EnrichWizard({
             </div>
             <button
               onClick={goNext}
-              className="mt-5 h-11 w-full rounded-md bg-primary text-sm font-medium text-primary-on"
+              className="mt-5 h-11 w-full rounded-md bg-primary text-[14px] font-medium text-primary-on"
             >
               다음 · 한두 문장 소개 고르기
             </button>
@@ -1019,7 +1019,7 @@ export function EnrichWizard({
         {/* 한 줄 소개 5지선다 */}
         {kind === "oneLiner" && options && (
           <div>
-            <p className="pr-8 text-lg font-bold text-ink">마음에 드는 소개를 골라주세요.</p>
+            <p className="pr-8 text-[18px] font-bold text-ink">마음에 드는 소개를 골라주세요.</p>
             <p className="mt-1.5 text-[15px] leading-relaxed text-mute">‘수정’으로 다듬으며 비교하고, 마음에 드는 하나를 골라주세요.</p>
             <div className="mt-4 max-h-[42vh] overflow-y-auto slim-scrollbar pr-0.5">
               <OptionPicker
@@ -1035,7 +1035,7 @@ export function EnrichWizard({
             </div>
             <button
               onClick={goToDescFromOneLiner}
-              className="mt-4 h-11 w-full rounded-md bg-primary text-sm font-medium text-primary-on"
+              className="mt-4 h-11 w-full rounded-md bg-primary text-[14px] font-medium text-primary-on"
             >
               다음 · 브랜드 소개 고르기
             </button>
@@ -1045,11 +1045,11 @@ export function EnrichWizard({
         {/* 브랜드 소개 5지선다 */}
         {kind === "desc" && options && (
           <div>
-            <p className="pr-8 text-lg font-bold text-ink">브랜드 소개를 골라주세요</p>
+            <p className="pr-8 text-[18px] font-bold text-ink">브랜드 소개를 골라주세요</p>
             <p className="mt-1.5 text-[15px] leading-relaxed text-mute">‘수정’으로 다듬으며 비교하고, 마음에 드는 하나를 골라주세요.</p>
             {descRegenBusy ? (
               <div className="mt-4 flex min-h-[200px] items-center justify-center">
-                <p className="flex items-center gap-2 text-sm font-medium text-primary-on">
+                <p className="flex items-center gap-2 text-[14px] font-medium text-primary-on">
                   <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
                   고르신 소개에 맞춰 브랜드 소개를 다시 쓰고 있어요…
                 </p>
@@ -1072,7 +1072,7 @@ export function EnrichWizard({
             <button
               onClick={storyItems.length ? goNext : apply}
               disabled={descRegenBusy}
-              className="mt-4 h-11 w-full rounded-md bg-primary text-sm font-medium text-primary-on disabled:opacity-50"
+              className="mt-4 h-11 w-full rounded-md bg-primary text-[14px] font-medium text-primary-on disabled:opacity-50"
             >
               {storyItems.length ? "다음 · 찾은 이야기 고르기" : "이 내용으로 소개서 채우기"}
             </button>
@@ -1082,7 +1082,7 @@ export function EnrichWizard({
         {/* 찾은 이야기 체크리스트(힌트 있을 때만) — 섹션 그룹당 헤더 1회 + 항목 체크박스 */}
         {kind === "story" && (
           <div>
-            <p className="pr-8 text-lg font-bold text-ink">소개서에 담을 추가 내용을 골라보세요.</p>
+            <p className="pr-8 text-[18px] font-bold text-ink">소개서에 담을 추가 내용을 골라보세요.</p>
             <p className="mt-1.5 text-[15px] leading-relaxed text-mute">
               AI가 찾은 내용을 정리해봤어요. 소개서에 담고 싶은 내용을 선택해 주세요. 내용이
               다르거나 정확하지 않다면 제외해 주세요.
@@ -1129,7 +1129,7 @@ export function EnrichWizard({
             </div>
             <button
               onClick={apply}
-              className="mt-4 h-11 w-full rounded-md bg-primary text-sm font-medium text-primary-on"
+              className="mt-4 h-11 w-full rounded-md bg-primary text-[14px] font-medium text-primary-on"
             >
               이 내용으로 소개서 채우기
             </button>
@@ -1141,7 +1141,7 @@ export function EnrichWizard({
         {confirmClose && (
           <div className="absolute inset-0 z-20 flex items-center justify-center rounded-lg bg-surface p-5">
             <div className="w-full max-w-xs text-center">
-              <p className="text-base font-bold text-ink">작성을 그만둘까요?</p>
+              <p className="text-[18px] font-bold text-ink">작성을 그만둘까요?</p>
               <p className="mt-1.5 text-[14px] leading-relaxed text-mute">
                 지금까지 고른 내용은 저장되지 않아요.
               </p>
@@ -1149,14 +1149,14 @@ export function EnrichWizard({
                 <button
                   type="button"
                   onClick={() => setConfirmClose(false)}
-                  className="h-11 flex-1 rounded-md bg-primary text-sm font-medium text-primary-on"
+                  className="h-11 flex-1 rounded-md bg-primary text-[14px] font-medium text-primary-on"
                 >
                   계속 쓸게요
                 </button>
                 <button
                   type="button"
                   onClick={onClose}
-                  className="h-11 flex-1 rounded-md border border-border-strong bg-surface text-sm font-medium text-ink"
+                  className="h-11 flex-1 rounded-md border border-border-strong bg-surface text-[14px] font-medium text-ink"
                 >
                   그만두기
                 </button>
@@ -1205,7 +1205,7 @@ function LinkPicker({
     fixedPrefix ? v.replace(new RegExp(`^\\${fixedPrefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}+`), "") : v;
   const customInput = pick.customOn && fixedPrefix ? (
     <div className="mt-1.5 flex h-11 w-full items-center rounded-sm border border-hairline bg-surface px-3 focus-within:[outline:2px_solid_var(--focus)] focus-within:[outline-offset:2px]">
-      <span className="shrink-0 text-base text-mute">{fixedPrefix}</span>
+      <span className="shrink-0 text-[16px] text-mute">{fixedPrefix}</span>
       <input
         autoFocus
         value={stripPrefix(pick.customText)}
@@ -1334,10 +1334,10 @@ function FieldEdit({
     fixedPrefix ? v.replace(new RegExp(`^\\${fixedPrefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}+`), "") : v;
   return (
     <div>
-      <label className="mb-1.5 block text-[15px] font-medium text-body">{label}</label>
+      <label className="mb-1.5 block text-[16px] font-medium text-body">{label}</label>
       {fixedPrefix ? (
         <div className="flex h-11 w-full items-center rounded-sm border border-hairline bg-surface px-3 focus-within:[outline:2px_solid_var(--focus)] focus-within:[outline-offset:2px]">
-          <span className="shrink-0 text-base text-mute">{fixedPrefix}</span>
+          <span className="shrink-0 text-[16px] text-mute">{fixedPrefix}</span>
           <input
             value={stripPrefix(value)}
             onChange={(e) => {
@@ -1366,7 +1366,7 @@ function FieldEdit({
                 key={c}
                 type="button"
                 onClick={() => onChange(c)}
-                className="inline-flex h-8 items-center rounded-pill border border-border-strong bg-surface px-3 text-sm text-ink hover:border-primary hover:bg-primary-pale"
+                className="inline-flex h-8 items-center rounded-pill border border-border-strong bg-surface px-3 text-[13px] text-ink hover:border-primary hover:bg-primary-pale"
               >
                 {c}
               </button>
@@ -1473,7 +1473,7 @@ function OptionPicker({
             onAddCustom();
             setEditing(list.length);
           }}
-          className="flex w-full items-center justify-center gap-1 rounded-md border border-dashed border-border-strong bg-surface py-2.5 text-sm text-mute transition-colors hover:border-primary hover:text-primary-on"
+          className="flex w-full items-center justify-center gap-1 rounded-md border border-dashed border-border-strong bg-surface py-2.5 text-[13px] text-mute transition-colors hover:border-primary hover:text-primary-on"
         >
           ＋ 직접 입력하기
         </button>
@@ -1512,14 +1512,14 @@ function LoadingView({ name, generating }: { name: string; generating?: boolean 
         <circle cx="45.32" cy="18" r="2.8" fill="currentColor" />
         <circle cx="28" cy="28" r="7" fill="var(--primary)" stroke="currentColor" strokeWidth="2" />
       </svg>
-      <p className="mt-5 text-base font-bold text-ink">
+      <p className="mt-5 text-[18px] font-bold text-ink">
         {generating
           ? "소개를 만드는 중이에요"
           : name
             ? `${name}${josa(name, "을", "를")} 살펴보는 중이에요`
             : "브랜드를 살펴보는 중이에요"}
       </p>
-      <p className="mt-1.5 text-sm text-mute">{msgs[i]}</p>
+      <p className="mt-1.5 text-[13px] text-mute">{msgs[i]}</p>
     </div>
   );
 }

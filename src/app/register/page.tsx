@@ -1354,7 +1354,7 @@ function RegisterForm() {
 
           {/* 자세히 소개 — 브랜드를 소개해주세요 (초안 받기 버튼은 ① 상호 옆으로 이사) */}
           <div>
-            <label className="mb-2 flex items-center gap-2 text-[15px] font-medium text-body">
+            <label className="mb-2 flex items-center gap-2 text-[16px] font-medium text-body">
               <span>자세히 소개 (선택)</span>
               {aiFilled.has("description") && <AiBadge />}
             </label>
@@ -1375,7 +1375,7 @@ function RegisterForm() {
 
           {/* 브랜드 사진 (선택) */}
           <div>
-            <label className="mb-1 block text-[15px] font-medium text-body">
+            <label className="mb-1 block text-[16px] font-medium text-body">
               브랜드 사진 (선택, 최대 10장)
             </label>
             {/* 사진 불안 완화 — 사진 없이도 완성 예시를 그 자리에서 확인(바텀시트, 폼 이탈 없음) */}
@@ -1401,7 +1401,7 @@ function RegisterForm() {
 
           {/* 소개자료 PDF 첨부 (선택) — 구⑨에서 ① 브랜드 사진 아래로 이사 */}
           <div>
-            <label className="mb-2 block text-[15px] font-medium text-body">
+            <label className="mb-2 block text-[16px] font-medium text-body">
               이미 소개서가 있나요? (선택)
             </label>
             <div className="flex items-center gap-3">
@@ -2380,7 +2380,7 @@ function RegisterForm() {
                   이제 링크를 복사해 협업을 제안해 볼 수 있어요! 비회원 상태라 관리용 비밀번호를 입력해주세요.
                 </p>
                 <div className="mt-7 text-left">
-                  <label className="mb-1.5 block text-[15px] font-medium text-body">
+                  <label className="mb-1.5 block text-[16px] font-medium text-body">
                     소개서 관리 비밀번호 <span className="text-red-500">*</span>{" "}
                     <span className="font-normal text-faint">(입력 규칙 없음)</span>
                   </label>
@@ -2589,7 +2589,10 @@ function GroupHeader({
           <span className="rounded-pill bg-primary-tint px-2 py-0.5 text-[14px] font-bold text-primary-on">
             {n}
           </span>
-          <span className="text-[17px] font-bold text-ink">{title}</span>
+          {/* 섹션 헤더 18 — 필드 라벨을 16으로 올리면서 함께 올린다(대표 확정 07-31).
+              헤더를 17로 두면 라벨(16)과 1px 차이가 되어 위계가 굵기 하나에만 의존한다.
+              2px + 굵기 두 겹으로 갈라져 있어야 "섹션 제목 / 필드 이름"이 다른 급으로 읽힌다. */}
+          <span className="text-[18px] font-bold text-ink">{title}</span>
         </div>
         {action}
       </div>
@@ -2612,7 +2615,7 @@ function Field({
   return (
     <div>
       <div className="mb-2 flex items-center justify-between gap-2">
-        <label className="flex items-center gap-2 text-[15px] font-medium text-body">
+        <label className="flex items-center gap-2 text-[16px] font-medium text-body">
           <span>{label}</span>
           {hint}
         </label>
