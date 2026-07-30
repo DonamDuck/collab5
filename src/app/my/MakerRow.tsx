@@ -51,7 +51,7 @@ export function MakerRow({
         >
           {/* 이 행의 주인공 = 소개서 이름. 전엔 15px인데 바로 아래 oneLiner가 14.875px라
               **0.125px 차이**로 사실상 같은 크기였다 → /m 사다리(제목 17 / 보조 14)로 벌린다. */}
-          <p className="flex items-center gap-1.5 text-[17px] font-medium text-ink">
+          <p className="flex items-center gap-1.5 text-[17px] font-bold text-ink">
             <span className="min-w-0 truncate">{name}</span>
             {isDemoSlug(slug) && (
               <span className="inline-flex h-6 shrink-0 items-center rounded-pill bg-surface-soft px-2 text-[12px] font-medium text-mute">

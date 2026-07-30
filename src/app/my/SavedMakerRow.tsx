@@ -36,7 +36,7 @@ export function SavedMakerRow({
     <div className="flex items-center gap-2 rounded-md border border-hairline bg-surface px-4 py-3">
       <Link href={`/m/${slug}`} className="min-w-0 flex-1 text-left">
         {/* MakerRow와 같은 사다리(제목 17 / 보조 14) — 두 탭의 행이 형제라 서로 달라지면 안 된다 */}
-        <p className="truncate text-[17px] font-medium text-ink">{name}</p>
+        <p className="truncate text-[17px] font-bold text-ink">{name}</p>
         {oneLiner && <p className="mt-0.5 truncate text-[14px] text-mute">{oneLiner}</p>}
       </Link>
       <button

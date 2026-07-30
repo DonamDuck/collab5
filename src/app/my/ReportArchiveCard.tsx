@@ -45,10 +45,9 @@ export function ReportArchiveCard({ item }: { item: CollabReportListItem }) {
         {item.toRegion && <span className="shrink-0 text-[13px] font-semibold text-mute">{item.toRegion}</span>}
       </div>
 
-      {/* 주인공 — 무엇을 상상했는지 */}
-      {/* 카드의 주인공 — 다른 탭의 행 제목(17)과 같은 단으로 올린다.
-          semibold→medium: 이 카드 안에 이미 라벨 3개가 bold라 제목까지 굵으면 위계가 평평해진다. */}
-      <p className="mt-2 line-clamp-2 text-[17px] font-medium leading-snug break-keep text-ink">
+      {/* 주인공 — 무엇을 상상했는지. 17 bold(대표 확정 07-31: "콜라보 리포트처럼 볼드로").
+          이 카드의 굵기 대비가 /my 전 탭의 기준이 됐다 — 소개서·찜·성사 행 제목도 같은 17 bold. */}
+      <p className="mt-2 line-clamp-2 text-[17px] font-bold leading-snug break-keep text-ink">
         {item.oneLiner}
       </p>
 

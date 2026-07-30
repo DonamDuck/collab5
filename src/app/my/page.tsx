@@ -164,7 +164,7 @@ export default async function MyPage({ searchParams }: { searchParams: Promise<{
             <li key={c.id} className="rounded-md border border-hairline bg-surface px-4 py-3">
               <div className="flex items-center gap-2">
                 {/* 이 행의 주인공 = 콜라보 쌍. 다른 탭의 행 제목(17)과 같은 단으로 맞춘다 */}
-                <span className="truncate text-[17px] font-medium text-ink">
+                <span className="truncate text-[17px] font-bold text-ink">
                   {c.brandAName} <span className="text-faint">×</span> {c.brandBName}
                 </span>
                 {/* origin 배지 — 지표 순도 규칙이 눈에 보이게. 컨시어지만 쌓이면 바로 티가 난다 */}
