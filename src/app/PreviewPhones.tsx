@@ -1,6 +1,7 @@
 "use client";
 
-// 홈 미리보기 — 실제 데모 소개서 2종을 폰 프레임 "걸쳐 보이는" 갤러리(피크 캐러셀)로 노출.
+// 홈 미리보기 — 실제 데모 소개서 2종을 브라우저 카드 "걸쳐 보이는" 갤러리(피크 캐러셀)로 노출.
+// (07-31: 폰 프레임 → 브라우저 카드. 이유는 아래 프레임 주석 참조 — 앱 오해 제거 + 링크가 결과물임을 전달)
 // 목적: 랜딩 순간 "결과물이 뭔지" 보여주기 + "사진 없어도 이 정도" 안심(사진 부재 이탈 대응).
 // 탭별 슬라이드 3~4장 = 상단 카드만이 아니라 차이가 드러나는 구간(사진 슬라이더·블록 등)까지 (대표 지시).
 // 이미지 = prod 데모 고정본 실화면 스크린샷(과장·미화 없음). 갱신은 데모 재복제 후 재캡처로.
@@ -117,33 +118,45 @@ function PhoneGallery({ demo }: { demo: { key: string; slides: readonly { src: s
         className="flex snap-x snap-mandatory overflow-x-auto overscroll-x-contain pl-[calc(6%+5px)] pr-[calc(13%+5px)] pb-12 cursor-grab select-none active:cursor-grabbing sm:snap-none sm:pl-1 sm:pr-[21px] [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         {demo.slides.map((s, i) => (
-          // 폰 프레임(시안 A) — 검은 액자처럼 보이던 걸 실제 기기처럼. 값은 폭 280px 기준.
-          // · bg-white: 다크 테마에서도 "기기 색"이라 흰색 고정(bg-surface 쓰면 테마 따라 변해 프레임이 사라진다)
-          // · 안쪽 라운드 = 바깥(44) − 베젤(9) = 35. 이 관계가 어긋나면 베젤 두께가 모서리에서 들쭉날쭉해 보인다
-          // · ⚠️ 라운드는 px 고정이라 **폭이 줄면 상대적으로 더 둥글어진다**. 280px에서 50px이면 18%로 맞지만
-          //   모바일(≈200px)에선 25%까지 올라가 말랑해 보인다 → 양쪽 절충값 44. `sm:` 분기는 답이 아니다:
-          //   프레임은 뷰포트 639px에서 이미 280px 상한에 닿아 브레이크포인트와 실제 폭 변화 지점이 어긋난다.
-          // · 그림자 3겹(접지 1px·몸통·확산): 한 겹짜리가 '허접해 보이던' 주 원인이라 꼭 3겹 유지
+          // 브라우저 카드 — 예전엔 폰 프레임이었다(대표 지시로 07-31 교체).
+          // ⚠️ **폰 목업은 "앱이 있다"는 가장 강한 시각 신호**라, 웹서비스인 우리 홈이
+          //    앱 다운로드 랜딩처럼 읽히게 만들던 주범이었다(대표 제보).
+          //    게다가 우리 제품의 결과물은 **공유되는 링크(URL)** 인데 폰 프레임이 그걸 가리고 있었다
+          //    → 주소창을 노출해 "링크가 나온다"를 그림 하나로 전달한다.
+          // · 스크린샷이 세로형(750×1540 모바일 캡처)이라 데스크탑 창이 아니라 **모바일 브라우저 창** 형태로 간다.
+          //   데스크탑 크롬(점3개+넓은 주소창)을 세로 비율에 씌우면 창이 기형적으로 길어 보인다.
+          // · bg-white 고정: 다크 테마에서도 "브라우저 UI 색"이다(bg-surface면 테마 따라 변해 크롬이 사라진다).
+          // · 라운드 16px — 기기(44px)보다 확 낮춰야 '창'으로 읽힌다. 폭이 줄어도 안 말랑해지는 값.
+          // · 그림자 3겹(접지 1px·몸통·확산)은 폰 프레임에서 그대로 계승 — 한 겹짜리가 허접해 보이던 주 원인.
           <div
             key={s.src}
-            className="block w-[74%] max-w-[280px] shrink-0 snap-center rounded-[44px] bg-white p-[9px] sm:snap-start"
+            className="block w-[74%] max-w-[280px] shrink-0 snap-center overflow-hidden rounded-[16px] bg-white ring-1 ring-black/[.07] sm:snap-start"
             style={{
               boxShadow:
                 "0 1px 2px rgba(24,24,22,.05), 0 10px 24px -8px rgba(24,24,22,.14), 0 32px 64px -20px rgba(24,24,22,.16)",
             }}
           >
-            <div className="overflow-hidden rounded-[35px] ring-1 ring-black/[.07]">
-              <Image
-                src={s.src}
-                alt={s.alt}
-                width={750}
-                height={1540}
-                priority={demo.key === "photos" && i === 0}
-                draggable={false}
-                sizes="(max-width: 640px) 74vw, 280px"
-                className="h-auto w-full"
-              />
+            {/* 주소창 — 실제 공개 주소. aria-hidden: 장식이고, 링크가 아니라 그림이다(누를 수 없는데 읽히면 혼란) */}
+            <div
+              className="flex items-center gap-1.5 border-b border-black/[.06] bg-[#f5f5f6] px-2.5 py-[7px]"
+              aria-hidden="true"
+            >
+              <svg viewBox="0 0 12 12" className="h-[9px] w-[9px] shrink-0 text-[#9a9a9a]" fill="none" stroke="currentColor" strokeWidth="1.4">
+                <rect x="2.4" y="5.2" width="7.2" height="5.4" rx="1.2" />
+                <path d="M4.2 5.2V3.9a1.8 1.8 0 0 1 3.6 0v1.3" strokeLinecap="round" />
+              </svg>
+              <span className="truncate text-[9px] leading-none text-[#6b6b6b]">collab5.co.kr/m/…</span>
             </div>
+            <Image
+              src={s.src}
+              alt={s.alt}
+              width={750}
+              height={1540}
+              priority={demo.key === "photos" && i === 0}
+              draggable={false}
+              sizes="(max-width: 640px) 74vw, 280px"
+              className="h-auto w-full"
+            />
           </div>
         ))}
       </div>
