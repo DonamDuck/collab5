@@ -112,14 +112,24 @@ function PhoneGallery({ demo }: { demo: { key: string; slides: readonly { src: s
         onDragStart={(e) => e.preventDefault()}
         style={{ gap: SLIDE_GAP_PX }}
         // overscroll-x-contain: 레일 끝에서 오버스크롤이 문서로 새면 브라우저 뒤로가기가 발동한다. 세로축은 그대로.
-        className="flex snap-x snap-mandatory overflow-x-auto overscroll-x-contain pl-[calc(6%+5px)] pr-[calc(13%+5px)] pb-2 cursor-grab select-none active:cursor-grabbing sm:snap-none sm:pl-1 sm:pr-[21px] [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        // pb-12: overflow-x-auto는 세로축도 auto라 프레임 그림자(아래로 ~44px)가 잘려 레일 밑에 가로줄이 그어졌다.
+        //        확산 그림자가 다 들어갈 만큼 띄우고, 그만큼 아래 인디케이터를 -mt로 당겨 간격은 전과 동일하게 유지.
+        className="flex snap-x snap-mandatory overflow-x-auto overscroll-x-contain pl-[calc(6%+5px)] pr-[calc(13%+5px)] pb-12 cursor-grab select-none active:cursor-grabbing sm:snap-none sm:pl-1 sm:pr-[21px] [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         {demo.slides.map((s, i) => (
+          // 폰 프레임(시안 A) — 검은 액자처럼 보이던 걸 실제 기기처럼. 값은 폭 280px 기준.
+          // · bg-white: 다크 테마에서도 "기기 색"이라 흰색 고정(bg-surface 쓰면 테마 따라 변해 프레임이 사라진다)
+          // · 안쪽 라운드 = 바깥(50) − 베젤(9) = 41. 이 관계가 어긋나면 베젤 두께가 모서리에서 들쭉날쭉해 보인다
+          // · 그림자 3겹(접지 1px·몸통·확산): 한 겹짜리가 '허접해 보이던' 주 원인이라 꼭 3겹 유지
           <div
             key={s.src}
-            className="block w-[74%] max-w-[280px] shrink-0 snap-center rounded-[2.75rem] bg-ink p-1 shadow-e3 sm:snap-start"
+            className="block w-[74%] max-w-[280px] shrink-0 snap-center rounded-[50px] bg-white p-[9px] sm:snap-start"
+            style={{
+              boxShadow:
+                "0 1px 2px rgba(24,24,22,.05), 0 10px 24px -8px rgba(24,24,22,.14), 0 32px 64px -20px rgba(24,24,22,.16)",
+            }}
           >
-            <div className="overflow-hidden rounded-[2.5rem] bg-surface">
+            <div className="overflow-hidden rounded-[41px] ring-1 ring-black/[.07]">
               <Image
                 src={s.src}
                 alt={s.alt}
@@ -134,8 +144,8 @@ function PhoneGallery({ demo }: { demo: { key: string; slides: readonly { src: s
           </div>
         ))}
       </div>
-      {/* 인디케이터 점 */}
-      <div className="mt-3 flex justify-center gap-1.5" aria-hidden="true">
+      {/* 인디케이터 점 — -mt-7은 위 레일의 pb-12(그림자 여유) 상쇄용. 프레임 밑 간격은 예전 그대로 ~20px */}
+      <div className="-mt-7 flex justify-center gap-1.5" aria-hidden="true">
         {demo.slides.map((_, i) => (
           <span
             key={i}
