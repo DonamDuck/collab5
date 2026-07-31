@@ -54,7 +54,10 @@ export function SampleReportLink() {
   );
 }
 
-/** ③ 실물 구경 — 리포트 축약 카드. 한줄 요약 + 어울리는 점 2개만 보여주고 전체는 시트로. */
+/** ③ 실물 구경 — 리포트 축약 카드.
+ *  구성 = ①콜라보 아이디어 예시 ②이런 점이 잘 어울려요 (대표 확정 07-31).
+ *  ⚠️ 한줄 요약은 **뺐다** — 결론만 던지면 "그래서 뭘 해준다는 건데"가 안 남는다.
+ *     아이디어(구체 산출물)를 먼저 보여주고 근거를 뒤에 붙이는 편이 '안목'으로 읽힌다. */
 export function SampleReportPeek() {
   const [open, setOpen] = useState(false);
   const report = sampleData.report;
@@ -65,12 +68,30 @@ export function SampleReportPeek() {
         <p className="text-[12px] font-medium tracking-wide text-mute">
           {sampleData.fromName} × {sampleData.toName} · 가상의 두 브랜드로 만든 예시예요
         </p>
-        <p className="mt-2 break-keep text-[18px] font-bold leading-snug text-ink">
-          {report.oneLiner}
-        </p>
-        <ul className="mt-3 space-y-1.5">
+
+        <p className="mt-3 text-[14px] font-bold text-ink">콜라보 아이디어 예시</p>
+        <div className="mt-2 space-y-2">
+          {report.ideas.slice(0, 2).map((idea, i) => (
+            <div key={i} className="rounded-md border border-hairline p-3">
+              <div className="flex items-start justify-between gap-2">
+                <p className="break-keep text-[14px] font-bold text-ink">{idea.title}</p>
+                {idea.method && (
+                  <span className="shrink-0 rounded-pill bg-surface-soft px-2 py-0.5 text-[11px] text-body">
+                    {idea.method}
+                  </span>
+                )}
+              </div>
+              <p className="mt-1 line-clamp-2 break-keep text-[13px] leading-[1.55] text-body">
+                {idea.desc}
+              </p>
+            </div>
+          ))}
+        </div>
+
+        <p className="mt-4 text-[14px] font-bold text-ink">이런 점이 잘 어울려요</p>
+        <ul className="mt-2 space-y-1.5">
           {report.matchPoints.slice(0, 2).map((p, i) => (
-            <li key={i} className="flex gap-2 text-[14px] leading-relaxed text-body">
+            <li key={i} className="flex gap-2 text-[13px] leading-[1.55] text-body">
               <span className="shrink-0">✔</span>
               <span className="break-keep line-clamp-2">{p.text}</span>
             </li>

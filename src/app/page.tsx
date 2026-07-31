@@ -131,10 +131,10 @@ export default async function Home() {
             "소개서를 만들면 이런 것도 받는다"가 소개서 CTA의 두 번째 근거가 된다(대표: 기능을 더 잘 쓰게). */}
         <div className="mt-14 text-center">
           <h3 className="text-balance break-keep text-[20px] font-bold leading-[1.35] tracking-[-0.02em] text-ink sm:text-[24px]">
-            소개서를 만들면, 이런 콜라보 분석도 받아요.
+            소개서를 만들면 이런 콜라보 분석이 가능해요
           </h3>
           <p className="mx-auto mt-2 max-w-[440px] break-keep text-[16px] leading-[1.65] text-body sm:text-[17px]">
-            두 브랜드가 왜 어울리는지, 뭘 함께하면 좋을지까지 알려드려요.
+            두 브랜드가 왜 함께하면 좋을지, 함께 하면 좋을 만한 콜라보 아이디어를 알려드려요.
           </p>
           <div className="mt-6">
             <SampleReportPeek />
@@ -232,7 +232,7 @@ export default async function Home() {
       <Reveal as="section" eager className="mt-14 text-center">
         {/* 미션 한 줄 — 소개서가 쌓이면 발견으로 이어진다(BM 발굴 방향을 고객 언어로, 대표 확정 2026-07-23) */}
         <p className="mx-auto max-w-[440px] break-keep text-[20px] font-bold leading-[1.4] tracking-[-0.02em] text-ink sm:text-[24px]">
-          매력적인 콜라보를 만들어보세요.
+          지금 바로 콜라보를 시작해보세요 :)
         </p>
         <Link
           href="/register"
