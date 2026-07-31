@@ -117,35 +117,74 @@ body {
   outline-offset: 2px;
 }
 
-/* 구글 로그인 버튼(GIS renderButton) — **구글이 그린 DOM**을 우리 버튼 치수에 맞춘다.
-   구글은 높이 40px·라운드 4px 고정이라, 옆의 h-12(51px)·rounded-md(16px) 버튼과
-   나란히 두면 혼자 작고 각져 보인다(실측 07-31).
-   ⚠️ 구글 내부 클래스(.nsm7Bb-…)는 난독화라 절대 잡지 않는다 — 우리 컨테이너 + `role="button"`
-      (의미 속성이라 잘 안 바뀐다)으로만 건다. 폭은 renderButton이 인라인으로 박으므로 안 건드린다.
+/* 구글 로그인 버튼(GIS renderButton) — **보이는 박스는 우리 것**, 구글은 로고+문구만 얹는다.
+   옆의 `로그인`/`카카오로 시작하기`가 h-12(51px)·rounded-md(16px)라 구글만 40px·라운드 4px로
+   혼자 작고 각져 보이는 문제를 여기서 맞춘다.
+   ⚠️ 구글 내부 클래스(.nsm7Bb-…·.S9gUrf-…)는 난독화라 절대 잡지 않는다 — 우리 컨테이너
+      `[data-gsi]` + 의미 속성 `role="button"`으로만 건다.
 
-   🐛 **높이가 51 → 40으로 되돌아가며 눈앞에서 바뀌던 버그**(대표 제보 07-31).
-      원인: 예전 규칙엔 `!important`가 없었다. 우리 선택자가 구글 *클래스*는 이기지만
-      **인라인 스타일은 못 이긴다** — 구글은 렌더 경로에 따라 인라인 height를 박는데,
-      그 경로는 **브라우저에 구글 세션이 있을 때** 타서 개발자 환경에선 재현되지 않았다.
-      (세션 없는 브라우저에서는 5.75초 관찰 내내 51px로 멀쩡했다 → "나만 안 보이는" 유형)
-   🐛🐛 **2차 사고 — 버튼이 작아지면서 아래 '회원가입 · 비밀번호 찾기' 줄을 덮어버림**(대표 제보 07-31).
-      1차 대책 ①(컨테이너에 `height: 3rem` 고정)이 원인이었다. **고정 높이는 넘치는 순간 겹친다** —
-      구글이 51px보다 큰 무언가를 그리면(개인화 카드·FedCM 변형 등) 박스는 51px에 머물고 내용만
-      아래로 삐져나와 다음 줄 위에 얹힌다. 여기서도 재현 조건은 **구글 세션이 있는 브라우저**뿐이라
-      우리 쪽에선 또 안 보였다(같은 함정 두 번째).
-   ✅ 최종 원칙: **남이 그리는 DOM에는 고정 높이를 주지 않는다.**
-      - 컨테이너 = `min-height` — 커지면 레이아웃이 *밀린다*(겹치지 않는다). 이게 본진.
-      - 버튼 = `min-height` — 우리 h-12(51px)에 맞추되, 구글이 더 큰 걸 그리면 커지도록 둔다.
-        `min-height`는 인라인 `height`도 이기므로 `!important` 없이 40px 고정을 덮는다.
-      - 결과: 최악의 경우 버튼이 옆 버튼보다 살짝 커질 뿐, **화면이 깨지는 경우는 없다.**
-        "항상 정확히 51px"보다 "절대 겹치지 않음"이 우선이다. */
+   🐛🐛🐛 **"51px로 떴다가 팅 하고 40px로 줄어드는" 버그 — 세 번째이자 마지막 대책(07-31).**
+   앞의 두 번은 원인을 잘못 짚었다(인라인 스타일 우선순위 싸움인 줄 알았다). 진짜 원인은 이것:
+      renderButton은 **두 개**를 만든다.
+        ① 경량 DOM 버튼 `div[role="button"]` — 우리 CSS가 닿는다.
+        ② `accounts.google.com/gsi/button` **크로스오리진 iframe**(처음엔 0×0, 안 보임).
+      브라우저에 **구글 세션이 있으면** ②가 로드에 성공해 부모로 resize 메시지를 쏘고,
+      gsi/client는 그걸 받아 iframe을 44px로 키운 뒤 **①을 DOM에서 삭제한다.**
+      (gsi/client 소스 실측: resize 커맨드 → `jv()` → `dispose()` → `_.ul()` = removeChild)
+      그때부터 화면에 보이는 버튼은 **iframe 안**이다 — 그 문서의 버튼은 `height:40px;
+      border-radius:4px; border:1px solid #dadce0`로 고정이고(iframe HTML 실측),
+      크로스오리진이라 **우리 CSS가 물리적으로 닿지 않는다.**
+      → "처음엔 먹다가 갑자기 안 먹는" 정체. 세션 없는 브라우저에선 ②가 영원히 0×0이라
+        우리 검증 환경에서는 두 번 다 재현되지 않았다.
+   ✅ 그래서 설계를 바꿨다 — **치수 싸움을 그만두고, 보이는 박스의 소유권을 가져온다.**
+      - 겉박스(테두리·라운드·면·높이)는 `[data-gsi]`가 그린다. 구글이 안쪽을 어떻게 다시 그리든
+        **바깥 치수는 변할 수가 없다.** 인수인계가 일어나도 "팅"은 없다.
+      - 안쪽 ①은 `position:absolute; inset:0`으로 박스에 딱 붙인다. 구글이 height를 40이든 80이든
+        무엇을 박아도 **박스 크기 = 클릭 영역**이고, 넘쳐서 아랫줄을 덮는 일도 없다(overflow:hidden).
+      - 그 위에 GoogleButton.tsx가 ②의 인수인계 자체를 끊는다(거기 주석 참조). 두 겹이라,
+        JS 쪽이 실패해도 겉모습은 안 깨진다(iframe이 박스 안에 가운데로 들어올 뿐). */
 [data-gsi] {
-  min-height: 3rem;
+  position: relative;
+  display: grid; /* 자식이 몇 개든 한 칸에 겹쳐 깔린다 — 구글이 형제를 더 만들어도 레이아웃이 안 밀린다 */
+  min-height: 3rem; /* 51px = 옆 h-12 버튼. min-이라 커질 일이 생겨도 겹치지 않고 밀린다 */
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-md); /* 16px = rounded-md */
+  background: var(--surface);
+  overflow: hidden; /* 구글이 뭘 그리든 우리 라운드 밖으로는 못 나간다 */
 }
+/* 아직(또는 영영) 아무것도 안 그려졌으면 빈 테두리만 덩그러니 남지 않게 — 자리(높이)는 그대로 둔다 */
+[data-gsi]:not(:has(*)) { border-color: transparent; background: transparent; }
+/* 구글 래퍼는 한 칸을 꽉 채운다. (인수인계가 끊기지 않은 최악의 경우) iframe이 보이더라도 가운데로 */
+[data-gsi] > * {
+  grid-area: 1 / 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+/* 구글이 그린 버튼 = 우리 박스의 '내용물'. 자기 테두리·면·라운드는 지우고 로고+문구만 남긴다.
+   inset:0이라 구글이 박는 height/width가 무엇이든 보이는 크기는 우리 박스 그대로다. */
 [data-gsi] div[role="button"] {
-  min-height: 3rem;
-  border-radius: var(--r-md);
-  border-color: var(--border-strong);
+  position: absolute !important;
+  inset: 0 !important;
+  width: auto !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  margin: 0 !important;
+  border: 0 !important;
+  border-radius: var(--r-md) !important; /* hover/active 면이 각지게 비치지 않도록 */
+  background: transparent !important;
+  box-shadow: none !important;
+}
+/* 포커스 링은 **바깥(우리 박스)**에 그린다 — 안쪽에 그리면 위 overflow:hidden에 잘려 안 보인다.
+   (자기 자신의 outline은 자기 overflow에 안 잘린다) */
+[data-gsi] div[role="button"]:focus-visible { outline: none; }
+[data-gsi]:has(div[role="button"]:focus-visible) {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
 }
 
 /* 스와이프 슬라이드용 — 스크롤바 숨김(넘김 제스처만) */

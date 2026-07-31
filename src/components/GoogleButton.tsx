@@ -16,8 +16,9 @@
 //
 // ⚠️ 버튼 모양은 구글이 그린다(renderButton). 자체 버튼으로 팝업을 띄우는 공식 API는 없다 —
 //    `prompt()`는 원탭 전용이고 `use_fedcm_for_prompt`는 폐기돼 무시된다(2026-07 확인).
-//    대신 text/theme/size/locale로 문구와 톤을 맞추고, 구글이 고정해버리는 높이(40px)·라운드(4px)는
-//    globals.css의 `[data-gsi] div[role="button"]`에서 우리 버튼 치수(51px·16px)로 덮는다.
+//    대신 text/theme/size/locale로 문구와 톤을 맞추고, **보이는 박스(테두리·라운드·높이)는
+//    globals.css의 `[data-gsi]`가 직접 소유한다** — 구글이 그린 건 로고+문구만 얹히는 내용물이다.
+//    아래 draw()의 "iframe 인수인계 차단"과 한 세트다.
 //
 // ⚠️ 라벨이 "Google로 계속하기"(continue_with)인 이유: 소셜 로그인은 **가입과 로그인이 한 버튼**이다.
 //    "가입"이라 쓰면 기존 유저에게, "로그인"이라 쓰면 신규 유저에게 거짓말이 된다.
@@ -134,7 +135,7 @@ function GoogleIdButton({ className }: { className: string }) {
       //    large + 폭 200px 이상이면 구글이 **개인화 버튼**("○○ 계정 사용" + 내 이메일·프로필사진)을
       //    자동으로 띄운다 — 우리 앱에 구글로 이미 로그인한 적 있는 사람에게만. 끄는 설정은 **없다**
       //    (구글 문서 확인 07-31: 개인화를 막는 유일한 수단이 type=icon / size=medium·small / 폭<200px).
-      //    medium이면 글자만 작아지는데, 아래 [data-gsi] CSS가 높이를 어차피 51px로 늘리므로
+      //    medium이면 글자만 작아지는데, 겉박스는 [data-gsi]가 51px로 잡으므로
       //    옆 버튼과의 정합은 그대로다. 문구도 그대로 나온다(실측).
       size: "medium",
       text: "continue_with",
@@ -143,6 +144,26 @@ function GoogleIdButton({ className }: { className: string }) {
       width: String(w),
       locale: "ko",
     });
+
+    // 🚨 **구글의 '버튼 iframe 인수인계'를 여기서 끊는다** — "51px로 떴다가 팅 하고 40px" 버그의 진짜 원인.
+    //    renderButton은 두 개를 만든다:
+    //      ① 경량 DOM 버튼 `div[role="button"]` — 우리 CSS가 닿는다.
+    //      ② `accounts.google.com/gsi/button` 크로스오리진 iframe — 처음엔 0×0이라 안 보인다.
+    //    브라우저에 **구글 세션이 있으면** ②가 로드에 성공해 부모로 resize 메시지를 쏘고,
+    //    gsi/client는 그 메시지를 받아 iframe을 키운 뒤 **①을 DOM에서 삭제한다**
+    //    (gsi/client 소스 실측: resize 커맨드 → jv() → dispose() → removeChild).
+    //    그 뒤로 보이는 버튼은 iframe 안(높이 40px·라운드 4px 고정)이라 **우리 CSS가 물리적으로 못 닿는다.**
+    //    세션 없는 브라우저에선 ②가 영원히 0×0이라 우리 검증 환경에서는 재현이 안 됐다(두 번 헛짚은 이유).
+    //    → src를 about:blank로 돌리면 ②는 부모와 메시지 채널을 못 열고, ①이 그대로 살아남는다.
+    //    안전한 이유(모두 gsi/client 소스로 확인):
+    //      - 클릭 리스너는 구글이 ①에 직접 걸어둔다. 그 핸들러가 여는 팝업 코드는 iframe을 쓰지 않는다.
+    //      - 엘리먼트는 **지우지 않고 src만 비운다** — gsi/client가 iframeId로 찾을 때 없으면 로그를 남긴다.
+    //      - ②가 담당하던 건 개인화 버튼("○○ 계정 사용")인데, size:"medium"을 고른 이유가 바로 그걸 안 쓰는 것이다.
+    //    ⚠️ ①이 없으면(구글이 언젠가 iframe만 그리도록 바뀌면) **건드리지 않는다** —
+    //       그땐 iframe이 유일한 버튼이라 죽이면 로그인이 통째로 막힌다. 모양보다 로그인 동작이 우선.
+    const drawn = box.querySelector('[role="button"]');
+    const frame = box.querySelector("iframe");
+    if (drawn && frame) frame.src = "about:blank";
   }, []);
 
   useEffect(() => {
@@ -217,13 +238,23 @@ function GoogleIdButton({ className }: { className: string }) {
 
   return (
     <div className={className}>
-      {/* 구글이 이 안에 버튼을 그린다. 자리를 미리 잡아둬야(min-h) 로드 직후 레이아웃이 튀지 않는다.
-          data-gsi = globals.css에서 구글 버튼 높이·라운드를 우리 치수로 맞추는 훅. */}
+      {/* 구글이 이 안에 버튼을 그린다.
+          data-gsi = globals.css가 **보이는 버튼 박스**(51px·라운드16·테두리·면)를 그리는 훅.
+          자리(min-height)도 거기서 잡으므로 로드 직후 레이아웃이 튀지 않는다. */}
       <div
         ref={boxRef}
         data-gsi
-        className="flex min-h-12 justify-center"
         aria-busy={phase === "loading"}
+        // 박스 안 어디를 눌러도 구글 버튼이 눌리게 하는 **2중 안전장치**.
+        // CSS가 이미 구글 버튼을 박스에 꽉 채우지만(inset:0), 구글이 언젠가 인라인 `!important`로
+        // 더 작은 높이를 박으면 아래쪽에 안 눌리는 띠가 생긴다(실측 확인). 그때도 죽은 영역이 없도록.
+        // ⚠️ 구글 버튼이 이미 받은 클릭은 절대 건드리지 않는다 — 그래야 이중 발화·무한 재귀가 없다.
+        // 합성 클릭이라도 진짜 사용자 제스처 처리 중이라 팝업 차단에 걸리지 않는다.
+        onClick={(e) => {
+          const el = boxRef.current?.querySelector<HTMLElement>('[role="button"]');
+          if (!el || el.contains(e.target as Node)) return;
+          el.click();
+        }}
       />
       {phase === "signing" && (
         <p className="mt-1.5 text-center text-sm text-mute">구글 계정을 확인하고 있어요…</p>
