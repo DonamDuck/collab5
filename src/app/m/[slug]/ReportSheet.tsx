@@ -11,8 +11,16 @@ import { track } from "@/lib/track";
 import type { CollabReportData } from "@/lib/types";
 import sampleData from "@/lib/sample-report.json";
 
+// 순환 문구 — 2번째에 소요시간을 끼운다(대표 지시 07-31).
+// 전엔 "보통 30초 정도 걸려요"가 순환 문구 **아래 고정 줄**로 따로 있었다. 배열에 넣으면서
+// 그 줄은 지운다 — 안 지우면 2번째 차례에 같은 문장이 위아래로 두 번 보인다.
+// 2번째 자리인 이유: 첫 문구(4초)로 "일이 시작됐다"를 알린 직후, **아직 참을 만할 때** 끝을 알려준다.
+//   기다림에서 힘든 건 길이가 아니라 끝을 모르는 것 — 실측 25~28초라 30초는 넉넉하게 부른 값이다.
+// ⚠️ 이제 소요시간이 상시 노출이 아니라 4초마다 한 번 지나간다. 늦게 연 사람은 최대 12초 뒤에 본다.
+//    (⏱ 파이프라인이 빨라지면 이 문구도 같이 낮출 것)
 const LOADING_COPY = [
   "두 소개서를 읽고 있어요…",
+  "보통 30초 정도 걸려요",
   "접점을 찾는 중…",
   "콜라보를 상상하는 중…",
 ];
@@ -148,7 +156,7 @@ export function ReportSheet({
     if (open && sampleMode) track("report_locked_view", { source });
   }, [open, sampleMode, source]);
 
-  // 로딩 카피 3단 순환(4초 간격)
+  // 로딩 카피 4단 순환(4초 간격) — 2번째가 소요시간 안내
   useEffect(() => {
     if (phase !== "loading") return;
     setCopyIdx(0);
@@ -419,12 +427,11 @@ export function ReportSheet({
                   <ellipse cx="28" cy="28" rx="23" ry="9" stroke="currentColor" strokeWidth="2" opacity="0.45" transform="rotate(-28 28 28)" />
                   <circle cx="28" cy="28" r="6" fill="#98ff5c" />
                 </svg>
-                {/* 순환 문구 = '지금 뭘 하는 중' / 아래 시간 안내 = '언제 끝나는지'. 역할이 달라 둘 다 둔다.
-                    기다림에서 힘든 건 길이가 아니라 끝을 모르는 것 — 위저드의 "1~2분 걸릴 수 있어요"와 같은 계열.
-                    실측 25~28초라 30초는 살짝 넉넉하게 부른 값(약속을 넘기지 않게). ⏱ 파이프라인이 빨라지면 같이 낮출 것.
-                    animate-pulse는 뺐다 — 문구가 4초마다 바뀌는 것 자체가 이미 '살아있음' 신호다. */}
+                {/* 소요시간("보통 30초…")은 07-31에 **순환 배열 2번째로 흡수**됐다(대표 지시) —
+                    여기 있던 고정 줄을 지운 이유는 LOADING_COPY 주석 참조(안 지우면 중복 노출).
+                    animate-pulse는 뺐다 — 문구가 4초마다 바뀌는 것 자체가 이미 '살아있음' 신호다.
+                    ⚠️ 줄 하나가 사라져 문구 아래 여백이 달라지므로, 높이는 py-16이 잡아준다(레이아웃 안 튐). */}
                 <p className="mt-4 text-[15px] text-mute">{LOADING_COPY[copyIdx]}</p>
-                <p className="mt-2 text-[13px] text-faint">보통 30초 정도 걸려요</p>
               </div>
             ) : phase === "ok" ? (
               pieces
