@@ -247,7 +247,9 @@ export default async function Home() {
 
 /** 제품 여정 스트립 — ①소개서 3분 작성 ②콜라보 둘러보기 ③AI 추천 콜라보 분석 (대표 확정 07-31).
  *  ⚠️ v1은 맨숭맨숭한 점 3개였다("허접하다" 대표 QA) → soft 면 카드로 묶어 **하나의 도식**으로 읽히게.
- *  문장 설명이 아니라 그림이다 — 안 읽고도 이해가 목표라 부연은 sm+에서만.
+ *  문장 설명이 아니라 그림이다 — 안 읽고도 이해가 목표.
+ *  ⚠️ 부연은 처음에 `hidden sm:block`으로 모바일에서 숨겼는데, 그게 곧 **주 사용 환경에서만 안 보이는**
+ *     꼴이라 대표 QA에서 바로 걸렸다(07-31). 좁아도 보여주는 쪽이 맞다 — 폰트만 한 단 줄여 수용.
  *  라벨이 길어져(최대 10자) 375px에서 열당 ~90px → `break-keep`으로 두 줄까지 허용. */
 function FlowStrip() {
   const steps = [
@@ -278,7 +280,7 @@ function FlowStrip() {
             <p className="mt-2 break-keep text-[12.5px] font-bold leading-[1.35] text-ink sm:text-[14px]">
               {s.label}
             </p>
-            <p className="mt-1 hidden break-keep text-[12px] leading-tight text-mute sm:block">
+            <p className="mt-1 break-keep text-[11px] leading-[1.35] text-mute sm:text-[12px]">
               {s.desc}
             </p>
           </div>
