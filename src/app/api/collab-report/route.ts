@@ -5,6 +5,7 @@
 import { NextResponse } from "next/server";
 import { repo } from "@/lib/repo";
 import { getSessionUserId } from "@/lib/profiles";
+import { isStaffUser } from "@/lib/staff";
 import { generateDna, generateReport, isDnaStale, isThin, REPORT_MODEL } from "@/lib/collab-report";
 import { logTotal, type CallMeter } from "@/lib/ai-cost";
 import { distinctTypeCount } from "@/lib/dna-pool";
@@ -54,6 +55,13 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "forbidden" }, { status: 403 }); // from은 내 브랜드만
     }
     if (from.id === to.id) return NextResponse.json({ error: "self" }, { status: 400 });
+    // 내 브랜드 × 내 브랜드 차단(대표 지시 07-31, 첫 실고객 유입 시점에 원복) —
+    // 매칭 정보로선 의미가 없는데 유료 콜(DNA+리포트)은 그대로 나간다. 화면(MakerActionBar)도
+    // 같은 규칙으로 버튼을 감추지만, **막는 층은 여기다**(직접 호출로 뚫리면 곧 비용이다).
+    // 사내 계정만 예외 — 대표가 규칙 안에서 기능을 확인해야 하므로(`lib/staff.ts`).
+    if (to.ownerUserId === userId && !isStaffUser(userId)) {
+      return NextResponse.json({ error: "own_brand" }, { status: 403 });
+    }
 
     const startedAt = Date.now();
     let dnaCalls = 0;

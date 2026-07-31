@@ -37,6 +37,7 @@ export function MakerActionBar({
   senderName,
   viewerBrands = [],
   isOwner = false,
+  ownerCanReport = false,
 }: {
   slug: string;
   makerId: number;
@@ -51,6 +52,10 @@ export function MakerActionBar({
   /** 내가 이 소개서의 주인인가 — 주인에겐 '나에게 제안·찜'이 말이 안 되고, 눌리면 북극성 퍼널이 오염된다
    *  (07-29 디자인팀 QA 지적). 서버에도 같은 가드가 있고 여긴 화면 층. */
   isOwner?: boolean;
+  /** 내 소개서에서도 [콜라보 분석]을 열어줄 것인가 — **사내 계정 전용 예외**(`lib/staff.ts`).
+   *  자기 브랜드끼리의 분석은 결과가 의미 없고 유료 콜만 나가서, 일반 유저에겐 닫아둔다.
+   *  isOwner가 false면 애초에 이 분기를 안 타므로 여기선 소유자일 때만 의미가 있다. */
+  ownerCanReport?: boolean;
 }) {
   // 🚧 위 OWNER_MODE 스위치를 통과시킨 값 — 화면 분기는 전부 이걸 본다(원래는 isOwner 그대로였다)
   const ownerUi = isOwner && OWNER_MODE;
@@ -488,19 +493,21 @@ export function MakerActionBar({
           {/* 백보드 바 — 흰 배경 + 상단 좌우 라운드. 콜라보 액션 전용 */}
           <div className="flex items-center gap-2.5 rounded-t-2xl border border-b-0 border-hairline bg-surface px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 shadow-e2">
             {ownerUi ? (
-              /* 내 소개서 모드 — '제안'은 자기 자신에게 보내는 거라 말이 안 되지만(북극성 퍼널 오염),
-                 **분석은 다르다**: 내 다른 소개서 × 이 소개서 조합이 성립하고, 소개서 0개가 아닌 이상
-                 결과도 의미가 있다(대표 요청 07-31 "내 소개서에서도 분석 켜줘").
-                 예전엔 OWNER_MODE 임시 스위치로 소유자 UI를 통째로 껐다 켰는데, 그러면 '콜라보 시작하기'와
-                 하트까지 같이 열려 자기 제안이 가능해졌다 — 이번엔 **분석만** 정식으로 연다. */
+              /* 내 소개서 모드 — '제안'은 자기 자신에게 보내는 거라 말이 안 된다(북극성 퍼널 오염).
+                 **분석도 기본은 닫는다**(대표 지시 07-31, 첫 실고객 유입 시점에 원복):
+                 내 브랜드 × 내 브랜드 조합은 매칭 정보로서 의미가 없는데 유료 콜은 그대로 나간다.
+                 단 대표는 그 규칙 안에서 기능을 확인해야 하므로 **사내 계정에만** 분석을 남긴다
+                 (`ownerCanReport` ← `lib/staff.ts`). 서버(`/api/collab-report`)에도 같은 가드가 있다. */
               <>
-                <button
-                  type="button"
-                  onClick={handleReport}
-                  className="flex h-12 flex-[0.8] items-center justify-center rounded-md border border-border-strong bg-surface text-base font-medium text-ink transition-colors"
-                >
-                  콜라보 분석
-                </button>
+                {ownerCanReport && (
+                  <button
+                    type="button"
+                    onClick={handleReport}
+                    className="flex h-12 flex-[0.8] items-center justify-center rounded-md border border-border-strong bg-surface text-base font-medium text-ink transition-colors"
+                  >
+                    콜라보 분석
+                  </button>
+                )}
                 <a
                   href={`/register?edit=${slug}`}
                   className="flex h-12 flex-1 items-center justify-center rounded-md bg-primary text-base font-medium text-primary-on transition-colors"
