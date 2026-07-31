@@ -47,33 +47,37 @@ export default async function Home() {
             실측: 모바일 타이틀 24~28 / 본문 16, 데스크탑 타이틀 36~44 / 본문 20~22.
             핵심은 **모바일→데스크탑에서 타이틀만 1.6배로 키우고 본문은 1.3배만** 키워
             넓은 화면일수록 위계 대비를 벌리는 것(모바일 1.5~1.75배 → 데스크탑 2.0배). */}
+        {/* 슬로건 B′ — 콜라보 프레임(대표 확정 07-31 아침, "변경" 지시). '시작'만 약속(11곳으로도 이행 가능).
+            디자인팀 차별화 변형이 나오면 2안 비교로 교체 가능. */}
         <h1 className="break-keep text-[28px] font-bold leading-[1.3] tracking-[-0.03em] text-ink sm:text-[40px]">
-          좋은 협업은,
+          우리 브랜드의 콜라보,
           <br />
-          좋은 소개에서 시작돼요.
+          여기서 시작해요.
         </h1>
-        <p className="mx-auto mt-4 max-w-[460px] text-[18px] font-bold leading-[1.5] text-primary-on sm:text-[20px]">
-          AI와 함께 브랜드 소개서를 만들어보세요.
+        {/* 서브가 기능 전달 담당 — 소개서→분석 흐름을 한 문장에. AI 언급은 히어로 1곳 원칙 유지. */}
+        <p className="mx-auto mt-4 max-w-[460px] break-keep text-[18px] font-bold leading-[1.5] text-primary-on sm:text-[20px]">
+          AI와 함께 3분 만에 소개서를 만들고,
           <br />
-          3분이면 충분해요.
+          잘 맞는 콜라보 분석까지 받아보세요.
         </p>
         <p className="mx-auto mt-3 max-w-[460px] break-keep text-[16px] leading-[1.65] text-body sm:text-[17px]">
-          작은 가게도, 1인 브랜드도 괜찮아요.
-          <br />
-          몇 줄이면 소개서가 완성돼요. 무료로 시작해보세요.
+          작은 가게도, 1인 브랜드도 괜찮아요. 무료로 시작해보세요.
         </p>
-        <div className="mt-7 flex justify-center">
+        <div className="mx-auto mt-7 flex max-w-[420px] flex-col items-stretch gap-2">
           <TrackLink
             href="/register"
             event="home_hero_register_click"
-            className="flex h-12 w-full items-center justify-center rounded-md bg-primary px-6 text-[16px] font-medium text-primary-on sm:w-auto"
+            className="flex h-12 w-full items-center justify-center rounded-md bg-primary px-6 text-[16px] font-medium text-primary-on"
           >
             브랜드 소개서 만들기
           </TrackLink>
+          {/* 분석 진입은 보더 버튼으로 승격(대표 07-31 "텍스트 링크는 안 보인다") —
+              단 1번 CTA는 여전히 소개서(레드팀 R1: 분석 1번은 콜드스타트 절벽). 라벨 정직: 목적지=예시 시트. */}
+          <SampleReportLink />
         </div>
-        {/* 보조 링크 — 분석은 '구경'으로만(히어로 1번 CTA 금지 = 레드팀 R1: 콜드스타트 절벽·웨지 강등).
-            라벨 정직 원칙: 목적지가 예시 시트이므로 '예시 보기'라고 쓴다. */}
-        <SampleReportLink />
+        {/* 제품 여정 스트립 — "소개서 → 분석 → 제안"이 한눈에(대표 07-31: 플로우가 드러나는 콘텐츠).
+            설명 문단이 아니라 도식 — 안 읽고도 이해가 목표. */}
+        <FlowStrip />
       </section>
 
       {/* ② 콜라보 가능한 브랜드 — 히어로 바로 다음(07-31 개편: "여기 어떤 브랜드들이 있나"가
@@ -233,6 +237,46 @@ export default async function Home() {
         </Link>
       </Reveal>
     </main>
+  );
+}
+
+/** 히어로 하단 제품 여정 스트립 — ①소개서 ②분석 ③제안. 순수 마크업(서버 렌더).
+ *  숫자 점(키위)과 화살표만으로 흐름을 도식화 — 문장 설명 금지(안 읽고도 이해가 목표).
+ *  모바일은 라벨만, sm+는 한 줄 부연까지. */
+function FlowStrip() {
+  const steps = [
+    { label: "소개서 만들기", desc: "3분이면 충분해요" },
+    { label: "콜라보 분석", desc: "뭘 함께하면 좋을지" },
+    { label: "부담 없는 제안", desc: "링크 하나로 시작" },
+  ];
+  return (
+    <div className="mx-auto mt-10 flex max-w-[520px] items-start justify-center">
+      {steps.map((s, i) => (
+        <div key={s.label} className="flex flex-1 items-start">
+          {i > 0 && (
+            <svg
+              viewBox="0 0 20 20"
+              className="mx-1 mt-1.5 h-4 w-4 shrink-0 text-faint sm:mx-2"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              aria-hidden="true"
+            >
+              <path d="M7 4l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          )}
+          <div className="flex-1 text-center">
+            <span className="mx-auto flex h-7 w-7 items-center justify-center rounded-pill bg-primary text-[13px] font-bold text-primary-on">
+              {i + 1}
+            </span>
+            <p className="mt-1.5 break-keep text-[13px] font-bold leading-tight text-ink sm:text-[14px]">
+              {s.label}
+            </p>
+            <p className="mt-0.5 hidden text-[12px] text-mute sm:block">{s.desc}</p>
+          </div>
+        </div>
+      ))}
+    </div>
   );
 }
 

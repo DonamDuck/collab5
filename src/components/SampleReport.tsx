@@ -34,7 +34,9 @@ function PortalSheet({ open, onClose }: { open: boolean; onClose: () => void }) 
   );
 }
 
-/** 히어로 보조 링크 — 텍스트 링크 모양, 누르면 예시 리포트 시트가 열린다(페이지 이동 없음). */
+/** 히어로 보조 버튼 — 주 CTA(소개서) 아래 보더 버튼. 누르면 예시 리포트 시트(페이지 이동 없음).
+ *  처음엔 텍스트 링크였는데 대표 QA(07-31) "가시적이지 못하다" → 보더 버튼으로 승격.
+ *  주 CTA와의 위계는 면색(primary vs 보더)으로 유지 — 분석을 1번 자리로 올리는 건 아니다. */
 export function SampleReportLink() {
   const [open, setOpen] = useState(false);
   return (
@@ -42,10 +44,10 @@ export function SampleReportLink() {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="mt-4 inline-flex items-center gap-1 text-[15px] font-medium text-primary-on underline-offset-4 hover:underline"
+        className="flex h-12 w-full items-center justify-center gap-1.5 rounded-md border border-border-strong bg-surface text-[16px] font-medium text-ink hover:bg-surface-soft"
       >
         콜라보 분석 리포트 예시 보기
-        <span aria-hidden="true">→</span>
+        <span aria-hidden="true" className="text-primary-on">→</span>
       </button>
       <PortalSheet open={open} onClose={() => setOpen(false)} />
     </>
