@@ -58,7 +58,7 @@ export default async function Home() {
         <p className="mx-auto mt-4 max-w-[460px] break-keep text-[18px] font-bold leading-[1.5] text-primary-on sm:text-[20px]">
           AI와 함께 3분 만에 소개서를 만들고,
           <br />
-          추천 콜라보 분석까지 받아보세요.
+          추천 콜라보 아이디어까지 받아보세요.
         </p>
         <p className="mx-auto mt-3 max-w-[460px] break-keep text-[16px] leading-[1.65] text-body sm:text-[17px]">
           작은 가게도, 1인 브랜드도 괜찮아요. 무료로 시작해보세요.
