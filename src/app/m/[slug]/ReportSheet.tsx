@@ -38,6 +38,7 @@ export function ReportSheet({
   sampleMode,
   onPropose,
   initialFromSlug = null,
+  source = "maker_page",
 }: {
   open: boolean;
   onClose: () => void;
@@ -47,6 +48,8 @@ export function ReportSheet({
   sampleMode: boolean; // 소개서 0개 유저 — 샘플 리포트 티저
   onPropose: () => void; // CTA — 리포트 닫고 제안 시트 오픈(부모가 처리)
   initialFromSlug?: string | null; // /my 아카이브 딥링크 — 이 slug로 선택 스텝 없이 바로 실행
+  /** 계측용 오픈 위치 — 홈 샘플 오픈이 /m 잠금 티저 지표(report_locked_view)를 오염시키지 않게 구분(07-31) */
+  source?: "maker_page" | "home";
 }) {
   const [phase, setPhase] = useState<Phase>("idle");
   const [result, setResult] = useState<OkPayload | null>(null);
@@ -140,10 +143,10 @@ export function ReportSheet({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, sampleMode, initialFromSlug]);
 
-  // 샘플 모드(잠금 티저) 오픈 계측 — 무소개서 퍼널 시작점
+  // 샘플 모드(잠금 티저) 오픈 계측 — 무소개서 퍼널 시작점. source로 홈/소개서 유입 구분.
   useEffect(() => {
-    if (open && sampleMode) track("report_locked_view");
-  }, [open, sampleMode]);
+    if (open && sampleMode) track("report_locked_view", { source });
+  }, [open, sampleMode, source]);
 
   // 로딩 카피 3단 순환(4초 간격)
   useEffect(() => {
@@ -346,9 +349,11 @@ export function ReportSheet({
               {sampleMode && (
                 /* 무소개서 퍼널 — 위저드 CTA */
                 <div className="mt-8 rounded-md border border-hairline bg-surface-soft p-4">
+                  {/* 홈(source=home)에선 상대 브랜드가 없어 toName이 빈 문자열 — 범용 문구로 분기(07-31) */}
                   <p className="text-[14px] leading-relaxed break-keep text-body">
-                    소개서를 등록하면 {toName}님과 나의 콜라보 분석을 받을 수
-                    있어요
+                    {toName
+                      ? `소개서를 등록하면 ${toName}님과 나의 콜라보 분석을 받을 수 있어요`
+                      : "소개서를 등록하면 마음에 드는 브랜드와 우리 브랜드의 콜라보 분석을 받을 수 있어요"}
                   </p>
                   <a
                     href="/register"

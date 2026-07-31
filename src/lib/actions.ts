@@ -192,6 +192,17 @@ export async function getPreviewDemoNoneAction(): Promise<{ maker: Maker; logoUr
   return { maker, logoUrl };
 }
 
+/** 등록 완료 얼럿 — 콜라보 분석 파트너 후보(본인 제외 최신 1곳). 없으면 null.
+ *  ⚠️ 정렬이 최신순(07-31)이라 1등은 대개 방금 발행한 자기 자신 — 반드시 excludeSlug로 거른다.
+ *  로그인 유저 전용 동선(리포트는 로그인+내 소개서 필요)이지만 액션 자체는 공개 데이터만 읽는다. */
+export async function getAnalysisPartnerAction(
+  excludeSlug: string
+): Promise<{ slug: string; name: string } | null> {
+  const list = await repo.listCollabOpenMakers(2);
+  const p = list.find((m) => m.slug !== excludeSlug);
+  return p ? { slug: p.slug, name: p.name } : null;
+}
+
 /** 비회원이 완료 얼럿에서 뒤늦게 비번을 설정(소유자·기존 비번 없을 때만) */
 export async function setMakerPasswordAction(
   slug: string,

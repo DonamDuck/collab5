@@ -18,7 +18,7 @@ export interface Repo {
   deleteMaker(slug: string): Promise<void>;
   listMakersByOwner(ownerUserId: number): Promise<Maker[]>;
   searchMakers(q: string): Promise<Maker[]>;
-  listCollabOpenMakers(limit: number): Promise<Maker[]>; // 홈 캐러셀 — 콜라보 받는 중 + 검색 노출, 등록순
+  listCollabOpenMakers(limit: number): Promise<Maker[]>; // 홈 그리드 — 콜라보 받는 중 + 검색 노출, ⭐최신순(07-31 반전: 오래된 순+상한이면 방금 소개서 만든 씨딩 사장님이 홈에서 자기 브랜드를 못 본다)
   // 카드
   createCard(input: Omit<CollabCard, "id" | "createdAt">): Promise<CollabCard>;
   getCardBySlug(slug: string): Promise<CollabCard | null>;
@@ -436,7 +436,7 @@ class InMemoryRepo implements Repo {
   async listCollabOpenMakers(limit: number): Promise<Maker[]> {
     return this.makers
       .filter((m) => m.collabOpen && m.searchVisible && m.status !== "inactive")
-      .sort((a, b) => (a.createdAt < b.createdAt ? -1 : 1))
+      .sort((a, b) => (a.createdAt > b.createdAt ? -1 : 1)) // 최신순 — 인터페이스 주석 참조
       .slice(0, limit);
   }
 
@@ -711,7 +711,7 @@ class SupabaseRepo implements Repo {
       .eq("collab_open", true)
       .eq("search_visible", true)
       .eq("status", "active")
-      .order("created_at", { ascending: true })
+      .order("created_at", { ascending: false }) // 최신순 — 인터페이스 주석 참조
       .limit(limit);
     return (data ?? []).map((r) => rowToMaker(r as MakerRow));
   }

@@ -1,13 +1,19 @@
-// 홈 랜딩 — 발신자(보내는 쪽) 여정 중심. 등록 → 카드 만들기 → 공유. design.md §9.6 온보딩 3스텝.
-// 2026-07-27: cold-start를 벗어나 "콜라보 가능한 브랜드" 캐러셀 신설(/search의 세미 버전).
+// 홈 랜딩 — 콜라보 프레임(2026-07-31 개편, 대표 확정 · Obsidian [[홈-콜라보-프레임-개편]]).
+// 위계: ①히어로(소개서 CTA + 분석 예시 링크) ②콜라보 가능한 브랜드 그리드 ③실물 구경(목업+리포트)
+//       ④3스텝 ⑤DM비교 ⑥마무리 CTA. (④⑤ 압축은 디자인팀 3자 기획 후 — 스텝카드 스크린샷 소유권)
+// 1차 관객 = 씨딩 링크 타고 온 사장님 — "안 읽고도 이해"가 성공 기준. 익명 방문자 퍼널은 포켓 후 P3.
 import Link from "next/link";
 import { PreviewPhones } from "./PreviewPhones";
 import { Reveal } from "@/components/Reveal";
-import { BrandCarousel } from "@/components/BrandCarousel";
+import { BrandGrid } from "@/components/BrandGrid";
+import { SampleReportLink, SampleReportPeek } from "@/components/SampleReport";
+import { TrackLink } from "@/components/TrackLink";
 import { repo } from "@/lib/repo";
 
-const CAROUSEL_LIMIT = 10; // 홈 캐러셀 노출 개수(대표 지시). 나머지는 '더 많은 브랜드 보기' 카드로.
-const MIN_CAROUSEL = 3; // 이보다 적으면 섹션을 아예 안 그린다(디자인팀 07-27).
+// n≤12 동안 전량 노출(대표 확정 07-31 — 상한+오래된 순이면 방금 등록한 씨딩 사장님이 자기 브랜드를 못 본다).
+// 24는 "전량"의 방어적 상한 — 넘으면 P3 큐레이션 재론.
+const GRID_LIMIT = 24;
+const MIN_GRID = 3; // 이보다 적으면 섹션을 아예 안 그린다(디자인팀 07-27 규칙 승계).
 
 // ⚠️ 이 한 줄이 없으면 목록이 **배포 시점에 얼어붙는다**(서버 컴포넌트 프리렌더 함정, /search·/my와 동일).
 // 다만 홈은 최다 트래픽 랜딩이라 매 요청 조회(force-dynamic) 대신 ISR로 둔다 —
@@ -15,7 +21,7 @@ const MIN_CAROUSEL = 3; // 이보다 적으면 섹션을 아예 안 그린다(�
 export const revalidate = 300;
 
 export default async function Home() {
-  const collabBrands = await repo.listCollabOpenMakers(CAROUSEL_LIMIT);
+  const collabBrands = await repo.listCollabOpenMakers(GRID_LIMIT);
 
   return (
     <main className="mx-auto w-full max-w-[960px] px-4 py-12 sm:px-6">
@@ -23,7 +29,9 @@ export default async function Home() {
           ⚠️Tailwind v4(Lightning CSS)가 유틸로 안 잡히는 raw @keyframes를 제거해서 globals.css엔 못 둠 → 여기 인라인.
           순수 CSS라 JS 하이드레이션 전에도 재생 → 히어로가 안 보이는 위화감 없음(Reveal의 opacity-0 문제 회피). */}
       <style>{`
-        @keyframes home-rise { from { opacity: 0; transform: translateY(40px); } to { opacity: 1; transform: translateY(0); } }
+        /* ⚠️ to는 translateY(0)이 아니라 **none** — fill-mode:both가 끝값을 영구 유지하는데,
+           transform이 남은 섹션은 fixed 자손(시트·모달)의 컨테이닝 블록이 돼 오버레이가 섹션 안에 갇힌다(실측 07-31). */
+        @keyframes home-rise { from { opacity: 0; transform: translateY(40px); } to { opacity: 1; transform: none; } }
         .home-rise { animation: home-rise 0.95s ease-out both; }
         @media (prefers-reduced-motion: reduce) { .home-rise { animation: none; } }
       `}</style>
@@ -55,18 +63,42 @@ export default async function Home() {
           몇 줄이면 소개서가 완성돼요. 무료로 시작해보세요.
         </p>
         <div className="mt-7 flex justify-center">
-          <Link
+          <TrackLink
             href="/register"
+            event="home_hero_register_click"
             className="flex h-12 w-full items-center justify-center rounded-md bg-primary px-6 text-[16px] font-medium text-primary-on sm:w-auto"
           >
             브랜드 소개서 만들기
-          </Link>
+          </TrackLink>
         </div>
+        {/* 보조 링크 — 분석은 '구경'으로만(히어로 1번 CTA 금지 = 레드팀 R1: 콜드스타트 절벽·웨지 강등).
+            라벨 정직 원칙: 목적지가 예시 시트이므로 '예시 보기'라고 쓴다. */}
+        <SampleReportLink />
       </section>
 
-      {/* 미리보기 — 실제 데모 소개서 2종(사진 있는/없는) 폰 프레임. 결과물 먼저 → 과정 설명 순서.
-          온로드 라이즈 2번(제목·섭타이틀·목업 통째로 세트). delay로 히어로(1번) 뒤에 이어 올라온다.
-          데스크탑·모바일 동일 대응(스크롤 위치 무관, 로드 시 순차 재생). 대표 지시 2026-07-22. */}
+      {/* ② 콜라보 가능한 브랜드 — 히어로 바로 다음(07-31 개편: "여기 어떤 브랜드들이 있나"가
+          씨딩 사장님·소개서 수신 브랜드의 첫 질문). 그리드 전량 노출, 정렬 최신순(repo).
+          soft 밴드·통째 리빌·풀블리드 box-shadow 기법은 캐러셀 시절(07-27~29) 그대로 승계. */}
+      {collabBrands.length >= MIN_GRID && (
+        <Reveal
+          as="section"
+          className="mt-16 -mx-4 bg-surface-soft px-4 py-14 [box-shadow:0_0_0_100vmax_var(--surface-soft)] [clip-path:inset(0_-100vmax)] sm:-mx-6 sm:px-6"
+        >
+          <h2 className="text-balance break-keep text-center text-[24px] font-bold leading-[1.35] tracking-[-0.02em] text-ink sm:text-[28px]">
+            콜라보 가능한 브랜드
+          </h2>
+          <p className="mx-auto mt-2 max-w-[440px] break-keep text-center text-[16px] leading-[1.65] text-body sm:text-[17px]">
+            지금 함께할 파트너를 찾고 있는 브랜드예요.
+          </p>
+          <div className="mt-8">
+            <BrandGrid brands={collabBrands} />
+          </div>
+        </Reveal>
+      )}
+
+      {/* ③ 실물 구경 — 소개서 목업 + 분석 리포트 축약. 제품의 두 얼굴을 한 스크롤에(07-31).
+          목업은 실제 데모 소개서 2종(사진 있는/없는), 디자인팀 브라우저 카드(de9d6c5) 그대로.
+          온로드 라이즈 2번은 유지 — 폴드 아래면 안 보이는 채 재생이 끝나 정적으로 보인다(무해). */}
       <section className="home-rise mt-16" style={{ animationDelay: "600ms" }}>
         <h2 className="text-balance break-keep text-center text-[24px] font-bold leading-[1.35] tracking-[-0.02em] text-ink sm:text-[28px]">
           3분이면 브랜드 소개서가 완성돼요.
@@ -85,39 +117,21 @@ export default async function Home() {
             브랜드 소개서 작성 예시
           </Link>
         </div>
-      </section>
 
-      {/* 콜라보 가능한 브랜드 — /search의 세미 버전 캐러셀(대표 지시 2026-07-27).
-          노출 조건 = 콜라보 받는 중 + 검색 노출 ON, 등록 오래된 순 10개(repo.listCollabOpenMakers).
-          3곳 미만이면 섹션을 통째로 감춘다(디자인팀) — 캐러셀은 "여러 개 넘겨보는" UI라
-          1~2장이면 초라하고, "콜라보 가능한 브랜드"인데 2곳이면 오히려 역효과다. */}
-      {collabBrands.length >= MIN_CAROUSEL && (
-        // 흰 캔버스가 이어지는 홈에 soft 밴드를 하나 넣어 리듬(흰→soft→흰)을 주고,
-        // "좌우로 미는 영역"을 시각적으로 못박는다(디자인팀 07-27).
-        // ⚠️ 풀블리드에 `w-screen`/`100vw`를 쓰면 세로 스크롤바 폭만큼 가로 스크롤이 생긴다.
-        //    대신 **레이아웃을 안 건드리는** 방식 — 거대한 box-shadow로 좌우를 칠하고
-        //    clip-path로 위아래만 잘라낸다(가로는 -100vmax로 열어둠).
-        /* ⚠️ 밴드를 '통째로' 리빌한다 — 배경과 내용이 같은 순간에 도착해야 한다.
-           전엔 section(회색 배경)이 Reveal 밖이라 배경만 먼저 그려지고, 안쪽 Reveal은
-           하단 컷(-22%) 때문에 반 화면(≈382px) 더 스크롤해야 터졌다 → "텅 빈 회색 띠"가
-           화면 1/3을 차지한 채 올라와 스크롤 흐름이 끊겼다(대표 QA 07-29, 실측 확인).
-           Reveal은 style prop을 안 받으므로(내부에서 transitionDelay 점유) 풀블리드
-           box-shadow·clip-path는 Tailwind 임의 속성으로 옮긴다. */
-        <Reveal
-          as="section"
-          className="mt-16 -mx-4 bg-surface-soft px-4 py-14 [box-shadow:0_0_0_100vmax_var(--surface-soft)] [clip-path:inset(0_-100vmax)] sm:-mx-6 sm:px-6"
-        >
-          <h2 className="text-balance break-keep text-center text-[24px] font-bold leading-[1.35] tracking-[-0.02em] text-ink sm:text-[28px]">
-            콜라보 가능한 브랜드
-          </h2>
-          <p className="mx-auto mt-2 max-w-[440px] break-keep text-center text-[16px] leading-[1.65] text-body sm:text-[17px]">
-            지금 함께할 파트너를 찾고 있는 브랜드예요.
+        {/* 분석 리포트 축약 — 소개서 실물 바로 아래(같은 '실물 구경' 섹션). sample-report.json 재사용.
+            "소개서를 만들면 이런 것도 받는다"가 소개서 CTA의 두 번째 근거가 된다(대표: 기능을 더 잘 쓰게). */}
+        <div className="mt-14 text-center">
+          <h3 className="text-balance break-keep text-[20px] font-bold leading-[1.35] tracking-[-0.02em] text-ink sm:text-[24px]">
+            소개서를 만들면, 이런 콜라보 분석도 받아요.
+          </h3>
+          <p className="mx-auto mt-2 max-w-[440px] break-keep text-[16px] leading-[1.65] text-body sm:text-[17px]">
+            두 브랜드가 왜 어울리는지, 뭘 함께하면 좋을지까지 알려드려요.
           </p>
-          <div className="mt-8">
-            <BrandCarousel brands={collabBrands} />
+          <div className="mt-6">
+            <SampleReportPeek />
           </div>
-        </Reveal>
-      )}
+        </div>
+      </section>
 
       {/* §9.6 온보딩 3스텝 */}
       <section className="mt-16">

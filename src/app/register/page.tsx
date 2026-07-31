@@ -4,6 +4,7 @@ import { Suspense, useEffect, useRef, useState, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   createMakerAction,
+  getAnalysisPartnerAction,
   setMakerPasswordAction,
   getAuthStateAction,
   updateMakerAction,
@@ -18,6 +19,7 @@ import { uploadPhoto, uploadPdf } from "@/lib/upload";
 import { mapLinkLabel, instagramSlug } from "@/lib/links";
 import { useDismissable } from "@/components/useDismissable";
 import { PasswordInput } from "@/components/PasswordInput";
+import { track } from "@/lib/track";
 import type { ActivityHint, CollabHint, EnrichField } from "@/lib/enrich";
 import { blendDescriptions, canRegenDesc, noteRegenDesc } from "@/lib/enrichBlend";
 import { useDraftAutosave, draftKey, agoLabel } from "./useDraftAutosave";
@@ -1133,6 +1135,16 @@ function RegisterForm() {
   };
   // 소개서 페이지는 서버에서 데이터를 불러오는 동안 잠깐 멈춰 보임 → 버튼 로딩 표시.
   const [goingToPage, setGoingToPage] = useState(false);
+  // 완료 얼럿 분석 파트너(본인 제외 최신 1곳) — 홈이 "소개서 만들면 분석 받아요"라 약속한 것의 이행 지점.
+  // ⚠️ 로그인 유저 전용 — 리포트는 로그인+내 소개서가 필요하고, 비회원 얼럿은 비번 저장 전
+  //    탈출구를 열면 안 된다(이탈 시 소개서 영영 수정 불가). 스펙: [[홈-콜라보-프레임-개편]] P1c
+  const [analysisPartner, setAnalysisPartner] = useState<{ slug: string; name: string } | null>(null);
+  useEffect(() => {
+    if (!portfolioOpen || !loggedIn || !createdSlug) return;
+    getAnalysisPartnerAction(createdSlug)
+      .then(setAnalysisPartner)
+      .catch(() => setAnalysisPartner(null)); // 후보 조회 실패는 조용히 — 버튼만 안 뜬다
+  }, [portfolioOpen, loggedIn, createdSlug]);
   const goToPage = async () => {
     if (!loggedIn) {
       if (!editPw.trim()) return;
@@ -2405,6 +2417,23 @@ function RegisterForm() {
             >
               {goingToPage || savingPw ? "이동 중…" : "소개서 확인하러 가기"}
             </button>
+            {/* ⭐ 콜라보 분석 진입(P1c) — 홈 ③의 약속("소개서 만들면 분석 받아요")의 이행 지점.
+                로그인 유저만(비회원은 비번 흐름 보호 + 리포트 자체가 로그인 필요).
+                딥링크 = /m/{파트너}?report={내slug} — MakerActionBar의 아카이브 딥링크 배선 재사용(0신규). */}
+            {loggedIn && analysisPartner && (
+              <button
+                type="button"
+                onClick={() => {
+                  track("report_start_from_publish");
+                  setGoingToPage(true);
+                  router.push(`/m/${analysisPartner.slug}?report=${createdSlug}`);
+                }}
+                disabled={goingToPage}
+                className="mt-2 flex h-12 w-full items-center justify-center rounded-md border border-border-strong bg-surface text-base font-medium text-ink disabled:opacity-50"
+              >
+                {analysisPartner.name}님과 콜라보 분석 받아보기
+              </button>
+            )}
             <p className="mt-3 text-[13px] text-faint">언제든 ‘내 소개서’에서 수정할 수 있어요.</p>
           </div>
         </div>
