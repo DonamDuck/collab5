@@ -81,6 +81,8 @@ export interface OnboardingState {
   email: string;
   brandName: string;
   phone: string;
+  /** 이미 저장된 로고/브랜드 사진 — 온보딩 화면의 미리보기 초기값. 없으면 "" */
+  profileImage: string;
 }
 
 // 해요체 — 사용자에게 보이는 문구는 이 저장소 톤을 따른다(위 DUP_MSG는 기존 가입 흐름 전용).
@@ -92,7 +94,14 @@ const ONBOARD_EXPIRED = "로그인 정보를 확인하지 못했어요. 다시 �
 
 /** /welcome 진입 판정 — 세션 여부 + 프로필이 이미 채워졌는지. */
 export async function getOnboardingStateAction(): Promise<OnboardingState> {
-  const blank: OnboardingState = { authed: false, done: false, email: "", brandName: "", phone: "" };
+  const blank: OnboardingState = {
+    authed: false,
+    done: false,
+    email: "",
+    brandName: "",
+    phone: "",
+    profileImage: "",
+  };
   if (!authEnabled()) return blank;
   const user = await getSessionUser();
   if (!user) return blank;
@@ -106,6 +115,7 @@ export async function getOnboardingStateAction(): Promise<OnboardingState> {
     email: profile?.email || user.email || "",
     brandName,
     phone,
+    profileImage: profile?.profileImage ?? "",
   };
 }
 
@@ -113,6 +123,8 @@ export async function getOnboardingStateAction(): Promise<OnboardingState> {
 export async function completeOnboardingAction(input: {
   brandName: string;
   phone: string;
+  /** 선택 — 로고/브랜드 사진. 안 올리면 undefined로 오고, 그때는 기존 값을 그대로 지킨다. */
+  profileImage?: string;
 }): Promise<{ error?: string }> {
   if (!authEnabled()) return { error: NO_AUTH_MSG };
   const user = await getSessionUser();
@@ -136,7 +148,10 @@ export async function completeOnboardingAction(input: {
       brandName,
       phone,
       email: existing?.email || user.email || "",
-      profileImage: existing?.profileImage || "",
+      // ⚠️ `undefined`(안 넘김) 와 `""`(화면에서 '지우기'를 누름)는 다른 뜻이다.
+      //    upsert라 안 실어주면 기존 값이 통째로 날아가므로, 안 넘긴 경우에만 기존 값을 되싣는다.
+      profileImage:
+        input.profileImage !== undefined ? input.profileImage.trim() : existing?.profileImage || "",
     });
   } catch {
     return { error: "저장에 실패했어요. 잠시 후 다시 시도해주세요." };

@@ -14,6 +14,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { authEnvReady, createBrowserAuthClient } from "@/lib/supabase/client";
 import { completeOnboardingAction, getOnboardingStateAction } from "@/lib/auth-actions";
+import { uploadPhoto } from "@/lib/upload";
+import { Avatar } from "@/components/Avatar";
 import { Field, authInputCls } from "@/components/Field";
 import { LoadingDots } from "@/components/LoadingDots";
 import { LoadingOverlay } from "@/components/LoadingOverlay";
@@ -28,6 +30,8 @@ export default function WelcomePage() {
   const [email, setEmail] = useState("");
   const [brandName, setBrandName] = useState("");
   const [phone, setPhone] = useState("");
+  const [image, setImage] = useState(""); // 선택 — 로고/브랜드 사진(가입 폼과 같은 방식)
+  const [imgUploading, setImgUploading] = useState(false);
   const [err, setErr] = useState("");
   const brandRef = useRef<HTMLInputElement>(null);
   const phoneRef = useRef<HTMLInputElement>(null);
@@ -68,12 +72,27 @@ export default function WelcomePage() {
       setEmail(st.email);
       setBrandName(st.brandName);
       setPhone(st.phone);
+      setImage(st.profileImage);
       setPhase("form");
     })();
     return () => {
       alive = false;
     };
   }, [router]);
+
+  // 가입 폼(`/signup`)과 같은 방식 — 브라우저에서 400px로 줄여 Storage에 올리고 URL만 상태에 둔다.
+  const onImage = async (files: FileList | null) => {
+    const f = files?.[0];
+    if (!f || !f.type.startsWith("image/")) return;
+    setImgUploading(true);
+    try {
+      setImage(await uploadPhoto(f, 400));
+    } catch {
+      alert("이미지 업로드에 실패했어요. 다시 시도해주세요.");
+    } finally {
+      setImgUploading(false);
+    }
+  };
 
   const submit = () =>
     start(async () => {
@@ -86,7 +105,7 @@ export default function WelcomePage() {
         return;
       }
       setErr("");
-      const r = await completeOnboardingAction({ brandName: b, phone: p });
+      const r = await completeOnboardingAction({ brandName: b, phone: p, profileImage: image });
       if (r.error) {
         setErr(r.error);
         if (/이름/.test(r.error)) brandRef.current?.focus();
@@ -126,7 +145,7 @@ export default function WelcomePage() {
     <main className="mx-auto w-full max-w-[400px] px-4 py-14 sm:px-6">
       <h1 className="text-2xl font-bold tracking-tight text-ink">거의 다 왔어요</h1>
       <p className="mt-2 text-[15px] text-mute">
-        소개서에 쓸 브랜드 이름과 연락받을 번호만 알려주세요.
+        소개서에 쓸 브랜드 이름과 연락받을 번호를 알려주세요.
       </p>
 
       {/* <form> — Enter로 제출되고, 비밀번호 매니저가 organization·tel을 알아본다 */}
@@ -176,6 +195,33 @@ export default function WelcomePage() {
               maxLength={13}
               className={authInputCls}
             />
+          </Field>
+          {/* 선택 — 가입 폼(`/signup`)의 블록을 그대로 가져왔다(대표 지시 07-31).
+              두 입구(이메일 가입 / 구글 로그인)가 같은 모습이어야 나중에 한쪽만 손보는 사고가 안 난다.
+              ⚠️ 필수로 만들지 않는다 — 온보딩은 로그인 직후의 문턱이라, 여기서 사진을 찾느라
+                 멈추면 그대로 이탈이다. 안 올리면 Avatar가 브랜드명 첫 글자로 대신한다. */}
+          <Field label="로고 또는 브랜드 사진" optional>
+            <div className="flex items-center gap-3">
+              <Avatar image={image || undefined} name={brandName || "?"} size={48} />
+              <label className="inline-flex h-9 cursor-pointer items-center rounded-md border border-border-strong bg-surface px-3 text-sm font-medium text-ink">
+                {imgUploading ? "업로드 중…" : "이미지 선택"}
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => onImage(e.target.files)}
+                />
+              </label>
+              {image && (
+                <button
+                  type="button"
+                  onClick={() => setImage("")}
+                  className="text-sm text-faint hover:text-ink"
+                >
+                  지우기
+                </button>
+              )}
+            </div>
           </Field>
         </div>
 
