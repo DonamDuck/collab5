@@ -417,12 +417,10 @@ export function MakerActionBar({
                 >
                   {on ? "✓" : "+"}
                 </span>
+                {/* 제목만 — `idea.method`(제품 스팟 소개·협동 워크숍 …) 칩은 뺐다(대표 지시 07-31).
+                    칩이 폭을 먹어 **정작 고르는 기준인 제목이 6~8자에서 잘렸다**("드립커피와 조각 …").
+                    분류는 지금 고르는 판단에 쓰이지 않는다 — 초안에 들어가는 건 제목이다. */}
                 <span className="min-w-0 flex-1 truncate text-[13px] font-medium">{idea.title}</span>
-                {idea.method && (
-                  <span className="shrink-0 rounded-pill bg-surface-soft px-1.5 py-0.5 text-[11px] text-mute">
-                    {idea.method}
-                  </span>
-                )}
               </button>
             );
           })}

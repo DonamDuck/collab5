@@ -197,7 +197,10 @@ export function ReportSheet({
         <p className="text-[12px] font-medium tracking-wide text-mute">
           콜라보 한줄 요약
         </p>
-        <p className="mt-1.5 text-[20px] font-bold leading-snug text-balance break-keep text-ink">
+        {/* 18px — 20은 시트 폭에서 5줄까지 늘어져 혼자 튀었다(대표 07-31 "생각보다 너무 크다").
+            시트 사다리는 요약 → 섹션제목 15 → 본문 14 → 메타 13. 18이면 섹션제목과 1.2배라
+            주인공 자리는 지키면서 덩어리가 가벼워진다. (17로 내리면 15와 1.13배라 위계가 무너진다) */}
+        <p className="mt-1.5 text-[18px] font-bold leading-[1.45] text-balance break-keep text-ink">
           {report.oneLiner}
         </p>
       </div>
