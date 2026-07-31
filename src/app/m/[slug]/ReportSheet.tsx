@@ -47,6 +47,7 @@ export function ReportSheet({
   onPropose,
   initialFromSlug = null,
   source = "maker_page",
+  onReportLoaded,
 }: {
   open: boolean;
   onClose: () => void;
@@ -58,6 +59,9 @@ export function ReportSheet({
   initialFromSlug?: string | null; // /my 아카이브 딥링크 — 이 slug로 선택 스텝 없이 바로 실행
   /** 계측용 오픈 위치 — 홈 샘플 오픈이 /m 잠금 티저 지표(report_locked_view)를 오염시키지 않게 구분(07-31) */
   source?: "maker_page" | "home";
+  /** 리포트가 실제로 열렸을 때 부모에게 올려준다 — 제안 시트가 콜라보 아이디어를 초안에 넣는 데 쓴다(07-31).
+   *  ⚠️ 샘플(가상 쌍)은 올리지 않는다 — 남의 브랜드 얘기가 내 DM 초안에 섞이면 안 된다. */
+  onReportLoaded?: (report: CollabReportData) => void;
 }) {
   const [phase, setPhase] = useState<Phase>("idle");
   const [result, setResult] = useState<OkPayload | null>(null);
@@ -71,6 +75,9 @@ export function ReportSheet({
   // in-flight 가드 — 생성 중 재요청 금지(이중 지출 차단). 도중에 칩이 바뀌면 완료 후 최신 선택으로 1회 재실행.
   const inFlightRef = useRef(false);
   const wantSlugRef = useRef<string | null>(null);
+  // 콜백을 ref로 들고 있는다 — run의 useCallback 의존성에 넣으면 부모 리렌더마다 run이 새로 만들어진다.
+  const loadedCbRef = useRef(onReportLoaded);
+  loadedCbRef.current = onReportLoaded;
 
   const selected =
     fromBrands.find((b) => b.slug === selectedSlug) ?? fromBrands[0];
@@ -109,6 +116,7 @@ export function ReportSheet({
             const ok = data as OkPayload;
             setResult(ok);
             setPhase("ok");
+            loadedCbRef.current?.(ok.report); // 제안 시트가 아이디어를 쓸 수 있게 부모로 올림
             track("report_view", { cache_hit: ok.cached });
             if (ok.cached === false) {
               track("report_generated", {

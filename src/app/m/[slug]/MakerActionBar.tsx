@@ -8,6 +8,7 @@ import { setMakerSavedAction, recordCollabRequestAction } from "@/lib/actions";
 import { resolveCollabChannel } from "@/lib/links";
 import { useDismissable } from "@/components/useDismissable";
 import { ReportSheet } from "./ReportSheet";
+import type { CollabReportData } from "@/lib/types";
 
 // 로그인/가입 전에 눌렀던 의도를 보관하는 키(같은 탭 세션 한정) — 복귀 시 자동 재개.
 const PENDING_SAVE_KEY = "collab5:pendingSave";
@@ -61,6 +62,10 @@ export function MakerActionBar({
   const [reportSample, setReportSample] = useState(false); // 소개서 0개 유저 — 샘플 리포트 티저
   const [reportInitialFrom, setReportInitialFrom] = useState<string | null>(null); // /my 아카이브 딥링크(?report=fromSlug) — 선택 스텝 건너뛰고 그 쌍을 바로 연다
   const [message, setMessage] = useState(""); // 추천 메시지(수정 가능)
+  // 콜라보 분석에서 올라온 아이디어 — 제안 시트에서 '+'로 초안에 골라 넣는다(대표 07-31).
+  // 분석을 안 돌린 사람에겐 아예 안 뜬다(빈 배열). 샘플 리포트는 올라오지 않는다(ReportSheet에서 차단).
+  const [reportIdeas, setReportIdeas] = useState<CollabReportData["ideas"]>([]);
+  const [addedIdeas, setAddedIdeas] = useState<number[]>([]);
   const [toast, setToast] = useState<string | null>(null); // 복사 완료 토스트(3종 통일)
   const [selectedSlug, setSelectedSlug] = useState(viewerBrands[0]?.slug); // 함께 보낼 내 소개서
   const [pending, start] = useTransition();
@@ -86,7 +91,18 @@ export function MakerActionBar({
       msg += `\n\n저희 소개도 함께 보내드려요.\n${window.location.origin}/m/${selectedBrand.slug}`;
     }
     setMessage(msg);
+    setAddedIdeas([]); // 초안이 새로 채워지면 '추가됨' 표시도 원위치 — 안 그러면 넣지도 않았는데 넣은 걸로 보인다
   }, [proposeOpen, senderName, selectedBrand?.slug, selectedBrand?.name]);
+
+  /** 콜라보 아이디어 1건을 초안 끝에 덧붙인다. 여러 건을 눌러도 머리말("생각해본…")은 한 번만. */
+  const addIdeaToMessage = (i: number) => {
+    const idea = reportIdeas[i];
+    if (!idea) return;
+    const head = "\n\n함께 하면 좋을 콜라보 아이디어예요.";
+    setMessage((prev) => `${prev}${prev.includes(head.trim()) ? "" : head}\n· ${idea.title} — ${idea.desc}`);
+    setAddedIdeas((prev) => [...prev, i]);
+    flash("✓ 초안에 넣었어요.");
+  };
 
   // 로그인/가입으로 떠나기 직전, 무슨 의도였는지(찜/제안/분석) 이 업체 기준으로 남긴다.
   const markPending = () => {
@@ -280,7 +296,14 @@ export function MakerActionBar({
   };
 
   const isInstagram = channel?.channel === "instagram";
-  const proposePrimaryLabel = isInstagram ? "메시지 복사하고 인스타 DM 보내기" : "메시지 복사하고 채널 열기";
+  // 좌우 2버튼이 되면서 라벨을 짧게 잘랐다(대표 07-31). "메시지 복사하고 …"는 두 버튼 폭에 안 들어간다.
+  // ⚠️ 동작은 그대로 **복사 + 채널 열기**다 — 눌러도 클립보드가 비어 있으면 붙여넣을 게 없다.
+  //    그래서 누르는 즉시 "✓ 메시지를 복사했어요" 토스트가 떠서 복사됐음을 알려준다.
+  const proposePrimaryLabel = !channel
+    ? "이메일 주소 복사"
+    : isInstagram
+      ? "인스타 DM 보내기"
+      : "채널 열고 보내기";
 
   // 소개서 링크 복사 — copyText + flash로 정리(pill 라벨은 정적 고정).
   const copy = () => {
@@ -335,6 +358,51 @@ export function MakerActionBar({
             {typeof window !== "undefined" ? window.location.origin : ""}/m/{selectedBrand.slug}
           </p>
         )}
+      </div>
+    );
+
+  // 콜라보 아이디어 넣기 — 분석을 본 사람에게만 뜬다(대표 07-31: "리포트를 DM에 담을 방법이 없다").
+  // ⚠️ 전체 리포트를 통째로 붙이지 않는다. DM에 리포트를 쏟으면 읽히지 않고, 남의 브랜드 분석을
+  //    상대에게 그대로 전달하는 모양새가 된다. **아이디어만, 고른 것만** 초안에 들어간다.
+  const ideaPicker =
+    reportIdeas.length === 0 ? null : (
+      <div className="mt-3 rounded-md border border-hairline bg-surface-soft p-3">
+        <p className="text-[13px] font-medium text-body">
+          콜라보 분석에서 아이디어 넣기 <span className="text-faint">(고른 것만 초안에 들어가요)</span>
+        </p>
+        <div className="mt-2 space-y-1.5">
+          {reportIdeas.map((idea, i) => {
+            const on = addedIdeas.includes(i);
+            return (
+              <button
+                key={i}
+                type="button"
+                onClick={() => addIdeaToMessage(i)}
+                disabled={on}
+                className={`flex w-full items-center gap-2 rounded-md border px-3 py-2 text-left transition-colors ${
+                  on
+                    ? "border-hairline bg-surface-soft text-faint"
+                    : "border-border-strong bg-surface text-ink hover:bg-primary-pale"
+                }`}
+              >
+                <span
+                  aria-hidden="true"
+                  className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-pill text-[13px] font-bold ${
+                    on ? "bg-hairline text-faint" : "bg-primary text-primary-on"
+                  }`}
+                >
+                  {on ? "✓" : "+"}
+                </span>
+                <span className="min-w-0 flex-1 truncate text-[13px] font-medium">{idea.title}</span>
+                {idea.method && (
+                  <span className="shrink-0 rounded-pill bg-surface-soft px-1.5 py-0.5 text-[11px] text-mute">
+                    {idea.method}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
       </div>
     );
 
@@ -449,92 +517,93 @@ export function MakerActionBar({
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 print:hidden" {...proposeDialog.overlayProps}>
           {/* ⚠️ max-h(dvh)+스크롤 — 없으면 내용이 뷰포트보다 길 때 시트가 위로 넘쳐 제목과 닫기 X가
               화면 밖으로 밀리는데, 배경 스크롤은 잠겨 있어 도달할 방법이 없다(QA 07-29). */}
+          {/* 고정 푸터 구조(07-31 대표 요청) — 예전엔 패널 자체가 스크롤 컨테이너라 버튼이 본문 맨 아래
+              따라다녔다. 초안에 아이디어를 넣으면 본문이 길어져 버튼이 더 멀어진다 → **본문만 스크롤,
+              버튼은 하단 고정**. 리포트 시트가 이미 쓰는 패턴(고정 바 + 스크롤 영역)을 그대로 맞춘다. */}
           <div
             {...proposeDialog.panelProps}
-            className="relative max-h-[85dvh] w-full max-w-[640px] overflow-y-auto rounded-t-2xl border border-b-0 border-hairline bg-surface p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] shadow-e2"
+            className="relative flex max-h-[85dvh] w-full max-w-[640px] flex-col rounded-t-2xl border border-b-0 border-hairline bg-surface shadow-e2"
           >
             {/* 우측 상단 닫기 */}
             <button
               type="button"
               onClick={() => setProposeOpen(false)}
               aria-label="닫기"
-              className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-md text-faint hover:bg-surface-soft hover:text-ink"
+              className="absolute right-3 top-3 z-10 flex h-8 w-8 items-center justify-center rounded-md text-faint hover:bg-surface-soft hover:text-ink"
             >
               <svg viewBox="0 0 20 20" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8">
                 <path d="M5 5l10 10M15 5L5 15" strokeLinecap="round" />
               </svg>
             </button>
 
-            <p className="pr-8 text-xl font-bold break-keep text-ink">{makerName}님과 콜라보 시작하기</p>
-            {channel ? (
-              <>
+            <div className="flex-1 overflow-y-auto p-6 pb-4">
+              <p className="pr-8 text-xl font-bold break-keep text-ink">{makerName}님과 콜라보 시작하기</p>
+              {channel ? (
+                <>
+                  <p className="mt-2 text-[15px] leading-relaxed text-mute">
+                    아직 앱 내 채팅은 준비 중이에요.
+                    <br />
+                    그전까지는 아래 메시지를 복사해 {isInstagram ? "인스타그램으로" : "아래 채널로"} 연락해보세요.
+                  </p>
+                  {reportLink}
+                  <label className="mt-3 block text-[13px] font-medium text-body">메시지 초안 (자유롭게 수정해보세요)</label>
+                  <textarea
+                    value={message}
+                    onChange={(e) => setMessage(e.target.value)}
+                    rows={7}
+                    className="mt-1.5 w-full resize-none rounded-md border border-border-strong bg-surface-soft p-3 text-[14px] leading-relaxed text-ink focus:border-primary focus:outline-none"
+                  />
+                  {ideaPicker}
+                  {brandPicker}
+                </>
+              ) : contactEmail ? (
+                <>
+                  <p className="mt-2 text-[15px] leading-relaxed text-mute">
+                    아직 앱 내 채팅은 준비 중이에요.
+                    <br />
+                    그전까지는 아래 이메일로 연락해보세요.
+                  </p>
+                  <p className="mt-3 text-[14px] text-body break-all select-all">{contactEmail}</p>
+                  {reportLink}
+                  <label className="mt-3 block text-[13px] font-medium text-body">메시지 초안 (자유롭게 수정해보세요)</label>
+                  <textarea
+                    value={message}
+                    onChange={(e) => setMessage(e.target.value)}
+                    rows={7}
+                    className="mt-1.5 w-full resize-none rounded-md border border-border-strong bg-surface-soft p-3 text-[14px] leading-relaxed text-ink focus:border-primary focus:outline-none"
+                  />
+                  {ideaPicker}
+                  {brandPicker}
+                </>
+              ) : (
                 <p className="mt-2 text-[15px] leading-relaxed text-mute">
-                  아직 앱 내 채팅은 준비 중이에요.
+                  아직 {makerName}님의 연락처가 준비되지 않았어요.
                   <br />
-                  그전까지는 아래 메시지를 복사해 {isInstagram ? "인스타그램으로" : "아래 채널로"} 연락해보세요.
+                  조금만 기다려 주세요.
                 </p>
-                {reportLink}
-                <label className="mt-3 block text-[13px] font-medium text-body">메시지 초안 (자유롭게 수정해보세요)</label>
-                <textarea
-                  value={message}
-                  onChange={(e) => setMessage(e.target.value)}
-                  rows={7}
-                  className="mt-1.5 w-full resize-none rounded-md border border-border-strong bg-surface-soft p-3 text-[14px] leading-relaxed text-ink focus:border-primary focus:outline-none"
-                />
-                {brandPicker}
-                <button
-                  type="button"
-                  onClick={proposeAndSend}
-                  className="mt-4 flex h-12 w-full items-center justify-center rounded-md bg-primary text-base font-medium text-primary-on"
-                >
-                  {proposePrimaryLabel}
-                </button>
-                <button
-                  type="button"
-                  onClick={copyMessageOnly}
-                  className="mt-2 flex h-12 w-full items-center justify-center rounded-md border border-border-strong bg-surface text-base font-medium text-ink"
-                >
-                  메시지 복사하기
-                </button>
-              </>
-            ) : contactEmail ? (
-              <>
-                <p className="mt-2 text-[15px] leading-relaxed text-mute">
-                  아직 앱 내 채팅은 준비 중이에요.
-                  <br />
-                  그전까지는 아래 이메일로 연락해보세요.
-                </p>
-                <p className="mt-3 text-[14px] text-body break-all select-all">{contactEmail}</p>
-                {reportLink}
-                <label className="mt-3 block text-[13px] font-medium text-body">메시지 초안 (자유롭게 수정해보세요)</label>
-                <textarea
-                  value={message}
-                  onChange={(e) => setMessage(e.target.value)}
-                  rows={7}
-                  className="mt-1.5 w-full resize-none rounded-md border border-border-strong bg-surface-soft p-3 text-[14px] leading-relaxed text-ink focus:border-primary focus:outline-none"
-                />
-                {brandPicker}
-                <button
-                  type="button"
-                  onClick={copyEmailOnly}
-                  className="mt-4 flex h-12 w-full items-center justify-center rounded-md bg-primary text-base font-medium text-primary-on"
-                >
-                  이메일 주소 복사하기
-                </button>
-                <button
-                  type="button"
-                  onClick={copyMessageOnly}
-                  className="mt-2 flex h-12 w-full items-center justify-center rounded-md border border-border-strong bg-surface text-base font-medium text-ink"
-                >
-                  메시지 복사하기
-                </button>
-              </>
-            ) : (
-              <p className="mt-2 text-[15px] leading-relaxed text-mute">
-                아직 {makerName}님의 연락처가 준비되지 않았어요.
-                <br />
-                조금만 기다려 주세요.
-              </p>
+              )}
+            </div>
+
+            {/* 고정 액션 바 — 좌:복사(고스트) / 우:보내기(primary). 연락 수단이 아예 없으면 안 그린다. */}
+            {(channel || contactEmail) && (
+              <div className="shrink-0 border-t border-hairline bg-surface px-6 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-3">
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={copyMessageOnly}
+                    className="flex h-12 flex-1 items-center justify-center rounded-md border border-border-strong bg-surface text-[15px] font-medium text-ink"
+                  >
+                    메시지 초안 복사
+                  </button>
+                  <button
+                    type="button"
+                    onClick={channel ? proposeAndSend : copyEmailOnly}
+                    className="flex h-12 flex-1 items-center justify-center rounded-md bg-primary text-[15px] font-medium text-primary-on"
+                  >
+                    {proposePrimaryLabel}
+                  </button>
+                </div>
+              </div>
             )}
           </div>
         </div>
@@ -542,6 +611,7 @@ export function MakerActionBar({
 
       {/* AI 콜라보 분석 리포트 시트 — CTA는 리포트 닫고 제안 시트로 */}
       <ReportSheet
+        onReportLoaded={(r) => setReportIdeas(r.ideas)}
         open={reportOpen}
         onClose={() => {
           setReportOpen(false);
