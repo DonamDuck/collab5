@@ -13,6 +13,7 @@
 import { useState } from "react";
 import { createPortal } from "react-dom";
 import { ReportSheet } from "@/app/m/[slug]/ReportSheet";
+import { collabMethodLabel } from "@/lib/dna-pool";
 import { track } from "@/lib/track";
 import sampleData from "@/lib/sample-report.json";
 
@@ -77,7 +78,7 @@ export function SampleReportPeek() {
                 <p className="break-keep text-[14px] font-bold text-ink">{idea.title}</p>
                 {idea.method && (
                   <span className="shrink-0 rounded-pill bg-surface-soft px-2 py-0.5 text-[11px] text-body">
-                    {idea.method}
+                    {collabMethodLabel(idea.method)}
                   </span>
                 )}
               </div>

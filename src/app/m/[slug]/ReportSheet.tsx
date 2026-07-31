@@ -7,6 +7,7 @@
 // 스펙: docs/superpowers/specs/2026-07-25-collab-report-dna-design.md §4·§5
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useDismissable } from "@/components/useDismissable";
+import { collabMethodLabel } from "@/lib/dna-pool";
 import { track } from "@/lib/track";
 import type { CollabReportData } from "@/lib/types";
 import sampleData from "@/lib/sample-report.json";
@@ -234,7 +235,7 @@ export function ReportSheet({
               </p>
               {idea.method && (
                 <span className="shrink-0 rounded-pill bg-surface-soft px-2 py-0.5 text-[12px] text-body">
-                  {idea.method}
+                  {collabMethodLabel(idea.method)}
                 </span>
               )}
             </div>

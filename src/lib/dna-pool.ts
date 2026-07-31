@@ -26,6 +26,26 @@ export const DNA_POOL: Record<string, readonly string[]> = {
   seasonality: ["사계절","특정 시즌 강세"],
 };
 
+/** 🏷 collabMethod **표시 전용** 축약 라벨 (대표 확정 07-31).
+ *  Pool 값 자체는 절대 바꾸지 않는다 — 프롬프트 제시 목록·서버 화이트리스트(filterPoolValid)·
+ *  이미 캐싱된 brands.dna / collab_reports가 전부 위 원문을 쓴다. 여기는 **UI가 그릴 때만** 갈아끼우는 층.
+ *  이유: 아이디어 카드 칩이 `shrink-0`이라 긴 값("프로젝트·프로그램 소속 팝업 참여" 16자)이 가로를
+ *  독차지하면 옆의 제목이 4줄로 쪼개진다(대표 제보). 매핑에 없는 값은 원문 그대로 노출한다. */
+export const COLLAB_METHOD_LABEL: Record<string, string> = {
+  "프로젝트·프로그램 소속 팝업 참여": "공동 팝업",
+  "상호 고객 혜택 교환": "혜택 교환",
+  "협동 프로그램 운영": "공동 프로그램",
+  "제품 스팟 소개": "제품 소개",
+  "링크 제휴 할인": "제휴 할인",
+  "할인 코드 교환": "할인 코드",
+  "협동 워크숍": "워크숍",
+};
+
+/** 칩에 그릴 짧은 라벨. 매핑 없으면 원문(= Pool 값)을 그대로 돌려준다. */
+export function collabMethodLabel(method: string): string {
+  return COLLAB_METHOD_LABEL[method] ?? method;
+}
+
 // 가벼움→무거움 순 강도(작게 시작 추천 근거). 여기 없는 method는 중간 취급.
 export const LIGHT_METHODS = ["할인 코드 교환","링크 제휴 할인","제품 스팟 소개","SNS 이벤트"];
 export const HEAVY_METHODS = ["공동 상품","공동 브랜딩","입점 판매"];
