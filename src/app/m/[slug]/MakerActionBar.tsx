@@ -293,14 +293,17 @@ export function MakerActionBar({
     if (proposeOpen) recordedRef.current = false; // 시트를 새로 열면 다시 셀 수 있게
   }, [proposeOpen]);
 
-  // Primary — 메시지 복사 + 상대 채널 오픈(제스처 내 즉시, 팝업 차단 회피) + 계측(best-effort) + 닫기.
+  // Primary — 메시지 복사 + 상대 채널 오픈(제스처 내 즉시, 팝업 차단 회피) + 계측(best-effort).
+  // ⚠️ **시트를 닫지 않는다**(07-31 대표 QA). 전엔 여기서 setProposeOpen(false)를 불러서, 인스타를
+  //    갔다가 브라우저로 돌아오면 초안도 아이디어 선택도 전부 사라져 있었다. 실제 사용은 한 번에
+  //    안 끝난다 — 붙여넣다 실패하거나, 앱에서 상대를 못 찾거나, 문구를 다시 보고 싶어서 돌아온다.
+  //    닫는 건 사용자가 X를 누를 때뿐. (탭 전환이라 페이지는 살아 있어 state가 그대로 남는다.)
   const proposeAndSend = () => {
     if (!channel) return;
     copyText(message);
     flash("✓ 메시지를 복사했어요.");
     window.open(channel.url, "_blank", "noopener,noreferrer");
     recordOnce(channel.channel);
-    setProposeOpen(false);
   };
 
   // Secondary — 메시지만 복사(시트 유지 + 토스트).
@@ -541,33 +544,35 @@ export function MakerActionBar({
             {...proposeDialog.panelProps}
             className="relative flex max-h-[85dvh] w-full max-w-[640px] flex-col rounded-t-2xl border border-b-0 border-hairline bg-surface shadow-e2"
           >
-            {/* 우측 상단 닫기 */}
-            <button
-              type="button"
-              onClick={() => setProposeOpen(false)}
-              aria-label="닫기"
-              className="absolute right-3 top-3 z-10 flex h-8 w-8 items-center justify-center rounded-md text-faint hover:bg-surface-soft hover:text-ink"
-            >
-              <svg viewBox="0 0 20 20" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8">
-                <path d="M5 5l10 10M15 5L5 15" strokeLinecap="round" />
-              </svg>
-            </button>
+            {/* 고정 내비 바 — [← 뒤로] … [닫기 X]. 07-31 대표 QA: 뒤로가기가 제목 옆에 붙어 있으니
+                제목이 화살표만큼 들여쓰여 어색했다(제목 = 시트의 첫 문장인데 왼쪽 정렬이 깨짐).
+                둘 다 '창 조작'이라 성격이 같으니 한 줄에 모으고, 제목은 그 아래에서 온전히 시작한다.
+                리포트 시트의 고정 바와 같은 구조 — 두 시트를 오갈 때 조작부 위치가 안 흔들린다. */}
+            <div className="flex shrink-0 items-center justify-between gap-2 border-b border-hairline px-3 py-2.5">
+              <button
+                type="button"
+                onClick={backToReport}
+                aria-label="뒤로: 콜라보 분석 보기"
+                className="flex h-8 w-8 items-center justify-center rounded-md text-faint hover:bg-surface-soft hover:text-ink"
+              >
+                <svg viewBox="0 0 20 20" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8">
+                  <path d="M12 4l-6 6 6 6" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+              <button
+                type="button"
+                onClick={() => setProposeOpen(false)}
+                aria-label="닫기"
+                className="flex h-8 w-8 items-center justify-center rounded-md text-faint hover:bg-surface-soft hover:text-ink"
+              >
+                <svg viewBox="0 0 20 20" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8">
+                  <path d="M5 5l10 10M15 5L5 15" strokeLinecap="round" />
+                </svg>
+              </button>
+            </div>
 
-            <div className="flex-1 overflow-y-auto p-6 pb-4">
-              {/* 제목 옆 뒤로가기 — 분석 시트로. 상시 노출(위 backToReport 주석 참조). */}
-              <div className="flex items-start gap-1.5 pr-8">
-                <button
-                  type="button"
-                  onClick={backToReport}
-                  aria-label="뒤로: 콜라보 분석 보기"
-                  className="-ml-1.5 mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-faint hover:bg-surface-soft hover:text-ink"
-                >
-                  <svg viewBox="0 0 20 20" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8">
-                    <path d="M12 4l-6 6 6 6" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </button>
-                <p className="text-xl font-bold break-keep text-ink">{makerName}님과 콜라보 시작하기</p>
-              </div>
+            <div className="flex-1 overflow-y-auto p-6 pt-4 pb-4">
+              <p className="text-xl font-bold break-keep text-ink">{makerName}님과 콜라보 시작하기</p>
               {channel ? (
                 <>
                   <p className="mt-2 text-[15px] leading-relaxed text-mute">
