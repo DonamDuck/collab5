@@ -288,6 +288,16 @@ export function ReportSheet({
           >
             이 내용으로 협업 제안 보내기
           </button>
+          {/* 다른 소개서로 분석 — 상단 바에서 이사(07-31). 제안 버튼 아래 보조 위치로 격 낮춤. */}
+          {fromBrands.length > 1 && (
+            <button
+              type="button"
+              onClick={() => setPhase("select")}
+              className="mt-3 flex h-9 w-full items-center justify-center text-[13px] font-medium text-mute underline underline-offset-2 hover:text-ink"
+            >
+              다른 소개서로 분석
+            </button>
+          )}
         </div>
       )}
     </div>
@@ -333,25 +343,13 @@ export function ReportSheet({
             <div className="flex shrink-0 items-center justify-between gap-2 border-b border-hairline px-4 py-2.5">
               {/* 고정 바의 유일한 텍스트라 13→15px로 키움(대표 07-26). 색은 body 유지 —
                   ink로 올리면 스크롤 영역의 결론(20 bold ink)과 경쟁해 3층 위계가 다시 뭉갠다. */}
+              {/* ⚠️ "다른 소개서로 분석"은 여기 안 둔다(07-31 대표 QA) — 이 줄엔 원래도 캡션+버튼+닫기가
+                  붙어살아 좁았는데, 업체명이 길면 "캔버스가든 × 콜…"처럼 잘렸다. 그 버튼을 아래 CTA
+                  블록(제안 보내기 버튼 밑)으로 옮기면 이 줄엔 캡션과 닫기만 남아 truncate가 훨씬 덜 걸린다. */}
               <p className="min-w-0 flex-1 truncate text-[15px] font-semibold text-body">
                 {fromName} × {reportToName}
               </p>
-              <div className="flex shrink-0 items-center gap-2">
-                {!sampleMode && fromBrands.length > 1 && (
-                  <button
-                    type="button"
-                    onClick={() => setPhase("select")}
-                    // 높이가 14px이라 44px 규칙에 한참 못 미쳤고, 12.75px 옆이 닫기 ✕라
-                    // 엄지로 노리면 리포트가 통째로 닫혔다(QA #21). 글자 크기는 유지하고 히트영역만 넓힌다.
-                    className="-my-1 flex h-9 items-center rounded-md px-2 text-[12px] font-medium text-mute underline underline-offset-2 hover:bg-surface-soft"
-                  >
-                    다른 소개서로 분석
-                  </button>
-                )}
-                {/* 두 버튼 사이 시각적 구분선 — 붙어 있으면 잘못 누르기 쉽다 */}
-                {!sampleMode && fromBrands.length > 1 && <span aria-hidden="true" className="h-4 w-px bg-hairline" />}
-                {closeButton("")}
-              </div>
+              {closeButton("")}
             </div>
 
             {/* 스크롤 영역 — 첫 요소가 요약 카드(결론). 패널에 있던 패딩·safe-area는 여기로 이사 */}

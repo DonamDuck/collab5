@@ -82,25 +82,49 @@ export function MakerActionBar({
   const channel = resolveCollabChannel({ instagram, homepage });
   const selectedBrand = viewerBrands.find((b) => b.slug === selectedSlug) ?? viewerBrands[0];
 
-  // 추천 메시지 기본값 — 선택한 소개서 이름으로 인사·링크 첨부. 시트 열릴 때 / 소개서 바꿀 때 다시 채운다.
+  // 추천 메시지 빌더 — 아이디어를 넣으면 **템플릿 구조 자체**가 바뀐다(대표 07-31).
+  //  · 아이디어 0건: 인사 → 관심 유도 인사말 → 소개 링크. **이 형태는 고정**(대표 지시 — 아이디어
+  //    없는 버전은 건드리지 않는다), 최초 오픈·소개서 변경 때 여기로 초기화된다.
+  //  · 아이디어 1건+: 인사 바로 뒤에 소개 링크가 "우선,"으로 앞당겨지고, 관심 유도 인사말은
+  //    아이디어 목록 뒤로 밀려 마무리 멘트("혹, 저희와의 콜라보에…")로 바뀐다.
+  //    소개 링크를 먼저 보여줘야 상대가 "누가 왜 이런 아이디어를 냈는지" 순서대로 읽는다.
+  const buildMessage = (added: number[]) => {
+    const hello = selectedBrand ? `안녕하세요, ${selectedBrand.name}입니다.` : senderName ? `안녕하세요, ${senderName}입니다.` : "안녕하세요!";
+    const intro = `${hello}\ncollab5에서 소개서를 보고 함께 재미있는 콜라보를 만들어볼 수 있을 것 같아 먼저 연락드렸어요.`;
+    const url = selectedBrand && typeof window !== "undefined" ? `${window.location.origin}/m/${selectedBrand.slug}` : "";
+
+    if (added.length === 0) {
+      let msg = `${intro}\n관심 있으시다면 편하실 때 답장 주시면 감사하겠습니다. 😊`;
+      if (selectedBrand && url) msg += `\n\n저희 소개도 함께 보내드려요.\n${url}`;
+      return msg;
+    }
+
+    let msg = intro;
+    if (selectedBrand && url) msg += `\n\n우선, 저희 소개를 함께 보내드려요.\n${url}`;
+    const ideaLines = added
+      .map((i) => reportIdeas[i])
+      .filter((idea): idea is CollabReportData["ideas"][number] => !!idea)
+      .map((idea, i) => `${i + 1}.${idea.title} — ${idea.desc}`)
+      .join("\n\n");
+    msg += `\n\n아래는 콜라보를 함께 한다면 제안드려보고 싶은 콜라보 아이디어예요.\n${ideaLines}`;
+    msg += `\n\n혹, 저희와의 콜라보에 관심 있으시다면 편하실 때 답장 주시면 감사하겠습니다. 😊`;
+    return msg;
+  };
+
+  // 시트 열릴 때 / 소개서 바꿀 때 기본형(아이디어 0건)으로 다시 채운다.
   useEffect(() => {
     if (!proposeOpen) return;
-    const hello = selectedBrand ? `안녕하세요, ${selectedBrand.name}입니다.` : senderName ? `안녕하세요, ${senderName}입니다.` : "안녕하세요!";
-    let msg = `${hello}\ncollab5에서 소개서를 보고 함께 재미있는 콜라보를 만들어볼 수 있을 것 같아 먼저 연락드렸어요.\n관심 있으시다면 편하실 때 답장 주시면 감사하겠습니다. 😊`;
-    if (selectedBrand && typeof window !== "undefined") {
-      msg += `\n\n저희 소개도 함께 보내드려요.\n${window.location.origin}/m/${selectedBrand.slug}`;
-    }
-    setMessage(msg);
+    setMessage(buildMessage([]));
     setAddedIdeas([]); // 초안이 새로 채워지면 '추가됨' 표시도 원위치 — 안 그러면 넣지도 않았는데 넣은 걸로 보인다
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [proposeOpen, senderName, selectedBrand?.slug, selectedBrand?.name]);
 
-  /** 콜라보 아이디어 1건을 초안 끝에 덧붙인다. 여러 건을 눌러도 머리말("생각해본…")은 한 번만. */
+  /** 콜라보 아이디어 1건을 추가 — 초안 전체를 아이디어 있는 템플릿으로 다시 짠다(부분 삽입이 아니다). */
   const addIdeaToMessage = (i: number) => {
-    const idea = reportIdeas[i];
-    if (!idea) return;
-    const head = "\n\n함께 하면 좋을 콜라보 아이디어예요.";
-    setMessage((prev) => `${prev}${prev.includes(head.trim()) ? "" : head}\n· ${idea.title} — ${idea.desc}`);
-    setAddedIdeas((prev) => [...prev, i]);
+    if (addedIdeas.includes(i) || !reportIdeas[i]) return;
+    const next = [...addedIdeas, i];
+    setAddedIdeas(next);
+    setMessage(buildMessage(next));
     flash("✓ 초안에 넣었어요.");
   };
 
@@ -368,7 +392,7 @@ export function MakerActionBar({
     reportIdeas.length === 0 ? null : (
       <div className="mt-3 rounded-md border border-hairline bg-surface-soft p-3">
         <p className="text-[13px] font-medium text-body">
-          콜라보 분석에서 아이디어 넣기 <span className="text-faint">(고른 것만 초안에 들어가요)</span>
+          메시지 초안에 콜라보 아이디어 추가하기! <span className="text-faint">(고른 것만 들어가요)</span>
         </p>
         <div className="mt-2 space-y-1.5">
           {reportIdeas.map((idea, i) => {
@@ -406,19 +430,14 @@ export function MakerActionBar({
       </div>
     );
 
-  // 제안 시트 안 보조 진입 — 논블로킹 한 줄 링크(제안 시트는 로그인 후에만 열리므로 비로그인 노출 없음).
-  const reportLink = (
-    <button
-      type="button"
-      onClick={() => {
-        setProposeOpen(false);
-        handleReport();
-      }}
-      className="mt-4 block text-[13px] font-medium text-ink underline underline-offset-2"
-    >
-      제안 전에 콜라보 분석을 볼까요? →
-    </button>
-  );
+  // 제안 시트 ↔ 분석 시트 왕복 — 뒤로 가기(대표 07-31: "왔다갔다 할 수 있게").
+  // 가는 길(분석→제안)은 ReportSheet의 onPropose CTA가 이미 담당하니, 여긴 오는 길만 있으면 된다.
+  // 예전엔 본문 안 텍스트 링크("제안 전에 분석을 볼까요?")였는데, 제목 옆 화살표로 격을 낮추고
+  // 상시 노출한다 — 분석은 어느 진입 경로에서든 늘 의미 있는 액션이라 조건부로 숨길 이유가 없다.
+  const backToReport = () => {
+    setProposeOpen(false);
+    handleReport();
+  };
 
   return (
     <>
@@ -537,7 +556,20 @@ export function MakerActionBar({
             </button>
 
             <div className="flex-1 overflow-y-auto p-6 pb-4">
-              <p className="pr-8 text-xl font-bold break-keep text-ink">{makerName}님과 콜라보 시작하기</p>
+              {/* 제목 옆 뒤로가기 — 분석 시트로. 상시 노출(위 backToReport 주석 참조). */}
+              <div className="flex items-start gap-1.5 pr-8">
+                <button
+                  type="button"
+                  onClick={backToReport}
+                  aria-label="뒤로: 콜라보 분석 보기"
+                  className="-ml-1.5 mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-faint hover:bg-surface-soft hover:text-ink"
+                >
+                  <svg viewBox="0 0 20 20" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8">
+                    <path d="M12 4l-6 6 6 6" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+                <p className="text-xl font-bold break-keep text-ink">{makerName}님과 콜라보 시작하기</p>
+              </div>
               {channel ? (
                 <>
                   <p className="mt-2 text-[15px] leading-relaxed text-mute">
@@ -545,7 +577,6 @@ export function MakerActionBar({
                     <br />
                     그전까지는 아래 메시지를 복사해 {isInstagram ? "인스타그램으로" : "아래 채널로"} 연락해보세요.
                   </p>
-                  {reportLink}
                   <label className="mt-3 block text-[13px] font-medium text-body">메시지 초안 (자유롭게 수정해보세요)</label>
                   <textarea
                     value={message}
@@ -564,7 +595,6 @@ export function MakerActionBar({
                     그전까지는 아래 이메일로 연락해보세요.
                   </p>
                   <p className="mt-3 text-[14px] text-body break-all select-all">{contactEmail}</p>
-                  {reportLink}
                   <label className="mt-3 block text-[13px] font-medium text-body">메시지 초안 (자유롭게 수정해보세요)</label>
                   <textarea
                     value={message}
