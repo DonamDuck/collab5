@@ -286,7 +286,7 @@ export function ReportSheet({
             }}
             className="mt-3 flex h-12 w-full items-center justify-center rounded-md bg-primary text-base font-medium text-primary-on"
           >
-            이 내용으로 협업 제안 보내기
+            이 내용으로 콜라보 과정 시작하기
           </button>
           {/* 다른 소개서로 분석 — 상단 바에서 이사(07-31). 제안 버튼 아래 보조 위치로 격 낮춤. */}
           {fromBrands.length > 1 && (
@@ -388,8 +388,11 @@ export function ReportSheet({
                 샘플 모드는 report가 항상 있어 위 isReportView 분기로 빠지므로 여기 오지 않는다. */}
             {phase === "select" ? (
               /* 멀티 소개서 — 선택이 첫 depth. 칩 고르고 [분석하기]를 눌러야 생성(대표 QA 07-26) */
-              <div className="pr-8">
-                <p className="text-xl font-bold break-keep text-ink">
+              <div>
+                {/* ⚠️ pr-8(닫기 ✕ 회피)은 **제목 줄에만** 건다 — 예전엔 이 블록 전체(칩·버튼까지)에
+                    걸려 있어서, 오른쪽만 여백이 32px 더 붙는 바람에 [분석하기] 버튼이 시트 중앙이 아니라
+                    왼쪽으로 치우쳐 보였다(실측 07-31, 대표 QA). 닫기 버튼은 제목 높이에서만 겹칠 수 있다. */}
+                <p className="pr-8 text-xl font-bold break-keep text-ink">
                   어떤 소개서로 분석할까요
                 </p>
                 <p className="mt-1.5 text-[14px] text-mute">

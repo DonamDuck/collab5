@@ -663,10 +663,19 @@ export function MakerActionBar({
         // pointer-events-none: 토스트가 링크복사·찜 버튼, 제안 시트 CTA와 겹치는 자리에 떠서
         //   2초 동안 그 아래 버튼의 탭을 가로챘다(QA 07-29). 위치도 하단 UI 스택 위로 올린다.
         // role=status: 스크린리더가 복사 완료를 읽도록(design.md 계약).
+        // ⚠️ 오프셋을 proposeOpen으로 분기(07-31 대표 QA: "공중에 붕 떴다"). 예전엔 9.5rem 고정값이었는데,
+        //    그건 제안 시트가 버튼 2개를 세로로 쌓던 옛 레이아웃(07-30 이전) 높이에 맞춘 값이었다.
+        //    지금은 ①제안 시트=좌우 2버튼 한 줄(고정 푸터) — 실측 갭 16px
+        //    ②시트 닫힌 기본 화면 — 걸림돌은 메인 바가 아니라 **그 위에 얹힌 유틸 줄**
+        //    (🔗링크복사·♡찜, `-top-[52px]`로 바 위에 떠 있다. 실측 utilTop=130px) — 실측 갭 15px.
         <div
           role="status"
           aria-live="polite"
-          className="pointer-events-none fixed bottom-[calc(9.5rem+env(safe-area-inset-bottom))] left-1/2 z-[60] -translate-x-1/2 rounded-pill bg-ink px-4 py-2.5 text-[13px] font-medium text-surface shadow-e2 print:hidden"
+          className={`pointer-events-none fixed left-1/2 z-[60] -translate-x-1/2 rounded-pill bg-ink px-4 py-2.5 text-[13px] font-medium text-surface shadow-e2 print:hidden ${
+            proposeOpen
+              ? "bottom-[calc(5.75rem+env(safe-area-inset-bottom))]"
+              : "bottom-[calc(8.5rem+env(safe-area-inset-bottom))]"
+          }`}
         >
           {toast}
         </div>
