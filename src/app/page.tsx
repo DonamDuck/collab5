@@ -73,7 +73,7 @@ export default async function Home() {
             event="home_hero_register_click"
             className="flex h-12 w-full items-center justify-center rounded-md bg-primary px-6 text-[16px] font-medium text-primary-on"
           >
-            브랜드 소개서 만들기
+            브랜드 소개서 등록하기(3분)
           </TrackLink>
           {/* 분석 진입은 보더 버튼으로 승격(대표 07-31 "텍스트 링크는 안 보인다") —
               단 1번 CTA는 여전히 소개서(레드팀 R1: 분석 1번은 콜드스타트 절벽). 라벨 정직: 목적지=예시 시트. */}
@@ -94,10 +94,10 @@ export default async function Home() {
           className="mt-16 -mx-4 bg-surface-soft px-4 py-14 [box-shadow:0_0_0_100vmax_var(--surface-soft)] [clip-path:inset(0_-100vmax)] sm:-mx-6 sm:px-6"
         >
           <h2 className="text-balance break-keep text-center text-[24px] font-bold leading-[1.35] tracking-[-0.02em] text-ink sm:text-[28px]">
-            콜라보 가능한 브랜드
+            지금, 콜라보 가능한 브랜드예요.
           </h2>
           <p className="mx-auto mt-2 max-w-[440px] break-keep text-center text-[16px] leading-[1.65] text-body sm:text-[17px]">
-            지금 함께할 파트너를 찾고 있는 브랜드예요.
+            지금 함께할 콜라보를 찾고 있는 브랜드예요.
           </p>
           <div className="mt-8">
             <BrandGrid brands={collabBrands} />
@@ -251,9 +251,9 @@ export default async function Home() {
  *  라벨이 길어져(최대 10자) 375px에서 열당 ~90px → `break-keep`으로 두 줄까지 허용. */
 function FlowStrip() {
   const steps = [
-    { label: "소개서 3분 작성", desc: "AI가 먼저 정리해요" },
-    { label: "콜라보 둘러보기", desc: "잘 맞는 브랜드 찾기" },
-    { label: "AI 추천 콜라보 분석", desc: "뭘 함께하면 좋을지" },
+    { label: "소개서 3분 작성", desc: "AI가 작성 도움" },
+    { label: "콜라보 둘러보기", desc: "등록 브랜드 서칭" },
+    { label: "AI 추천 콜라보 분석", desc: "콜라보 아이템 확인!" },
   ];
   return (
     <div className="mx-auto mt-7 flex max-w-[460px] items-start justify-center rounded-lg bg-surface-soft px-2 py-4 sm:px-4">
