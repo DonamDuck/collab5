@@ -149,33 +149,29 @@ export default async function Home() {
             브랜드 소개서, 이렇게 만들어요
           </h2>
         </Reveal>
-        <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
-          {/* 카드 스태거 — 순차 등장(90ms 간격) */}
-          <Reveal delay={0} className="h-full">
-            <StepCard
-              n={1}
-              title="브랜드 이름을 알려주세요"
-              desc="흩어져 있던 우리 브랜드의 이야기를 먼저 찾아 모아드려요."
-              illu={<NodeIllu />}
-            />
-          </Reveal>
-          <Reveal delay={90} className="h-full">
-            <StepCard
-              n={2}
-              title="마음에 드는 소개를 골라 다듬어요"
-              desc="몇 번의 선택이면 소개서가 완성돼요. 언제든 다시 고칠 수 있어요."
-              illu={<CardIllu />}
-            />
-          </Reveal>
-          <Reveal delay={180} className="h-full">
-            <StepCard
-              n={3}
-              title="소개서 링크를 활용해요"
-              desc="협업 파트너에게 전달하거나, 개인 포트폴리오 페이지로 쓸 수 있어요."
-              illu={<ConnectIllu />}
-            />
-          </Reveal>
-        </div>
+        {/* ⚠️ 리빌은 **그룹 하나**로 건다(07-31 대표 QA). 예전엔 카드마다 개별 Reveal + 스태거였는데,
+            데스크탑은 3열이라 한 화면에 들어와 같이 떴지만 **모바일은 1열로 쌓여** 카드마다 따로
+            스크롤해야 하나씩 나타났다 — 첫 카드를 봐도 나머지는 여전히 빈칸. 그룹 리빌이면 한 번에 뜬다. */}
+        <Reveal className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <StepCard
+            n={1}
+            title="브랜드 이름을 알려주세요"
+            desc="흩어져 있던 우리 브랜드의 이야기를 먼저 찾아 모아드려요."
+            illu={<NodeIllu />}
+          />
+          <StepCard
+            n={2}
+            title="마음에 드는 소개를 골라 다듬어요"
+            desc="몇 번의 선택이면 소개서가 완성돼요. 언제든 다시 고칠 수 있어요."
+            illu={<CardIllu />}
+          />
+          <StepCard
+            n={3}
+            title="소개서 링크를 활용해요"
+            desc="협업 파트너에게 전달하거나, 개인 포트폴리오 페이지로 쓸 수 있어요."
+            illu={<ConnectIllu />}
+          />
+        </Reveal>
       </section>
 
       {/* 왜 소개서? — DM vs 소개서 */}
@@ -185,47 +181,44 @@ export default async function Home() {
             브랜드 소개서는 이렇게 활용할 수 있어요.
           </h2>
         </Reveal>
-        <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2">
+        {/* 위 3스텝과 같은 이유로 그룹 리빌 — 모바일 1열에서 카드마다 따로 뜨지 않게(대표 QA 07-31) */}
+        <Reveal className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2">
           {/* 그냥 DM */}
-          <Reveal delay={0} className="h-full">
-            <div className="h-full rounded-xl border border-hairline bg-surface-soft p-6">
-              <p className="text-[16px] font-bold text-mute sm:text-[17px]">이런 경험 있으셨나요?</p>
-              <ul className="mt-4 space-y-3">
-                {[
-                  "내가 어떤 브랜드인지 하나씩 설명해야 해요.",
-                  "상대는 내용을 이해하기 전부터 부담을 느껴요.",
-                  "다른 메시지 사이에 금방 묻혀버려요.",
-                ].map((t) => (
-                  <li key={t} className="flex gap-2 text-[16px] leading-[1.65] text-body sm:text-[17px]">
-                    <span className="text-faint">·</span>
-                    {t}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </Reveal>
+          <div className="h-full rounded-xl border border-hairline bg-surface-soft p-6">
+            <p className="text-[16px] font-bold text-mute sm:text-[17px]">이런 경험 있으셨나요?</p>
+            <ul className="mt-4 space-y-3">
+              {[
+                "내가 어떤 브랜드인지 하나씩 설명해야 해요.",
+                "상대는 내용을 이해하기 전부터 부담을 느껴요.",
+                "다른 메시지 사이에 금방 묻혀버려요.",
+              ].map((t) => (
+                <li key={t} className="flex gap-2 text-[16px] leading-[1.65] text-body sm:text-[17px]">
+                  <span className="text-faint">·</span>
+                  {t}
+                </li>
+              ))}
+            </ul>
+          </div>
           {/* 브랜드 소개서 */}
-          <Reveal delay={110} className="h-full">
-            <div className="h-full rounded-xl border border-primary bg-surface p-6 shadow-e1">
-              <p className="flex items-center gap-1.5 text-[16px] font-bold text-ink sm:text-[17px]">
-                <span className="h-2 w-2 rounded-pill bg-primary" />
-                이렇게 달라져요
-              </p>
-              <ul className="mt-4 space-y-3">
-                {[
-                  "브랜드와 협업 제안을 한 번에 전달할 수 있어요.",
-                  "상대가 필요한 정보를 한눈에 이해할 수 있어요.",
-                  "프로필 링크에 걸어두면 우리 브랜드의 포트폴리오가 돼요.",
-                ].map((t) => (
-                  <li key={t} className="flex gap-2 text-[16px] leading-[1.65] text-body sm:text-[17px]">
-                    <span className="font-bold text-primary-on">✓</span>
-                    {t}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </Reveal>
-        </div>
+          <div className="h-full rounded-xl border border-primary bg-surface p-6 shadow-e1">
+            <p className="flex items-center gap-1.5 text-[16px] font-bold text-ink sm:text-[17px]">
+              <span className="h-2 w-2 rounded-pill bg-primary" />
+              이렇게 달라져요
+            </p>
+            <ul className="mt-4 space-y-3">
+              {[
+                "브랜드와 협업 제안을 한 번에 전달할 수 있어요.",
+                "상대가 필요한 정보를 한눈에 이해할 수 있어요.",
+                "프로필 링크에 걸어두면 우리 브랜드의 포트폴리오가 돼요.",
+              ].map((t) => (
+                <li key={t} className="flex gap-2 text-[16px] leading-[1.65] text-body sm:text-[17px]">
+                  <span className="font-bold text-primary-on">✓</span>
+                  {t}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </Reveal>
       </section>
 
       {/* 마무리 CTA — eager 필수: 페이지 맨 마지막 요소라 하단 -22% 데드존을 못 벗어나 리빌이 영영 안 터짐 */}
@@ -255,7 +248,7 @@ function FlowStrip() {
   const steps = [
     { label: "소개서 3분 작성", desc: "AI가 작성 도움" },
     { label: "콜라보 둘러보기", desc: "등록 브랜드 서칭" },
-    { label: "AI 추천 콜라보 분석", desc: "콜라보 아이템 확인!" },
+    { label: "AI 추천 콜라보 분석", desc: "✨콜라보 아이디어 확인" },
   ];
   return (
     <div className="mx-auto mt-7 flex max-w-[460px] items-start justify-center rounded-lg bg-surface-soft px-2 py-4 sm:px-4">
