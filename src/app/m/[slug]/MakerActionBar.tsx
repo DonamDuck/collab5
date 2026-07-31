@@ -400,13 +400,26 @@ export function MakerActionBar({
           {/* 백보드 바 — 흰 배경 + 상단 좌우 라운드. 콜라보 액션 전용 */}
           <div className="flex items-center gap-2.5 rounded-t-2xl border border-b-0 border-hairline bg-surface px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 shadow-e2">
             {ownerUi ? (
-              /* 내 소개서 모드 — 제안·분석은 자기 자신 대상이라 말이 안 된다. 여기서 할 일은 '고치기'다. */
-              <a
-                href={`/register?edit=${slug}`}
-                className="flex h-12 flex-1 items-center justify-center rounded-md bg-primary text-base font-medium text-primary-on transition-colors"
-              >
-                소개서 수정하기
-              </a>
+              /* 내 소개서 모드 — '제안'은 자기 자신에게 보내는 거라 말이 안 되지만(북극성 퍼널 오염),
+                 **분석은 다르다**: 내 다른 소개서 × 이 소개서 조합이 성립하고, 소개서 0개가 아닌 이상
+                 결과도 의미가 있다(대표 요청 07-31 "내 소개서에서도 분석 켜줘").
+                 예전엔 OWNER_MODE 임시 스위치로 소유자 UI를 통째로 껐다 켰는데, 그러면 '콜라보 시작하기'와
+                 하트까지 같이 열려 자기 제안이 가능해졌다 — 이번엔 **분석만** 정식으로 연다. */
+              <>
+                <button
+                  type="button"
+                  onClick={handleReport}
+                  className="flex h-12 flex-[0.8] items-center justify-center rounded-md border border-border-strong bg-surface text-base font-medium text-ink transition-colors"
+                >
+                  콜라보 분석
+                </button>
+                <a
+                  href={`/register?edit=${slug}`}
+                  className="flex h-12 flex-1 items-center justify-center rounded-md bg-primary text-base font-medium text-primary-on transition-colors"
+                >
+                  소개서 수정하기
+                </a>
+              </>
             ) : (
               <>
                 {/* 콜라보 분석 — 고스트(왼쪽) */}

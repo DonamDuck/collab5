@@ -5,9 +5,12 @@
 // 이 파일 하나로 클릭 즉시 골격이 뜬다(실제 응답 속도가 아니라 '반응하는 느낌'의 문제였다).
 import { LoadingDots } from "@/components/LoadingDots";
 
+// ⚠️ `min-h`가 필요한 이유(07-31 실측): 골격은 899px인데 실제 홈은 4773px이다. 문서가 한 화면짜리로
+//    쪼그라들었다가 부풀면 그 사이 스크롤이 먹지 않고(스크롤 가능 범위가 87px), 도착 순간 위치가 튄다
+//    — 대표 제보 "스크롤업이 제대로 안 된다"의 원인. 한 화면 이상을 확보해 스크롤 컨텍스트를 유지한다.
 export default function HomeLoading() {
   return (
-    <main className="mx-auto w-full max-w-[960px] px-4 py-12 sm:px-6">
+    <main className="mx-auto min-h-[180dvh] w-full max-w-[960px] px-4 py-12 sm:px-6">
       {/* 히어로 골격 — 실제 홈과 같은 폭·정렬이라 도착 시 덜컹거리지 않는다 */}
       <section className="mx-auto max-w-[600px] text-center">
         <div className="mx-auto mb-4 h-7 w-28 rounded-pill bg-surface-soft" />

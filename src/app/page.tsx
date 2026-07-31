@@ -58,11 +58,15 @@ export default async function Home() {
         <p className="mx-auto mt-4 max-w-[460px] break-keep text-[18px] font-bold leading-[1.5] text-primary-on sm:text-[20px]">
           AI와 함께 3분 만에 소개서를 만들고,
           <br />
-          잘 맞는 콜라보 분석까지 받아보세요.
+          추천 콜라보 분석까지 받아보세요.
         </p>
         <p className="mx-auto mt-3 max-w-[460px] break-keep text-[16px] leading-[1.65] text-body sm:text-[17px]">
           작은 가게도, 1인 브랜드도 괜찮아요. 무료로 시작해보세요.
         </p>
+        {/* 제품 여정 — 카피와 CTA **사이**(대표 제안 07-31). 여기가 맞는 자리인 이유:
+            "무료로 시작해보세요"를 읽은 직후 = 뭘 하게 되는지 궁금한 순간이고,
+            버튼을 누르기 직전에 기대치를 맞춰준다. 아래에 두면 CTA 뒤라 아무도 안 본다. */}
+        <FlowStrip />
         <div className="mx-auto mt-7 flex max-w-[420px] flex-col items-stretch gap-2">
           <TrackLink
             href="/register"
@@ -75,17 +79,18 @@ export default async function Home() {
               단 1번 CTA는 여전히 소개서(레드팀 R1: 분석 1번은 콜드스타트 절벽). 라벨 정직: 목적지=예시 시트. */}
           <SampleReportLink />
         </div>
-        {/* 제품 여정 스트립 — "소개서 → 분석 → 제안"이 한눈에(대표 07-31: 플로우가 드러나는 콘텐츠).
-            설명 문단이 아니라 도식 — 안 읽고도 이해가 목표. */}
-        <FlowStrip />
       </section>
 
       {/* ② 콜라보 가능한 브랜드 — 히어로 바로 다음(07-31 개편: "여기 어떤 브랜드들이 있나"가
           씨딩 사장님·소개서 수신 브랜드의 첫 질문). 그리드 전량 노출, 정렬 최신순(repo).
           soft 밴드·통째 리빌·풀블리드 box-shadow 기법은 캐러셀 시절(07-27~29) 그대로 승계. */}
       {collabBrands.length >= MIN_GRID && (
-        <Reveal
-          as="section"
+        // ⚠️ **Reveal을 쓰지 않는다**(07-31 대표 "최상단이 어색하다" 실측 결과).
+        //    히어로 바로 다음 섹션인데 높이가 738px이라, Reveal의 threshold 0.15는 **110px이 보여야** 터진다.
+        //    스크롤 0에서 이 밴드는 82px만 보이므로 안 터지고 → 첫 화면 바로 아래에 **738px 투명 구멍**이 남았다.
+        //    (`eager`로 하단 컷을 없애도 threshold는 그대로라 해결 안 됨 — 실측 확인)
+        //    이 섹션은 홈의 주 콘텐츠다. 등장 연출보다 "바로 보이는 것"이 우선.
+        <section
           className="mt-16 -mx-4 bg-surface-soft px-4 py-14 [box-shadow:0_0_0_100vmax_var(--surface-soft)] [clip-path:inset(0_-100vmax)] sm:-mx-6 sm:px-6"
         >
           <h2 className="text-balance break-keep text-center text-[24px] font-bold leading-[1.35] tracking-[-0.02em] text-ink sm:text-[28px]">
@@ -97,7 +102,7 @@ export default async function Home() {
           <div className="mt-8">
             <BrandGrid brands={collabBrands} />
           </div>
-        </Reveal>
+        </section>
       )}
 
       {/* ③ 실물 구경 — 소개서 목업 + 분석 리포트 축약. 제품의 두 얼굴을 한 스크롤에(07-31).
@@ -240,23 +245,24 @@ export default async function Home() {
   );
 }
 
-/** 히어로 하단 제품 여정 스트립 — ①소개서 ②분석 ③제안. 순수 마크업(서버 렌더).
- *  숫자 점(키위)과 화살표만으로 흐름을 도식화 — 문장 설명 금지(안 읽고도 이해가 목표).
- *  모바일은 라벨만, sm+는 한 줄 부연까지. */
+/** 제품 여정 스트립 — ①소개서 3분 작성 ②콜라보 둘러보기 ③AI 추천 콜라보 분석 (대표 확정 07-31).
+ *  ⚠️ v1은 맨숭맨숭한 점 3개였다("허접하다" 대표 QA) → soft 면 카드로 묶어 **하나의 도식**으로 읽히게.
+ *  문장 설명이 아니라 그림이다 — 안 읽고도 이해가 목표라 부연은 sm+에서만.
+ *  라벨이 길어져(최대 10자) 375px에서 열당 ~90px → `break-keep`으로 두 줄까지 허용. */
 function FlowStrip() {
   const steps = [
-    { label: "소개서 만들기", desc: "3분이면 충분해요" },
-    { label: "콜라보 분석", desc: "뭘 함께하면 좋을지" },
-    { label: "부담 없는 제안", desc: "링크 하나로 시작" },
+    { label: "소개서 3분 작성", desc: "AI가 먼저 정리해요" },
+    { label: "콜라보 둘러보기", desc: "잘 맞는 브랜드 찾기" },
+    { label: "AI 추천 콜라보 분석", desc: "뭘 함께하면 좋을지" },
   ];
   return (
-    <div className="mx-auto mt-10 flex max-w-[520px] items-start justify-center">
+    <div className="mx-auto mt-7 flex max-w-[460px] items-start justify-center rounded-lg bg-surface-soft px-2 py-4 sm:px-4">
       {steps.map((s, i) => (
         <div key={s.label} className="flex flex-1 items-start">
           {i > 0 && (
             <svg
               viewBox="0 0 20 20"
-              className="mx-1 mt-1.5 h-4 w-4 shrink-0 text-faint sm:mx-2"
+              className="mt-2 h-4 w-4 shrink-0 text-faint"
               fill="none"
               stroke="currentColor"
               strokeWidth="1.8"
@@ -265,14 +271,16 @@ function FlowStrip() {
               <path d="M7 4l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           )}
-          <div className="flex-1 text-center">
+          <div className="flex-1 px-0.5 text-center">
             <span className="mx-auto flex h-7 w-7 items-center justify-center rounded-pill bg-primary text-[13px] font-bold text-primary-on">
               {i + 1}
             </span>
-            <p className="mt-1.5 break-keep text-[13px] font-bold leading-tight text-ink sm:text-[14px]">
+            <p className="mt-2 break-keep text-[12.5px] font-bold leading-[1.35] text-ink sm:text-[14px]">
               {s.label}
             </p>
-            <p className="mt-0.5 hidden text-[12px] text-mute sm:block">{s.desc}</p>
+            <p className="mt-1 hidden break-keep text-[12px] leading-tight text-mute sm:block">
+              {s.desc}
+            </p>
           </div>
         </div>
       ))}
