@@ -1,6 +1,7 @@
 import type { Maker } from "@/lib/types";
 import { PhotoSlider } from "@/components/PhotoSlider";
 import { normalizeUrl, mapLinkLabel } from "@/lib/links";
+import { MapCard } from "@/components/MapCard";
 import { BrandSummaryCard } from "./BrandSummaryCard";
 import { BlockSections } from "./BlockSections";
 
@@ -174,7 +175,7 @@ export function MakerArticle({ maker, isOwner, logoUrl, readOnly }: {
         </Section>
       )}
 
-      {/* 상세 주소 — 참고 수준으로 최하단 배치(추후 지도 연동용) */}
+      {/* 상세 주소 — 참고 수준으로 최하단 배치. 07-31: 좌표가 있으면 지도 카드까지. */}
       {maker.trust.address && (
         <Section title="상세 주소">
           {/* 지도 링크가 있으면 주소 자체를 지도로 연결(찾아가기). 없으면 기존처럼 텍스트. */}
@@ -192,6 +193,19 @@ export function MakerArticle({ maker, isOwner, logoUrl, readOnly }: {
             </a>
           ) : (
             <p className="text-[16px] leading-relaxed text-body">{maker.trust.address}</p>
+          )}
+          {/* ⚠️ 좌표가 있을 때만. 사장님이 직접 붙여넣은 place 링크(좌표 없음)인 소개서는
+              위 텍스트 링크만 보인다 — 지도 카드가 조용히 빠지는 것이지 오류가 아니다.
+              print:hidden — 인쇄본(지류 포트폴리오)에서 원격 이미지 요청은 무의미하다. */}
+          {maker.trust.lat != null && maker.trust.lng != null && (
+            <div className="mt-3 max-w-[460px] print:hidden">
+              <MapCard
+                lat={maker.trust.lat}
+                lng={maker.trust.lng}
+                address={maker.trust.address}
+                mapUrl={mapLinkLabel(maker.trust.mapUrl) ? normalizeUrl(maker.trust.mapUrl!) : undefined}
+              />
+            </div>
           )}
         </Section>
       )}

@@ -21,6 +21,10 @@ export type NaverPlace = {
   /** 지역검색이 준 좌표로 조립한 네이버 지도 링크(AI 개입 0) */
   mapUrl: string | null;
   category: string;
+  /** WGS84 좌표 — 07-31 지도 핀 UI에서 씀. mapx/mapy(×10^7 정수)를 그대로 나눈 값.
+   *  좌표가 깨졌으면 undefined(toMapUrl과 같은 범위 가드). */
+  lat?: number;
+  lng?: number;
 };
 
 type NaverItem = {
@@ -49,15 +53,20 @@ function norm(s: string): string {
   return s.replace(/[\s·・.,'"()[\]-]/g, "").toLowerCase();
 }
 
-/** 좌표 → 네이버 지도 딥링크. mapx/mapy는 WGS84 ×10^7 정수 문자열.
- *  좌표가 깨졌으면 null(엉뚱한 위치로 보내느니 링크를 포기). enrich.naverMapLink와 같은 규칙. */
-function toMapUrl(name: string, mapx?: string, mapy?: string): string | null {
-  if (!name) return null;
+/** mapx/mapy(WGS84 ×10^7 정수 문자열) → {lat,lng}. 대한민국 범위 밖이면 null(좌표가 깨진 것 —
+ *  엉뚱한 위치에 핀을 찍느니 포기한다). toMapUrl과 지도 핀 UI가 같은 값을 공유한다. */
+function toLatLng(mapx?: string, mapy?: string): { lat: number; lng: number } | null {
   const lng = Number(mapx) / 1e7;
   const lat = Number(mapy) / 1e7;
   if (!Number.isFinite(lng) || !Number.isFinite(lat)) return null;
   if (lng < 124 || lng > 132 || lat < 33 || lat > 39) return null; // 대한민국 밖
-  return `https://map.naver.com/p/search/${encodeURIComponent(name)}?c=${lng.toFixed(6)},${lat.toFixed(6)},17,0,0,0,dh`;
+  return { lat, lng };
+}
+
+/** 좌표 → 네이버 지도 딥링크(사람이 누르는 용도, Static Map과 별개). */
+function toMapUrl(name: string, ll: { lat: number; lng: number } | null): string | null {
+  if (!name || !ll) return null;
+  return `https://map.naver.com/p/search/${encodeURIComponent(name)}?c=${ll.lng.toFixed(6)},${ll.lat.toFixed(6)},17,0,0,0,dh`;
 }
 
 /**
@@ -119,10 +128,32 @@ export async function lookupPlaceByName(
   const address = clean(hit.roadAddress) || clean(hit.address);
   if (!address) return null;
 
+  const ll = toLatLng(hit.mapx, hit.mapy);
   return {
     name: cleanName,
     address,
-    mapUrl: toMapUrl(cleanName, hit.mapx, hit.mapy),
+    mapUrl: toMapUrl(cleanName, ll),
     category: clean(hit.category),
+    lat: ll?.lat,
+    lng: ll?.lng,
   };
+}
+
+/** 우리가 생성한 지도 링크(`?c=lng,lat,...`)에서 좌표를 되꺼낸다 — 기존 소개서 백필용.
+ *  사장님이 붙여넣은 place 링크(`/p/entry/place/{id}`)엔 좌표가 없어 여기선 null이 나온다
+ *  (그 경우는 상호명 재조회로 보충 — naver-local.ts 상단 주석 참조). */
+export function parseLatLngFromMapUrl(url?: string): { lat: number; lng: number } | null {
+  if (!url) return null;
+  try {
+    const c = new URL(url).searchParams.get("c"); // "lng,lat,level,..."
+    if (!c) return null;
+    const [lngStr, latStr] = c.split(",");
+    const lng = Number(lngStr);
+    const lat = Number(latStr);
+    if (!Number.isFinite(lng) || !Number.isFinite(lat)) return null;
+    if (lng < 124 || lng > 132 || lat < 33 || lat > 39) return null;
+    return { lat, lng };
+  } catch {
+    return null;
+  }
 }

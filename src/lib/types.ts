@@ -21,6 +21,10 @@ export interface TrustSignals {
    *  주소·영업시간·전화·사진·후기가 한 번에 딸려온다. trust가 jsonb라 마이그레이션 불필요.
    *  ※ 자세히 소개(description)는 07-25에 최상위 컬럼으로 분리됨 — 여긴 채널·위치만. */
   mapUrl?: string;
+  /** WGS84 좌표(07-31 지도 핀 UI). Static Map 렌더용 — mapUrl과 같은 지역검색 응답에서 함께 온다.
+   *  trust가 jsonb라 마이그레이션 없이 추가됨. 기존 소개서는 없을 수 있다(백필 전까진 지도 카드 미노출). */
+  lat?: number;
+  lng?: number;
 }
 
 /** 함께한 콜라보 이력 — 자기보고(말랑한 층). ✓검증마크 X. 수신자 신뢰의 결정타. */

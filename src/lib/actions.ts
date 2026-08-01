@@ -8,7 +8,7 @@ import { getSessionUserId } from "./profiles";
 import { updateProfileImage } from "./profiles";
 import { sha256 } from "./hash";
 import { mapLinkLabel } from "./links";
-import { lookupPlaceByName } from "./naver-local";
+import { lookupPlaceByName, parseLatLngFromMapUrl } from "./naver-local";
 import type { Block, CollabType, Maker, Enrichment } from "./types";
 
 // 사진(리사이즈 data URL)은 개당 수십만~100만 자에 달해, 배열에 문자열로 담아
@@ -128,6 +128,11 @@ export async function createMakerAction(
       // 지도 칩이 "네이버 지도"라 써놓고 딴 데로 가면 안 되니 서버에서도 서비스 검증(클라 우회 차단)
       mapUrl: mapLinkLabel(input.mapUrl) ? input.mapUrl!.trim() : undefined,
       address: input.address?.trim() || undefined,
+      // 좌표(07-31 지도 핀 UI) — 새 폼 상태를 안 늘리고, 이미 저장되는 mapUrl에서 유도한다.
+      // 우리가 자동 생성한 지도 링크(주소 자동 채움 시)는 ?c=lng,lat를 담고 있어 그대로 파싱된다.
+      // 사장님이 직접 붙여넣은 place 링크는 좌표가 없어 undefined로 빠진다 — 지도 핀 UI가 조용히
+      // 숨는 것으로 처리(에러 아님). 백필 스크립트가 그런 건을 상호명 재조회로 나중에 채운다.
+      ...(mapLinkLabel(input.mapUrl) ? parseLatLngFromMapUrl(input.mapUrl) ?? {} : {}),
     },
     searchVisible: input.searchVisible,
     enrichment: input.enrichment,
@@ -304,6 +309,11 @@ export async function updateMakerAction(
       // 지도 칩이 "네이버 지도"라 써놓고 딴 데로 가면 안 되니 서버에서도 서비스 검증(클라 우회 차단)
       mapUrl: mapLinkLabel(input.mapUrl) ? input.mapUrl!.trim() : undefined,
       address: input.address?.trim() || undefined,
+      // 좌표(07-31 지도 핀 UI) — 새 폼 상태를 안 늘리고, 이미 저장되는 mapUrl에서 유도한다.
+      // 우리가 자동 생성한 지도 링크(주소 자동 채움 시)는 ?c=lng,lat를 담고 있어 그대로 파싱된다.
+      // 사장님이 직접 붙여넣은 place 링크는 좌표가 없어 undefined로 빠진다 — 지도 핀 UI가 조용히
+      // 숨는 것으로 처리(에러 아님). 백필 스크립트가 그런 건을 상호명 재조회로 나중에 채운다.
+      ...(mapLinkLabel(input.mapUrl) ? parseLatLngFromMapUrl(input.mapUrl) ?? {} : {}),
     },
     searchVisible: input.searchVisible,
   });
