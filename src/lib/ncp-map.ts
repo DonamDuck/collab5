@@ -32,8 +32,13 @@ export async function fetchStaticMap(p: StaticMapParams): Promise<{ buf: Buffer;
   const center = `${p.lng.toFixed(6)},${p.lat.toFixed(6)}`;
   // 핀은 markers로 직접 찍는다 — center만 쓰면 지도 중심 표시일 뿐 마커가 없다.
   const markers = `type:d|size:mid|pos:${p.lng.toFixed(6)} ${p.lat.toFixed(6)}`;
+  // ⭐ scale=2 — Retina용 고해상도. **w/h를 키우는 것과 전혀 다르다**(08-01 실측으로 배운 것):
+  //    · w/h를 키우면 같은 줌에서 **더 넓은 지역**이 담긴다 → 축소된 것처럼 보인다(실제로 그랬다)
+  //    · scale=2는 w/h(=지역 범위)는 그대로 두고 **픽셀 밀도만 2배**로 준다
+  //      (실측: w=640&h=280&scale=2 → 실제 1280×560px 수신. 512 타일 기반)
+  //    NCP w/h 상한 1024는 요청값 기준이라 scale=2를 붙여도 여유가 있다.
   const url =
-    `${ENDPOINT}?w=${p.w}&h=${p.h}&center=${center}&level=${level}` +
+    `${ENDPOINT}?w=${p.w}&h=${p.h}&center=${center}&level=${level}&scale=2` +
     `&markers=${encodeURIComponent(markers)}`;
 
   try {
