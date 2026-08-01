@@ -39,10 +39,14 @@ export function ReportArchiveCard({ item }: { item: CollabReportListItem }) {
           (design.md 희소 원칙), 목록 카드마다 형광이 깔리면 CTA에서 힘을 잃는다.
           라이트 배경에 Kiwi를 '텍스트'로 쓰는 것도 대비 부족으로 금지 → 글자는 primary-on(진초록). */}
       <div className="flex items-center justify-between gap-2">
-        <span className="min-w-0 truncate rounded-pill bg-primary-pale px-2.5 py-1 text-[13px] font-semibold text-primary-on">
+        {/* 굵기 없음(대표 지시 07-31) — 이 칩은 '어느 쌍인지' 알려주는 메타지 주인공이 아니다.
+            카드의 주인공은 아래 한줄요약(17 bold)이고, 칩까지 굵으면 시선이 둘로 갈린다.
+            면색(primary-pale)만으로도 충분히 구분된다. */}
+        <span className="min-w-0 truncate rounded-pill bg-primary-pale px-2.5 py-1 text-[13px] text-primary-on">
           {item.fromName} × {item.toName}
         </span>
-        {item.toRegion && <span className="shrink-0 text-[13px] font-semibold text-mute">{item.toRegion}</span>}
+        {/* 지역도 같이 굵기 제거 — 칩과 한 줄에 나란한 짝이라 혼자 semibold면 어긋나 보인다 */}
+        {item.toRegion && <span className="shrink-0 text-[13px] text-mute">{item.toRegion}</span>}
       </div>
 
       {/* 주인공 — 무엇을 상상했는지. 17 bold(대표 확정 07-31: "콜라보 리포트처럼 볼드로").
