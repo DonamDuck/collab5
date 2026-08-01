@@ -118,6 +118,34 @@ export default async function Home() {
         <div className="mt-8">
           <PreviewPhones />
         </div>
+
+        {/* 온보딩 3스텝 — 원래는 "브랜드 소개서, 이렇게 만들어요" 제목을 단 **별도 섹션**이었다(08-01 통합).
+            ① 그 제목이 바로 위 h2("3분이면 브랜드 소개서가 완성돼요")와 같은 말을 두 번 하고 있었다(대표 QA).
+            ② 3스텝은 그 자체가 "어떻게 만드는지"의 답이라, 결과물(목업)과 예시 CTA **사이**가 제자리다 —
+               결과를 보고 → 만드는 과정을 읽고 → 예시로 들어간다. 제목 없이도 순서가 설명을 대신한다.
+            ⚠️ Reveal은 **그룹 하나**로 건다(07-31 대표 QA). 카드마다 개별 Reveal이면 데스크탑(3열)은
+               같이 뜨지만 모바일(1열)은 카드마다 따로 스크롤해야 하나씩 나타난다. */}
+        <Reveal className="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <StepCard
+            n={1}
+            title="브랜드 이름을 알려주세요"
+            desc="흩어져 있던 우리 브랜드의 이야기를 먼저 찾아 모아드려요."
+            illu={<NodeIllu />}
+          />
+          <StepCard
+            n={2}
+            title="마음에 드는 소개를 골라 다듬어요"
+            desc="몇 번의 선택이면 소개서가 완성돼요. 언제든 다시 고칠 수 있어요."
+            illu={<CardIllu />}
+          />
+          <StepCard
+            n={3}
+            title="소개서 링크를 활용해요"
+            desc="협업 파트너에게 전달하거나, 개인 포트폴리오 페이지로 쓸 수 있어요."
+            illu={<ConnectIllu />}
+          />
+        </Reveal>
+
         <div className="mt-8 flex justify-center">
           <Link
             href="/preview"
@@ -140,38 +168,6 @@ export default async function Home() {
             <SampleReportPeek />
           </div>
         </div>
-      </section>
-
-      {/* §9.6 온보딩 3스텝 */}
-      <section className="mt-16">
-        <Reveal>
-          <h2 className="text-balance break-keep text-center text-[24px] font-bold leading-[1.35] tracking-[-0.02em] text-ink sm:text-[28px]">
-            브랜드 소개서, 이렇게 만들어요
-          </h2>
-        </Reveal>
-        {/* ⚠️ 리빌은 **그룹 하나**로 건다(07-31 대표 QA). 예전엔 카드마다 개별 Reveal + 스태거였는데,
-            데스크탑은 3열이라 한 화면에 들어와 같이 떴지만 **모바일은 1열로 쌓여** 카드마다 따로
-            스크롤해야 하나씩 나타났다 — 첫 카드를 봐도 나머지는 여전히 빈칸. 그룹 리빌이면 한 번에 뜬다. */}
-        <Reveal className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <StepCard
-            n={1}
-            title="브랜드 이름을 알려주세요"
-            desc="흩어져 있던 우리 브랜드의 이야기를 먼저 찾아 모아드려요."
-            illu={<NodeIllu />}
-          />
-          <StepCard
-            n={2}
-            title="마음에 드는 소개를 골라 다듬어요"
-            desc="몇 번의 선택이면 소개서가 완성돼요. 언제든 다시 고칠 수 있어요."
-            illu={<CardIllu />}
-          />
-          <StepCard
-            n={3}
-            title="소개서 링크를 활용해요"
-            desc="협업 파트너에게 전달하거나, 개인 포트폴리오 페이지로 쓸 수 있어요."
-            illu={<ConnectIllu />}
-          />
-        </Reveal>
       </section>
 
       {/* 왜 소개서? — DM vs 소개서 */}
