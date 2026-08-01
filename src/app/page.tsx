@@ -1,9 +1,10 @@
 // 홈 랜딩 — 콜라보 프레임(2026-07-31 개편, 대표 확정 · Obsidian [[홈-콜라보-프레임-개편]]).
-// 위계: ①히어로(소개서 CTA + 분석 예시 링크) ②콜라보 가능한 브랜드 그리드 ③실물 구경(목업+리포트)
-//       ④3스텝 ⑤DM비교 ⑥마무리 CTA. (④⑤ 압축은 디자인팀 3자 기획 후 — 스텝카드 스크린샷 소유권)
+// 위계: ①히어로(소개서 CTA + 분석 예시 링크) ②콜라보 가능한 브랜드 그리드 ③실물 구경(앵커 탭 + 목업 + 리포트)
+//       ④DM비교 ⑤마무리 CTA. (3스텝은 08-02에 홈에서 내림 → 코드는 ./HomeSteps.tsx에 보관)
 // 1차 관객 = 씨딩 링크 타고 온 사장님 — "안 읽고도 이해"가 성공 기준. 익명 방문자 퍼널은 포켓 후 P3.
 import Link from "next/link";
 import { PreviewPhones } from "./PreviewPhones";
+import { HomeSectionTabs } from "./HomeSectionTabs";
 import { Reveal } from "@/components/Reveal";
 import { BrandGrid } from "@/components/BrandGrid";
 import { SampleReportLink, SampleReportPeek } from "@/components/SampleReport";
@@ -109,7 +110,17 @@ export default async function Home() {
           목업은 실제 데모 소개서 2종(사진 있는/없는), 디자인팀 브라우저 카드(de9d6c5) 그대로.
           온로드 라이즈 2번은 유지 — 폴드 아래면 안 보이는 채 재생이 끝나 정적으로 보인다(무해). */}
       <section className="home-rise mt-16" style={{ animationDelay: "600ms" }}>
-        <h2 className="text-balance break-keep text-center text-[24px] font-bold leading-[1.35] tracking-[-0.02em] text-ink sm:text-[28px]">
+        {/* 앵커 탭 — 섹션 ③은 ⓐ소개서 만들기 / ⓑ콜라보 분석 두 덩어리라, 맨 위에 목차를 세워
+            "다른 하나도 있다"를 먼저 알린다(대표 지시 08-02). 섹션 안에서만 sticky. 상세는 HomeSectionTabs.tsx. */}
+        <HomeSectionTabs />
+        {/* ⚠️ id는 HomeSectionTabs.tsx의 TABS와 짝. 바꾸면 둘 다.
+            scroll-mt-32 = 8rem인데 이 저장소 루트 폰트가 17px이라 **136px**이다(128 아님).
+            헤더 59.5 + 탭바 65.75 = 125.25를 실측해 얹은 값. HomeSectionTabs의 ANCHOR_LINE_PX와
+            **같은 값**이어야 한다(눌러 간 자리 ≠ 활성 판정 자리가 되면 안 된다). */}
+        <h2
+          id="home-brandpage"
+          className="scroll-mt-32 text-balance break-keep text-center text-[24px] font-bold leading-[1.35] tracking-[-0.02em] text-ink sm:text-[28px]"
+        >
           3분이면 브랜드 소개서가 완성돼요.
         </h2>
         <p className="mx-auto mt-2 max-w-[440px] break-keep text-center text-[16px] leading-[1.65] text-body sm:text-[17px]">
@@ -119,32 +130,8 @@ export default async function Home() {
           <PreviewPhones />
         </div>
 
-        {/* 온보딩 3스텝 — 원래는 "브랜드 소개서, 이렇게 만들어요" 제목을 단 **별도 섹션**이었다(08-01 통합).
-            ① 그 제목이 바로 위 h2("3분이면 브랜드 소개서가 완성돼요")와 같은 말을 두 번 하고 있었다(대표 QA).
-            ② 3스텝은 그 자체가 "어떻게 만드는지"의 답이라, 결과물(목업)과 예시 CTA **사이**가 제자리다 —
-               결과를 보고 → 만드는 과정을 읽고 → 예시로 들어간다. 제목 없이도 순서가 설명을 대신한다.
-            ⚠️ Reveal은 **그룹 하나**로 건다(07-31 대표 QA). 카드마다 개별 Reveal이면 데스크탑(3열)은
-               같이 뜨지만 모바일(1열)은 카드마다 따로 스크롤해야 하나씩 나타난다. */}
-        <Reveal className="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <StepCard
-            n={1}
-            title="브랜드 이름을 알려주세요"
-            desc="흩어져 있던 우리 브랜드의 이야기를 먼저 찾아 모아드려요."
-            illu={<NodeIllu />}
-          />
-          <StepCard
-            n={2}
-            title="마음에 드는 소개를 골라 다듬어요"
-            desc="몇 번의 선택이면 소개서가 완성돼요. 언제든 다시 고칠 수 있어요."
-            illu={<CardIllu />}
-          />
-          <StepCard
-            n={3}
-            title="소개서 링크를 활용해요"
-            desc="협업 파트너에게 전달하거나, 개인 포트폴리오 페이지로 쓸 수 있어요."
-            illu={<ConnectIllu />}
-          />
-        </Reveal>
+        {/* 여기 있던 온보딩 3스텝은 홈에서 내렸다(대표 지시 08-02). 코드는 지우지 않고
+            `./HomeSteps.tsx`로 통째로 옮겨뒀다 — 되살리려면 그 파일 머리말대로 이 자리에 <HomeSteps />. */}
 
         <div className="mt-8 flex justify-center">
           <Link
@@ -158,9 +145,16 @@ export default async function Home() {
         {/* 분석 리포트 축약 — 소개서 실물 바로 아래(같은 '실물 구경' 섹션). sample-report.json 재사용.
             "소개서를 만들면 이런 것도 받는다"가 소개서 CTA의 두 번째 근거가 된다(대표: 기능을 더 잘 쓰게). */}
         <div className="mt-14 text-center">
-          <h3 className="text-balance break-keep text-[20px] font-bold leading-[1.35] tracking-[-0.02em] text-ink sm:text-[24px]">
+          {/* h3 → h2 승격 + 크기도 형제 제목과 동일(08-02). 원래 이것만 h3/20px이라 "혼자 작아 보인다"(대표 QA).
+              단순히 크기만 키우고 h3를 두면 안 된다 — 앵커 탭의 목적지가 되면서 이 구간은
+              '소개서 구간의 하위 설명'이 아니라 **동급 섹션**이 됐다. 마크업이 보이는 위계를 따라가야 한다.
+              ⚠️ id/scroll-mt-32는 위 h2와 같은 규칙(HomeSectionTabs.tsx의 TABS·ANCHOR_LINE_PX와 짝). */}
+          <h2
+            id="home-collab-report"
+            className="scroll-mt-32 text-balance break-keep text-[24px] font-bold leading-[1.35] tracking-[-0.02em] text-ink sm:text-[28px]"
+          >
             소개서를 만들면 이런 콜라보 분석이 가능해요
-          </h3>
+          </h2>
           <p className="mx-auto mt-2 max-w-[440px] break-keep text-[16px] leading-[1.65] text-body sm:text-[17px]">
             두 브랜드가 왜 함께하면 좋을지, 함께 하면 좋을 만한 콜라보 아이디어를 알려드려요.
           </p>
@@ -279,75 +273,3 @@ function FlowStrip() {
   );
 }
 
-function StepCard({
-  n,
-  title,
-  desc,
-  illu,
-}: {
-  n: number;
-  title: string;
-  desc: string;
-  illu: React.ReactNode;
-}) {
-  return (
-    // h-full = Reveal 래퍼가 그리드 아이템이 돼도 카드 높이를 셀에 맞춰 균등하게(스태거 도입 후)
-    <div className="h-full rounded-xl border border-hairline bg-surface p-6">
-      <div className="flex h-12 w-12 items-center justify-center text-ink">{illu}</div>
-      <p className="mt-4 text-[12px] font-bold tracking-wide text-primary-on">
-        STEP {n}
-      </p>
-      <h3 className="mt-1.5 text-[17px] font-bold leading-snug tracking-[-0.01em] text-ink">{title}</h3>
-      <p className="mt-2 text-[14px] leading-[1.6] text-mute sm:text-[15px]">{desc}</p>
-    </div>
-  );
-}
-
-/* ── 아톰 라인 일러스트 (design.md §9.7: 잉크선 + 키위 핵 1점) ── */
-function NodeIllu() {
-  // 노드 형성
-  return (
-    <svg viewBox="0 0 48 48" className="h-11 w-11" fill="none" aria-hidden="true">
-      <ellipse
-        cx="24"
-        cy="24"
-        rx="16"
-        ry="6"
-        transform="rotate(-25 24 24)"
-        stroke="currentColor"
-        strokeWidth="1.8"
-      />
-      <circle cx="24" cy="24" r="5.5" fill="var(--primary)" stroke="currentColor" strokeWidth="1.8" />
-    </svg>
-  );
-}
-function CardIllu() {
-  // 카드 + 아톰
-  return (
-    <svg viewBox="0 0 48 48" className="h-11 w-11" fill="none" aria-hidden="true">
-      <rect x="9" y="7" width="30" height="34" rx="5" stroke="currentColor" strokeWidth="1.8" />
-      <line x1="15" y1="30" x2="33" y2="30" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-      <line x1="15" y1="35" x2="27" y2="35" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-      <circle cx="24" cy="18" r="4.5" fill="var(--primary)" stroke="currentColor" strokeWidth="1.6" />
-    </svg>
-  );
-}
-function ConnectIllu() {
-  // 두 노드 점선 연결
-  return (
-    <svg viewBox="0 0 48 48" className="h-11 w-11" fill="none" aria-hidden="true">
-      <line
-        x1="14"
-        y1="24"
-        x2="34"
-        y2="24"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        strokeDasharray="3 3.5"
-      />
-      <circle cx="12" cy="24" r="5" stroke="currentColor" strokeWidth="1.8" />
-      <circle cx="36" cy="24" r="5" fill="var(--primary)" stroke="currentColor" strokeWidth="1.8" />
-    </svg>
-  );
-}
