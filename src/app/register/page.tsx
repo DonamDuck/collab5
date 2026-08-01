@@ -10,6 +10,7 @@ import {
   updateMakerAction,
   getEditDataAction,
   getPreviewDemoNoneAction,
+  lookupPlaceAction,
 } from "@/lib/actions";
 import { MakerArticle } from "../m/[slug]/MakerArticle";
 import type { CollabType, Block, Maker, Enrichment } from "@/lib/types";
@@ -207,6 +208,54 @@ function RegisterForm() {
   const [introFileUrl, setIntroFileUrl] = useState("");
   const [pdfUploading, setPdfUploading] = useState(false);
   const region = deriveRegion(address); // 주소에서 자동 추출 (별도 입력 없음)
+  // 네이버 주소 자동 채움 — 채워졌음을 알리고 되돌릴 수 있게(대표 지시 07-31: 버튼 없이 바로 채우기).
+  const [addrAuto, setAddrAuto] = useState<{ prev: string } | null>(null);
+  const lookedUpRef = useRef(""); // 같은 (상호|지도링크)로 두 번 조회하지 않기 위한 키
+
+  // 네이버 지역검색으로 상세주소 자동 채움 (대표 지시 07-31 — 버튼 없이 결과 있으면 바로)
+  //
+  // 트리거 2개, 덮어쓰기 정책이 서로 다르다:
+  //   ⓐ 주소가 **비어 있을 때** → 채운다. (덮어쓸 게 없으니 안전)
+  //   ⓑ **지도 링크가 새로 들어왔을 때** → 수기로 쓴 주소가 있어도 **덮어쓴다**(대표 확정).
+  //      사장님이 주소를 먼저 손으로 쓰고 나중에 지도 링크를 붙여넣는 흐름이 흔한데,
+  //      이때 네이버가 준 도로명 주소가 더 정확하다(상세주소·층수까지 온다).
+  //
+  // ⚠️ 덮어쓰기를 **지도 링크가 바뀌는 순간에만** 한정한 이유:
+  //    매 입력마다 덮으면 자동으로 채워진 주소를 **사장님이 영영 고칠 수 없다**(고치는 즉시 되돌아감).
+  //    링크가 바뀔 때만 덮으므로, 그 뒤 수정은 그대로 남는다.
+  // ⚠️ 조회는 **상호명**으로 한다 — 붙여넣은 지도 URL은 주소로 바꿀 수 없다(place ID→주소 공식 API
+  //    없음, 스크래핑 403/429). 근거 = lib/naver-local.ts 상단.
+  useEffect(() => {
+    const brand = name.trim();
+    if (brand.length < 2) return;
+    const hasMap = !!mapLinkLabel(mapUrl);
+    const addrEmpty = !address.trim();
+    if (!hasMap && !addrEmpty) return; // 채울 이유도, 덮을 계기도 없음
+    // 링크가 바뀌면 키가 바뀌어 다시 조회된다(= 덮어쓰기 계기). 상호만 같으면 재조회 안 함.
+    const key = `${brand}|${hasMap ? mapUrl.trim() : ""}`;
+    if (lookedUpRef.current === key) return;
+    lookedUpRef.current = key;
+
+    let alive = true;
+    const t = window.setTimeout(async () => {
+      const r = await lookupPlaceAction(brand, region || undefined);
+      if (!alive || !r.address) return;
+      setAddress((prev) => {
+        if (prev.trim() === r.address!.trim()) return prev; // 같으면 안내도 띄우지 않는다
+        // 덮어쓰는 경우에만 '되돌리기'를 준다. 빈 칸을 채운 건 되돌릴 게 없다.
+        if (prev.trim()) setAddrAuto({ prev });
+        return r.address!;
+      });
+      // 지도 링크가 아직 없으면 좌표로 만든 링크도 함께 채운다(사장님이 URL을 찾아 붙일 필요가 없어짐)
+      if (r.mapUrl && !mapLinkLabel(mapUrl)) setMapUrl(r.mapUrl);
+    }, 600); // 타이핑 중 매 글자 조회 방지
+    return () => {
+      alive = false;
+      window.clearTimeout(t);
+    };
+    // region은 address에서 파생 — 의존성에 넣으면 채운 직후 다시 돌아 루프가 된다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [name, mapUrl, address]);
 
   // ── 섹션 펼침 상태 (스텁·시트 섹션 공용 단일 상태) ──
   const [openSections, setOpenSections] = useState<Set<SectionKey>>(new Set());
@@ -1961,10 +2010,30 @@ function RegisterForm() {
             <input
               id="detail-address"
               value={address}
-              onChange={(e) => setAddress(e.target.value)}
+              onChange={(e) => {
+                setAddress(e.target.value);
+                setAddrAuto(null); // 직접 고치기 시작하면 '되돌리기' 안내는 사라진다
+              }}
               placeholder="서울 성북구 보문로 56, 5층"
               className="h-11 w-full rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
             />
+            {/* 덮어쓴 사실을 숨기지 않는다 — 사장님이 쓴 값을 말없이 바꾸면 "내가 쓴 게 어디 갔지"가 된다.
+                되돌리기를 함께 줘서, 네이버가 틀렸을 때 원래 값으로 즉시 복구할 수 있게. */}
+            {addrAuto && (
+              <p className="mt-1 flex flex-wrap items-center gap-x-2 text-[13px] text-mute">
+                <span>📍 네이버 지도에서 주소를 가져왔어요.</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAddress(addrAuto.prev);
+                    setAddrAuto(null);
+                  }}
+                  className="text-primary-on underline underline-offset-2 hover:text-ink"
+                >
+                  직접 쓴 주소로 되돌리기
+                </button>
+              </p>
+            )}
             {region && (
               <p className="mt-1 text-[13px] text-mute">
                 지역 자동 인식: <span className="text-body">{region}</span>

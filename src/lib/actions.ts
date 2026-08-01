@@ -8,6 +8,7 @@ import { getSessionUserId } from "./profiles";
 import { updateProfileImage } from "./profiles";
 import { sha256 } from "./hash";
 import { mapLinkLabel } from "./links";
+import { lookupPlaceByName } from "./naver-local";
 import type { Block, CollabType, Maker, Enrichment } from "./types";
 
 // 사진(리사이즈 data URL)은 개당 수십만~100만 자에 달해, 배열에 문자열로 담아
@@ -548,4 +549,19 @@ function sanitizeBlocks(blocks?: Block[]): Block[] {
         return b.desc.trim().length > 0 || b.features.length > 0 || extra;
       return b.title.trim().length > 0 || b.body.trim().length > 0 || extra;
     });
+}
+
+/** 상호명으로 네이버 지역검색 → 도로명 주소(+지도 링크). 소개서 폼의 주소 자동 채움용.
+ *
+ *  ⚠️ 붙여넣은 지도 URL은 **주소로 바꿀 수 없다**(place ID→주소 공식 API 없음, 스크래핑은 403/429).
+ *     그래서 URL이 아니라 **상호명**으로 조회한다 — 자세한 근거는 lib/naver-local.ts 상단 주석.
+ *  ⚠️ 확신할 때만 값이 온다(상호 정확 일치 + 지역 일치, 애매하면 null). 자동으로 덮어쓰는 값이라
+ *     잘못 채우느니 비워두는 쪽이 안전하다. */
+export async function lookupPlaceAction(
+  name: string,
+  regionHint?: string
+): Promise<{ address?: string; mapUrl?: string }> {
+  const hit = await lookupPlaceByName(name, regionHint);
+  if (!hit) return {};
+  return { address: hit.address, mapUrl: hit.mapUrl ?? undefined };
 }
