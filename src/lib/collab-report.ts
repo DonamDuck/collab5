@@ -164,10 +164,6 @@ const DNA_SCHEMA = {
 const REPORT_SCHEMA = {
   type: Type.OBJECT,
   properties: {
-    oneLiner: {
-      type: Type.STRING,
-      description: '"콜라보"로 끝나는 명사구 헤드라인(12~22자, 최대 25자·공백 제외). 서술어 종결 금지',
-    },
     candidates: {
       type: Type.ARRAY,
       items: {
@@ -199,7 +195,7 @@ const REPORT_SCHEMA = {
     steps: { type: Type.ARRAY, items: { type: Type.STRING }, description: "실행 플랜 최대 4단계" },
     effects: { type: Type.ARRAY, items: { type: Type.STRING }, description: "기대 효과 2~3개" },
   },
-  required: ["oneLiner", "candidates", "ideas", "steps", "effects"],
+  required: ["candidates", "ideas", "steps", "effects"],
 };
 
 // ── DNA 생성 ──────────────────────────────────────────────────
@@ -342,64 +338,15 @@ function methodIntensity(method: string): string {
   return "중간";
 }
 
-// ── oneLiner 문형 보증 (대표 확정 07-31) ──────────────────────
-//
-// oneLiner는 "~콜라보"로 끝나는 12~22자(최대 25자) 명사구 헤드라인이다.
-// ⭐프롬프트는 '요청'이고 형식을 **보장하는 건 파서다**(prompt-parser-contract 원칙).
-//   프롬프트만 고치면 모델이 가끔 옛 문형(서술어 종결 설명문)으로 돌아가는데,
-//   그 사고가 화면에서는 "AI가 이상한 문장을 뱉었다"로 보인다. 여기서 막는다.
-//
-// ⚠️ 글자 수는 **공백 제외**로 센다. 대표 확정 예시 11개는 공백을 포함하면 23~27자로
-//    스펙 상한(25)을 넘긴다("안 입던 옷으로 나의 수호 오브제를 만드는 콜라보" = 27/20).
-//    즉 확정 스펙의 '자'는 공백을 뺀 글자 수다. 공백을 세면 정답 세트가 전부 탈락한다.
-export const ONELINER_MAX = 25;
+// ⚠️ (은퇴 2026-08-01) oneLiner — 리포트 최상단 한줄 요약을 폐지했다(대표 확정).
+//    한줄은 결국 ideas[0]의 축약이라, 아이디어의 신선함이 가시면 정보가 0인 중복으로 남았다.
+//    실쌍 11개·10라운드 문형 개편 끝의 결론이므로 "더 나은 문형"으로 되살리지 말 것.
+//    함께 은퇴: checkOneLiner/resolveOneLiner/ONELINER_MAX(문형 파서 게이트),
+//    scripts/test-oneliner-shape.ts, scripts/x-oneliner-ab.ts.
+//    리포트의 얼굴은 이제 ③ 추천 콜라보 아이디어다(ReportSheet 첫 섹션).
 
-/** 금지어 — 감성 추상어·메타어·대시(대표 확정 스펙). 부분 문자열로 검사한다. */
-const ONELINER_BANNED = [
-  "설레", "특별한", "소중한", "의미 있는", "의미있는", "따뜻한 시간",
-  "아름다운", "완벽한", "잊지 못할", "감동", "힐링", "선사",
-  "조합", "두 곳", "시너지", "—", "–",
-];
-
-/** 문형 검사 — 통과면 ok, 아니면 사유(로그용). */
-export function checkOneLiner(s: string): { ok: boolean; reason?: string } {
-  const t = String(s ?? "").trim();
-  if (!t) return { ok: false, reason: "빈 문자열" };
-  // ①"콜라보"로 끝나야 한다 — 서술어 종결("~만듭니다.")은 여기서 전부 걸린다.
-  if (!t.endsWith("콜라보")) return { ok: false, reason: "'콜라보'로 끝나지 않음" };
-  // ②길이(공백 제외). 이모지·서로게이트 대비로 코드포인트 단위로 센다.
-  const len = [...t.replace(/\s+/g, "")].length;
-  if (len > ONELINER_MAX) return { ok: false, reason: `${len}자(공백 제외, 상한 ${ONELINER_MAX}자)` };
-  // ③금지어
-  const hit = ONELINER_BANNED.find((w) => t.includes(w));
-  if (hit) return { ok: false, reason: `금지어 "${hit}"` };
-  return { ok: true };
-}
-
-/** 검증 + 폴백. 탈락하면 ideas[0].desc를 그대로 쓴다.
- *  desc는 프롬프트상 이미 "~하는 콜라보"로 끝나는 명사구라(07-31 확정) 문형이 자동으로 맞는다.
- *
- *  ⭐폴백은 **자르지 않는다**(판단 근거): desc는 1~2줄이라 25자를 대개 넘긴다. 그런데 한국어
- *  명사구를 중간에서 자르면 문형의 핵심인 "~하는 콜라보" 끝맺음이 통째로 날아가고 의미도 깨진다
- *  (자른 뒤 "…코스터를 함께 제공하고 취향" 같은 꼬리가 남는다). 길이 위반보다 문형·의미 파괴가
- *  더 나쁘고, 무엇보다 폴백은 **예외 경로**라 화면에서 자주 보일 물건이 아니다. 길이는 프롬프트
- *  쪽에서 줄이고, 여기서는 온전한 문장을 지킨다.
- *
- *  폴백 발동은 stdout에 남긴다 — 실측이 있어야 나중에 프롬프트를 튜닝한다. */
-export function resolveOneLiner(raw: unknown, ideas: { desc: string }[]): string {
-  const t = String(raw ?? "").trim();
-  const verdict = checkOneLiner(t);
-  if (verdict.ok) return t;
-  const fallback = (ideas[0]?.desc ?? "").trim();
-  console.log(
-    `[collab-report] oneLiner 문형 탈락(${verdict.reason}) → ${fallback ? "ideas[0].desc로 폴백" : "폴백 없음(ideas 비어 원문 유지)"} / 원문="${t}"`
-  );
-  return fallback || t;
-}
-
-/** 키 없는 로컬용 mock 리포트 — 캔버스가든×호락호락 도서관 소재, 6조각 전부(⑥ CTA는 UI 고정). */
+/** 키 없는 로컬용 mock 리포트 — 캔버스가든×호락호락 도서관 소재, 5조각 전부(⑥ CTA는 UI 고정). */
 const MOCK_REPORT: CollabReportData = {
-  oneLiner: "내 그림책 커버를 폐원단으로 만드는 콜라보",
   matchPoints: [
     { text: "조각 워크숍과 느린 책방 무드는 '천천히 손으로 몰입하는 시간'이라는 같은 경험을 서로 다른 재료로 만들고 있어요." },
     { text: "책방을 찾는 아이와 부모에게 천 조각 소품 만들기는 책 읽기 다음의 자연스러운 활동이 돼요." },
@@ -476,7 +423,6 @@ export async function generateReport(
   logMeter(reportMeter);
   meters?.push(reportMeter);
   const p = JSON.parse(res.text ?? "{}") as {
-    oneLiner?: unknown;
     candidates?: ReportCandidate[];
     ideas?: { title?: unknown; desc?: unknown; method?: unknown }[];
     steps?: unknown[];
@@ -515,7 +461,6 @@ export async function generateReport(
 
   return {
     report: {
-      oneLiner: resolveOneLiner(p.oneLiner, ideas),
       matchPoints,
       ideas,
       steps: (p.steps ?? []).slice(0, 4).map(String),

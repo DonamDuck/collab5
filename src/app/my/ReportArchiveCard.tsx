@@ -6,10 +6,14 @@
 // /my에 리포트 렌더러를 복제하지 않으므로 시트·제안 CTA·계측이 전부 기존 경로를 그대로 탄다.
 // 캐시가 살아 있으면 즉시(0콜) 뜨고, 소개서가 그새 바뀌었으면 자연스럽게 새 리포트가 생성된다.
 //
-// 카드 구성(대표 07-26): 쌍 캡션+지역 → oneLiner(주인공) → 리포트 3축 미리보기.
+// 카드 구성(2026-08-01 개편): 쌍 캡션+지역 → 리포트 3축 미리보기.
+// ⭐한줄 요약(17 bold) 줄은 폐지했다 — ideas[0]의 축약이라 정보 0인 중복(대표 확정).
+//    대신 "추천 콜라보" 칩을 체급 승격(13 medium → 14 semibold)해 스캔성을 대신 받는다.
+//    구조를 바꾸지 않고 체급만 올린 이유: 목록에서 2~3개를 열거하는 게 목적이라 pill이 맞는 형태다.
 // ⚠️ 칩은 **라벨 아래에서만** 쓴다. 라벨 없이 카드에 흩뿌리면 "이게 뭐지"가 되고,
 //    제목이 15자 문장이라 pill 경계만 어지러웠다(대표 07-26 1차 지적).
 //    "추천 콜라보" 라벨이 맥락을 주면 칩은 제 역할(여러 개 열거)을 한다 → 이 축만 칩 3개.
+// ⚠️ 구 캐시 리포트엔 oneLiner가 남아 있지만 이 카드는 읽지 않는다(ideaTitles가 비면 라벨째 숨김).
 import Link from "next/link";
 import { track } from "@/lib/track";
 import type { CollabReportListItem } from "@/lib/types";
@@ -40,7 +44,7 @@ export function ReportArchiveCard({ item }: { item: CollabReportListItem }) {
           라이트 배경에 Kiwi를 '텍스트'로 쓰는 것도 대비 부족으로 금지 → 글자는 primary-on(진초록). */}
       <div className="flex items-center justify-between gap-2">
         {/* 굵기 없음(대표 지시 07-31) — 이 칩은 '어느 쌍인지' 알려주는 메타지 주인공이 아니다.
-            카드의 주인공은 아래 한줄요약(17 bold)이고, 칩까지 굵으면 시선이 둘로 갈린다.
+            카드의 주인공은 아래 "추천 콜라보" 칩들이고, 이 칩까지 굵으면 시선이 둘로 갈린다.
             면색(primary-pale)만으로도 충분히 구분된다. */}
         <span className="min-w-0 truncate rounded-pill bg-primary-pale px-2.5 py-1 text-[13px] text-primary-on">
           {item.fromName} × {item.toName}
@@ -48,12 +52,6 @@ export function ReportArchiveCard({ item }: { item: CollabReportListItem }) {
         {/* 지역도 같이 굵기 제거 — 칩과 한 줄에 나란한 짝이라 혼자 semibold면 어긋나 보인다 */}
         {item.toRegion && <span className="shrink-0 text-[13px] text-mute">{item.toRegion}</span>}
       </div>
-
-      {/* 주인공 — 무엇을 상상했는지. 17 bold(대표 확정 07-31: "콜라보 리포트처럼 볼드로").
-          이 카드의 굵기 대비가 /my 전 탭의 기준이 됐다 — 소개서·찜·성사 행 제목도 같은 17 bold. */}
-      <p className="mt-2 line-clamp-2 text-[17px] font-bold leading-snug break-keep text-ink">
-        {item.oneLiner}
-      </p>
 
       {hasDetail && (
         <div className="mt-3 space-y-2.5 border-t border-hairline pt-3">
@@ -68,12 +66,14 @@ export function ReportArchiveCard({ item }: { item: CollabReportListItem }) {
             <PreviewRow label="추천 콜라보">
               {/* 이 축만 칩 — 여러 개를 나란히 보여주는 게 목적이라 열거형이 맞다.
                   면은 surface-soft(뉴트럴) — 위 쌍 캡션이 primary-pale이라 여기까지 색을 쓰면
-                  한 카드에 색 면이 둘이 되어 시선이 갈린다. 대비는 글자 ink medium으로. */}
+                  한 카드에 색 면이 둘이 되어 시선이 갈린다. 대비는 글자 ink로.
+                  ⭐체급 승격(08-01): 13 medium·px-2.5 py-1 → 14 semibold·px-3 py-1.5.
+                  한줄요약(17 bold)이 빠진 자리를 크기가 아니라 **칩의 체급**으로 받는다. */}
               <div className="flex flex-wrap gap-1.5">
                 {item.ideaTitles.map((t) => (
                   <span
                     key={t}
-                    className="rounded-pill bg-surface-soft px-2.5 py-1 text-[13px] font-medium break-keep text-ink"
+                    className="rounded-pill bg-surface-soft px-3 py-1.5 text-[14px] font-semibold break-keep text-ink"
                   >
                     {t}
                   </span>

@@ -163,7 +163,9 @@ export interface BrandDna {
   updated_at: string;
 }
 
-/** AI 콜라보 분석 리포트 — 카드형 6조각(⑥ CTA는 UI 고정 문구라 데이터 없음) */
+/** AI 콜라보 분석 리포트 — 카드형 5조각(CTA는 UI 고정 문구라 데이터 없음).
+ *  ⚠️ (은퇴 2026-08-01) oneLiner — 한줄 요약 폐지(대표 확정). ideas[0]의 축약이라 정보 0인 중복이었다.
+ *     구 캐시(collab_reports.report jsonb)에는 oneLiner 키가 그대로 남아 있지만 아무도 읽지 않는다. */
 export interface ReportMatchPoint { text: string; }           // ② 접점 (선발 통과분)
 export interface ReportIdea { title: string; desc: string; method: string; } // ③ method=collabMethod 어휘
 
@@ -173,18 +175,16 @@ export interface CollabReportListItem {
   fromSlug: string; fromName: string;   // 내 소개서(제안자)
   toSlug: string; toName: string;       // 상상해 본 상대
   toRegion?: string;                    // 상대 지역(상위 2토막) — 날짜보다 재인식에 쓸모 있는 축
-  oneLiner: string;                     // 카드의 주인공 — "어떤 콜라보를 상상했는지"
   matchPoint?: string;                  // 잘 어울리는 점 1개(채점 1위)
-  ideaTitles: string[];                 // 추천 콜라보 제목 최대 3개(라벨 아래 칩으로 열거)
+  ideaTitles: string[];                 // ⭐카드의 주인공 — 추천 콜라보 제목 최대 3개(라벨 아래 칩으로 열거)
   effect?: string;                      // 기대 효과 1개
   createdAt: string;                    // 정렬용(카드에는 노출 안 함)
 }
 export interface CollabReportData {
-  oneLiner: string;                 // ① 한 줄 결론
-  matchPoints: ReportMatchPoint[];  // ② 2~4개
-  ideas: ReportIdea[];              // ③ 1~3개
-  steps: string[];                  // ④ 최대 4
-  effects: string[];                // ⑤ 2~3개
+  matchPoints: ReportMatchPoint[];  // 2~4개
+  ideas: ReportIdea[];              // 1~3개 — 리포트의 얼굴(첫 섹션)
+  steps: string[];                  // 최대 4
+  effects: string[];                // 2~3개
 }
 
 // ── 성사된 콜라보 (collabs) — ⭐북극성을 실제로 세는 자리. 스펙 = Obsidian [[성사-기록-계측]] ──

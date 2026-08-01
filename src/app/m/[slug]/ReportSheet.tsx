@@ -1,7 +1,7 @@
 "use client";
 
 // AI 콜라보 분석 리포트 시트 — 풀하이트 바텀시트(제안 시트 패턴 재사용).
-// 상태 머신: idle → (select: 소개서 2개+ 첫 depth 선택) → loading(카피 3단 순환) → ok(6조각) | thin | no_match | error(재시도).
+// 상태 머신: idle → (select: 소개서 2개+ 첫 depth 선택) → loading(카피 3단 순환) → ok(5조각) | thin | no_match | error(재시도).
 // 멀티 소개서는 칩 선택 + [분석하기]를 눌러야 fetch — 자동 생성으로 콜 낭비하지 않는다(대표 QA 07-26).
 // sampleMode = 무소개서 유저 티저: fetch 없이 sample-report.json 렌더 + 위저드 CTA.
 // 스펙: docs/superpowers/specs/2026-07-25-collab-report-dna-design.md §4·§5
@@ -187,23 +187,40 @@ export function ReportSheet({
   const fromName = sampleMode ? sampleData.fromName : (selected?.name ?? "");
   const reportToName = sampleMode ? sampleData.toName : toName;
 
-  // ── 6조각 렌더(ok·샘플 공용) ──
+  // ── 5조각 렌더(ok·샘플 공용) ──
   // ① 식별 메타(A×B 캡션)와 [다른 소개서로 분석]은 **고정 유틸 바로 이사**(디자인팀 07-26).
-  //    덕분에 스크롤 첫 요소가 '요약 카드(결론)'가 되어 열자마자 결론이 최상단에 온다.
-  //    3층 위계(캡션 mute → 라벨 mute → 결론 20px ink)는 그대로 유지.
+  // ⭐순서 개편(2026-08-01, 디자인팀 시안): ①아이디어 ②어울려요 ③실행플랜 ④기대효과 ⑤CTA.
+  //    한줄 요약 박스는 폐지했다 — ideas[0]의 축약이라 정보가 겹쳤다(대표 확정, 실쌍 11개 10라운드).
+  //    빈자리를 메운 게 아니라 **제품이 파는 것(아이디어)을 얼굴로 세운 정보 위계 재설계**다.
+  //    새 사다리: 카드제목 16 → 섹션헤더 15 → 본문 14 → 메타 13. **18 슬롯은 은퇴**.
   const pieces = report && (
     <div>
-      {/* 핵심 요약 박스 — 형광 대신 뉴트럴 면으로 독립(무대 원칙) */}
-      <div className="rounded-lg bg-surface-soft p-4">
-        <p className="text-[12px] font-medium tracking-wide text-mute">
-          콜라보 한줄 요약
-        </p>
-        {/* 18px — 20은 시트 폭에서 5줄까지 늘어져 혼자 튀었다(대표 07-31 "생각보다 너무 크다").
-            시트 사다리는 요약 → 섹션제목 15 → 본문 14 → 메타 13. 18이면 섹션제목과 1.2배라
-            주인공 자리는 지키면서 덩어리가 가벼워진다. (17로 내리면 15와 1.13배라 위계가 무너진다) */}
-        <p className="mt-1.5 text-[18px] font-bold leading-[1.45] text-balance break-keep text-ink">
-          {report.oneLiner}
-        </p>
+      {/* ① 추천 콜라보 아이디어 — 리포트의 얼굴 */}
+      <p className="text-[15px] font-bold text-ink">추천 콜라보 아이디어</p>
+      {/* 카운트 캡션 — 개수가 2~3으로 흔들려도 "부족"이 아니라 "선별"로 읽히게 먼저 선언한다 */}
+      <p className="mt-1 text-[13px] text-mute">
+        두 소개서의 DNA에서 찾은 {report.ideas.length}가지 방향이에요
+      </p>
+      <div className="mt-3 space-y-3">
+        {report.ideas.map((idea, i) => (
+          /* shadow-e1은 **리포트에서 이 카드만** — "우리가 파는 물건"이라 유일하게 살짝 뜬다.
+             나머지 섹션은 플랫 유지(경계는 hairline+e1 전담). */
+          <div key={i} className="rounded-lg border border-hairline bg-surface p-4 shadow-e1">
+            {/* 아이브로 — method를 제목 오른쪽 칩에서 윗줄로 올렸다(07-31 제목 4줄 사고 재발 방지).
+                제목과 폭을 다투지 않고 번호가 공짜로 생긴다(/m ItemLabel `활동 1 · …` 문법과 통일).
+                ⚠️ method는 반드시 collabMethodLabel()을 거친다 — 원문은 16자짜리 Pool 어휘다. */}
+            <p className="text-[12px] font-medium tracking-wide text-faint">
+              아이디어 {i + 1}
+              {idea.method ? ` · ${collabMethodLabel(idea.method)}` : ""}
+            </p>
+            <p className="mt-1.5 text-[16px] font-bold leading-snug break-keep text-ink">
+              {idea.title}
+            </p>
+            <p className="mt-1.5 text-[14px] leading-relaxed break-keep text-body">
+              {idea.desc}
+            </p>
+          </div>
+        ))}
       </div>
 
       {/* ② 이런 점이 잘 어울려요 — ✔ 리스트 */}
@@ -222,31 +239,7 @@ export function ReportSheet({
         ))}
       </ul>
 
-      {/* ③ 추천 콜라보 아이디어 — 카드 + 형태 태그 */}
-      <p className="mt-6 text-[15px] font-bold text-ink">
-        추천 콜라보 아이디어
-      </p>
-      <div className="mt-2 space-y-2.5">
-        {report.ideas.map((idea, i) => (
-          <div key={i} className="rounded-md border border-hairline p-4">
-            <div className="flex items-start justify-between gap-2">
-              <p className="text-[14px] font-bold break-keep text-ink">
-                {idea.title}
-              </p>
-              {idea.method && (
-                <span className="shrink-0 rounded-pill bg-surface-soft px-2 py-0.5 text-[12px] text-body">
-                  {collabMethodLabel(idea.method)}
-                </span>
-              )}
-            </div>
-            <p className="mt-1 text-[14px] leading-relaxed break-keep text-body">
-              {idea.desc}
-            </p>
-          </div>
-        ))}
-      </div>
-
-      {/* ④ 실행 플랜 — 번호 스텝 */}
+      {/* ③ 실행 플랜 — 번호 스텝 */}
       <p className="mt-6 text-[15px] font-bold text-ink">실행 플랜</p>
       <ol className="mt-2 space-y-2">
         {report.steps.map((s, i) => (
@@ -262,7 +255,7 @@ export function ReportSheet({
         ))}
       </ol>
 
-      {/* ⑤ 기대 효과 — 불릿 */}
+      {/* ④ 기대 효과 — 불릿 */}
       <p className="mt-6 text-[15px] font-bold text-ink">기대 효과</p>
       <ul className="mt-2 space-y-1.5">
         {report.effects.map((s, i) => (
@@ -276,7 +269,7 @@ export function ReportSheet({
         ))}
       </ul>
 
-      {/* ⑥ CTA — 샘플 모드는 위저드 CTA로 대체 */}
+      {/* ⑤ CTA — 샘플 모드는 위저드 CTA로 대체 */}
       {!sampleMode && (
         <div className="mt-8">
           <p className="text-center text-[15px] font-medium text-ink">
@@ -346,7 +339,7 @@ export function ReportSheet({
             {/* 고정 유틸 바 — 리포트가 길어 스크롤해도 닫기가 항상 잡힌다(대표 요청 07-26) */}
             <div className="flex shrink-0 items-center justify-between gap-2 border-b border-hairline px-4 py-2.5">
               {/* 고정 바의 유일한 텍스트라 13→15px로 키움(대표 07-26). 색은 body 유지 —
-                  ink로 올리면 스크롤 영역의 결론(20 bold ink)과 경쟁해 3층 위계가 다시 뭉갠다. */}
+                  ink로 올리면 스크롤 영역의 아이디어 카드 제목(16 bold ink)과 경쟁해 위계가 뭉갠다. */}
               {/* ⚠️ "다른 소개서로 분석"은 여기 안 둔다(07-31 대표 QA) — 이 줄엔 원래도 캡션+버튼+닫기가
                   붙어살아 좁았는데, 업체명이 길면 "캔버스가든 × 콜…"처럼 잘렸다. 그 버튼을 아래 CTA
                   블록(제안 보내기 버튼 밑)으로 옮기면 이 줄엔 캡션과 닫기만 남아 truncate가 훨씬 덜 걸린다. */}
@@ -356,7 +349,7 @@ export function ReportSheet({
               {closeButton("")}
             </div>
 
-            {/* 스크롤 영역 — 첫 요소가 요약 카드(결론). 패널에 있던 패딩·safe-area는 여기로 이사 */}
+            {/* 스크롤 영역 — 첫 요소가 추천 아이디어 섹션. 패널에 있던 패딩·safe-area는 여기로 이사 */}
             <div className="flex-1 overflow-y-auto px-5 pb-[calc(1.5rem+env(safe-area-inset-bottom))] pt-4">
               {sampleMode && (
                 <div className="mb-4 rounded-md bg-surface-soft px-3 py-2 text-[13px] font-medium text-body">

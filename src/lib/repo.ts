@@ -504,7 +504,6 @@ class InMemoryRepo implements Repo {
       items.push({
         fromSlug: from.slug, fromName: from.name, toSlug: to.slug, toName: to.name,
         toRegion: topRegion(to.region),
-        oneLiner: latest.report.oneLiner,
         matchPoint: latest.report.matchPoints?.[0]?.text,
         ideaTitles: (latest.report.ideas ?? []).map((i) => i.title).filter(Boolean).slice(0, 3),
         effect: latest.report.effects?.[0],
@@ -843,7 +842,8 @@ class SupabaseRepo implements Repo {
         fromSlug: r.from_brand.slug, fromName: r.from_brand.name,
         toSlug: r.to_brand.slug, toName: r.to_brand.name,
         toRegion: topRegion(r.to_brand.region),
-        oneLiner: r.report?.oneLiner ?? "",
+        // ⚠️ 구 캐시 행에는 report.oneLiner가 그대로 남아 있다(폐지 2026-08-01) — 읽지 않고 버린다.
+        //    아래 접근은 전부 옵셔널 체이닝이라 필드 구성이 달라진 옛 행도 터지지 않는다.
         matchPoint: r.report?.matchPoints?.[0]?.text,
         ideaTitles: (r.report?.ideas ?? []).map((i) => i.title).filter(Boolean).slice(0, 3),
         effect: r.report?.effects?.[0],

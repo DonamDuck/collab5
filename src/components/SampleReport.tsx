@@ -58,7 +58,8 @@ export function SampleReportLink() {
 /** ③ 실물 구경 — 리포트 축약 카드.
  *  구성 = ①콜라보 아이디어 예시 ②이런 점이 잘 어울려요 (대표 확정 07-31).
  *  ⚠️ 한줄 요약은 **뺐다** — 결론만 던지면 "그래서 뭘 해준다는 건데"가 안 남는다.
- *     아이디어(구체 산출물)를 먼저 보여주고 근거를 뒤에 붙이는 편이 '안목'으로 읽힌다. */
+ *     아이디어(구체 산출물)를 먼저 보여주고 근거를 뒤에 붙이는 편이 '안목'으로 읽힌다.
+ *     (2026-08-01: 이 판단이 리포트 전체로 확대돼 oneLiner 자체가 폐지됐다 — 홈은 구조 변화 없음) */
 export function SampleReportPeek() {
   const [open, setOpen] = useState(false);
   const report = sampleData.report;
@@ -74,14 +75,13 @@ export function SampleReportPeek() {
         <div className="mt-2 space-y-2">
           {report.ideas.slice(0, 2).map((idea, i) => (
             <div key={i} className="rounded-md border border-hairline p-3">
-              <div className="flex items-start justify-between gap-2">
-                <p className="break-keep text-[14px] font-bold text-ink">{idea.title}</p>
-                {idea.method && (
-                  <span className="shrink-0 rounded-pill bg-surface-soft px-2 py-0.5 text-[11px] text-body">
-                    {collabMethodLabel(idea.method)}
-                  </span>
-                )}
-              </div>
+              {/* 아이브로 — 시트·/my와 같은 카드 문법(08-01 시안 C). method를 제목 오른쪽 칩에서
+                  윗줄로 올려 제목과 폭을 다투지 않게 한다. 11px 유지(홈은 축약 카드라 한 급 작게). */}
+              <p className="text-[11px] font-medium tracking-wide text-faint">
+                아이디어 {i + 1}
+                {idea.method ? ` · ${collabMethodLabel(idea.method)}` : ""}
+              </p>
+              <p className="mt-1 break-keep text-[14px] font-bold text-ink">{idea.title}</p>
               <p className="mt-1 line-clamp-2 break-keep text-[13px] leading-[1.55] text-body">
                 {idea.desc}
               </p>
