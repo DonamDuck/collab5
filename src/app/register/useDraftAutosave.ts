@@ -63,7 +63,8 @@ export interface DraftAutosave<T> {
   found: { data: T; savedAt: string } | null;
   /** 배너 닫기 — 이번 세션에서만 숨긴다(저장본은 남겨 둔다). */
   dismiss: () => void;
-  /** 저장본 삭제 — '새로 시작' / 제출 성공 시. */
+  /** 저장본 삭제 — '저장 내용 무시하기'('새로 시작') / 제출 성공 시.
+   *  지운 뒤에도 자동저장은 살아 있다 — **사용자가 폼을 고치면 다시 저장된다**(그게 목적). */
   clear: () => void;
   /** 제출 직전 호출 — 저장 중단 + 이탈 경고 해제(제출 후 이동에서 경고가 뜨면 안 된다). */
   finish: () => void;
@@ -83,6 +84,8 @@ export function useDraftAutosave<T>(opts: {
   const lastWritten = useRef<string>("");
   const loadedFor = useRef<string | null>(null);
   const quotaWarned = useRef(false);
+  const snapshotRef = useRef(snapshot); // clear()가 '지금 폼 내용'을 알아야 한다(아래 주석)
+  snapshotRef.current = snapshot;
 
   // ── 마운트(또는 키 확정) 시 1회 읽기. 비로그인으로 쓰다 로그인한 경우를 위해 anon 키도 승계한다.
   useEffect(() => {
@@ -145,7 +148,16 @@ export function useDraftAutosave<T>(opts: {
   const dismiss = useCallback(() => setFound(null), []);
   const clear = useCallback(() => {
     setFound(null);
-    lastWritten.current = "";
+    // ⚠️ 여기서 lastWritten을 **비우면 안 된다.** 비우면 삭제 직후 디바운스 저장이 지금 폼 내용을
+    //    그대로 다시 써버려서, 수정 모드(폼에 서버 내용이 이미 차 있다)에선 "무시하기를 눌렀는데
+    //    새로고침하면 배너가 또 뜬다". 실제로 그랬다(2026-07-31 실측).
+    //    대신 **지금 스냅샷을 '이미 쓴 것'으로 표시**한다 → 삭제가 유지되고,
+    //    사용자가 폼을 한 글자라도 고치는 순간 json이 달라져 자동저장이 다시 돈다(의도한 동작).
+    try {
+      lastWritten.current = JSON.stringify(snapshotRef.current);
+    } catch {
+      lastWritten.current = "";
+    }
     if (key) {
       try {
         localStorage.removeItem(key);

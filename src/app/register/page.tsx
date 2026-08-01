@@ -1008,7 +1008,7 @@ function RegisterForm() {
     snapshot: draftSnapshot,
     hasContent: hasDraftContent,
   });
-  /** 저장본을 폼에 얹는다 — 사용자가 [이어서 쓰기]를 눌렀을 때만.
+  /** 저장본을 폼에 얹는다 — 사용자가 배너의 주 버튼([저장 내용 불러오기]/[이어서 쓰기])을 눌렀을 때만.
    *  (위쪽 applyDraft는 AI 초안 적용용이라 이름을 나눈다) */
   const restoreDraft = (d: DraftShape) => {
     setName(d.name); setOneLiner(d.oneLiner); setDescription(d.description); setStory(d.story);
@@ -1304,50 +1304,44 @@ function RegisterForm() {
       <div className="mt-8 space-y-12">
         {/* 이어서 쓰기 배너 — **자동 복구는 절대 하지 않는다.**
             수정 모드에서 낡은 초안을 덜컥 얹으면 서버에 잘 저장해둔 내용을 되돌려버린다.
-            그래서 ①항상 물어보고 ②저장 시각을 보여주고 ③기본 강조를 모드별로 다르게 둔다
-            (생성=이어서 쓰기 / 수정=서버 내용 유지). */}
+            그래서 ①항상 물어보고 ②(생성 모드는) 저장 시각을 보여준다.
+
+            대표 확정(2026-07-31): **수정 모드의 주 버튼 = 복원**으로 위계를 뒤집는다.
+            문구·라벨은 대표가 직접 쓴 문장이라 글자 그대로 쓴다(다듬지 말 것).
+            - 주(초록) [저장 내용 불러오기] = restoreDraft — 초안을 폼에 얹는다.
+            - 부       [저장 내용 무시하기] = draft.clear — 배너를 닫고 **저장본까지 지운다.**
+              ⚠️ '닫기만' 하면(dismiss) 바로 위 설명문이 약속한 "새로 시작하면 저장된 내용은
+              삭제됩니다"를 화면이 스스로 어긴다. 그래서 dismiss가 아니라 clear다.
+              clear는 저장본만 지우고 자동저장을 끄지 않는다(finished 플래그는 제출 때만) —
+              그 뒤 폼을 고치면 다시 저장되는 게 정상이다. */}
         {draft.found && (
           <div className="rounded-lg border border-border-strong bg-surface px-4 py-3 shadow-e1">
             <p className="text-[15px] font-medium text-ink">
-              {agoLabel(draft.found.savedAt)} 쓰시던 내용이 있어요.
+              {editSlug
+                ? "작성 중이던 내용을 발견했어요."
+                : `${agoLabel(draft.found.savedAt)} 쓰시던 내용이 있어요.`}
             </p>
             <p className="mt-0.5 text-[13px] text-mute">
               {editSlug
-                ? "지금 화면은 저장된 소개서예요. 불러오면 그때 쓰던 내용으로 덮어써요."
+                ? "이전에 작성하던 내용이 저장되어 있어요. 이어서 작성할 수 있으며, 새로 시작하면 저장된 내용은 삭제됩니다."
                 : "이어서 쓰거나, 새로 시작할 수 있어요."}
             </p>
             <div className="mt-3 flex gap-2">
-              {(() => {
-                const cont = (
-                  <button
-                    key="cont"
-                    type="button"
-                    onClick={() => draft.found && restoreDraft(draft.found.data)}
-                    className={`h-10 rounded-md px-4 text-[14px] font-medium ${
-                      editSlug
-                        ? "border border-border-strong bg-surface text-ink"
-                        : "bg-primary text-primary-on"
-                    }`}
-                  >
-                    이어서 쓰기
-                  </button>
-                );
-                const fresh = (
-                  <button
-                    key="fresh"
-                    type="button"
-                    onClick={draft.clear}
-                    className={`h-10 rounded-md px-4 text-[14px] font-medium ${
-                      editSlug
-                        ? "bg-primary text-primary-on"
-                        : "border border-border-strong bg-surface text-mute"
-                    }`}
-                  >
-                    {editSlug ? "저장된 내용 그대로" : "새로 시작"}
-                  </button>
-                );
-                return editSlug ? [fresh, cont] : [cont, fresh];
-              })()}
+              {/* 주 = 복원. 부 = 삭제. 두 모드 모두 [주, 부] 순서라 분기가 필요없다. */}
+              <button
+                type="button"
+                onClick={() => draft.found && restoreDraft(draft.found.data)}
+                className="h-10 rounded-md bg-primary px-4 text-[14px] font-medium text-primary-on"
+              >
+                {editSlug ? "저장 내용 불러오기" : "이어서 쓰기"}
+              </button>
+              <button
+                type="button"
+                onClick={draft.clear}
+                className="h-10 rounded-md border border-border-strong bg-surface px-4 text-[14px] font-medium text-mute"
+              >
+                {editSlug ? "저장 내용 무시하기" : "새로 시작"}
+              </button>
             </div>
           </div>
         )}
