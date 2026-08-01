@@ -1,5 +1,6 @@
 // 지도 좌표(trust.lat/lng) 백필 — 대표가 키 넣어 1회 실행 (재실행 안전·멱등).
-// 실행: SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... npx tsx scripts/backfill-map-coords.ts
+// 실행: .env.local에 SUPABASE_URL·SUPABASE_SERVICE_ROLE_KEY 채운 뒤
+//       npx tsx scripts/backfill-map-coords.ts
 //       (좌표 안 바꾸고 몇 건이 채워질지만 보려면 뒤에 --dry-run 붙이기)
 //
 // 배경: 07-31 지도 핀 UI(trust.lat/lng)는 **그 뒤로 저장된 소개서에만** 자동으로 붙는다
@@ -13,13 +14,28 @@
 //  3. 그래도 못 찾으면 건너뛴다 — 잘못 채우느니 비워두는 게 맞다(자동 채움 원칙, 07-31).
 //
 // 대상 = mapUrl은 있는데 lat/lng가 없는 행만. 이미 좌표 있는 건 안 건드림(멱등).
+import { readFileSync, existsSync } from "node:fs";
 import { createClient } from "@supabase/supabase-js";
+
+// .env.local을 직접 읽어 process.env에 채운다(이미 있는 값은 안 덮음) — 매번 긴 커맨드를
+// 손으로 안 치고, 지금까지 다른 키(NAVER·GEMINI·NCP_MAP)를 넣던 것과 같은 자리에서 채우게 한다.
+// ⚠️ `KEY=value` 형태만 읽는 얕은 파서다(따옴표·멀티라인 값은 없다고 가정 — 이 파일의 다른 값들과 동일 스타일).
+function loadDotEnvLocal() {
+  const path = new URL("../.env.local", import.meta.url);
+  if (!existsSync(path)) return;
+  for (const line of readFileSync(path, "utf8").split("\n")) {
+    const m = line.match(/^([A-Z_][A-Z0-9_]*)=(.*)$/);
+    if (m && !(m[1] in process.env)) process.env[m[1]] = m[2].trim();
+  }
+}
+loadDotEnvLocal();
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 if (!SUPABASE_URL || !SERVICE_KEY) {
-  console.error("❌ SUPABASE_URL·SUPABASE_SERVICE_ROLE_KEY 환경변수가 필요해요.");
-  console.error("   SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... npx tsx scripts/backfill-map-coords.ts");
+  console.error("❌ SUPABASE_URL·SUPABASE_SERVICE_ROLE_KEY가 비어있어요.");
+  console.error("   .env.local 맨 아래 '── Supabase 서비스키 ──' 항목에 값을 채우고 다시 실행해주세요.");
+  console.error("   (Supabase 대시보드 → Project Settings → API → Project URL / service_role 키)");
   process.exit(1);
 }
 const NAVER_ID = process.env.NAVER_CLIENT_ID;
