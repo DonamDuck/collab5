@@ -91,7 +91,6 @@ export interface Maker {
   introFileUrl?: string; // 소개자료 PDF(코어 위계)
   keywords: string[]; // 브랜드를 표현하는 키워드 칩 (DB=keywords, 구 soul.values)
   trust: TrustSignals;
-  collabOpen: boolean; // 콜라보 열림/닫힘 토글
   searchVisible: boolean; // 검색 결과 노출 on/off (DB=search_visible, 기본 true)
   status: MakerStatus; // active=정상 / inactive=소프트 삭제(전 노출면 비노출, DB 보관). DB=status, 기본 active
   ownerUserId?: number; // 소유 계정 = profiles.user_id(정수). 07-25 auth uuid→user_id 전환

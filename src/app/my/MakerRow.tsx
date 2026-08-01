@@ -7,18 +7,17 @@ import { deleteMakerAction, updateMakerFlagsAction } from "@/lib/actions";
 import { isDemoSlug } from "@/lib/demo";
 import { useDismissable } from "@/components/useDismissable";
 
-// /my 소개서 행 — 카드 클릭 시 소개서로 이동, 수정·삭제 + 검색노출·콜라보 토글(즉시 저장).
+// /my 소개서 행 — 카드 클릭 시 소개서로 이동, 수정·삭제 + 검색 노출 토글(즉시 저장).
+// 07-31: '콜라보 받는 중' 토글 폐지 — 검색 노출 하나가 곧 콜라보 수신 여부다.
 export function MakerRow({
   slug,
   name,
   oneLiner,
-  collabOpen,
   searchVisible,
 }: {
   slug: string;
   name: string;
   oneLiner?: string;
-  collabOpen: boolean;
   searchVisible: boolean;
 }) {
   const router = useRouter();
@@ -82,10 +81,12 @@ export function MakerRow({
         </div>
       </div>
 
-      {/* 토글 행 — 클릭 즉시 저장(낙관적) */}
-      <div className="flex items-center gap-5 border-t border-hairline px-4 py-2.5">
+      {/* 토글 행 — 클릭 즉시 저장(낙관적). 한 토글이 '검색 노출 = 콜라보 수신' 두 뜻을 지므로 설명을 붙인다. */}
+      <div className="border-t border-hairline px-4 py-2.5">
         <FlagToggle slug={slug} label="검색에 보이기" field="searchVisible" initial={searchVisible} />
-        <FlagToggle slug={slug} label="콜라보 받는 중" field="collabOpen" initial={collabOpen} />
+        <p className="mt-1 text-[13px] leading-relaxed break-keep text-faint">
+          켜두면 다른 브랜드가 검색으로 찾아와 콜라보를 제안할 수 있어요. 꺼두면 검색에 안 뜨고, 링크로는 계속 공유할 수 있어요.
+        </p>
       </div>
 
       {confirming && (
@@ -132,7 +133,7 @@ function FlagToggle({
 }: {
   slug: string;
   label: string;
-  field: "collabOpen" | "searchVisible";
+  field: "searchVisible";
   initial: boolean;
 }) {
   const [on, setOn] = useState(initial);

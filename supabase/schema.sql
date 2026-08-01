@@ -79,8 +79,9 @@ create table brands (
   dna                jsonb,                          -- Brand DNA(파생 해석층) {summary, items:[{type,value,evidence}], created_at, updated_at}
                                                      -- 리포트 요청 시 lazy 생성·갱신(stale = brands.updated_at > dna.updated_at). 사람이 직접 수정 안 함. 스펙 2026-07-25
   intro_file_url     text,                           -- 소개자료 PDF URL
-  collab_open        boolean not null default true,  -- 콜라보 열림/닫힘
-  search_visible     boolean not null default true,  -- 검색 노출 on/off
+  -- (폐지) collab_open: '콜라보 받는 중' 토글 — 07-31 제거. "검색에 노출 = 콜라보 가능"으로 단일화.
+  --        기존 DB에는 컬럼이 남아 있을 수 있음(대표가 배포 후 drop). 코드는 더 이상 읽지도 쓰지도 않는다.
+  search_visible     boolean not null default true,  -- 검색 노출 on/off (= 콜라보 제안 수신 가능)
   status             text    not null default 'active' check (status in ('active','inactive')),
                                                      -- 소프트 삭제: /my 삭제 = inactive(행 보관). 전 조회 함수가 active만 필터
   owner_user_id      bigint references users(user_id) on delete set null,  -- 소유 계정(구 owner_uuid)

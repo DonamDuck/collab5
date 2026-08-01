@@ -21,7 +21,7 @@ const MIN_GRID = 3; // 이보다 적으면 섹션을 아예 안 그린다(디자
 export const revalidate = 300;
 
 export default async function Home() {
-  const collabBrands = await repo.listCollabOpenMakers(GRID_LIMIT);
+  const collabBrands = await repo.listHomeMakers(GRID_LIMIT);
 
   return (
     <main className="mx-auto w-full max-w-[960px] px-4 py-12 sm:px-6">

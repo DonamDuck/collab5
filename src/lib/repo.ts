@@ -12,13 +12,13 @@ export interface Repo {
   getMakerBySlug(slug: string): Promise<Maker | null>;
   getMakerById(id: number): Promise<Maker | null>;
   updateMakerContent(slug: string, content: Omit<Maker, "id" | "slug" | "createdAt" | "ownerUserId" | "editPasswordHash" | "status">): Promise<Maker | null>;
-  setMakerFlags(slug: string, flags: { collabOpen?: boolean; searchVisible?: boolean }): Promise<Maker | null>;
+  setMakerFlags(slug: string, flags: { searchVisible?: boolean }): Promise<Maker | null>;
   setMakerOwner(slug: string, ownerUserId: number): Promise<void>;
   setMakerPasswordHash(slug: string, hash: string): Promise<void>;
   deleteMaker(slug: string): Promise<void>;
   listMakersByOwner(ownerUserId: number): Promise<Maker[]>;
   searchMakers(q: string): Promise<Maker[]>;
-  listCollabOpenMakers(limit: number): Promise<Maker[]>; // 홈 그리드 — 콜라보 받는 중 + 검색 노출, ⭐최신순(07-31 반전: 오래된 순+상한이면 방금 소개서 만든 씨딩 사장님이 홈에서 자기 브랜드를 못 본다)
+  listHomeMakers(limit: number): Promise<Maker[]>; // 홈 그리드 — 검색 노출(=콜라보 가능) + active, ⭐최신순(07-31 반전: 오래된 순+상한이면 방금 소개서 만든 씨딩 사장님이 홈에서 자기 브랜드를 못 본다)
   // 카드
   createCard(input: Omit<CollabCard, "id" | "createdAt">): Promise<CollabCard>;
   getCardBySlug(slug: string): Promise<CollabCard | null>;
@@ -161,7 +161,6 @@ const seedMakers: Maker[] = [
       instagram: "@canvasgarden",
       address: "서울 성동구 성수이로 88 2층 캔버스가든",
     },
-    collabOpen: true,
     searchVisible: true,
     status: "active",
     createdAt: now(),
@@ -188,7 +187,6 @@ const seedMakers: Maker[] = [
       instagram: "@owol.forest",
       address: "서울 마포구 연남동",
     },
-    collabOpen: true,
     searchVisible: true,
     status: "active",
     createdAt: now(),
@@ -215,7 +213,6 @@ const seedMakers: Maker[] = [
       instagram: "@stonebrew.coffee",
       address: "부산 영도구",
     },
-    collabOpen: true,
     searchVisible: true,
     status: "active",
     createdAt: now(),
@@ -242,7 +239,6 @@ const seedMakers: Maker[] = [
       instagram: "@horak.lib",
       address: "제주시",
     },
-    collabOpen: false,
     searchVisible: true,
     status: "active",
     createdAt: now(),
@@ -297,7 +293,6 @@ const seedMakers: Maker[] = [
       instagram: "@morucho.studio",
       address: "전북 전주시 완산구 한옥마을길 12",
     },
-    collabOpen: false,
     searchVisible: false,
     status: "active",
     createdAt: now(),
@@ -346,7 +341,6 @@ const seedMakers: Maker[] = [
       instagram: "@midnight.underline",
       address: "대구 중구 종로 24 1층",
     },
-    collabOpen: false,
     searchVisible: false,
     status: "active",
     createdAt: now(),
@@ -399,10 +393,9 @@ class InMemoryRepo implements Repo {
     Object.assign(m, c);
     return m;
   }
-  async setMakerFlags(slug: string, flags: { collabOpen?: boolean; searchVisible?: boolean }): Promise<Maker | null> {
+  async setMakerFlags(slug: string, flags: { searchVisible?: boolean }): Promise<Maker | null> {
     const m = this.makers.find((x) => x.slug === slug);
     if (!m) return null;
-    if (flags.collabOpen !== undefined) m.collabOpen = flags.collabOpen;
     if (flags.searchVisible !== undefined) m.searchVisible = flags.searchVisible;
     return m;
   }
@@ -433,9 +426,9 @@ class InMemoryRepo implements Repo {
         .includes(t)
     );
   }
-  async listCollabOpenMakers(limit: number): Promise<Maker[]> {
+  async listHomeMakers(limit: number): Promise<Maker[]> {
     return this.makers
-      .filter((m) => m.collabOpen && m.searchVisible && m.status !== "inactive")
+      .filter((m) => m.searchVisible && m.status !== "inactive")
       .sort((a, b) => (a.createdAt > b.createdAt ? -1 : 1)) // 최신순 — 인터페이스 주석 참조
       .slice(0, limit);
   }
@@ -569,7 +562,7 @@ interface MakerRow {
   keywords?: string[] | null; showcases?: Maker["showcases"] | null;
   offers_description?: string | null; seeks_description?: string | null;
   description?: string | null; // 자세히 소개(07-25 trust.description에서 분리 완료)
-  collab_open: boolean; search_visible: boolean | null; status: string | null; created_at: string; updated_at?: string | null;
+  search_visible: boolean | null; status: string | null; created_at: string; updated_at?: string | null;
   owner_user_id?: number | null;
   // 수정 비밀번호 해시 — 07-25 claim_token_hash → edit_password_hash 이사(옛 컬럼 폴백)
   edit_password_hash?: string | null; claim_token_hash?: string | null;
@@ -587,14 +580,14 @@ interface ReactionRow { id: number; card_id: number; type: string; created_at: s
 
 /** /search 카드가 실제로 읽는 컬럼만(썸네일=photos[0]·필터=offers/seeks). 나머지는 rowToMaker가 기본값으로 채운다. */
 const SEARCH_CARD_COLS =
-  "id, slug, name, one_liner, region, photos, keywords, offers, seeks, collab_open, search_visible, status, created_at";
+  "id, slug, name, one_liner, region, photos, keywords, offers, seeks, search_visible, status, created_at";
 
 /** /my 목록(내 소개서·찜)과 /m 제안시트의 브랜드 칩이 읽는 컬럼만.
- *  카드가 쓰는 건 slug·name·oneLiner·collabOpen·searchVisible(+칩은 id)뿐인데 전체 select를 하면
+ *  카드가 쓰는 건 slug·name·oneLiner·searchVisible(+칩은 id)뿐인데 전체 select를 하면
  *  dna(브랜드당 수 KB)·showcases·activities·collab_history·enrichment·구 base64 photos까지 딸려온다.
  *  썸네일을 안 그리므로 photos·keywords·region도 제외. */
 const LIST_CARD_COLS =
-  "id, slug, name, one_liner, collab_open, search_visible, status, created_at";
+  "id, slug, name, one_liner, search_visible, status, created_at";
 
 function rowToMaker(r: MakerRow): Maker {
   return {
@@ -613,7 +606,7 @@ function rowToMaker(r: MakerRow): Maker {
     keywords: r.keywords ?? [],
     description: r.description ?? "",
     trust: r.trust ?? {},
-    collabOpen: r.collab_open, searchVisible: r.search_visible ?? true,
+    searchVisible: r.search_visible ?? true,
     status: (r.status as MakerStatus) ?? "active",
     createdAt: r.created_at,
     updatedAt: r.updated_at ?? undefined,
@@ -641,7 +634,7 @@ class SupabaseRepo implements Repo {
       offers_description: input.offersDescription, seeks_description: input.seeksDescription,
       photos: input.photos,
       showcases: input.showcases, intro_file_url: input.introFileUrl ?? null,
-      keywords: input.keywords, trust: input.trust, collab_open: input.collabOpen,
+      keywords: input.keywords, trust: input.trust,
       search_visible: input.searchVisible,
       status: "active", // 생성 default = active (소프트 삭제 시에만 inactive)
       enrichment: input.enrichment ?? null,
@@ -671,7 +664,7 @@ class SupabaseRepo implements Repo {
       description: c.description, story: c.story, activities: c.activities,
       offers_description: c.offersDescription, seeks_description: c.seeksDescription,
       photos: c.photos, showcases: c.showcases, intro_file_url: c.introFileUrl ?? null,
-      keywords: c.keywords, trust: c.trust, collab_open: c.collabOpen,
+      keywords: c.keywords, trust: c.trust,
       search_visible: c.searchVisible,
     };
     const { data } = await this.db.from("brands").update(patch).eq("slug", slug).select().maybeSingle();
@@ -702,26 +695,24 @@ class SupabaseRepo implements Repo {
     const { data } = await query.order("created_at", { ascending: false });
     return (data ?? []).map((r) => rowToMaker(r as MakerRow));
   }
-  /** 홈 "콜라보 가능한 브랜드" 캐러셀 — 콜라보 받는 중 + 검색 노출 + active, **등록 오래된 순**으로 limit개.
-   *  먼저 등록한 브랜드가 앞에 오는 게 맞다는 대표 판단(07-27). 검색(최신순)과 정렬이 반대라 별도 메서드. */
-  async listCollabOpenMakers(limit: number): Promise<Maker[]> {
+  /** 홈 "콜라보 가능한 브랜드" 캐러셀 — 검색 노출(=콜라보 가능) + active, 최신순으로 limit개.
+   *  07-31: collab_open 토글 폐지 — "검색에 노출 = 콜라보 가능"으로 단일화(지키지 못할 약속 제거). */
+  async listHomeMakers(limit: number): Promise<Maker[]> {
     const { data } = await this.db
       .from("brands")
       .select(SEARCH_CARD_COLS)
-      .eq("collab_open", true)
       .eq("search_visible", true)
       .eq("status", "active")
       .order("created_at", { ascending: false }) // 최신순 — 인터페이스 주석 참조
       .limit(limit);
     return (data ?? []).map((r) => rowToMaker(r as MakerRow));
   }
-  // /my 토글 — 소유자 검증은 actions에서. collab_open·search_visible 만 부분 갱신.
+  // /my 토글 — 소유자 검증은 actions에서. search_visible 만 부분 갱신.
   async setMakerFlags(
     slug: string,
-    flags: { collabOpen?: boolean; searchVisible?: boolean }
+    flags: { searchVisible?: boolean }
   ): Promise<Maker | null> {
     const patch: Record<string, boolean> = {};
-    if (flags.collabOpen !== undefined) patch.collab_open = flags.collabOpen;
     if (flags.searchVisible !== undefined) patch.search_visible = flags.searchVisible;
     if (Object.keys(patch).length === 0) return this.getMakerBySlug(slug);
     const { data } = await this.db.from("brands").update(patch).eq("slug", slug).select().maybeSingle();

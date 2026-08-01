@@ -61,8 +61,7 @@ export interface RegisterInput {
   photos?: PhotoWire[]; // 브랜드 사진(리사이즈 data URL, 객체 래핑)
   showcases?: Block[]; // 선택 블록(사진=Storage URL이라 그대로 전송)
   introFileUrl?: string; // 소개자료 PDF URL
-  collabOpen: boolean;
-  searchVisible: boolean; // 검색 결과 노출 on/off
+  searchVisible: boolean; // 검색 결과 노출 on/off (= 콜라보 제안 수신 가능)
   instagram?: string;
   homepage?: string;
   mapUrl?: string; // 지도 링크(네이버·카카오·구글). 화이트리스트 밖이면 저장 시 버림
@@ -129,7 +128,6 @@ export async function createMakerAction(
       mapUrl: mapLinkLabel(input.mapUrl) ? input.mapUrl!.trim() : undefined,
       address: input.address?.trim() || undefined,
     },
-    collabOpen: input.collabOpen,
     searchVisible: input.searchVisible,
     enrichment: input.enrichment,
     ownerUserId,
@@ -198,7 +196,7 @@ export async function getPreviewDemoNoneAction(): Promise<{ maker: Maker; logoUr
 export async function getAnalysisPartnerAction(
   excludeSlug: string
 ): Promise<{ slug: string; name: string } | null> {
-  const list = await repo.listCollabOpenMakers(2);
+  const list = await repo.listHomeMakers(2);
   const p = list.find((m) => m.slug !== excludeSlug);
   return p ? { slug: p.slug, name: p.name } : null;
 }
@@ -306,7 +304,6 @@ export async function updateMakerAction(
       mapUrl: mapLinkLabel(input.mapUrl) ? input.mapUrl!.trim() : undefined,
       address: input.address?.trim() || undefined,
     },
-    collabOpen: input.collabOpen,
     searchVisible: input.searchVisible,
   });
   if (!updated) return { error: "업데이트에 실패했어요." };
@@ -325,10 +322,10 @@ export async function updateProfileImageAction(imageUrl: string): Promise<{ erro
   }
 }
 
-/** /my 토글 — 로그인 소유자만 collab_open·search_visible 부분 갱신. */
+/** /my 토글 — 로그인 소유자만 search_visible 부분 갱신. */
 export async function updateMakerFlagsAction(
   slug: string,
-  flags: { collabOpen?: boolean; searchVisible?: boolean }
+  flags: { searchVisible?: boolean }
 ): Promise<{ error?: string }> {
   const sessionUserId = await getSessionUserId();
   if (!sessionUserId) return { error: "로그인이 필요해요." };

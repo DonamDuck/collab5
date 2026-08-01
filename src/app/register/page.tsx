@@ -183,7 +183,6 @@ function RegisterForm() {
   const [targetAudience, setTargetAudience] = useState<string[]>([]);
   const [customAudience, setCustomAudience] = useState("");
   const [collabHistory, setCollabHistory] = useState<HistItem[]>([emptyHist()]);
-  const [collabOpen, setCollabOpen] = useState(true);
   const [searchVisible, setSearchVisible] = useState(true); // 검색 노출(기본 on)
   const [instagram, setInstagram] = useState("");
   const [homepage, setHomepage] = useState("");
@@ -938,7 +937,7 @@ function RegisterForm() {
     ps.filter((x) => !x.uploading && /^https?:\/\//.test(x.url)).map((x) => ({ url: x.url }));
   const draftSnapshot = {
     name, oneLiner, description, story, offersNote, seeksNote,
-    offers, values, targetAudience, collabOpen, searchVisible,
+    offers, values, targetAudience, searchVisible,
     instagram, homepage, mapUrl, address, introFileUrl, blocks,
     photos: keepPhotos(photos),
     activities: activities.map((a) => ({ title: a.title, desc: a.desc, link: a.link, photos: keepPhotos(a.photos) })),
@@ -966,7 +965,7 @@ function RegisterForm() {
     setName(d.name); setOneLiner(d.oneLiner); setDescription(d.description); setStory(d.story);
     setOffersNote(d.offersNote); setSeeksNote(d.seeksNote);
     setOffers(d.offers); setValues(d.values); setTargetAudience(d.targetAudience);
-    setCollabOpen(d.collabOpen); setSearchVisible(d.searchVisible);
+    setSearchVisible(d.searchVisible);
     setInstagram(d.instagram); setHomepage(d.homepage); setMapUrl(d.mapUrl); setAddress(d.address);
     setIntroFileUrl(d.introFileUrl); setBlocks(d.blocks); setPhotos(d.photos);
     setActivities(d.activities.map((a) => ({ title: a.title, desc: a.desc, link: a.link ?? "", photos: a.photos })));
@@ -1021,7 +1020,6 @@ function RegisterForm() {
       setHomepage(m.trust.homepage ?? "");
       setMapUrl(m.trust.mapUrl ?? "");
       setAddress(m.trust.address ?? "");
-      setCollabOpen(m.collabOpen);
       setSearchVisible(m.searchVisible ?? true);
       setPhotos(m.photos.map((u) => ({ url: u })));
       setBlocks((m.showcases ?? []).map((b) => ({ ...b, uid: crypto.randomUUID() })));
@@ -1105,7 +1103,6 @@ function RegisterForm() {
         showcases: blocks,
         introFileUrl: introFileUrl || undefined,
         photos: wrap(photoUrls),
-        collabOpen,
         searchVisible,
         enrichment,
         instagram,
@@ -2044,38 +2041,13 @@ function RegisterForm() {
           </Field>
         </div>
 
-        {/* 콜라보 열림/닫힘 + 검색 노출 */}
+        {/* 검색 노출 — 07-31부터 이 한 토글이 '콜라보 받는 중'을 겸한다(collab_open 폐지) */}
         <div className="space-y-2">
-          <div className="flex items-center justify-between rounded-lg border border-hairline bg-surface px-4 py-3">
-            <div>
-              <p className="text-[15px] font-medium text-ink">콜라보 받는 중</p>
-              <p className="text-[13px] text-mute">
-                켜두면 다른 브랜드가 먼저 콜라보를 제안할 수 있어요.
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => setCollabOpen((v) => !v)}
-              role="switch"
-              aria-checked={collabOpen}
-              aria-label="콜라보 받는 중"
-              className={`flex h-[26px] w-11 shrink-0 items-center rounded-pill p-[2px] transition-colors ${
-                collabOpen ? "bg-primary" : "bg-border-strong"
-              }`}
-            >
-              <span
-                className={`h-[22px] w-[22px] rounded-pill bg-white transition-transform ${
-                  collabOpen ? "translate-x-[18px]" : "translate-x-0"
-                }`}
-              />
-            </button>
-          </div>
-
-          <div className="flex items-center justify-between rounded-lg border border-hairline bg-surface px-4 py-3">
+          <div className="flex items-center justify-between gap-3 rounded-lg border border-hairline bg-surface px-4 py-3">
             <div>
               <p className="text-[15px] font-medium text-ink">검색에 보이기</p>
-              <p className="text-[13px] text-mute">
-                꺼두면 검색 결과에 노출되지 않아요. 링크로는 계속 공유할 수 있어요.
+              <p className="text-[13px] leading-relaxed break-keep text-mute">
+                켜두면 다른 브랜드가 검색으로 찾아와 콜라보를 제안할 수 있어요. 꺼두면 검색에 안 뜨고, 링크로는 계속 공유할 수 있어요.
               </p>
             </div>
             <button

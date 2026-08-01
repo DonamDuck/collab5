@@ -62,7 +62,6 @@ export default async function MyPage({ searchParams }: { searchParams: Promise<{
             slug={m.slug}
             name={m.name}
             oneLiner={m.oneLiner}
-            collabOpen={m.collabOpen}
             searchVisible={m.searchVisible}
           />
         ))}

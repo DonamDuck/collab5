@@ -31,11 +31,6 @@ export function BrandSummaryCard({
             <h1 className="text-[22px] font-bold leading-tight tracking-tight text-ink">
               {maker.name}
             </h1>
-            {maker.collabOpen && (
-              <span className="inline-flex h-6 items-center rounded-pill bg-primary-pale px-2.5 text-xs font-medium text-primary-on">
-                콜라보 받는 중
-              </span>
-            )}
           </div>
         </div>
         {!readOnly && (

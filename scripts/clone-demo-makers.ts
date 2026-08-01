@@ -6,7 +6,7 @@
 //  2. jsonb 안 사진 URL 전부(photos·activities[].photos·collab_history[].photos·showcases[].photos)를
 //     "maker-photos" 버킷의 demo/<slug>/ 경로로 복사(동결) → 공개 URL로 교체
 //     (원본 사진이 지워져도 데모는 깨지지 않음. storage upsert → 재실행 시 덮어쓰기, 고아 없음)
-//  3. search_visible=false·collab_open=false·intro_file_url=null·slug 교체 후 upsert(onConflict: slug)
+//  3. search_visible=false·intro_file_url=null·slug 교체 후 upsert(onConflict: slug)
 //
 // ⚠️07-25 DB 전면 개명 반영(07-28) — 이 스크립트만 옛 이름을 쓰다가 실행이 통째로 죽었다
 //   ("Could not find the table 'public.makers'"). 대조표:
@@ -50,7 +50,7 @@ interface BrandRow {
   photos: string[] | null;
   showcases: PhotoHolder[] | null; intro_file_url: string | null;
   keywords: string[] | null; trust: unknown; enrichment: unknown;
-  collab_open: boolean; search_visible: boolean | null; status: string | null;
+  search_visible: boolean | null; status: string | null;
   created_at: string; updated_at: string | null;
   owner_user_id: number | null; edit_password_hash: string | null;
 }
@@ -164,8 +164,7 @@ async function cloneOne({ from, to, stripPhotos }: { from: string; to: string; s
     keywords: row.keywords,
     trust: row.trust,
     enrichment: row.enrichment,
-    collab_open: false, // 데모는 콜라보 제안 비활성
-    search_visible: false, // 검색 미노출
+    search_visible: false, // 검색 미노출(= 콜라보 제안도 안 들어옴). 07-31 collab_open 폐지
     status: "active", // ⚠️필수 — 없으면 읽기 함수(status='active' 필터)가 걸러내 404가 된다
     owner_user_id: row.owner_user_id,
     edit_password_hash: row.edit_password_hash,
