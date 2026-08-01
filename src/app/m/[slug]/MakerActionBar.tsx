@@ -66,6 +66,10 @@ export function MakerActionBar({
   const [reportOpen, setReportOpen] = useState(false);
   const [reportSample, setReportSample] = useState(false); // 소개서 0개 유저 — 샘플 리포트 티저
   const [reportInitialFrom, setReportInitialFrom] = useState<string | null>(null); // /my 아카이브 딥링크(?report=fromSlug) — 선택 스텝 건너뛰고 그 쌍을 바로 연다
+  // /my 시트의 제안 CTA에서 `&propose=1`로 넘어왔나 — 리포트가 뜨는 즉시 제안 시트로 넘긴다(1회성).
+  // ⚠️ state가 아니라 ref다: 이 값이 바뀌었다고 리렌더가 필요하진 않고, 오히려 state면 리포트 로드 →
+  //    리렌더 → 이펙트 재실행 순서에 얽힌다. 소비 즉시 false로 내려 중복 발동을 막는다.
+  const autoProposeRef = useRef(false);
   const [message, setMessage] = useState(""); // 추천 메시지(수정 가능)
   // 콜라보 분석에서 올라온 아이디어 — 제안 시트에서 '+'로 초안에 골라 넣는다(대표 07-31).
   // 분석을 안 돌린 사람에겐 아예 안 뜬다(빈 배열). 샘플 리포트는 올라오지 않는다(ReportSheet에서 차단).
@@ -197,6 +201,11 @@ export function MakerActionBar({
   // /my 리포트 아카이브 딥링크 — ?report={fromSlug}면 그 쌍의 시트를 바로 연다(캐시면 즉시·0콜).
   // window.location으로 1회만 읽고 URL에서 지운다(useSearchParams+Suspense 불필요, 새로고침 재발동 방지).
   // 비로그인이거나 fromSlug가 내 소개서가 아니면 조용히 무시(링크 공유·소개서 연결 해제 케이스).
+  //
+  // 🆕 `&propose=1`(08-02) — /my 시트의 제안 CTA에서 넘어온 경우. 리포트는 이미 /my에서 읽었으므로
+  //    **화면에 세우지 않고** 로드되자마자 제안 시트로 넘긴다(아래 onReportLoaded).
+  //    리포트를 거쳐 가는 이유: 제안 시트의 아이디어 피커가 `report.ideas`를 받아야 채워지는데,
+  //    그 재료는 리포트 응답에만 있다. 곧장 제안만 열면 피커가 빈 채로 뜬다.
   useEffect(() => {
     if (!loggedIn) return;
     let fromSlug: string | null = null;
@@ -204,7 +213,9 @@ export function MakerActionBar({
       const url = new URL(window.location.href);
       fromSlug = url.searchParams.get("report");
       if (!fromSlug) return;
+      if (url.searchParams.get("propose") === "1") autoProposeRef.current = true;
       url.searchParams.delete("report");
+      url.searchParams.delete("propose");
       window.history.replaceState(null, "", url.pathname + url.search);
     } catch {
       return;
@@ -651,7 +662,15 @@ export function MakerActionBar({
 
       {/* AI 콜라보 분석 리포트 시트 — CTA는 리포트 닫고 제안 시트로 */}
       <ReportSheet
-        onReportLoaded={(r) => setReportIdeas(r.ideas)}
+        onReportLoaded={(r) => {
+          setReportIdeas(r.ideas);
+          // /my에서 "콜라보 과정 시작하기"로 넘어온 경우 — 리포트는 이미 읽었으니 세우지 않고 넘긴다.
+          if (autoProposeRef.current) {
+            autoProposeRef.current = false; // 1회성 — 뒤로가기·재오픈 때 다시 튀지 않게
+            setReportOpen(false);
+            setProposeOpen(true);
+          }
+        }}
         open={reportOpen}
         onClose={() => {
           setReportOpen(false);

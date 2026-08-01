@@ -106,7 +106,13 @@ export default async function MyPage({ searchParams }: { searchParams: Promise<{
     ) : (
       <div className="space-y-2">
         {reports.map((r) => (
-          <ReportArchiveCard key={`${r.fromSlug}:${r.toSlug}`} item={r} />
+          <ReportArchiveCard
+            key={`${r.fromSlug}:${r.toSlug}`}
+            item={r}
+            // 시트가 제자리(/my)에서 뜨므로 "다른 소개서로 분석"에 쓸 내 소개서 목록이 필요하다.
+            // Maker 통째로 넘기면 클라이언트 번들에 사진·본문까지 실린다 — 시트가 쓰는 3개만.
+            myBrands={makers.map((m) => ({ id: m.id, slug: m.slug, name: m.name }))}
+          />
         ))}
       </div>
     );

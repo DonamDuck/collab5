@@ -58,8 +58,10 @@ export function ReportSheet({
   sampleMode: boolean; // 소개서 0개 유저 — 샘플 리포트 티저
   onPropose: () => void; // CTA — 리포트 닫고 제안 시트 오픈(부모가 처리)
   initialFromSlug?: string | null; // /my 아카이브 딥링크 — 이 slug로 선택 스텝 없이 바로 실행
-  /** 계측용 오픈 위치 — 홈 샘플 오픈이 /m 잠금 티저 지표(report_locked_view)를 오염시키지 않게 구분(07-31) */
-  source?: "maker_page" | "home";
+  /** 계측용 오픈 위치 — 홈 샘플 오픈이 /m 잠금 티저 지표(report_locked_view)를 오염시키지 않게 구분(07-31).
+   *  🆕 "my" = /my 아카이브에서 **제자리로** 연 것(08-02). 남의 소개서로 튕겨나가지 않는 다시보기라
+   *     "새로 궁금해서 연 것"과 성격이 다르다 — 섞이면 리포트 수요가 부풀어 보인다. */
+  source?: "maker_page" | "home" | "my";
   /** 리포트가 실제로 열렸을 때 부모에게 올려준다 — 제안 시트가 콜라보 아이디어를 초안에 넣는 데 쓴다(07-31).
    *  ⚠️ 샘플(가상 쌍)은 올리지 않는다 — 남의 브랜드 얘기가 내 DM 초안에 섞이면 안 된다. */
   onReportLoaded?: (report: CollabReportData) => void;

@@ -2,9 +2,16 @@
 
 // /my 콜라보 리포트 아카이브 카드.
 //
-// 방법론: 리포트는 자기 집(/m/{to})에서 렌더한다 — 카드는 딥링크(`?report={fromSlug}`)일 뿐.
-// /my에 리포트 렌더러를 복제하지 않으므로 시트·제안 CTA·계측이 전부 기존 경로를 그대로 탄다.
-// 캐시가 살아 있으면 즉시(0콜) 뜨고, 소개서가 그새 바뀌었으면 자연스럽게 새 리포트가 생성된다.
+// 방법론: 리포트 렌더러(ReportSheet)를 **복제하지 않고 여기로 들고 온다** — 홈이 이미 같은 방식으로
+// 포털에 띄우고 있다(SampleReport.tsx). 캐시가 살아 있으면 즉시(0콜), 소개서가 그새 바뀌었으면 재생성.
+//
+// ⭐2026-08-02 전환: 예전엔 카드가 `/m/{to}?report={from}` **딥링크**였다 — 읽으려고 눌렀을 뿐인데
+//    남의 소개서 페이지로 튕겨 나가고, 그 위에 시트가 떴다(대표: *"별도 소개서 페이지로 넘어가지 말고
+//    /my 위에 뜨는 바텀시트로"*). 아카이브는 **다시 읽는 곳**이지 이동하는 곳이 아니다.
+//    → 읽기는 제자리(/my), **행동할 때만** 소개서로 간다.
+// ⚠️ 제안 CTA는 여전히 /m으로 넘긴다 — 제안 시트는 채널·핸들·DM 초안 빌더를 MakerActionBar에서
+//    가져다 쓰므로 /my엔 그 재료가 없다. 대신 `?report=&propose=1`로 넘겨 **아이디어 피커가 살아 있는**
+//    상태로 제안 시트가 바로 열린다(리포트를 두 번 열게 만들지 않는다).
 //
 // 카드 구성(2026-08-01 **2차** 개편): 쌍 캡션+지역 → **추천 콜라보(주인공)** → 구분선 → 근거 2축.
 //
@@ -29,7 +36,9 @@
 //    특히 지금은 제목 바로 밑이라 라벨이 없으면 **업체의 태그처럼** 읽힐 위험이 있다.
 //    낮추되 지우지 않는 이유가 이것.
 // ⚠️ 구 캐시 리포트엔 oneLiner가 남아 있지만 이 카드는 읽지 않는다(ideaTitles가 비면 라벨째 숨김).
-import Link from "next/link";
+import { useState } from "react";
+import { createPortal } from "react-dom";
+import { ReportSheet } from "@/app/m/[slug]/ReportSheet";
 import { track } from "@/lib/track";
 import type { CollabReportListItem } from "@/lib/types";
 
@@ -58,14 +67,26 @@ function PreviewRow({ label, children }: { label: string; children: React.ReactN
   );
 }
 
-export function ReportArchiveCard({ item }: { item: CollabReportListItem }) {
+export function ReportArchiveCard({
+  item,
+  myBrands,
+}: {
+  item: CollabReportListItem;
+  /** 내 소개서 전체 — 시트의 "다른 소개서로 분석"이 동작하려면 목록이 필요하다(한 개만 넘기면 그 기능이 죽는다) */
+  myBrands: { id: number; slug: string; name: string }[];
+}) {
+  const [open, setOpen] = useState(false);
+
   // ⚠️ 예전의 `hasDetail`(3축 OR) 단일 게이트는 은퇴 — 주인공/근거가 서로 다른 블록이 되면서
   //    각자 자기 조건으로 켜진다. 하나로 묶으면 아이디어만 있는 리포트에 빈 구분선이 남는다.
   return (
-    <Link
-      href={`/m/${item.toSlug}?report=${encodeURIComponent(item.fromSlug)}`}
-      onClick={() => track("report_archive_open")}
-      className="block rounded-md border border-hairline bg-surface p-4 transition-colors hover:bg-surface-soft"
+    <button
+      type="button"
+      onClick={() => {
+        track("report_archive_open");
+        setOpen(true);
+      }}
+      className="block w-full rounded-md border border-hairline bg-surface p-4 text-left transition-colors hover:bg-surface-soft"
     >
       {/* 쌍 이름 + 상대 지역 — 날짜보다 "어디 브랜드였지"가 재인식에 쓸모 있다(대표 07-26).
           ⭐**pill을 벗고 카드 제목으로 승격**(대표 08-01): *"업체×업체 초록칩과 추천 콜라보 칩이
@@ -128,6 +149,29 @@ export function ReportArchiveCard({ item }: { item: CollabReportListItem }) {
           )}
         </div>
       )}
-    </Link>
+
+      {/* 리포트 시트 — open일 때만 body 포털. /my 카드 목록은 서로 겹치는 스택 컨텍스트가 많아
+          제자리에 fixed로 두면 다른 카드 아래로 깔릴 수 있다(홈 SampleReport와 같은 이유).
+          ⚠️ `open &&`로 감싸므로 SSR에서 document를 만지지 않는다. */}
+      {open &&
+        createPortal(
+          <ReportSheet
+            open
+            onClose={() => setOpen(false)}
+            fromBrands={myBrands}
+            initialFromSlug={item.fromSlug} // 선택 스텝 건너뛰고 이 쌍을 바로 연다
+            toSlug={item.toSlug}
+            toName={item.toName}
+            sampleMode={false}
+            source="my"
+            onPropose={() => {
+              // 제안은 소개서 페이지에서 — `propose=1`이면 리포트를 화면에 세우지 않고
+              // 로드되는 즉시 제안 시트로 넘어간다(아이디어 피커가 채워진 채로).
+              window.location.href = `/m/${item.toSlug}?report=${encodeURIComponent(item.fromSlug)}&propose=1`;
+            }}
+          />,
+          document.body
+        )}
+    </button>
   );
 }
