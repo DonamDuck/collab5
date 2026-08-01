@@ -73,13 +73,17 @@ export function HomeSectionTabs() {
   };
 
   return (
-    // 떠 있는 알약 하나만 불투명 — 바 전체에 배경 밴드를 깔면 헤더가 두 겹으로 보인다.
-    // 알약은 surface(흰 면)+hairline+shadow라 뒤로 콘텐츠가 지나가도 글자는 안 겹쳐 읽힌다.
-    <div className="sticky top-14 z-[5] flex justify-center py-2">
+    // 🐛 배경 밴드 없이 알약만 띄웠더니 **제목이 알약 좌우로 비어져 나왔다**(08-02 실측: "3ᄇ…요." 가
+    //    탭 양옆으로 삐져나옴). 알약 폭이 화면보다 좁으니 구조적으로 안 가려진다.
+    //    → 캔버스색 밴드를 풀블리드로 깔아 **콘텐츠가 밴드 아래로 사라지게** 한다.
+    // ⚠️ 밴드에 보더·그림자는 주지 않는다 — 그걸 얹는 순간 헤더가 두 겹으로 보인다.
+    //    같은 배경색이라 "페이지가 탭 밑으로 흘러간다"로만 읽히고 바가 하나 더 생긴 느낌은 안 난다.
+    // ⚠️ 풀블리드는 `100vw` 금지(가로 스크롤바 폭만큼 넘쳐 가로 스크롤이 생긴다) —
+    //    브랜드 그리드와 같은 box-shadow+clip-path 기법을 쓴다(page.tsx §② 참고).
+    <div className="sticky top-14 z-[5] flex justify-center bg-canvas py-2 [box-shadow:0_0_0_100vmax_var(--canvas)] [clip-path:inset(0_-100vmax)]">
       <nav
         aria-label="소개서·콜라보 분석 바로가기"
-        // 트랙=surface-soft / 활성 썸=surface(흰 면) — 기존 토큰 조합만. 라이트 배경에 비비드 Kiwi를
-        // **글자색**으로 쓰는 건 금지(대비 부족)고, 면색 Kiwi는 주 CTA 하나뿐이라 여기 쓰지 않는다.
+        // 트랙=surface-soft. 활성 썸은 아래 **"선택됨" 키위 조합**을 쓴다(대표 지시 08-02 "탭바에도 키위를").
         className="inline-flex gap-1 rounded-pill border border-hairline bg-surface-soft p-1 shadow-e1"
       >
         {TABS.map((t, i) => (
@@ -92,8 +96,17 @@ export function HomeSectionTabs() {
             onClick={(e) => go(e, t.id)}
             // aria-current="location" = "지금 이 집합 안에서 내가 있는 위치"(page가 아니다 — 같은 문서다)
             aria-current={active === i ? "location" : undefined}
-            className={`flex h-9 shrink-0 items-center whitespace-nowrap rounded-pill px-3.5 text-[13px] transition-colors sm:px-5 sm:text-[14px] ${
-              active === i ? "bg-surface font-bold text-ink shadow-e1" : "font-medium text-mute"
+            // ⭐활성 = 이 저장소가 이미 쓰는 **"선택됨" 어휘** 그대로: `border-primary bg-primary-tint
+            //   text-primary-on` (/search 지역·업종 칩, register/BlockEditor 선택 칩과 동일 조합).
+            //   탭 활성도 뜻이 "선택됨"이라 새 표현을 만들 이유가 없다 — 사용자는 이미 이 색을 배웠다.
+            // ⚠️ 비비드 Kiwi(`bg-primary`)를 면으로 깔지 않는다 — 그 면색은 주 CTA 전용이고,
+            //    목차가 CTA와 같은 무게로 보이면 "눌러야 할 것"이 둘이 된다. tint(#d6ffc0)는 한 단 아래다.
+            // ⚠️ 비활성에도 `border`를 **투명으로** 둔다 — 활성에만 보더를 주면 전환 때 알약 폭이
+            //    2px 뛰어 탭이 덜컹거린다.
+            className={`flex h-9 shrink-0 items-center whitespace-nowrap rounded-pill border px-3.5 text-[13px] transition-colors sm:px-5 sm:text-[14px] ${
+              active === i
+                ? "border-primary bg-primary-tint font-bold text-primary-on"
+                : "border-transparent font-medium text-mute"
             }`}
           >
             {t.label}
