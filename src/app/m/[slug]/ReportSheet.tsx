@@ -21,7 +21,7 @@ import sampleData from "@/lib/sample-report.json";
 //    (⏱ 파이프라인이 빨라지면 이 문구도 같이 낮출 것)
 const LOADING_COPY = [
   "두 소개서를 읽고 있어요…",
-  "보통 30초 정도 걸려요",
+  "보통 30초 정도 걸려요…",
   "접점을 찾는 중…",
   "콜라보를 상상하는 중…",
 ];
