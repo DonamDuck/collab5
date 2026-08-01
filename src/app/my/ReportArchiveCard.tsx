@@ -19,8 +19,14 @@
 //    ⭐구분선도 자리를 옮겼다 — 헤더/본문이 아니라 **주인공/근거**를 가른다(선이 의미를 갖게).
 //    시트 순서(①아이디어 ②어울려요 …)와도 이제 같다 — 두 화면이 같은 얘기를 같은 순서로 한다.
 //
+// ⭐3차(같은 날): **카드에 pill을 하나만 남겼다.** 대표 —
+//    *"업체×업체 초록칩과 추천 콜라보 칩이 겹치니 헷갈림. 칩은 한 개여야 할 것 같은데"*.
+//    쌍 이름은 pill을 벗고 **카드 제목(15 semibold)** 으로, 초록은 `×` 한 글자에만 남겼다.
+//    같은 날 밸런스 조정도 함께: 칩 14→13 / 근거 13 regular→14 medium(§각 주석).
+//    최종 사다리 = **제목 15 semibold ink → 근거 14 medium body → 칩 13 semibold ink(+면) → 라벨 12 mute**.
+//
 // ⚠️ 칩은 **라벨 아래에서만** 쓴다. 라벨 없이 흩뿌리면 "이게 뭐지"가 되고(대표 07-26 1차 지적),
-//    특히 지금은 쌍 캡션 바로 밑이라 라벨이 없으면 **업체의 태그처럼** 읽힐 위험이 있다.
+//    특히 지금은 제목 바로 밑이라 라벨이 없으면 **업체의 태그처럼** 읽힐 위험이 있다.
 //    낮추되 지우지 않는 이유가 이것.
 // ⚠️ 구 캐시 리포트엔 oneLiner가 남아 있지만 이 카드는 읽지 않는다(ideaTitles가 비면 라벨째 숨김).
 import Link from "next/link";
@@ -35,9 +41,14 @@ function BlockLabel({ children }: { children: React.ReactNode }) {
   return <p className="text-[12px] font-medium tracking-wide text-mute">{children}</p>;
 }
 
-/** 근거 축 한 행 — 아이브로 위, 본문(13 body) 아래.
- *  본문을 14→13으로 낮춘 건 인색해서가 아니라, 목록 카드에서 이 두 줄은 읽는 글이 아니라
- *  **"그래서 왜?"의 근거**이기 때문이다. 진짜 본문은 한 탭 뒤 시트에 있다. */
+/** 근거 축 한 행 — 아이브로 위, 본문(14 medium body) 아래.
+ *  ⭐대표 08-01: *"타이틀 하위 본문 bold하면 어때?"* + *"잘 어울리는 점과 기대 효과의 font를
+ *     좀만 키워서 (칩과) 맞추면 어때?"* → 13 regular → **14 medium**.
+ *  ⚠️ `font-bold`(700)까지 가지 않은 이유: 2줄짜리 한글 문장을 700으로 깔면 **읽는 글이 아니라
+ *     외치는 글**이 되고, 바로 위 칩(13 semibold)과 무게가 같아져 다시 평평해진다.
+ *     medium(500)이면 "굵어졌다"는 체감은 주면서 칩에 주인공 자리를 남긴다.
+ *  ⭐크기(14)는 칩(13)보다 크고 무게(500)는 칩(600)보다 낮다 — **축을 엇갈리게 해서**
+ *     둘이 서로 다른 이유로 눈에 들어오게 한 것. 같은 축으로 겨루면 하나가 죽는다. */
 function PreviewRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
@@ -56,25 +67,30 @@ export function ReportArchiveCard({ item }: { item: CollabReportListItem }) {
       onClick={() => track("report_archive_open")}
       className="block rounded-md border border-hairline bg-surface p-4 transition-colors hover:bg-surface-soft"
     >
-      {/* 쌍 캡션(칩) + 상대 지역 — 날짜보다 "어디 브랜드였지"가 재인식에 쓸모 있다(대표 07-26).
-          ⚠️ 비비드 Kiwi(bg-primary) 대신 **primary-pale**: Kiwi를 면으로 쓰는 곳은 primary CTA 하나뿐이고
-          (design.md 희소 원칙), 목록 카드마다 형광이 깔리면 CTA에서 힘을 잃는다.
-          라이트 배경에 Kiwi를 '텍스트'로 쓰는 것도 대비 부족으로 금지 → 글자는 primary-on(진초록). */}
+      {/* 쌍 이름 + 상대 지역 — 날짜보다 "어디 브랜드였지"가 재인식에 쓸모 있다(대표 07-26).
+          ⭐**pill을 벗고 카드 제목으로 승격**(대표 08-01): *"업체×업체 초록칩과 추천 콜라보 칩이
+             겹치니 헷갈림. 칩은 한 개여야 할 것 같은데"* — 정확한 지적이다. 한 카드에 pill이 두 종류면
+             독자는 **둘이 같은 종류의 정보라고 읽는다**(형태가 의미를 만든다). 그런데 이 둘은
+             전혀 다르다: 쌍 이름 = 카드의 정체 / 아이디어 = 카드의 내용.
+          ⭐**pill을 뺀 쪽이 여기인 이유**: 아이디어는 2~3개를 **열거**하는 게 목적이라 pill이 형태적으로
+             옳고(07-26 확정), 쌍 이름은 하나뿐이라 애초에 pill일 이유가 없었다. 제목은 제목답게.
+          ⚠️ 초록을 **`×` 하나에만** 남긴다 — 대표가 "text 컬러를 키위나 녹색으로"도 제안했지만,
+             브랜드명 전체를 초록으로 칠하면 목록 카드마다 초록 문단이 깔려 Kiwi 희소 원칙이 깨진다
+             (면색으로 Kiwi를 쓰는 곳은 primary CTA 하나뿐). `×`만 primary-on이면 초록은 최소로 남고,
+             **"두 브랜드가 만난다"는 뜻을 색이 대신 말해준다**. 라이트 배경에 비비드 Kiwi를 글자로
+             쓰는 건 여전히 금지(대비 부족) — primary-on(#1f5c00)은 대비 9:1로 안전. */}
       <div className="flex items-center justify-between gap-2">
-        {/* 굵기 없음(대표 지시 07-31) — 이 칩은 '어느 쌍인지' 알려주는 메타지 주인공이 아니다.
-            카드의 주인공은 아래 "추천 콜라보" 칩들이고, 이 칩까지 굵으면 시선이 둘로 갈린다.
-            면색(primary-pale)만으로도 충분히 구분된다. */}
-        <span className="min-w-0 truncate rounded-pill bg-primary-pale px-2.5 py-1 text-[13px] text-primary-on">
-          {item.fromName} × {item.toName}
-        </span>
-        {/* 지역도 같이 굵기 제거 — 칩과 한 줄에 나란한 짝이라 혼자 semibold면 어긋나 보인다 */}
+        <p className="min-w-0 truncate text-[15px] font-semibold text-ink">
+          {item.fromName} <span className="font-medium text-primary-on">×</span> {item.toName}
+        </p>
         {item.toRegion && <span className="shrink-0 text-[13px] text-mute">{item.toRegion}</span>}
       </div>
 
-      {/* ① 주인공 — 추천 콜라보. 캡션 바로 아래 = 카드의 머리.
-          이 축만 칩인 이유는 여러 개를 나란히 보여주는 게 목적이라 열거형이 맞아서다.
-          면은 surface-soft(뉴트럴) — 위 쌍 캡션이 primary-pale이라 여기까지 색을 쓰면
-          한 카드에 색 면이 둘이 되어 시선이 갈린다. 대비는 글자 ink + semibold로만. */}
+      {/* ① 추천 콜라보 — 카드에 남은 **유일한 칩**. 여러 개를 나란히 보여주는 게 목적이라
+          열거형(pill)이 형태적으로 옳다. 면은 surface-soft(뉴트럴) — 색 면은 카드에 두지 않는다.
+          ⭐14 → **13**(대표 08-01): *"아이디어 칩은 좋은데 다른 거에 비해 font가 너무 커서
+             밸런스가 안 맞아 보인다"*. 맞다 — 칩은 이미 **면(pill) + semibold + ink**로 강조 수단을
+             셋이나 갖고 있어서, 거기에 크기까지 얹으면 과했다. 크기를 빼도 주인공 자리는 안 뺏긴다. */}
       {item.ideaTitles.length > 0 && (
         <div className="mt-3">
           <BlockLabel>추천 콜라보</BlockLabel>
@@ -82,7 +98,7 @@ export function ReportArchiveCard({ item }: { item: CollabReportListItem }) {
             {item.ideaTitles.map((t) => (
               <span
                 key={t}
-                className="rounded-pill bg-surface-soft px-3 py-1.5 text-[14px] font-semibold break-keep text-ink"
+                className="rounded-pill bg-surface-soft px-3 py-1.5 text-[13px] font-semibold break-keep text-ink"
               >
                 {t}
               </span>
@@ -98,14 +114,14 @@ export function ReportArchiveCard({ item }: { item: CollabReportListItem }) {
         <div className="mt-3 space-y-2.5 border-t border-hairline pt-3">
           {item.matchPoint && (
             <PreviewRow label="잘 어울리는 점">
-              <p className="line-clamp-2 text-[13px] leading-relaxed break-keep text-body">
+              <p className="line-clamp-2 text-[14px] leading-relaxed font-medium break-keep text-body">
                 {item.matchPoint}
               </p>
             </PreviewRow>
           )}
           {item.effect && (
             <PreviewRow label="기대 효과">
-              <p className="line-clamp-2 text-[13px] leading-relaxed break-keep text-body">
+              <p className="line-clamp-2 text-[14px] leading-relaxed font-medium break-keep text-body">
                 {item.effect}
               </p>
             </PreviewRow>
