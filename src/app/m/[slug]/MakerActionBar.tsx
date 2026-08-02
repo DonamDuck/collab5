@@ -99,7 +99,23 @@ export function MakerActionBar({
   //    소개 링크를 먼저 보여줘야 상대가 "누가 왜 이런 아이디어를 냈는지" 순서대로 읽는다.
   const buildMessage = (added: number[]) => {
     const hello = selectedBrand ? `안녕하세요, ${selectedBrand.name}입니다.` : senderName ? `안녕하세요, ${senderName}입니다.` : "안녕하세요!";
-    const intro = `${hello}\ncollab5에서 소개서를 보고 함께 재미있는 콜라보를 만들어볼 수 있을 것 같아 먼저 연락드렸어요.`;
+    // 첫 줄 — ⚠️**우리 쪽 물건을 언급하지 않는다**(대표 확정 08-02).
+    //  구 문구: "collab5에서 소개서를 보고 …". 두 가지가 깨진다 —
+    //   ① 받는 사람은 collab5를 모른다. 낯선 플랫폼 이름으로 시작하는 콜드 DM은 신뢰를 **깎는다**.
+    //   ② 더 큰 문제: 상대가 **우리 회원이 아니면 그 사람에겐 소개서가 없다.** 컨시어지로 만든
+    //      소개서는 본인도 모르는 상태라 "소개서를 보고"는 "내 소개서? 내가 언제?"가 된다.
+    //  → 대신 **상대 이름을 부른다.** B안("인스타그램 보다가")보다 28자 길지만 이름이 들어가는 쪽이
+    //     "누구한테나 뿌린 템플릿"과 "우리를 보고 쓴 글"을 가른다(대표 C안 선택).
+    // ⚠️인스타 채널이 없으면 "인스타그램을 보다가"는 **거짓**이 된다 → 그 절을 통째로 뺀다.
+    //   없는 근거를 지어내느니 이유를 말 안 하는 쪽이 낫다.
+    // 🔜 **되돌릴 예정**: 등록 업체를 전부 실제 사장님께 위임하고 나면 구 문구로 복귀한다.
+    //   그 시점엔 상대에게 진짜 소개서가 있으므로 `collab5` 언급이 흠이 아니라 **마케팅 문구**가 된다.
+    //   (대표 지시 08-02 · 백로그 = [[콜라보-제안-찜-플로우]])
+    const sawOn =
+      channel?.channel === "instagram"
+        ? `${makerName}님 인스타그램을 보다가, `
+        : "";
+    const intro = `${hello}\n${sawOn}저희와 함께 하면 재미있는 걸 만들 수 있겠다 싶어 먼저 연락드렸어요.`;
     const url = selectedBrand && typeof window !== "undefined" ? `${window.location.origin}/m/${selectedBrand.slug}` : "";
 
     if (added.length === 0) {
@@ -113,7 +129,9 @@ export function MakerActionBar({
     const ideaLines = added
       .map((i) => reportIdeas[i])
       .filter((idea): idea is CollabReportData["ideas"][number] => !!idea)
-      .map((idea, i) => `${i + 1}.${idea.title} — ${idea.desc}`)
+      // ⚠️ 번호 뒤 **공백 필수**(08-02). `1.드립커피`처럼 붙여 쓰면 사람이 쓴 글로 안 보인다 —
+      //    DM에서 이런 사소한 흠 하나가 통째로 "기계가 뿌린 것"으로 읽히게 만든다.
+      .map((idea, i) => `${i + 1}. ${idea.title} — ${idea.desc}`)
       .join("\n\n");
     msg += `\n\n아래는 콜라보를 함께 한다면 제안드려보고 싶은 콜라보 아이디어예요.\n${ideaLines}`;
     msg += `\n\n혹, 저희와의 콜라보에 관심 있으시다면 편하실 때 답장 주시면 감사하겠습니다. 😊`;
