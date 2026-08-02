@@ -1,0 +1,444 @@
+<title>소개서 보강 검토</title>
+
+<!--
+  ═══════════════════════════════════════════════════════════════════
+  소개서 보강 검토판 — collab-page-enrich §③ 전용 템플릿
+
+  쓰는 법: 아래 BRAND / ITEMS 만 채워서 Artifact로 발행한다.
+  나머지(스타일·복사 로직)는 손대지 마라 — 특히 복사 3단 폴백은
+  "복사 실패" 사고(2026-08-02) 때문에 들어간 것이다.
+
+  ITEMS 한 항목:
+  {
+    id:      'collab-01',                  // 안 겹치게
+    kind:    '콜라보' | '활동' | '소개된 곳' | '섹션',
+    title:   '살화 x 수상한 짜이가게 팝업',   // 콜라보 제목은 파트너명 아닌 프로젝트명
+    meta:    '2025.09 · ♥182 · 💬14 · 사진 8장',
+    url:     'https://www.instagram.com/p/XXXX/',   // 없으면 ''
+    photos:  8,                            // 사진 장수(0이면 배지 없음)
+    current: '지금 소개서에 있는 문장',        // 신규면 ''
+    draft:   '내가 제안하는 문안 전문',
+  }
+  ═══════════════════════════════════════════════════════════════════
+-->
+
+<script>
+const BRAND = {
+  name: "브랜드명",
+  slug: "m-xxxxxx",
+  caps: { "콜라보": 5, "활동": 5 },   // 소개서 상한
+};
+
+const ITEMS = [
+  // 여기에 항목들
+];
+</script>
+
+<style>
+  :root {
+    --ink: #16130f;
+    --ink-soft: #5c554c;
+    --ink-faint: #8e857a;
+    --paper: #fbf9f6;
+    --card: #ffffff;
+    --line: #e5ded4;
+    --line-soft: #efe9e1;
+    --accent: #7d4f2a;
+    --accent-soft: #f3e7db;
+    --keep: #2f6b4f;
+    --keep-soft: #e2f0e8;
+    --drop: #a33a3a;
+    --drop-soft: #f7e4e4;
+    --edit: #8a6414;
+    --edit-soft: #f8eed4;
+    --shadow: 0 1px 2px rgba(28, 22, 14, .05), 0 6px 18px -10px rgba(28, 22, 14, .18);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ink: #f0ebe4; --ink-soft: #b3a99c; --ink-faint: #8b8175;
+      --paper: #16140f; --card: #1f1c17; --line: #34302a; --line-soft: #2a2721;
+      --accent: #d6a173; --accent-soft: #3a2c1e;
+      --keep: #7fc4a1; --keep-soft: #1f3a2e;
+      --drop: #e08787; --drop-soft: #3d2222;
+      --edit: #d9b45f; --edit-soft: #3a3018;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 6px 18px -10px rgba(0,0,0,.6);
+    }
+  }
+  :root[data-theme="light"] {
+    --ink: #16130f; --ink-soft: #5c554c; --ink-faint: #8e857a;
+    --paper: #fbf9f6; --card: #ffffff; --line: #e5ded4; --line-soft: #efe9e1;
+    --accent: #7d4f2a; --accent-soft: #f3e7db;
+    --keep: #2f6b4f; --keep-soft: #e2f0e8;
+    --drop: #a33a3a; --drop-soft: #f7e4e4;
+    --edit: #8a6414; --edit-soft: #f8eed4;
+    --shadow: 0 1px 2px rgba(28, 22, 14, .05), 0 6px 18px -10px rgba(28, 22, 14, .18);
+  }
+  :root[data-theme="dark"] {
+    --ink: #f0ebe4; --ink-soft: #b3a99c; --ink-faint: #8b8175;
+    --paper: #16140f; --card: #1f1c17; --line: #34302a; --line-soft: #2a2721;
+    --accent: #d6a173; --accent-soft: #3a2c1e;
+    --keep: #7fc4a1; --keep-soft: #1f3a2e;
+    --drop: #e08787; --drop-soft: #3d2222;
+    --edit: #d9b45f; --edit-soft: #3a3018;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 6px 18px -10px rgba(0,0,0,.6);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Pretendard",
+                 "Noto Sans KR", system-ui, sans-serif;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 780px; margin: 0 auto; padding: 32px 20px 200px; }
+
+  header.top { margin-bottom: 28px; }
+  .eyebrow {
+    font-size: 12px; letter-spacing: .12em; text-transform: uppercase;
+    color: var(--accent); font-weight: 700; margin-bottom: 6px;
+  }
+  h1 { font-size: 26px; margin: 0 0 10px; letter-spacing: -.02em; text-wrap: balance; }
+  .lede { color: var(--ink-soft); font-size: 14.5px; margin: 0; }
+  .lede b { color: var(--ink); }
+
+  .howto {
+    margin-top: 18px; padding: 14px 16px; border-radius: 10px;
+    background: var(--accent-soft); border: 1px solid var(--line);
+    font-size: 13.5px; color: var(--ink-soft);
+  }
+  .howto ol { margin: 6px 0 0; padding-left: 20px; }
+  .howto li { margin: 3px 0; }
+  .howto b { color: var(--ink); }
+
+  h2.group {
+    font-size: 13px; letter-spacing: .1em; color: var(--ink-faint);
+    font-weight: 700; margin: 36px 0 12px; padding-bottom: 8px;
+    border-bottom: 1px solid var(--line); display: flex; justify-content: space-between;
+    align-items: baseline; gap: 12px;
+  }
+  h2.group .count { font-variant-numeric: tabular-nums; letter-spacing: 0; font-size: 12px; }
+  h2.group .over { color: var(--drop); }
+
+  .card {
+    background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+    padding: 16px 18px; margin-bottom: 12px; box-shadow: var(--shadow);
+    border-left: 4px solid var(--line); transition: border-left-color .15s;
+  }
+  .card[data-state="keep"] { border-left-color: var(--keep); }
+  .card[data-state="edit"] { border-left-color: var(--edit); }
+  .card[data-state="drop"] { border-left-color: var(--drop); opacity: .55; }
+
+  .card-head { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+  .num {
+    font-variant-numeric: tabular-nums; font-size: 12px; font-weight: 700;
+    color: var(--ink-faint); min-width: 22px;
+  }
+  .card-title { font-size: 16px; font-weight: 700; letter-spacing: -.01em; flex: 1; min-width: 0; }
+  .badge {
+    font-size: 11px; padding: 2px 7px; border-radius: 999px;
+    background: var(--accent-soft); color: var(--accent); font-weight: 700; white-space: nowrap;
+  }
+  .meta {
+    font-size: 12.5px; color: var(--ink-faint); margin: 4px 0 0 30px;
+    font-variant-numeric: tabular-nums;
+  }
+  .meta a { color: var(--accent); text-decoration: none; border-bottom: 1px solid currentColor; }
+  .meta a:hover { opacity: .75; }
+
+  .body { margin: 12px 0 0 30px; }
+  .current {
+    font-size: 13.5px; color: var(--ink-faint); background: var(--paper);
+    border-left: 2px solid var(--line); padding: 8px 12px; margin: 0 0 10px;
+    border-radius: 0 6px 6px 0; white-space: pre-wrap;
+  }
+  .current .lbl { display: block; font-size: 11px; letter-spacing: .08em; margin-bottom: 3px; font-weight: 700; }
+
+  textarea.draft {
+    width: 100%; border: 1px solid var(--line); border-radius: 8px;
+    background: var(--paper); color: var(--ink); padding: 11px 13px;
+    font: inherit; font-size: 14.5px; line-height: 1.7; resize: vertical;
+    min-height: 84px; overflow: hidden;
+  }
+  textarea.draft:focus { outline: 2px solid var(--accent); outline-offset: 1px; border-color: transparent; }
+  .card[data-state="drop"] textarea.draft { text-decoration: line-through; }
+
+  .note-row { margin: 8px 0 0 30px; }
+  .note-row label {
+    display: block; font-size: 11px; letter-spacing: .07em; font-weight: 700;
+    color: var(--ink-faint); margin-bottom: 3px;
+  }
+  textarea.note {
+    width: 100%; border: 1px dashed var(--line); border-radius: 8px; background: transparent;
+    color: var(--ink-soft); padding: 7px 11px; font: inherit; font-size: 13px; line-height: 1.6;
+    resize: vertical; min-height: 36px; overflow: hidden;
+  }
+  textarea.note::placeholder { color: var(--ink-faint); opacity: .8; }
+  textarea.note:focus {
+    outline: 2px solid var(--accent); outline-offset: 1px;
+    border-color: transparent; background: var(--paper);
+  }
+  .card[data-note="on"] textarea.note { border-style: solid; border-color: var(--accent); background: var(--paper); }
+
+  .actions { display: flex; gap: 6px; margin: 10px 0 0 30px; flex-wrap: wrap; align-items: center; }
+  button.st {
+    font: inherit; font-size: 12.5px; font-weight: 600; padding: 5px 12px;
+    border-radius: 999px; border: 1px solid var(--line); background: transparent;
+    color: var(--ink-soft); cursor: pointer; transition: .12s;
+  }
+  button.st:hover { border-color: var(--ink-faint); }
+  button.st:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .card[data-state="keep"] button[data-set="keep"] { background: var(--keep-soft); color: var(--keep); border-color: transparent; }
+  .card[data-state="drop"] button[data-set="drop"] { background: var(--drop-soft); color: var(--drop); border-color: transparent; }
+  .edited-flag {
+    font-size: 11.5px; font-weight: 700; color: var(--edit);
+    background: var(--edit-soft); padding: 3px 9px; border-radius: 999px; display: none;
+  }
+  .card[data-state="edit"] .edited-flag { display: inline-block; }
+
+  .bar {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
+    background: color-mix(in srgb, var(--card) 92%, transparent);
+    backdrop-filter: blur(10px); border-top: 1px solid var(--line);
+    padding: 12px 20px calc(12px + env(safe-area-inset-bottom));
+  }
+  .bar-in {
+    max-width: 780px; margin: 0 auto; display: flex; align-items: center;
+    gap: 14px; flex-wrap: wrap;
+  }
+  .tally { font-size: 13px; color: var(--ink-soft); font-variant-numeric: tabular-nums; flex: 1; min-width: 180px; }
+  .tally b { color: var(--ink); }
+  .tally .over { color: var(--drop); font-weight: 700; }
+  button.copy {
+    font: inherit; font-size: 14.5px; font-weight: 700; padding: 11px 22px;
+    border-radius: 9px; border: none; background: var(--accent); color: var(--paper);
+    cursor: pointer; transition: .12s; white-space: nowrap;
+  }
+  button.copy:hover { filter: brightness(1.08); }
+  button.copy:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+  button.copy.done { background: var(--keep); }
+
+  /* ── 복사 3단 폴백의 3단계: 권한과 무관하게 항상 먹는 수동 경로 ── */
+  #fallback { display: none; margin-top: 12px; }
+  #fallback.on { display: block; }
+  #fallback p {
+    font-size: 13px; color: var(--drop); margin: 0 0 6px; font-weight: 600;
+  }
+  #fallback textarea {
+    width: 100%; height: 120px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 12px; border: 1px solid var(--drop); border-radius: 8px;
+    padding: 10px; background: var(--paper); color: var(--ink); line-height: 1.5;
+  }
+
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+  @media (max-width: 560px) {
+    .wrap { padding: 24px 14px 220px; }
+    .meta, .body, .actions { margin-left: 0; }
+    h1 { font-size: 22px; }
+  }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div class="eyebrow">소개서 보강 검토</div>
+    <h1 id="h-title">브랜드</h1>
+    <p class="lede">제가 쓴 문안입니다. <b>마음에 안 드는 문장은 여기서 바로 고쳐주세요.</b></p>
+
+    <div class="howto">
+      <b>고르는 법</b>
+      <ol>
+        <li>넣을 항목은 <b>[그대로]</b>, 뺄 항목은 <b>[빼기]</b>를 누르세요.</li>
+        <li>문장을 고치고 싶으면 <b>글상자를 직접 수정</b>하면 됩니다 (자동으로 '수정함'이 됩니다).</li>
+        <li><b>의견 칸에 "왜" 를 한 줄만</b> 남겨주세요 — 고친 결과만으론 규칙을 못 뽑습니다.
+            사실이 틀린 건지, 문체가 별로인 건지에 따라 다음 초안이 달라집니다.</li>
+        <li>다 하셨으면 아래 <b>[결정 전체 복사]</b> → 채팅에 붙여넣기. 한 번이면 끝입니다.</li>
+      </ol>
+    </div>
+  </header>
+
+  <main id="list"></main>
+</div>
+
+<div class="bar">
+  <div class="bar-in">
+    <div class="tally" id="tally"></div>
+    <button class="copy" id="copyBtn">결정 전체 복사</button>
+  </div>
+  <div class="bar-in" id="fallback">
+    <div style="width:100%">
+      <p>자동 복사가 막혔습니다 — 아래 글상자가 전체 선택돼 있으니 <b>⌘C</b>(또는 Ctrl+C)를 누르세요.</p>
+      <textarea id="fallbackText" readonly></textarea>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  const state = {};   // id -> {status:'keep'|'drop', text:string, edited:boolean}
+  const listEl = document.getElementById("list");
+  document.getElementById("h-title").textContent = BRAND.name + " 소개서 보강";
+
+  const esc = (s) => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  const groups = [...new Set(ITEMS.map(i => i.kind))];
+
+  groups.forEach(kind => {
+    const items = ITEMS.filter(i => i.kind === kind);
+    const cap = BRAND.caps[kind];
+    const h = document.createElement("h2");
+    h.className = "group";
+    h.innerHTML = `<span>${esc(kind)}</span><span class="count" data-kind="${esc(kind)}"></span>`;
+    listEl.appendChild(h);
+
+    items.forEach((it, idx) => {
+      state[it.id] = { status: "keep", text: it.draft, edited: false, note: "" };
+      const card = document.createElement("section");
+      card.className = "card";
+      card.dataset.state = "keep";
+      card.dataset.id = it.id;
+      card.dataset.kind = kind;
+      card.innerHTML = `
+        <div class="card-head">
+          <span class="num">${String(idx + 1).padStart(2, "0")}</span>
+          <span class="card-title">${esc(it.title)}</span>
+          ${it.photos ? `<span class="badge">사진 ${it.photos}장</span>` : ""}
+          ${it.current ? `<span class="badge">기존 항목</span>` : ""}
+        </div>
+        <div class="meta">${esc(it.meta || "")}${it.url ? ` · <a href="${esc(it.url)}" target="_blank" rel="noopener">원문 보기 ↗</a>` : ""}</div>
+        <div class="body">
+          ${it.current ? `<div class="current"><span class="lbl">지금 소개서</span>${esc(it.current)}</div>` : ""}
+          <textarea class="draft" spellcheck="false">${esc(it.draft)}</textarea>
+        </div>
+        <div class="note-row">
+          <label for="note-${esc(it.id)}">의견 (선택) — 왜 고쳤는지 한 줄만 적어주시면 다음 초안이 나아집니다</label>
+          <textarea class="note" id="note-${esc(it.id)}" rows="1" spellcheck="false"
+            placeholder="예) 사실이 틀림 / 너무 홍보 같음 / 이 문장이 제일 좋음"></textarea>
+        </div>
+        <div class="actions">
+          <button class="st" data-set="keep">그대로</button>
+          <button class="st" data-set="drop">빼기</button>
+          <span class="edited-flag">수정함</span>
+        </div>`;
+      listEl.appendChild(card);
+
+      const ta = card.querySelector("textarea.draft");
+      const fit = () => { ta.style.height = "auto"; ta.style.height = ta.scrollHeight + 2 + "px"; };
+      requestAnimationFrame(fit);
+      ta.addEventListener("input", () => {
+        fit();
+        const s = state[it.id];
+        s.text = ta.value;
+        s.edited = ta.value.trim() !== it.draft.trim();
+        if (s.status !== "drop") card.dataset.state = s.edited ? "edit" : "keep";
+        render();
+      });
+      const nt = card.querySelector("textarea.note");
+      const fitNote = () => { nt.style.height = "auto"; nt.style.height = nt.scrollHeight + 2 + "px"; };
+      requestAnimationFrame(fitNote);
+      nt.addEventListener("input", () => {
+        fitNote();
+        state[it.id].note = nt.value;
+        card.dataset.note = nt.value.trim() ? "on" : "";
+        render();
+      });
+      card.querySelectorAll("button.st").forEach(b => {
+        b.addEventListener("click", () => {
+          const s = state[it.id];
+          s.status = b.dataset.set;
+          card.dataset.state = s.status === "drop" ? "drop" : (s.edited ? "edit" : "keep");
+          render();
+        });
+      });
+    });
+  });
+
+  function render() {
+    groups.forEach(kind => {
+      const kept = ITEMS.filter(i => i.kind === kind && state[i.id].status !== "drop").length;
+      const cap = BRAND.caps[kind];
+      const el = document.querySelector(`.count[data-kind="${CSS.escape(kind)}"]`);
+      if (!el) return;
+      el.textContent = cap ? `${kept} / ${cap}` : `${kept}개`;
+      el.className = "count" + (cap && kept > cap ? " over" : "");
+    });
+    const parts = groups.map(kind => {
+      const kept = ITEMS.filter(i => i.kind === kind && state[i.id].status !== "drop").length;
+      const cap = BRAND.caps[kind];
+      const over = cap && kept > cap;
+      return `${kind} <b class="${over ? "over" : ""}">${kept}${cap ? "/" + cap : ""}</b>`;
+    });
+    const editedN = ITEMS.filter(i => state[i.id].edited && state[i.id].status !== "drop").length;
+    const noteN = ITEMS.filter(i => state[i.id].note.trim()).length;
+    document.getElementById("tally").innerHTML =
+      parts.join(" &nbsp;·&nbsp; ")
+      + (editedN ? ` &nbsp;·&nbsp; 수정 <b>${editedN}</b>` : "")
+      + (noteN ? ` &nbsp;·&nbsp; 의견 <b>${noteN}</b>` : "");
+  }
+  render();
+
+  function buildText() {
+    const L = [`[${BRAND.name} 보강 검토 결과 — ${BRAND.slug}]`, ""];
+    groups.forEach(kind => {
+      L.push(`### ${kind}`);
+      ITEMS.filter(i => i.kind === kind).forEach((it, idx) => {
+        const s = state[it.id];
+        const n = String(idx + 1).padStart(2, "0");
+        const note = s.note.trim();
+        if (s.status === "drop") {
+          L.push(`- ${n} ${it.title} → 빼기`);
+          if (note) L.push(`  💬 ${note}`);
+          return;
+        }
+        L.push(`- ${n} ${it.title} → ${s.edited ? "수정함" : "그대로"}`);
+        if (s.edited) L.push(s.text.trim().split("\n").map(l => "  " + l).join("\n"));
+        if (note) L.push(`  💬 ${note}`);
+      });
+      L.push("");
+    });
+    return L.join("\n").trim();
+  }
+
+  // ── 복사 3단 폴백 ─────────────────────────────────────────────
+  // ① navigator.clipboard  ② execCommand  ③ 전체선택 후 수동 ⌘C
+  // 아티팩트는 iframe 안이라 ①이 권한 정책으로 조용히 실패하는 환경이 있다.
+  const btn = document.getElementById("copyBtn");
+  const fb = document.getElementById("fallback");
+  const fbText = document.getElementById("fallbackText");
+
+  btn.addEventListener("click", async () => {
+    const text = buildText();
+    fb.classList.remove("on");
+
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(text);
+        return ok();
+      }
+    } catch (_) { /* ② 로 */ }
+
+    try {
+      const t = document.createElement("textarea");
+      t.value = text;
+      t.style.cssText = "position:fixed;top:0;left:0;opacity:0;";
+      document.body.appendChild(t);
+      t.focus(); t.select();
+      const done = document.execCommand("copy");
+      document.body.removeChild(t);
+      if (done) return ok();
+    } catch (_) { /* ③ 으로 */ }
+
+    fbText.value = text;
+    fb.classList.add("on");
+    fbText.focus();
+    fbText.select();
+    fbText.setSelectionRange(0, text.length);
+  });
+
+  function ok() {
+    btn.textContent = "복사됐어요 — 채팅에 붙여넣기";
+    btn.classList.add("done");
+    setTimeout(() => { btn.textContent = "결정 전체 복사"; btn.classList.remove("done"); }, 2600);
+  }
+})();
+</script>
