@@ -1489,7 +1489,7 @@ function OptionPicker({
           }}
           className="flex w-full items-center justify-center gap-1 rounded-md border border-dashed border-border-strong bg-surface py-2.5 text-[13px] text-mute transition-colors hover:border-primary hover:text-primary-on"
         >
-          ＋ 직접 입력하기
+          ＋직접 입력하기
         </button>
       )}
     </div>

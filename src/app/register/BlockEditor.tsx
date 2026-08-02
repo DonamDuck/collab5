@@ -240,7 +240,7 @@ export function BlockEditor({ blocks, onChange, onUploadingChange, onSheetOpenCh
                     onClick={() => setBlock(i, { ...b, items: [...b.items, { label: "", value: "" }] })}
                     className="flex w-full items-center justify-center gap-1 rounded-sm border border-primary-tint bg-primary-pale py-1.5 text-[14px] font-medium text-primary-on transition-colors hover:bg-primary-tint"
                   >
-                    ＋ 숫자 추가
+                    ＋숫자 추가
                   </button>
                 )}
               </div>
@@ -284,7 +284,7 @@ export function BlockEditor({ blocks, onChange, onUploadingChange, onSheetOpenCh
                       placeholder="어떻게 소개됐나요? (선택) 예: 동네 사랑방 같은 공간으로 소개했어요"
                       className={taCls}
                     />
-                    <CollapsedField hasValue={(it.photos?.length ?? 0) > 0} label="＋ 사진 추가 (선택)">
+                    <CollapsedField hasValue={(it.photos?.length ?? 0) > 0} label="＋사진 추가 (선택)">
                       <div className="flex flex-wrap gap-2">
                         {(it.photos ?? []).map((url, p) => (
                           <div key={p} className="relative h-20 w-20 shrink-0 overflow-hidden rounded-md border border-hairline">
@@ -315,7 +315,7 @@ export function BlockEditor({ blocks, onChange, onUploadingChange, onSheetOpenCh
                         )}
                       </div>
                     </CollapsedField>
-                    <CollapsedField hasValue={!!it.link?.trim()} label="＋ 링크 추가 (선택)">
+                    <CollapsedField hasValue={!!it.link?.trim()} label="＋링크 추가 (선택)">
                       <input
                         value={it.link ?? ""}
                         onChange={(e) => setBlock(i, { ...b, items: b.items.map((x, y) => (y === k ? { ...x, link: e.target.value } : x)) })}
@@ -331,7 +331,7 @@ export function BlockEditor({ blocks, onChange, onUploadingChange, onSheetOpenCh
                     onClick={() => setBlock(i, { ...b, items: [...b.items, { title: "", year: "", desc: "", link: "", photos: [] }] })}
                     className="flex w-full items-center justify-center gap-1 rounded-sm border border-primary-tint bg-primary-pale py-1.5 text-[14px] font-medium text-primary-on transition-colors hover:bg-primary-tint"
                   >
-                    ＋ 소개 추가
+                    ＋소개 추가
                   </button>
                 )}
               </div>
@@ -373,7 +373,7 @@ export function BlockEditor({ blocks, onChange, onUploadingChange, onSheetOpenCh
                     onClick={() => setBlock(i, { ...b, items: [...b.items, { quote: "", source: "" }] })}
                     className="flex w-full items-center justify-center gap-1 rounded-sm border border-primary-tint bg-primary-pale py-1.5 text-[14px] font-medium text-primary-on transition-colors hover:bg-primary-tint"
                   >
-                    ＋ 후기 추가
+                    ＋후기 추가
                   </button>
                 )}
               </div>
@@ -534,7 +534,7 @@ export function BlockEditor({ blocks, onChange, onUploadingChange, onSheetOpenCh
   );
 }
 
-// 블록 공통 첨부(사진 최대3 · 링크 최대3) — '＋ 사진 추가'와 '＋ 링크 추가' 버튼을
+// 블록 공통 첨부(사진 최대3 · 링크 최대3) — '＋사진 추가'와 '＋링크 추가' 버튼을
 // 같은 스타일·같은 위치(하단 한 줄)로 통일. 사진은 있으면 펼침 시작(0→n 전이에서만 자동 펼침 —
 // 사용자가 일부러 접은 상태와 싸우지 않는다).
 function BlockAttachments({
@@ -627,12 +627,12 @@ function BlockAttachments({
       <div className="flex flex-wrap items-center gap-4">
         {!photosOpen && (
           <button type="button" onClick={() => setPhotosOpen(true)} className={actionCls}>
-            ＋ 사진 추가 (선택)
+            ＋사진 추가 (선택)
           </button>
         )}
         {links.length < 3 && (
           <button type="button" onClick={onAddLink} className={actionCls}>
-            ＋ 링크 추가
+            ＋링크 추가
           </button>
         )}
       </div>

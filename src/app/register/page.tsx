@@ -1708,7 +1708,7 @@ function RegisterForm() {
               onClick={addActivity}
               className="flex w-full items-center justify-center gap-1.5 rounded-md border border-primary-tint bg-primary-pale py-2.5 text-[14px] font-medium text-primary-on transition-colors hover:bg-primary-tint"
             >
-              ＋ 활동 추가
+              ＋활동 추가
             </button>
           )}
           </div>
@@ -1905,7 +1905,7 @@ function RegisterForm() {
                   onClick={addCollab}
                   className="flex w-full items-center justify-center gap-1.5 rounded-md border border-primary-tint bg-primary-pale py-2.5 text-[14px] font-medium text-primary-on transition-colors hover:bg-primary-tint"
                 >
-                  ＋ 콜라보 추가
+                  ＋콜라보 추가
                 </button>
               )}
             </div>
@@ -2734,7 +2734,7 @@ function CollapsedPhotos({ children, photoCount }: { children: React.ReactNode; 
         onClick={() => setOpen(true)}
         className="mr-4 text-[14px] text-mute underline underline-offset-2"
       >
-        ＋ 사진 추가 (선택)
+        ＋사진 추가 (선택)
       </button>
     );
   return <>{children}</>;
@@ -2755,7 +2755,7 @@ function CollapsedLink({ children, hasLink }: { children: React.ReactNode; hasLi
         onClick={() => setOpen(true)}
         className="mr-4 text-[14px] text-mute underline underline-offset-2"
       >
-        ＋ 링크 추가 (선택)
+        ＋링크 추가 (선택)
       </button>
     );
   return <>{children}</>;
