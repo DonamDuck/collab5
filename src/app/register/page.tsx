@@ -17,7 +17,8 @@ import type { CollabType, Block, Maker, Enrichment } from "@/lib/types";
 import { deriveRegion } from "@/lib/region";
 import { isRichIntro } from "@/lib/completeness";
 import { uploadPhoto, uploadPdf } from "@/lib/upload";
-import { mapLinkLabel, instagramSlug } from "@/lib/links";
+import { mapLinkLabel, instagramSlug, parseLatLngFromMapUrl } from "@/lib/links";
+import { MapCard } from "@/components/MapCard";
 import { useDismissable } from "@/components/useDismissable";
 import { PasswordInput } from "@/components/PasswordInput";
 import { track } from "@/lib/track";
@@ -189,6 +190,8 @@ function RegisterForm() {
   const [homepage, setHomepage] = useState("");
   const [mapUrl, setMapUrl] = useState("");
   const [mapUrlEditing, setMapUrlEditing] = useState(false);
+  // 지도 필드 미리보기용 핀 — 링크 문자열에서 그냥 꺼낸다(콜 0). 못 뽑으면 null → 지도 안 그림.
+  const mapPin = parseLatLngFromMapUrl(mapUrl);
   const [description, setDescription] = useState("");
   const [address, setAddress] = useState("");
   const [photos, setPhotos] = useState<Ph[]>([]);
@@ -2095,6 +2098,16 @@ function RegisterForm() {
                 placeholder="네이버 지도·카카오맵 공유 링크"
                 className="h-11 w-full rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
               />
+            )}
+            {/* ⭐ 지도 한 컷(08-02, 대표 지시) — 링크만 보여주면 **맞게 넣었는지 확인할 방법이
+                [열어보기 ↗]로 나가는 것뿐**이었다. 저장하면 소개서에 이 지도가 그대로 실리니,
+                작성 화면에서 미리 같은 그림을 보는 게 맞다(작성 = 결과의 예고여야 한다).
+                ⚠️ 좌표를 못 뽑으면(place 공유 링크 등) 안 그린다 — 위 링크 행이 그대로 폴백.
+                   그런 건은 저장 시 상호명 재조회로 좌표가 채워져 소개서엔 지도가 뜬다. */}
+            {mapPin && (
+              <div className="mt-2">
+                <MapCard {...mapPin} address={name.trim() || "우리 브랜드"} mapUrl={mapUrl} compact />
+              </div>
             )}
             {mapUrl.trim() && !mapLinkLabel(mapUrl) && (
               <p className="mt-1 text-[13px] text-mute">

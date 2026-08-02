@@ -7,8 +7,8 @@ import { getSessionUser } from "./supabase/server";
 import { getSessionUserId } from "./profiles";
 import { updateProfileImage } from "./profiles";
 import { sha256 } from "./hash";
-import { mapLinkLabel } from "./links";
-import { lookupPlaceByName, parseLatLngFromMapUrl } from "./naver-local";
+import { mapLinkLabel, parseLatLngFromMapUrl } from "./links";
+import { lookupPlaceByName } from "./naver-local";
 import type { Block, CollabType, Maker, Enrichment } from "./types";
 
 // 사진(리사이즈 data URL)은 개당 수십만~100만 자에 달해, 배열에 문자열로 담아

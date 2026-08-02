@@ -139,21 +139,7 @@ export async function lookupPlaceByName(
   };
 }
 
-/** 우리가 생성한 지도 링크(`?c=lng,lat,...`)에서 좌표를 되꺼낸다 — 기존 소개서 백필용.
- *  사장님이 붙여넣은 place 링크(`/p/entry/place/{id}`)엔 좌표가 없어 여기선 null이 나온다
- *  (그 경우는 상호명 재조회로 보충 — naver-local.ts 상단 주석 참조). */
-export function parseLatLngFromMapUrl(url?: string): { lat: number; lng: number } | null {
-  if (!url) return null;
-  try {
-    const c = new URL(url).searchParams.get("c"); // "lng,lat,level,..."
-    if (!c) return null;
-    const [lngStr, latStr] = c.split(",");
-    const lng = Number(lngStr);
-    const lat = Number(latStr);
-    if (!Number.isFinite(lng) || !Number.isFinite(lat)) return null;
-    if (lng < 124 || lng > 132 || lat < 33 || lat > 39) return null;
-    return { lat, lng };
-  } catch {
-    return null;
-  }
-}
+// ⚠️ `parseLatLngFromMapUrl`은 **`lib/links.ts`로 이사했다**(08-02).
+//    이 파일은 네이버 키를 들고 fetch하는 **서버 전용** 모듈이라, 폼(클라이언트 컴포넌트)에서
+//    좌표만 뽑으려고 import하면 서버 코드가 클라 번들에 딸려 들어간다.
+//    파서는 URL 문자열만 만지는 순수 함수 → 지도 URL 유틸(mapLinkLabel)이 이미 사는 links.ts가 제집.

@@ -21,7 +21,8 @@ import type {
 import { josa } from "@/lib/josa";
 import { blendDescriptions, canRegenDesc, noteRegenDesc } from "@/lib/enrichBlend";
 import { buildEnrichment } from "@/lib/enrichment";
-import { instagramSlug } from "@/lib/links";
+import { instagramSlug, parseLatLngFromMapUrl } from "@/lib/links";
+import { MapCard } from "@/components/MapCard";
 import { kstIso } from "@/lib/time";
 import type { Enrichment } from "@/lib/types";
 
@@ -239,6 +240,9 @@ export function EnrichWizard({
   const [mapPick, setMapPick] = useState<{ ans: "yes" | "custom" | "none" | null; customText: string }>({ ans: null, customText: "" });
   const [hpPick, setHpPick] = useState<LinkPick>(EMPTY_PICK);
   const [customInput, setCustomInput] = useState("");
+  // 지도 확인 카드에 띄울 핀 좌표 — 크롤이 만든 링크(`?c=lng,lat,...`)에서 그냥 꺼낸다(콜 0).
+  // ⚠️ 못 뽑으면 null → 카드가 조용히 안 그려지고 기존 텍스트 링크가 폴백(호출부 §지도 링크).
+  const mapPin = parseLatLngFromMapUrl(links.mapUrl);
 
   const [options, setOptions] = useState<EnrichOptions | null>(null);
   // 마지막 생성 입력 스냅샷 — 뒤로 갔다가 그대로 다음 누르면 재생성 스킵(콜 절약)
@@ -936,7 +940,17 @@ export function EnrichWizard({
                       확인하기 ↗
                     </a>
                   </div>
-                  <p className="mt-1 text-[13px] leading-relaxed text-mute">이 장소가 맞나요?</p>
+                  {/* ⭐ 지도 한 컷(08-02, 대표 지시). 바로 아래에서 "이 장소가 맞나요?"라고 묻는데,
+                      지금까진 확인하려면 [확인하기 ↗]로 **새 탭에 나갔다 와야** 했다 — 위저드는
+                      시트라서 이탈이 특히 비싸다. 핀을 보여주면 그 자리에서 판단이 끝난다.
+                      ⚠️ 좌표를 못 뽑으면(사장님이 붙여넣은 place 링크 등) 그냥 안 그린다 —
+                         위 텍스트 링크가 그대로 폴백이라 이 블록만 조용히 빠진다. */}
+                  {mapPin && (
+                    <div className="mt-2">
+                      <MapCard {...mapPin} address={fName.trim() || query} mapUrl={links.mapUrl} compact />
+                    </div>
+                  )}
+                  <p className="mt-2 text-[13px] leading-relaxed text-mute">이 장소가 맞나요?</p>
                   <div className="mt-2 flex flex-wrap gap-2">
                     {(
                       [
