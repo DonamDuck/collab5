@@ -475,7 +475,13 @@ class InMemoryRepo implements Repo {
   }
   // ── Brand DNA + 콜라보 리포트 (Map 기반 — Supabase와 동일 시그니처) ──
   private dnaByBrand = new Map<number, BrandDna>();
-  private reportsByPair = new Map<string, { report: CollabReportData; model: string; createdAt: string }[]>();
+  // status는 Supabase 구현과 **같은 규칙**으로 들고 있는다(08-02). 여기선 마지막이 곧 최신이라
+  // 없어도 동작은 같지만, 나중에 "이 리포트 폐기" 경로가 붙었을 때 로컬에서만 다르게 굴면
+  // 그 차이를 prod에서 처음 발견하게 된다.
+  private reportsByPair = new Map<
+    string,
+    { report: CollabReportData; model: string; createdAt: string; status: "active" | "inactive" }[]
+  >();
   async getBrandDna(brandId: number): Promise<BrandDna | null> {
     return this.dnaByBrand.get(brandId) ?? null;
   }
@@ -483,13 +489,14 @@ class InMemoryRepo implements Repo {
     this.dnaByBrand.set(brandId, dna);
   }
   async getLatestCollabReport(fromBrandId: number, toBrandId: number) {
-    const list = this.reportsByPair.get(`${fromBrandId}:${toBrandId}`) ?? [];
-    return list.length > 0 ? list[list.length - 1] : null; // append-only — 마지막 = 최신
+    const list = (this.reportsByPair.get(`${fromBrandId}:${toBrandId}`) ?? []).filter((r) => r.status === "active");
+    return list.length > 0 ? list[list.length - 1] : null; // append-only — 마지막 active = 최신
   }
   async insertCollabReport(r: { fromBrandId: number; toBrandId: number; requestedBy: number | null; report: CollabReportData; model: string }): Promise<void> {
     const key = `${r.fromBrandId}:${r.toBrandId}`;
     const list = this.reportsByPair.get(key) ?? [];
-    list.push({ report: r.report, model: r.model, createdAt: now() });
+    for (const old of list) old.status = "inactive"; // 먼저 내리고 → 그 다음에 넣는다(Supabase와 동일 순서)
+    list.push({ report: r.report, model: r.model, createdAt: now(), status: "active" });
     this.reportsByPair.set(key, list);
   }
   async listCollabReportsByUser(): Promise<CollabReportListItem[]> {
@@ -794,14 +801,28 @@ class SupabaseRepo implements Repo {
     const { error } = await this.db.from("brands").update({ dna }).eq("id", brandId);
     if (error) console.error(`[repo] setBrandDna failed brand=${brandId}: ${error.message}`);
   }
+  // ⭐status='active'만 읽는다(2026-08-02). append-only + 최신순으로도 "최신만 보임"은 됐지만,
+  //   그건 **새 리포트를 만들어야만** 옛 게 밀려난다는 뜻이었다. status가 있으면 새로 만들지 않고도
+  //   특정 행을 폐기할 수 있다 — 사장님이 "이 리포트 다시 만들어주세요"라고 할 때(=제작자가 폐기를
+  //   요청한 상황) 응할 수 있는 유일한 층. 전역 날짜 상수로는 남의 리포트까지 죽고, 행을 지우면
+  //   이력·원가 기록이 사라진다. (대표 판단 08-02 — 위계상 개별 요청엔 개별 상태가 맞다)
+  // 🎁 부작용이 곧 기능: **inactive로 두면 다음에 그 쌍을 여는 순간 캐시 미스 → 자동 재생성.**
+  //   미리 돈 내고 갈아엎을 필요 없이, 실제로 열릴 때만 비용이 난다(안 열리면 0원).
   async getLatestCollabReport(fromBrandId: number, toBrandId: number) {
     const { data, error } = await this.db.from("collab_reports").select("report, model, created_at")
-      .eq("from_brand_id", fromBrandId).eq("to_brand_id", toBrandId)
+      .eq("from_brand_id", fromBrandId).eq("to_brand_id", toBrandId).eq("status", "active")
       .order("created_at", { ascending: false }).limit(1).maybeSingle();
     if (error) console.error(`[repo] getLatestCollabReport failed ${fromBrandId}→${toBrandId}: ${error.message}`);
     return data ? { report: data.report as CollabReportData, model: data.model as string, createdAt: data.created_at as string } : null;
   }
   async insertCollabReport(r: { fromBrandId: number; toBrandId: number; requestedBy: number | null; report: CollabReportData; model: string }): Promise<void> {
+    // ⚠️**순서가 중요하다 — 먼저 기존 행을 내리고, 그 다음에 넣는다.** 반대로 하면 방금 넣은
+    //   자기 행까지 inactive로 만들어 캐시가 영영 안 산다(= 열 때마다 재생성 = 돈).
+    //   동시 요청이 겹쳐도 안전: 나중 것이 앞의 것까지 내리고 자기가 active가 되어 **항상 하나만 active**.
+    const { error: deactErr } = await this.db.from("collab_reports")
+      .update({ status: "inactive" })
+      .eq("from_brand_id", r.fromBrandId).eq("to_brand_id", r.toBrandId).eq("status", "active");
+    if (deactErr) console.error(`[repo] deactivate old reports failed ${r.fromBrandId}→${r.toBrandId}: ${deactErr.message}`);
     // 실패를 삼키면 캐시 행이 영영 안 쌓여 매 요청이 풀 생성이 된다(느림의 유력 원인).
     const { error } = await this.db.from("collab_reports").insert({ from_brand_id: r.fromBrandId, to_brand_id: r.toBrandId,
       requested_by: r.requestedBy, report: r.report, model: r.model });
@@ -810,6 +831,8 @@ class SupabaseRepo implements Repo {
   async listCollabReportsByUser(userId: number): Promise<CollabReportListItem[]> {
     // 내가 요청한 것만(요청자 전용 원칙) + 브랜드명·slug를 FK 임베드로 한 방에.
     // append-only라 같은 쌍이 여러 행 — 최신순으로 읽어 JS에서 쌍별 첫 행만 취한다(수십 건 규모라 충분).
+    // ⭐`status='active'`(08-02) — 폐기된 리포트는 아카이브에서도 사라진다. 쌍별 첫 행만 취하는
+    //   기존 로직은 그대로 두는데, 그건 **혹시 남을 중복 active를 막는 2차 방어**다(정상이면 쌍당 1행).
     const { data, error } = await this.db
       .from("collab_reports")
       .select(
@@ -818,6 +841,7 @@ class SupabaseRepo implements Repo {
           "to_brand:brands!collab_reports_to_brand_id_fkey(slug, name, status, region)"
       )
       .eq("requested_by", userId)
+      .eq("status", "active")
       .order("created_at", { ascending: false })
       .limit(200);
     if (error) {
