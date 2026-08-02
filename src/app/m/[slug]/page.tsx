@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { headers } from "next/headers";
 import { repo } from "@/lib/repo";
@@ -7,6 +8,44 @@ import { isStaffUser } from "@/lib/staff";
 import { MakerArticle } from "./MakerArticle";
 import { ConnectProfileButton } from "./ConnectProfileButton";
 import { MakerActionBar } from "./MakerActionBar";
+
+// ⭐링크 미리보기(카톡·인스타 DM에서 펼쳐지는 카드) — 이게 없으면 루트 layout의 홈 제목을
+//   그대로 물려받아 **"collab5 — 마음 맞는 브랜드들의 콜라보 플랫폼"** 이 뜬다(08-02 실측).
+//   DM 첫 줄에서 플랫폼 이름을 뺀 이유(받는 사람은 collab5를 모른다)가 링크 카드에서 무효화되고 있었다.
+//   제목에 한 줄 소개까지 이어 붙이면 **두 줄에서 잘려** 상호가 밀리므로, 소개는 description으로 내린다.
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}): Promise<Metadata> {
+  const { slug } = await params;
+  const maker = await repo.getMakerBySlug(slug);
+  if (!maker) return { title: "소개서를 찾을 수 없어요 — collab5" };
+
+  // 썸네일 — 지금까지는 og:image가 없어 카톡이 본문에서 아무 이미지나 주워왔다. 그걸 우리가 정한다.
+  // ⚠️**브랜드 사진이 먼저다.** 로고(`profiles.profile_image`)는 브랜드가 아니라 **계정**의 것이라,
+  //   한 계정이 소개서를 여러 개 가지면 전부 같은 썸네일이 된다 — 지금 15/17이 대표 계정 소유라
+  //   로고를 우선하면 링크 미리보기가 전부 같은 그림으로 뜬다(08-02 실측: 캔버스가든·로컬페이지 동일).
+  //   소유권을 사장님들께 넘기고 나면 계정=브랜드가 되어 로고도 고유해지지만, 그때도 그 브랜드의
+  //   사진이 더 잘 보여준다. 로고는 사진이 아예 없을 때의 폴백으로만 둔다.
+  //   (data URL 로고는 크롤러가 http로 다시 요청해 가져가므로 통째로 무시된다 → http만 통과시킨다.)
+  const ownerProfile = maker.ownerUserId ? await getProfileById(maker.ownerUserId) : null;
+  const logo = ownerProfile?.profileImage?.startsWith("http") ? ownerProfile.profileImage : "";
+  const image = maker.photos[0] || logo || undefined;
+  const title = `[collab5 소개서] ${maker.name}`;
+  const description = maker.oneLiner || maker.description || "브랜드 소개서";
+
+  return {
+    title,
+    description,
+    openGraph: {
+      title,
+      description,
+      type: "profile",
+      ...(image ? { images: [{ url: image }] } : {}),
+    },
+  };
+}
 
 // 공개 업체 상세페이지 — 누구나 열람(MVP 검색 결과의 도착지). 검증 가능한 신뢰 시그널 노출.
 export default async function MakerPage({
