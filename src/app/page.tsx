@@ -17,13 +17,35 @@ import { repo } from "@/lib/repo";
 const GRID_LIMIT = 24;
 const MIN_GRID = 3; // 이보다 적으면 섹션을 아예 안 그린다(디자인팀 07-27 규칙 승계).
 
+// ⭐홈 그리드 노출 순서 — 대표가 직접 정한다(08-02). 2열이라 위→아래·왼→오른쪽으로 1,2 / 3,4 …
+//   ⚠️ 이름이 아니라 **slug**로 잡는다 — 상호는 사장님이 바꿀 수 있지만 slug는 안 바뀐다.
+//   여기 없는 브랜드(새로 등록된 곳)는 이 목록 **뒤에** repo 기본 정렬대로 붙는다.
+//   순서를 바꾸려면 이 배열만 고치면 된다.
+const HOME_ORDER: string[] = [
+  "m-ofjghi", // 캔버스가든
+  "m-vs9xzg", // 호락호락도서관
+  "m-uako9s", // 아그레아블
+  "m-oblejt", // 계단뿌셔클럽
+  "m-irywef", // 두더지요가원
+  "m-8r5gep", // 콜렉트마이페이보릿
+  "m-u8y5i3", // 캔앤코르크
+  "m-x3djf8", // 레이지오터
+  "m-1vv8kj", // 로컬페이지
+];
+
 // ⚠️ 이 한 줄이 없으면 목록이 **배포 시점에 얼어붙는다**(서버 컴포넌트 프리렌더 함정, /search·/my와 동일).
 // 다만 홈은 최다 트래픽 랜딩이라 매 요청 조회(force-dynamic) 대신 ISR로 둔다 —
 // 캐러셀은 '등록 오래된 순 10개'라 신규 등록이 앞자리를 밀어내는 일이 거의 없어 5분 지연이 문제되지 않는다.
 export const revalidate = 300;
 
 export default async function Home() {
-  const collabBrands = await repo.listHomeMakers(GRID_LIMIT);
+  const fetched = await repo.listHomeMakers(GRID_LIMIT);
+  // HOME_ORDER에 있는 것부터 그 순서대로, 없는 건 뒤에 원래 순서 그대로(Array#sort는 안정 정렬).
+  const rank = (slug: string) => {
+    const i = HOME_ORDER.indexOf(slug);
+    return i === -1 ? Number.MAX_SAFE_INTEGER : i;
+  };
+  const collabBrands = [...fetched].sort((a, b) => rank(a.slug) - rank(b.slug));
 
   return (
     <main className="mx-auto w-full max-w-[960px] px-4 py-12 sm:px-6">

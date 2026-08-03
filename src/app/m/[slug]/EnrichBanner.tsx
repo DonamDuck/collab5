@@ -102,7 +102,8 @@ export function EnrichBanner({
             🌱 소개서를 더 풍성하게 만들어드릴까요?
           </h2>
           <p className={`mt-1 break-keep text-[13px] leading-[1.6] ${desc}`}>
-            collab5가 온라인과 인스타그램에 있는 사진과 이야기를 찾아 소개서에 함께 담아드려요.(무료, 1일 소요)
+            collab5팀이 웹과 인스타그램의 사진, 이야기를 더해 더욱 풍성하게 채워드릴 수 있어요. (무료,
+            1일 소요)
           </p>
         </div>
         <button
