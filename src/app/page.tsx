@@ -192,23 +192,30 @@ export default async function Home() {
         </div>
       </section>
 
-      {/* 왜 소개서? — DM vs 소개서 */}
+      {/* 콜라보의 시작 — 「혼자 시작할 때 vs collab5에서 시작할 때」
+          ⚠️ 대조축을 함부로 「DM vs 소개서」로 되돌리지 말 것(08-03 대표 확정, 원래 그거였다).
+             ①히어로가 콜라보 프레임인데 마지막 설명만 옛 웨지(소개서) 프레임으로 돌아갔고
+             ②콜라보 리포트의 종착지가 **DM 문구 복사**라 우리가 만들어 주는 걸 우리가 깎는 꼴이었다.
+             ③「이런 경험 있으셨나요?」는 콜라보 DM을 보내본 적 없는 1차 관객에게 "아니요"를 부른다(P1에 있는 사람에게 P3의 고통을 물음).
+          왼쪽 3줄 = 문제정의 P2 탐색 / P3 연락 / P1 상상과 1:1. 오른쪽은 **실재하는 기능만** — 없는 걸 넣지 말 것.
+          ⛔ 여정 3칸(찾기→제안→기록) 안은 기각 — 히어로 FlowStrip과 정면으로 겹친다.
+             역할 분담: FlowStrip=사이트에서 뭘 하나 / 이 섹션=내 브랜드에 뭐가 달라지나. */}
       <section className="mt-12">
         <Reveal>
           <h2 className="text-balance break-keep text-center text-[24px] font-bold leading-[1.35] tracking-[-0.02em] text-ink sm:text-[28px]">
-            브랜드 소개서는 이렇게 활용할 수 있어요.
+            콜라보의 시작이 이렇게 달라져요.
           </h2>
         </Reveal>
         {/* 위 3스텝과 같은 이유로 그룹 리빌 — 모바일 1열에서 카드마다 따로 뜨지 않게(대표 QA 07-31) */}
         <Reveal className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2">
-          {/* 그냥 DM */}
+          {/* 혼자 시작할 때 */}
           <div className="h-full rounded-xl border border-hairline bg-surface-soft p-6">
-            <p className="text-[16px] font-bold text-mute sm:text-[17px]">이런 경험 있으셨나요?</p>
+            <p className="text-[16px] font-bold text-mute sm:text-[17px]">혼자 시작하려면</p>
             <ul className="mt-4 space-y-3">
               {[
-                "내가 어떤 브랜드인지 하나씩 설명해야 해요.",
-                "상대는 내용을 이해하기 전부터 부담을 느껴요.",
-                "다른 메시지 사이에 금방 묻혀버려요.",
+                "어디에 어떤 브랜드가 있는지 알기 어려워요.",
+                "먼저 연락하기가 늘 조심스러워요.",
+                "무엇을 같이 하자고 해야 할지 막막해요.",
               ].map((t) => (
                 <li key={t} className="flex gap-2 text-[16px] leading-[1.65] text-body sm:text-[17px]">
                   <span className="text-faint">·</span>
@@ -217,17 +224,19 @@ export default async function Home() {
               ))}
             </ul>
           </div>
-          {/* 브랜드 소개서 */}
+          {/* collab5에서 시작할 때 — 왼쪽 3줄과 **순서까지 1:1**(탐색/연락/상상). 줄을 늘리면 대조가 흐려진다.
+              ⚠️ 「프로필 링크에 걸어두면 포트폴리오가 돼요」는 08-03에 뺐다 — 여기서 유일한 M3(자산) 문장이라
+                 '시작'으로 통일한 축에서 혼자 미래를 말했다. 자산 이야기는 M3 실험이 붙을 때 별도 자리로. */}
           <div className="h-full rounded-xl border border-primary bg-surface p-6 shadow-e1">
             <p className="flex items-center gap-1.5 text-[16px] font-bold text-ink sm:text-[17px]">
               <span className="h-2 w-2 rounded-pill bg-primary" />
-              이렇게 달라져요
+              collab5에서는
             </p>
             <ul className="mt-4 space-y-3">
               {[
-                "브랜드와 협업 제안을 한 번에 전달할 수 있어요.",
-                "상대가 필요한 정보를 한눈에 이해할 수 있어요.",
-                "프로필 링크에 걸어두면 우리 브랜드의 포트폴리오가 돼요.",
+                "콜라보를 기다리는 브랜드를 먼저 둘러볼 수 있어요.",
+                "소개서 링크 하나로 우리 브랜드를 설명할 수 있어요.",
+                "AI가 두 브랜드의 콜라보 아이디어를 먼저 정리해줘요.",
               ].map((t) => (
                 <li key={t} className="flex gap-2 text-[16px] leading-[1.65] text-body sm:text-[17px]">
                   <span className="font-bold text-primary-on">✓</span>
