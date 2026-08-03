@@ -74,9 +74,9 @@ export default async function Home() {
         {/* 슬로건 B′ — 콜라보 프레임(대표 확정 07-31 아침, "변경" 지시). '시작'만 약속(11곳으로도 이행 가능).
             디자인팀 차별화 변형이 나오면 2안 비교로 교체 가능. */}
         <h1 className="break-keep text-[28px] font-bold leading-[1.3] tracking-[-0.03em] text-ink sm:text-[40px]">
-          우리 브랜드의 콜라보,
+          우리 브랜드,
           <br />
-          여기서 시작해요.
+          이제는 콜라보할 차례예요.
         </h1>
         {/* 서브가 기능 전달 담당 — 소개서→분석 흐름을 한 문장에. AI 언급은 히어로 1곳 원칙 유지. */}
         <p className="mx-auto mt-4 max-w-[460px] break-keep text-[18px] font-bold leading-[1.5] text-primary-on sm:text-[20px]">
@@ -115,7 +115,7 @@ export default async function Home() {
         //    (`eager`로 하단 컷을 없애도 threshold는 그대로라 해결 안 됨 — 실측 확인)
         //    이 섹션은 홈의 주 콘텐츠다. 등장 연출보다 "바로 보이는 것"이 우선.
         <section
-          className="mt-16 -mx-4 bg-surface-soft px-4 py-14 [box-shadow:0_0_0_100vmax_var(--surface-soft)] [clip-path:inset(0_-100vmax)] sm:-mx-6 sm:px-6"
+          className="mt-10 -mx-4 bg-surface-soft px-4 py-10 [box-shadow:0_0_0_100vmax_var(--surface-soft)] [clip-path:inset(0_-100vmax)] sm:-mx-6 sm:px-6"
         >
           <h2 className="text-balance break-keep text-center text-[24px] font-bold leading-[1.35] tracking-[-0.02em] text-ink sm:text-[28px]">
             지금, 콜라보 가능한 브랜드예요.
@@ -132,7 +132,7 @@ export default async function Home() {
       {/* ③ 실물 구경 — 소개서 목업 + 분석 리포트 축약. 제품의 두 얼굴을 한 스크롤에(07-31).
           목업은 실제 데모 소개서 2종(사진 있는/없는), 디자인팀 브라우저 카드(de9d6c5) 그대로.
           온로드 라이즈 2번은 유지 — 폴드 아래면 안 보이는 채 재생이 끝나 정적으로 보인다(무해). */}
-      <section className="home-rise mt-16" style={{ animationDelay: "600ms" }}>
+      <section className="home-rise mt-10" style={{ animationDelay: "600ms" }}>
         {/* 앵커 탭 — 섹션 ③은 ⓐ소개서 만들기 / ⓑ콜라보 분석 두 덩어리라, 맨 위에 목차를 세워
             "다른 하나도 있다"를 먼저 알린다(대표 지시 08-02). 섹션 안에서만 sticky. 상세는 HomeSectionTabs.tsx. */}
         <HomeSectionTabs />
@@ -172,7 +172,7 @@ export default async function Home() {
 
         {/* 분석 리포트 축약 — 소개서 실물 바로 아래(같은 '실물 구경' 섹션). sample-report.json 재사용.
             "소개서를 만들면 이런 것도 받는다"가 소개서 CTA의 두 번째 근거가 된다(대표: 기능을 더 잘 쓰게). */}
-        <div className="mt-14 text-center">
+        <div className="mt-12 text-center">
           {/* h3 → h2 승격 + 크기도 형제 제목과 동일(08-02). 원래 이것만 h3/20px이라 "혼자 작아 보인다"(대표 QA).
               단순히 크기만 키우고 h3를 두면 안 된다 — 앵커 탭의 목적지가 되면서 이 구간은
               '소개서 구간의 하위 설명'이 아니라 **동급 섹션**이 됐다. 마크업이 보이는 위계를 따라가야 한다.
@@ -193,7 +193,7 @@ export default async function Home() {
       </section>
 
       {/* 왜 소개서? — DM vs 소개서 */}
-      <section className="mt-16">
+      <section className="mt-12">
         <Reveal>
           <h2 className="text-balance break-keep text-center text-[24px] font-bold leading-[1.35] tracking-[-0.02em] text-ink sm:text-[28px]">
             브랜드 소개서는 이렇게 활용할 수 있어요.
@@ -240,7 +240,7 @@ export default async function Home() {
       </section>
 
       {/* 마무리 CTA — eager 필수: 페이지 맨 마지막 요소라 하단 -22% 데드존을 못 벗어나 리빌이 영영 안 터짐 */}
-      <Reveal as="section" eager className="mt-14 text-center">
+      <Reveal as="section" eager className="mt-12 text-center">
         {/* 미션 한 줄 — 소개서가 쌓이면 발견으로 이어진다(BM 발굴 방향을 고객 언어로, 대표 확정 2026-07-23) */}
         <p className="mx-auto max-w-[440px] break-keep text-[20px] font-bold leading-[1.4] tracking-[-0.02em] text-ink sm:text-[24px]">
           지금 바로 콜라보를 시작해보세요 :)
