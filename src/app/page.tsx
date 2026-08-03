@@ -5,6 +5,7 @@
 import Link from "next/link";
 import { PreviewPhones } from "./PreviewPhones";
 import { HomeSectionTabs } from "./HomeSectionTabs";
+import { HomeEnrichBanner } from "./HomeEnrichBanner";
 import { Reveal } from "@/components/Reveal";
 import { BrandGrid } from "@/components/BrandGrid";
 import { SampleReportLink, SampleReportPeek } from "@/components/SampleReport";
@@ -141,6 +142,11 @@ export default async function Home() {
             브랜드 소개서 작성 예시
           </Link>
         </div>
+
+        {/* 보강 서비스 안내 — 예시 버튼 바로 아래(대표 지시 08-02). 위 버튼은 보더(보조),
+            이건 키위 면(주)이라 시선 순서가 '구경 → 신청'으로 이어진다.
+            보는 사람에 따라 문구·목적지가 갈린다 — 상세는 HomeEnrichBanner.tsx. */}
+        <HomeEnrichBanner />
 
         {/* 분석 리포트 축약 — 소개서 실물 바로 아래(같은 '실물 구경' 섹션). sample-report.json 재사용.
             "소개서를 만들면 이런 것도 받는다"가 소개서 CTA의 두 번째 근거가 된다(대표: 기능을 더 잘 쓰게). */}

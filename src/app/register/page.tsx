@@ -20,6 +20,7 @@ import { uploadPhoto, uploadPdf } from "@/lib/upload";
 import { mapLinkLabel, instagramSlug, parseLatLngFromMapUrl } from "@/lib/links";
 import { MapCard } from "@/components/MapCard";
 import { useDismissable } from "@/components/useDismissable";
+import { EnrichIntroSheet } from "./EnrichIntroSheet";
 import { PasswordInput } from "@/components/PasswordInput";
 import { track } from "@/lib/track";
 import type { ActivityHint, CollabHint, EnrichField } from "@/lib/enrich";
@@ -1234,6 +1235,10 @@ function RegisterForm() {
 
   return (
     <main className="mx-auto w-full max-w-[640px] px-4 pb-28 pt-8 sm:px-6">
+      {/* 진입 시트 — **새로 작성**하러 온 사람에게만 1초 뒤 올라온다(수정 모드는 제외).
+          "혼자 다 채우지 않아도 된다"를 먼저 알려 작성 부담으로 인한 이탈을 막는다. 상세는 EnrichIntroSheet.tsx */}
+      <EnrichIntroSheet enabled={!editParam && !editSlug} />
+
       {editSlug ? (
         <>
           <div className="flex items-start justify-between gap-3">
@@ -1446,7 +1451,11 @@ function RegisterForm() {
                 className="text-primary-on underline underline-offset-2"
               >
                 텍스트형 소개서 예시
-              </button>
+              </button>{" "}
+              {/* ⚠️ 여기서 보강 서비스로 나가는 **링크를 달지 않는다** — 폼 작성 중에 밖으로 내보내면
+                  소개서가 미완성으로 남고, 그러면 정작 보강해줄 대상이 사라진다(08-02 판단).
+                  안심만 주고, 실제 신청은 저장 후 소개서 페이지의 배너에서 받는다. */}
+              사진은 나중에 채워도 좋아요.
             </p>
             <PhotoGrid
               items={photos}

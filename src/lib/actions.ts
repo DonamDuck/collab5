@@ -186,6 +186,17 @@ export async function searchAction(q: string): Promise<Maker[]> {
   return repo.searchMakers(q);
 }
 
+/** 홈 보강 배너 분기용 — 지금 사람이 **자기 소개서를 가졌는지**만 알려준다.
+ *  ⚠️ 홈은 ISR(revalidate 300)이라 서버에서 세션을 읽으면 캐시가 통째로 깨진다.
+ *     그래서 배너만 클라 컴포넌트로 두고 이 액션을 부른다 — 홈 HTML은 계속 캐시된다.
+ *     소개서 목록·이름은 배너에 필요 없으니 boolean만 돌려준다(불필요한 데이터 노출 방지). */
+export async function hasOwnBrandAction(): Promise<boolean> {
+  const userId = await getSessionUserId();
+  if (!userId) return false;
+  const mine = await repo.listMakersByOwner(userId);
+  return mine.length > 0;
+}
+
 /** 등록 폼 '텍스트형 소개서 예시' 바텀시트용 — 텍스트 데모 소개서(고정 slug) 조회. 유료 콜 없음(DB 1회). */
 export async function getPreviewDemoNoneAction(): Promise<{ maker: Maker; logoUrl: string | null } | null> {
   const { DEMO_SLUG_NONE } = await import("./demo");
