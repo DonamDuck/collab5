@@ -1306,44 +1306,48 @@ function RegisterForm() {
 
       <div className="mt-8 space-y-12">
         {/* 이어서 쓰기 배너 — **자동 복구는 절대 하지 않는다.**
-            수정 모드에서 낡은 초안을 덜컥 얹으면 서버에 잘 저장해둔 내용을 되돌려버린다.
-            그래서 ①항상 물어보고 ②(생성 모드는) 저장 시각을 보여준다.
+            낡은 초안을 덜컥 얹으면 서버에 잘 저장해둔 내용을 되돌려버린다. 그래서 항상 물어본다.
 
-            대표 확정(2026-07-31): **수정 모드의 주 버튼 = 복원**으로 위계를 뒤집는다.
+            대표 확정(2026-07-31): **주 버튼 = 복원**으로 위계를 뒤집는다.
             문구·라벨은 대표가 직접 쓴 문장이라 글자 그대로 쓴다(다듬지 말 것).
             - 주(초록) [저장 내용 불러오기] = restoreDraft — 초안을 폼에 얹는다.
             - 부       [저장 내용 무시하기] = draft.clear — 배너를 닫고 **저장본까지 지운다.**
               ⚠️ '닫기만' 하면(dismiss) 바로 위 설명문이 약속한 "새로 시작하면 저장된 내용은
               삭제됩니다"를 화면이 스스로 어긴다. 그래서 dismiss가 아니라 clear다.
               clear는 저장본만 지우고 자동저장을 끄지 않는다(finished 플래그는 제출 때만) —
-              그 뒤 폼을 고치면 다시 저장되는 게 정상이다. */}
+              그 뒤 폼을 고치면 다시 저장되는 게 정상이다.
+
+            ⭐ 08-02 대표 지시로 **생성/수정 분기를 없앴다**(전엔 문구·라벨이 모드마다 달랐다).
+               통일 기준을 수정 모드로 잡은 이유 = 생성 모드 문구엔 **결정적 정보가 빠져 있었다**:
+               [새로 시작]이 실제로는 `draft.clear`라 **저장본을 지우는데**, "이어서 쓰거나,
+               새로 시작할 수 있어요"는 그 말을 안 한다 — 되돌릴 수 없는 행동을 예고 없이 시킨 셈.
+               수정 모드 문장은 "새로 시작하면 저장된 내용은 삭제됩니다"까지 말한다.
+            ⚠️ 대신 생성 모드가 갖고 있던 **저장 시각은 버리지 않았다.** 대표 문장의 막연한
+               "**이전에** 작성하던 내용이" 자리에 `agoLabel`을 끼워 "14시간 전에 작성하던
+               내용이"로 채운다 — 문장 구조는 그대로 두고 부사만 정확해진다.
+               (초안이 오래됐는지 = 이어쓸지 말지의 판단 근거라 빼면 안 되는 정보다) */}
         {draft.found && (
           <div className="rounded-lg border border-border-strong bg-surface px-4 py-3 shadow-e1">
-            <p className="text-[15px] font-medium text-ink">
-              {editSlug
-                ? "작성 중이던 내용을 발견했어요."
-                : `${agoLabel(draft.found.savedAt)} 쓰시던 내용이 있어요.`}
-            </p>
+            <p className="text-[15px] font-medium text-ink">작성 중이던 내용을 발견했어요.</p>
             <p className="mt-0.5 text-[13px] text-mute">
-              {editSlug
-                ? "이전에 작성하던 내용이 저장되어 있어요. 이어서 작성할 수 있으며, 새로 시작하면 저장된 내용은 삭제됩니다."
-                : "이어서 쓰거나, 새로 시작할 수 있어요."}
+              {agoLabel(draft.found.savedAt)} 작성하던 내용이 저장되어 있어요. 이어서 작성할 수
+              있으며, 새로 시작하면 저장된 내용은 삭제됩니다.
             </p>
             <div className="mt-3 flex gap-2">
-              {/* 주 = 복원. 부 = 삭제. 두 모드 모두 [주, 부] 순서라 분기가 필요없다. */}
+              {/* 주 = 복원. 부 = 삭제. */}
               <button
                 type="button"
                 onClick={() => draft.found && restoreDraft(draft.found.data)}
                 className="h-10 rounded-md bg-primary px-4 text-[14px] font-medium text-primary-on"
               >
-                {editSlug ? "저장 내용 불러오기" : "이어서 쓰기"}
+                저장 내용 불러오기
               </button>
               <button
                 type="button"
                 onClick={draft.clear}
                 className="h-10 rounded-md border border-border-strong bg-surface px-4 text-[14px] font-medium text-mute"
               >
-                {editSlug ? "저장 내용 무시하기" : "새로 시작"}
+                저장 내용 무시하기
               </button>
             </div>
           </div>
