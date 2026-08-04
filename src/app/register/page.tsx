@@ -903,6 +903,11 @@ function RegisterForm() {
     if (!name.trim()) return { anchor: "name-field", msg: "브랜드 이름을 알려주세요." };
     if (!offers.length)
       return { anchor: "offers-chips", msg: "함께하고 싶은 콜라보를 하나 이상 골라주세요." };
+    // 브랜드 사진 1장 — **신규 등록에서만** 필수(대표 확정 08-05). 상세 사유는 사진 섹션 주석 참조.
+    // ⚠️ `editSlug`는 편집 데이터를 불러온 뒤에 세팅되므로 **`editParam`도 같이** 본다 —
+    //    editSlug만 보면 부팅 중(editBooting) 한순간 신규로 오인해 기존 주인에게 사진을 요구한다.
+    if (!editParam && !editSlug && !photos.length)
+      return { anchor: "photos-field", msg: "브랜드 사진을 한 장 이상 올려주세요." };
     return null;
   };
   // 스크롤이 멈춘 그 자리에 표시를 남긴다 — 토스트는 사라져도 이건 고칠 때까지 남는다.
@@ -913,7 +918,8 @@ function RegisterForm() {
     if (!errField) return;
     if (errField.anchor === "name-field" && name.trim()) setErrField(null);
     if (errField.anchor === "offers-chips" && offers.length) setErrField(null);
-  }, [errField, name, offers.length]);
+    if (errField.anchor === "photos-field" && photos.length) setErrField(null);
+  }, [errField, name, offers.length, photos.length]);
 
   // ── 초본 완성 얼럿(AI 크롤 직후 사진 유도 · 세션 1회) ──
   const draftDoneShownRef = useRef(false); // '다시 받기'로 applyWizard 재호출돼도 처음 1번만
@@ -1437,29 +1443,48 @@ function RegisterForm() {
             )}
           </div>
 
-          {/* 브랜드 사진 (선택) */}
-          <div>
+          {/* 브랜드 사진 — **신규 등록 시 최소 1장 필수**(대표 확정 08-05).
+              왜 필수가 됐나: 사진 0장 소개서는 사장님이 **남에게 링크를 못 보낸다.** 안 보내면 P2·P3가 시작을 안 한다.
+              M0의 「간편하게 + 그럴싸하게」는 짝이라 하나만으론 성립하지 않는다([[미션-문제정의]]).
+              ⚠️ **수정 저장에는 적용하지 않는다** — 기존 텍스트형 소개서(08-01 기준 9곳 중 4곳) 주인이
+                 오타 하나 고치려다 자기 페이지에 갇힌다. 그쪽은 배너·보강 신청으로 채운다.
+              ⚠️ AI 크롤은 사진을 못 가져온다 → 모든 신규 사용자가 여기서 한 번 멈춘다.
+                 그래서 문구가 "왜 필요한지"까지 말해야 한다(요구만 하면 이탈한다). */}
+          <div id="photos-field" className="scroll-mt-28">
             <label className="mb-1 block text-[16px] font-medium text-body">
-              브랜드 사진 (선택, 최대 10장)
+              브랜드 사진{" "}
+              {!editParam && !editSlug ? (
+                <span className={errField?.anchor === "photos-field" ? "text-danger" : "text-primary-on"}>
+                  (필수 · 최소 1장)
+                </span>
+              ) : (
+                <span className="text-mute">(선택)</span>
+              )}
+              <span className="text-mute"> · 최대 10장</span>
             </label>
-            {/* 사진 불안 완화 — 사진 없이도 완성 예시를 그 자리에서 확인(바텀시트, 폼 이탈 없음) */}
             <p className="mb-2.5 text-[14px] leading-relaxed text-body">
-              지금 사진이 없다면 우선, 텍스트형 소개서로 시작해보세요.{" "}
+              한 장이면 충분해요. 가게·작업물·만든 것 아무거나 괜찮아요.{" "}
               <button
                 type="button"
                 onClick={openPreview}
                 className="text-primary-on underline underline-offset-2"
               >
-                텍스트형 소개서 예시
-              </button>{" "}
+                소개서 예시 보기
+              </button>
               {/* ⚠️ 여기서 보강 서비스로 나가는 **링크를 달지 않는다** — 폼 작성 중에 밖으로 내보내면
                   소개서가 미완성으로 남고, 그러면 정작 보강해줄 대상이 사라진다(08-02 판단).
                   안심만 주고, 실제 신청은 저장 후 소개서 페이지의 배너에서 받는다. */}
-              사진은 나중에 채워도 좋아요.
             </p>
+            {errField?.anchor === "photos-field" && (
+              <p className="mb-2.5 text-[13.5px] font-medium leading-relaxed text-danger">
+                {errField.msg}
+              </p>
+            )}
             <PhotoGrid
               items={photos}
               max={10}
+              // 신규 등록에서만 필수라, 수정 모드에선 타일도 "(선택)"으로 둔다(요구하지 않는 걸 요구하는 것처럼 보이지 않게).
+              addLabel={!editParam && !editSlug ? "사진(필수)" : "사진(선택)"}
               onAdd={onPhotos}
               onRemove={(i) => setPhotos((ps) => ps.filter((_, j) => j !== i))}
               onReorder={(from, to) => setPhotos((ps) => reorder(ps, from, to))}

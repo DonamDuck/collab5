@@ -10,6 +10,7 @@ export function PhotoGrid({
   onRemove,
   onReorder,
   onRetry,
+  addLabel = "사진(선택)",
 }: {
   items: { url: string; uploading?: boolean; failed?: string }[];
   max: number;
@@ -18,6 +19,9 @@ export function PhotoGrid({
   onReorder: (from: number, to: number) => void;
   /** 실패한 사진 다시 올리기 — 보관해둔 원본 파일로 재시도한다. */
   onRetry?: (i: number) => void;
+  /** 추가 타일 문구. ⚠️이 컴포넌트를 **네 곳이 공유**한다(브랜드·활동·콜라보·성사기록) —
+   *  기본값을 바꾸지 말고 필요한 곳에서만 넘겨라. 브랜드 사진만 필수(08-05)라 거기서 "사진(필수)"를 준다. */
+  addLabel?: string;
 }) {
   const [drag, setDrag] = useState<number | null>(null);
 
@@ -118,7 +122,7 @@ export function PhotoGrid({
         {items.length < max && (
           <label className="flex h-20 w-20 shrink-0 cursor-pointer flex-col items-center justify-center rounded-md border border-dashed border-border-strong bg-surface text-mute">
             <span className="text-xl leading-none">＋</span>
-            <span className="mt-1 text-[11px]">사진(선택)</span>
+            <span className="mt-1 text-[11px]">{addLabel}</span>
             <input
               type="file"
               accept="image/*"
