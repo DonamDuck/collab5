@@ -5,6 +5,7 @@
 import Link from "next/link";
 import { PreviewPhones } from "./PreviewPhones";
 import { HomeSectionTabs } from "./HomeSectionTabs";
+import { HomeEnrichBanner } from "./HomeEnrichBanner";
 import { Reveal } from "@/components/Reveal";
 import { BrandGrid } from "@/components/BrandGrid";
 import { SampleReportLink, SampleReportPeek } from "@/components/SampleReport";
@@ -16,13 +17,35 @@ import { repo } from "@/lib/repo";
 const GRID_LIMIT = 24;
 const MIN_GRID = 3; // 이보다 적으면 섹션을 아예 안 그린다(디자인팀 07-27 규칙 승계).
 
+// ⭐홈 그리드 노출 순서 — 대표가 직접 정한다(08-02). 2열이라 위→아래·왼→오른쪽으로 1,2 / 3,4 …
+//   ⚠️ 이름이 아니라 **slug**로 잡는다 — 상호는 사장님이 바꿀 수 있지만 slug는 안 바뀐다.
+//   여기 없는 브랜드(새로 등록된 곳)는 이 목록 **뒤에** repo 기본 정렬대로 붙는다.
+//   순서를 바꾸려면 이 배열만 고치면 된다.
+const HOME_ORDER: string[] = [
+  "m-ofjghi", // 캔버스가든
+  "m-vs9xzg", // 호락호락도서관
+  "m-uako9s", // 아그레아블
+  "m-oblejt", // 계단뿌셔클럽
+  "m-irywef", // 두더지요가원
+  "m-8r5gep", // 콜렉트마이페이보릿
+  "m-u8y5i3", // 캔앤코르크
+  "m-x3djf8", // 레이지오터
+  "m-1vv8kj", // 로컬페이지
+];
+
 // ⚠️ 이 한 줄이 없으면 목록이 **배포 시점에 얼어붙는다**(서버 컴포넌트 프리렌더 함정, /search·/my와 동일).
 // 다만 홈은 최다 트래픽 랜딩이라 매 요청 조회(force-dynamic) 대신 ISR로 둔다 —
 // 캐러셀은 '등록 오래된 순 10개'라 신규 등록이 앞자리를 밀어내는 일이 거의 없어 5분 지연이 문제되지 않는다.
 export const revalidate = 300;
 
 export default async function Home() {
-  const collabBrands = await repo.listHomeMakers(GRID_LIMIT);
+  const fetched = await repo.listHomeMakers(GRID_LIMIT);
+  // HOME_ORDER에 있는 것부터 그 순서대로, 없는 건 뒤에 원래 순서 그대로(Array#sort는 안정 정렬).
+  const rank = (slug: string) => {
+    const i = HOME_ORDER.indexOf(slug);
+    return i === -1 ? Number.MAX_SAFE_INTEGER : i;
+  };
+  const collabBrands = [...fetched].sort((a, b) => rank(a.slug) - rank(b.slug));
 
   return (
     <main className="mx-auto w-full max-w-[960px] px-4 py-12 sm:px-6">
@@ -51,9 +74,9 @@ export default async function Home() {
         {/* 슬로건 B′ — 콜라보 프레임(대표 확정 07-31 아침, "변경" 지시). '시작'만 약속(11곳으로도 이행 가능).
             디자인팀 차별화 변형이 나오면 2안 비교로 교체 가능. */}
         <h1 className="break-keep text-[28px] font-bold leading-[1.3] tracking-[-0.03em] text-ink sm:text-[40px]">
-          우리 브랜드의 콜라보,
+          우리 브랜드,
           <br />
-          여기서 시작해요.
+          이제는 콜라보할 차례예요.
         </h1>
         {/* 서브가 기능 전달 담당 — 소개서→분석 흐름을 한 문장에. AI 언급은 히어로 1곳 원칙 유지. */}
         <p className="mx-auto mt-4 max-w-[460px] break-keep text-[18px] font-bold leading-[1.5] text-primary-on sm:text-[20px]">
@@ -92,7 +115,7 @@ export default async function Home() {
         //    (`eager`로 하단 컷을 없애도 threshold는 그대로라 해결 안 됨 — 실측 확인)
         //    이 섹션은 홈의 주 콘텐츠다. 등장 연출보다 "바로 보이는 것"이 우선.
         <section
-          className="mt-16 -mx-4 bg-surface-soft px-4 py-14 [box-shadow:0_0_0_100vmax_var(--surface-soft)] [clip-path:inset(0_-100vmax)] sm:-mx-6 sm:px-6"
+          className="mt-10 -mx-4 bg-surface-soft px-4 py-10 [box-shadow:0_0_0_100vmax_var(--surface-soft)] [clip-path:inset(0_-100vmax)] sm:-mx-6 sm:px-6"
         >
           <h2 className="text-balance break-keep text-center text-[24px] font-bold leading-[1.35] tracking-[-0.02em] text-ink sm:text-[28px]">
             지금, 콜라보 가능한 브랜드예요.
@@ -109,7 +132,7 @@ export default async function Home() {
       {/* ③ 실물 구경 — 소개서 목업 + 분석 리포트 축약. 제품의 두 얼굴을 한 스크롤에(07-31).
           목업은 실제 데모 소개서 2종(사진 있는/없는), 디자인팀 브라우저 카드(de9d6c5) 그대로.
           온로드 라이즈 2번은 유지 — 폴드 아래면 안 보이는 채 재생이 끝나 정적으로 보인다(무해). */}
-      <section className="home-rise mt-16" style={{ animationDelay: "600ms" }}>
+      <section className="home-rise mt-10" style={{ animationDelay: "600ms" }}>
         {/* 앵커 탭 — 섹션 ③은 ⓐ소개서 만들기 / ⓑ콜라보 분석 두 덩어리라, 맨 위에 목차를 세워
             "다른 하나도 있다"를 먼저 알린다(대표 지시 08-02). 섹션 안에서만 sticky. 상세는 HomeSectionTabs.tsx. */}
         <HomeSectionTabs />
@@ -142,9 +165,14 @@ export default async function Home() {
           </Link>
         </div>
 
+        {/* 보강 서비스 안내 — 예시 버튼 바로 아래(대표 지시 08-02). 위 버튼은 보더(보조),
+            이건 키위 면(주)이라 시선 순서가 '구경 → 신청'으로 이어진다.
+            보는 사람에 따라 문구·목적지가 갈린다 — 상세는 HomeEnrichBanner.tsx. */}
+        <HomeEnrichBanner />
+
         {/* 분석 리포트 축약 — 소개서 실물 바로 아래(같은 '실물 구경' 섹션). sample-report.json 재사용.
             "소개서를 만들면 이런 것도 받는다"가 소개서 CTA의 두 번째 근거가 된다(대표: 기능을 더 잘 쓰게). */}
-        <div className="mt-14 text-center">
+        <div className="mt-12 text-center">
           {/* h3 → h2 승격 + 크기도 형제 제목과 동일(08-02). 원래 이것만 h3/20px이라 "혼자 작아 보인다"(대표 QA).
               단순히 크기만 키우고 h3를 두면 안 된다 — 앵커 탭의 목적지가 되면서 이 구간은
               '소개서 구간의 하위 설명'이 아니라 **동급 섹션**이 됐다. 마크업이 보이는 위계를 따라가야 한다.
@@ -164,23 +192,30 @@ export default async function Home() {
         </div>
       </section>
 
-      {/* 왜 소개서? — DM vs 소개서 */}
-      <section className="mt-16">
+      {/* 콜라보의 시작 — 「혼자 시작할 때 vs collab5에서 시작할 때」
+          ⚠️ 대조축을 함부로 「DM vs 소개서」로 되돌리지 말 것(08-03 대표 확정, 원래 그거였다).
+             ①히어로가 콜라보 프레임인데 마지막 설명만 옛 웨지(소개서) 프레임으로 돌아갔고
+             ②콜라보 리포트의 종착지가 **DM 문구 복사**라 우리가 만들어 주는 걸 우리가 깎는 꼴이었다.
+             ③「이런 경험 있으셨나요?」는 콜라보 DM을 보내본 적 없는 1차 관객에게 "아니요"를 부른다(P1에 있는 사람에게 P3의 고통을 물음).
+          왼쪽 3줄 = 문제정의 P2 탐색 / P3 연락 / P1 상상과 1:1. 오른쪽은 **실재하는 기능만** — 없는 걸 넣지 말 것.
+          ⛔ 여정 3칸(찾기→제안→기록) 안은 기각 — 히어로 FlowStrip과 정면으로 겹친다.
+             역할 분담: FlowStrip=사이트에서 뭘 하나 / 이 섹션=내 브랜드에 뭐가 달라지나. */}
+      <section className="mt-12">
         <Reveal>
           <h2 className="text-balance break-keep text-center text-[24px] font-bold leading-[1.35] tracking-[-0.02em] text-ink sm:text-[28px]">
-            브랜드 소개서는 이렇게 활용할 수 있어요.
+            콜라보의 시작이 이렇게 달라져요.
           </h2>
         </Reveal>
         {/* 위 3스텝과 같은 이유로 그룹 리빌 — 모바일 1열에서 카드마다 따로 뜨지 않게(대표 QA 07-31) */}
         <Reveal className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2">
-          {/* 그냥 DM */}
+          {/* 혼자 시작할 때 */}
           <div className="h-full rounded-xl border border-hairline bg-surface-soft p-6">
-            <p className="text-[16px] font-bold text-mute sm:text-[17px]">이런 경험 있으셨나요?</p>
+            <p className="text-[16px] font-bold text-mute sm:text-[17px]">혼자 시작하려면</p>
             <ul className="mt-4 space-y-3">
               {[
-                "내가 어떤 브랜드인지 하나씩 설명해야 해요.",
-                "상대는 내용을 이해하기 전부터 부담을 느껴요.",
-                "다른 메시지 사이에 금방 묻혀버려요.",
+                "어디에 어떤 브랜드가 있는지 알기 어려워요.",
+                "먼저 연락하기가 늘 조심스러워요.",
+                "무엇을 같이 하자고 해야 할지 막막해요.",
               ].map((t) => (
                 <li key={t} className="flex gap-2 text-[16px] leading-[1.65] text-body sm:text-[17px]">
                   <span className="text-faint">·</span>
@@ -189,17 +224,19 @@ export default async function Home() {
               ))}
             </ul>
           </div>
-          {/* 브랜드 소개서 */}
+          {/* collab5에서 시작할 때 — 왼쪽 3줄과 **순서까지 1:1**(탐색/연락/상상). 줄을 늘리면 대조가 흐려진다.
+              ⚠️ 「프로필 링크에 걸어두면 포트폴리오가 돼요」는 08-03에 뺐다 — 여기서 유일한 M3(자산) 문장이라
+                 '시작'으로 통일한 축에서 혼자 미래를 말했다. 자산 이야기는 M3 실험이 붙을 때 별도 자리로. */}
           <div className="h-full rounded-xl border border-primary bg-surface p-6 shadow-e1">
             <p className="flex items-center gap-1.5 text-[16px] font-bold text-ink sm:text-[17px]">
               <span className="h-2 w-2 rounded-pill bg-primary" />
-              이렇게 달라져요
+              collab5에서는
             </p>
             <ul className="mt-4 space-y-3">
               {[
-                "브랜드와 협업 제안을 한 번에 전달할 수 있어요.",
-                "상대가 필요한 정보를 한눈에 이해할 수 있어요.",
-                "프로필 링크에 걸어두면 우리 브랜드의 포트폴리오가 돼요.",
+                "콜라보를 기다리는 브랜드를 먼저 둘러볼 수 있어요.",
+                "소개서 링크 하나로 우리 브랜드를 설명할 수 있어요.",
+                "AI가 두 브랜드의 콜라보 아이디어를 먼저 정리해줘요.",
               ].map((t) => (
                 <li key={t} className="flex gap-2 text-[16px] leading-[1.65] text-body sm:text-[17px]">
                   <span className="font-bold text-primary-on">✓</span>
@@ -212,7 +249,7 @@ export default async function Home() {
       </section>
 
       {/* 마무리 CTA — eager 필수: 페이지 맨 마지막 요소라 하단 -22% 데드존을 못 벗어나 리빌이 영영 안 터짐 */}
-      <Reveal as="section" eager className="mt-14 text-center">
+      <Reveal as="section" eager className="mt-12 text-center">
         {/* 미션 한 줄 — 소개서가 쌓이면 발견으로 이어진다(BM 발굴 방향을 고객 언어로, 대표 확정 2026-07-23) */}
         <p className="mx-auto max-w-[440px] break-keep text-[20px] font-bold leading-[1.4] tracking-[-0.02em] text-ink sm:text-[24px]">
           지금 바로 콜라보를 시작해보세요 :)

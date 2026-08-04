@@ -12,15 +12,21 @@ import { track } from "@/lib/track";
 import type { CollabReportData } from "@/lib/types";
 import sampleData from "@/lib/sample-report.json";
 
-// 순환 문구 — 2번째에 소요시간을 끼운다(대표 지시 07-31).
-// 전엔 "보통 30초 정도 걸려요"가 순환 문구 **아래 고정 줄**로 따로 있었다. 배열에 넣으면서
-// 그 줄은 지운다 — 안 지우면 2번째 차례에 같은 문장이 위아래로 두 번 보인다.
-// 2번째 자리인 이유: 첫 문구(4초)로 "일이 시작됐다"를 알린 직후, **아직 참을 만할 때** 끝을 알려준다.
-//   기다림에서 힘든 건 길이가 아니라 끝을 모르는 것 — 실측 25~28초라 30초는 넉넉하게 부른 값이다.
-// ⚠️ 이제 소요시간이 상시 노출이 아니라 4초마다 한 번 지나간다. 늦게 연 사람은 최대 12초 뒤에 본다.
-//    (⏱ 파이프라인이 빨라지면 이 문구도 같이 낮출 것)
+// 로딩 = **고정 타이틀 + 아래 회색 롤링** (대표 지시 08-02).
+// EnrichWizard `LoadingView`와 같은 얼굴로 맞췄다 — 두 화면 다 "AI가 오래 일하는 중"이라
+// 사장님 입장에선 같은 경험인데, 여기만 타이틀 없이 회색 한 줄이 굴러 **무슨 일이 벌어지는지
+// 모른 채 기다렸다.** 타이틀이 '무엇을'을 고정하고, 롤링이 '지금 어디쯤'을 말한다.
+const LOADING_TITLE = "콜라보 아이디어를 분석하고 있어요";
+
+// 롤링 문구 — 타이틀이 큰 그림을 잡아주므로 여기선 **진행 단계**만 말한다.
+// ⚠️ 예전 1번 문구 "두 소개서를 읽고 있어요…"는 **뺐다**(대표: "똑같이 겹치는 건 빼자").
+//    타이틀과 같은 '-고 있어요' 종결형이라 **타이틀이 두 줄로 보였다** — 롤링은 전부 '~중…'
+//    조각으로 통일해야 타이틀과 역할이 갈린다(위저드 CRAWL_STEPS/GEN_STEPS와 같은 규칙).
+// 2번째에 소요시간을 끼운 이유(07-31): 첫 문구(4초)로 "일이 시작됐다"를 알린 직후,
+//   **아직 참을 만할 때** 끝을 알려준다. 기다림에서 힘든 건 길이가 아니라 끝을 모르는 것.
+//   실측 25~28초라 30초는 넉넉하게 부른 값이다. (⏱ 파이프라인이 빨라지면 같이 낮출 것)
 const LOADING_COPY = [
-  "두 소개서를 읽고 있어요…",
+  "두 소개서를 읽는 중…",
   "보통 30초 정도 걸려요…",
   "접점을 찾는 중…",
   "콜라보를 상상하는 중…",
@@ -434,17 +440,21 @@ export function ReportSheet({
               // ⚠️ 스피너를 쓰지 않는다 — design.md Loader 원칙: "움직임은 텍스트 순환만, 회전 금지"
               //    (브랜드 정체성 + 어지럼 방지). 여기만 `animate-spin`+`animate-pulse`로 어기고 있었다(QA #25).
               //    정적 아톰 마크 + 순환 문구가 기준 구현(EnrichWizard LoadingView)과 같은 얼굴이다.
-              <div role="status" aria-live="polite" className="flex flex-col items-center justify-center py-16">
+              <div role="status" aria-live="polite" className="flex flex-col items-center justify-center py-16 text-center">
+                {/* ⚠️ fill은 토큰(var(--primary))으로 — 예전엔 #98ff5c 하드코딩이었다. */}
                 <svg width="44" height="44" viewBox="0 0 56 56" fill="none" className="text-faint" aria-hidden="true">
                   <ellipse cx="28" cy="28" rx="23" ry="9" stroke="currentColor" strokeWidth="2" opacity="0.45" transform="rotate(28 28 28)" />
                   <ellipse cx="28" cy="28" rx="23" ry="9" stroke="currentColor" strokeWidth="2" opacity="0.45" transform="rotate(-28 28 28)" />
-                  <circle cx="28" cy="28" r="6" fill="#98ff5c" />
+                  <circle cx="28" cy="28" r="6" fill="var(--primary)" />
                 </svg>
-                {/* 소요시간("보통 30초…")은 07-31에 **순환 배열 2번째로 흡수**됐다(대표 지시) —
-                    여기 있던 고정 줄을 지운 이유는 LOADING_COPY 주석 참조(안 지우면 중복 노출).
-                    animate-pulse는 뺐다 — 문구가 4초마다 바뀌는 것 자체가 이미 '살아있음' 신호다.
-                    ⚠️ 줄 하나가 사라져 문구 아래 여백이 달라지므로, 높이는 py-16이 잡아준다(레이아웃 안 튐). */}
-                <p className="mt-4 text-[15px] text-mute">{LOADING_COPY[copyIdx]}</p>
+                {/* 고정 타이틀 + 회색 롤링 — 위저드 LoadingView와 같은 사다리(18 bold / 13 mute).
+                    animate-pulse는 안 쓴다 — 문구가 4초마다 바뀌는 것 자체가 '살아있음' 신호다.
+                    ⚠️ 롤링 줄은 길이가 제각각이라 한 줄↔두 줄로 오갈 수 있다 → `min-h`로 자리를 미리
+                       잡아둬야 타이틀·마크가 위아래로 튀지 않는다(13px·leading-relaxed 두 줄 ≈ 40px). */}
+                <p className="mt-5 text-[18px] font-bold break-keep text-ink">{LOADING_TITLE}</p>
+                <p className="mt-1.5 min-h-[40px] text-[13px] leading-relaxed text-mute">
+                  {LOADING_COPY[copyIdx]}
+                </p>
               </div>
             ) : phase === "ok" ? (
               pieces

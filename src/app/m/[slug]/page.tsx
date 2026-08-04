@@ -8,6 +8,27 @@ import { isStaffUser } from "@/lib/staff";
 import { MakerArticle } from "./MakerArticle";
 import { ConnectProfileButton } from "./ConnectProfileButton";
 import { MakerActionBar } from "./MakerActionBar";
+import { EnrichBanner, type BannerVariant } from "./EnrichBanner";
+import type { Maker } from "@/lib/types";
+
+// 사진 보강 배너 게이트 — 사진이 이 수 **미만**일 때만 뜬다(대표 확정 08-02).
+const ENRICH_MIN_PHOTOS = 5;
+// 컨시어지 신청 폼(구글폼). 공개 링크라 코드에 둔다 —
+// 환경변수로 빼면 Vercel에 넣는 걸 잊었을 때 **배너가 조용히 사라진다**(실패가 안 보인다).
+const ENRICH_FORM_URL = "https://forms.gle/6XnnSTCQ2HDVkf2Y7";
+
+/** 소개서에 실린 **모든** 사진 수. 브랜드 대표 사진만 세면 활동 사진 20장짜리에도 배너가 뜬다. */
+function countAllPhotos(m: Maker): number {
+  let n = m.photos.length;
+  for (const a of m.activities) n += a.photos.length;
+  for (const h of m.collabHistory) n += h.photos.length;
+  for (const b of m.showcases) {
+    n += b.photos.length;
+    if (b.type === "press") for (const it of b.items) n += it.photos?.length ?? 0;
+  }
+  return n;
+}
+
 
 // ⭐링크 미리보기(카톡·인스타 DM에서 펼쳐지는 카드) — 이게 없으면 루트 layout의 홈 제목을
 //   그대로 물려받아 **"collab5 — 마음 맞는 브랜드들의 콜라보 플랫폼"** 이 뜬다(08-02 실측).
@@ -50,10 +71,15 @@ export async function generateMetadata({
 // 공개 업체 상세페이지 — 누구나 열람(MVP 검색 결과의 도착지). 검증 가능한 신뢰 시그널 노출.
 export default async function MakerPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<{ banner?: string }>;
 }) {
   const { slug } = await params;
+  // ?banner=a|b — 시안 비교용. 주인·사진수·시간 규칙을 모두 건너뛰고 그 안을 강제로 그린다.
+  const bannerParam = (await searchParams)?.banner;
+  const bannerPreview = bannerParam === "a" || bannerParam === "b";
   const maker = await repo.getMakerBySlug(slug);
   if (!maker) notFound();
 
@@ -88,6 +114,16 @@ export default async function MakerPage({
 
   return (
     <main className="mx-auto w-full max-w-[640px] px-4 pt-10 pb-32 sm:px-6 print:max-w-none print:px-0 print:py-0">
+      {/* 소개서 보강 신청 배너 — 주인에게만, 사진이 5장 미만일 때. 나머지(1일 숨김·7일 수명)는 클라 판정 */}
+      {(bannerPreview || (isOwner && countAllPhotos(maker) < ENRICH_MIN_PHOTOS)) && (
+        <EnrichBanner
+          slug={slug}
+          formUrl={ENRICH_FORM_URL}
+          variant={(bannerParam as BannerVariant) || "a"}
+          preview={bannerPreview}
+        />
+      )}
+
       {/* 소개서 본문 — /preview와 공유하는 단일 렌더 */}
       <MakerArticle maker={maker} isOwner={isOwner} logoUrl={logoUrl} />
 

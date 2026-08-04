@@ -141,7 +141,8 @@ export interface KeywordChip {
   factual: boolean; // 사실 게이트 대상(숫자·방송·수상·대표명 등 — 오귀속 시 거짓말이 됨). 기본 OFF·탭 확인
 }
 
-/** 5지선다 결과 — 확인된 identity + 한줄소개/브랜드소개 후보 5개씩 + 결 단어 */
+/** 후보 결과 — 확인된 identity + 한줄소개/브랜드소개 후보 + 결 단어.
+ *  ⚠️개수는 경로마다 다르다: `options()`=한줄 5·소개 5 / `draftBoth()`=한줄 3·소개 6 / `draft()`=소개 6. */
 export interface EnrichOptions {
   identity: {
     name: string;
@@ -502,8 +503,11 @@ const OptionsResultSchema = z.object({
   instagramCandidates: z
     .array(z.string())
     .describe("인스타 핸들 후보 0~4개(@형식) — 확정 안 됐을 때 사장이 고를 추정치"),
-  oneLiners: z.array(z.string()).describe("한 줄 소개 후보 5개 — 서로 다른 앵글. 실제 슬로건·태그라인이 자료에 있으면 하나는 [슬로건 원형] — [하는 일] 형식(없으면 지어내지 말고 기존 앵글로)"),
-  descriptions: z.array(z.string()).describe("브랜드 소개 후보 6개 — 1~5는 서로 다른 앵글, 6번은 사실 정리형. 각 3~5문장, 어미는 시스템 지침의 '어미 리듬'(기능 기반 혼합체)"),
+  // ⚠️개수는 여기 적지 않는다 — 이 스키마를 `options()`(한줄 5)와 `draftBoth()`(한줄 3)가 **같이 쓴다.**
+  //   어느 숫자를 박아도 다른 경로가 틀리고, 시스템(스키마)과 유저 메시지가 서로 다른 수를 말하게 된다.
+  //   개수는 **호출마다 유저 메시지가 지시**한다. 스키마는 "무엇을 담는 칸인가"만 설명할 것.
+  oneLiners: z.array(z.string()).describe("한 줄 소개 후보 — 서로 다른 앵글. 실제 슬로건·태그라인이 자료에 있으면 하나는 [슬로건 원형] — [하는 일] 형식(없으면 지어내지 말고 기존 앵글로)"),
+  descriptions: z.array(z.string()).describe("브랜드 소개 후보 — 마지막 하나는 사실 정리형, 나머지는 서로 다른 앵글. 각 3~5문장, 어미는 시스템 지침의 '어미 리듬'(기능 기반 혼합체)"),
   values: z.array(z.string()).describe("브랜드 결 단어 2~4개"),
   activityHints: z
     .array(
@@ -593,12 +597,12 @@ const GEMINI_OPTIONS_SCHEMA = {
     oneLiners: {
       type: Type.ARRAY,
       items: { type: Type.STRING },
-      description: "한 줄 소개 후보 5개 — 서로 확실히 다른 앵글로. 실제 슬로건·태그라인이 자료에 있으면 하나는 [슬로건 원형] — [하는 일] 형식(없으면 지어내지 말고 기존 앵글로)",
+      description: "한 줄 소개 후보 — 서로 확실히 다른 앵글로. 실제 슬로건·태그라인이 자료에 있으면 하나는 [슬로건 원형] — [하는 일] 형식(없으면 지어내지 말고 기존 앵글로)",
     },
     descriptions: {
       type: Type.ARRAY,
       items: { type: Type.STRING },
-      description: "브랜드 소개 후보 6개 — 1~5는 서로 다른 앵글, 6번은 사실 정리형(구체 사실 밀도 높게). 각 3~5문장, 어미는 시스템 지침의 '어미 리듬'(기능 기반 혼합체)",
+      description: "브랜드 소개 후보 — 마지막 하나는 사실 정리형(구체 사실 밀도 높게), 나머지는 서로 다른 앵글. 각 3~5문장, 어미는 시스템 지침의 '어미 리듬'(기능 기반 혼합체)",
     },
     values: { type: Type.ARRAY, items: { type: Type.STRING }, description: "브랜드 결 단어 2~4개" },
     activityHints: {
@@ -699,7 +703,7 @@ const GEMINI_OPTIONS_SCHEMA = {
   required: ["identity", "instagramCandidates", "oneLiners", "descriptions", "values", "activityHints", "collabHints", "blockHints", "seeksHint", "offersHint"],
 };
 
-const OPTIONS_SYSTEM = `너는 콜라보 플랫폼 collab5의 브랜드 소개 카피라이터야. 웹 조사 메모를 바탕으로 브랜드가 고를 수 있는 '한 줄 소개'와 '브랜드 소개'를 각각 5개씩 서로 다른 앵글로 만든다.
+const OPTIONS_SYSTEM = `너는 콜라보 플랫폼 collab5의 브랜드 소개 카피라이터야. 웹 조사 메모를 바탕으로 브랜드가 고를 수 있는 '한 줄 소개'와 '브랜드 소개'를 서로 다른 앵글로 만든다. **각각 몇 개를 만들지는 이 지침이 아니라 아래 요청문이 지시한다 — 요청문의 개수를 따라라.**
 
 ${BRAND_VOICE}
 

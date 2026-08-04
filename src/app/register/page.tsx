@@ -17,8 +17,10 @@ import type { CollabType, Block, Maker, Enrichment } from "@/lib/types";
 import { deriveRegion } from "@/lib/region";
 import { isRichIntro } from "@/lib/completeness";
 import { uploadPhoto, uploadPdf } from "@/lib/upload";
-import { mapLinkLabel, instagramSlug } from "@/lib/links";
+import { mapLinkLabel, instagramSlug, parseLatLngFromMapUrl } from "@/lib/links";
+import { MapCard } from "@/components/MapCard";
 import { useDismissable } from "@/components/useDismissable";
+import { EnrichIntroSheet } from "./EnrichIntroSheet";
 import { PasswordInput } from "@/components/PasswordInput";
 import { track } from "@/lib/track";
 import type { ActivityHint, CollabHint, EnrichField } from "@/lib/enrich";
@@ -189,6 +191,8 @@ function RegisterForm() {
   const [homepage, setHomepage] = useState("");
   const [mapUrl, setMapUrl] = useState("");
   const [mapUrlEditing, setMapUrlEditing] = useState(false);
+  // 지도 필드 미리보기용 핀 — 링크 문자열에서 그냥 꺼낸다(콜 0). 못 뽑으면 null → 지도 안 그림.
+  const mapPin = parseLatLngFromMapUrl(mapUrl);
   const [description, setDescription] = useState("");
   const [address, setAddress] = useState("");
   const [photos, setPhotos] = useState<Ph[]>([]);
@@ -1231,6 +1235,10 @@ function RegisterForm() {
 
   return (
     <main className="mx-auto w-full max-w-[640px] px-4 pb-28 pt-8 sm:px-6">
+      {/* 진입 시트 — **새로 작성**하러 온 사람에게만 1초 뒤 올라온다(수정 모드는 제외).
+          "혼자 다 채우지 않아도 된다"를 먼저 알려 작성 부담으로 인한 이탈을 막는다. 상세는 EnrichIntroSheet.tsx */}
+      <EnrichIntroSheet enabled={!editParam && !editSlug} />
+
       {editSlug ? (
         <>
           <div className="flex items-start justify-between gap-3">
@@ -1303,44 +1311,48 @@ function RegisterForm() {
 
       <div className="mt-8 space-y-12">
         {/* 이어서 쓰기 배너 — **자동 복구는 절대 하지 않는다.**
-            수정 모드에서 낡은 초안을 덜컥 얹으면 서버에 잘 저장해둔 내용을 되돌려버린다.
-            그래서 ①항상 물어보고 ②(생성 모드는) 저장 시각을 보여준다.
+            낡은 초안을 덜컥 얹으면 서버에 잘 저장해둔 내용을 되돌려버린다. 그래서 항상 물어본다.
 
-            대표 확정(2026-07-31): **수정 모드의 주 버튼 = 복원**으로 위계를 뒤집는다.
+            대표 확정(2026-07-31): **주 버튼 = 복원**으로 위계를 뒤집는다.
             문구·라벨은 대표가 직접 쓴 문장이라 글자 그대로 쓴다(다듬지 말 것).
             - 주(초록) [저장 내용 불러오기] = restoreDraft — 초안을 폼에 얹는다.
             - 부       [저장 내용 무시하기] = draft.clear — 배너를 닫고 **저장본까지 지운다.**
               ⚠️ '닫기만' 하면(dismiss) 바로 위 설명문이 약속한 "새로 시작하면 저장된 내용은
               삭제됩니다"를 화면이 스스로 어긴다. 그래서 dismiss가 아니라 clear다.
               clear는 저장본만 지우고 자동저장을 끄지 않는다(finished 플래그는 제출 때만) —
-              그 뒤 폼을 고치면 다시 저장되는 게 정상이다. */}
+              그 뒤 폼을 고치면 다시 저장되는 게 정상이다.
+
+            ⭐ 08-02 대표 지시로 **생성/수정 분기를 없앴다**(전엔 문구·라벨이 모드마다 달랐다).
+               통일 기준을 수정 모드로 잡은 이유 = 생성 모드 문구엔 **결정적 정보가 빠져 있었다**:
+               [새로 시작]이 실제로는 `draft.clear`라 **저장본을 지우는데**, "이어서 쓰거나,
+               새로 시작할 수 있어요"는 그 말을 안 한다 — 되돌릴 수 없는 행동을 예고 없이 시킨 셈.
+               수정 모드 문장은 "새로 시작하면 저장된 내용은 삭제됩니다"까지 말한다.
+            ⚠️ 대신 생성 모드가 갖고 있던 **저장 시각은 버리지 않았다.** 대표 문장의 막연한
+               "**이전에** 작성하던 내용이" 자리에 `agoLabel`을 끼워 "14시간 전에 작성하던
+               내용이"로 채운다 — 문장 구조는 그대로 두고 부사만 정확해진다.
+               (초안이 오래됐는지 = 이어쓸지 말지의 판단 근거라 빼면 안 되는 정보다) */}
         {draft.found && (
           <div className="rounded-lg border border-border-strong bg-surface px-4 py-3 shadow-e1">
-            <p className="text-[15px] font-medium text-ink">
-              {editSlug
-                ? "작성 중이던 내용을 발견했어요."
-                : `${agoLabel(draft.found.savedAt)} 쓰시던 내용이 있어요.`}
-            </p>
+            <p className="text-[15px] font-medium text-ink">작성 중이던 내용을 발견했어요.</p>
             <p className="mt-0.5 text-[13px] text-mute">
-              {editSlug
-                ? "이전에 작성하던 내용이 저장되어 있어요. 이어서 작성할 수 있으며, 새로 시작하면 저장된 내용은 삭제됩니다."
-                : "이어서 쓰거나, 새로 시작할 수 있어요."}
+              {agoLabel(draft.found.savedAt)} 작성하던 내용이 저장되어 있어요. 이어서 작성할 수
+              있으며, 새로 시작하면 저장된 내용은 삭제됩니다.
             </p>
             <div className="mt-3 flex gap-2">
-              {/* 주 = 복원. 부 = 삭제. 두 모드 모두 [주, 부] 순서라 분기가 필요없다. */}
+              {/* 주 = 복원. 부 = 삭제. */}
               <button
                 type="button"
                 onClick={() => draft.found && restoreDraft(draft.found.data)}
                 className="h-10 rounded-md bg-primary px-4 text-[14px] font-medium text-primary-on"
               >
-                {editSlug ? "저장 내용 불러오기" : "이어서 쓰기"}
+                저장 내용 불러오기
               </button>
               <button
                 type="button"
                 onClick={draft.clear}
                 className="h-10 rounded-md border border-border-strong bg-surface px-4 text-[14px] font-medium text-mute"
               >
-                {editSlug ? "저장 내용 무시하기" : "새로 시작"}
+                저장 내용 무시하기
               </button>
             </div>
           </div>
@@ -1439,7 +1451,11 @@ function RegisterForm() {
                 className="text-primary-on underline underline-offset-2"
               >
                 텍스트형 소개서 예시
-              </button>
+              </button>{" "}
+              {/* ⚠️ 여기서 보강 서비스로 나가는 **링크를 달지 않는다** — 폼 작성 중에 밖으로 내보내면
+                  소개서가 미완성으로 남고, 그러면 정작 보강해줄 대상이 사라진다(08-02 판단).
+                  안심만 주고, 실제 신청은 저장 후 소개서 페이지의 배너에서 받는다. */}
+              사진은 나중에 채워도 좋아요.
             </p>
             <PhotoGrid
               items={photos}
@@ -1705,7 +1721,7 @@ function RegisterForm() {
               onClick={addActivity}
               className="flex w-full items-center justify-center gap-1.5 rounded-md border border-primary-tint bg-primary-pale py-2.5 text-[14px] font-medium text-primary-on transition-colors hover:bg-primary-tint"
             >
-              ＋ 활동 추가
+              ＋활동 추가
             </button>
           )}
           </div>
@@ -1902,7 +1918,7 @@ function RegisterForm() {
                   onClick={addCollab}
                   className="flex w-full items-center justify-center gap-1.5 rounded-md border border-primary-tint bg-primary-pale py-2.5 text-[14px] font-medium text-primary-on transition-colors hover:bg-primary-tint"
                 >
-                  ＋ 콜라보 추가
+                  ＋콜라보 추가
                 </button>
               )}
             </div>
@@ -2095,6 +2111,16 @@ function RegisterForm() {
                 placeholder="네이버 지도·카카오맵 공유 링크"
                 className="h-11 w-full rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
               />
+            )}
+            {/* ⭐ 지도 한 컷(08-02, 대표 지시) — 링크만 보여주면 **맞게 넣었는지 확인할 방법이
+                [열어보기 ↗]로 나가는 것뿐**이었다. 저장하면 소개서에 이 지도가 그대로 실리니,
+                작성 화면에서 미리 같은 그림을 보는 게 맞다(작성 = 결과의 예고여야 한다).
+                ⚠️ 좌표를 못 뽑으면(place 공유 링크 등) 안 그린다 — 위 링크 행이 그대로 폴백.
+                   그런 건은 저장 시 상호명 재조회로 좌표가 채워져 소개서엔 지도가 뜬다. */}
+            {mapPin && (
+              <div className="mt-2">
+                <MapCard {...mapPin} address={name.trim() || "우리 브랜드"} mapUrl={mapUrl} compact />
+              </div>
             )}
             {mapUrl.trim() && !mapLinkLabel(mapUrl) && (
               <p className="mt-1 text-[13px] text-mute">
@@ -2721,7 +2747,7 @@ function CollapsedPhotos({ children, photoCount }: { children: React.ReactNode; 
         onClick={() => setOpen(true)}
         className="mr-4 text-[14px] text-mute underline underline-offset-2"
       >
-        ＋ 사진 추가 (선택)
+        ＋사진 추가 (선택)
       </button>
     );
   return <>{children}</>;
@@ -2742,7 +2768,7 @@ function CollapsedLink({ children, hasLink }: { children: React.ReactNode; hasLi
         onClick={() => setOpen(true)}
         className="mr-4 text-[14px] text-mute underline underline-offset-2"
       >
-        ＋ 링크 추가 (선택)
+        ＋링크 추가 (선택)
       </button>
     );
   return <>{children}</>;

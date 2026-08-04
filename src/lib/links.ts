@@ -111,3 +111,30 @@ export function mapLinkLabel(url?: string): string | null {
   for (const [re, label] of MAP_HOSTS) if (re.test(host)) return label;
   return null;
 }
+
+/** 우리가 만든 지도 링크(`?c=lng,lat,...`)에서 좌표를 되꺼낸다. 없으면 null.
+ *
+ *  ⭐ 08-02에 `naver-local.ts`에서 **여기로 이사**했다 — 그 파일은 네이버 키로 fetch하는
+ *     서버 전용 모듈이라, 폼(클라이언트 컴포넌트)이 좌표만 뽑으려고 import하면 서버 코드가
+ *     클라 번들에 딸려 들어간다. 이건 URL 문자열만 만지는 순수 함수라 여기가 제집.
+ *
+ *  ⚠️ **null이 정상 동작인 경우가 많다** — 사장님이 네이버 '공유'로 복사한 place 링크
+ *     (`/p/entry/place/{id}`)는 좌표가 없거나 `?c=15.00,0,0,0,dh`처럼 **앞자리가 줌 레벨**이다.
+ *     우리 링크(`?c=127.02,37.58,...`)와 생김새가 같아 위험한데, 아래 **대한민국 좌표 범위
+ *     가드**가 그걸 걸러낸다(07-31 실측으로 잡은 사고 — 엉뚱한 위치에 핀 찍힐 뻔했다).
+ *     좌표가 없는 건은 저장 시 상호명 재조회로 보충된다(`naver-local.ts` 상단 주석). */
+export function parseLatLngFromMapUrl(url?: string): { lat: number; lng: number } | null {
+  if (!url) return null;
+  try {
+    const c = new URL(url).searchParams.get("c"); // "lng,lat,level,..."
+    if (!c) return null;
+    const [lngStr, latStr] = c.split(",");
+    const lng = Number(lngStr);
+    const lat = Number(latStr);
+    if (!Number.isFinite(lng) || !Number.isFinite(lat)) return null;
+    if (lng < 124 || lng > 132 || lat < 33 || lat > 39) return null;
+    return { lat, lng };
+  } catch {
+    return null;
+  }
+}
