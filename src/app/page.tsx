@@ -153,7 +153,7 @@ export default async function Home() {
             id="home-collab-report"
             className="scroll-mt-32 text-balance break-keep text-[24px] font-bold leading-[1.35] tracking-[-0.02em] text-ink sm:text-[28px]"
           >
-            소개서를 만들면 이런 콜라보 분석이 가능해요
+            소개서를 만들면 이런 콜라보 분석이 가능해요.
           </h2>
           <p className="mx-auto mt-2 max-w-[440px] break-keep text-[16px] leading-[1.65] text-body sm:text-[17px]">
             두 브랜드가 왜 함께하면 좋을지, 함께 하면 좋을 만한 콜라보 아이디어를 알려드려요.
