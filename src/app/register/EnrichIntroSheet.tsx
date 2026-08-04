@@ -5,8 +5,11 @@
 //       여기서 신청까지 받지는 않는다 — 소개서가 있어야 보강이 성립하므로 **등록 후**로 보낸다.
 //
 // ⚠️ 지켜야 할 선 3가지
-//  ① 수정 모드(?edit=)에는 뜨지 않는다 — 이미 소개서가 있는 사람에게 "작성이 어려우신가요?"는 무례하다.
-//  ② 닫으면 30일간 안 뜬다 — 소개서를 여러 번 고치러 오는 사람에게 매번 뜨면 그게 방해다.
+//  ① 수정 모드(?edit=)에는 뜨지 않는다 — 이미 소개서가 있는 사람에겐 이 약속이 이미 지난 이야기다.
+//  ② 닫으면 QUIET_MS(7일)간 안 뜬다 — 소개서를 여러 번 고치러 오는 사람에게 매번 뜨면 그게 방해다.
+//  ⭐ 타이틀은 **질문이 아니라 약속**이다(08-03 대표 확정). 원래 "소개서 작성이 어려우신가요?"였는데,
+//     이제 막 시작하려는 사람에게 "어렵죠?"라고 단정해 **없던 부담을 먼저 심는 문장**이었다.
+//     지금 문형 = 「(당신이) ~하면, (저희가) ~해드릴게요」 — 조건과 보상이 한 문장에 있어야 한다.
 //  ③ 기존 nudge 시트(등록 버튼 누를 때 뜸)와 시점이 겹치지 않는다 — 이건 **진입 직후**다.
 import { useEffect, useState } from "react";
 import { useDismissable } from "@/components/useDismissable";
@@ -62,7 +65,7 @@ export function EnrichIntroSheet({ enabled }: { enabled: boolean }) {
         >
           <div className="flex items-start justify-between gap-3">
             <p className="break-keep text-[17px] font-bold leading-[1.4] tracking-[-0.02em] text-ink">
-              💌 소개서 작성이 어려우신가요?
+              💌 소개서를 작성하면, 저희가 더 채워드릴게요.
             </p>
             <button
               type="button"
