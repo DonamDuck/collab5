@@ -21,27 +21,34 @@ function db(): SupabaseClient | null {
   return createClient(url, key);
 }
 
-/** 가입 시 프로필 생성/갱신 — uuid 기준 upsert (user_id 정수는 DB 자동) */
+/** 가입 시 프로필 생성/갱신 — uuid 기준 upsert (user_id 정수는 DB 자동).
+ *  ⭐생성된 정수 user_id를 돌려준다(가입 알림 메일에 담는 용도). 반환값은 무시해도 된다 —
+ *    로컬 mock이거나 DB가 안 돌려주면 null이고, 그 경우에도 저장 자체는 정상이다. */
 export async function upsertProfile(p: {
   uuid: string;
   brandName: string;
   phone: string;
   email: string;
   profileImage: string;
-}): Promise<void> {
+}): Promise<number | null> {
   const client = db();
-  if (!client) return; // 로컬 mock — DB 없음
-  const { error } = await client.from("users").upsert(
-    {
-      uuid: p.uuid,
-      brand_name: p.brandName,
-      phone: p.phone,
-      email: p.email,
-      profile_image: p.profileImage,
-    },
-    { onConflict: "uuid" }
-  );
+  if (!client) return null; // 로컬 mock — DB 없음
+  const { data, error } = await client
+    .from("users")
+    .upsert(
+      {
+        uuid: p.uuid,
+        brand_name: p.brandName,
+        phone: p.phone,
+        email: p.email,
+        profile_image: p.profileImage,
+      },
+      { onConflict: "uuid" }
+    )
+    .select("user_id")
+    .maybeSingle();
   if (error) throw new Error(error.message);
+  return data?.user_id ?? null;
 }
 
 export interface DuplicateFlags {
