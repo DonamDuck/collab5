@@ -136,7 +136,14 @@ const ITEMS = [
     font-variant-numeric: tabular-nums; font-size: 12px; font-weight: 700;
     color: var(--ink-faint); min-width: 22px;
   }
-  .card-title { font-size: 16px; font-weight: 700; letter-spacing: -.01em; flex: 1; min-width: 0; }
+  /* 제목도 편집 가능 (2026-08-05 대표 요청) — input이지만 본문처럼 보이게 */
+  input.card-title {
+    font-size: 16px; font-weight: 700; letter-spacing: -.01em; flex: 1; min-width: 0;
+    font-family: inherit; color: inherit; background: transparent;
+    border: 0; border-bottom: 1px dashed transparent; padding: 0; outline: none;
+  }
+  input.card-title:hover { border-bottom-color: var(--line); }
+  input.card-title:focus { border-bottom-color: var(--accent); }
   .badge {
     font-size: 11px; padding: 2px 7px; border-radius: 999px;
     background: var(--accent-soft); color: var(--accent); font-weight: 700; white-space: nowrap;
@@ -250,7 +257,8 @@ const ITEMS = [
       <b>고르는 법</b>
       <ol>
         <li>넣을 항목은 <b>[그대로]</b>, 뺄 항목은 <b>[빼기]</b>를 누르세요.</li>
-        <li>문장을 고치고 싶으면 <b>글상자를 직접 수정</b>하면 됩니다 (자동으로 '수정함'이 됩니다).</li>
+        <li>문장을 고치고 싶으면 <b>글상자를 직접 수정</b>하면 됩니다 (자동으로 '수정함'이 됩니다).
+            <b>제목도 눌러서 바로 고칠 수 있어요.</b></li>
         <li><b>의견 칸에 "왜" 를 한 줄만</b> 남겨주세요 — 고친 결과만으론 규칙을 못 뽑습니다.
             사실이 틀린 건지, 문체가 별로인 건지에 따라 다음 초안이 달라집니다.</li>
         <li>다 하셨으면 아래 <b>[결정 전체 복사]</b> → 채팅에 붙여넣기. 한 번이면 끝입니다.</li>
@@ -292,7 +300,7 @@ const ITEMS = [
     listEl.appendChild(h);
 
     items.forEach((it, idx) => {
-      state[it.id] = { status: "keep", text: it.draft, edited: false, note: "" };
+      state[it.id] = { status: "keep", text: it.draft, edited: false, note: "", title: it.title, titleEdited: false };
       const card = document.createElement("section");
       card.className = "card";
       card.dataset.state = "keep";
@@ -301,7 +309,7 @@ const ITEMS = [
       card.innerHTML = `
         <div class="card-head">
           <span class="num">${String(idx + 1).padStart(2, "0")}</span>
-          <span class="card-title">${esc(it.title)}</span>
+          <input class="card-title" value="${esc(it.title)}" spellcheck="false" title="제목도 바로 고칠 수 있어요">
           ${it.photos ? `<span class="badge">사진 ${it.photos}장</span>` : ""}
           ${it.current ? `<span class="badge">기존 항목</span>` : ""}
         </div>
@@ -333,6 +341,14 @@ const ITEMS = [
         if (s.status !== "drop") card.dataset.state = s.edited ? "edit" : "keep";
         render();
       });
+      const ti = card.querySelector("input.card-title");
+      ti.addEventListener("input", () => {
+        const s = state[it.id];
+        s.title = ti.value;
+        s.titleEdited = ti.value.trim() !== it.title.trim();
+        if (s.status !== "drop") card.dataset.state = (s.edited || s.titleEdited) ? "edit" : "keep";
+        render();
+      });
       const nt = card.querySelector("textarea.note");
       const fitNote = () => { nt.style.height = "auto"; nt.style.height = nt.scrollHeight + 2 + "px"; };
       requestAnimationFrame(fitNote);
@@ -346,7 +362,7 @@ const ITEMS = [
         b.addEventListener("click", () => {
           const s = state[it.id];
           s.status = b.dataset.set;
-          card.dataset.state = s.status === "drop" ? "drop" : (s.edited ? "edit" : "keep");
+          card.dataset.state = s.status === "drop" ? "drop" : ((s.edited || s.titleEdited) ? "edit" : "keep");
           render();
         });
       });
@@ -368,7 +384,7 @@ const ITEMS = [
       const over = cap && kept > cap;
       return `${kind} <b class="${over ? "over" : ""}">${kept}${cap ? "/" + cap : ""}</b>`;
     });
-    const editedN = ITEMS.filter(i => state[i.id].edited && state[i.id].status !== "drop").length;
+    const editedN = ITEMS.filter(i => (state[i.id].edited || state[i.id].titleEdited) && state[i.id].status !== "drop").length;
     const noteN = ITEMS.filter(i => state[i.id].note.trim()).length;
     document.getElementById("tally").innerHTML =
       parts.join(" &nbsp;·&nbsp; ")
@@ -385,12 +401,14 @@ const ITEMS = [
         const s = state[it.id];
         const n = String(idx + 1).padStart(2, "0");
         const note = s.note.trim();
+        const title = s.title.trim() || it.title;
         if (s.status === "drop") {
           L.push(`- ${n} ${it.title} → 빼기`);
           if (note) L.push(`  💬 ${note}`);
           return;
         }
-        L.push(`- ${n} ${it.title} → ${s.edited ? "수정함" : "그대로"}`);
+        L.push(`- ${n} ${title} → ${(s.edited || s.titleEdited) ? "수정함" : "그대로"}`);
+        if (s.titleEdited) L.push(`  ✏️ 제목 수정 (원래: ${it.title})`);
         if (s.edited) L.push(s.text.trim().split("\n").map(l => "  " + l).join("\n"));
         if (note) L.push(`  💬 ${note}`);
       });
