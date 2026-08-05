@@ -6,7 +6,7 @@ description: 이미 발행된 소개서 보강 — 웹 검색 + 인스타그램 
 # collab-page-enrich — 기존 소개서 보강
 
 이미 발행된 `/m/{slug}` 소개서를 대상으로, `/collab-ab-test`의 B가 하던 리서치 보강을
-단독 워크플로로 수행한다. **신규 생성 아님**(그건 `/collab-brandpage-creation`),
+단독 워크플로로 수행한다. **신규 생성 아님**(그건 `/collab-brandpage-creation-basic`(정식 제작은 `/collab-brandpage-creation-with-insta`)),
 **실험 아님**(그건 `/collab-ab-test`). 핵심 차이는 **보고 게이트**:
 
 ```
@@ -561,7 +561,7 @@ DNA는 **소개서 내용의 지문(`dna.input_hash`, sha1)**으로 stale을 판
 2. **2건 이상 같은 방향으로 고쳐졌을 때만** 규칙 후보로 올린다 — 1건은 그 브랜드 사정일 수 있다.
 3. 규칙 후보를 대표에게 **"프롬프트에 넣을까요"로 확인**한다(제품 문구를 조용히 바꾸지 않는다).
 4. OK 나면 ⓐ`enrich.ts`(`BRAND_VOICE`/`OPTIONS_SYSTEM`) ⓑ이 스킬 §② 어투 규칙
-   ⓒ`collab-brandpage-creation` §3단계 ⓓ볼트 [[브랜드-보이스]] — **네 곳을 같이** 고친다.
+   ⓒ`collab-brandpage-creation-basic` §3단계 ⓓ볼트 [[브랜드-보이스]] — **네 곳을 같이** 고친다.
    ⚠️한 곳만 고치면 다음 세션이 옛 규칙을 읽는다(스킬도 갱신 대상이다).
 5. `enrich.ts`는 **1팀 핫파일** — `git fetch` 먼저, 고친 뒤 1팀에 겹침핑 DM.
 
