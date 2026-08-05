@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { authEnabled, createAuthClient, getSessionUser } from "./supabase/server";
 import { upsertProfile, findDuplicates, getProfile, type DuplicateFlags } from "./profiles";
 import { validatePassword } from "./validation";
+import { notifySignup } from "./notify";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://collab5.vercel.app";
 const NO_AUTH_MSG = "로그인 설정이 아직 준비되지 않았어요. (환경변수 미설정)";
@@ -52,8 +53,9 @@ export async function signUpAction(input: SignUpInput): Promise<{ error?: string
     password: input.password,
   });
   if (error || !data.user) return { error: friendly(error?.message) };
+  let userId: number | null = null;
   try {
-    await upsertProfile({
+    userId = await upsertProfile({
       uuid: data.user.id,
       brandName: input.brandName.trim(),
       phone: input.phone.trim(),
@@ -63,6 +65,13 @@ export async function signUpAction(input: SignUpInput): Promise<{ error?: string
   } catch {
     return { error: "프로필 저장에 실패했어요. 로그인 후 다시 시도해주세요." };
   }
+  // 대표 알림 — 프로필 저장이 끝난 뒤에만. 실패해도 가입은 성공으로 둔다(notify가 스스로 삼킨다).
+  await notifySignup({
+    userId,
+    brandName: input.brandName.trim(),
+    email: input.email.trim(),
+    origin: "email",
+  });
   // 스펙: 자동 로그인 X → 세션 정리 후 /login으로 보냄(클라에서 이동)
   await supabase.auth.signOut();
   return {};
@@ -142,12 +151,18 @@ export async function completeOnboardingAction(input: {
 
   // upsert라 email·profileImage를 안 넘기면 기존 값이 지워진다 — 있던 값을 그대로 다시 실어준다.
   const existing = await getProfile(user.id);
+  // ⭐가입 알림은 **이번에 처음 온보딩을 마친 사람**에게만 보낸다.
+  //   이 액션은 재시도·브랜드명 수정으로 여러 번 들어올 수 있어서(위 excludeUuid 주석 참고),
+  //   그냥 걸면 같은 사람으로 알림이 반복된다. brandName이 비어 있었다 = 아직 온보딩 전이었다.
+  const isNewSignup = !existing?.brandName;
+  const email = existing?.email || user.email || "";
+  let userId: number | null = null;
   try {
-    await upsertProfile({
+    userId = await upsertProfile({
       uuid: user.id,
       brandName,
       phone,
-      email: existing?.email || user.email || "",
+      email,
       // ⚠️ `undefined`(안 넘김) 와 `""`(화면에서 '지우기'를 누름)는 다른 뜻이다.
       //    upsert라 안 실어주면 기존 값이 통째로 날아가므로, 안 넘긴 경우에만 기존 값을 되싣는다.
       profileImage:
@@ -155,6 +170,11 @@ export async function completeOnboardingAction(input: {
     });
   } catch {
     return { error: "저장에 실패했어요. 잠시 후 다시 시도해주세요." };
+  }
+  // ⚠️ 지금 소셜 로그인은 구글뿐이다. 카카오 등이 붙으면 여기서 경로를 갈라야 한다
+  //    (user.app_metadata.provider로 판별 가능) — 안 갈라면 메일에 전부 "구글 로그인"으로 찍힌다.
+  if (isNewSignup) {
+    await notifySignup({ userId, brandName, email, origin: "google" });
   }
   return {};
 }
