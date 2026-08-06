@@ -6,14 +6,16 @@ import { verifyMakerPasswordAction } from "@/lib/actions";
 import { useDismissable } from "@/components/useDismissable";
 import { PasswordInput } from "@/components/PasswordInput";
 
-// 우상단 수정 버튼 — 소유자면 바로 / 비회원생성(비번 있음)이면 비번 모달 / 회원생성(비번 없음)이면 로그인 필요 얼럿.
+// 우상단 수정 버튼 — 소유자면 바로 / 주인 있는 남의 카드면 로그인 얼럿 / 주인 없는 비번 카드면 비번 모달.
 export function EditButton({
   slug,
   isOwner,
+  hasOwner,
   hasPassword,
 }: {
   slug: string;
   isOwner: boolean;
+  hasOwner: boolean; // 어떤 계정에든 귀속된 카드 = true. 비번만 있는 미귀속 카드 = false.
   hasPassword: boolean; // 비회원이 관리비번으로 만든 카드 = true. 회원 계정으로 만든 카드 = false.
 }) {
   const router = useRouter();
@@ -47,8 +49,14 @@ export function EditButton({
       router.push(`/register?edit=${slug}`); // 소유자는 세션으로 저장 인증
       return;
     }
+    // ⭐주인 판정이 비번보다 먼저다(08-06). 순서가 반대면 귀속된 카드에서도 옛 비번 모달이 떠서,
+    //   남의 소개서를 비번으로 고칠 수 있는 것처럼 보인다(서버도 같이 막았다).
+    if (hasOwner) {
+      setLoginNeeded(true); // 이미 누군가의 카드 → 그 계정으로 로그인
+      return;
+    }
     if (hasPassword) {
-      setOpen(true); // 비회원 관리비번 카드 → 비번 모달
+      setOpen(true); // 주인 없는 비회원 관리비번 카드 → 비번 모달
       return;
     }
     setLoginNeeded(true); // 회원 계정으로 만든 카드 → 로그인 필요
@@ -68,7 +76,7 @@ export function EditButton({
           <div {...loginDialog.panelProps} className="w-full max-w-sm rounded-lg border border-hairline bg-surface p-6 shadow-e2">
             <p className="text-base font-bold break-keep text-ink">로그인이 필요해요</p>
             <p className="mt-1.5 text-sm leading-relaxed break-keep text-mute">
-              이 소개서는 회원 계정으로 만들어졌어요. 수정하려면 만든 계정으로 로그인해주세요.
+              이 소개서는 계정에 연결되어 있어요. 수정하려면 연결된 계정으로 로그인해주세요.
             </p>
             <div className="mt-4 flex gap-2">
               <button

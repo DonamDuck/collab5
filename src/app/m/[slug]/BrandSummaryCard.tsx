@@ -35,7 +35,12 @@ export function BrandSummaryCard({
         </div>
         {!readOnly && (
           <div className="shrink-0">
-            <EditButton slug={maker.slug} isOwner={isOwner} hasPassword={!!maker.editPasswordHash} />
+            <EditButton
+              slug={maker.slug}
+              isOwner={isOwner}
+              hasOwner={!!maker.ownerUserId}
+              hasPassword={!!maker.editPasswordHash}
+            />
           </div>
         )}
       </div>
