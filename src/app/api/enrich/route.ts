@@ -65,11 +65,20 @@ async function digestsOf(
   researchMemo: unknown
 ): Promise<{ homepageDigest?: string; instagramDigest?: string; pressDigest?: string }> {
   const memo = typeof researchMemo === "string" ? researchMemo : undefined;
+  const t0 = Date.now();
+  const each: Record<string, number> = {};
+  const timed = async <T,>(k: string, p: Promise<T>): Promise<T> => {
+    const s = Date.now();
+    try { return await p; } finally { each[k] = Date.now() - s; }
+  };
   const [homepageDigest, instagramDigest, pressDigest] = await Promise.all([
-    digestOf(homepage),
-    igDigestOf(instagram, researchMemo),
-    fetchArticleExcerpts(memo).catch(() => ""),
+    timed("homepage", digestOf(homepage)),
+    timed("instagram", igDigestOf(instagram, researchMemo)),
+    timed("press", fetchArticleExcerpts(memo).catch(() => "")),
   ]);
+  // ⏱계측(08-07) — 프리페치(미리 읽어두기)를 만들 가치가 있는지 **데이터로** 정하려고 남긴다.
+  // 판단 기준: 이 total이 생성 콜(24~40초) 대비 유의미한가. p95가 6초를 넘지 않으면 프리페치는 과잉이다.
+  console.log("[digest-time]", JSON.stringify({ total: Date.now() - t0, ...each }));
   return { homepageDigest, instagramDigest, pressDigest: pressDigest || undefined };
 }
 
