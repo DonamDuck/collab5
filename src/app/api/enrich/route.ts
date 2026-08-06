@@ -267,6 +267,7 @@ export async function POST(req: Request) {
         focusKeywords: strArr(body.focusKeywords),
         starredKeywords: strArr(body.starredKeywords),
         verbatimKeywords: strArr(body.verbatimKeywords),
+        ownerNote: typeof body.ownerNote === "string" ? body.ownerNote.trim() || undefined : undefined, // 특장점(B35) — 다시 받기 유지
         researchMemo: typeof body.researchMemo === "string" ? body.researchMemo : undefined,
         homepageDigest: await digestOf(body.homepage), // 확정 홈페이지 딥리드(실패 시 undefined)
         instagramDigest: await igDigestOf(body.instagram, body.researchMemo), // 확정 인스타 딥리드(실패 시 undefined)
@@ -308,6 +309,8 @@ export async function POST(req: Request) {
         researchMemo: typeof body.researchMemo === "string" ? body.researchMemo : undefined,
         focusKeywords: strArr(body.focusKeywords),
         values: strArr(body.values),
+        ownerNote: typeof body.ownerNote === "string" ? body.ownerNote.trim() || undefined : undefined, // 특장점(B35) — 한 줄 변경 시 증발 방지
+
         homepageDigest: await digestOf(body.homepage), // 확정 홈페이지 딥리드(실패 시 undefined)
         instagramDigest: await igDigestOf(body.instagram, body.researchMemo), // 확정 인스타 딥리드(실패 시 undefined)
       });

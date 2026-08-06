@@ -12,6 +12,7 @@ export function buildEnrichment(params: {
   confirmed: Set<string>;     // factualOk
   sectionOf: (text: string) => string | undefined;
   factualOf: (text: string) => boolean;
+  ownerNote?: string; // 특장점 한 문장(B35) — 저장해야 '다시 받기'가 재사용한다
 }): Enrichment | null {
   const businessType = params.businessType.trim();
   const chips: EnrichmentChip[] = params.selected.map((text) => ({
@@ -22,10 +23,12 @@ export function buildEnrichment(params: {
     confirmed: params.confirmed.has(text),
   }));
   if (!businessType && chips.length === 0) return null;
+  const ownerNote = params.ownerNote?.trim();
   return {
     createdAt: params.createdAt,
     tier: params.tier,
     seed: { region: params.region.trim(), businessType },
     chips,
+    ...(ownerNote ? { ownerNote } : {}),
   };
 }

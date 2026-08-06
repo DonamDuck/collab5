@@ -15,6 +15,8 @@ export interface Repo {
   setMakerFlags(slug: string, flags: { searchVisible?: boolean }): Promise<Maker | null>;
   setMakerOwner(slug: string, ownerUserId: number): Promise<void>;
   setMakerPasswordHash(slug: string, hash: string): Promise<void>;
+  /** enrichment 스냅샷 교체 — B35 특장점 [지우기] 전용. updateMakerContent는 enrichment를 의도적으로 보존한다. */
+  setMakerEnrichment(slug: string, enrichment: Maker["enrichment"] | null): Promise<void>;
   deleteMaker(slug: string): Promise<void>;
   listMakersByOwner(ownerUserId: number): Promise<Maker[]>;
   searchMakers(q: string): Promise<Maker[]>;
@@ -403,6 +405,10 @@ class InMemoryRepo implements Repo {
     const m = this.makers.find((x) => x.slug === slug);
     if (m) m.ownerUserId = ownerUserId;
   }
+  async setMakerEnrichment(slug: string, enrichment: Maker["enrichment"] | null): Promise<void> {
+    const m = this.makers.find((x) => x.slug === slug);
+    if (m) m.enrichment = enrichment ?? undefined;
+  }
   async setMakerPasswordHash(slug: string, hash: string): Promise<void> {
     const m = this.makers.find((x) => x.slug === slug);
     if (m) m.editPasswordHash = hash;
@@ -678,6 +684,9 @@ class SupabaseRepo implements Repo {
   }
   async setMakerOwner(slug: string, ownerUserId: number): Promise<void> {
     await this.db.from("brands").update({ owner_user_id: ownerUserId }).eq("slug", slug);
+  }
+  async setMakerEnrichment(slug: string, enrichment: Maker["enrichment"] | null): Promise<void> {
+    await this.db.from("brands").update({ enrichment: enrichment ?? null }).eq("slug", slug);
   }
   async setMakerPasswordHash(slug: string, hash: string): Promise<void> {
     await this.db.from("brands").update({ edit_password_hash: hash }).eq("slug", slug);

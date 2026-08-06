@@ -226,6 +226,9 @@ export function EnrichWizard({
   const [crawlChips, setCrawlChips] = useState<KeywordChip[]>([]);
   const [starterChips, setStarterChips] = useState<KeywordChip[]>([]);
   const [customChips, setCustomChips] = useState<KeywordChip[]>([]);
+  // 특장점 한 문장(B35, 2026-08-06) — 칩·별표와 별개의 독립 재료(칩 10칸·별표 6칸 안 소모).
+  // 계약 = "의미가 드러나면 됨"(verbatim의 '그대로 등장'과 다름). 미입력이면 생성 요청·프롬프트 완전 불변.
+  const [ownerNote, setOwnerNote] = useState("");
   const [tier, setTier] = useState<"rich" | "thin">("rich");
   const [links, setLinks] = useState<LinkFinds>({});
   const [research, setResearch] = useState("");
@@ -396,7 +399,8 @@ export function EnrichWizard({
     const optOutNote = optOut.length
       ? `\n\n[사장 확인 — 반드시 반영] 이 브랜드는 ${optOut.join("·")}을(를) 운영하지 않아요. 소개 문구와 identity에 ${optOut.join("·")} 관련 언급·링크를 절대 넣지 마세요.`
       : "";
-    const genKey = JSON.stringify({ ingredients, stars, igChosen, hpChosen, optOut });
+    // ownerNote도 키에 포함 — 특장점만 바꿔도 재생성돼야 한다(캐시 스킵 오판 방지)
+    const genKey = JSON.stringify({ ingredients, stars, igChosen, hpChosen, optOut, note: ownerNote.trim() });
     if (genKey === lastGenKey && options) {
       setKind("fields"); // 입력 그대로면 재생성 스킵(콜 절약)
       return;
@@ -413,6 +417,8 @@ export function EnrichWizard({
           focusKeywords: ingredients,
           starredKeywords: stars,
           verbatimKeywords: verbatim,
+          ownerNote: ownerNote.trim() || undefined, // 특장점(B35) — 의미 반영 계약
+
           // 확약된 공식 홈페이지 → 서버가 직접 읽어 소개서에 반영(딥리드). URL만 보낸다.
           homepage: hpChosen || undefined,
           // 확약된 인스타 핸들 → 서버가 바이오·(메모 속 게시물) 캡션을 직접 읽는다(사장님 글 딥리드).
@@ -505,6 +511,7 @@ export function EnrichWizard({
           chosenOneLiner: chosen,
           researchMemo: research || undefined, // 조사메모 재사용 → 재크롤 없음
           focusKeywords: ingredients,
+          ownerNote: ownerNote.trim() || undefined, // 특장점(B35) — 한 줄 바꿔도 유지
           homepage: fHomepage || undefined,
         }),
       });
@@ -550,6 +557,7 @@ export function EnrichWizard({
       confirmed: factualOk,
       sectionOf: (t) => chipOf(t)?.section,
       factualOf: (t) => isFactual(t),
+      ownerNote: ownerNote.trim() || undefined, // 스냅샷 저장 → '다시 받기'가 재사용(B35)
     });
     onApply({
       name: fName.trim() || query || undefined,
@@ -732,6 +740,26 @@ export function EnrichWizard({
                 「{regionInput.trim()} · {btype.trim()}」 수정
               </button>
               <span className="text-[13px] text-faint">{selected.length}개 선택</span>
+            </div>
+
+            {/* 특장점 한 문장(B35, 대표 확정 08-06) — 칩 위 최상단. 직접 추가 칸이 하단에 묻혀
+                문장을 넣을 곳이 없던 문제의 출구. 칩이 아니라 독립 재료(값이 남아 있으면 그게 확인 상태). */}
+            <div className="mt-3 rounded-lg border border-hairline bg-surface-soft px-3 py-2.5">
+              <label htmlFor="wizard-owner-note" className="block text-[13px] font-semibold text-body">
+                💬 우리 브랜드를 소개할 때 꼭 빼놓고 싶지 않은 점이 있나요? <span className="font-normal text-faint">(선택)</span>
+              </label>
+              <input
+                id="wizard-owner-note"
+                type="text"
+                value={ownerNote}
+                onChange={(e) => setOwnerNote(e.target.value)}
+                maxLength={100}
+                placeholder="예: 걷고 뛰기 모두 가능한 러닝크루예요"
+                className="mt-1.5 w-full rounded-md border border-hairline bg-surface px-2.5 py-2 text-[14px] text-ink placeholder:text-faint focus:border-primary focus:outline-none"
+              />
+              <p className="mt-1 text-[12px] leading-relaxed text-faint">
+                소개 글을 쓸 때 이 내용을 중심으로 담아드려요.
+              </p>
             </div>
 
             <div className="mt-2 max-h-[46vh] overflow-y-auto slim-scrollbar pr-0.5">

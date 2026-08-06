@@ -68,6 +68,7 @@ export interface Enrichment {
   tier: "rich" | "thin";
   seed: { region: string; businessType: string };
   chips: EnrichmentChip[]; // 선택 칩만
+  ownerNote?: string; // 사장이 직접 쓴 특장점 한 문장(B35, 2026-08-06) — '다시 받기'가 재사용. 의미 반영 계약(verbatim 아님)
 }
 
 /** 소개서 상태 — active=정상 / inactive=소프트 삭제(비노출·DB 보관, 2026-07-22) */

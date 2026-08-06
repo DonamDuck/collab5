@@ -19,6 +19,7 @@ import {
   isUsableOwnerVoice,
   CHIP_TARGET,
   sanitizeSearchText,
+  ownerNoteCovered,
 } from "../src/lib/enrich";
 import { regionMatches, regionConflict } from "../src/lib/regionSynonyms";
 import { mapLinkLabel, channelLabel } from "../src/lib/links";
@@ -601,6 +602,15 @@ check("✅ 정식 URL로 재조립(임의 URL 페치 방지)", postUrls.every((u
 check("✅ 중복 shortcode 제거", extractPostUrls(`${igMemo}\n${igMemo}`).length === 3);
 check("✅ 상한 5개", extractPostUrls(Array.from({ length: 9 }, (_, i) => `https://instagram.com/p/AbCdEf${i}gHi/`).join(" ")).length === 5);
 check("✅ 포스트 URL 없으면 빈 배열", extractPostUrls("인스타 @can.n.cork 만 언급") .length === 0);
+
+// 특장점 사후 확인(B35) — ⚠️보장이 아니라 표본 신호(좋은 의역이면 0겹침이 정상, 게이트로 쓰지 말 것)
+console.log("[특장점(ownerNote) 표면 겹침 검사]");
+check("✅ 내용어가 결과물에 있으면 covered(어미 완충: 러닝크루예요→러닝크루)", ownerNoteCovered("걷고 뛰기 가능한 러닝크루예요", ["달리기가 어려워도 러닝크루에 함께할 수 있어요"]));
+check("✅ 여러 텍스트 중 하나에만 있어도 covered", ownerNoteCovered("자체 제작 보트", ["무관한 문장", "보트를 직접 만들어 띄워요"]));
+check("⛔ 아무 조각도 없으면 not covered(로그 대상)", !ownerNoteCovered("걷고 뛰기 가능한 러닝크루", ["매주 함께 모여 커피를 내려요"]));
+check("✅ 내용어가 없는 입력(한 글자·기호뿐)은 경보 안 울림", ownerNoteCovered("!! ㅋ ~", ["아무 문장"]));
+check("✅ 숫자·영문 조각도 검사", ownerNoteCovered("DJI 액션캠 50대", ["DJI 카메라로 촬영해 드려요"]));
+check("⛔ 빈 결과물이면 not covered", !ownerNoteCovered("자체 제작 장비", []));
 
 console.log(`\n결과: ${pass} pass / ${fail} fail`);
 process.exit(fail ? 1 : 0);

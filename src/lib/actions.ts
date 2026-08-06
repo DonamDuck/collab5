@@ -492,6 +492,18 @@ export async function deleteMakerAction(slug: string): Promise<{ error?: string 
   return {};
 }
 
+/** 특장점(ownerNote) 지우기 — 소유자 세션만. '다시 받기'의 보이지 않는 재주입 방지(B35 스펙 4-4).
+ *  enrichment 자체는 updateMakerAction이 의도적으로 보존하는 필드라, 지우기만 이 전용 액션으로 연다. */
+export async function clearOwnerNoteAction(slug: string): Promise<{ ok: boolean }> {
+  const maker = await repo.getMakerBySlug(slug);
+  if (!maker?.enrichment?.ownerNote) return { ok: true }; // 지울 게 없으면 성공으로
+  const sessionUserId = await getSessionUserId();
+  if (!sessionUserId || maker.ownerUserId !== sessionUserId) return { ok: false };
+  const { ownerNote: _drop, ...rest } = maker.enrichment;
+  await repo.setMakerEnrichment(slug, rest);
+  return { ok: true };
+}
+
 /** register 완료 얼럿 버전 분기용 */
 export async function getAuthStateAction(): Promise<{ loggedIn: boolean; userId?: number }> {
   const user = await getSessionUser();

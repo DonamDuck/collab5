@@ -11,6 +11,7 @@ import {
   getEditDataAction,
   getPreviewDemoNoneAction,
   lookupPlaceAction,
+  clearOwnerNoteAction,
 } from "@/lib/actions";
 import { MakerArticle } from "../m/[slug]/MakerArticle";
 import type { CollabType, Block, Maker, Enrichment } from "@/lib/types";
@@ -584,6 +585,8 @@ function RegisterForm() {
       verbatimKeywords: usableChips
         .filter((c) => c.starred && c.section === "직접")
         .map((c) => c.text),
+      // 특장점(B35) — 스냅샷에서 재전달해 다시 받아도 유지. 지우려면 다시 받기 옆 [지우기](보이지 않는 재주입 방지).
+      ownerNote: enrichment?.ownerNote || undefined,
       // 폼에 적힌 홈페이지 → 서버가 직접 읽어 초안에 반영(딥리드). URL만 보낸다.
       homepage: homepage.trim() || undefined,
       // 폼에 적힌 인스타 핸들 → 서버가 바이오·캡션을 직접 읽는다(사장님 글 딥리드).
@@ -648,6 +651,7 @@ function RegisterForm() {
           name: name.trim(),
           chosenOneLiner: chosen,
           researchMemo: draftResearchMemo || undefined,
+          ownerNote: enrichment?.ownerNote || undefined, // 특장점(B35) — 한 줄 바꿔도 유지
           values,
           homepage: homepage.trim() || undefined,
           instagram: instagram.trim() || undefined,
@@ -1395,6 +1399,30 @@ function RegisterForm() {
             ) : undefined
           }
         />
+        {/* 특장점 표시 + [지우기](B35 스펙 4-4) — 보이지 않는 재주입 방지: 저장된 특장점이 '다시 받기'마다
+            몰래 들어가면 잘못 쓴 문장이 "왜 자꾸 이상하게 나오지"의 보이지 않는 원인이 된다. 수정 UI는 스코프 밖(지우고 새로 받기). */}
+        {enrichment?.ownerNote && (
+          <div className="mb-4 flex items-start justify-between gap-3 rounded-lg border border-hairline bg-surface-soft px-3 py-2.5">
+            <p className="text-[13px] leading-relaxed text-mute">
+              💬 초안에 담는 특장점: <span className="text-body">“{enrichment.ownerNote}”</span>
+            </p>
+            <button
+              type="button"
+              onClick={async () => {
+                setEnrichment((e) => {
+                  if (!e) return e;
+                  const { ownerNote: _drop, ...rest } = e;
+                  return rest as Enrichment;
+                });
+                // 저장된 소개서면 스냅샷에서도 지운다 — 다음 편집 세션에 되살아나지 않게. 실패해도 로컬은 이미 제거됨.
+                if (editSlug) void clearOwnerNoteAction(editSlug);
+              }}
+              className="shrink-0 text-[13px] text-faint underline underline-offset-2 hover:text-mute"
+            >
+              지우기
+            </button>
+          </div>
+        )}
         <div className="space-y-8">
           <Field label="상호 *" hint={hintFor("name")}>
             <input

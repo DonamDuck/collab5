@@ -63,6 +63,7 @@ export interface DraftInput {
   focusKeywords?: string[]; // 가중 키워드 — 생성 방향을 잡는다(선택한 키워드 = 재료)
   starredKeywords?: string[]; // ⭐ 한 줄 소개에 반드시 반영(캡 6 — 위저드 MAX_STARS와 동기, 배열 순서 = 우선순위)
   verbatimKeywords?: string[]; // '그대로 넣기' — 슬로건·인증·상표. 표현 변형 금지
+  ownerNote?: string; // 특장점 한 문장(B35) — 의미 반영 계약. 다시 받기(draft2)가 스냅샷에서 재전달
   researchMemo?: string; // 이미 크롤한 조사메모 재사용(키워드 추출 때 쓴 것) — 재크롤 방지(콜 절감)
   homepageDigest?: string; // 홈페이지 딥리드 발췌 — 서버(fetchHomepageDigest)에서만 생성, 클라이언트 텍스트 금지
   instagramDigest?: string; // 인스타 발췌(바이오·캡션 = 사장님이 직접 쓴 글) — 서버(fetchInstagramDigest)에서만 생성
@@ -93,6 +94,7 @@ export interface RegenDescInput {
   instagramDigest?: string; // 인스타 발췌(있으면) — 서버에서만 생성
   focusKeywords?: string[]; // 키워드 재료(선택한 키워드)
   values?: string[]; // 브랜드 결 단어
+  ownerNote?: string; // 특장점 한 문장(B35) — 미전달 시 한 줄만 바꿔도 특장점이 증발한다(스펙 적용 경로 ③)
 }
 
 /** 크롤이 발견한 활동 흔적 — 창작 아님, 조사 메모에 실제 등장한 것만 */
@@ -1783,8 +1785,12 @@ class NaverGeminiProvider implements SearchProvider {
 
   // 조사 메모 + (사장 설명 + 키워드) → 한줄소개·브랜드소개 5지선다(빠른 생성 단계).
   async options(input: OptionsInput): Promise<EnrichOptions> {
+    // 특장점 한 문장(ownerNote) — B35 되살리기(스펙 2026-08-06). 계약 = "의미가 드러나면 됨"(verbatim의 '원문 그대로'와 다른 계약).
+    // 도배 금지(대표 08-07): 자세히 후보 중 앵커 2 + 나머지 자유 — 별표의 한줄 2+3과 같은 정신, 자리는 자세히.
+    // ⚠️여기에 개수(숫자)를 쓰지 마라 — 개수는 요청문이 지시한다(공유 프롬프트 계약, memory prompt-edit-collides-silently).
+    // 미입력이면 블록 자체가 없어 기존 프롬프트와 완전 동일(회귀 불변).
     const note = input.ownerNote?.trim()
-      ? `⭐⭐가장 중요 — 사장이 직접 쓴 브랜드 핵심 설명이야. 이 내용·관점·강조점을 모든 후보의 최우선 중심으로 삼아줘(조사 자료보다 이걸 우선):\n"${input.ownerNote.trim()}"\n\n`
+      ? `⭐⭐사장이 직접 쓴 특장점 한 문장(조사 자료보다 우선하는 1순위 사실):\n"${input.ownerNote.trim()}"\n· 이 특장점의 **의미와 맥락**이 드러나야 한다 — 표현은 자연스럽게 다듬어도 되지만 사실을 왜곡·약화하지 마라.\n· descriptions 후보 중 2개는 이 특장점을 중심 앵글로 강하게 쓰되 그 2개끼리도 서로 다른 렌즈로, 나머지는 자유 앵글 — 자유 후보엔 자연스럽게 녹을 때만 넣어라(전 후보가 특장점으로 시작하는 도배 금지).\n· activityHints: 특장점이 활동 성격이면 힌트 하나로 뽑아라.\n· ⛔oneLiners에는 이 문장을 통째로 넣지 마라(자세히·활동이 이 문장의 자리다).\n· 특장점 안의 검증 불가한 수치·수상·최상급("10년 무사고"류)은 단정 대신 완화 표현으로.\n· 특장점이 상투어("정성을 다합니다"류)면 내용은 살리되 표현은 시스템 지침의 문체 규칙이 이긴다.\n· 자랑이 여러 개 나열돼 있으면 가장 구체적인 사실 하나만 채택해 살려라.\n\n`
       : "";
     const kw = input.focusKeywords?.length
       ? `⭐사장이 직접 고른 키워드(이것들이 곧 이 브랜드다 — 모든 후보의 재료로 최우선 사용. 단, 나열하지 말고 자연스러운 문장으로 녹여라): ${input.focusKeywords.join(", ")}\n\n`
@@ -1819,6 +1825,21 @@ class NaverGeminiProvider implements SearchProvider {
       oneLiners: opts.oneLiners.map((t) => tidyTypography(stripDecorativeQuotes(t))),
       descriptions: opts.descriptions.map((t) => tidyTypography(stripDecorativeQuotes(t))),
     };
+    // [owner-note-check] 보장이 아니라 표본 신호(스펙 4-3) — 좋은 의역일수록 표면 겹침이 0이라 오탐이 정상.
+    // 로그에 원문+발췌를 같이 남겨 사람이 한 줄만 보고 "누락 vs 의역"을 판정한다. 재시도 없음(콜 상한 불변).
+    const noteText = input.ownerNote?.trim();
+    if (noteText) {
+      const hay = [
+        ...cleaned.descriptions,
+        ...(cleaned.activityHints ?? []).map((h) => JSON.stringify(h)),
+      ];
+      if (!ownerNoteCovered(noteText, hay)) {
+        console.warn("[owner-note-check] 특장점 표면 겹침 0 — 누락인지 의역인지 확인 필요", {
+          note: noteText,
+          자세히발췌: cleaned.descriptions[0]?.slice(0, 140) ?? "",
+        });
+      }
+    }
     return mapUrl ? { ...cleaned, identity: { ...cleaned.identity, mapUrl } } : cleaned;
   }
 
@@ -1882,9 +1903,13 @@ class NaverGeminiProvider implements SearchProvider {
     const verbatimLine = verbatim.length
       ? `⭐그대로 넣을 문구(의역·표현 변형 절대 금지, 원문 그대로 등장시켜 — 단 따옴표로 감싸지 말고 문장에 녹여라): ${verbatim.join(", ")}.\n`
       : "";
+    // 특장점(B35) — 다시 받기에서도 유지(스냅샷 재전달). 계약은 options()의 note 블록과 동일: 의미 반영, 도배 금지.
+    const noteLine = input.ownerNote?.trim()
+      ? `⭐⭐사장이 직접 쓴 특장점 한 문장(1순위 사실 — '브랜드 소개' 후보 중 2개는 이 의미를 중심 앵글로, 나머지는 자연스럽게 녹을 때만. 표현은 자유, 왜곡 금지. 한 줄 소개에는 통째로 넣지 마라. 검증 불가한 수치·수상은 완화 표현으로): "${input.ownerNote.trim()}"\n`
+      : "";
     const prompt = `브랜드명: "${input.name}"\n\n[사용자 입력]\n${
       info || "(입력이 적어요 — 조사 자료 위주로)"
-    }\n\n${kw.length ? `⭐가중 키워드(가장 중요하게 반영): ${kw.join(", ")}\n` : ""}${starLine}${verbatimLine}\n${this.igBlock(input.instagramDigest)}${this.digestBlock(input.homepageDigest)}${this.pressBlock(input.pressDigest)}[조사 자료]\n${research}\n\n⭐자료 신뢰 순서(충돌 시 위가 이긴다): ①인스타 발췌(사장님이 직접 쓴 글) ②홈페이지 발췌 ③네이버 검증 블록(직접 쓴 소개·지도 교차검증·지역검색) ④기타 네이버 문서 ⑤제미나이 조사.\n위 자료로 '한 줄 소개' 후보 3개(각 40자 이내 — 브랜드 정체성이 무엇을·어떻게·누구에게 한 줄에 드러나게, 서술어는 말로 소개하듯 행위+진행형 "~을 만들고 있어요/열고 있어요"로 — 단답 현재형 "~을 만들어요/열어요" 금지, 과장·오글거리는 표현 금지)와 '브랜드 소개' 후보 6개(1~5는 서로 다른 앵글, 6번은 사실 정리형, 각 3~5문장, 어미는 시스템 지침의 '어미 리듬' — 선언=~합니다/부연=~이에요 혼합)를 함께 만들어줘. values·identity도 형식에 맞게 채워줘.${
+    }\n\n${kw.length ? `⭐가중 키워드(가장 중요하게 반영): ${kw.join(", ")}\n` : ""}${noteLine}${starLine}${verbatimLine}\n${this.igBlock(input.instagramDigest)}${this.digestBlock(input.homepageDigest)}${this.pressBlock(input.pressDigest)}[조사 자료]\n${research}\n\n⭐자료 신뢰 순서(충돌 시 위가 이긴다): ①인스타 발췌(사장님이 직접 쓴 글) ②홈페이지 발췌 ③네이버 검증 블록(직접 쓴 소개·지도 교차검증·지역검색) ④기타 네이버 문서 ⑤제미나이 조사.\n위 자료로 '한 줄 소개' 후보 3개(각 40자 이내 — 브랜드 정체성이 무엇을·어떻게·누구에게 한 줄에 드러나게, 서술어는 말로 소개하듯 행위+진행형 "~을 만들고 있어요/열고 있어요"로 — 단답 현재형 "~을 만들어요/열어요" 금지, 과장·오글거리는 표현 금지)와 '브랜드 소개' 후보 6개(1~5는 서로 다른 앵글, 6번은 사실 정리형, 각 3~5문장, 어미는 시스템 지침의 '어미 리듬' — 선언=~합니다/부연=~이에요 혼합)를 함께 만들어줘. values·identity도 형식에 맞게 채워줘.${
       round > 0 ? " 이전과는 다른 표현·각도로 새롭게 써줘." : ""
     }`;
     const opts = await this.generateOptions(prompt, round > 0 ? 1.0 : 0.9);
@@ -1922,7 +1947,7 @@ class NaverGeminiProvider implements SearchProvider {
 ⭐⭐사장이 최종 선택한 '한 줄 소개' — 이 문장을 아래 브랜드 소개 후보 전체의 공통 *관통 주제*로 삼아라:
 "${chosen}"
 
-${kw.length ? `⭐가중 키워드(나열 말고 문장에 자연스럽게 녹여라): ${kw.join(", ")}\n\n` : ""}${this.igBlock(input.instagramDigest)}${this.digestBlock(input.homepageDigest)}[조사 자료]
+${input.ownerNote?.trim() ? `⭐사장이 직접 쓴 특장점 한 문장(1순위 사실) — 앵커 ${n}개 중 적어도 하나에 이 의미가 드러나게 하라(표현은 자유, 사실 왜곡·약화 금지): "${input.ownerNote.trim()}"\n\n` : ""}${kw.length ? `⭐가중 키워드(나열 말고 문장에 자연스럽게 녹여라): ${kw.join(", ")}\n\n` : ""}${this.igBlock(input.instagramDigest)}${this.digestBlock(input.homepageDigest)}[조사 자료]
 ${input.researchMemo?.trim() || "(추가 조사 자료 없음 — 위 한 줄 소개와 키워드를 중심으로, 없는 사실은 지어내지 말고 담백하게)"}
 
 ⭐지시 — '앵커' 브랜드 소개 ${n}개를 써라(descriptions 배열에 정확히 ${n}개):
@@ -2030,6 +2055,18 @@ export async function enrichDraftBoth(
 
 /** 고른/수정한 한 줄 소개를 관통 주제로 '자세히 소개' 5개만 재생성(+1 Gemini 콜, 재크롤 없음).
  *  provider 미지원이면 규칙 기반 담백한 1개로 폴백. */
+// [owner-note-check]용 표면 겹침 검사(B35 스펙 4-3) — ⚠️보장이 아니라 표본 신호다.
+// 특장점이 좋은 의역으로 반영될수록 표면 겹침이 0이 될 수 있다(그게 정상). 게이트로 쓰지 말 것.
+export function ownerNoteCovered(note: string, texts: string[]): boolean {
+  const tokens = note.split(/[^0-9A-Za-z가-힣]+/u).filter((t) => t.length >= 2);
+  if (!tokens.length) return true; // 검사할 내용어가 없으면 판정 불가 = 경보 안 울림
+  const hay = texts.join(" ");
+  // 어미 완충: "러닝크루예요"는 출력에 "러닝크루"로 등장한다 — 꼬리를 1~2자 깎은 변형도 같이 본다(최소 2자).
+  return tokens.some((t) =>
+    [t, t.slice(0, -1), t.slice(0, -2)].filter((v) => v.length >= 2).some((v) => hay.includes(v))
+  );
+}
+
 export async function enrichRegenDescriptions(input: RegenDescInput): Promise<string[]> {
   if (provider.regenDescriptions) return provider.regenDescriptions(input);
   const ol = input.chosenOneLiner.trim();
