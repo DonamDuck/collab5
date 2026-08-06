@@ -54,6 +54,25 @@ async function igDigestOf(instagram: unknown, researchMemo: unknown): Promise<st
   }
 }
 
+/** 홈페이지·인스타·기사 발췌를 **병렬로** 읽는다 (2026-08-07).
+ *  왜: 셋은 서로 독립인데 `await`를 나란히 쓰면 순차로 쌓인다 — 각 상한이 홈피 8초·인스타 12초·기사 6초라
+ *  느린 사이트에선 최악 26초가 Gemini 콜 **앞에** 붙었다. 병렬이면 최악 = 가장 느린 하나(12초).
+ *  실측(로컬페이지, 08-07): 순차 3.3초 → 병렬 1.2초. 품질·비용 변화 0(같은 함수를 같은 횟수 부른다).
+ *  ⚠️각 실패는 이미 함수 안에서 삼켜 undefined가 되므로 Promise.all이 전체를 깨뜨리지 않는다(기사만 catch 보강). */
+async function digestsOf(
+  homepage: unknown,
+  instagram: unknown,
+  researchMemo: unknown
+): Promise<{ homepageDigest?: string; instagramDigest?: string; pressDigest?: string }> {
+  const memo = typeof researchMemo === "string" ? researchMemo : undefined;
+  const [homepageDigest, instagramDigest, pressDigest] = await Promise.all([
+    digestOf(homepage),
+    igDigestOf(instagram, researchMemo),
+    fetchArticleExcerpts(memo).catch(() => ""),
+  ]);
+  return { homepageDigest, instagramDigest, pressDigest: pressDigest || undefined };
+}
+
 // 임시 진단: web_search 없는 최소 호출 — 전반 과부하 vs web_search 특정 구분용.
 export async function GET() {
   try {
@@ -197,6 +216,8 @@ export async function POST(req: Request) {
     const name = typeof body.name === "string" ? body.name.trim() : "";
     if (!name) return NextResponse.json({ error: "브랜드 이름이 필요해요." }, { status: 400 });
     try {
+      // 홈피·인스타·기사를 병렬로(08-07) — 순차 await면 최악 26초가 생성 콜 앞에 쌓인다
+      const digests = await digestsOf(body.homepage, body.instagram, body.research);
       const options = await enrichOptions({
         name,
         research: typeof body.research === "string" ? body.research : "",
@@ -204,12 +225,7 @@ export async function POST(req: Request) {
         starredKeywords: strArr(body.starredKeywords),
         verbatimKeywords: strArr(body.verbatimKeywords),
         ownerNote: typeof body.ownerNote === "string" ? body.ownerNote : undefined,
-        homepageDigest: await digestOf(body.homepage), // 확정 홈페이지 딥리드(실패 시 undefined)
-        instagramDigest: await igDigestOf(body.instagram, body.research), // 확정 인스타 딥리드(실패 시 undefined)
-        pressDigest:
-          (await fetchArticleExcerpts(
-            typeof body.research === "string" ? body.research : undefined
-          ).catch(() => "")) || undefined, // 메모 속 기사 본문 발췌(실패 시 undefined)
+        ...digests,
       });
       return NextResponse.json({ options });
     } catch (e) {
@@ -269,12 +285,7 @@ export async function POST(req: Request) {
         verbatimKeywords: strArr(body.verbatimKeywords),
         ownerNote: typeof body.ownerNote === "string" ? body.ownerNote.trim() || undefined : undefined, // 특장점(B35) — 다시 받기 유지
         researchMemo: typeof body.researchMemo === "string" ? body.researchMemo : undefined,
-        homepageDigest: await digestOf(body.homepage), // 확정 홈페이지 딥리드(실패 시 undefined)
-        instagramDigest: await igDigestOf(body.instagram, body.researchMemo), // 확정 인스타 딥리드(실패 시 undefined)
-        pressDigest:
-          (await fetchArticleExcerpts(
-            typeof body.researchMemo === "string" ? body.researchMemo : undefined
-          ).catch(() => "")) || undefined, // 메모 속 기사 본문 발췌(실패 시 undefined)
+        ...(await digestsOf(body.homepage, body.instagram, body.researchMemo)), // 병렬 딥리드(08-07)
         round: typeof body.round === "number" ? body.round : 0,
       });
       // researchMemo = 자세히 재생성(descFromOneLiner)이 재사용 → 재크롤 방지(콜 절감)
@@ -311,8 +322,14 @@ export async function POST(req: Request) {
         values: strArr(body.values),
         ownerNote: typeof body.ownerNote === "string" ? body.ownerNote.trim() || undefined : undefined, // 특장점(B35) — 한 줄 변경 시 증발 방지
 
-        homepageDigest: await digestOf(body.homepage), // 확정 홈페이지 딥리드(실패 시 undefined)
-        instagramDigest: await igDigestOf(body.instagram, body.researchMemo), // 확정 인스타 딥리드(실패 시 undefined)
+        // 홈피·인스타 병렬(08-07) — 기사 발췌는 이 모드가 원래 안 쓴다(앵커 재생성은 조사메모 재사용)
+        ...(await (async () => {
+          const [homepageDigest, instagramDigest] = await Promise.all([
+            digestOf(body.homepage),
+            igDigestOf(body.instagram, body.researchMemo),
+          ]);
+          return { homepageDigest, instagramDigest };
+        })()),
       });
       return NextResponse.json({ anchors });
     } catch (e) {
