@@ -241,6 +241,9 @@ export async function verifyMakerPasswordAction(
   if (!maker) return { ok: false };
   const sessionUserId = await getSessionUserId();
   if (sessionUserId && maker.ownerUserId === sessionUserId) return { ok: true };
+  // ⭐주인이 붙은 소개서에선 옛 관리비번이 무효다(08-06). 비회원 비번으로 만든 카드를 나중에
+  //   계정에 귀속시키거나 다른 사람에게 넘기면 비번을 아는 쪽이 계속 남의 소개서를 고칠 수 있었다.
+  if (maker.ownerUserId) return { ok: false };
   if (maker.editPasswordHash && sha256(password.trim()) === maker.editPasswordHash) return { ok: true };
   return { ok: false };
 }
@@ -287,7 +290,9 @@ export async function updateMakerAction(
   if (!maker) return { error: "소개서를 찾을 수 없어요." };
   const sessionUserId = await getSessionUserId();
   const isOwner = !!sessionUserId && maker.ownerUserId === sessionUserId;
+  // ⚠️주인이 붙었으면 비번 경로는 닫힌다(08-06) — 저장이 진짜 관문이라 화면·진입만 막으면 반쪽이다.
   const pwOk =
+    !maker.ownerUserId &&
     !!maker.editPasswordHash && !!password && sha256(password.trim()) === maker.editPasswordHash;
   if (!isOwner && !pwOk) return { error: "수정 권한이 없어요." };
   // enrichment는 의도적으로 전달하지 않음 — 전달하면 일반 수정마다 저장된 크롤 스냅샷을 덮어씀(보존 불변식).
