@@ -21,6 +21,7 @@ const MODEL_WHITELIST = ["gemini-2.5-flash", "gemini-3.6-flash", "gemini-3.1-pro
 export async function POST(req: Request) {
   // 원가·토큰 실측 누적기 — try 밖에 두어 thin·no_match 등 조기 리턴에서도 합계가 남게 한다.
   const meters: CallMeter[] = [];
+  const startedAt = Date.now(); // finally의 벽시계 로그용 — try 안에 두면 스코프 밖
   let costTag = "?";
   try {
     // ① 킬스위치
@@ -79,7 +80,6 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "own_brand" }, { status: 403 });
     }
 
-    const startedAt = Date.now();
     let dnaCalls = 0;
     costTag = `${from.slug}→${to.slug}`;
 
@@ -158,6 +158,6 @@ export async function POST(req: Request) {
     console.error("[collab-report] failed:", e);
     return NextResponse.json({ error: "failed" }, { status: 500 });
   } finally {
-    logTotal(costTag, meters); // 콜 0건(캐시 히트)이면 아무것도 찍지 않는다
+    logTotal(costTag, meters, Date.now() - startedAt); // 콜 0건(캐시 히트)이면 아무것도 찍지 않는다
   }
 }
