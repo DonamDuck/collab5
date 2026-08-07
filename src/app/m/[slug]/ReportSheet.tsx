@@ -57,6 +57,7 @@ export function ReportSheet({
   initialFromSlug = null,
   initialReport = null,
   initialReadOnly = false,
+  initialFromName,
   source = "maker_page",
   onReportLoaded,
 }: {
@@ -74,6 +75,10 @@ export function ReportSheet({
    *  ⭐부수효과(의도된 것): 아카이브 열람이 더는 재생성(유료 콜)을 태우지 않는다.
    *     최신 분석이 필요하면 소개서 페이지에서 열거나 [다른 소개서로 분석]으로 명시 실행한다. */
   initialReport?: CollabReportData | null;
+  /** 그 쌍의 내 브랜드 이름 — **넘긴 브랜드는 `fromBrands`에 없어서** 이름을 그쪽에서 못 찾는다.
+   *  없이 두면 헤더가 `?? fromBrands[0]`으로 **엉뚱한 내 소개서 이름**을 박는다
+   *  (08-07 prod 실측: 아그레아블 카드를 열었는데 제목이 "로컬페이지 × 두더지요가원"). */
+  initialFromName?: string;
   /** 넘긴 브랜드의 보관본이라는 표시 — `initialReport`로 즉시 열 땐 서버 응답(readOnly)이 없어서 부모가 알려준다.
    *  ⚠️ 이건 **안내 문구용 힌트지 권한 검문이 아니다**(권한 판정은 서버 몫 — 08-07 아카이브 버그의 교훈). */
   initialReadOnly?: boolean;
@@ -221,7 +226,13 @@ export function ReportSheet({
 
   const sampleReport = sampleData.report as CollabReportData;
   const report = sampleMode ? sampleReport : (result?.report ?? null);
-  const fromName = sampleMode ? sampleData.fromName : (selected?.name ?? "");
+  // ⚠️ 헤더 이름은 `selected`(= 못 찾으면 fromBrands[0]로 떨어지는 값)를 그대로 쓰면 안 된다 —
+  //    소유권이 떠난 브랜드는 목록에 없어서 **엉뚱한 내 소개서 이름**이 박힌다. 정확히 일치할 때만 쓰고,
+  //    없으면 부모가 준 이름(아카이브 행의 fromName)으로 간다.
+  const exactFrom = fromBrands.find((b) => b.slug === selectedSlug);
+  const fromName = sampleMode
+    ? sampleData.fromName
+    : (exactFrom?.name ?? initialFromName ?? selected?.name ?? "");
   const reportToName = sampleMode ? sampleData.toName : toName;
 
   // ── 5조각 렌더(ok·샘플 공용) ──

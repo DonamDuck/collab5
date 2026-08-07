@@ -167,6 +167,7 @@ export function ReportArchiveCard({
             initialReport={item.report}
             // 내 소개서 목록에 없는 from = 소유권이 떠난 브랜드 → 보관본 안내 문구용 힌트(권한 판정 아님)
             initialReadOnly={!myBrands.some((b) => b.slug === item.fromSlug)}
+            initialFromName={item.fromName} // 넘긴 브랜드는 myBrands에 없어 시트가 이름을 못 찾는다
             toSlug={item.toSlug}
             toName={item.toName}
             sampleMode={false}
