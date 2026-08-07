@@ -186,8 +186,9 @@ export interface CollabReportListItem {
 export interface NovelIdea {
   title: string;
   desc: string;
-  gainA: string;   // 우리가 얻는 것 — 한쪽만 좋은 아이디어를 거르는 장치(양쪽 이득 게이트)
-  gainB: string;   // 상대가 얻는 것
+  method: string;  // collabMethod 어휘 — ideas와 **같은 섹션에 나란히 놓이므로** 아이브로 문법도 같아야 한다
+  gainA: string;   // 우리에게 벌어지는 일 — 한쪽만 좋은 아이디어를 거르는 장치이자 화면에 나가는 문장
+  gainB: string;   // 상대에게 벌어지는 일
 }
 export interface CollabReportData {
   matchPoints: ReportMatchPoint[];  // 2~4개

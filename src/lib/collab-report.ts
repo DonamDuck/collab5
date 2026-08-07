@@ -214,11 +214,12 @@ const NOVEL_GEN_SCHEMA = {
         type: Type.OBJECT,
         properties: {
           title: { type: Type.STRING, description: "15자 내외" },
-          desc: { type: Type.STRING, description: "2~3문장" },
-          gain_a: { type: Type.STRING, description: "브랜드 A가 얻는 것 한 줄" },
-          gain_b: { type: Type.STRING, description: "브랜드 B가 얻는 것 한 줄" },
+          desc: { type: Type.STRING, description: "'~하는 콜라보'로 끝나는 명사구" },
+          method: { type: Type.STRING, description: "Collab Method Pool 어휘 하나" },
+          gain_a: { type: Type.STRING, description: "A에게 벌어지는 일 한 줄" },
+          gain_b: { type: Type.STRING, description: "B에게 벌어지는 일 한 줄" },
         },
-        required: ["title", "desc", "gain_a", "gain_b"],
+        required: ["title", "desc", "method", "gain_a", "gain_b"],
       },
       description: "기발한 후보 8개",
     },
@@ -316,12 +317,17 @@ async function generateNovelIdeas(
     );
     const cands: NovelIdea[] = gens
       .flatMap((g) => g.ideas ?? [])
-      .map((i) => ({
-        title: String(i.title ?? ""),
-        desc: String(i.desc ?? ""),
-        gainA: String(i.gain_a ?? ""),
-        gainB: String(i.gain_b ?? ""),
-      }))
+      .map((i) => {
+        const method = String(i.method ?? "");
+        return {
+          title: String(i.title ?? ""),
+          desc: String(i.desc ?? ""),
+          // Pool 밖 어휘는 빈 문자열로 — 아이디어는 살리고 UI가 태그만 생략한다(기존 ideas와 같은 처리)
+          method: DNA_POOL.collabMethod.includes(method) ? method : "",
+          gainA: String(i.gain_a ?? ""),
+          gainB: String(i.gain_b ?? ""),
+        };
+      })
       .filter((i) => i.title && i.desc);
     if (cands.length === 0) return [];
 
@@ -544,15 +550,17 @@ const MOCK_REPORT: CollabReportData = {
   novelIdeas: [
     {
       title: "반납 못 한 책 부적",
-      desc: "책방에 오래 반납되지 않은 책 목록을 받아, 그 책이 무사히 돌아오길 비는 작은 직물 부적을 만들어요. 손님은 부적을 책갈피처럼 끼워 두고, 책이 돌아오면 부적은 책방 벽에 걸려요.",
-      gainA: "부적 워크숍을 책이라는 새로운 소재로 열어봐요.",
-      gainB: "반납 독촉이 놀이가 되고, 벽에 걸린 부적이 책방 이야깃거리가 돼요.",
+      desc: "오래 반납되지 않은 책 목록을 받아 그 책이 돌아오길 비는 직물 부적을 만들고, 책이 돌아오면 부적을 책방 벽에 거는 콜라보",
+      method: "협동 워크숍",
+      gainA: "부적 만들기가 책이라는 새 소재를 만나요.",
+      gainB: "반납 독촉이 놀이가 되고 벽에 이야깃거리가 쌓여요.",
     },
     {
       title: "책방 동선 직물 지도",
-      desc: "손님들이 책방에서 어느 서가를 먼저 들르는지 한 달간 모아, 그 동선을 자투리 천으로 이어 붙인 지도를 만들어요. 완성된 지도는 책방 입구에 걸어 처음 온 손님의 길잡이가 돼요.",
-      gainA: "직물 조형을 공간 안내물로 확장해봐요.",
-      gainB: "단골의 취향이 눈에 보이는 형태로 남고, 새 손님에게는 안내가 돼요.",
+      desc: "손님들이 어느 서가를 먼저 들르는지 한 달간 모아 그 동선을 자투리 천으로 이어 붙이고, 완성된 지도를 책방 입구에 거는 콜라보",
+      method: "전시",
+      gainA: "직물 조형이 공간을 안내하는 물건이 돼요.",
+      gainB: "단골의 취향이 눈에 보이고 처음 온 손님에게 길잡이가 돼요.",
     },
   ],
   steps: [
