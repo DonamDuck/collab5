@@ -769,7 +769,8 @@ export async function generateReport(
   if (matchPoints.length < 2) return { report: null, candidates }; // no_match(스펙 선발 규칙)
 
   // ideas 후처리 — Pool 밖 method는 빈 문자열로(아이디어는 유지, UI가 태그 생략). 0개면 no_match.
-  // ⭐08-07부터 여기 오는 건 **후보 4~6개**다(전엔 최종 3개) — 고르는 건 아래 심사가 한다.
+  // ⭐08-07부터 여기 오는 건 **후보 4개**다(전엔 최종 3개) — 고르는 건 아래 심사가 한다.
+  //   상한은 6으로 남긴다: 프롬프트가 4를 요청하지만 모델이 더 뱉어도 심사가 감당하게(계약은 파서가 보장).
   const ideaCands = (p.ideas ?? []).slice(0, 6).map((i) => {
     const method = String(i.method ?? "");
     return {
