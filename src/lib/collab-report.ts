@@ -235,7 +235,8 @@ export const NOVEL_JUDGE_SCHEMA = {
       items: {
         type: Type.OBJECT,
         properties: {
-          title: { type: Type.STRING, description: "심사한 후보의 title 그대로" },
+          no: { type: Type.NUMBER, description: "심사한 후보의 번호(입력에 붙은 숫자 그대로)" },
+          title: { type: Type.STRING, description: "심사한 후보의 title(참고용 — 매칭은 no로 한다)" },
           group: { type: Type.STRING, description: "추천 또는 기발 — 입력 그룹 그대로" },
           verdict: { type: Type.STRING, description: "통과 또는 탈락" },
           reason: { type: Type.STRING },
@@ -251,7 +252,7 @@ export const NOVEL_JUDGE_SCHEMA = {
           family: { type: Type.STRING, description: "만드는 결과물 계열" },
           motif: { type: Type.STRING, description: "핵심 장치" },
         },
-        required: ["title", "group", "verdict", "exchange", "specificity", "unexpected", "light", "viral", "overlap", "family", "motif"],
+        required: ["no", "title", "group", "verdict", "exchange", "specificity", "unexpected", "light", "viral", "overlap", "family", "motif"],
       },
     },
   },
@@ -263,6 +264,7 @@ type ReportIdeaCandidate = ReportIdea;
 
 /** 후보 심사 결과(추천·기발 공통) — 선발 로직이 쓰는 중간 형태(밖으로 나가지 않는다). */
 interface JudgedIdea {
+  no: number;      // 입력에 붙인 번호 — ⭐매칭은 이걸로 한다(title은 어긋난다, 아래 파싱 주석 참조)
   title: string;
   group: string;   // "추천" | "기발" — 심사관이 입력 그룹을 그대로 되돌려준다
   verdict: string;
@@ -285,8 +287,9 @@ const novelTotal = (j: JudgedIdea) => j.exchange + j.unexpected + j.light + j.vi
  *  ⚠️단 이 제약은 **기발 2개 내부에만** 건다 — 기존 ideas와 모티프가 겹치는 건 허용이다(행위만 다르면). */
 function selectNovel(
   judged: JudgedIdea[],
-  byTitle: Map<string, NovelIdea>,
-  pickedRecTitles: Set<string>
+  novelCands: NovelIdea[],
+  pickedRecTitles: Set<string>,
+  resolve: (j: JudgedIdea, pool: NovelIdea[]) => NovelIdea | undefined
 ): NovelIdea[] {
   const norm = (s: string) => s.trim().toLowerCase();
   const pickedNorm = new Set([...pickedRecTitles].map(norm));
@@ -303,7 +306,7 @@ function selectNovel(
     .find((j) => norm(j.family) !== norm(first.family) && norm(j.motif) !== norm(first.motif));
   return [first, second]
     .filter((j): j is JudgedIdea => !!j)
-    .map((j) => byTitle.get(j.title))
+    .map((j) => resolve(j, novelCands))
     .filter((i): i is NovelIdea => !!i);
 }
 
@@ -312,13 +315,13 @@ function selectNovel(
  *  조각이라(0개면 no_match) 심사 사고로 리포트를 죽이면 안 된다. 기발(부가 가치)과 처지가 다르다. */
 function selectRecommended(
   judged: JudgedIdea[],
-  original: ReportIdeaCandidate[]
+  original: ReportIdeaCandidate[],
+  resolve: (j: JudgedIdea, pool: ReportIdeaCandidate[]) => ReportIdeaCandidate | undefined
 ): ReportIdeaCandidate[] {
-  const byTitle = new Map(original.map((i) => [i.title, i]));
   const pool = judged
     .filter((j) => j.group === "추천" && j.verdict !== "탈락")
     .sort((x, y) => recTotal(y) - recTotal(x))
-    .map((j) => byTitle.get(j.title))
+    .map((j) => resolve(j, original))
     .filter((i): i is ReportIdeaCandidate => !!i);
   return (pool.length > 0 ? pool : original).slice(0, 3);
 }
@@ -441,6 +444,7 @@ async function judgeIdeas(
 
     const parsed = JSON.parse(judgeRes.text ?? "{}") as { judged?: Record<string, unknown>[] };
     const judged: JudgedIdea[] = (parsed.judged ?? []).map((j) => ({
+      no: Number(j.no) || 0,
       title: String(j.title ?? ""),
       group: String(j.group ?? ""),
       verdict: String(j.verdict ?? ""),
@@ -454,13 +458,26 @@ async function judgeIdeas(
       family: String(j.family ?? ""),
       motif: String(j.motif ?? ""),
     }));
-    // 🛡심사관이 group을 어긋나게 돌려주는 경우 대비 — title로 실제 소속을 재판정(파서가 보장, 프롬프트는 요청).
-    const recTitles = new Set(recCands.map((c) => c.title));
-    for (const j of judged) j.group = recTitles.has(j.title) ? "추천" : "기발";
+    // 🚨**매칭은 번호로 한다**(08-07 실측 사고). 심사관이 `title`에 `제목 — 설명` 전체를 넣어 돌려주는 일이
+    //   있었다(한 실행에서 10/10, 다른 실행에서 0/10 — **같은 프롬프트인데 실행마다 다르다**).
+    //   title로 찾으면 그때 후보를 못 찾아 **기발이 통째로 사라지고 추천은 폴백으로 떨어진다.**
+    //   → `no`(입력 번호)를 1순위, title 접두 매칭을 2순위로 둔다. [[prompt-parser-contract]]
+    const norm = (t: string) => t.trim().toLowerCase();
+    const resolve = <T extends { title: string }>(j: JudgedIdea, pool: T[]): T | undefined => {
+      if (j.no >= 1 && j.no <= pool.length) return pool[j.no - 1];
+      const t = norm(j.title);
+      // 심사관이 "제목 — 설명"을 통째로 넣었어도 접두로는 맞는다
+      return pool.find((c) => t === norm(c.title) || t.startsWith(norm(c.title)));
+    };
+    // 그룹은 심사관 답을 쓰되, 번호가 해당 풀 범위를 벗어나면 반대편으로 본다
+    for (const j of judged) {
+      const g = j.group === "추천" ? "추천" : "기발";
+      const pool = g === "추천" ? recCands : novelCands;
+      j.group = resolve(j, pool) ? g : g === "추천" ? "기발" : "추천";
+    }
 
-    const ideas = selectRecommended(judged, recCands);
-    const byTitle = new Map(novelCands.map((c) => [c.title, c]));
-    const novelIdeas = selectNovel(judged, byTitle, new Set(ideas.map((i) => i.title)));
+    const ideas = selectRecommended(judged, recCands, resolve);
+    const novelIdeas = selectNovel(judged, novelCands, new Set(ideas.map((i) => i.title)), resolve);
     return { ideas, novelIdeas };
   } catch (e) {
     // 추천은 원 순서 폴백으로 살리고, 기발만 비운다 — 심사 사고로 리포트를 죽이지 않는다
