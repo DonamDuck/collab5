@@ -44,6 +44,11 @@ export interface Repo {
   getBrandDna(brandId: number): Promise<BrandDna | null>;
   setBrandDna(brandId: number, dna: BrandDna): Promise<void>;
   getLatestCollabReport(fromBrandId: number, toBrandId: number): Promise<{ report: CollabReportData; model: string; createdAt: string } | null>;
+  /** 여러 from × 하나의 to를 **한 번에** — 소개서 페이지가 "로딩 없이 바로 열 쌍"을 고를 때 쓴다(08-09).
+   *  ⚠️브랜드마다 `getLatestCollabReport`를 도는 대신 이걸 쓴다: 대표 계정은 소개서가 14개라
+   *     낱개로 돌면 페이지 로드마다 DB 왕복이 수십 번 된다. 대부분의 쌍은 애초에 리포트가 없으니
+   *     **먼저 이걸로 후보를 좁히고** 그 몇 건만 DNA 신선도를 확인하는 순서가 맞다. */
+  listLatestCollabReportsTo(fromBrandIds: number[], toBrandId: number): Promise<Map<number, { report: CollabReportData; model: string; createdAt: string }>>;
   /** 이 쌍의 리포트를 이 사용자가 요청한 적이 있나 — 소유권을 넘긴 뒤에도 **읽기만** 열어주기 위한 확인(08-07).
    *  ⚠️소유 검사의 대체가 아니다. 생성(유료 콜)은 여전히 `from.ownerUserId === userId`만 통과한다. */
   wasCollabReportRequestedBy(fromBrandId: number, toBrandId: number, userId: number): Promise<boolean>;
@@ -512,6 +517,14 @@ class InMemoryRepo implements Repo {
     const list = (this.reportsByPair.get(`${fromBrandId}:${toBrandId}`) ?? []).filter((r) => r.status === "active");
     return list.length > 0 ? list[list.length - 1] : null; // append-only — 마지막 active = 최신
   }
+  async listLatestCollabReportsTo(fromBrandIds: number[], toBrandId: number) {
+    const out = new Map<number, { report: CollabReportData; model: string; createdAt: string }>();
+    for (const fromId of fromBrandIds) {
+      const latest = await this.getLatestCollabReport(fromId, toBrandId);
+      if (latest) out.set(fromId, latest);
+    }
+    return out;
+  }
   async wasCollabReportRequestedBy(fromBrandId: number, toBrandId: number, userId: number): Promise<boolean> {
     return (this.reportsByPair.get(`${fromBrandId}:${toBrandId}`) ?? []).some((r) => r.requestedBy === userId);
   }
@@ -862,6 +875,26 @@ class SupabaseRepo implements Repo {
       .order("created_at", { ascending: false }).limit(1).maybeSingle();
     if (error) console.error(`[repo] getLatestCollabReport failed ${fromBrandId}→${toBrandId}: ${error.message}`);
     return data ? { report: data.report as CollabReportData, model: data.model as string, createdAt: data.created_at as string } : null;
+  }
+  // 여러 from × 하나의 to를 **쿼리 1번**으로(08-09). 낱개로 돌면 소개서 14개짜리 계정에선
+  // /m 페이지 로드마다 왕복이 14번 붙는다 — 그중 리포트가 실제로 있는 건 보통 0~1개다.
+  // 쌍당 여러 행이 남을 수 있으므로(2차 방어) 최신순으로 읽어 **쌍별 첫 행만** 취한다.
+  async listLatestCollabReportsTo(fromBrandIds: number[], toBrandId: number) {
+    const out = new Map<number, { report: CollabReportData; model: string; createdAt: string }>();
+    if (fromBrandIds.length === 0) return out;
+    const { data, error } = await this.db.from("collab_reports").select("from_brand_id, report, model, created_at")
+      .in("from_brand_id", fromBrandIds).eq("to_brand_id", toBrandId).eq("status", "active")
+      .order("created_at", { ascending: false });
+    if (error) {
+      console.error(`[repo] listLatestCollabReportsTo failed →${toBrandId}: ${error.message}`);
+      return out; // 실패 시 빈 맵 — 화면은 "캐시 없음"으로 보고 평소대로 fetch한다(기능 정지 아님)
+    }
+    for (const row of data ?? []) {
+      const fromId = row.from_brand_id as number;
+      if (out.has(fromId)) continue; // 최신순이라 첫 행이 최신
+      out.set(fromId, { report: row.report as CollabReportData, model: row.model as string, createdAt: row.created_at as string });
+    }
+    return out;
   }
   // 소유권이 떠난 뒤에도 **내가 만들었던** 리포트는 읽게 하려는 확인(08-07). status 무관 — 폐기된 행이라도
   // "내가 요청했다"는 사실은 남는다(읽기 대상은 getLatestCollabReport가 active만 고르므로 이중 방어).

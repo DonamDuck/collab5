@@ -103,23 +103,39 @@ export function ReportSheet({
   onReportLoaded?: (report: CollabReportData) => void;
 }) {
   // 저장본을 들고 왔으면 **첫 렌더부터 `ok`** — 아래 effect에서 세우면 로딩 화면이 한 프레임 스친다.
-  // ⭐08-09: `cachedReports`도 같은 자격이다 — /my의 `initialReport`(딱 1건)와 달리 여긴 맵이라,
-  //   "지금 이 시트가 열자마자 어떤 fromSlug로 뜰지"를 먼저 계산해야 한다(딥링크 or 소개서 1개 자동선택).
-  //   2개+라 선택 스텝(select)부터 시작하는 경우는 여기서 못 정한다 — [분석하기] 클릭 시점에
-  //   run() 안에서 다시 확인한다(아래).
-  const initialArchiveSlug = initialFromSlug ?? (fromBrands.length === 1 ? fromBrands[0]?.slug : undefined);
+  //
+  // ⭐08-09 2차 수정 — 열자마자 보여줄 쌍을 고르는 우선순위:
+  //   ①딥링크(`initialFromSlug`) → ②**저장본이 딱 1건뿐이면 그것** → ③소개서가 1개뿐이면 그것
+  //   ②가 이번에 추가됐다. 1차 땐 ③만 있어서, **소개서를 14개 가진 대표 계정에선 한 번도 안 걸렸다**
+  //   (대표 제보: "로컬페이지에서 콜라보 분석 누르면 여전히 로딩이 뜬다" — 실측 결과 리포트가 있는
+  //   쌍은 캔버스가든 1건뿐인데도 선택 화면부터 시작했다).
+  //   ⚠️저장본이 2건 이상이면 여전히 선택 화면이 맞다 — 어느 쌍을 원하는지 시스템이 알 수 없다.
+  //   ⚠️"선택이 첫 depth"(07-26 대표 QA)를 어기는 게 아니다. 그 규칙은 **유료 콜 낭비 방지**가
+  //     목적인데, 저장본을 여는 건 0원이다. 다른 쌍을 원하면 [다른 소개서로 분석]이 그대로 있다.
+  const cachedSlugs = cachedReports ? Object.keys(cachedReports) : [];
+  const initialArchiveSlug =
+    initialFromSlug ??
+    (cachedSlugs.length === 1 ? cachedSlugs[0] : undefined) ??
+    (fromBrands.length === 1 ? fromBrands[0]?.slug : undefined);
   const archived: OkPayload | null = initialReport
     ? { report: initialReport, cached: true, model: "archive", readOnly: initialReadOnly }
     : initialArchiveSlug && cachedReports?.[initialArchiveSlug]
       ? { report: cachedReports[initialArchiveSlug], cached: true, model: "cache" }
       : null;
-  const [phase, setPhase] = useState<Phase>(archived ? "ok" : "idle");
+  // ⚠️초기 phase를 **정확히** 세운다 — `idle`은 아래에서 로딩 화면을 그리므로, 실제로 fetch가
+  //   따라오지 않는 상황에서 idle로 두면 **"분석하고 있어요"를 한 프레임 거짓말**하게 된다.
+  //   소개서가 2개+면 곧 select로 갈 것이 확정이니 처음부터 select로 연다.
+  const [phase, setPhase] = useState<Phase>(
+    archived ? "ok" : fromBrands.length > 1 ? "select" : "idle",
+  );
   const [result, setResult] = useState<OkPayload | null>(archived);
   const [thin, setThin] = useState<{
     side: "from" | "to";
     distinctTypes?: number;
   }>({ side: "from" });
-  const [selectedSlug, setSelectedSlug] = useState(fromBrands[0]?.slug);
+  // ⚠️저장본으로 바로 여는 경우 **그 쌍의 slug로 시작해야** 헤더가 "A × B"를 맞게 쓰고
+  //   [다른 소개서로 분석]도 올바른 칩이 선택된 채 열린다(안 그러면 fromBrands[0]로 어긋난다).
+  const [selectedSlug, setSelectedSlug] = useState(initialArchiveSlug ?? fromBrands[0]?.slug);
   const [copyIdx, setCopyIdx] = useState(0);
 
   // in-flight 가드 — 생성 중 재요청 금지(이중 지출 차단). 도중에 칩이 바뀌면 완료 후 최신 선택으로 1회 재실행.
@@ -214,16 +230,19 @@ export function ReportSheet({
     //   아카이브 목록은 "내가 요청한 것" 기준이라 카드가 남는다 → 검문에 걸려 **선택 화면으로 떨어졌다**
     //   (08-06 아그레아블 이전 후 실제 발생). 판정은 서버가 한다 — 내가 요청했던 쌍이면 읽기 전용으로 열어주고,
     //   아니면 403 → 아래 error phase. 클라가 미리 막으면 정당한 열람까지 함께 막힌다.
+    // 저장본을 이미 손에 쥐었으면 **어느 경로로 왔든** 여기서 끝 — 네트워크도 유료 콜도 없다.
+    // (08-07엔 딥링크일 때만 이 길로 왔는데, 08-09에 "저장본 1건뿐이면 그것"이 더해지면서
+    //  딥링크가 아닌 일반 [콜라보 분석] 클릭도 여기로 들어온다.)
+    if (archived && initialArchiveSlug) {
+      setSelectedSlug(initialArchiveSlug);
+      setResult(archived);
+      setPhase("ok");
+      loadedCbRef.current?.(archived.report);
+      track("report_view", { cache_hit: true });
+      return;
+    }
     if (initialFromSlug) {
       setSelectedSlug(initialFromSlug);
-      // 저장본을 들고 왔으면 여기서 끝 — 네트워크도 유료 콜도 없다(08-07).
-      if (archived) {
-        setResult(archived);
-        setPhase("ok");
-        loadedCbRef.current?.(archived.report);
-        track("report_view", { cache_hit: true });
-        return;
-      }
       run(initialFromSlug);
       return;
     }

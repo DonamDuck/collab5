@@ -45,15 +45,30 @@ async function computeCachedReports(
 ): Promise<Record<string, CollabReportData>> {
   const fromCandidates = viewerMakers.filter((m) => m.id !== to.id);
   if (fromCandidates.length === 0) return {};
+  // ⚠️**리포트가 있는 쌍부터 좁힌다**(08-09 수정). 처음엔 브랜드마다 DNA·리포트를 낱개로 조회했는데,
+  //    대표 계정은 소개서가 14개라 /m 페이지 로드마다 왕복이 29번 붙었다 — 그중 리포트가 실제로
+  //    있는 건 1개였다. 쿼리 1번으로 후보를 좁히면 DNA 조회는 그 몇 건에만 든다.
+  const reports = await repo.listLatestCollabReportsTo(fromCandidates.map((m) => m.id), to.id);
+  if (reports.size === 0) return {};
+  const hits = fromCandidates.filter((m) => reports.has(m.id));
   const toDna = await repo.getBrandDna(to.id);
   const entries = await Promise.all(
-    fromCandidates.map(async (from) => {
-      const [fromDna, latest] = await Promise.all([
-        repo.getBrandDna(from.id),
-        repo.getLatestCollabReport(from.id, to.id),
+    hits.map(async (card) => {
+      // 🪤**`viewerMakers`는 카드용 경량 투영이라 여기 그대로 쓰면 안 된다**(08-09 실측으로 잡은 버그).
+      //   `listMakersByOwner`가 select하는 건 `id·slug·name·one_liner…`뿐인데, DNA stale 판정은
+      //   `digestHash(maker)`로 **소개서 본문 전체**(description·story·activities·keywords…)의 지문을
+      //   비교한다. 빈 필드로 지문을 내면 저장된 `input_hash`와 영원히 어긋나 **항상 stale** →
+      //   캐시가 늘 비어 이 기능이 통째로 무력화됐다(대표 제보: "여전히 로딩이 뜬다").
+      //   → 후보를 리포트 있는 몇 건으로 좁힌 뒤 **그 건만 전체 소개서를 다시 읽는다**(보통 0~1회).
+      const [from, fromDna] = await Promise.all([
+        repo.getMakerById(card.id),
+        repo.getBrandDna(card.id),
       ]);
-      const fresh = isReportCacheFresh(latest, fromDna, toDna, from, to);
-      return fresh ? ([from.slug, latest!.report] as const) : null;
+      if (!from) return null;
+      const latest = reports.get(card.id)!;
+      return isReportCacheFresh(latest, fromDna, toDna, from, to)
+        ? ([from.slug, latest.report] as const)
+        : null;
     }),
   );
   return Object.fromEntries(entries.filter((e): e is [string, CollabReportData] => e !== null));
