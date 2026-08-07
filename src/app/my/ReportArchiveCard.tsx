@@ -160,6 +160,13 @@ export function ReportArchiveCard({
             onClose={() => setOpen(false)}
             fromBrands={myBrands}
             initialFromSlug={item.fromSlug} // 선택 스텝 건너뛰고 이 쌍을 바로 연다
+            // ⭐저장본을 그대로 넘긴다(08-07 대표 지적) — 예전엔 여기서 /api/collab-report를 다시 불러
+            //   **"콜라보 아이디어를 분석하고 있어요"**가 떴다. 다시 읽는 화면이 분석 중이라 말한 셈이고,
+            //   소개서가 그새 바뀌었으면 조용히 재생성(유료 콜)까지 태웠다. 목록 쿼리가 이미 전문을
+            //   읽어와 칩·근거를 그리고 있었으니, 열 때 필요한 건 왕복이 아니라 그 데이터였다.
+            initialReport={item.report}
+            // 내 소개서 목록에 없는 from = 소유권이 떠난 브랜드 → 보관본 안내 문구용 힌트(권한 판정 아님)
+            initialReadOnly={!myBrands.some((b) => b.slug === item.fromSlug)}
             toSlug={item.toSlug}
             toName={item.toName}
             sampleMode={false}

@@ -527,6 +527,7 @@ class InMemoryRepo implements Repo {
         ideaTitles: (latest.report.ideas ?? []).map((i) => i.title).filter(Boolean).slice(0, 3),
         effect: latest.report.effects?.[0],
         createdAt: latest.createdAt,
+        report: latest.report,
       });
     }
     return items.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
@@ -899,6 +900,7 @@ class SupabaseRepo implements Repo {
         ideaTitles: (r.report?.ideas ?? []).map((i) => i.title).filter(Boolean).slice(0, 3),
         effect: r.report?.effects?.[0],
         createdAt: r.created_at,
+        report: r.report, // 시트가 이걸 바로 그린다 — 열 때 API 재왕복 없음(08-07)
       });
     }
     return items;

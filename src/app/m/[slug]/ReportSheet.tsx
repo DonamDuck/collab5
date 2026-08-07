@@ -55,6 +55,8 @@ export function ReportSheet({
   sampleMode,
   onPropose,
   initialFromSlug = null,
+  initialReport = null,
+  initialReadOnly = false,
   source = "maker_page",
   onReportLoaded,
 }: {
@@ -66,6 +68,15 @@ export function ReportSheet({
   sampleMode: boolean; // 소개서 0개 유저 — 샘플 리포트 티저
   onPropose: () => void; // CTA — 리포트 닫고 제안 시트 오픈(부모가 처리)
   initialFromSlug?: string | null; // /my 아카이브 딥링크 — 이 slug로 선택 스텝 없이 바로 실행
+  /** 이미 손에 쥔 저장본 — 있으면 **fetch를 아예 하지 않고 즉시 `ok`로 연다**(08-07 대표 지적).
+   *  /my 아카이브는 목록 쿼리가 리포트 전문을 이미 읽어왔는데도 시트가 API를 다시 불러
+   *  "콜라보 아이디어를 분석하고 있어요"를 띄웠다 — **다시 읽는 화면인데 분석 중이라 말한 것**.
+   *  ⭐부수효과(의도된 것): 아카이브 열람이 더는 재생성(유료 콜)을 태우지 않는다.
+   *     최신 분석이 필요하면 소개서 페이지에서 열거나 [다른 소개서로 분석]으로 명시 실행한다. */
+  initialReport?: CollabReportData | null;
+  /** 넘긴 브랜드의 보관본이라는 표시 — `initialReport`로 즉시 열 땐 서버 응답(readOnly)이 없어서 부모가 알려준다.
+   *  ⚠️ 이건 **안내 문구용 힌트지 권한 검문이 아니다**(권한 판정은 서버 몫 — 08-07 아카이브 버그의 교훈). */
+  initialReadOnly?: boolean;
   /** 계측용 오픈 위치 — 홈 샘플 오픈이 /m 잠금 티저 지표(report_locked_view)를 오염시키지 않게 구분(07-31).
    *  🆕 "my" = /my 아카이브에서 **제자리로** 연 것(08-02). 남의 소개서로 튕겨나가지 않는 다시보기라
    *     "새로 궁금해서 연 것"과 성격이 다르다 — 섞이면 리포트 수요가 부풀어 보인다. */
@@ -74,8 +85,12 @@ export function ReportSheet({
    *  ⚠️ 샘플(가상 쌍)은 올리지 않는다 — 남의 브랜드 얘기가 내 DM 초안에 섞이면 안 된다. */
   onReportLoaded?: (report: CollabReportData) => void;
 }) {
-  const [phase, setPhase] = useState<Phase>("idle");
-  const [result, setResult] = useState<OkPayload | null>(null);
+  // 저장본을 들고 왔으면 **첫 렌더부터 `ok`** — 아래 effect에서 세우면 로딩 화면이 한 프레임 스친다.
+  const archived: OkPayload | null = initialReport
+    ? { report: initialReport, cached: true, model: "archive", readOnly: initialReadOnly }
+    : null;
+  const [phase, setPhase] = useState<Phase>(archived ? "ok" : "idle");
+  const [result, setResult] = useState<OkPayload | null>(archived);
   const [thin, setThin] = useState<{
     side: "from" | "to";
     distinctTypes?: number;
@@ -163,6 +178,14 @@ export function ReportSheet({
     //   아니면 403 → 아래 error phase. 클라가 미리 막으면 정당한 열람까지 함께 막힌다.
     if (initialFromSlug) {
       setSelectedSlug(initialFromSlug);
+      // 저장본을 들고 왔으면 여기서 끝 — 네트워크도 유료 콜도 없다(08-07).
+      if (archived) {
+        setResult(archived);
+        setPhase("ok");
+        loadedCbRef.current?.(archived.report);
+        track("report_view", { cache_hit: true });
+        return;
+      }
       run(initialFromSlug);
       return;
     }

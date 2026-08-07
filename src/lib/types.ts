@@ -180,6 +180,11 @@ export interface CollabReportListItem {
   ideaTitles: string[];                 // ⭐카드의 주인공 — 추천 콜라보 제목 최대 3개(라벨 아래 칩으로 열거)
   effect?: string;                      // 기대 효과 1개
   createdAt: string;                    // 정렬용(카드에는 노출 안 함)
+  /** 저장본 전문 — 카드를 누르면 **API를 다시 부르지 않고 이걸 그대로 그린다**(08-07).
+   *  목록 쿼리가 이미 `report` jsonb를 통째로 읽어 미리보기 3조각을 뽑고 있었다 —
+   *  본문은 손에 쥔 채로 버리고, 열 때 다시 왕복하며 "분석하고 있어요"를 띄우고 있었던 것.
+   *  ⚠️ 이 필드가 /my의 RSC 페이로드를 키운다(리포트 1건 ≈ 2KB, 수십 건 규모라 감당 범위). */
+  report: CollabReportData;
 }
 export interface CollabReportData {
   matchPoints: ReportMatchPoint[];  // 2~4개
