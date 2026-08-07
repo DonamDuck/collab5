@@ -186,9 +186,20 @@ export interface CollabReportListItem {
    *  ⚠️ 이 필드가 /my의 RSC 페이로드를 키운다(리포트 1건 ≈ 2KB, 수십 건 규모라 감당 범위). */
   report: CollabReportData;
 }
+/** ④ 기발한 콜라보 아이디어(B36) — 기존 ideas 아래 붙는 별도 섹션. 스펙 = 2026-08-06-novel-collab-ideas-design.md
+ *  ⚠️ideas와 형태가 비슷해 보이지만 **다른 것**이다: ideas는 각자의 경험·활동에서 출발한 안전한 제안이고,
+ *  이쪽은 "해왔던 것에 얽매이지 않는" 제안이라 게이트·채점·겹침 제거를 따로 거친다. */
+export interface NovelIdea {
+  title: string;
+  desc: string;
+  method: string;  // collabMethod 어휘 — ideas와 **같은 섹션에 나란히 놓이므로** 아이브로 문법도 같아야 한다
+  gainA: string;   // 우리에게 벌어지는 일 — 한쪽만 좋은 아이디어를 거르는 장치이자 화면에 나가는 문장
+  gainB: string;   // 상대에게 벌어지는 일
+}
 export interface CollabReportData {
   matchPoints: ReportMatchPoint[];  // 2~4개
   ideas: ReportIdea[];              // 1~3개 — 리포트의 얼굴(첫 섹션)
+  novelIdeas?: NovelIdea[];         // 0~2개 — 없을 수 있다(게이트·겹침으로 전멸 가능). 옛 캐시엔 아예 없음
   steps: string[];                  // 최대 4
   effects: string[];                // 2~3개
 }

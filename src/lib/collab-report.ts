@@ -6,7 +6,13 @@
 
 import { createHash } from "node:crypto";
 import { GoogleGenAI, Type } from "@google/genai";
-import { DNA_SYSTEM, REPORT_SYSTEM } from "./collab-report-prompts";
+import {
+  DNA_SYSTEM,
+  REPORT_SYSTEM,
+  NOVEL_SEEDS,
+  NOVEL_GEN_SYSTEM,
+  NOVEL_JUDGE_SYSTEM,
+} from "./collab-report-prompts";
 import {
   DNA_POOL,
   LIGHT_METHODS,
@@ -18,7 +24,7 @@ import {
   MIN_MATCH_SCORE,
   DNA_REFRESH_BEFORE,
 } from "./dna-pool";
-import type { Block, BrandDna, CollabReportData, DnaItem, DnaSignature, Maker } from "./types";
+import type { Block, BrandDna, CollabReportData, DnaItem, DnaSignature, Maker, NovelIdea } from "./types";
 import { kstIso } from "./time";
 import { meter, logMeter, type CallMeter } from "./ai-cost";
 
@@ -198,6 +204,182 @@ const REPORT_SCHEMA = {
   required: ["candidates", "ideas", "steps", "effects"],
 };
 
+// 기발 아이디어(B36) — 생성/심사 2종. 스펙 = 2026-08-06-novel-collab-ideas-design.md
+const NOVEL_GEN_SCHEMA = {
+  type: Type.OBJECT,
+  properties: {
+    ideas: {
+      type: Type.ARRAY,
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          title: { type: Type.STRING, description: "15자 내외" },
+          desc: { type: Type.STRING, description: "'~하는 콜라보'로 끝나는 명사구" },
+          method: { type: Type.STRING, description: "Collab Method Pool 어휘 하나" },
+          gain_a: { type: Type.STRING, description: "A에게 벌어지는 일 한 줄" },
+          gain_b: { type: Type.STRING, description: "B에게 벌어지는 일 한 줄" },
+        },
+        required: ["title", "desc", "method", "gain_a", "gain_b"],
+      },
+      description: "기발한 후보 8개",
+    },
+  },
+  required: ["ideas"],
+};
+
+const NOVEL_JUDGE_SCHEMA = {
+  type: Type.OBJECT,
+  properties: {
+    judged: {
+      type: Type.ARRAY,
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          title: { type: Type.STRING, description: "심사한 후보의 title 그대로" },
+          verdict: { type: Type.STRING, description: "통과 또는 탈락" },
+          reason: { type: Type.STRING },
+          exchange: { type: Type.NUMBER },
+          unexpected: { type: Type.NUMBER },
+          light: { type: Type.NUMBER },
+          viral: { type: Type.NUMBER },
+          risk: { type: Type.STRING },
+          overlap: { type: Type.BOOLEAN },
+          overlap_with: { type: Type.STRING },
+          overlap_reason: { type: Type.STRING },
+          family: { type: Type.STRING, description: "만드는 결과물 계열" },
+          motif: { type: Type.STRING, description: "핵심 장치" },
+        },
+        required: ["title", "verdict", "exchange", "unexpected", "light", "viral", "overlap", "family", "motif"],
+      },
+    },
+  },
+  required: ["judged"],
+};
+
+/** 기발 후보 심사 결과 — 선발 로직이 쓰는 중간 형태(밖으로 나가지 않는다). */
+interface JudgedNovel {
+  title: string;
+  verdict: string;
+  exchange: number; unexpected: number; light: number; viral: number;
+  total: number;
+  overlap: boolean;
+  family: string;
+  motif: string;
+}
+
+/** 게이트·겹침 통과분에서 최종 2개를 고른다.
+ *  ⭐1위는 최고점, 2위는 **계열(family)과 모티프(motif)가 둘 다 1위와 다른 것** 중 최고점.
+ *  화면에 나란히 붙는 두 줄이 둘 다 부적이면 "또 부적?"이 되므로 점수 순 채택보다 이 규칙이 먼저다(대표 확정 08-06).
+ *  ⚠️단 이 제약은 **기발 2개 내부에만** 건다 — 기존 ideas와 모티프가 겹치는 건 허용이다(행위만 다르면). */
+function selectNovel(judged: JudgedNovel[], byTitle: Map<string, NovelIdea>): NovelIdea[] {
+  const pool = judged
+    .filter((j) => j.verdict !== "탈락" && !j.overlap)
+    .sort((x, y) => y.total - x.total);
+  const first = pool[0];
+  if (!first) return [];
+  const norm = (s: string) => s.trim().toLowerCase();
+  const second = pool
+    .slice(1)
+    .find((j) => norm(j.family) !== norm(first.family) && norm(j.motif) !== norm(first.motif));
+  return [first, second]
+    .filter((j): j is JudgedNovel => !!j)
+    .map((j) => byTitle.get(j.title))
+    .filter((i): i is NovelIdea => !!i);
+}
+
+/** 기발한 콜라보 아이디어 생성 — 후보 16개(관점 2개 × 8) → 심사 1콜 → 최종 2개.
+ *  ⚠️실패해도 리포트를 막지 않는다(빈 배열 반환) — 이 섹션은 부가 가치이지 리포트의 필수 조각이 아니다. */
+async function generateNovelIdeas(
+  brandsText: string,
+  baseIdeas: { title: string; desc: string }[],
+  model: string,
+  meters?: CallMeter[]
+): Promise<NovelIdea[]> {
+  try {
+    // ① 후보 16개 — 관점 2개를 병렬로(같은 입력이라 서로 기다릴 이유가 없다)
+    const gens = await Promise.all(
+      NOVEL_SEEDS.map(async (seed) => {
+        const t = Date.now();
+        const r = await ai().models.generateContent({
+          model,
+          contents: brandsText,
+          config: {
+            systemInstruction: NOVEL_GEN_SYSTEM(seed),
+            responseMimeType: "application/json",
+            responseSchema: NOVEL_GEN_SCHEMA,
+          },
+        });
+        const m = meter("novel-gen", model, Date.now() - t, r.usageMetadata);
+        logMeter(m);
+        meters?.push(m);
+        return JSON.parse(r.text ?? "{}") as { ideas?: Record<string, unknown>[] };
+      })
+    );
+    const cands: NovelIdea[] = gens
+      .flatMap((g) => g.ideas ?? [])
+      .map((i) => {
+        const method = String(i.method ?? "");
+        return {
+          title: String(i.title ?? ""),
+          desc: String(i.desc ?? ""),
+          // Pool 밖 어휘는 빈 문자열로 — 아이디어는 살리고 UI가 태그만 생략한다(기존 ideas와 같은 처리)
+          method: DNA_POOL.collabMethod.includes(method) ? method : "",
+          gainA: String(i.gain_a ?? ""),
+          gainB: String(i.gain_b ?? ""),
+        };
+      })
+      .filter((i) => i.title && i.desc);
+    if (cands.length === 0) return [];
+
+    // ② 심사 — 기존 ideas를 줘야 겹침 판정이 된다(그래서 리포트 뒤에 온다)
+    const t2 = Date.now();
+    const judgeRes = await ai().models.generateContent({
+      model,
+      contents: [
+        brandsText,
+        "",
+        "[기존 아이디어]",
+        baseIdeas.map((i, n) => `${n + 1}. ${i.title} — ${i.desc}`).join("\n"),
+        "",
+        "[심사할 기발 후보]",
+        cands.map((i, n) => `${n + 1}. ${i.title} — ${i.desc}`).join("\n"),
+      ].join("\n"),
+      config: {
+        systemInstruction: NOVEL_JUDGE_SYSTEM,
+        responseMimeType: "application/json",
+        responseSchema: NOVEL_JUDGE_SCHEMA,
+      },
+    });
+    const jm = meter("novel-judge", model, Date.now() - t2, judgeRes.usageMetadata);
+    logMeter(jm);
+    meters?.push(jm);
+
+    const parsed = JSON.parse(judgeRes.text ?? "{}") as { judged?: Record<string, unknown>[] };
+    const judged: JudgedNovel[] = (parsed.judged ?? []).map((j) => {
+      const exchange = Number(j.exchange) || 0;
+      const unexpected = Number(j.unexpected) || 0;
+      const light = Number(j.light) || 0;
+      const viral = Number(j.viral) || 0;
+      return {
+        title: String(j.title ?? ""),
+        verdict: String(j.verdict ?? ""),
+        exchange, unexpected, light, viral,
+        total: exchange + unexpected + light + viral,
+        overlap: j.overlap === true,
+        family: String(j.family ?? ""),
+        motif: String(j.motif ?? ""),
+      };
+    });
+
+    const byTitle = new Map(cands.map((c) => [c.title, c]));
+    return selectNovel(judged, byTitle);
+  } catch (e) {
+    // 리포트는 살린다 — 기발 섹션만 비운다
+    console.error("[novel] 기발 아이디어 생성 실패", e);
+    return [];
+  }
+}
+
 // ── DNA 생성 ──────────────────────────────────────────────────
 
 /** 키 없는 로컬용 mock DNA — 실제 스키마와 동일 형태(캔버스가든 소재). thin 아님(type 6종). */
@@ -364,6 +546,23 @@ const MOCK_REPORT: CollabReportData = {
       method: "굿즈",
     },
   ],
+  // 기발 섹션 mock — 계열·모티프가 서로 다른 2개(선발 규칙이 만드는 모양 그대로)
+  novelIdeas: [
+    {
+      title: "반납 못 한 책 부적",
+      desc: "오래 반납되지 않은 책 목록을 받아 그 책이 돌아오길 비는 직물 부적을 만들고, 책이 돌아오면 부적을 책방 벽에 거는 콜라보",
+      method: "협동 워크숍",
+      gainA: "부적 만들기가 책이라는 새 소재를 만나요.",
+      gainB: "반납 독촉이 놀이가 되고 벽에 이야깃거리가 쌓여요.",
+    },
+    {
+      title: "책방 동선 직물 지도",
+      desc: "손님들이 어느 서가를 먼저 들르는지 한 달간 모아 그 동선을 자투리 천으로 이어 붙이고, 완성된 지도를 책방 입구에 거는 콜라보",
+      method: "전시",
+      gainA: "직물 조형이 공간을 안내하는 물건이 돼요.",
+      gainB: "단골의 취향이 눈에 보이고 처음 온 손님에게 길잡이가 돼요.",
+    },
+  ],
   steps: [
     "인스타 DM으로 가볍게 인사 나누기",
     "30분 미팅으로 일정과 규모 정하기",
@@ -459,10 +658,16 @@ export async function generateReport(
   });
   if (ideas.length === 0) return { report: null, candidates };
 
+  // ④ 기발한 아이디어(B36) — 리포트가 성립한 뒤에만 만든다.
+  //    ⚠️겹침 판정에 위 ideas가 필요해서 병렬로 못 당긴다(생성 2콜만 내부에서 병렬).
+  //    실패해도 빈 배열이라 리포트는 그대로 나간다.
+  const novelIdeas = await generateNovelIdeas(contents, ideas, reportModel, meters);
+
   return {
     report: {
       matchPoints,
       ideas,
+      novelIdeas,
       steps: (p.steps ?? []).slice(0, 4).map(String),
       effects: (p.effects ?? []).slice(0, 3).map(String),
     },

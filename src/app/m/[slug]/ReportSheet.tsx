@@ -241,6 +241,27 @@ export function ReportSheet({
   //    한줄 요약 박스는 폐지했다 — ideas[0]의 축약이라 정보가 겹쳤다(대표 확정, 실쌍 11개 10라운드).
   //    빈자리를 메운 게 아니라 **제품이 파는 것(아이디어)을 얼굴로 세운 정보 위계 재설계**다.
   //    새 사다리: 카드제목 16 → 섹션헤더 15 → 본문 14 → 메타 13. **18 슬롯은 은퇴**.
+  // ⭐아이디어 카드 한 줄 세우기(08-06 대표 확정) — 기발 아이디어는 **별도 섹션이 아니라 같은 섹션**에 섞는다.
+  //   고객은 섹션이 왜 나뉘는지 모르므로, 구분은 제목이 아니라 **태그**가 한다.
+  //   순서 = ①추천(기존 1등) ②확장(기발) ③나머지 기존. 태그 달린 카드가 위로 온다.
+  const ideaCards: {
+    title: string; desc: string; method?: string;
+    tag?: "추천" | "확장"; gains?: string[];
+  }[] = report
+    ? [
+        ...report.ideas.slice(0, 1).map((i) => ({ ...i, tag: "추천" as const })),
+        ...(report.novelIdeas ?? []).map((n) => ({
+          title: n.title,
+          desc: n.desc,
+          method: n.method,
+          tag: "확장" as const,
+          // 주어를 지우고 불릿으로만 — 빈 값은 버린다(둘 다 비면 구분선도 안 생긴다)
+          gains: [n.gainA, n.gainB].map((s) => s.trim()).filter(Boolean),
+        })),
+        ...report.ideas.slice(1),
+      ]
+    : [];
+
   const pieces = report && (
     <div>
       {/* ① 추천 콜라보 아이디어 — 리포트의 얼굴 */}
@@ -252,26 +273,53 @@ export function ReportSheet({
                 한 줄에서 끝난다(바로 위 섹션 헤더와 겹치는 건 감수: 첫 문장은 중복보다 모호함이 비싸다).
              ③ 어미를 **완료형("찾았어요")**으로 — 일이 끝났다는 신호. */}
       <p className="mt-1 text-[13px] text-mute">
-        두 소개서를 분석해 {report.ideas.length}가지 콜라보 아이디어를 찾았어요.
+        두 소개서를 분석해 {ideaCards.length}가지 콜라보 아이디어를 찾았어요.
       </p>
       <div className="mt-3 space-y-3">
-        {report.ideas.map((idea, i) => (
+        {ideaCards.map((idea, i) => (
           /* shadow-e1은 **리포트에서 이 카드만** — "우리가 파는 물건"이라 유일하게 살짝 뜬다.
              나머지 섹션은 플랫 유지(경계는 hairline+e1 전담). */
           <div key={i} className="rounded-lg border border-hairline bg-surface p-4 shadow-e1">
             {/* 아이브로 — method를 제목 오른쪽 칩에서 윗줄로 올렸다(07-31 제목 4줄 사고 재발 방지).
                 제목과 폭을 다투지 않고 번호가 공짜로 생긴다(/m ItemLabel `활동 1 · …` 문법과 통일).
-                ⚠️ method는 반드시 collabMethodLabel()을 거친다 — 원문은 16자짜리 Pool 어휘다. */}
-            <p className="text-[12px] font-medium tracking-wide text-faint">
-              아이디어 {i + 1}
-              {idea.method ? ` · ${collabMethodLabel(idea.method)}` : ""}
-            </p>
+                ⚠️ method는 반드시 collabMethodLabel()을 거친다 — 원문은 16자짜리 Pool 어휘다.
+                ⭐우측 태그(08-06 대표 확정): 기발 아이디어를 **별도 섹션으로 떼지 않고** 같은 섹션에서
+                  태그로 위계를 준다 — 고객은 섹션이 왜 나뉘는지 모른다. 태그 달린 카드가 위로 온다. */}
+            <div className="flex items-start justify-between gap-2">
+              <p className="text-[12px] font-medium tracking-wide text-faint">
+                아이디어 {i + 1}
+                {idea.method ? ` · ${collabMethodLabel(idea.method)}` : ""}
+              </p>
+              {idea.tag && (
+                <span
+                  className={`shrink-0 rounded-pill px-2 py-0.5 text-[11px] font-bold ${
+                    idea.tag === "추천"
+                      ? "bg-primary-tint text-primary-on"
+                      : "bg-corn-pale text-corn-on"
+                  }`}
+                >
+                  {idea.tag}
+                </span>
+              )}
+            </div>
             <p className="mt-1.5 text-[16px] font-bold leading-snug break-keep text-ink">
               {idea.title}
             </p>
             <p className="mt-1.5 text-[14px] leading-relaxed break-keep text-body">
               {idea.desc}
             </p>
+            {/* 양쪽에 남는 것 — ⚠️"우리가 얻는 것/상대가 얻는 것" 라벨은 쓰지 않는다(대표 08-06).
+                주어를 지우고 기대 효과 섹션과 같은 불릿 문형으로 — 이익을 나열하면 노골적으로 읽힌다. */}
+            {idea.gains && idea.gains.length > 0 && (
+              <ul className="mt-3 space-y-1 border-t border-hairline pt-2.5">
+                {idea.gains.map((g, gi) => (
+                  <li key={gi} className="flex gap-1.5 text-[13px] leading-relaxed text-mute">
+                    <span className="shrink-0 text-faint">•</span>
+                    <span className="break-keep">{g}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
         ))}
       </div>
