@@ -108,6 +108,10 @@ export async function POST(req: Request) {
 
     // ⑥ 캐시 3조건(스펙 §2-2): 최신 행 존재 + 양쪽 DNA non-stale(④ 후 항상 참)
     //    + 행 created_at이 양쪽 dna.updated_at보다 최신 → 저장본 즉시 반환(Gemini 0콜)
+    // 🪤 이 3조건, `lib/collab-report.ts`의 `isReportCacheFresh()`가 **읽기 전용 버전으로
+    //    복제**하고 있다(08-09, 소개서 페이지가 로딩 화면을 스킵할지 미리 훑는 용도).
+    //    아래 if 조건을 고치면 그쪽도 같이 고칠 것 — 안 고치면 두 판정이 갈라져
+    //    "캐시 있는데 스킵 안 됨"류 눈에 안 띄는 버그가 난다(1팀 08-09 지적).
     const latest = force ? null : await repo.getLatestCollabReport(from.id, to.id);
     if (
       latest &&
