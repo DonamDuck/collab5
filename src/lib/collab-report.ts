@@ -5,7 +5,7 @@
 // 플랜: docs/superpowers/plans/2026-07-25-collab-report-dna.md Task 6
 
 import { createHash } from "node:crypto";
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenAI, Type, ThinkingLevel } from "@google/genai";
 import {
   DNA_SYSTEM,
   REPORT_SYSTEM,
@@ -287,16 +287,16 @@ function selectNovel(judged: JudgedNovel[], byTitle: Map<string, NovelIdea>): No
     .filter((i): i is NovelIdea => !!i);
 }
 
-/** 기발한 콜라보 아이디어 생성 — 후보 16개(관점 2개 × 8) → 심사 1콜 → 최종 2개.
- *  ⚠️실패해도 리포트를 막지 않는다(빈 배열 반환) — 이 섹션은 부가 가치이지 리포트의 필수 조각이 아니다. */
-async function generateNovelIdeas(
+/** 기발 후보 16개 생성(관점 2 × 8, 콜 2개 병렬) — ⭐**리포트 콜과 동시에 시작한다**(입력이 같아 기다릴 이유가 없다).
+ *  ⏱실측(08-07, 캔가×두더지): 리포트 16.4s / 생성 17.6s / 심사 22.1s = 직렬 56s.
+ *    생성을 리포트와 병렬로 돌리면 생성 몫은 +1~2s로 줄어든다(느린 쪽 차액만 남음).
+ *  실패는 빈 배열 — 이 섹션은 부가 가치이지 리포트의 필수 조각이 아니다. */
+async function generateNovelCandidates(
   brandsText: string,
-  baseIdeas: { title: string; desc: string }[],
   model: string,
   meters?: CallMeter[]
 ): Promise<NovelIdea[]> {
   try {
-    // ① 후보 16개 — 관점 2개를 병렬로(같은 입력이라 서로 기다릴 이유가 없다)
     const gens = await Promise.all(
       NOVEL_SEEDS.map(async (seed) => {
         const t = Date.now();
@@ -329,27 +329,58 @@ async function generateNovelIdeas(
         };
       })
       .filter((i) => i.title && i.desc);
-    if (cands.length === 0) return [];
+    return cands;
+  } catch (e) {
+    console.error("[novel] 기발 후보 생성 실패", e);
+    return [];
+  }
+}
 
-    // ② 심사 — 기존 ideas를 줘야 겹침 판정이 된다(그래서 리포트 뒤에 온다)
+/** 심사 1콜 → 최종 2개. 겹침 판정에 기존 ideas가 필요해서 **리포트 뒤에만** 올 수 있다.
+ *  ⚡사고 low가 기본(08-07) — 심사가 22.1s로 파이프라인 최대 병목이었고 사고 토큰이 리포트의 1.5배였다.
+ *    채점·분류는 창작이 아니라 판정이라 DNA 사고 끄기(07-26, 4.7배 빠르고 품질 유지)와 같은 계열.
+ *    `NOVEL_JUDGE_THINKING=1`로 복구 가능.
+ *  ⚠️3.6-flash는 thinkingBudget:0을 400으로 거부한다(07-26 실측) — 대신 thinkingLevel:'low'.
+ *    모델 오버라이드로 다른 세대가 들어와 400이 나면 옵션 없이 1회 재시도(DNA와 동일 패턴). */
+async function judgeNovelIdeas(
+  brandsText: string,
+  baseIdeas: { title: string; desc: string }[],
+  cands: NovelIdea[],
+  model: string,
+  meters?: CallMeter[]
+): Promise<NovelIdea[]> {
+  if (cands.length === 0) return [];
+  try {
     const t2 = Date.now();
-    const judgeRes = await ai().models.generateContent({
-      model,
-      contents: [
-        brandsText,
-        "",
-        "[기존 아이디어]",
-        baseIdeas.map((i, n) => `${n + 1}. ${i.title} — ${i.desc}`).join("\n"),
-        "",
-        "[심사할 기발 후보]",
-        cands.map((i, n) => `${n + 1}. ${i.title} — ${i.desc}`).join("\n"),
-      ].join("\n"),
-      config: {
-        systemInstruction: NOVEL_JUDGE_SYSTEM,
-        responseMimeType: "application/json",
-        responseSchema: NOVEL_JUDGE_SCHEMA,
-      },
-    });
+    const lowThinking = process.env.NOVEL_JUDGE_THINKING !== "1";
+    const call = (withLevel: boolean) =>
+      ai().models.generateContent({
+        model,
+        contents: [
+          brandsText,
+          "",
+          "[기존 아이디어]",
+          baseIdeas.map((i, n) => `${n + 1}. ${i.title} — ${i.desc}`).join("\n"),
+          "",
+          "[심사할 기발 후보]",
+          cands.map((i, n) => `${n + 1}. ${i.title} — ${i.desc}`).join("\n"),
+        ].join("\n"),
+        config: {
+          systemInstruction: NOVEL_JUDGE_SYSTEM,
+          responseMimeType: "application/json",
+          responseSchema: NOVEL_JUDGE_SCHEMA,
+          ...(withLevel && lowThinking ? { thinkingConfig: { thinkingLevel: ThinkingLevel.LOW } } : {}),
+        },
+      });
+    let judgeRes;
+    try {
+      judgeRes = await call(true);
+    } catch (e) {
+      const status = (e as { status?: number; code?: number })?.status ?? (e as { code?: number })?.code;
+      if (!lowThinking || status !== 400) throw e;
+      console.warn(`[novel] ${model} thinkingLevel=low 거부(400) → 옵션 없이 재시도`);
+      judgeRes = await call(false);
+    }
     const jm = meter("novel-judge", model, Date.now() - t2, judgeRes.usageMetadata);
     logMeter(jm);
     meters?.push(jm);
@@ -375,7 +406,7 @@ async function generateNovelIdeas(
     return selectNovel(judged, byTitle);
   } catch (e) {
     // 리포트는 살린다 — 기발 섹션만 비운다
-    console.error("[novel] 기발 아이디어 생성 실패", e);
+    console.error("[novel] 기발 심사 실패", e);
     return [];
   }
 }
@@ -608,6 +639,10 @@ export async function generateReport(
   ].join("\n");
 
   const reportModel = modelOverride || REPORT_MODEL();
+  // ⭐기발 후보 생성을 리포트와 **동시에** 출발시킨다 — 입력이 같아서 리포트를 기다릴 이유가 없다.
+  //   심사(judgeNovelIdeas)만 리포트의 ideas를 기다린다(겹침 판정 재료).
+  //   ⏱실측(08-07): 직렬 56s → 이 병렬화 + 심사 사고 low로 ~30s 목표.
+  const novelCandsPromise = generateNovelCandidates(contents, reportModel, meters);
   const t0 = Date.now();
   const res = await ai().models.generateContent({
     model: reportModel,
@@ -658,10 +693,10 @@ export async function generateReport(
   });
   if (ideas.length === 0) return { report: null, candidates };
 
-  // ④ 기발한 아이디어(B36) — 리포트가 성립한 뒤에만 만든다.
-  //    ⚠️겹침 판정에 위 ideas가 필요해서 병렬로 못 당긴다(생성 2콜만 내부에서 병렬).
+  // ④ 기발한 아이디어(B36) — 후보는 위에서 이미 리포트와 병렬로 만들어지고 있다.
+  //    여기서는 심사만 한다(겹침 판정에 위 ideas가 필요해서 이 지점보다 당길 수 없다).
   //    실패해도 빈 배열이라 리포트는 그대로 나간다.
-  const novelIdeas = await generateNovelIdeas(contents, ideas, reportModel, meters);
+  const novelIdeas = await judgeNovelIdeas(contents, ideas, await novelCandsPromise, reportModel, meters);
 
   return {
     report: {
