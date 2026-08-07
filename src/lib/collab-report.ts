@@ -297,18 +297,34 @@ async function generateNovelCandidates(
   meters?: CallMeter[]
 ): Promise<NovelIdea[]> {
   try {
+    // ⚡생성도 사고 low(08-07 A/B) — 기본은 15.4~26.5s로 널뛰었는데 low는 8.1~8.3s 고정.
+    //   심사 점수(=품질 계량기)가 동급이었다: 기본 상위 33~35점대 / low 33·33·33·32·31.
+    //   16개를 뿌리고 심사가 거르는 구조라 생성의 긴 사고가 품질을 안 올리고 있었다.
+    //   `NOVEL_GEN_THINKING=1`로 복구. 400 거부 시 옵션 없이 재시도(심사와 동일 패턴).
+    const lowThinking = process.env.NOVEL_GEN_THINKING !== "1";
     const gens = await Promise.all(
       NOVEL_SEEDS.map(async (seed) => {
         const t = Date.now();
-        const r = await ai().models.generateContent({
-          model,
-          contents: brandsText,
-          config: {
-            systemInstruction: NOVEL_GEN_SYSTEM(seed),
-            responseMimeType: "application/json",
-            responseSchema: NOVEL_GEN_SCHEMA,
-          },
-        });
+        const call = (withLevel: boolean) =>
+          ai().models.generateContent({
+            model,
+            contents: brandsText,
+            config: {
+              systemInstruction: NOVEL_GEN_SYSTEM(seed),
+              responseMimeType: "application/json",
+              responseSchema: NOVEL_GEN_SCHEMA,
+              ...(withLevel && lowThinking ? { thinkingConfig: { thinkingLevel: ThinkingLevel.LOW } } : {}),
+            },
+          });
+        let r;
+        try {
+          r = await call(true);
+        } catch (e) {
+          const status = (e as { status?: number; code?: number })?.status ?? (e as { code?: number })?.code;
+          if (!lowThinking || status !== 400) throw e;
+          console.warn(`[novel] ${model} 생성 thinkingLevel=low 거부(400) → 옵션 없이 재시도`);
+          r = await call(false);
+        }
         const m = meter("novel-gen", model, Date.now() - t, r.usageMetadata);
         logMeter(m);
         meters?.push(m);
