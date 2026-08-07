@@ -445,6 +445,17 @@ export function ReportSheet({
   // 리포트 본문 뷰만 '고정 바 + 스크롤 영역' 구조를 쓴다(디자인팀: 짧은 뷰는 과설계라 현행 유지).
   const isReportView = !!report && (sampleMode || phase === "ok");
 
+  // 🆕 소개서 페이지에서 연 무소개서 티저(08-07 대표 QA) — **홈과 갈라 쓴다.**
+  //   왜 갈랐나: 08-01에 홈 예시를 가상 쌍에서 **실제 쌍**(캔버스가든×호락호락도서관)으로 바꿨는데,
+  //   그 파일을 /m 티저도 함께 읽는다는 걸 놓쳤다. 그래서 **캔버스가든 페이지에서 열면**
+  //   헤더엔 "캔버스가든 × 호락호락도서관", 아래 CTA엔 "캔버스가든님과 나의 분석을 받을 수 있어요" —
+  //   **같은 브랜드가 제안하는 쪽과 받는 쪽을 동시에** 하는 화면이 됐다(대표 실측).
+  //   ⭐고친 방향은 "샘플을 바꾸기"가 아니라 **"예시임을 화면 구조로 못 박기"**다(대표 지시):
+  //   ①맨 위에서 왜 예시를 보는지 말하고 ②쌍 이름을 배너에 명시하고 ③헤더의 쌍 캡션은 뺀다
+  //   (헤더에 남으면 *지금 보는 브랜드의 분석*으로 읽힌다) ④CTA는 스크롤과 무관하게 늘 잡히는 자리로.
+  //   ⚠️홈(source="home")은 이 분기를 타지 않는다 — 홈 UI는 손대지 않는다(대표 지시).
+  const sampleTeaser = sampleMode && source !== "home";
+
   const closeButton = (extra: string) => (
     <button
       type="button"
@@ -485,22 +496,46 @@ export function ReportSheet({
               {/* ⚠️ "다른 소개서로 분석"은 여기 안 둔다(07-31 대표 QA) — 이 줄엔 원래도 캡션+버튼+닫기가
                   붙어살아 좁았는데, 업체명이 길면 "캔버스가든 × 콜…"처럼 잘렸다. 그 버튼을 아래 CTA
                   블록(제안 보내기 버튼 밑)으로 옮기면 이 줄엔 캡션과 닫기만 남아 truncate가 훨씬 덜 걸린다. */}
-              <p className="min-w-0 flex-1 truncate text-[15px] font-semibold text-body">
-                {fromName} × {reportToName}
-              </p>
+              {/* ⚠️티저에선 쌍 캡션을 비운다 — 여긴 "지금 보는 리포트가 누구 것인가" 자리라,
+                  예시 쌍 이름이 여기 있으면 **내가 연 브랜드의 분석**으로 읽힌다(위 sampleTeaser 주석). */}
+              {sampleTeaser ? (
+                <span aria-hidden="true" />
+              ) : (
+                <p className="min-w-0 flex-1 truncate text-[15px] font-semibold text-body">
+                  {fromName} × {reportToName}
+                </p>
+              )}
               {closeButton("")}
             </div>
 
-            {/* 스크롤 영역 — 첫 요소가 추천 아이디어 섹션. 패널에 있던 패딩·safe-area는 여기로 이사 */}
-            <div className="flex-1 overflow-y-auto px-5 pb-[calc(1.5rem+env(safe-area-inset-bottom))] pt-4">
+            {/* 스크롤 영역 — 첫 요소가 추천 아이디어 섹션. 패널에 있던 패딩·safe-area는 여기로 이사.
+                ⚠️티저는 CTA가 아래 고정 바로 빠지므로 하단 여백을 safe-area 없이 짧게 준다(이중 여백 방지). */}
+            <div
+              className={`flex-1 overflow-y-auto px-5 pt-4 ${
+                sampleTeaser ? "pb-5" : "pb-[calc(1.5rem+env(safe-area-inset-bottom))]"
+              }`}
+            >
+              {/* 티저 최상단 — **왜 예시를 보고 있는지**를 리포트보다 먼저 말한다(대표 지시 08-07).
+                  이게 없으면 리포트가 띡 하고 나와서 "내 분석인가?"로 읽힌다. */}
+              {sampleTeaser && (
+                <p className="mb-3 text-[16px] font-bold leading-snug break-keep text-ink">
+                  콜라보 분석은 내 소개서 작성 후 가능해요.
+                  <br />
+                  우선 예시 리포트를 보여드릴게요.
+                </p>
+              )}
               {sampleMode && (
-                <div className="mb-4 rounded-md bg-surface-soft px-3 py-2 text-[13px] font-medium text-body">
-                  예시 리포트예요
+                <div className="mb-4 rounded-md bg-surface-soft px-3 py-2 text-[13px] font-medium leading-relaxed break-keep text-body">
+                  {/* 티저는 **어느 쌍의 예시인지**를 밝힌다 — 헤더에서 뺀 정보가 갈 자리가 여기다.
+                      홈은 기존 문구 그대로(대표 지시: 홈 UI 불변). */}
+                  {sampleTeaser
+                    ? `${sampleData.fromName} × ${sampleData.toName}의 콜라보 분석 예시 리포트예요.`
+                    : "예시 리포트예요"}
                 </div>
               )}
               {pieces}
-              {sampleMode && (
-                /* 무소개서 퍼널 — 위저드 CTA */
+              {sampleMode && !sampleTeaser && (
+                /* 무소개서 퍼널 — 위저드 CTA (홈 전용. /m 티저는 아래 고정 바가 대신한다) */
                 <div className="mt-8 rounded-md border border-hairline bg-surface-soft p-4">
                   {/* 홈(source=home)에선 상대 브랜드가 없어 toName이 빈 문자열 — 범용 문구로 분기(07-31) */}
                   <p className="text-[14px] leading-relaxed break-keep text-body">
@@ -518,6 +553,21 @@ export function ReportSheet({
                 </div>
               )}
             </div>
+
+            {/* 🆕 고정 CTA(08-07 대표 지시) — 스크롤 영역의 **형제**라 리포트가 아무리 길어도 늘 보인다.
+                (스크롤 안에 두면 끝까지 내려야 나오는데, 이 사람에게 필요한 건 리포트가 아니라 이 버튼이다.)
+                문구는 안내 없이 버튼만 — 무엇을 하는 버튼인지는 위 타이틀이 이미 말했다. */}
+            {sampleTeaser && (
+              <div className="shrink-0 border-t border-hairline bg-surface px-5 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-3">
+                <a
+                  href="/register"
+                  onClick={() => track("wizard_start_from_report")}
+                  className="flex h-12 w-full items-center justify-center rounded-md bg-primary text-base font-medium text-primary-on"
+                >
+                  내 소개서 만들기
+                </a>
+              </div>
+            )}
           </>
         ) : (
           <>
