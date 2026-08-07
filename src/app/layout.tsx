@@ -20,8 +20,8 @@ export const metadata: Metadata = {
   alternates: { canonical: "/" },
   // 🆕링크 미리보기 카드(08-07) — 소개서(/m)는 08-02에 넣었는데 **홈은 빠져 있었다.**
   //   영업 DM에 홈 링크를 붙이면 글자만 뜨고 카드가 안 펼쳐졌다는 뜻이다.
-  //   ⚠️이미지는 아직 없다 — 지금 있는 로고는 전부 SVG인데 카톡·페북은 SVG를 og:image로 안 받는다.
-  //      제대로 된 대표 이미지(1200×630 PNG)를 만들면 여기 `images`를 더한다.
+  //   이미지 = 디자인팀 제작(`public/og-image.png`, 1200×630, 08-07) — 로고+브랜드명만,
+  //   장식·슬로건 없음(대표 지정 구성). 소스는 `assets/og-image.svg`.
   openGraph: {
     type: "website",
     siteName: "collab5",
@@ -29,6 +29,7 @@ export const metadata: Metadata = {
     url: "/",
     title: TITLE,
     description: DESCRIPTION,
+    images: [{ url: "/og-image.png", width: 1200, height: 630 }],
   },
   // 검색엔진 소유확인 — 구글은 `public/google...html` 파일로 이미 확인됨(07-31).
   // 네이버는 서치어드바이저에서 받은 값을 여기 `other`에 넣거나 같은 방식으로 파일을 올리면 된다.
