@@ -526,11 +526,12 @@ export function ReportSheet({
                     **한 급 차이도 안 나서** 둘이 겹쳐 보였다. 20은 시트 최상단 안내 타이틀의 기존 슬롯이다
                     (`phase==="select"`의 "어떤 소개서로 분석할까요"와 같은 `text-xl`) — 새 크기를 만든 게
                     아니라 **같은 역할엔 같은 크기**를 쓴 것. 리포트 본문 사다리(16→15→14→13)는 그대로. */}
+              {/* ⚠️`<br>`로 문장을 끊지 않는다 — 20px로 키우니 모바일(320px)에서 4줄이 되면서
+                  "가능해요."와 "보여드릴게요."만 남는 토막 줄이 두 개 생겼다(08-07 실측).
+                  break-keep이 어절은 이미 지켜주므로, 폭에 맞춰 흐르게 두는 쪽이 균형이 낫다. */}
               {sampleTeaser && (
                 <p className="mb-4 text-xl font-bold leading-snug break-keep text-ink">
-                  콜라보 분석은 내 소개서 작성 후 가능해요.
-                  <br />
-                  우선 예시 리포트를 보여드릴게요.
+                  콜라보 분석은 내 소개서 작성 후 가능해요. 우선 예시 리포트를 보여드릴게요.
                 </p>
               )}
               {/* 회색 박스는 **홈 전용으로 남았다** — 티저는 같은 정보를 위 고정 헤더로 올렸다(대표 08-07 2차).
@@ -538,6 +539,20 @@ export function ReportSheet({
               {sampleMode && !sampleTeaser && (
                 <div className="mb-4 rounded-md bg-surface-soft px-3 py-2 text-[13px] font-medium leading-relaxed break-keep text-body">
                   예시 리포트예요
+                </div>
+              )}
+              {/* ⭐경계 구분선(대표 08-07 3차) — **안내가 끝나고 리포트가 시작되는 지점**을 선으로 긋는다.
+                  헤더 문장이 *무엇의* 예시인지(쌍 이름)를 맡고, 이 선은 *어디부터*를 맡아 역할이 갈린다.
+                  같은 말의 반복처럼 보여도 이 화면의 목적이 "예시임을 못 박기"라 반복이 기능한다.
+                  ⚠️새 컴포넌트를 만들지 않았다 — register 폼의 "또는 아래에 직접 입력할 수 있어요" 구분선과
+                     **같은 어휘**(h-px hairline + 13 medium mute)다. 라벨만 '샘플'→'예시'로(화면 전체 통일). */}
+              {sampleTeaser && (
+                <div className="mb-5 flex items-center gap-3">
+                  <div className="h-px flex-1 bg-hairline" />
+                  <span className="shrink-0 text-[13px] font-medium text-mute">
+                    분석 리포트 예시
+                  </span>
+                  <div className="h-px flex-1 bg-hairline" />
                 </div>
               )}
               {pieces}
