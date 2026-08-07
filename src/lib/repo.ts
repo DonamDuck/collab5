@@ -22,6 +22,11 @@ export interface Repo {
   listMakersByOwner(ownerUserId: number): Promise<Maker[]>;
   searchMakers(q: string): Promise<Maker[]>;
   listHomeMakers(limit: number): Promise<Maker[]>; // 홈 그리드 — 검색 노출(=콜라보 가능) + active, ⭐최신순(07-31 반전: 오래된 순+상한이면 방금 소개서 만든 씨딩 사장님이 홈에서 자기 브랜드를 못 본다)
+  /** 사이트맵(구글·네이버에 낼 주소 목록) 전용 — slug와 수정시각만. 08-07 신설.
+   *  ⭐**소개서를 새로 만들면 자동으로 들어간다** — 사이트맵을 정적으로 적어두지 않고 매번 DB에서 뽑는 이유(대표 지시).
+   *  ⚠️`listHomeMakers` 재사용을 일부러 피했다: 그건 카드용이라 사진·블록 jsonb까지 통째로 읽어오는데
+   *     사이트맵엔 주소와 날짜뿐이다. 브랜드가 늘수록 이 차이가 커진다. */
+  listSitemapBrands(): Promise<{ slug: string; updatedAt: string }[]>;
   // 카드
   createCard(input: Omit<CollabCard, "id" | "createdAt">): Promise<CollabCard>;
   getCardBySlug(slug: string): Promise<CollabCard | null>;
@@ -442,6 +447,11 @@ class InMemoryRepo implements Repo {
       .sort((a, b) => (a.createdAt > b.createdAt ? -1 : 1)) // 최신순 — 인터페이스 주석 참조
       .slice(0, limit);
   }
+  async listSitemapBrands(): Promise<{ slug: string; updatedAt: string }[]> {
+    return this.makers
+      .filter((m) => m.searchVisible && m.status !== "inactive")
+      .map((m) => ({ slug: m.slug, updatedAt: m.updatedAt || m.createdAt }));
+  }
 
   async createCard(input: Omit<CollabCard, "id" | "createdAt">): Promise<CollabCard> {
     const card: CollabCard = { ...input, id: this.nextCardId++, createdAt: now() };
@@ -729,6 +739,27 @@ class SupabaseRepo implements Repo {
       .order("created_at", { ascending: false }) // 최신순 — 인터페이스 주석 참조
       .limit(limit);
     return (data ?? []).map((r) => rowToMaker(r as MakerRow));
+  }
+  async listSitemapBrands(): Promise<{ slug: string; updatedAt: string }[]> {
+    // 조건은 홈·검색과 **같은 두 개**(search_visible + active) — 검색에 안 보이기로 한 소개서가
+    // 구글엔 뜨는 일이 없게. 상한 1000은 폭주 방지선이지 정책이 아니다(넘으면 분할 사이트맵을 쓴다).
+    const { data, error } = await this.db
+      .from("brands")
+      .select("slug, updated_at, created_at")
+      .eq("search_visible", true)
+      .eq("status", "active")
+      .order("updated_at", { ascending: false })
+      .limit(1000);
+    if (error) {
+      // 조용히 빈 사이트맵을 내면 "색인이 왜 안 되지"로 며칠을 날린다 — 로그로 남긴다.
+      console.error(`[repo] listSitemapBrands failed: ${error.message}`);
+      return [];
+    }
+    type Row = { slug: string; updated_at: string | null; created_at: string };
+    return (data ?? []).map((r) => {
+      const row = r as Row;
+      return { slug: row.slug, updatedAt: row.updated_at || row.created_at };
+    });
   }
   // /my 토글 — 소유자 검증은 actions에서. search_visible 만 부분 갱신.
   async setMakerFlags(

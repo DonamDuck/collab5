@@ -59,10 +59,15 @@ export async function generateMetadata({
   return {
     title,
     description,
+    // 🆕정본 주소(08-07) — `?banner=a`·`?report=`처럼 파라미터가 붙어 공유돼도 검색엔진이
+    //    **한 페이지로 합쳐** 센다. 안 주면 파라미터 조합마다 별개 페이지로 세어 힘이 흩어진다.
+    alternates: { canonical: `/m/${slug}` },
     openGraph: {
       title,
       description,
       type: "profile",
+      url: `/m/${slug}`,
+      siteName: "collab5",
       ...(image ? { images: [{ url: image }] } : {}),
     },
   };
