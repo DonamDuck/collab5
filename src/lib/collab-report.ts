@@ -24,7 +24,7 @@ import {
   MIN_MATCH_SCORE,
   DNA_REFRESH_BEFORE,
 } from "./dna-pool";
-import type { Block, BrandDna, CollabReportData, DnaItem, DnaSignature, Maker, NovelIdea } from "./types";
+import type { Block, BrandDna, CollabReportData, DnaItem, DnaSignature, Maker, NovelIdea, ReportIdea } from "./types";
 import { kstIso } from "./time";
 import { meter, logMeter, type CallMeter } from "./ai-cost";
 
@@ -167,7 +167,7 @@ const DNA_SCHEMA = {
   required: ["summary", "items", "signature"],
 };
 
-const REPORT_SCHEMA = {
+export const REPORT_SCHEMA = {
   type: Type.OBJECT,
   properties: {
     candidates: {
@@ -205,7 +205,7 @@ const REPORT_SCHEMA = {
 };
 
 // 기발 아이디어(B36) — 생성/심사 2종. 스펙 = 2026-08-06-novel-collab-ideas-design.md
-const NOVEL_GEN_SCHEMA = {
+export const NOVEL_GEN_SCHEMA = {
   type: Type.OBJECT,
   properties: {
     ideas: {
@@ -227,7 +227,7 @@ const NOVEL_GEN_SCHEMA = {
   required: ["ideas"],
 };
 
-const NOVEL_JUDGE_SCHEMA = {
+export const NOVEL_JUDGE_SCHEMA = {
   type: Type.OBJECT,
   properties: {
     judged: {
@@ -236,9 +236,11 @@ const NOVEL_JUDGE_SCHEMA = {
         type: Type.OBJECT,
         properties: {
           title: { type: Type.STRING, description: "심사한 후보의 title 그대로" },
+          group: { type: Type.STRING, description: "추천 또는 기발 — 입력 그룹 그대로" },
           verdict: { type: Type.STRING, description: "통과 또는 탈락" },
           reason: { type: Type.STRING },
           exchange: { type: Type.NUMBER },
+          specificity: { type: Type.NUMBER },
           unexpected: { type: Type.NUMBER },
           light: { type: Type.NUMBER },
           viral: { type: Type.NUMBER },
@@ -249,42 +251,76 @@ const NOVEL_JUDGE_SCHEMA = {
           family: { type: Type.STRING, description: "만드는 결과물 계열" },
           motif: { type: Type.STRING, description: "핵심 장치" },
         },
-        required: ["title", "verdict", "exchange", "unexpected", "light", "viral", "overlap", "family", "motif"],
+        required: ["title", "group", "verdict", "exchange", "specificity", "unexpected", "light", "viral", "overlap", "family", "motif"],
       },
     },
   },
   required: ["judged"],
 };
 
-/** 기발 후보 심사 결과 — 선발 로직이 쓰는 중간 형태(밖으로 나가지 않는다). */
-interface JudgedNovel {
+/** 추천 아이디어 후보 — `ReportIdea`와 모양이 같다(심사 전이라 아직 화면에 못 나가는 상태라는 뜻의 별칭). */
+type ReportIdeaCandidate = ReportIdea;
+
+/** 후보 심사 결과(추천·기발 공통) — 선발 로직이 쓰는 중간 형태(밖으로 나가지 않는다). */
+interface JudgedIdea {
   title: string;
+  group: string;   // "추천" | "기발" — 심사관이 입력 그룹을 그대로 되돌려준다
   verdict: string;
-  exchange: number; unexpected: number; light: number; viral: number;
-  total: number;
+  exchange: number; specificity: number; unexpected: number; light: number; viral: number;
   overlap: boolean;
+  overlapWith: string; // 겹친 추천 후보의 title — "선발된 추천과 겹칠 때만" 겹침 처리하는 데 쓴다
   family: string;
   motif: string;
 }
+
+// ⭐그룹별 가중치(08-07 대표 확정) — 축은 공통, 무엇을 중시하는지만 다르다.
+//   추천 = 익숙해도 되니 unexpected 제외. 확산력은 정식 축(대표: "세모 말고").
+//   기발 = 기존 4축 유지(B36 실험 3판으로 검증된 조합). specificity는 게이트(사실)가 이미 막아준다.
+const recTotal = (j: JudgedIdea) => j.exchange + j.specificity + j.light + j.viral;
+const novelTotal = (j: JudgedIdea) => j.exchange + j.unexpected + j.light + j.viral;
 
 /** 게이트·겹침 통과분에서 최종 2개를 고른다.
  *  ⭐1위는 최고점, 2위는 **계열(family)과 모티프(motif)가 둘 다 1위와 다른 것** 중 최고점.
  *  화면에 나란히 붙는 두 줄이 둘 다 부적이면 "또 부적?"이 되므로 점수 순 채택보다 이 규칙이 먼저다(대표 확정 08-06).
  *  ⚠️단 이 제약은 **기발 2개 내부에만** 건다 — 기존 ideas와 모티프가 겹치는 건 허용이다(행위만 다르면). */
-function selectNovel(judged: JudgedNovel[], byTitle: Map<string, NovelIdea>): NovelIdea[] {
+function selectNovel(
+  judged: JudgedIdea[],
+  byTitle: Map<string, NovelIdea>,
+  pickedRecTitles: Set<string>
+): NovelIdea[] {
+  const norm = (s: string) => s.trim().toLowerCase();
+  const pickedNorm = new Set([...pickedRecTitles].map(norm));
   const pool = judged
-    .filter((j) => j.verdict !== "탈락" && !j.overlap)
-    .sort((x, y) => y.total - x.total);
+    .filter((j) => j.group !== "추천" && j.verdict !== "탈락")
+    // ⚠️겹침은 **화면에 실제로 나가는 추천과 겹칠 때만** 죽인다(08-07) — 심사 시점엔 추천 선발 전이라
+    //   심사관은 후보 전체와 대조하는데, 탈락한 추천 후보와 겹쳤다고 기발을 버리면 과잉 제거다.
+    .filter((j) => !j.overlap || !pickedNorm.has(norm(j.overlapWith)))
+    .sort((x, y) => novelTotal(y) - novelTotal(x));
   const first = pool[0];
   if (!first) return [];
-  const norm = (s: string) => s.trim().toLowerCase();
   const second = pool
     .slice(1)
     .find((j) => norm(j.family) !== norm(first.family) && norm(j.motif) !== norm(first.motif));
   return [first, second]
-    .filter((j): j is JudgedNovel => !!j)
+    .filter((j): j is JudgedIdea => !!j)
     .map((j) => byTitle.get(j.title))
     .filter((i): i is NovelIdea => !!i);
+}
+
+/** 추천 후보 선발 — 게이트 통과분을 추천 가중치로 정렬해 상위 3개.
+ *  ⚠️심사가 통째로 실패하거나 전부 탈락시키면 **원 순서 앞 3개로 폴백** — 추천은 리포트의 필수
+ *  조각이라(0개면 no_match) 심사 사고로 리포트를 죽이면 안 된다. 기발(부가 가치)과 처지가 다르다. */
+function selectRecommended(
+  judged: JudgedIdea[],
+  original: ReportIdeaCandidate[]
+): ReportIdeaCandidate[] {
+  const byTitle = new Map(original.map((i) => [i.title, i]));
+  const pool = judged
+    .filter((j) => j.group === "추천" && j.verdict !== "탈락")
+    .sort((x, y) => recTotal(y) - recTotal(x))
+    .map((j) => byTitle.get(j.title))
+    .filter((i): i is ReportIdeaCandidate => !!i);
+  return (pool.length > 0 ? pool : original).slice(0, 3);
 }
 
 /** 기발 후보 16개 생성(관점 2 × 8, 콜 2개 병렬) — ⭐**리포트 콜과 동시에 시작한다**(입력이 같아 기다릴 이유가 없다).
@@ -352,20 +388,20 @@ async function generateNovelCandidates(
   }
 }
 
-/** 심사 1콜 → 최종 2개. 겹침 판정에 기존 ideas가 필요해서 **리포트 뒤에만** 올 수 있다.
- *  ⚡사고 low가 기본(08-07) — 심사가 22.1s로 파이프라인 최대 병목이었고 사고 토큰이 리포트의 1.5배였다.
- *    채점·분류는 창작이 아니라 판정이라 DNA 사고 끄기(07-26, 4.7배 빠르고 품질 유지)와 같은 계열.
- *    `NOVEL_JUDGE_THINKING=1`로 복구 가능.
- *  ⚠️3.6-flash는 thinkingBudget:0을 400으로 거부한다(07-26 실측) — 대신 thinkingLevel:'low'.
- *    모델 오버라이드로 다른 세대가 들어와 400이 나면 옵션 없이 1회 재시도(DNA와 동일 패턴). */
-async function judgeNovelIdeas(
+/** 심사 1콜 — **추천 후보와 기발 후보를 한 번에** 채점한다(08-07 대표 확정).
+ *  추천도 심사를 거치게 하면서 콜을 안 늘리는 구조 — 입력에 그룹 라벨만 늘었다.
+ *  겹침 판정에 추천 후보가 필요해서 리포트 콜 **뒤에만** 올 수 있는 건 그대로다.
+ *  ⚡사고 low가 기본(08-07 blind A/B: 판정 일치 35/36·유일한 불일치에선 low가 정확). NOVEL_JUDGE_THINKING=1로 복구.
+ *  ⚠️추천은 리포트의 필수 조각이라 심사가 죽으면 **원 순서 폴백**으로 살린다(기발은 빈 배열). */
+async function judgeIdeas(
   brandsText: string,
-  baseIdeas: { title: string; desc: string }[],
-  cands: NovelIdea[],
+  recCands: ReportIdeaCandidate[],
+  novelCands: NovelIdea[],
   model: string,
   meters?: CallMeter[]
-): Promise<NovelIdea[]> {
-  if (cands.length === 0) return [];
+): Promise<{ ideas: ReportIdeaCandidate[]; novelIdeas: NovelIdea[] }> {
+  const fallback = { ideas: recCands.slice(0, 3), novelIdeas: [] as NovelIdea[] };
+  if (recCands.length === 0) return fallback;
   try {
     const t2 = Date.now();
     const lowThinking = process.env.NOVEL_JUDGE_THINKING !== "1";
@@ -375,11 +411,13 @@ async function judgeNovelIdeas(
         contents: [
           brandsText,
           "",
-          "[기존 아이디어]",
-          baseIdeas.map((i, n) => `${n + 1}. ${i.title} — ${i.desc}`).join("\n"),
+          "[추천 후보]",
+          recCands.map((i, n) => `${n + 1}. ${i.title} — ${i.desc}`).join("\n"),
           "",
-          "[심사할 기발 후보]",
-          cands.map((i, n) => `${n + 1}. ${i.title} — ${i.desc}`).join("\n"),
+          "[기발 후보]",
+          novelCands.length > 0
+            ? novelCands.map((i, n) => `${n + 1}. ${i.title} — ${i.desc}`).join("\n")
+            : "(없음)",
         ].join("\n"),
         config: {
           systemInstruction: NOVEL_JUDGE_SYSTEM,
@@ -397,33 +435,37 @@ async function judgeNovelIdeas(
       console.warn(`[novel] ${model} thinkingLevel=low 거부(400) → 옵션 없이 재시도`);
       judgeRes = await call(false);
     }
-    const jm = meter("novel-judge", model, Date.now() - t2, judgeRes.usageMetadata);
+    const jm = meter("idea-judge", model, Date.now() - t2, judgeRes.usageMetadata);
     logMeter(jm);
     meters?.push(jm);
 
     const parsed = JSON.parse(judgeRes.text ?? "{}") as { judged?: Record<string, unknown>[] };
-    const judged: JudgedNovel[] = (parsed.judged ?? []).map((j) => {
-      const exchange = Number(j.exchange) || 0;
-      const unexpected = Number(j.unexpected) || 0;
-      const light = Number(j.light) || 0;
-      const viral = Number(j.viral) || 0;
-      return {
-        title: String(j.title ?? ""),
-        verdict: String(j.verdict ?? ""),
-        exchange, unexpected, light, viral,
-        total: exchange + unexpected + light + viral,
-        overlap: j.overlap === true,
-        family: String(j.family ?? ""),
-        motif: String(j.motif ?? ""),
-      };
-    });
+    const judged: JudgedIdea[] = (parsed.judged ?? []).map((j) => ({
+      title: String(j.title ?? ""),
+      group: String(j.group ?? ""),
+      verdict: String(j.verdict ?? ""),
+      exchange: Number(j.exchange) || 0,
+      specificity: Number(j.specificity) || 0,
+      unexpected: Number(j.unexpected) || 0,
+      light: Number(j.light) || 0,
+      viral: Number(j.viral) || 0,
+      overlap: j.overlap === true,
+      overlapWith: String(j.overlap_with ?? ""),
+      family: String(j.family ?? ""),
+      motif: String(j.motif ?? ""),
+    }));
+    // 🛡심사관이 group을 어긋나게 돌려주는 경우 대비 — title로 실제 소속을 재판정(파서가 보장, 프롬프트는 요청).
+    const recTitles = new Set(recCands.map((c) => c.title));
+    for (const j of judged) j.group = recTitles.has(j.title) ? "추천" : "기발";
 
-    const byTitle = new Map(cands.map((c) => [c.title, c]));
-    return selectNovel(judged, byTitle);
+    const ideas = selectRecommended(judged, recCands);
+    const byTitle = new Map(novelCands.map((c) => [c.title, c]));
+    const novelIdeas = selectNovel(judged, byTitle, new Set(ideas.map((i) => i.title)));
+    return { ideas, novelIdeas };
   } catch (e) {
-    // 리포트는 살린다 — 기발 섹션만 비운다
-    console.error("[novel] 기발 심사 실패", e);
-    return [];
+    // 추천은 원 순서 폴백으로 살리고, 기발만 비운다 — 심사 사고로 리포트를 죽이지 않는다
+    console.error("[novel] 통합 심사 실패 — 추천 폴백", e);
+    return fallback;
   }
 }
 
@@ -727,7 +769,8 @@ export async function generateReport(
   if (matchPoints.length < 2) return { report: null, candidates }; // no_match(스펙 선발 규칙)
 
   // ideas 후처리 — Pool 밖 method는 빈 문자열로(아이디어는 유지, UI가 태그 생략). 0개면 no_match.
-  const ideas = (p.ideas ?? []).slice(0, 3).map((i) => {
+  // ⭐08-07부터 여기 오는 건 **후보 4~6개**다(전엔 최종 3개) — 고르는 건 아래 심사가 한다.
+  const ideaCands = (p.ideas ?? []).slice(0, 6).map((i) => {
     const method = String(i.method ?? "");
     return {
       title: String(i.title ?? ""),
@@ -735,12 +778,19 @@ export async function generateReport(
       method: DNA_POOL.collabMethod.includes(method) ? method : "",
     };
   });
-  if (ideas.length === 0) return { report: null, candidates };
+  if (ideaCands.length === 0) return { report: null, candidates };
 
-  // ④ 기발한 아이디어(B36) — 후보는 위에서 이미 리포트와 병렬로 만들어지고 있다.
-  //    여기서는 심사만 한다(겹침 판정에 위 ideas가 필요해서 이 지점보다 당길 수 없다).
-  //    실패해도 빈 배열이라 리포트는 그대로 나간다.
-  const novelIdeas = await judgeNovelIdeas(contents, ideas, await novelCandsPromise, reportModel, meters);
+  // ④ 통합 심사(08-07 대표 확정) — 추천 후보와 기발 후보를 **한 콜에서 같이** 채점하고 각각 뽑는다.
+  //    기발 후보는 위에서 이미 리포트와 병렬로 만들어져 있고, 심사만 여기서 기다린다
+  //    (겹침 판정에 추천 후보가 필요해서 이 지점보다 당길 수 없다).
+  //    추천은 심사가 죽어도 원 순서 폴백으로 살아난다 — 리포트의 필수 조각이라서.
+  const { ideas, novelIdeas } = await judgeIdeas(
+    contents,
+    ideaCands,
+    await novelCandsPromise,
+    reportModel,
+    meters
+  );
 
   return {
     report: {
