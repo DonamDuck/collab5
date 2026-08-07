@@ -550,6 +550,34 @@ export function isDnaStale(dna: BrandDna | null, brand?: Maker): boolean {
   return false;
 }
 
+/** **읽기 전용** 캐시 신선 판정 — `/api/collab-report`의 ⑥ 캐시 3조건과 같은 로직이지만
+ *  이쪽은 DNA를 만들지 않는다(stale이면 그냥 false — 유료 콜 0). 라우트는 생성 경로라 먼저
+ *  `ensureDna`로 DNA를 채워둔 뒤 판정하지만, 여긴 "지금 있는 그대로"만 본다.
+ *
+ *  용도(08-09) — 소개서 페이지(`/m/[slug]`)가 [콜라보 분석]을 열기 **전에** 미리 훑어서,
+ *  DNA가 안 바뀐 쌍은 로딩 화면 없이 바로 리포트를 보여주기 위함(`ReportSheet`의 `cachedReports`).
+ *  /my 아카이브가 이미 하던 것(저장본을 손에 쥐고 열기)과 같은 경험을 소개서 페이지에도 준다.
+ *
+ *  ⚠️ 라우트(`route.ts`)는 건드리지 않았다 — 거긴 이미 `ensureDna` 이후라 fromDna/toDna가
+ *     항상 non-stale임이 보장돼 있어 이 함수를 끼워 넣을 이유가 없고, 유료 생성 경로라
+ *     리스크를 더 얹지 않는 편이 안전하다. 판정 로직만 여기 한 곳에 두고 두 쪽이 같은 규칙을
+ *     참조하게 하고 싶었지만, route.ts 쪽은 이미 스스로 같은 조건(3줄)을 인라인으로 쓰고
+ *     있어 중복은 딱 그 3줄뿐이다 — 갈라질 위험보다 라이브 코드 미변경이 우선이었다. */
+export function isReportCacheFresh(
+  latest: { createdAt: string } | null,
+  fromDna: BrandDna | null,
+  toDna: BrandDna | null,
+  from: Maker,
+  to: Maker,
+): boolean {
+  if (!latest) return false;
+  if (isDnaStale(fromDna, from) || isDnaStale(toDna, to)) return false;
+  return (
+    Date.parse(latest.createdAt) > Date.parse(fromDna!.updated_at) &&
+    Date.parse(latest.createdAt) > Date.parse(toDna!.updated_at)
+  );
+}
+
 // ── 리포트 생성 ────────────────────────────────────────────────
 
 export interface ReportCandidate {

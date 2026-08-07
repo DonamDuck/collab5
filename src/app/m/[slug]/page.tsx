@@ -5,11 +5,12 @@ import { repo } from "@/lib/repo";
 import { getSessionUser } from "@/lib/supabase/server";
 import { getProfile, getProfileById } from "@/lib/profiles";
 import { isStaffUser } from "@/lib/staff";
+import { isReportCacheFresh } from "@/lib/collab-report";
 import { MakerArticle } from "./MakerArticle";
 import { ConnectProfileButton } from "./ConnectProfileButton";
 import { MakerActionBar } from "./MakerActionBar";
 import { EnrichBanner, type BannerVariant } from "./EnrichBanner";
-import type { Maker } from "@/lib/types";
+import type { CollabReportData, Maker } from "@/lib/types";
 
 // 사진 보강 배너 게이트 — 사진이 이 수 **미만**일 때만 뜬다(대표 확정 08-02).
 const ENRICH_MIN_PHOTOS = 5;
@@ -27,6 +28,35 @@ function countAllPhotos(m: Maker): number {
     if (b.type === "press") for (const it of b.items) n += it.photos?.length ?? 0;
   }
   return n;
+}
+
+/** [콜라보 분석] 시트가 로딩 화면 없이 바로 열 수 있는 쌍만 골라 fromSlug별 맵으로 돌려준다
+ *  (대표 지시 08-09: "/my는 캐시면 바로 뜨는데 소개서 페이지는 왜 매번 분석중이야?").
+ *
+ *  ⭐**유료 콜 0** — `repo.getBrandDna`·`getLatestCollabReport`는 전부 읽기고, DNA가 없거나
+ *  낡았으면(=`isReportCacheFresh`가 false) 그냥 그 쌍만 맵에서 빠진다(생성 시도 안 함).
+ *  ReportSheet가 그 쌍은 지금처럼 fetch+로딩 화면을 그대로 탄다 — **이 함수는 있는 걸
+ *  미리 보여주는 최적화지, 없는 걸 만들어내는 게 아니다.**
+ *
+ *  viewerBrands가 보통 1~2개라 쿼리 비용이 작다(toDna 1회 + 브랜드당 fromDna·latest 병렬 1쌍). */
+async function computeCachedReports(
+  viewerMakers: Maker[],
+  to: Maker,
+): Promise<Record<string, CollabReportData>> {
+  const fromCandidates = viewerMakers.filter((m) => m.id !== to.id);
+  if (fromCandidates.length === 0) return {};
+  const toDna = await repo.getBrandDna(to.id);
+  const entries = await Promise.all(
+    fromCandidates.map(async (from) => {
+      const [fromDna, latest] = await Promise.all([
+        repo.getBrandDna(from.id),
+        repo.getLatestCollabReport(from.id, to.id),
+      ]);
+      const fresh = isReportCacheFresh(latest, fromDna, toDna, from, to);
+      return fresh ? ([from.slug, latest!.report] as const) : null;
+    }),
+  );
+  return Object.fromEntries(entries.filter((e): e is [string, CollabReportData] => e !== null));
 }
 
 
@@ -108,6 +138,9 @@ export default async function MakerPage({
   const viewerBrands = viewerMakers
     .filter((m) => m.id !== maker.id)
     .map((m) => ({ id: m.id, slug: m.slug, name: m.name }));
+  // [콜라보 분석] 사전 캐시 확인 — viewerMakers 확정 후에만 계산 가능해 별도 await(위 배치와 병렬 불가).
+  // isOwner 여부와 무관하게 계산해도 무해하지만 viewerBrands가 보통 비어 있어(비로그인·미등록) 대부분 즉시 {}.
+  const cachedReports = await computeCachedReports(viewerMakers, maker);
   // 점유 가능 = 아직 소유 계정 없음(비회원 생성) + 관리 비번 존재(비번으로 점유 검증 가능).
   // 이미 소유(회원 생성 or 점유됨)면 버튼 미노출. 비번 없는 익명 소개서는 점유 불가라 미노출.
   const claimable = !maker.ownerUserId && !!maker.editPasswordHash;
@@ -171,6 +204,7 @@ export default async function MakerPage({
            서버(`/api/collab-report`)에도 같은 가드가 있다 — 여긴 화면 층. */
         ownerCanReport={isOwner && isStaffUser(viewerUserId)}
         viewerBrands={viewerBrands}
+        cachedReports={cachedReports}
       />
     </main>
   );

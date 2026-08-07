@@ -38,6 +38,7 @@ export function MakerActionBar({
   viewerBrands = [],
   isOwner = false,
   ownerCanReport = false,
+  cachedReports,
 }: {
   slug: string;
   makerId: number;
@@ -56,6 +57,9 @@ export function MakerActionBar({
    *  자기 브랜드끼리의 분석은 결과가 의미 없고 유료 콜만 나가서, 일반 유저에겐 닫아둔다.
    *  isOwner가 false면 애초에 이 분기를 안 타므로 여기선 소유자일 때만 의미가 있다. */
   ownerCanReport?: boolean;
+  /** 서버(`page.tsx`)가 미리 훑어 둔 "DNA 안 바뀐" 쌍들 — fromSlug별 리포트 맵.
+   *  ReportSheet로 그대로 전달만 한다(08-09) — /my와 같은 "로딩 화면 없이 바로 열기" 경험. */
+  cachedReports?: Record<string, CollabReportData>;
 }) {
   // 🚧 위 OWNER_MODE 스위치를 통과시킨 값 — 화면 분기는 전부 이걸 본다(원래는 isOwner 그대로였다)
   const ownerUi = isOwner && OWNER_MODE;
@@ -696,6 +700,7 @@ export function MakerActionBar({
         }}
         initialFromSlug={reportInitialFrom}
         fromBrands={viewerBrands}
+        cachedReports={cachedReports}
         toSlug={slug}
         toName={makerName}
         sampleMode={reportSample}

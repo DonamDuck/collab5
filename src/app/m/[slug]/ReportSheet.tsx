@@ -23,9 +23,12 @@ const LOADING_TITLE = "콜라보 아이디어를 분석하고 있어요";
 // ⚠️ 예전 1번 문구 "두 소개서를 읽고 있어요…"는 **뺐다**(대표: "똑같이 겹치는 건 빼자").
 //    타이틀과 같은 '-고 있어요' 종결형이라 **타이틀이 두 줄로 보였다** — 롤링은 전부 '~중…'
 //    조각으로 통일해야 타이틀과 역할이 갈린다(위저드 CRAWL_STEPS/GEN_STEPS와 같은 규칙).
-// 2번째에 소요시간을 끼운 이유(07-31): 첫 문구(4초)로 "일이 시작됐다"를 알린 직후,
-//   **아직 참을 만할 때** 끝을 알려준다. 기다림에서 힘든 건 길이가 아니라 끝을 모르는 것.
-//   실측 25~28초라 30초는 넉넉하게 부른 값이다. (⏱ 파이프라인이 빨라지면 같이 낮출 것)
+// 순환 간격 = **2000ms**(08-09 대표 지적 "전환 속도 쪼금 느려" → 4000ms에서 단축).
+//   EnrichWizard LoadingView가 원래부터 2000ms였다 — "같은 얼굴" 원칙(위 LOADING_TITLE 주석)을
+//   문구 내용뿐 아니라 **템포**까지 맞춘 것. 2번째 자리(소요시간 안내)가 이제 t=2s·10s·18s·26s에
+//   뜬다(실측 25~28초 기준 3~4회) — 07-31 "아직 참을 만할 때 끝을 알린다"는 취지는 그대로 살아있고
+//   더 자주 재확인시켜준다. (⏱ 파이프라인이 빨라지면 간격도 같이 낮출 것)
+const LOADING_INTERVAL_MS = 2000;
 const LOADING_COPY = [
   "두 소개서를 읽는 중…",
   "보통 30초 정도 걸려요…",
@@ -59,6 +62,7 @@ export function ReportSheet({
   initialReport = null,
   initialReadOnly = false,
   initialFromName,
+  cachedReports,
   source = "maker_page",
   onReportLoaded,
 }: {
@@ -76,6 +80,13 @@ export function ReportSheet({
    *  ⭐부수효과(의도된 것): 아카이브 열람이 더는 재생성(유료 콜)을 태우지 않는다.
    *     최신 분석이 필요하면 소개서 페이지에서 열거나 [다른 소개서로 분석]으로 명시 실행한다. */
   initialReport?: CollabReportData | null;
+  /** 소개서 페이지(`/m/[slug]`)판 `initialReport` — **1건 고정이 아니라 쌍(fromSlug)별 맵**이다(08-09).
+   *  마커 페이지는 /my와 달리 "내 소개서가 몇 개"·"어떤 게 선택될지"가 열기 전엔 안 정해져 있어서
+   *  (칩 선택 UI가 있다) 단일 `initialReport`로는 못 커버한다. 서버(`page.tsx`)가 **DNA 안 바뀐 쌍만**
+   *  미리 읽기 전용으로 골라 이 맵에 담아 내려준다(유료 콜 0 — `lib/collab-report.ts`의
+   *  `isReportCacheFresh`가 라우트 ⑥ 캐시 3조건과 같은 판정을 쓴다).
+   *  키에 없는 fromSlug는 지금처럼 fetch+로딩 화면을 그대로 탄다(신규 쌍·DNA 변경분). */
+  cachedReports?: Record<string, CollabReportData>;
   /** 그 쌍의 내 브랜드 이름 — **넘긴 브랜드는 `fromBrands`에 없어서** 이름을 그쪽에서 못 찾는다.
    *  없이 두면 헤더가 `?? fromBrands[0]`으로 **엉뚱한 내 소개서 이름**을 박는다
    *  (08-07 prod 실측: 아그레아블 카드를 열었는데 제목이 "로컬페이지 × 두더지요가원"). */
@@ -92,9 +103,16 @@ export function ReportSheet({
   onReportLoaded?: (report: CollabReportData) => void;
 }) {
   // 저장본을 들고 왔으면 **첫 렌더부터 `ok`** — 아래 effect에서 세우면 로딩 화면이 한 프레임 스친다.
+  // ⭐08-09: `cachedReports`도 같은 자격이다 — /my의 `initialReport`(딱 1건)와 달리 여긴 맵이라,
+  //   "지금 이 시트가 열자마자 어떤 fromSlug로 뜰지"를 먼저 계산해야 한다(딥링크 or 소개서 1개 자동선택).
+  //   2개+라 선택 스텝(select)부터 시작하는 경우는 여기서 못 정한다 — [분석하기] 클릭 시점에
+  //   run() 안에서 다시 확인한다(아래).
+  const initialArchiveSlug = initialFromSlug ?? (fromBrands.length === 1 ? fromBrands[0]?.slug : undefined);
   const archived: OkPayload | null = initialReport
     ? { report: initialReport, cached: true, model: "archive", readOnly: initialReadOnly }
-    : null;
+    : initialArchiveSlug && cachedReports?.[initialArchiveSlug]
+      ? { report: cachedReports[initialArchiveSlug], cached: true, model: "cache" }
+      : null;
   const [phase, setPhase] = useState<Phase>(archived ? "ok" : "idle");
   const [result, setResult] = useState<OkPayload | null>(archived);
   const [thin, setThin] = useState<{
@@ -116,6 +134,20 @@ export function ReportSheet({
 
   const run = useCallback(
     async (fromSlug: string) => {
+      // 캐시 신선 쌍(DNA 변경 없음)이면 네트워크 없이 즉시 연다 — /my 아카이브와 같은 경험(08-09).
+      // 위 `archived`(딥링크·단일 소개서 자동선택)가 못 잡는 경로가 하나 있다 — **멀티 소개서 select
+      // 스텝에서 칩 고르고 [분석하기]를 누르는 경우**는 useEffect를 안 타고 run()을 직접 부르므로
+      // 여기서 한 번 더 확인해야 한다. 대표 지적: "콜라보 분석중이에요 이거 안 보여주고!" — 소개서
+      // 페이지의 모든 실행 경로가 /my와 같은 대우를 받아야 한다는 뜻.
+      const hit = cachedReports?.[fromSlug];
+      if (hit) {
+        const ok: OkPayload = { report: hit, cached: true, model: "cache" };
+        setResult(ok);
+        setPhase("ok");
+        loadedCbRef.current?.(ok.report);
+        track("report_view", { cache_hit: true });
+        return;
+      }
       if (inFlightRef.current) {
         wantSlugRef.current = fromSlug; // 완료 후 이 선택으로 재실행
         return;
@@ -170,7 +202,7 @@ export function ReportSheet({
           run(wantSlugRef.current);
       }
     },
-    [toSlug],
+    [toSlug, cachedReports],
   );
 
   // 열릴 때: 소개서 1개면 바로 fetch(캐시면 서버가 즉시 반환), 2개+면 선택(select)이 첫 depth.
@@ -208,13 +240,13 @@ export function ReportSheet({
     if (open && sampleMode) track("report_locked_view", { source });
   }, [open, sampleMode, source]);
 
-  // 로딩 카피 4단 순환(4초 간격) — 2번째가 소요시간 안내
+  // 로딩 카피 4단 순환(2초 간격) — 2번째가 소요시간 안내
   useEffect(() => {
     if (phase !== "loading") return;
     setCopyIdx(0);
     const t = window.setInterval(
       () => setCopyIdx((i) => (i + 1) % LOADING_COPY.length),
-      4000,
+      LOADING_INTERVAL_MS,
     );
     return () => window.clearInterval(t);
   }, [phase]);
