@@ -529,7 +529,7 @@ export function ReportSheet({
                   {/* 티저는 **어느 쌍의 예시인지**를 밝힌다 — 헤더에서 뺀 정보가 갈 자리가 여기다.
                       홈은 기존 문구 그대로(대표 지시: 홈 UI 불변). */}
                   {sampleTeaser
-                    ? `${sampleData.fromName} × ${sampleData.toName}의 콜라보 분석 예시 리포트예요.`
+                    ? `${sampleData.fromName} × ${sampleData.toName}의 콜라보 분석 리포트 예시예요.`
                     : "예시 리포트예요"}
                 </div>
               )}
