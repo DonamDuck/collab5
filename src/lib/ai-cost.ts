@@ -60,8 +60,10 @@ export function logMeter(m: CallMeter): void {
   );
 }
 
-/** 요청 1건 합계 — "이 리포트 1건 = 몇 원, 어디서 몇 초" 한 줄 요약. */
-export function logTotal(tag: string, meters: CallMeter[]): void {
+/** 요청 1건 합계 — "이 리포트 1건 = 몇 원, 어디서 몇 초" 한 줄 요약.
+ *  ⚠️콜 시간의 **합계**는 벽시계가 아니다(병렬 콜이 겹친다) — 08-07에 대표가 "52.7초 걸렸다"로
+ *  오독한 사고. wallMs를 주면 체감(벽시계)을 따로 찍는다. */
+export function logTotal(tag: string, meters: CallMeter[], wallMs?: number): void {
   if (meters.length === 0) return;
   const krw = meters.reduce((s, m) => s + m.krw, 0);
   const think = meters.reduce((s, m) => s + m.thinkTok, 0);
@@ -70,7 +72,7 @@ export function logTotal(tag: string, meters: CallMeter[]): void {
   const breakdown = meters.map((m) => `${m.label}:${secs(m.ms)}/${won(m.krw)}`).join(" + ");
   console.log(
     `[cost] TOTAL ${tag} calls=${meters.length} ${breakdown} ` +
-      `→ ${won(krw)} / ${secs(ms)} ` +
+      `→ ${won(krw)}${wallMs !== undefined ? ` / 체감 ${secs(wallMs)}` : ""} / 콜합계 ${secs(ms)}(병렬로 겹침) ` +
       `(think=${think}/out=${out}, 사고비중 ${out + think > 0 ? Math.round((think / (out + think)) * 100) : 0}%)`
   );
 }
