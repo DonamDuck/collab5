@@ -167,7 +167,7 @@ const DNA_SCHEMA = {
   required: ["summary", "items", "signature"],
 };
 
-const REPORT_SCHEMA = {
+export const REPORT_SCHEMA = {
   type: Type.OBJECT,
   properties: {
     candidates: {
@@ -205,7 +205,7 @@ const REPORT_SCHEMA = {
 };
 
 // 기발 아이디어(B36) — 생성/심사 2종. 스펙 = 2026-08-06-novel-collab-ideas-design.md
-const NOVEL_GEN_SCHEMA = {
+export const NOVEL_GEN_SCHEMA = {
   type: Type.OBJECT,
   properties: {
     ideas: {
@@ -227,7 +227,7 @@ const NOVEL_GEN_SCHEMA = {
   required: ["ideas"],
 };
 
-const NOVEL_JUDGE_SCHEMA = {
+export const NOVEL_JUDGE_SCHEMA = {
   type: Type.OBJECT,
   properties: {
     judged: {
