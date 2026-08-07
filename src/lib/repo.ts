@@ -38,6 +38,9 @@ export interface Repo {
   getBrandDna(brandId: number): Promise<BrandDna | null>;
   setBrandDna(brandId: number, dna: BrandDna): Promise<void>;
   getLatestCollabReport(fromBrandId: number, toBrandId: number): Promise<{ report: CollabReportData; model: string; createdAt: string } | null>;
+  /** 이 쌍의 리포트를 이 사용자가 요청한 적이 있나 — 소유권을 넘긴 뒤에도 **읽기만** 열어주기 위한 확인(08-07).
+   *  ⚠️소유 검사의 대체가 아니다. 생성(유료 콜)은 여전히 `from.ownerUserId === userId`만 통과한다. */
+  wasCollabReportRequestedBy(fromBrandId: number, toBrandId: number, userId: number): Promise<boolean>;
   insertCollabReport(r: { fromBrandId: number; toBrandId: number; requestedBy: number | null; report: CollabReportData; model: string }): Promise<void>;
   listCollabReportsByUser(userId: number): Promise<CollabReportListItem[]>; // /my 아카이브 — 쌍별 최신 1건
   // ⭐성사된 콜라보 = 북극성. 스펙 = Obsidian [[성사-기록-계측]]
@@ -486,7 +489,7 @@ class InMemoryRepo implements Repo {
   // 그 차이를 prod에서 처음 발견하게 된다.
   private reportsByPair = new Map<
     string,
-    { report: CollabReportData; model: string; createdAt: string; status: "active" | "inactive" }[]
+    { report: CollabReportData; model: string; createdAt: string; status: "active" | "inactive"; requestedBy?: number | null }[]
   >();
   async getBrandDna(brandId: number): Promise<BrandDna | null> {
     return this.dnaByBrand.get(brandId) ?? null;
@@ -498,11 +501,14 @@ class InMemoryRepo implements Repo {
     const list = (this.reportsByPair.get(`${fromBrandId}:${toBrandId}`) ?? []).filter((r) => r.status === "active");
     return list.length > 0 ? list[list.length - 1] : null; // append-only — 마지막 active = 최신
   }
+  async wasCollabReportRequestedBy(fromBrandId: number, toBrandId: number, userId: number): Promise<boolean> {
+    return (this.reportsByPair.get(`${fromBrandId}:${toBrandId}`) ?? []).some((r) => r.requestedBy === userId);
+  }
   async insertCollabReport(r: { fromBrandId: number; toBrandId: number; requestedBy: number | null; report: CollabReportData; model: string }): Promise<void> {
     const key = `${r.fromBrandId}:${r.toBrandId}`;
     const list = this.reportsByPair.get(key) ?? [];
     for (const old of list) old.status = "inactive"; // 먼저 내리고 → 그 다음에 넣는다(Supabase와 동일 순서)
-    list.push({ report: r.report, model: r.model, createdAt: now(), status: "active" });
+    list.push({ report: r.report, model: r.model, createdAt: now(), status: "active", requestedBy: r.requestedBy });
     this.reportsByPair.set(key, list);
   }
   async listCollabReportsByUser(): Promise<CollabReportListItem[]> {
@@ -823,6 +829,18 @@ class SupabaseRepo implements Repo {
       .order("created_at", { ascending: false }).limit(1).maybeSingle();
     if (error) console.error(`[repo] getLatestCollabReport failed ${fromBrandId}→${toBrandId}: ${error.message}`);
     return data ? { report: data.report as CollabReportData, model: data.model as string, createdAt: data.created_at as string } : null;
+  }
+  // 소유권이 떠난 뒤에도 **내가 만들었던** 리포트는 읽게 하려는 확인(08-07). status 무관 — 폐기된 행이라도
+  // "내가 요청했다"는 사실은 남는다(읽기 대상은 getLatestCollabReport가 active만 고르므로 이중 방어).
+  async wasCollabReportRequestedBy(fromBrandId: number, toBrandId: number, userId: number): Promise<boolean> {
+    const { data, error } = await this.db.from("collab_reports").select("id")
+      .eq("from_brand_id", fromBrandId).eq("to_brand_id", toBrandId).eq("requested_by", userId)
+      .limit(1).maybeSingle();
+    if (error) {
+      console.error(`[repo] wasCollabReportRequestedBy failed ${fromBrandId}→${toBrandId}: ${error.message}`);
+      return false; // 실패 시 안전한 쪽(닫힘)으로
+    }
+    return !!data;
   }
   async insertCollabReport(r: { fromBrandId: number; toBrandId: number; requestedBy: number | null; report: CollabReportData; model: string }): Promise<void> {
     // ⚠️**순서가 중요하다 — 먼저 기존 행을 내리고, 그 다음에 넣는다.** 반대로 하면 방금 넣은

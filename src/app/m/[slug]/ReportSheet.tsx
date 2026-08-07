@@ -42,6 +42,8 @@ type OkPayload = {
   model: string;
   durationMs?: number;
   dnaCalls?: number;
+  /** 소유권이 떠난 브랜드의 옛 리포트 — 읽기만 된다(08-07). 재생성 UI를 숨기는 신호. */
+  readOnly?: boolean;
 };
 
 export function ReportSheet({
@@ -155,7 +157,11 @@ export function ReportSheet({
   useEffect(() => {
     if (!open || sampleMode) return;
     // 아카이브 딥링크 — 쌍이 이미 정해져 있으니 선택 스텝을 건너뛰고 바로 실행(캐시면 즉시)
-    if (initialFromSlug && fromBrands.some((b) => b.slug === initialFromSlug)) {
+    // ⚠️**`fromBrands` 포함 여부로 막지 않는다**(08-07 버그): 소유권을 넘긴 브랜드는 내 목록에서 빠지는데
+    //   아카이브 목록은 "내가 요청한 것" 기준이라 카드가 남는다 → 검문에 걸려 **선택 화면으로 떨어졌다**
+    //   (08-06 아그레아블 이전 후 실제 발생). 판정은 서버가 한다 — 내가 요청했던 쌍이면 읽기 전용으로 열어주고,
+    //   아니면 403 → 아래 error phase. 클라가 미리 막으면 정당한 열람까지 함께 막힌다.
+    if (initialFromSlug) {
       setSelectedSlug(initialFromSlug);
       run(initialFromSlug);
       return;
@@ -298,6 +304,12 @@ export function ReportSheet({
           >
             이 내용으로 콜라보 과정 시작하기
           </button>
+          {/* 넘긴 브랜드의 보관본(08-07) — 왜 다시 만들 수 없는지 한 줄로. 없으면 "왜 갱신이 안 되지"가 된다. */}
+          {result?.readOnly && (
+            <p className="mt-3 rounded-md border border-hairline bg-surface-soft px-3 py-2 text-[13px] leading-relaxed text-mute">
+              🗄 예전에 만들어 둔 보관본이에요. 이 소개서는 이제 다른 분 것이라 새로 분석할 수는 없어요.
+            </p>
+          )}
           {/* 다른 소개서로 분석 — 상단 바에서 이사(07-31). 제안 버튼 아래 보조 위치로 격 낮춤. */}
           {fromBrands.length > 1 && (
             <button

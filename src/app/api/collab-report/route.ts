@@ -52,6 +52,22 @@ export async function POST(req: Request) {
     ]);
     if (!from || !to) return NextResponse.json({ error: "notfound" }, { status: 404 });
     if (from.ownerUserId !== userId) {
+      // 🗄 **넘긴 브랜드의 옛 리포트는 읽기만 허용**(대표 확정 08-07, B안).
+      //   왜: 아카이브 목록은 "내가 요청한 것" 기준이라 소유권을 넘겨도 카드가 남는데, 열면 여기서 403이 났다
+      //   (08-06 아그레아블을 지인 계정으로 이전 → /my 리포트 탭에서 그 카드가 선택 화면으로 떨어짐).
+      //   ⭐읽기(저장본)와 만들기(유료 콜)를 가른다 — **새로 만드는 건 여전히 내 브랜드만**.
+      //   내가 요청했던 기록이 있을 때만 열어준다(남의 쌍을 훔쳐보는 경로가 되지 않게).
+      const mine = await repo.wasCollabReportRequestedBy(from.id, to.id, userId);
+      const archived = mine ? await repo.getLatestCollabReport(from.id, to.id) : null;
+      if (archived) {
+        return NextResponse.json({
+          state: "ok",
+          report: archived.report,
+          cached: true,
+          model: archived.model,
+          readOnly: true, // 클라: 소유권이 떠나 재생성 불가 — 안내만 띄우고 [다시 분석] 숨김
+        });
+      }
       return NextResponse.json({ error: "forbidden" }, { status: 403 }); // from은 내 브랜드만
     }
     if (from.id === to.id) return NextResponse.json({ error: "self" }, { status: 400 });
