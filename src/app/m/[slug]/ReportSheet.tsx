@@ -8,6 +8,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useDismissable } from "@/components/useDismissable";
 import { collabMethodLabel } from "@/lib/dna-pool";
+import { orderIdeaCards } from "@/lib/report-cards";
 import { track } from "@/lib/track";
 import type { CollabReportData } from "@/lib/types";
 import sampleData from "@/lib/sample-report.json";
@@ -241,26 +242,9 @@ export function ReportSheet({
   //    한줄 요약 박스는 폐지했다 — ideas[0]의 축약이라 정보가 겹쳤다(대표 확정, 실쌍 11개 10라운드).
   //    빈자리를 메운 게 아니라 **제품이 파는 것(아이디어)을 얼굴로 세운 정보 위계 재설계**다.
   //    새 사다리: 카드제목 16 → 섹션헤더 15 → 본문 14 → 메타 13. **18 슬롯은 은퇴**.
-  // ⭐아이디어 카드 한 줄 세우기(08-06 대표 확정) — 기발 아이디어는 **별도 섹션이 아니라 같은 섹션**에 섞는다.
-  //   고객은 섹션이 왜 나뉘는지 모르므로, 구분은 제목이 아니라 **태그**가 한다.
-  //   순서 = ①추천(기존 1등) ②확장(기발) ③나머지 기존. 태그 달린 카드가 위로 온다.
-  const ideaCards: {
-    title: string; desc: string; method?: string;
-    tag?: "추천" | "확장"; gains?: string[];
-  }[] = report
-    ? [
-        ...report.ideas.slice(0, 1).map((i) => ({ ...i, tag: "추천" as const })),
-        ...(report.novelIdeas ?? []).map((n) => ({
-          title: n.title,
-          desc: n.desc,
-          method: n.method,
-          tag: "확장" as const,
-          // 주어를 지우고 불릿으로만 — 빈 값은 버린다(둘 다 비면 구분선도 안 생긴다)
-          gains: [n.gainA, n.gainB].map((s) => s.trim()).filter(Boolean),
-        })),
-        ...report.ideas.slice(1),
-      ]
-    : [];
+  // ⭐아이디어 카드 순서 — 정본은 `lib/report-cards.ts`. `/my` 아카이브 카드의 칩도 같은 함수를 쓴다
+  //   (08-07: 여기에만 규칙이 있어서 카드 칩 순서와 시트 순서가 어긋났다 — 1팀 지적).
+  const ideaCards = orderIdeaCards(report);
 
   const pieces = report && (
     <div>

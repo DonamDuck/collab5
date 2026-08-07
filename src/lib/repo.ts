@@ -5,6 +5,7 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { BrandDna, Collab, CollabCard, CollabInput, CollabOrigin, CollabReportData, CollabReportListItem, CollabStatus, CollabType, Maker, MakerStatus, Reaction, ViewEvent } from "./types";
 import { kstIso } from "./time";
+import { orderedIdeaTitles } from "./report-cards";
 
 export interface Repo {
   // 업체
@@ -524,7 +525,7 @@ class InMemoryRepo implements Repo {
         fromSlug: from.slug, fromName: from.name, toSlug: to.slug, toName: to.name,
         toRegion: topRegion(to.region),
         matchPoint: latest.report.matchPoints?.[0]?.text,
-        ideaTitles: (latest.report.ideas ?? []).map((i) => i.title).filter(Boolean).slice(0, 3),
+        ideaTitles: orderedIdeaTitles(latest.report),
         effect: latest.report.effects?.[0],
         createdAt: latest.createdAt,
         report: latest.report,
@@ -897,7 +898,7 @@ class SupabaseRepo implements Repo {
         // ⚠️ 구 캐시 행에는 report.oneLiner가 그대로 남아 있다(폐지 2026-08-01) — 읽지 않고 버린다.
         //    아래 접근은 전부 옵셔널 체이닝이라 필드 구성이 달라진 옛 행도 터지지 않는다.
         matchPoint: r.report?.matchPoints?.[0]?.text,
-        ideaTitles: (r.report?.ideas ?? []).map((i) => i.title).filter(Boolean).slice(0, 3),
+        ideaTitles: orderedIdeaTitles(r.report),
         effect: r.report?.effects?.[0],
         createdAt: r.created_at,
         report: r.report, // 시트가 이걸 바로 그린다 — 열 때 API 재왕복 없음(08-07)
