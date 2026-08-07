@@ -202,7 +202,7 @@ export default async function MakerPage({
         </div>
       )}
 
-      {/* 하단 고정 플로팅 액션바 — 찜 + 콜라보 시작하기(UI) + 링크복사 */}
+      {/* 하단 고정 플로팅 액션바 — 찜 + 콜라보 제안 시작하기(UI) + 링크복사 */}
       <MakerActionBar
         slug={slug}
         makerId={maker.id}

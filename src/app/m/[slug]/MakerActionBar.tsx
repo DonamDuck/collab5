@@ -367,7 +367,7 @@ export function MakerActionBar({
   const proposePrimaryLabel = !channel
     ? "이메일 주소 복사"
     : isInstagram
-      ? "인스타 DM 보내기"
+      ? "인스타 DM으로 이동"
       : "채널 열고 보내기";
 
   // 소개서 링크 복사 — copyText + flash로 정리(pill 라벨은 정적 고정).
@@ -558,13 +558,13 @@ export function MakerActionBar({
                 >
                   콜라보 분석
                 </button>
-                {/* 콜라보 시작하기 — primary */}
+                {/* 콜라보 제안 시작하기 — primary */}
                 <button
                   type="button"
                   onClick={handlePropose}
                   className="flex h-12 flex-1 items-center justify-center rounded-md bg-primary text-base font-medium text-primary-on transition-colors"
                 >
-                  콜라보 시작하기
+                  콜라보 제안 시작하기
                 </button>
               </>
             )}
@@ -616,11 +616,11 @@ export function MakerActionBar({
               {channel ? (
                 <>
                   <p className="mt-2 text-[15px] leading-relaxed text-mute">
-                    아직 앱 내 채팅은 준비 중이에요.
+                    앱 내 채팅 기능은 준비 중이에요.
                     <br />
-                    그전까지는 아래 메시지를 복사해 {isInstagram ? "인스타그램으로" : "아래 채널로"} 연락해보세요.
+                    그전까지는 아래 메시지를 복사해 {isInstagram ? "인스타그램으로" : "아래 채널로"} 편하게 연락해보세요.
                   </p>
-                  <label className="mt-3 block text-[13px] font-medium text-body">메시지 초안 (자유롭게 수정해보세요)</label>
+                  <label className="mt-3 block text-[13px] font-medium text-body">메세지 초안 (자유롭게 수정해보세요)</label>
                   <textarea
                     value={message}
                     onChange={(e) => setMessage(e.target.value)}
@@ -633,12 +633,12 @@ export function MakerActionBar({
               ) : contactEmail ? (
                 <>
                   <p className="mt-2 text-[15px] leading-relaxed text-mute">
-                    아직 앱 내 채팅은 준비 중이에요.
+                    앱 내 채팅 기능은 준비 중이에요.
                     <br />
-                    그전까지는 아래 이메일로 연락해보세요.
+                    그전까지는 아래 이메일로 편하게 연락해보세요.
                   </p>
                   <p className="mt-3 text-[14px] text-body break-all select-all">{contactEmail}</p>
-                  <label className="mt-3 block text-[13px] font-medium text-body">메시지 초안 (자유롭게 수정해보세요)</label>
+                  <label className="mt-3 block text-[13px] font-medium text-body">메세지 초안 (자유롭게 수정해보세요)</label>
                   <textarea
                     value={message}
                     onChange={(e) => setMessage(e.target.value)}
@@ -666,7 +666,7 @@ export function MakerActionBar({
                     onClick={copyMessageOnly}
                     className="flex h-12 flex-1 items-center justify-center rounded-md border border-border-strong bg-surface text-[15px] font-medium text-ink"
                   >
-                    메시지 초안 복사
+                    메세지 복사
                   </button>
                   <button
                     type="button"

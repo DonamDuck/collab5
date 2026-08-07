@@ -419,7 +419,7 @@ export function ReportSheet({
             }}
             className="mt-3 flex h-12 w-full items-center justify-center rounded-md bg-primary text-base font-medium text-primary-on"
           >
-            이 내용으로 콜라보 과정 시작하기
+            콜라보 제안 시작하기
           </button>
           {/* 넘긴 브랜드의 보관본(08-07) — 왜 다시 만들 수 없는지 한 줄로. 없으면 "왜 갱신이 안 되지"가 된다. */}
           {result?.readOnly && (
@@ -496,10 +496,15 @@ export function ReportSheet({
               {/* ⚠️ "다른 소개서로 분석"은 여기 안 둔다(07-31 대표 QA) — 이 줄엔 원래도 캡션+버튼+닫기가
                   붙어살아 좁았는데, 업체명이 길면 "캔버스가든 × 콜…"처럼 잘렸다. 그 버튼을 아래 CTA
                   블록(제안 보내기 버튼 밑)으로 옮기면 이 줄엔 캡션과 닫기만 남아 truncate가 훨씬 덜 걸린다. */}
-              {/* ⚠️티저에선 쌍 캡션을 비운다 — 여긴 "지금 보는 리포트가 누구 것인가" 자리라,
-                  예시 쌍 이름이 여기 있으면 **내가 연 브랜드의 분석**으로 읽힌다(위 sampleTeaser 주석). */}
+              {/* ⭐티저는 **쌍 이름만 두지 않고 "예시"까지 한 문장으로** 넣는다(대표 08-07 2차).
+                  쌍 이름만 두면 *내가 연 브랜드의 분석*으로 읽히는데(1차 사고), 문장으로 쓰면
+                  같은 자리가 오히려 **예시임을 못 박는 자리**가 된다 — 헤더는 스크롤해도 안 사라지므로
+                  본문 회색 박스보다 이 정보가 있기에 더 나은 곳이다(그래서 아래 박스는 뺐다).
+                  ⚠️여기만 13px·mute·두 줄 허용 — 문장이라 15px·truncate면 "…리포트 예…"로 잘린다. */}
               {sampleTeaser ? (
-                <span aria-hidden="true" />
+                <p className="min-w-0 flex-1 text-[13px] leading-snug font-medium break-keep text-mute">
+                  {sampleData.fromName} × {sampleData.toName}의 콜라보 분석 리포트 예시예요.
+                </p>
               ) : (
                 <p className="min-w-0 flex-1 truncate text-[15px] font-semibold text-body">
                   {fromName} × {reportToName}
@@ -516,21 +521,23 @@ export function ReportSheet({
               }`}
             >
               {/* 티저 최상단 — **왜 예시를 보고 있는지**를 리포트보다 먼저 말한다(대표 지시 08-07).
-                  이게 없으면 리포트가 띡 하고 나와서 "내 분석인가?"로 읽힌다. */}
+                  이게 없으면 리포트가 띡 하고 나와서 "내 분석인가?"로 읽힌다.
+                  ⭐크기 16→**20**(대표 08-07 2차): 16 bold ink는 바로 아래 섹션헤더(15 bold ink)와
+                    **한 급 차이도 안 나서** 둘이 겹쳐 보였다. 20은 시트 최상단 안내 타이틀의 기존 슬롯이다
+                    (`phase==="select"`의 "어떤 소개서로 분석할까요"와 같은 `text-xl`) — 새 크기를 만든 게
+                    아니라 **같은 역할엔 같은 크기**를 쓴 것. 리포트 본문 사다리(16→15→14→13)는 그대로. */}
               {sampleTeaser && (
-                <p className="mb-3 text-[16px] font-bold leading-snug break-keep text-ink">
+                <p className="mb-4 text-xl font-bold leading-snug break-keep text-ink">
                   콜라보 분석은 내 소개서 작성 후 가능해요.
                   <br />
                   우선 예시 리포트를 보여드릴게요.
                 </p>
               )}
-              {sampleMode && (
+              {/* 회색 박스는 **홈 전용으로 남았다** — 티저는 같은 정보를 위 고정 헤더로 올렸다(대표 08-07 2차).
+                  본문에 두면 타이틀과 섹션헤더 사이에 끼어 덩어리가 셋이 되고, 스크롤하면 사라진다. */}
+              {sampleMode && !sampleTeaser && (
                 <div className="mb-4 rounded-md bg-surface-soft px-3 py-2 text-[13px] font-medium leading-relaxed break-keep text-body">
-                  {/* 티저는 **어느 쌍의 예시인지**를 밝힌다 — 헤더에서 뺀 정보가 갈 자리가 여기다.
-                      홈은 기존 문구 그대로(대표 지시: 홈 UI 불변). */}
-                  {sampleTeaser
-                    ? `${sampleData.fromName} × ${sampleData.toName}의 콜라보 분석 리포트 예시예요.`
-                    : "예시 리포트예요"}
+                  예시 리포트예요
                 </div>
               )}
               {pieces}
