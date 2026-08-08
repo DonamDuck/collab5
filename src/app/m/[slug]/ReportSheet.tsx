@@ -59,6 +59,7 @@ export function ReportSheet({
   sampleMode,
   onPropose,
   initialFromSlug = null,
+  restoreOnOpen = false,
   initialReport = null,
   initialReadOnly = false,
   initialFromName,
@@ -74,6 +75,9 @@ export function ReportSheet({
   sampleMode: boolean; // 소개서 0개 유저 — 샘플 리포트 티저
   onPropose: () => void; // CTA — 리포트 닫고 제안 시트 오픈(부모가 처리)
   initialFromSlug?: string | null; // /my 아카이브 딥링크 — 이 slug로 선택 스텝 없이 바로 실행
+  /** 제안 시트 [← 뒤로]로 다시 열렸다 — **손에 쥔 결과를 버리지 않고 그대로 되살린다**(08-08 대표 QA).
+   *  네트워크·유료 콜 0. 시트를 X로 아예 닫으면 부모가 false로 되돌려, 다음 오픈은 평소대로 처음부터. */
+  restoreOnOpen?: boolean;
   /** 이미 손에 쥔 저장본 — 있으면 **fetch를 아예 하지 않고 즉시 `ok`로 연다**(08-07 대표 지적).
    *  /my 아카이브는 목록 쿼리가 리포트 전문을 이미 읽어왔는데도 시트가 API를 다시 불러
    *  "콜라보 아이디어를 분석하고 있어요"를 띄웠다 — **다시 읽는 화면인데 분석 중이라 말한 것**.
@@ -225,6 +229,14 @@ export function ReportSheet({
   // 칩 변경만으로는 fetch하지 않는다 — [분석하기]를 눌러야 실행(콜 낭비 방지).
   useEffect(() => {
     if (!open || sampleMode) return;
+    // 🔙제안 시트에서 [← 뒤로]로 돌아온 길 — **아무것도 다시 하지 않는다.** 방금 보던 리포트가
+    //   아직 state에 그대로 있으니 그 화면으로 되돌리기만 하면 된다(08-08 대표 QA로 잡은 버그).
+    //   이 가드가 없으면 아래 `fromBrands.length > 1`에 걸려 **소개서 고르는 첫 화면으로 떨어졌다**
+    //   — 뒤로가기가 뒤가 아니라 맨 앞으로 보내던 셈. 소개서가 여러 개인 계정에서 항상 재현된다.
+    if (restoreOnOpen && result) {
+      setPhase("ok");
+      return;
+    }
     // 아카이브 딥링크 — 쌍이 이미 정해져 있으니 선택 스텝을 건너뛰고 바로 실행(캐시면 즉시)
     // ⚠️**`fromBrands` 포함 여부로 막지 않는다**(08-07 버그): 소유권을 넘긴 브랜드는 내 목록에서 빠지는데
     //   아카이브 목록은 "내가 요청한 것" 기준이라 카드가 남는다 → 검문에 걸려 **선택 화면으로 떨어졌다**
