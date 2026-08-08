@@ -9,6 +9,7 @@ import { resolveCollabChannel } from "@/lib/links";
 import { useDismissable } from "@/components/useDismissable";
 import { ReportSheet } from "./ReportSheet";
 import type { CollabReportData } from "@/lib/types";
+import { orderIdeaCards, type IdeaCard } from "@/lib/report-cards";
 
 // 로그인/가입 전에 눌렀던 의도를 보관하는 키(같은 탭 세션 한정) — 복귀 시 자동 재개.
 const PENDING_SAVE_KEY = "collab5:pendingSave";
@@ -70,6 +71,7 @@ export function MakerActionBar({
   const [reportOpen, setReportOpen] = useState(false);
   const [reportSample, setReportSample] = useState(false); // 소개서 0개 유저 — 샘플 리포트 티저
   const [reportInitialFrom, setReportInitialFrom] = useState<string | null>(null); // /my 아카이브 딥링크(?report=fromSlug) — 선택 스텝 건너뛰고 그 쌍을 바로 연다
+  const [restoreReport, setRestoreReport] = useState(false); // 제안 시트 [← 뒤로] — 방금 본 리포트를 그대로 되살린다(아래 backToReport 주석)
   // /my 시트의 제안 CTA에서 `&propose=1`로 넘어왔나 — 리포트가 뜨는 즉시 제안 시트로 넘긴다(1회성).
   // ⚠️ state가 아니라 ref다: 이 값이 바뀌었다고 리렌더가 필요하진 않고, 오히려 state면 리포트 로드 →
   //    리렌더 → 이펙트 재실행 순서에 얽힌다. 소비 즉시 false로 내려 중복 발동을 막는다.
@@ -77,7 +79,13 @@ export function MakerActionBar({
   const [message, setMessage] = useState(""); // 추천 메시지(수정 가능)
   // 콜라보 분석에서 올라온 아이디어 — 제안 시트에서 '+'로 초안에 골라 넣는다(대표 07-31).
   // 분석을 안 돌린 사람에겐 아예 안 뜬다(빈 배열). 샘플 리포트는 올라오지 않는다(ReportSheet에서 차단).
-  const [reportIdeas, setReportIdeas] = useState<CollabReportData["ideas"]>([]);
+  // 🚨**`report.ideas`가 아니라 `orderIdeaCards(report)`다**(08-08 대표 QA로 잡음).
+  //   ideas만 읽으면 **기발 아이디어(`novelIdeas`)가 통째로 빠진다** — 리포트엔 5장이 뜨는데
+  //   DM 시트엔 3장만 나오던 원인이다. 순서도 어긋났다(배열 규칙의 정본은 `orderIdeaCards` —
+  //   교차 배열이든 뭐든 그쪽이 바뀌면 여기도 자동으로 따라간다. 규칙을 여기 베껴 적지 말 것).
+  //   ⭐`report-cards.ts`는 "화면과 목록이 같은 순서를 봐야 한다"고 08-07에 뽑아낸 파일인데,
+  //     그때 소비자를 둘(시트·/my)만 세고 **여기 세 번째를 놓쳤다.**
+  const [reportIdeas, setReportIdeas] = useState<IdeaCard[]>([]);
   const [addedIdeas, setAddedIdeas] = useState<number[]>([]);
   const [toast, setToast] = useState<string | null>(null); // 복사 완료 토스트(3종 통일)
   const [selectedSlug, setSelectedSlug] = useState(viewerBrands[0]?.slug); // 함께 보낼 내 소개서
@@ -132,7 +140,7 @@ export function MakerActionBar({
     if (selectedBrand && url) msg += `\n\n우선, 저희 소개를 함께 보내드려요.\n${url}`;
     const ideaLines = added
       .map((i) => reportIdeas[i])
-      .filter((idea): idea is CollabReportData["ideas"][number] => !!idea)
+      .filter((idea): idea is IdeaCard => !!idea)
       // ⚠️ 번호 뒤 **공백 필수**(08-02). `1.드립커피`처럼 붙여 쓰면 사람이 쓴 글로 안 보인다 —
       //    DM에서 이런 사소한 흠 하나가 통째로 "기계가 뿌린 것"으로 읽히게 만든다.
       .map((idea, i) => `${i + 1}. ${idea.title} — ${idea.desc}`)
@@ -278,12 +286,14 @@ export function MakerActionBar({
   };
 
   // 콜라보 분석 — 비로그인=로그인 유도 / 소개서 0개=샘플 티저 / 그 외=정상 분석 시트.
-  const handleReport = () => {
+  // `restore` = 제안 시트 [← 뒤로]로 돌아오는 길. 방금 본 리포트를 **그대로 되살린다**(아래 주석 참조).
+  const handleReport = (restore = false) => {
     if (!loggedIn) {
       setLoginReason("report");
       setLoginOpen(true);
       return;
     }
+    setRestoreReport(restore);
     setReportSample(viewerBrands.length === 0);
     setReportOpen(true);
   };
@@ -473,9 +483,14 @@ export function MakerActionBar({
   // 가는 길(분석→제안)은 ReportSheet의 onPropose CTA가 이미 담당하니, 여긴 오는 길만 있으면 된다.
   // 예전엔 본문 안 텍스트 링크("제안 전에 분석을 볼까요?")였는데, 제목 옆 화살표로 격을 낮추고
   // 상시 노출한다 — 분석은 어느 진입 경로에서든 늘 의미 있는 액션이라 조건부로 숨길 이유가 없다.
+  // 제안 시트 [← 뒤로] = **방금 보던 리포트로.** 소개서 고르는 첫 화면이 아니다(08-08 대표 QA).
+  // 🪤버그였던 이유: ReportSheet는 열릴 때마다 "소개서 2개 이상이면 select"로 초기화하는데,
+  //   뒤로가기도 그냥 '다시 열기'라 **손에 쥔 결과를 버리고** 선택 화면으로 떨어졌다.
+  //   대표 계정은 소개서가 10개가 넘어 늘 걸린다. `restore`로 그 초기화만 건너뛴다
+  //   (다시 고르고 싶으면 리포트 안의 「다른 소개서로 분석」이 그대로 있다).
   const backToReport = () => {
     setProposeOpen(false);
-    handleReport();
+    handleReport(true);
   };
 
   return (
@@ -555,7 +570,9 @@ export function MakerActionBar({
                 {ownerCanReport && (
                   <button
                     type="button"
-                    onClick={handleReport}
+                    // ⚠️`onClick={handleReport}` 금지 — 클릭 이벤트가 `restore` 인자로 들어가
+                    //    **버튼을 누를 때마다 '되살리기'가 켜진다**(MouseEvent는 truthy). 감싸서 넘긴다.
+                    onClick={() => handleReport()}
                     className="flex h-12 flex-[0.8] items-center justify-center rounded-md border border-border-strong bg-surface text-base font-medium text-ink transition-colors"
                   >
                     콜라보 분석
@@ -573,7 +590,8 @@ export function MakerActionBar({
                 {/* 콜라보 분석 — 고스트(왼쪽) */}
                 <button
                   type="button"
-                  onClick={handleReport}
+                  // ⚠️감싸서 넘긴다 — 위 버튼 주석 참조(이벤트가 `restore`로 새어 들어간다)
+                  onClick={() => handleReport()}
                   className="flex h-12 flex-[0.8] items-center justify-center rounded-md border border-border-strong bg-surface text-base font-medium text-ink transition-colors"
                 >
                   콜라보 분석
@@ -706,7 +724,7 @@ export function MakerActionBar({
       {/* AI 콜라보 분석 리포트 시트 — CTA는 리포트 닫고 제안 시트로 */}
       <ReportSheet
         onReportLoaded={(r) => {
-          setReportIdeas(r.ideas);
+          setReportIdeas(orderIdeaCards(r)); // ⚠️r.ideas가 아니다 — 기발 아이디어까지, 리포트와 같은 순서로
           // /my에서 "콜라보 과정 시작하기"로 넘어온 경우 — 리포트는 이미 읽었으니 세우지 않고 넘긴다.
           if (autoProposeRef.current) {
             autoProposeRef.current = false; // 1회성 — 뒤로가기·재오픈 때 다시 튀지 않게
@@ -718,8 +736,10 @@ export function MakerActionBar({
         onClose={() => {
           setReportOpen(false);
           setReportInitialFrom(null); // 딥링크 소비 후엔 일반 동선으로 복귀(다음 오픈은 선택 스텝부터)
+          setRestoreReport(false); // 시트를 아예 닫았으면 다음 오픈은 처음부터 — 되살리기는 [← 뒤로] 전용
         }}
         initialFromSlug={reportInitialFrom}
+        restoreOnOpen={restoreReport}
         fromBrands={viewerBrands}
         cachedReports={cachedReports}
         toSlug={slug}
