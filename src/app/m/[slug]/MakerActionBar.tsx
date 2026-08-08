@@ -524,7 +524,16 @@ export function MakerActionBar({
           </div>
 
           {/* 백보드 바 — 흰 배경 + 상단 좌우 라운드. 콜라보 액션 전용 */}
-          <div className="flex items-center gap-2.5 rounded-t-2xl border border-b-0 border-hairline bg-surface px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 shadow-e2">
+          <div className="rounded-t-2xl border border-b-0 border-hairline bg-surface px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-2.5 shadow-e2">
+            {/* 소요시간 사전 고지(08-09 대표 지시) — 분석은 실제로 30초쯤 걸리는데, 누르기 전엔 그걸
+                알 방법이 없어 "멈췄나?" 싶은 대기가 된다. 라벨 안에 "(약 30초)"로 넣어봤더니 왼쪽
+                고스트 버튼 실폭(375px에서 ~148px)보다 라벨이 길어 눌려 보였고, 버튼을 2단으로 바꾸면
+                이번엔 오른쪽 primary와 이름 줄 높이가 어긋났다. → **버튼은 그대로 두고 바 위 한 줄**.
+                라벨은 '무엇을 하는가', 헬퍼는 '얼마가 드는가'로 역할을 나눈다. */}
+            {(ownerUi ? ownerCanReport : true) && (
+              <p className="mb-2 text-[12px] leading-none text-faint">🕐 약 30초면 완료돼요</p>
+            )}
+            <div className="flex items-center gap-2.5">
             {ownerUi ? (
               /* 내 소개서 모드 — '제안'은 자기 자신에게 보내는 거라 말이 안 된다(북극성 퍼널 오염).
                  **분석도 기본은 닫는다**(대표 지시 07-31, 첫 실고객 유입 시점에 원복):
@@ -538,7 +547,7 @@ export function MakerActionBar({
                     onClick={handleReport}
                     className="flex h-12 flex-[0.8] items-center justify-center rounded-md border border-border-strong bg-surface text-base font-medium text-ink transition-colors"
                   >
-                    콜라보 분석 (약 30초)
+                    콜라보 분석
                   </button>
                 )}
                 <a
@@ -556,7 +565,7 @@ export function MakerActionBar({
                   onClick={handleReport}
                   className="flex h-12 flex-[0.8] items-center justify-center rounded-md border border-border-strong bg-surface text-base font-medium text-ink transition-colors"
                 >
-                  콜라보 분석 (약 30초)
+                  콜라보 분석
                 </button>
                 {/* 콜라보 제안 시작하기 — primary */}
                 <button
@@ -568,6 +577,7 @@ export function MakerActionBar({
                 </button>
               </>
             )}
+            </div>
           </div>
         </div>
       </div>
