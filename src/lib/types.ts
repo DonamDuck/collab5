@@ -201,7 +201,10 @@ export interface NovelIdea {
 export interface CollabReportData {
   matchPoints: ReportMatchPoint[];  // 2~4개
   ideas: ReportIdea[];              // 1~3개 — 리포트의 얼굴(첫 섹션)
-  novelIdeas?: NovelIdea[];         // 0~2개 — 없을 수 있다(게이트·겹침으로 전멸 가능). 옛 캐시엔 아예 없음
+  /** ⚰️(은퇴 2026-08-08) 기발 아이디어 별도 칸 — 추천·기발 칸막이를 없애고 `ideas` 하나로 합쳤다.
+   *  **읽기는 계속 지원한다**: 08-06~08 사이에 저장된 리포트에는 이 필드가 있고, 화면은 그걸 그대로 그려야 한다
+   *  (`lib/report-cards.ts`가 ideas 뒤에 이어 붙인다). 새로 만드는 리포트는 이 필드를 채우지 않는다. */
+  novelIdeas?: NovelIdea[];
   steps: string[];                  // 최대 4
   effects: string[];                // 2~3개
 }

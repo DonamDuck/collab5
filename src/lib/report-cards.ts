@@ -17,32 +17,30 @@ export interface IdeaCard {
 
 const gainsOf = (a?: string, b?: string) => [a, b].map((s) => (s ?? "").trim()).filter(Boolean);
 
-/** 리포트 → 화면에 놓을 순서대로. **추천 2 → 기발 1 → 추천 1 → 기발 1** (+남으면 뒤에 이어붙임).
- *  ⭐대표 확정(08-06): 기발 아이디어는 **별도 섹션이 아니라 같은 섹션**에 섞는다 — 고객은 섹션이 왜 나뉘는지 모른다.
- *  🔁3차 확정(08-08): ~~태그로 위계~~ → 태그 철거(태그 없는 카드가 덜 중요해 보였다),
- *    ~~추천 전부→기발 전부~~ → **교차 배열**. 앞 2장으로 신뢰를 쌓고, 색다른 기발을 사이에 끼워
- *    리듬을 만들되 연속 2장으로 읽는 부담이 몰리지 않게 한다. */
+/** 리포트 → 화면에 놓을 순서대로. **`ideas`를 저장된 순서 그대로**(= 서버가 점수순으로 고른 순서).
+ *
+ *  🔁순서 규칙의 역사(전부 대표 확정, 하루에 넷):
+ *    ~~①1등만 위로 빼고 추천·확장 태그~~ → 태그 없는 카드가 덜 중요해 보였다
+ *    ~~②추천 전부 → 기발 전부~~ → ~~③교차 배열(추천2·기발1·추천1·기발1)~~
+ *    ④**칸막이 폐지(08-08)** — 두 씨앗을 한 풀에 합쳐 점수로만 고르니 배열 규칙 자체가 필요 없어졌다.
+ *
+ *  ⚠️`novelIdeas`는 **08-06~08 저장본에만** 있다. 새 리포트는 안 채우지만, 옛 저장본을 열면
+ *    그 카드들이 사라지면 안 되므로 뒤에 이어 붙인다(옛 저장본은 그때의 배열 규칙을 잃을 뿐 내용은 온전하다). */
 export function orderIdeaCards(report: CollabReportData | null | undefined): IdeaCard[] {
   if (!report) return [];
-  const recs: IdeaCard[] = (report.ideas ?? []).map((i) => ({
-    title: i.title,
-    desc: i.desc,
-    method: i.method,
-    gains: gainsOf(i.gainA, i.gainB), // 08-08 이전 저장본엔 없다 — 빈 배열이면 화면이 그 줄을 생략
-  }));
-  const novels: IdeaCard[] = (report.novelIdeas ?? []).map((n) => ({
-    title: n.title,
-    desc: n.desc,
-    method: n.method,
-    gains: gainsOf(n.gainA, n.gainB),
-  }));
-  // 한쪽이 모자라도 순서만 무너지고 카드는 안 사라진다(추천 2 + 기발 0 → 추천만 / 옛 저장본 등)
   return [
-    ...recs.slice(0, 2),
-    ...novels.slice(0, 1),
-    ...recs.slice(2, 3),
-    ...novels.slice(1),
-    ...recs.slice(3),
+    ...(report.ideas ?? []).map((i) => ({
+      title: i.title,
+      desc: i.desc,
+      method: i.method,
+      gains: gainsOf(i.gainA, i.gainB), // 08-08 이전 저장본엔 없다 — 빈 배열이면 화면이 그 줄을 생략
+    })),
+    ...(report.novelIdeas ?? []).map((n) => ({
+      title: n.title,
+      desc: n.desc,
+      method: n.method,
+      gains: gainsOf(n.gainA, n.gainB),
+    })),
   ];
 }
 

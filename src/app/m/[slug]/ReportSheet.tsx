@@ -331,7 +331,7 @@ export function ReportSheet({
                 제목과 폭을 다투지 않고 번호가 공짜로 생긴다(/m ItemLabel `활동 1 · …` 문법과 통일).
                 ⚠️ method는 반드시 collabMethodLabel()을 거친다 — 원문은 16자짜리 Pool 어휘다.
                 🔁~~우측 추천·확장 태그(08-06)~~ 철거(08-08 대표): 두 장에만 태그가 붙으니 **나머지가 덜 중요해
-                  보였다.** 위계는 태그가 아니라 순서로 준다(추천 2→기발 1→추천 1→기발 1, 정본 = lib/report-cards.ts). */}
+                  보였다.** 이제 카드에 종류 구분이 없다 — 한 풀에서 점수순으로 고른 4장이다(정본 = lib/report-cards.ts). */}
             <p className="text-[12px] font-medium tracking-wide text-faint">
               아이디어 {i + 1}
               {idea.method ? ` · ${collabMethodLabel(idea.method)}` : ""}
