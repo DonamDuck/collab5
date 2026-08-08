@@ -17,26 +17,32 @@ export interface IdeaCard {
 
 const gainsOf = (a?: string, b?: string) => [a, b].map((s) => (s ?? "").trim()).filter(Boolean);
 
-/** 리포트 → 화면에 놓을 순서대로. ①추천 전부 ②기발(확장) 전부.
+/** 리포트 → 화면에 놓을 순서대로. **추천 2 → 기발 1 → 추천 1 → 기발 1** (+남으면 뒤에 이어붙임).
  *  ⭐대표 확정(08-06): 기발 아이디어는 **별도 섹션이 아니라 같은 섹션**에 섞는다 — 고객은 섹션이 왜 나뉘는지 모른다.
- *  🔁대표 재확정(08-08): ~~1등만 위로 빼고 태그로 위계~~ → **추천 전부 → 기발 전부**로 단순 배열하고 태그는 뗀다.
- *    태그를 달았더니 **태그 없는 카드가 덜 중요해 보였다**(위계를 주려다 나머지를 깎았다).
- *    기발은 색다른 만큼 읽는 부담도 있어 뒤로 보내는 게 맞다. */
+ *  🔁3차 확정(08-08): ~~태그로 위계~~ → 태그 철거(태그 없는 카드가 덜 중요해 보였다),
+ *    ~~추천 전부→기발 전부~~ → **교차 배열**. 앞 2장으로 신뢰를 쌓고, 색다른 기발을 사이에 끼워
+ *    리듬을 만들되 연속 2장으로 읽는 부담이 몰리지 않게 한다. */
 export function orderIdeaCards(report: CollabReportData | null | undefined): IdeaCard[] {
   if (!report) return [];
+  const recs: IdeaCard[] = (report.ideas ?? []).map((i) => ({
+    title: i.title,
+    desc: i.desc,
+    method: i.method,
+    gains: gainsOf(i.gainA, i.gainB), // 08-08 이전 저장본엔 없다 — 빈 배열이면 화면이 그 줄을 생략
+  }));
+  const novels: IdeaCard[] = (report.novelIdeas ?? []).map((n) => ({
+    title: n.title,
+    desc: n.desc,
+    method: n.method,
+    gains: gainsOf(n.gainA, n.gainB),
+  }));
+  // 한쪽이 모자라도 순서만 무너지고 카드는 안 사라진다(추천 2 + 기발 0 → 추천만 / 옛 저장본 등)
   return [
-    ...(report.ideas ?? []).map((i) => ({
-      title: i.title,
-      desc: i.desc,
-      method: i.method,
-      gains: gainsOf(i.gainA, i.gainB), // 08-08 이전 저장본엔 없다 — 빈 배열이면 화면이 그 줄을 생략
-    })),
-    ...(report.novelIdeas ?? []).map((n) => ({
-      title: n.title,
-      desc: n.desc,
-      method: n.method,
-      gains: gainsOf(n.gainA, n.gainB),
-    })),
+    ...recs.slice(0, 2),
+    ...novels.slice(0, 1),
+    ...recs.slice(2, 3),
+    ...novels.slice(1),
+    ...recs.slice(3),
   ];
 }
 
