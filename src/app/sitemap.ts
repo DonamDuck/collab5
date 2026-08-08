@@ -24,7 +24,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${SITE_URL}/privacy`, changeFrequency: "yearly", priority: 0.2 },
   ];
 
-  // 소개서 — 검색 노출을 켜둔 것만(홈·검색과 같은 조건). 수정하면 lastModified가 따라 올라가
+  // 소개서 — **살아 있는 것 전부**(대표 확정 08-07 2차). [콜라보 찾기에 보이기] 토글은
+  // 사이트 안 목록(홈·`/search`)만 정하고 **웹 검색에는 다 나온다** — `/m`은 어차피 공개 페이지다.
+  // 수정하면 lastModified가 따라 올라가
   // 크롤러가 "이 페이지 바뀌었네"를 안다 = 보강 작업이 색인에 반영되는 통로.
   const makerPages: MetadataRoute.Sitemap = brands.map((b) => ({
     url: `${SITE_URL}/m/${b.slug}`,

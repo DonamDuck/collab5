@@ -1,6 +1,6 @@
 "use client";
 
-// 브랜드 찾기 — 검색어·필터·페이지네이션(클라 상태). **데이터는 서버가 미리 주입한다**(page.tsx).
+// 콜라보 찾기 — 검색어·필터·페이지네이션(클라 상태). **데이터는 서버가 미리 주입한다**(page.tsx).
 // 예전엔 마운트 후 서버액션으로 받아왔는데, 그러면 "페이지 도착 → 하이드레이션 → 요청 → 렌더"라
 // 카드가 한 박자 늦게 떴다. 지금은 첫 페인트에 카드가 함께 온다.
 
@@ -60,7 +60,7 @@ export function SearchClient({ all }: { all: Maker[] }) {
 
   return (
     <main className="mx-auto w-full max-w-[640px] px-4 py-8 sm:px-6 lg:max-w-4xl">
-      <h1 className="text-[28px] font-bold tracking-tight text-ink sm:text-[32px]">브랜드 찾기</h1>
+      <h1 className="text-[28px] font-bold tracking-tight text-ink sm:text-[32px]">콜라보 찾기</h1>
       <p className="mt-2 text-[17px] leading-relaxed text-body">잘 맞는 콜라보 파트너를 찾아보세요.</p>
 
       {/* 검색바 — 데스크탑 폭 캡(QA P2)

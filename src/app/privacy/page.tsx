@@ -3,6 +3,8 @@ import type { Metadata } from "next";
 export const metadata: Metadata = {
   title: "개인정보처리방침 — collab5",
   description: "collab5 개인정보처리방침",
+  // ⚠️루트 `canonical: "/"` 상속 차단 — 안 덮으면 홈의 사본으로 취급된다(terms 주석 참조).
+  alternates: { canonical: "/privacy" },
 };
 
 // 개인정보처리방침 — 기본 템플릿 초안. 서비스 실제 수집 항목(회원가입·소개서) 기준.
