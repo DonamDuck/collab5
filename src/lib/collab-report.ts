@@ -749,15 +749,32 @@ export async function generateReport(
   //   ⏱실측(08-07): 직렬 56s → 이 병렬화 + 심사 사고 low로 ~30s 목표.
   const novelCandsPromise = generateNovelCandidates(contents, reportModel, meters);
   const t0 = Date.now();
-  const res = await ai().models.generateContent({
-    model: reportModel,
-    contents,
-    config: {
-      systemInstruction: REPORT_SYSTEM,
-      responseMimeType: "application/json",
-      responseSchema: REPORT_SCHEMA,
-    },
-  });
+  // ⏱리포트 콜의 사고량 — **파이프라인에서 유일하게 안 낮춘 자리**(기발 생성·심사는 08-07에 low로).
+  //   `REPORT_THINKING=low`로만 켠다(기본=모델 기본값). 이 콜은 뒤에 거름망이 없어 품질이 곧 화면이라,
+  //   대표 블라인드 A/B 전에는 기본값을 바꾸지 않는다. 400 거부 시 옵션 없이 재시도(기발과 동일 패턴).
+  const reportLowThinking = process.env.REPORT_THINKING === "low";
+  const callReport = (withLevel: boolean) =>
+    ai().models.generateContent({
+      model: reportModel,
+      contents,
+      config: {
+        systemInstruction: REPORT_SYSTEM,
+        responseMimeType: "application/json",
+        responseSchema: REPORT_SCHEMA,
+        ...(withLevel && reportLowThinking
+          ? { thinkingConfig: { thinkingLevel: ThinkingLevel.LOW } }
+          : {}),
+      },
+    });
+  let res;
+  try {
+    res = await callReport(true);
+  } catch (e) {
+    const status = (e as { status?: number; code?: number })?.status ?? (e as { code?: number })?.code;
+    if (!reportLowThinking || status !== 400) throw e;
+    console.warn(`[report] ${reportModel} thinkingLevel=low 거부(400) → 옵션 없이 재시도`);
+    res = await callReport(false);
+  }
   const reportMeter = meter("report", reportModel, Date.now() - t0, res.usageMetadata);
   logMeter(reportMeter);
   meters?.push(reportMeter);
