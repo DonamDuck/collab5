@@ -168,7 +168,9 @@ export interface BrandDna {
  *  ⚠️ (은퇴 2026-08-01) oneLiner — 한줄 요약 폐지(대표 확정). ideas[0]의 축약이라 정보 0인 중복이었다.
  *     구 캐시(collab_reports.report jsonb)에는 oneLiner 키가 그대로 남아 있지만 아무도 읽지 않는다. */
 export interface ReportMatchPoint { text: string; }           // ② 접점 (선발 통과분)
-export interface ReportIdea { title: string; desc: string; method: string; } // ③ method=collabMethod 어휘
+/** ③ method=collabMethod 어휘. gainA/gainB = 양쪽에 남는 것 2줄(08-08 대표 — 기발 카드에만 있던 걸 추천에도).
+ *  ⚠️옵셔널인 이유는 **옛 저장본에는 없어서**다(08-08 이전 캐시). 화면은 빈 값이면 그 줄을 통째로 생략한다. */
+export interface ReportIdea { title: string; desc: string; method: string; gainA?: string; gainB?: string; }
 
 /** /my 리포트 아카이브 목록 행 — 쌍별 최신 1건, 요청자 본인 것만(프라이버시 원칙).
  *  리포트 6조각에서 **각 축의 대표 1개씩만** 뽑는다(카드는 미리보기지 축약본이 아니다). */

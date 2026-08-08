@@ -6,33 +6,37 @@
 //    같은 규칙이 두 곳에 흩어지면 한쪽만 고쳐진다.
 import type { CollabReportData } from "./types";
 
-/** 카드 한 장이 화면에 필요로 하는 모든 것. tag가 붙은 카드가 위로 온다. */
+/** 카드 한 장이 화면에 필요로 하는 모든 것. */
 export interface IdeaCard {
   title: string;
   desc: string;
   method?: string;
-  /** 추천 = 기존 아이디어 1등 / 확장 = 기발 아이디어(B36). 없으면 태그 없는 나머지. */
-  tag?: "추천" | "확장";
-  /** 양쪽에 남는 것 — 주어 없는 불릿 문장들(기발 카드에만). 빈 값은 담지 않는다. */
+  /** 양쪽에 남는 것 — 주어 없는 불릿 문장들. 빈 값은 담지 않는다. */
   gains?: string[];
 }
 
-/** 리포트 → 화면에 놓을 순서대로. ①추천(기존 1등) ②확장(기발) ③나머지 기존.
- *  ⭐대표 확정(08-06): 기발 아이디어는 **별도 섹션이 아니라 같은 섹션**에 섞고 태그로 위계를 준다 —
- *  고객은 섹션이 왜 나뉘는지 모른다. */
+const gainsOf = (a?: string, b?: string) => [a, b].map((s) => (s ?? "").trim()).filter(Boolean);
+
+/** 리포트 → 화면에 놓을 순서대로. ①추천 전부 ②기발(확장) 전부.
+ *  ⭐대표 확정(08-06): 기발 아이디어는 **별도 섹션이 아니라 같은 섹션**에 섞는다 — 고객은 섹션이 왜 나뉘는지 모른다.
+ *  🔁대표 재확정(08-08): ~~1등만 위로 빼고 태그로 위계~~ → **추천 전부 → 기발 전부**로 단순 배열하고 태그는 뗀다.
+ *    태그를 달았더니 **태그 없는 카드가 덜 중요해 보였다**(위계를 주려다 나머지를 깎았다).
+ *    기발은 색다른 만큼 읽는 부담도 있어 뒤로 보내는 게 맞다. */
 export function orderIdeaCards(report: CollabReportData | null | undefined): IdeaCard[] {
   if (!report) return [];
-  const ideas = report.ideas ?? [];
   return [
-    ...ideas.slice(0, 1).map((i) => ({ ...i, tag: "추천" as const })),
+    ...(report.ideas ?? []).map((i) => ({
+      title: i.title,
+      desc: i.desc,
+      method: i.method,
+      gains: gainsOf(i.gainA, i.gainB), // 08-08 이전 저장본엔 없다 — 빈 배열이면 화면이 그 줄을 생략
+    })),
     ...(report.novelIdeas ?? []).map((n) => ({
       title: n.title,
       desc: n.desc,
       method: n.method,
-      tag: "확장" as const,
-      gains: [n.gainA, n.gainB].map((s) => (s ?? "").trim()).filter(Boolean),
+      gains: gainsOf(n.gainA, n.gainB),
     })),
-    ...ideas.slice(1),
   ];
 }
 

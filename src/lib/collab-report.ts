@@ -193,10 +193,12 @@ export const REPORT_SCHEMA = {
           title: { type: Type.STRING, description: "15자 내외" },
           desc: { type: Type.STRING, description: "1~2줄" },
           method: { type: Type.STRING, description: "Collab Method Pool 어휘 하나" },
+          gain_a: { type: Type.STRING, description: "A에게 벌어지는 일 한 줄" },
+          gain_b: { type: Type.STRING, description: "B에게 벌어지는 일 한 줄" },
         },
-        required: ["title", "desc", "method"],
+        required: ["title", "desc", "method", "gain_a", "gain_b"],
       },
-      description: "추천 아이디어 1~3개",
+      description: "추천 아이디어 후보 5개(+각자에게 남는 것 2줄)",
     },
     steps: { type: Type.ARRAY, items: { type: Type.STRING }, description: "실행 플랜 최대 4단계" },
     effects: { type: Type.ARRAY, items: { type: Type.STRING }, description: "기대 효과 2~3개" },
@@ -761,7 +763,7 @@ export async function generateReport(
   meters?.push(reportMeter);
   const p = JSON.parse(res.text ?? "{}") as {
     candidates?: ReportCandidate[];
-    ideas?: { title?: unknown; desc?: unknown; method?: unknown }[];
+    ideas?: { title?: unknown; desc?: unknown; method?: unknown; gain_a?: unknown; gain_b?: unknown }[];
     steps?: unknown[];
     effects?: unknown[];
   };
@@ -794,6 +796,9 @@ export async function generateReport(
       title: String(i.title ?? ""),
       desc: String(i.desc ?? ""),
       method: DNA_POOL.collabMethod.includes(method) ? method : "",
+      // 양쪽에 남는 것(08-08 대표) — 기발 카드에만 있던 하단 2줄을 추천에도. 빈 값이면 화면이 알아서 생략한다.
+      gainA: String(i.gain_a ?? ""),
+      gainB: String(i.gain_b ?? ""),
     };
   });
   if (ideaCands.length === 0) return { report: null, candidates };
