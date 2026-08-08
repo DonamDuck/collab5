@@ -190,7 +190,7 @@ export const REPORT_SCHEMA = {
       items: {
         type: Type.OBJECT,
         properties: {
-          title: { type: Type.STRING, description: "15자 내외" },
+          title: { type: Type.STRING, description: "20자 이내, 형식어(워크숍·전시·굿즈 제작 등)로 끝나는 완결된 행사 이름" },
           desc: { type: Type.STRING, description: "1~2줄" },
           method: { type: Type.STRING, description: "Collab Method Pool 어휘 하나" },
           gain_a: { type: Type.STRING, description: "A에게 벌어지는 일 한 줄" },
@@ -215,7 +215,7 @@ export const NOVEL_GEN_SCHEMA = {
       items: {
         type: Type.OBJECT,
         properties: {
-          title: { type: Type.STRING, description: "15자 내외" },
+          title: { type: Type.STRING, description: "20자 이내, 형식어(워크숍·전시·굿즈 제작 등)로 끝나는 완결된 행사 이름" },
           desc: { type: Type.STRING, description: "'~하는 콜라보'로 끝나는 명사구" },
           method: { type: Type.STRING, description: "Collab Method Pool 어휘 하나" },
           gain_a: { type: Type.STRING, description: "A에게 벌어지는 일 한 줄" },
