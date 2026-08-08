@@ -713,20 +713,13 @@ const MOCK_REPORT: CollabReportData = {
 
 /** 리포트 생성 + 서버 채점 선발.
  *  통과 접점 < 2개 또는 아이디어 0개면 { report: null }(no_match — 억지 리포트보다 정직한 빈손). */
-export async function generateReport(
-  a: Maker,
-  aDna: BrandDna,
-  b: Maker,
-  bDna: BrandDna,
-  modelOverride?: string, // A/B 실험 — 라우트가 화이트리스트 검증 후 전달
-  meters?: CallMeter[] // 원가·토큰 실측 누적기(선택)
-): Promise<{ report: CollabReportData | null; candidates: ReportCandidate[] }> {
-  if (!hasKey()) return { report: MOCK_REPORT, candidates: [] };
-
+/** 리포트·기발 생성 콜의 공용 입력 직렬화 — A/B 실측 스크립트가 prod와 **같은 입력 계약**으로
+ *  돌 수 있게 export(08-08). 여기 형식을 바꾸면 저장된 리포트 캐시와의 비교 가능성이 깨진다. */
+export function buildReportContents(a: Maker, aDna: BrandDna, b: Maker, bDna: BrandDna): string {
   const methodPoolText = DNA_POOL.collabMethod
     .map((mth) => `${mth}(${methodIntensity(mth)})`)
     .join(", ");
-  const contents = [
+  return [
     `[브랜드 A(제안자=우리) — ${a.name}]`,
     brandDigest(a).text,
     "",
@@ -742,6 +735,19 @@ export async function generateReport(
     "[Collab Method Pool]",
     methodPoolText,
   ].join("\n");
+}
+
+export async function generateReport(
+  a: Maker,
+  aDna: BrandDna,
+  b: Maker,
+  bDna: BrandDna,
+  modelOverride?: string, // A/B 실험 — 라우트가 화이트리스트 검증 후 전달
+  meters?: CallMeter[] // 원가·토큰 실측 누적기(선택)
+): Promise<{ report: CollabReportData | null; candidates: ReportCandidate[] }> {
+  if (!hasKey()) return { report: MOCK_REPORT, candidates: [] };
+
+  const contents = buildReportContents(a, aDna, b, bDna);
 
   const reportModel = modelOverride || REPORT_MODEL();
   // ⭐기발 후보 생성을 리포트와 **동시에** 출발시킨다 — 입력이 같아서 리포트를 기다릴 이유가 없다.
