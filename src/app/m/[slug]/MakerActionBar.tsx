@@ -538,7 +538,7 @@ export function MakerActionBar({
                     onClick={handleReport}
                     className="flex h-12 flex-[0.8] items-center justify-center rounded-md border border-border-strong bg-surface text-base font-medium text-ink transition-colors"
                   >
-                    콜라보 분석
+                    콜라보 분석 (약 30초)
                   </button>
                 )}
                 <a
@@ -556,7 +556,7 @@ export function MakerActionBar({
                   onClick={handleReport}
                   className="flex h-12 flex-[0.8] items-center justify-center rounded-md border border-border-strong bg-surface text-base font-medium text-ink transition-colors"
                 >
-                  콜라보 분석
+                  콜라보 분석 (약 30초)
                 </button>
                 {/* 콜라보 제안 시작하기 — primary */}
                 <button
