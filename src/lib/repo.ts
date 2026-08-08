@@ -6,6 +6,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { BrandDna, Collab, CollabCard, CollabInput, CollabOrigin, CollabReportData, CollabReportListItem, CollabStatus, CollabType, Maker, MakerStatus, Reaction, ViewEvent } from "./types";
 import { kstIso } from "./time";
 import { orderedIdeaTitles } from "./report-cards";
+import { isDemoSlug } from "./demo";
 
 export interface Repo {
   // 업체
@@ -13,6 +14,8 @@ export interface Repo {
   getMakerBySlug(slug: string): Promise<Maker | null>;
   getMakerById(id: number): Promise<Maker | null>;
   updateMakerContent(slug: string, content: Omit<Maker, "id" | "slug" | "createdAt" | "ownerUserId" | "editPasswordHash" | "status">): Promise<Maker | null>;
+  /** ⚠️`searchVisible` = 화면상 **[콜라보 찾기에 보이기]**(홈·`/search` 목록). 08-07 개명 전 이름이
+   *  「검색에 보이기」라 웹 검색으로 오해됐는데, **구글·네이버 노출과는 무관**하다(사이트맵은 전부 싣는다). */
   setMakerFlags(slug: string, flags: { searchVisible?: boolean }): Promise<Maker | null>;
   setMakerOwner(slug: string, ownerUserId: number): Promise<void>;
   setMakerPasswordHash(slug: string, hash: string): Promise<void>;
@@ -453,8 +456,9 @@ class InMemoryRepo implements Repo {
       .slice(0, limit);
   }
   async listSitemapBrands(): Promise<{ slug: string; updatedAt: string }[]> {
+    // ⚠️`searchVisible`로 거르지 않는다 — 사이트맵은 웹 검색용(Supabase 구현 주석 참조).
     return this.makers
-      .filter((m) => m.searchVisible && m.status !== "inactive")
+      .filter((m) => m.status !== "inactive" && !isDemoSlug(m.slug))
       .map((m) => ({ slug: m.slug, updatedAt: m.updatedAt || m.createdAt }));
   }
 
@@ -754,12 +758,16 @@ class SupabaseRepo implements Repo {
     return (data ?? []).map((r) => rowToMaker(r as MakerRow));
   }
   async listSitemapBrands(): Promise<{ slug: string; updatedAt: string }[]> {
-    // 조건은 홈·검색과 **같은 두 개**(search_visible + active) — 검색에 안 보이기로 한 소개서가
-    // 구글엔 뜨는 일이 없게. 상한 1000은 폭주 방지선이지 정책이 아니다(넘으면 분할 사이트맵을 쓴다).
+    // ⭐조건은 `status='active'` **하나뿐**이다(대표 확정 08-07 2차) — 사이트맵은 **웹 검색**용이라
+    //   `search_visible` 토글과 무관하게 전부 싣는다. 그 토글은 이제 이름 그대로
+    //   **`콜라보 찾기`(사이트 안 목록)에 보일지**만 정한다(홈 캐러셀·/search).
+    //   근거: `/m/{slug}`는 원래 토글과 상관없이 **누구나 열리는 공개 페이지**다(링크 공유가 그 용도).
+    //   이미 공개인 페이지를 구글에만 숨기는 건 사장님을 지켜주지 못하면서 유입만 깎는다.
+    //   ⚠️`inactive`(삭제된 소개서)는 계속 뺀다 — 그건 열면 404다.
+    // 상한 1000은 폭주 방지선이지 정책이 아니다(넘으면 분할 사이트맵을 쓴다).
     const { data, error } = await this.db
       .from("brands")
       .select("slug, updated_at, created_at")
-      .eq("search_visible", true)
       .eq("status", "active")
       .order("updated_at", { ascending: false })
       .limit(1000);
@@ -769,10 +777,15 @@ class SupabaseRepo implements Repo {
       return [];
     }
     type Row = { slug: string; updated_at: string | null; created_at: string };
-    return (data ?? []).map((r) => {
-      const row = r as Row;
-      return { slug: row.slug, updatedAt: row.updated_at || row.created_at };
-    });
+    return (data ?? [])
+      .map((r) => {
+        const row = r as Row;
+        return { slug: row.slug, updatedAt: row.updated_at || row.created_at };
+      })
+      // ⛔데모 복제본만 예외 — `m-demo-*`는 캔버스가든 소개서를 **글자 그대로 복사**한 것이라
+      //   색인되면 진짜 소개서와 똑같은 내용이 둘이 되고, 검색엔진이 둘 중 뭘 보여줄지 자기가 고른다
+      //   (robots.ts가 `/preview`를 막는 것과 같은 이유 — 사장님 페이지의 힘을 데모가 나눠 갖는다).
+      .filter((b) => !isDemoSlug(b.slug));
   }
   // /my 토글 — 소유자 검증은 actions에서. search_visible 만 부분 갱신.
   async setMakerFlags(

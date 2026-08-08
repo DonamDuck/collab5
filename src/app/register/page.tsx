@@ -2183,13 +2183,15 @@ function RegisterForm() {
           </Field>
         </div>
 
-        {/* 검색 노출 — 07-31부터 이 한 토글이 '콜라보 받는 중'을 겸한다(collab_open 폐지) */}
+        {/* 목록 노출 — 07-31부터 이 한 토글이 '콜라보 받는 중'을 겸한다(collab_open 폐지).
+            🆕08-07 개명: 「검색에 보이기」→「콜라보 찾기에 보이기」. 옛 이름은 **웹 검색(구글·네이버)**으로
+            읽혔는데, 이 토글이 정하는 건 사이트 안 [콜라보 찾기] 목록뿐이다(웹 검색은 전부 열려 있다). */}
         <div className="space-y-2">
           <div className="flex items-center justify-between gap-3 rounded-lg border border-hairline bg-surface px-4 py-3">
             <div>
-              <p className="text-[15px] font-medium text-ink">검색에 보이기</p>
+              <p className="text-[15px] font-medium text-ink">콜라보 찾기에 보이기</p>
               <p className="text-[13px] leading-relaxed break-keep text-mute">
-                켜두면 다른 브랜드가 검색으로 찾아와 콜라보를 제안할 수 있어요. 꺼두면 검색에 안 뜨고, 링크로는 계속 공유할 수 있어요.
+                켜두면 다른 브랜드가 [콜라보 찾기]에서 나를 발견해 콜라보를 제안할 수 있어요. 꺼두면 목록에 안 뜨고, 링크로는 계속 공유할 수 있어요.
               </p>
             </div>
             <button
@@ -2197,7 +2199,7 @@ function RegisterForm() {
               onClick={() => setSearchVisible((v) => !v)}
               role="switch"
               aria-checked={searchVisible}
-              aria-label="검색에 보이기"
+              aria-label="콜라보 찾기에 보이기"
               className={`flex h-[26px] w-11 shrink-0 items-center rounded-pill p-[2px] transition-colors ${
                 searchVisible ? "bg-primary" : "bg-border-strong"
               }`}

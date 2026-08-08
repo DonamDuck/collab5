@@ -524,7 +524,27 @@ export function MakerActionBar({
           </div>
 
           {/* 백보드 바 — 흰 배경 + 상단 좌우 라운드. 콜라보 액션 전용 */}
-          <div className="flex items-center gap-2.5 rounded-t-2xl border border-b-0 border-hairline bg-surface px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 shadow-e2">
+          {/* 하단 여백은 `max()`다(08-09). `calc(0.75rem + env())`로 더하면 홈 인디케이터가 있는
+              기기에서 12+34=46px이 되어 대표 실기기에서 "여백이 넓다"로 잡혔다(데스크톱 개발자도구는
+              env()를 0으로 주기 때문에 12px로 멀쩡해 보인다 — 기기 차이의 정체가 이것). max()면
+              인디케이터가 있는 기기는 정확히 안전영역(34px)만, 없는 기기는 12px를 쓴다. */}
+          <div className="rounded-t-2xl border border-b-0 border-hairline bg-surface px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2.5 shadow-e2">
+            {/* 소요시간 사전 고지(08-09 대표 지시) — 분석은 실제로 30초쯤 걸리는데, 누르기 전엔 그걸
+                알 방법이 없어 "멈췄나?" 싶은 대기가 된다. 라벨 안에 "(약 30초)"로 넣어봤더니 왼쪽
+                고스트 버튼 실폭(375px에서 ~148px)보다 라벨이 길어 눌려 보였고, 버튼을 2단으로 바꾸면
+                이번엔 오른쪽 primary와 이름 줄 높이가 어긋났다. → **버튼은 그대로 두고 바 위 한 줄**.
+                라벨은 '무엇을 하는가', 헬퍼는 '얼마가 드는가'로 역할을 나눈다. */}
+            {/* 헬퍼는 아래 버튼 행과 **같은 flex 비율**을 써서 분석 버튼 위 정중앙에 앉는다(대표 08-09).
+                바 기준 좌측 정렬이면 어느 버튼 얘긴지가 위치로 안 드러난다. */}
+            {(ownerUi ? ownerCanReport : true) && (
+              <div className="mb-2 flex items-center gap-2.5">
+                <p className="flex-[0.8] text-center text-[12px] leading-none text-faint">
+                  🕐 약 30초면 완료돼요
+                </p>
+                <span className="flex-1" aria-hidden="true" />
+              </div>
+            )}
+            <div className="flex items-center gap-2.5">
             {ownerUi ? (
               /* 내 소개서 모드 — '제안'은 자기 자신에게 보내는 거라 말이 안 된다(북극성 퍼널 오염).
                  **분석도 기본은 닫는다**(대표 지시 07-31, 첫 실고객 유입 시점에 원복):
@@ -568,6 +588,7 @@ export function MakerActionBar({
                 </button>
               </>
             )}
+            </div>
           </div>
         </div>
       </div>

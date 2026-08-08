@@ -3,6 +3,9 @@ import type { Metadata } from "next";
 export const metadata: Metadata = {
   title: "이용약관 — collab5",
   description: "collab5 서비스 이용약관",
+  // ⚠️필수 — 루트 layout의 `canonical: "/"`가 **자식 페이지에 그대로 상속된다.**
+  //   안 덮으면 구글은 이 페이지를 "홈의 사본"으로 보고 색인에서 뺀다(08-07 발견).
+  alternates: { canonical: "/terms" },
 };
 
 // 이용약관 — 기본 템플릿 초안. collab5(브랜드 소개서·콜라보 연결 서비스) 기준.

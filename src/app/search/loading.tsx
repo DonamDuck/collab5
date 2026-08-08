@@ -1,4 +1,4 @@
-// 브랜드 찾기 로딩 — 이동 즉시 표시. 스피너 대신 **실제 레이아웃의 스켈레톤**을 그린다.
+// 콜라보 찾기 로딩 — 이동 즉시 표시. 스피너 대신 **실제 레이아웃의 스켈레톤**을 그린다.
 // 목록 화면은 "무엇이 올지" 모양이 정해져 있어, 뼈대를 먼저 보여주면 체감 대기가 짧고
 // 데이터 도착 시 레이아웃이 덜컹거리지 않는다(제목·검색바는 정적이라 진짜 내용으로 그린다).
 const CARDS = 6;
@@ -6,7 +6,7 @@ const CARDS = 6;
 export default function Loading() {
   return (
     <main className="mx-auto w-full max-w-[640px] px-4 py-8 sm:px-6 lg:max-w-4xl">
-      <h1 className="text-[28px] font-bold tracking-tight text-ink sm:text-[32px]">브랜드 찾기</h1>
+      <h1 className="text-[28px] font-bold tracking-tight text-ink sm:text-[32px]">콜라보 찾기</h1>
       <p className="mt-2 text-[17px] leading-relaxed text-body">잘 맞는 콜라보 파트너를 찾아보세요.</p>
 
       <div className="mt-5 h-11 max-w-xl animate-pulse rounded-pill bg-surface-soft" />
