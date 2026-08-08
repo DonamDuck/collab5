@@ -318,25 +318,12 @@ export function ReportSheet({
             {/* 아이브로 — method를 제목 오른쪽 칩에서 윗줄로 올렸다(07-31 제목 4줄 사고 재발 방지).
                 제목과 폭을 다투지 않고 번호가 공짜로 생긴다(/m ItemLabel `활동 1 · …` 문법과 통일).
                 ⚠️ method는 반드시 collabMethodLabel()을 거친다 — 원문은 16자짜리 Pool 어휘다.
-                ⭐우측 태그(08-06 대표 확정): 기발 아이디어를 **별도 섹션으로 떼지 않고** 같은 섹션에서
-                  태그로 위계를 준다 — 고객은 섹션이 왜 나뉘는지 모른다. 태그 달린 카드가 위로 온다. */}
-            <div className="flex items-start justify-between gap-2">
-              <p className="text-[12px] font-medium tracking-wide text-faint">
-                아이디어 {i + 1}
-                {idea.method ? ` · ${collabMethodLabel(idea.method)}` : ""}
-              </p>
-              {idea.tag && (
-                <span
-                  className={`shrink-0 rounded-pill px-2 py-0.5 text-[11px] font-bold ${
-                    idea.tag === "추천"
-                      ? "bg-primary-tint text-primary-on"
-                      : "bg-corn-pale text-corn-on"
-                  }`}
-                >
-                  {idea.tag}
-                </span>
-              )}
-            </div>
+                🔁~~우측 추천·확장 태그(08-06)~~ 철거(08-08 대표): 두 장에만 태그가 붙으니 **나머지가 덜 중요해
+                  보였다.** 위계는 태그가 아니라 순서로 준다(추천 전부 → 기발 전부, 정본 = lib/report-cards.ts). */}
+            <p className="text-[12px] font-medium tracking-wide text-faint">
+              아이디어 {i + 1}
+              {idea.method ? ` · ${collabMethodLabel(idea.method)}` : ""}
+            </p>
             <p className="mt-1.5 text-[16px] font-bold leading-snug break-keep text-ink">
               {idea.title}
             </p>
