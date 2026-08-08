@@ -818,11 +818,26 @@ export async function generateReport(
   return {
     report: {
       matchPoints,
-      ideas,
-      novelIdeas,
+      ideas: ideas.map((i) => ({ ...i, gainA: gateJargon(i.gainA, "gainA"), gainB: gateJargon(i.gainB, "gainB") })),
+      novelIdeas: novelIdeas.map((n) => ({ ...n, gainA: gateJargon(n.gainA, "novel.gainA"), gainB: gateJargon(n.gainB, "novel.gainB") })),
       steps: (p.steps ?? []).slice(0, 4).map(String),
-      effects: (p.effects ?? []).slice(0, 3).map(String),
+      effects: (p.effects ?? []).slice(0, 3).map(String).filter((s) => !gateJargonHit(s, "effects")),
     },
     candidates,
   };
 }
+
+// ── 사업 보고서 어휘 서버 게이트(08-08) ─────────────────────────
+// 계기: 프롬프트 ⛔금지어가 뚫려 "타깃층"이 화면까지 갔다(08-08 실측). [[prompt-parser-contract]] —
+// 프롬프트는 요청이고 **여기가 보장**이다.
+// ⚠️적용 범위는 **통째로 지워도 화면이 성립하는 줄만**: gains(빈 값이면 그 불릿을 생략)·effects(2~3개 중
+//   하나 빠져도 성립). desc·steps·title은 지우면 카드·플랜이 깨지므로 여기서 안 지운다(프롬프트만 막는다).
+// ⚠️단어는 프롬프트 ⛔목록과 같은 9종만 — 어느 콜라보에나 붙는 일반론 어휘라 오검이 없다.
+//   ("홍보 효과"만 묶음이고 "홍보" 단독은 안 막는다 — steps의 "인스타 홍보 게시물"류가 정당해서.)
+const BIZ_JARGON = /인지도|신규 고객|타깃|각인|확보|유입|홍보 효과|포트폴리오|매출/;
+function gateJargonHit(s: string | undefined, label: string): boolean {
+  if (!s || !BIZ_JARGON.test(s)) return false;
+  console.warn(`[gate] ${label} 금지어 낙마: ${s}`);
+  return true;
+}
+const gateJargon = (s: string | undefined, label: string) => (gateJargonHit(s, label) ? "" : (s ?? ""));
