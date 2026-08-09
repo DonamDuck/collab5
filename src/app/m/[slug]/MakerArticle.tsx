@@ -4,6 +4,7 @@ import { normalizeUrl, mapLinkLabel } from "@/lib/links";
 import { MapCard } from "@/components/MapCard";
 import { BrandSummaryCard } from "./BrandSummaryCard";
 import { BlockSections } from "./BlockSections";
+import { RevealList } from "./RevealList";
 
 // 소개서 본문 — /m 상세와 /preview 데모가 공유하는 단일 렌더.
 export function MakerArticle({ maker, isOwner, logoUrl, readOnly }: {
@@ -34,7 +35,9 @@ export function MakerArticle({ maker, isOwner, logoUrl, readOnly }: {
       {/* ② 우리는 이런 일을 하고 있습니다 — activities */}
       {maker.activities.length > 0 && (
         <Section title="우리는 이런 일을 하고 있어요">
-          <div className="space-y-6">
+          {/* 🆕08-10 상한 5→30. RevealList가 5건씩 끊어 보여준다 —
+              ⚠️여기서 `.slice()`로 자르면 안 된다(검색엔진·인쇄가 같이 깨진다, RevealList 머리말 참조). */}
+          <RevealList kind="activity" label="활동">
             {maker.activities.map((a, i) => (
               <div key={i} className="print:break-inside-avoid">
                 <ItemLabel kind="활동" index={i} total={maker.activities.length} />
@@ -65,7 +68,7 @@ export function MakerArticle({ maker, isOwner, logoUrl, readOnly }: {
                 )}
               </div>
             ))}
-          </div>
+          </RevealList>
         </Section>
       )}
 
@@ -81,7 +84,8 @@ export function MakerArticle({ maker, isOwner, logoUrl, readOnly }: {
       {/* ④ 함께한 콜라보 — collabHistory */}
       {maker.collabHistory.length > 0 && (
         <Section title="함께한 콜라보">
-          <div className="space-y-6">
+          {/* 🆕08-10 상한 5→30 — 활동 섹션과 같은 규칙(RevealList 머리말 참조) */}
+          <RevealList kind="collab" label="콜라보">
             {maker.collabHistory.map((h, i) => (
               <div key={i} className="print:break-inside-avoid">
                 <ItemLabel kind="콜라보" index={i} total={maker.collabHistory.length} />
@@ -108,7 +112,7 @@ export function MakerArticle({ maker, isOwner, logoUrl, readOnly }: {
                 )}
               </div>
             ))}
-          </div>
+          </RevealList>
         </Section>
       )}
 
