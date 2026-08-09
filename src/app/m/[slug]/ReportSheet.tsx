@@ -502,7 +502,7 @@ export function ReportSheet({
                   ⚠️여기만 13px·mute·두 줄 허용 — 문장이라 15px·truncate면 "…리포트 예…"로 잘린다. */}
               {sampleTeaser ? (
                 <p className="min-w-0 flex-1 text-[13px] leading-snug font-medium break-keep text-mute">
-                  {sampleData.fromName} × {sampleData.toName}의 콜라보 분석 리포트 예시예요.
+                  {sampleData.fromName} × {sampleData.toName}의 콜라보 추천 리포트 예시예요.
                 </p>
               ) : (
                 <p className="min-w-0 flex-1 truncate text-[15px] font-semibold text-body">
@@ -532,7 +532,7 @@ export function ReportSheet({
                      **문장 구분이 눈에 보이는 쪽**이 이 화면엔 더 중요하다는 대표 판단. */}
               {sampleTeaser && (
                 <p className="mb-4 text-xl font-bold leading-snug break-keep text-ink">
-                  콜라보 분석은 내 소개서 작성 후 가능해요.
+                  콜라보 추천은 내 소개서 작성 후 받아볼 수 있어요.
                   <br />
                   우선 예시 리포트를 보여드릴게요.
                 </p>
@@ -565,8 +565,8 @@ export function ReportSheet({
                   {/* 홈(source=home)에선 상대 브랜드가 없어 toName이 빈 문자열 — 범용 문구로 분기(07-31) */}
                   <p className="text-[14px] leading-relaxed break-keep text-body">
                     {toName
-                      ? `소개서를 등록하면 ${toName}님과 나의 콜라보 분석을 받을 수 있어요`
-                      : "소개서를 등록하면 마음에 드는 브랜드와 우리 브랜드의 콜라보 분석을 받을 수 있어요"}
+                      ? `소개서를 등록하면 ${toName}님과 나의 콜라보 추천을 받아볼 수 있어요`
+                      : "소개서를 등록하면 마음에 드는 브랜드와 우리 브랜드의 콜라보 추천을 받아볼 수 있어요"}
                   </p>
                   <a
                     href="/register"

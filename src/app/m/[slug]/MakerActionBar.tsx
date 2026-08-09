@@ -408,7 +408,7 @@ export function MakerActionBar({
 
   const loginTitle =
     loginReason === "report"
-      ? "콜라보 분석을 보려면 로그인이 필요해요"
+      ? "콜라보 추천을 받으려면 로그인이 필요해요"
       : loginReason === "propose"
         ? "콜라보를 시작하려면 로그인이 필요해요"
         : "찜하려면 로그인이 필요해요";
@@ -594,7 +594,7 @@ export function MakerActionBar({
                     onClick={() => handleReport()}
                     className="flex h-12 flex-[0.8] items-center justify-center rounded-md border border-border-strong bg-surface text-base font-medium text-ink transition-colors"
                   >
-                    콜라보 분석
+                    콜라보 추천받기
                   </button>
                 )}
                 <a
@@ -613,7 +613,7 @@ export function MakerActionBar({
                   onClick={() => handleReport()}
                   className="flex h-12 flex-[0.8] items-center justify-center rounded-md border border-border-strong bg-surface text-base font-medium text-ink transition-colors"
                 >
-                  콜라보 분석
+                  콜라보 추천받기
                 </button>
                 {/* 콜라보 제안 시작하기 — primary */}
                 <button
@@ -650,7 +650,7 @@ export function MakerActionBar({
               <button
                 type="button"
                 onClick={backToReport}
-                aria-label="뒤로: 콜라보 분석 보기"
+                aria-label="뒤로: 콜라보 추천 보기"
                 className="flex h-8 w-8 items-center justify-center rounded-md text-faint hover:bg-surface-soft hover:text-ink"
               >
                 <svg viewBox="0 0 20 20" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8">

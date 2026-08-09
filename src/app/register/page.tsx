@@ -2547,7 +2547,7 @@ function RegisterForm() {
                 disabled={goingToPage}
                 className="mt-2 flex h-12 w-full items-center justify-center rounded-md border border-border-strong bg-surface text-base font-medium text-ink disabled:opacity-50"
               >
-                {analysisPartner.name}님과 콜라보 분석 받아보기
+                {analysisPartner.name}님과 콜라보 추천받기
               </button>
             )}
             <p className="mt-3 text-[13px] text-faint">언제든 ‘내 소개서’에서 수정할 수 있어요.</p>

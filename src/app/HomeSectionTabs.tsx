@@ -82,7 +82,7 @@ export function HomeSectionTabs() {
     //    브랜드 그리드와 같은 box-shadow+clip-path 기법을 쓴다(page.tsx §② 참고).
     <div className="sticky top-14 z-[5] flex justify-center bg-canvas py-2 [box-shadow:0_0_0_100vmax_var(--canvas)] [clip-path:inset(0_-100vmax)]">
       <nav
-        aria-label="소개서·콜라보 분석 바로가기"
+        aria-label="소개서·콜라보 추천 바로가기"
         // 트랙=surface-soft. 활성 썸은 아래 **"선택됨" 키위 조합**을 쓴다(대표 지시 08-02 "탭바에도 키위를").
         className="inline-flex gap-1 rounded-pill border border-hairline bg-surface-soft p-1 shadow-e1"
       >

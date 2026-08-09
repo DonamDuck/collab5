@@ -97,7 +97,7 @@ export default async function MyPage({ searchParams }: { searchParams: Promise<{
           <>
             콜라보하고 싶은 브랜드를 찾아
             <br />
-            콜라보 분석 리포트를 만들어보세요.
+            콜라보 추천 리포트를 만들어보세요.
           </>
         }
         ctaLabel="브랜드 소개서 둘러보기"
