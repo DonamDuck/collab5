@@ -10,6 +10,7 @@ import { useDismissable } from "@/components/useDismissable";
 import { ReportSheet } from "./ReportSheet";
 import type { CollabReportData } from "@/lib/types";
 import { orderIdeaCards, type IdeaCard } from "@/lib/report-cards";
+import { track } from "@/lib/track";
 
 // 로그인/가입 전에 눌렀던 의도를 보관하는 키(같은 탭 세션 한정) — 복귀 시 자동 재개.
 const PENDING_SAVE_KEY = "collab5:pendingSave";
@@ -278,6 +279,7 @@ export function MakerActionBar({
   // 콜라보 시작하기 — 비로그인은 로그인 유도, 로그인은 제안 시트.
   const handlePropose = () => {
     if (!loggedIn) {
+      track("propose_login_needed");
       setLoginReason("propose");
       setLoginOpen(true);
       return;
@@ -289,10 +291,17 @@ export function MakerActionBar({
   // `restore` = 제안 시트 [← 뒤로]로 돌아오는 길. 방금 본 리포트를 **그대로 되살린다**(아래 주석 참조).
   const handleReport = (restore = false) => {
     if (!loggedIn) {
+      // 로그인 벽에서 되돌아간 사람 = "쓰려 했는데 못 쓴 사람". 이 숫자가 없으면 벽의 비용을 못 잰다.
+      track("report_login_needed");
       setLoginReason("report");
       setLoginOpen(true);
       return;
     }
+    // 🆕**누른 순간**을 센다(08-07 대표 지시). 전엔 `report_view`(=리포트가 뜬 뒤)가 첫 이벤트라
+    //   선택 화면에서 닫거나 30초를 못 기다리고 이탈한 사람이 **통째로 안 보였다** — 로그상 아무 일도
+    //   없는 것처럼 보인다. 이제 report_open → report_view → report_cta_propose 로 완주율이 나온다.
+    //   ⚠️`restore`(제안 시트 [← 뒤로])는 빼야 한다 — 한 번의 시도가 두 번으로 부풀어 완주율이 거짓말한다.
+    if (!restore) track("report_open", { has_brand: viewerBrands.length > 0 });
     setRestoreReport(restore);
     setReportSample(viewerBrands.length === 0);
     setReportOpen(true);
@@ -332,13 +341,23 @@ export function MakerActionBar({
   //   (대표 확정 2026-07-29). 그래서 DM 열기·메시지 복사·이메일 복사 셋 다 여기로 들어온다.
   //   ⚠️ 시트 한 번 열림당 1건만 — 복사하고 나서 DM 열기까지 누르면 한 사람이 2건으로 부풀기 때문.
   const recordedRef = useRef(false);
-  const recordOnce = (ch: string) => {
+  //  🆕`action`(08-07) — DB엔 채널만 남아서 **"복사만 했는지 인스타로 넘어갔는지"를 못 갈랐다.**
+  //     GA 쪽에만 붙인다(DB 스키마는 그대로). 값 = open(채널 열기)·copy(메시지만)·email(주소만).
+  //  ⚠️GA도 DB와 **같은 1회 규칙**을 탄다 — 여기 안에 두는 이유가 그것이다. 밖에 두면 복사→이동을
+  //     연달아 누른 한 사람이 GA에선 2건, DB에선 1건이 되어 두 숫자를 나란히 못 놓는다.
+  const recordOnce = (ch: string, action: "open" | "copy" | "email") => {
     if (recordedRef.current) return;
     recordedRef.current = true;
+    track("propose_send", { channel: ch, action, ideas: addedIdeas.length });
     recordCollabRequestAction(makerId, ch, selectedBrand?.id).catch(() => {});
   };
   useEffect(() => {
-    if (proposeOpen) recordedRef.current = false; // 시트를 새로 열면 다시 셀 수 있게
+    if (!proposeOpen) return;
+    recordedRef.current = false; // 시트를 새로 열면 다시 셀 수 있게
+    // 🆕시트가 열린 것 자체를 센다 — 진입 경로가 넷(액션바·리포트 CTA·로그인 복귀·/my 딥링크)이라
+    //   각 호출부에 흩뿌리면 반드시 하나를 빠뜨린다. 열림 상태 한 곳에서 잡으면 전부 정확히 1건.
+    //   짝 = `propose_send`. 둘의 비율이 **DM 시트를 열고 실제로 보낸 비율**이다.
+    track("propose_open");
   }, [proposeOpen]);
 
   // Primary — 메시지 복사 + 상대 채널 오픈(제스처 내 즉시, 팝업 차단 회피) + 계측(best-effort).
@@ -351,7 +370,7 @@ export function MakerActionBar({
     copyText(message);
     flash("✓ 메시지를 복사했어요.");
     window.open(channel.url, "_blank", "noopener,noreferrer");
-    recordOnce(channel.channel);
+    recordOnce(channel.channel, "open");
   };
 
   // Secondary — 메시지만 복사(시트 유지 + 토스트).
@@ -359,7 +378,7 @@ export function MakerActionBar({
   const copyMessageOnly = () => {
     copyText(message);
     flash("✓ 메시지를 복사했어요.");
-    recordOnce(channel?.channel ?? "copy");
+    recordOnce(channel?.channel ?? "copy", "copy");
   };
 
   // 이메일 폴백 Primary — 이메일 주소 복사(채널 오픈 없음, 시트 유지 + 토스트) + 계측.
@@ -367,7 +386,7 @@ export function MakerActionBar({
     if (!contactEmail) return;
     copyText(contactEmail);
     flash("✓ 이메일 주소를 복사했어요.");
-    recordOnce("email");
+    recordOnce("email", "email");
   };
 
   const isInstagram = channel?.channel === "instagram";
