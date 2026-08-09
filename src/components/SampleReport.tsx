@@ -49,7 +49,7 @@ export function SampleReportLink() {
         onClick={() => setOpen(true)}
         className="flex h-12 w-full items-center justify-center gap-1.5 rounded-md border border-border-strong bg-surface text-[16px] font-medium text-ink hover:bg-surface-soft"
       >
-        콜라보 분석 리포트 미리보기
+        콜라보 추천 리포트 미리보기
         <span aria-hidden="true" className="text-primary-on">→</span>
       </button>
       <PortalSheet open={open} onClose={() => setOpen(false)} />
