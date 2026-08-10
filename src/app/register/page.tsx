@@ -735,9 +735,15 @@ function RegisterForm() {
       const empty = p.findIndex(
         (c) => !c.partner.trim() && !c.desc.trim() && !c.types.length && !c.photos.length
       );
+      // 🆕`year`도 같이 싣는다(08-10) — 안 실으면 크롤이 애써 뽑은 연도가 폼에서 증발하고,
+      //   소개서엔 연도가 안 뜨며 "최신순"이 사장님 눈에 근거 없는 순서로 보인다.
+      //   ⚠️`h.year`가 없으면 `undefined`라 기존 값을 덮지 않는다(빈칸 채움만).
       if (empty >= 0)
-        return p.map((c, j) => (j === empty ? { ...c, partner: h.partner, desc: h.desc } : c));
-      if (p.length < MAX_COLLABS) return [...p, { ...emptyHist(), partner: h.partner, desc: h.desc }];
+        return p.map((c, j) =>
+          j === empty ? { ...c, partner: h.partner, desc: h.desc, year: h.year ?? c.year } : c
+        );
+      if (p.length < MAX_COLLABS)
+        return [...p, { ...emptyHist(), partner: h.partner, desc: h.desc, year: h.year ?? "" }];
       return p;
     });
   };

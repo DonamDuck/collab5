@@ -85,6 +85,21 @@ export function SortableCard({
         <div className="flex shrink-0 items-center gap-1">
           {sortable && (
             <>
+              {/* 🆕맨 위로 (08-10) — 상한이 30으로 열리면서 생긴 버튼.
+                  ↑만 있으면 20번째 항목을 앞세우는 데 클릭이 19번 든다. 새로 한 콜라보를
+                  대표작으로 올리는 건 흔한 동작이라 한 번에 끝나야 한다.
+                  ⚠️2번째 카드에선 ↑와 결과가 같아 군더더기다 → index >= 2에서만 보인다. */}
+              {index >= 2 && (
+                <button
+                  type="button"
+                  onClick={() => onMove(index, 0)}
+                  aria-label="맨 위로"
+                  title="맨 위로"
+                  className="flex h-7 w-7 items-center justify-center rounded-sm text-mute hover:bg-surface-soft hover:text-ink"
+                >
+                  ⇈
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => onMove(index, index - 1)}

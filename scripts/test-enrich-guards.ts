@@ -9,6 +9,7 @@ import {
   extractChipsFromResearch,
   starterChipsForType,
   sanitizeHttpUrl,
+  sanitizeYear,
   sniffInstagramFromText,
   naverMapLink,
   stripDecorativeQuotes,
@@ -611,6 +612,18 @@ check("⛔ 아무 조각도 없으면 not covered(로그 대상)", !ownerNoteCov
 check("✅ 내용어가 없는 입력(한 글자·기호뿐)은 경보 안 울림", ownerNoteCovered("!! ㅋ ~", ["아무 문장"]));
 check("✅ 숫자·영문 조각도 검사", ownerNoteCovered("DJI 액션캠 50대", ["DJI 카메라로 촬영해 드려요"]));
 check("⛔ 빈 결과물이면 not covered", !ownerNoteCovered("자체 제작 장비", []));
+
+// 연도 위생(08-10, 콜라보 최신순 정렬의 재료) — 프롬프트는 요청이고 **형식은 파서가 보장한다.**
+// 이 계약이 깨지면 소개서에 "작년"이 그대로 실리고, 정렬은 숫자 변환이 안 돼 전부 0 취급으로 조용히 뒤죽박죽이 된다.
+console.log("[연도 위생 sanitizeYear]");
+check("✅ 4자리 그대로", sanitizeYear("2024") === "2024");
+check("✅ '2024년', '2024년 봄'에서 연도만 추출", sanitizeYear("2024년") === "2024" && sanitizeYear("2024년 봄") === "2024");
+check("⛔ '작년'·'최근' 같은 상대 표현 거부", sanitizeYear("작년") === undefined && sanitizeYear("최근") === undefined);
+check("⛔ 빈값·undefined 거부", sanitizeYear("") === undefined && sanitizeYear(undefined) === undefined);
+check("⛔ 범위 밖(1800·2900) 거부", sanitizeYear("1800") === undefined && sanitizeYear("2900") === undefined);
+check("⛔ 두 자리('12')는 연도로 안 본다", sanitizeYear("12") === undefined);
+check("✅ 내년까지는 허용(예정 콜라보)", sanitizeYear(String(new Date().getFullYear() + 1)) !== undefined);
+check("⛔ 내후년은 거부(창작 방지)", sanitizeYear(String(new Date().getFullYear() + 2)) === undefined);
 
 console.log(`\n결과: ${pass} pass / ${fail} fail`);
 process.exit(fail ? 1 : 0);
