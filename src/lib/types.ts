@@ -319,3 +319,20 @@ export interface MagazineArticle {
  *  ⚠️본문 jsonb는 한 건이 수십 KB가 될 수 있어, 목록에서 통째로 끌어오면 글이 쌓일수록 페이로드가 커진다
  *  (소개서 목록에서 같은 실수를 한 적이 있다 — `SEARCH_CARD_COLS` 주석 참조). */
 export type MagazineListItem = Omit<MagazineArticle, "body">;
+
+/** 저장 입력 — id·created_at·updated_at은 DB가 채운다.
+ *  ⚠️`publishedAt`을 클라가 정하지 않는다 — 서버가 "draft→published로 처음 바뀌는 순간"에만 찍는다
+ *  (수정할 때마다 발행일이 오늘로 밀리면 아카이브 순서가 무너진다). */
+export interface MagazineSaveInput {
+  slug: string;
+  status: MagazineStatus;
+  title: string;
+  subtitle: string;
+  editorName: string;
+  location: string;
+  coverImage: string;
+  summary: string;
+  factBox: MagazineFact[];
+  brandLinks: MagazineBrandLink[];
+  body: MagazineDoc;
+}

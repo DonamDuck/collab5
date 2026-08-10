@@ -3,7 +3,7 @@
 // (DB는 '공유 → 타인 열람(view) 루프 = 배포 시점'에 투입 — masterbrain 2026-06-21 결정)
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import type { BrandDna, Collab, CollabCard, CollabInput, CollabOrigin, CollabReportData, CollabReportListItem, CollabStatus, CollabType, MagazineArticle, MagazineListItem, Maker, MakerStatus, Reaction, ViewEvent } from "./types";
+import type { BrandDna, Collab, CollabCard, CollabInput, CollabOrigin, CollabReportData, CollabReportListItem, CollabStatus, CollabType, MagazineArticle, MagazineListItem, MagazineSaveInput, Maker, MakerStatus, Reaction, ViewEvent } from "./types";
 import { kstIso } from "./time";
 import { orderedIdeaTitles } from "./report-cards";
 import { isDemoSlug } from "./demo";
@@ -36,6 +36,14 @@ export interface Repo {
   /** 상세 — ⚠️**발행분만 돌려준다.** 초안은 여기서 null이고, 편집자 예외는 PR2에서 별도 메서드로 좁게 뚫는다.
    *  (안전장치를 풀어놓고 나중에 막는 순서가 아니라, 닫아두고 예외를 뚫는 순서 — 08-07 권한 사고의 교훈) */
   getPublishedArticle(slug: string): Promise<MagazineArticle | null>;
+  /** 편집자용 — 초안 포함 전체 목록. ⚠️호출부에서 `isMagazineEditor()`를 반드시 먼저 통과시킬 것. */
+  listAllArticles(): Promise<MagazineListItem[]>;
+  /** 편집자용 — 초안 포함 단건. ⚠️위와 같음(권한 검사는 이 함수의 책임이 아니다). */
+  getArticleForEditor(slug: string): Promise<MagazineArticle | null>;
+  /** 저장 — slug 기준 upsert. 새 글이면 insert, 있으면 update. */
+  saveArticle(input: MagazineSaveInput): Promise<MagazineArticle>;
+  /** slug 중복 확인 — 새 글 저장 전 자동 슬러그 생성에 쓴다. */
+  articleSlugExists(slug: string): Promise<boolean>;
   // 카드
   createCard(input: Omit<CollabCard, "id" | "createdAt">): Promise<CollabCard>;
   getCardBySlug(slug: string): Promise<CollabCard | null>;
@@ -480,6 +488,31 @@ class InMemoryRepo implements Repo {
   async getPublishedArticle(slug: string): Promise<MagazineArticle | null> {
     return this.articles.find((a) => a.slug === slug && a.status === "published") ?? null;
   }
+  async listAllArticles(): Promise<MagazineListItem[]> {
+    return this.articles.map(({ body: _body, ...rest }) => rest);
+  }
+  async getArticleForEditor(slug: string): Promise<MagazineArticle | null> {
+    return this.articles.find((a) => a.slug === slug) ?? null;
+  }
+  async articleSlugExists(slug: string): Promise<boolean> {
+    return this.articles.some((a) => a.slug === slug);
+  }
+  async saveArticle(input: MagazineSaveInput): Promise<MagazineArticle> {
+    const prev = this.articles.find((a) => a.slug === input.slug);
+    const publishedAt =
+      input.status === "published" ? (prev?.publishedAt ?? now()) : undefined;
+    const saved: MagazineArticle = {
+      ...input,
+      id: prev?.id ?? this.articles.length + 1,
+      publishedAt,
+      createdAt: prev?.createdAt ?? now(),
+      updatedAt: now(),
+    };
+    this.articles = prev
+      ? this.articles.map((a) => (a.slug === input.slug ? saved : a))
+      : [...this.articles, saved];
+    return saved;
+  }
 
   async createCard(input: Omit<CollabCard, "id" | "createdAt">): Promise<CollabCard> {
     const card: CollabCard = { ...input, id: this.nextCardId++, createdAt: now() };
@@ -879,6 +912,66 @@ class SupabaseRepo implements Repo {
       return null;
     }
     return data ? rowToArticle(data as MagazineRow) : null;
+  }
+  async listAllArticles(): Promise<MagazineListItem[]> {
+    // 편집자 목록 — 초안이 위로 오게 status → 최신순. `published_at`은 초안이면 null이라 정렬 키로 못 쓴다.
+    const { data, error } = await this.db
+      .from("magazine_articles")
+      .select(MAGAZINE_LIST_COLS)
+      .order("status", { ascending: true })       // draft < published (사전순)
+      .order("updated_at", { ascending: false });
+    if (error) {
+      console.error(`[repo] listAllArticles failed: ${error.message}`);
+      return [];
+    }
+    return (data ?? []).map((r) => rowToArticleListItem(r as MagazineRow));
+  }
+  async getArticleForEditor(slug: string): Promise<MagazineArticle | null> {
+    const { data, error } = await this.db
+      .from("magazine_articles").select().eq("slug", slug).maybeSingle();
+    if (error) {
+      console.error(`[repo] getArticleForEditor(${slug}) failed: ${error.message}`);
+      return null;
+    }
+    return data ? rowToArticle(data as MagazineRow) : null;
+  }
+  async articleSlugExists(slug: string): Promise<boolean> {
+    const { data } = await this.db
+      .from("magazine_articles").select("id").eq("slug", slug).maybeSingle();
+    return !!data;
+  }
+  async saveArticle(input: MagazineSaveInput): Promise<MagazineArticle> {
+    // ⭐**발행일은 서버가 정한다.** "draft였다가 처음 published가 되는 순간"에만 찍고, 그 뒤 수정에는 손대지 않는다.
+    //   클라가 보내게 하거나 매 저장마다 now()를 넣으면 **글을 고칠 때마다 발행일이 오늘로 밀려**
+    //   목록 순서와 아카이브가 통째로 흐트러진다(눈에 잘 안 띄는 종류의 고장).
+    const prev = await this.getArticleForEditor(input.slug);
+    const publishedAt =
+      input.status === "published"
+        ? (prev?.publishedAt ?? new Date().toISOString())
+        : null; // 발행 취소(→draft)하면 비운다 — 다시 발행할 때 그날로 새로 찍히는 게 맞다.
+
+    const row = {
+      slug: input.slug,
+      status: input.status,
+      title: input.title,
+      subtitle: input.subtitle,
+      editor_name: input.editorName,
+      location: input.location,
+      cover_image: input.coverImage,
+      summary: input.summary,
+      fact_box: input.factBox,
+      brand_links: input.brandLinks,
+      body: input.body,
+      published_at: publishedAt,
+    };
+    // slug가 unique라 onConflict로 upsert. 새 글/수정 분기를 코드에서 하지 않는다(경합에도 안전).
+    const { data, error } = await this.db
+      .from("magazine_articles")
+      .upsert(row, { onConflict: "slug" })
+      .select()
+      .single();
+    if (error) throw new Error(`아티클 저장에 실패했어요: ${error.message}`);
+    return rowToArticle(data as MagazineRow);
   }
 
   // /my 토글 — 소유자 검증은 actions에서. search_visible 만 부분 갱신.

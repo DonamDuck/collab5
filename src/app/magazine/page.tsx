@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { repo } from "@/lib/repo";
 import { kstDateLabel } from "@/lib/magazine-format";
+import { isMagazineEditor } from "@/lib/magazine-auth";
 
 // 매거진 목록 (2026-08-10) — 콜라보 성사 사례를 현장 기록으로 모아 보여준다.
 //
@@ -18,14 +19,26 @@ export const metadata: Metadata = {
 };
 
 export default async function MagazinePage() {
-  const articles = await repo.listPublishedArticles();
+  // 편집자에겐 초안까지 보인다. ⚠️판정은 서버에서 — 클라에 넘겨 숨기는 방식이 아니다.
+  const editor = await isMagazineEditor();
+  const articles = editor ? await repo.listAllArticles() : await repo.listPublishedArticles();
 
   return (
     <main className="mx-auto w-full max-w-[720px] px-4 py-10 sm:px-6">
-      <h1 className="text-[28px] font-bold tracking-tight text-ink sm:text-[32px]">매거진</h1>
-      <p className="mt-2 text-[17px] leading-relaxed break-keep text-body">
-        작은 브랜드들이 만나 만든 장면을 직접 찾아가 기록해요.
-      </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-[28px] font-bold tracking-tight text-ink sm:text-[32px]">매거진</h1>
+          <p className="mt-2 text-[17px] leading-relaxed break-keep text-body">
+            작은 브랜드들이 만나 만든 장면을 직접 찾아가 기록해요.
+          </p>
+        </div>
+        {editor && (
+          <Link href="/magazine/new"
+            className="mt-1 shrink-0 rounded-md bg-primary px-4 py-2.5 text-[14px] font-medium text-primary-on">
+            새 글
+          </Link>
+        )}
+      </div>
 
       {articles.length === 0 ? (
         // 빈 화면도 화면이다 — "곧 올라와요"가 없으면 고장난 페이지로 읽힌다.
@@ -54,6 +67,11 @@ export default async function MagazinePage() {
                   </div>
                 )}
                 <div className="px-5 py-4">
+                  {a.status === "draft" && (
+                    <span className="mb-1.5 inline-block rounded-sm bg-surface-soft px-1.5 py-0.5 text-[12px] font-medium text-mute">
+                      초안
+                    </span>
+                  )}
                   {a.subtitle && (
                     <p className="text-[13px] font-medium text-primary-on">{a.subtitle}</p>
                   )}
@@ -71,6 +89,13 @@ export default async function MagazinePage() {
                   </p>
                 </div>
               </Link>
+              {/* 수정은 카드 링크 **바깥**에 둔다 — 안에 넣으면 <a> 안의 <a>가 되어 마크업이 깨진다. */}
+              {editor && (
+                <Link href={`/magazine/${a.slug}/edit`}
+                  className="mt-1.5 inline-block text-[13px] text-mute underline underline-offset-2 hover:text-ink">
+                  수정
+                </Link>
+              )}
             </li>
           ))}
         </ul>

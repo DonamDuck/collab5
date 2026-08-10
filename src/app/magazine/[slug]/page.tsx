@@ -3,11 +3,13 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { repo } from "@/lib/repo";
 import { kstDateLabel } from "@/lib/magazine-format";
+import { isMagazineEditor } from "@/lib/magazine-auth";
 import { ArticleBody, BrandLinkCards } from "./ArticleBody";
 
 // 매거진 상세 (2026-08-10)
-// ⚠️PR1은 **발행분만** 그린다 — `repo.getPublishedArticle`이 초안을 아예 안 돌려준다.
-//   편집자에게 초안을 열어주는 예외는 PR2에서 권한 검사와 함께 좁게 뚫는다(닫아두고 뚫는 순서).
+// ⭐기본은 **발행분만**이고, 편집자에게만 초안을 여는 예외를 뚫었다(PR2).
+//   순서가 중요하다 — 열어놓고 막는 게 아니라 **닫아두고 예외를 좁게** 뚫는다.
+//   `getArticleForEditor`(초안 포함)는 `isMagazineEditor()`를 통과한 뒤에만 부른다.
 export const dynamic = "force-dynamic";
 
 export async function generateMetadata({
@@ -43,11 +45,25 @@ export default async function MagazineArticlePage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const a = await repo.getPublishedArticle(slug);
+  let a = await repo.getPublishedArticle(slug);
+  const editor = await isMagazineEditor();
+  if (!a && editor) a = await repo.getArticleForEditor(slug); // 편집자만 초안 열람
   if (!a) notFound();
 
   return (
     <main className="mx-auto w-full max-w-[680px] px-4 py-10 sm:px-6">
+      {editor && (
+        <div className="mb-6 flex items-center justify-between gap-3 rounded-md border border-hairline bg-surface-soft px-4 py-2.5">
+          <span className="text-[13px] text-mute">
+            {a.status === "draft" ? "초안이에요. 나만 볼 수 있어요." : "발행된 글이에요."}
+          </span>
+          <Link href={`/magazine/${a.slug}/edit`}
+            className="shrink-0 rounded-sm border border-border-strong bg-surface px-3 py-1.5 text-[13px] font-medium text-ink">
+            수정
+          </Link>
+        </div>
+      )}
+
       <article>
         {/* ── 머리 ── */}
         <header>
