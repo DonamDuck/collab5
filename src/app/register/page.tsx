@@ -17,6 +17,7 @@ import { MakerArticle } from "../m/[slug]/MakerArticle";
 import type { CollabType, Block, Maker, Enrichment } from "@/lib/types";
 import { deriveRegion } from "@/lib/region";
 import { isRichIntro } from "@/lib/completeness";
+import { MAX_ACTIVITIES, MAX_COLLABS } from "@/lib/limits";
 import { uploadPhoto, uploadPdf } from "@/lib/upload";
 import { mapLinkLabel, instagramSlug, parseLatLngFromMapUrl } from "@/lib/links";
 import { MapCard } from "@/components/MapCard";
@@ -389,7 +390,7 @@ function RegisterForm() {
     setCustomAudience("");
   };
 
-  // ── 콜라보 이력 (활동과 동일한 인라인 카드 패턴, 최대 5세트) ──
+  // ── 콜라보 이력 (활동과 동일한 인라인 카드 패턴, 상한 = MAX_COLLABS) ──
   // 카드 순서변경(↑↓·드래그) 후 이동한 자리로 부드럽게 스크롤 — 수동 스크롤 불필요.
   // id는 위치 기반(`${idBase}-${to}`)이라 재정렬 후 그 자리에 이동한 카드가 있음.
   const scrollCardTo = (idBase: string, to: number) => {
@@ -400,7 +401,7 @@ function RegisterForm() {
     }, 30);
   };
   const addCollab = () =>
-    setCollabHistory((p) => (p.length >= 5 ? p : [...p, emptyHist()]));
+    setCollabHistory((p) => (p.length >= MAX_COLLABS ? p : [...p, emptyHist()]));
   const moveCollab = (from: number, to: number) => {
     setCollabHistory((p) => reorder(p, from, to));
     scrollCardTo("col-card", to);
@@ -501,9 +502,11 @@ function RegisterForm() {
       setCollabHistory((p) => p.map((h, j) => (j === i ? { ...h, photos: f(h.photos) } : h)))
     );
 
-  // ── 대표 활동 (최대 5세트) ──
+  // ── 대표 활동 (상한 = MAX_ACTIVITIES) ──
   const addActivity = () =>
-    setActivities((p) => (p.length >= 5 ? p : [...p, { title: "", desc: "", photos: [], link: "" }]));
+    setActivities((p) =>
+      p.length >= MAX_ACTIVITIES ? p : [...p, { title: "", desc: "", photos: [], link: "" }]
+    );
   const moveActivity = (from: number, to: number) => {
     setActivities((p) => reorder(p, from, to));
     scrollCardTo("act-card", to);
@@ -713,7 +716,8 @@ function RegisterForm() {
       const empty = p.findIndex((a) => !a.title.trim() && !a.desc.trim() && !a.photos.length);
       if (empty >= 0)
         return p.map((a, j) => (j === empty ? { ...a, title: h.title, desc: h.desc } : a));
-      if (p.length < 5) return [...p, { title: h.title, desc: h.desc, photos: [], link: "" }];
+      if (p.length < MAX_ACTIVITIES)
+        return [...p, { title: h.title, desc: h.desc, photos: [], link: "" }];
       return p;
     });
   };
@@ -725,15 +729,21 @@ function RegisterForm() {
   };
   const canApplyActHint =
     activities.some((a) => !a.title.trim() && !a.desc.trim() && !a.photos.length) ||
-    activities.length < 5;
+    activities.length < MAX_ACTIVITIES;
   const injectCollabHint = (h: CollabHint) => {
     setCollabHistory((p) => {
       const empty = p.findIndex(
         (c) => !c.partner.trim() && !c.desc.trim() && !c.types.length && !c.photos.length
       );
+      // 🆕`year`도 같이 싣는다(08-10) — 안 실으면 크롤이 애써 뽑은 연도가 폼에서 증발하고,
+      //   소개서엔 연도가 안 뜨며 "최신순"이 사장님 눈에 근거 없는 순서로 보인다.
+      //   ⚠️`h.year`가 없으면 `undefined`라 기존 값을 덮지 않는다(빈칸 채움만).
       if (empty >= 0)
-        return p.map((c, j) => (j === empty ? { ...c, partner: h.partner, desc: h.desc } : c));
-      if (p.length < 5) return [...p, { ...emptyHist(), partner: h.partner, desc: h.desc }];
+        return p.map((c, j) =>
+          j === empty ? { ...c, partner: h.partner, desc: h.desc, year: h.year ?? c.year } : c
+        );
+      if (p.length < MAX_COLLABS)
+        return [...p, { ...emptyHist(), partner: h.partner, desc: h.desc, year: h.year ?? "" }];
       return p;
     });
   };
@@ -746,7 +756,7 @@ function RegisterForm() {
   const canApplyCollabHint =
     collabHistory.some(
       (c) => !c.partner.trim() && !c.desc.trim() && !c.types.length && !c.photos.length
-    ) || collabHistory.length < 5; // ⚠️ 상한(5)과 같아야 한다 — injectCollabHint도 `< 5`로 새 카드를 붙인다
+    ) || collabHistory.length < MAX_COLLABS; // 상한은 lib/limits.ts 한 곳에서만 — 숫자를 여기 쓰지 말 것
 
   // 위저드가 고른 항목만 폼에 반영(검수 게이트). AI는 '초안'만 — 사용자가 확인·수정 후 저장.
   // ⑤스텝(찾은 이야기)에서 체크한 힌트(fill.selectedHints)는 즉시 적용 — never-overwrite:
@@ -1703,12 +1713,15 @@ function RegisterForm() {
           />
         </StubSection>
 
-        {/* ── 스텁 B — 주로 어떤 활동을 하나요 (구④) ── */}
+        {/* ── 스텁 B — 주로 어떤 활동을 하나요 (구④) ──
+             🆕08-10 `sub`에서 "최대 5가지"를 지웠다 — 상한을 30으로 열어놓고 문구가 5라고 하면
+             사장님은 5에서 멈춘다. 새 숫자(30)를 박지도 않는다: "30개나 써야 하나"라는 부담이 된다.
+             개수는 문구가 아니라 [＋활동 추가] 버튼이 알려준다(상한에 닿으면 버튼이 사라짐). */}
         <StubSection
           id="sec-activities"
           badge={aiFilled.has("activities") ? <AiBadge /> : null}
           label="주로 어떤 활동을 하나요?"
-          sub="대표 활동을 최대 5가지 소개해주세요. 사진도 담을 수 있어요."
+          sub="우리가 하고 있는 일을 소개해주세요. 사진도 담을 수 있어요."
           hiddenWhenCollapsed
           expanded={openSections.has("activities")}
           hasData={hasActivities}
@@ -1768,7 +1781,7 @@ function RegisterForm() {
               </div>
             </SortableCard>
           ))}
-          {activities.length < 5 && (
+          {activities.length < MAX_ACTIVITIES && (
             <button
               type="button"
               onClick={addActivity}
@@ -1806,7 +1819,7 @@ function RegisterForm() {
           id="sec-collabs"
           badge={aiFilled.has("collabs") ? <AiBadge /> : null}
           label="이런 콜라보 경험이 있어요."
-          sub="선택 · 최대 5개 · 지난 콜라보를 더하면 “검증된 파트너”라는 신호가 돼요."
+          sub="선택 · 지난 콜라보를 더할수록 “검증된 파트너”라는 신호가 돼요."
           hiddenWhenCollapsed
           expanded={openSections.has("collabs")}
           hasData={hasCollabs}
@@ -1965,7 +1978,7 @@ function RegisterForm() {
                   </div>
                 </SortableCard>
               ))}
-              {collabHistory.length < 5 && (
+              {collabHistory.length < MAX_COLLABS && (
                 <button
                   type="button"
                   onClick={addCollab}

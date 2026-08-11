@@ -247,3 +247,92 @@ export interface CollabInput {
   photos?: string[];
   link?: string;
 }
+
+// ─────────────────────────────────────────────────────────────
+// 📰 매거진 (2026-08-10) — 콜라보 성사 사례를 현장 기록으로 발행하는 코너
+// 스펙 = Obsidian [[매거진-기능-개발지시]]
+// ─────────────────────────────────────────────────────────────
+
+/** 본문 저장 포맷 = **Tiptap JSON**(HTML 문자열이 아니다).
+ *
+ *  ⭐HTML로 저장하지 않는 이유 두 가지:
+ *   ① 렌더링을 나중에 못 바꾼다 — 디자인이 바뀌면 저장된 글을 전부 다시 손봐야 한다.
+ *   ② `dangerouslySetInnerHTML`이 필요해져 XSS 표면이 생긴다. JSON은 우리가 노드별로 그린다.
+ *
+ *  🚨**이 타입이 에디터(PR2)와 렌더러(PR1)의 계약이다.** 한쪽만 바꾸면 글이 조용히 안 보인다 —
+ *    노드를 추가·개명할 땐 반드시 양쪽을 같이 고칠 것. (렌더러 = `app/magazine/[slug]/ArticleBody.tsx`)
+ */
+export interface MagazineNode {
+  type: string;
+  /** heading은 `{level:3}`, image는 `{src, alt, caption}`, link 마크는 `{href}` */
+  attrs?: Record<string, unknown>;
+  content?: MagazineNode[];
+  text?: string;
+  marks?: { type: string; attrs?: Record<string, unknown> }[];
+}
+export interface MagazineDoc {
+  type?: string; // "doc"
+  content?: MagazineNode[];
+}
+
+/** 지원 노드 — **이 목록 밖은 만들지 않는다**(지시서 §8: 에디터 기능 확장 금지).
+ *  `pullQuote`(강조 박스)와 image의 `caption`은 Tiptap 기본에 없어 PR2에서 커스텀 확장으로 만든다. */
+export const MAGAZINE_NODES = [
+  "doc", "paragraph", "text", "hardBreak",
+  "heading",        // level 3만 — h1=제목, h2=섹션이라 본문은 h3부터
+  "blockquote",     // 현장 발화·모집글 인용
+  "pullQuote",      // 강조 박스(가운데 큰 글씨) — 커스텀
+  "bulletList", "orderedList", "listItem",
+  "horizontalRule",
+  "image",          // attrs.caption 포함 — 커스텀
+] as const;
+
+/** 정보 카드 한 줄 — "함께한 곳 / 언제 / 누가 / 무엇을". **개수가 호마다 다르다**(가변) */
+export interface MagazineFact { label: string; value: string }
+
+/** 아티클 하단에서 소개서로 잇는 링크. 매거진↔소개서를 잇는 핵심 동선이다.
+ *  ⚠️brands FK가 아니라 **slug 문자열**로 담는다 — 소개서가 삭제·개명돼도 발행된 기록은 남아야 한다.
+ *  name·tagline을 같이 저장하는 것도 같은 이유(원본이 사라져도 카드가 빈칸이 되지 않게). */
+export interface MagazineBrandLink { slug: string; name: string; tagline: string }
+
+export type MagazineStatus = "draft" | "published";
+
+export interface MagazineArticle {
+  id: number;
+  slug: string;
+  status: MagazineStatus;
+  title: string;
+  subtitle: string;
+  editorName: string;
+  location: string;
+  coverImage: string;
+  summary: string;
+  factBox: MagazineFact[];
+  brandLinks: MagazineBrandLink[];
+  body: MagazineDoc;
+  publishedAt?: string; // draft면 없다
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** 목록 카드용 경량 투영 — 본문(body)을 빼고 읽는다.
+ *  ⚠️본문 jsonb는 한 건이 수십 KB가 될 수 있어, 목록에서 통째로 끌어오면 글이 쌓일수록 페이로드가 커진다
+ *  (소개서 목록에서 같은 실수를 한 적이 있다 — `SEARCH_CARD_COLS` 주석 참조). */
+export type MagazineListItem = Omit<MagazineArticle, "body">;
+
+/** 저장 입력 — id·created_at·updated_at은 DB가 채운다.
+ *  ⚠️`publishedAt`을 클라가 정하지 않는다 — 서버가 "draft→published로 처음 바뀌는 순간"에만 찍는다
+ *  (수정할 때마다 발행일이 오늘로 밀리면 아카이브 순서가 무너진다). */
+export interface MagazineSaveInput {
+  slug: string;
+  status: MagazineStatus;
+  title: string;
+  subtitle: string;
+  editorName: string;
+  location: string;
+  coverImage: string;
+  summary: string;
+  factBox: MagazineFact[];
+  brandLinks: MagazineBrandLink[];
+  body: MagazineDoc;
+}

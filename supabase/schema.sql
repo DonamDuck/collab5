@@ -23,6 +23,10 @@ end;
 $$ language plpgsql;
 
 -- ── 기존 테이블 제거 (자식 → 부모 순) ──
+-- ⚠️ **이 목록이 아래 create 목록보다 짧다.** `collab_reports`·`collabs`가 빠져 있어서,
+--    테이블이 이미 있는 DB에 이 파일을 통째로 돌리면 그 둘의 create에서 에러가 난다(2026-08-10 발견).
+--    운영엔 영향 없다(운영은 개별 alter로만 바꾼다) — 새 환경 재현 때만 걸린다. 정리는 별도 건.
+drop table if exists magazine_articles cascade;
 drop table if exists reactions        cascade;
 drop table if exists card_view_events cascade;
 drop table if exists collab_requests  cascade;
@@ -203,6 +207,34 @@ drop trigger if exists trg_collabs_updated on collabs;
 create trigger trg_collabs_updated before update on collabs
   for each row execute function set_updated_at();
 alter table collabs enable row level security;
+
+-- ── 📰 매거진 아티클 (2026-08-10) ──
+-- 콜라보 성사 사례를 현장 기록으로 발행하는 코너. 대표가 브라우저에서 직접 쓰고 고친다.
+-- ⚠️ 다른 테이블과 **FK가 하나도 없다** — 연결 브랜드는 `brand_links` jsonb에 slug 문자열로만 담는다.
+--    소개서가 삭제·개명돼도 아티클은 남아야 하고(발행된 기록이다), 링크가 끊기면 화면에서만 처리한다.
+-- 운영 DB 적용 = supabase/migrations/2026-08-10-magazine.sql (이 파일 전체를 돌리지 말 것)
+create table magazine_articles (
+  id            bigint generated always as identity primary key,
+  slug          text not null unique,
+  status        text not null default 'draft' check (status in ('draft', 'published')),
+  title         text not null,
+  subtitle      text not null default '',
+  editor_name   text not null default '안톤',
+  location      text not null default '',
+  cover_image   text not null default '',              -- 목록 썸네일 + OG 겸용
+  summary       text not null default '',
+  fact_box      jsonb not null default '[]'::jsonb,    -- [{label, value}]
+  brand_links   jsonb not null default '[]'::jsonb,    -- [{slug, name, tagline}]
+  body          jsonb not null default '{}'::jsonb,    -- Tiptap JSON document
+  published_at  timestamptz,
+  created_at    timestamptz not null default now(),
+  updated_at    timestamptz not null default now()
+);
+create index idx_magazine_status_pub on magazine_articles(status, published_at desc);
+drop trigger if exists trg_magazine_updated on magazine_articles;
+create trigger trg_magazine_updated before update on magazine_articles
+  for each row execute function set_updated_at();
+alter table magazine_articles enable row level security;
 
 -- ── 삭제 전파(CASCADE) 체인 ──
 --   auth.users ──CASCADE──▶ users ──CASCADE──▶ saved_brands

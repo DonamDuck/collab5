@@ -21,6 +21,7 @@ import {
 import type { Block, BrandDna, CollabReportData, DnaItem, DnaSignature, Maker, NovelIdea, ReportIdea } from "./types";
 import { kstIso } from "./time";
 import { meter, logMeter, type CallMeter } from "./ai-cost";
+import { DNA_ITEM_LIMIT } from "./limits";
 
 // 리포트 모델: 대표 블라인드 A/B(07-26)에서 3.6-flash가 2.5-flash·3.1-pro를 모두 이김.
 // 리포트 호출에는 샘플링 파라미터를 넘기지 않는다(3.x 계열 temperature 지원 중단 공지 대응).
@@ -74,9 +75,15 @@ export function brandDigest(m: Maker): { text: string; fields: string[] } {
   push("offers_description", m.offersDescription);
   push("seeks_description", m.seeksDescription);
   push("target_audience", m.targetAudience.join(", "));
+  // 🆕08-10 `slice(DNA_ITEM_LIMIT)` — 화면 상한(30)과 **분리한다**. 안 자르면 화면 상한을 푼 만큼
+  //   AI 입력이 조용히 따라 부푼다(리포트 원가의 큰 몫이 입력이다).
+  //   ✅도입 시점 실제 최대가 활동 5·콜라보 5라 7로 잘라도 결과가 같다 → 다이제스트 문자열 동일 →
+  //     `input_hash` 동일 → **DNA 재생성 0건.** 8건째를 넣는 브랜드부터만 갈린다.
+  //   ⚠️여기 순서는 **사장님이 폼에서 정한 순서**다(앞에 둔 것이 곧 대표작) — 정렬하지 말 것.
   push(
     "activities",
     m.activities
+      .slice(0, DNA_ITEM_LIMIT)
       .map((a) => [a.title, a.desc].filter(Boolean).join(": "))
       .filter(Boolean)
       .join("\n")
@@ -84,6 +91,7 @@ export function brandDigest(m: Maker): { text: string; fields: string[] } {
   push(
     "collab_history",
     m.collabHistory
+      .slice(0, DNA_ITEM_LIMIT) // 위 activities 주석 참조 — 화면 상한과 분리
       .map((h) => {
         const head = h.types.length > 0 ? `${h.partner} (${h.types.join("·")})` : h.partner;
         return h.desc ? `${head}: ${h.desc}` : head;

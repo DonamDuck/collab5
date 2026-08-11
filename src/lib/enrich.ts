@@ -108,7 +108,23 @@ export interface CollabHint {
   partner: string; // 파트너/함께한 곳
   desc: string; // 한두 문장 요약 (해요체)
   source: string; // 출처 유형 라벨
+  /** 🆕연도 "2024" (08-10, 대표 지시 "크롤은 최신이 맨 위로").
+   *  ⚠️**선택 필드다 — required에 넣지 않는다.** 필수로 만들면 메모에 연도가 없을 때 모델이 지어낸다
+   *  (우리 파이프라인의 제1원칙이 창작 금지다). 없으면 없는 채로 두고 정렬에서 뒤로 보낸다. */
+  year?: string;
 }
+/** 연도 위생 처리 — **4자리 숫자만** 통과. 모델은 "2024년", "2024년 봄", "작년"처럼도 준다.
+ *  ⭐프롬프트는 요청이고 **형식은 파서가 보장한다** — 이 계약이 깨지면 소개서에 "작년"이 그대로 실리고
+ *  정렬은 조용히 뒤죽박죽이 된다(문자열이 숫자로 안 바뀌어 전부 0 취급).
+ *  범위도 본다: 1900~현재+1. "20241"·"12" 같은 값과 미래 연도 창작을 막는다. */
+export function sanitizeYear(raw?: string): string | undefined {
+  const m = raw?.match(/(19|20)\d{2}/);
+  if (!m) return undefined;
+  const y = Number(m[0]);
+  const max = new Date().getFullYear() + 1;
+  return y >= 1900 && y <= max ? String(y) : undefined;
+}
+
 /** press 기사 URL 위생 처리 — http(s) 절대 URL만 통과(제미나이가 준 잡값·상대경로·빈값 차단). */
 export function sanitizeHttpUrl(raw?: string): string | undefined {
   const s = raw?.trim();
@@ -526,6 +542,8 @@ const OptionsResultSchema = z.object({
         partner: z.string().describe("파트너/함께한 곳 이름"),
         desc: z.string().describe("한두 문장 요약, 해요체"),
         source: z.string().describe("출처 유형: 네이버 블로그 후기/카페글/웹 검색/인스타그램 중 하나"),
+        // 위 responseSchema와 같은 이유로 optional — 메모에 연도가 없으면 비운다(추측 금지).
+        year: z.string().optional().describe("연도 4자리(예: 2024). 조사 메모에 드러난 것만, 없으면 생략"),
       })
     )
     .describe("조사 메모에 실제 언급된 콜라보 흔적 0~3건. 없으면 빈 배열"),
@@ -628,7 +646,12 @@ const GEMINI_OPTIONS_SCHEMA = {
           partner: { type: Type.STRING, description: "파트너/함께한 곳 이름" },
           desc: { type: Type.STRING, description: "한두 문장 요약, 해요체" },
           source: { type: Type.STRING, description: "출처 유형: 네이버 블로그 후기/카페글/웹 검색/인스타그램 중 하나" },
+          year: {
+            type: Type.STRING,
+            description: "그 콜라보가 있었던 연도 4자리(예: 2024). 조사 메모에 연도가 드러난 것만 — 없으면 이 필드를 빼라(추측 금지)",
+          },
         },
+        // ⚠️`year`는 required가 아니다 — 필수로 만들면 메모에 없을 때 모델이 지어낸다(창작 금지 원칙).
         required: ["partner", "desc", "source"],
       },
       description: "조사 메모에 파트너명이 드러난 협업 소식 0~3건. 메모에 없으면 빈 배열 — 창작 금지",
@@ -796,6 +819,7 @@ ${BRAND_VOICE}
   예) 다른 작가가 이 가게를 소재로 소설을 냈다 → "서적 출간을 병행합니다"❌ / 그건 [알려짐]이라 blockHints(press)로 간다.
   문장을 쓰기 전에 "이 일을 한 주어가 누구인가"를 조사 메모에서 확인하고, 브랜드가 아니면 활동·제품으로 쓰지 마라.
   collabHints: 메모에 파트너명이 드러난 협업 소식만 0~3건. 각 항목의 source는 그 정보가 나온 출처 유형(네이버 블로그 후기/카페글/웹 검색/인스타그램)으로. ⚠️메모에 없으면 절대 만들지 말고 빈 배열로 둬라(참고용 힌트라 사실만).
+  · year = 그 콜라보가 있었던 **연도 4자리**(예: 2024). 메모에 날짜·연도·"○○년"이 드러난 것만 적고, **없으면 필드를 아예 빼라 — 추측·계산 금지**(게시일이 곧 콜라보 시점이라 단정하지도 마라).
 - blockHints: 조사에서 근거가 뚜렷할 때만 추천 블록 최대 2개.
   공개 수치 발견(팔로워·서포터·펀딩액·판매량·매출·운영 연차·직원 규모·입점처 수 등, ⚠️후기 수·별점은 제외) → metrics(items에 label·value 밑그림) /
   언론·수상·방송 → press(items에 label=매체·수상명, year, desc=그 매체가 이 브랜드를 소개한 내용 한 줄 요약 "해요체", url=그 기사 원문 링크. ⭐label·desc·url 셋 다 조사 메모에 실제로 드러난 것만 — 없으면 빈 문자열, 창작·추측 금지. ⚠️특히 label(매체명)은 조사 자료의 표기를 글자 그대로 옮겨라. 비슷한 이름으로 바꾸거나 "○○매거진·○○뉴스"처럼 그럴싸한 이름을 지어내지 마라 — 매체명을 정확히 모르면 그 항목 자체를 빼라. ⚠️지역 지류신문·사보처럼 웹 링크가 없는 매체도 많다 — url이 없다고 해서 그 소개가 가짜인 건 아니니, 매체명이 자료에 분명하면 url은 비운 채로 항목을 남겨라. ⭐url을 채우는 법: **[네이버 웹문서] 섹션 줄 끝의 '링크:' 값을 글자 그대로 복사**해라 — 그 줄의 제목·설명이 이 브랜드를 소개한 기사·매거진이면 그 링크가 곧 기사 원문이다. URL을 새로 만들거나 도메인만 보고 조립하지 마라. 웹문서에 해당 줄이 없으면 url은 빈 문자열) /
@@ -1688,8 +1712,15 @@ class NaverGeminiProvider implements SearchProvider {
       activityHints: (o.activityHints ?? [])
         .filter((h) => h && h.title?.trim() && h.desc?.trim())
         .slice(0, 3),
+      // 🆕08-10 최신순 정렬 (대표 지시: "AI 크롤할 때는 시간순으로, 최신이 가장 상단").
+      //   ⭐**정렬은 여기 한 곳에서만** 한다 — 위저드 화면·힌트 주입·리빌 카드가 전부 이 배열을 쓰므로,
+      //     소비자 쪽에서 각자 정렬하면 반드시 한 곳이 어긋난다(같은 함정으로 08-07에 카드 순서가 갈렸다).
+      //   ⚠️연도가 없는 항목은 **뒤로 민다**(0으로 취급). 앞으로 오면 "최신이 위"라는 약속이 깨진 것처럼 보인다.
+      //   ⚠️`sanitizeYear`로 4자리만 통과 — "2024년 봄"·"작년" 같은 값이 그대로 소개서에 실리면 안 된다.
       collabHints: (o.collabHints ?? [])
         .filter((h) => h && h.partner?.trim() && h.desc?.trim())
+        .map((h) => ({ ...h, year: sanitizeYear(h.year) }))
+        .sort((a, b) => Number(b.year ?? 0) - Number(a.year ?? 0))
         .slice(0, 3),
       blockHints: (o.blockHints ?? [])
         .filter(
@@ -1816,7 +1847,7 @@ class NaverGeminiProvider implements SearchProvider {
 ⭐단 instagram이 확정 안 됐으면 instagramCandidates에 도메인·브랜드명 기반 그럴듯한 추정 핸들 2~4개를 넣어줘(사장이 직접 고를 후보). 예: 도메인이 canvasgarden.shop이면 @canvasgarden, @canvasgarden_official, @canvasgarden.shop 등.
 나머지는 사실만 쓰고, 확인 안 된 필드는 빈 문자열. 짧은 필드(note·desc·힌트 등)는 해요체, 브랜드 소개(descriptions)만 '어미 리듬' 혼합체.
 ⭐⭐oneLiners 필수 점검: 브랜드명(상호)을 문장 안에 절대 넣지 마라. 서술어는 말로 소개하듯 행위+진행형("~을 만들고 있어요/열고 있어요/만들어 가고 있어요")으로 — 단답 현재형("~을 만들어요/열어요"), "만나보세요·함께해요" 같은 권유형, "선물해요·선사해요" 같은 감성형 금지.
-⭐activityHints는 0~5건 — 대표 메뉴·정기 프로그램·상시 서비스·매달 반복 기획이 1순위지만 **자체 기획 팝업·일회성 행사도 브랜드다움이 보이면 포함**(반복은 자격이 아니라 가중치). 근거가 있으면 적극 추출. collabHints는 파트너명이 드러난 협업만 0~3건. (source=출처 유형, 홈페이지 발췌면 "홈페이지"). 자료에 없으면 빈 배열 — 지어내기 금지.`;
+⭐activityHints는 0~5건 — 대표 메뉴·정기 프로그램·상시 서비스·매달 반복 기획이 1순위지만 **자체 기획 팝업·일회성 행사도 브랜드다움이 보이면 포함**(반복은 자격이 아니라 가중치). 근거가 있으면 적극 추출. collabHints는 파트너명이 드러난 협업만 0~3건. (source=출처 유형, 홈페이지 발췌면 "홈페이지"). year=연도 4자리, **자료에 드러난 것만·없으면 생략(추측 금지)**. 자료에 없으면 빈 배열 — 지어내기 금지.`;
     const opts = await this.generateOptions(prompt, 0.9);
     // 지도 링크는 모델이 아니라 코드가 넣는다 — 네이버 좌표로 조립한 값을 메모에서 되찾아 덮어씀.
     const mapUrl = extractMapLinkFromResearch(input.research);
