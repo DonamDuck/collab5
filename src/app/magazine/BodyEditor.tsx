@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useEditor, EditorContent, type Editor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Link from "@tiptap/extension-link";
@@ -8,6 +8,8 @@ import Underline from "@tiptap/extension-underline";
 import Placeholder from "@tiptap/extension-placeholder";
 import { PullQuote, CaptionedImage } from "./MagazineEditorNodes";
 import { markdownToDoc, looksLikeMarkdown } from "@/lib/magazine-markdown";
+import { uploadPhoto } from "@/lib/upload";
+import { MAGAZINE_IMAGE_MAX_DIM, MAGAZINE_STORAGE_PREFIX } from "@/lib/limits";
 import type { MagazineDoc } from "@/lib/types";
 
 // 매거진 본문 에디터 (2026-08-10) — 지시서 §2-2의 블록만. **더 늘리지 말 것.**
@@ -34,7 +36,7 @@ function Btn({
   );
 }
 
-function Toolbar({ editor }: { editor: Editor }) {
+function Toolbar({ editor, onImage, uploading }: { editor: Editor; onImage: (f: File) => void; uploading: boolean }) {
   const addLink = () => {
     const prev = editor.getAttributes("link").href as string | undefined;
     const url = window.prompt("링크 주소", prev ?? "https://");
@@ -70,7 +72,45 @@ function Toolbar({ editor }: { editor: Editor }) {
       <span className="mx-1 h-4 w-px bg-hairline" />
       <Btn on={addLink} active={editor.isActive("link")} label="링크" title="링크" />
       <Btn on={() => editor.chain().focus().setHorizontalRule().run()} label="구분선" title="구분선" />
+      {/* 사진 — 업로드가 끝나면 커서 자리에 들어간다. 캡션은 삽입된 사진 아래 칸에서 입력. */}
+      <label
+        className={`inline-flex h-8 shrink-0 cursor-pointer items-center rounded-sm px-2 text-[13px] font-medium transition-colors ${
+          uploading ? "text-faint" : "text-mute hover:bg-surface-soft hover:text-ink"
+        }`}
+        title="사진 넣기"
+        onMouseDown={(e) => e.preventDefault()}
+      >
+        {uploading ? "올리는 중…" : "사진"}
+        <input type="file" accept="image/*" className="hidden" disabled={uploading}
+          onChange={(e) => { const f = e.target.files?.[0]; if (f) onImage(f); e.target.value = ""; }} />
+      </label>
       <Btn on={() => editor.chain().focus().unsetAllMarks().clearNodes().run()} label="서식 지우기" title="서식 지우기" />
+    </div>
+  );
+}
+
+/** 선택한 이미지의 캡션 입력 칸.
+ *  ⭐사진을 클릭했을 때만 나타난다 — 캡션을 본문 문단으로 두지 않고 **이미지 노드의 속성**으로 두기 때문에
+ *  (그래야 이미지를 지우면 캡션도 같이 사라진다), 그 값을 고칠 자리가 따로 필요하다. */
+function CaptionBar({ editor }: { editor: Editor }) {
+  const active = editor.isActive("image");
+  const caption = (editor.getAttributes("image").caption as string) ?? "";
+  if (!active) {
+    return (
+      <p className="border-t border-hairline px-4 py-2 text-[13px] text-faint">
+        사진을 클릭하면 여기에 캡션을 넣을 수 있어요.
+      </p>
+    );
+  }
+  return (
+    <div className="flex items-center gap-2 border-t border-hairline bg-surface-soft px-4 py-2">
+      <span className="shrink-0 text-[13px] font-medium text-mute">캡션</span>
+      <input
+        value={caption}
+        onChange={(e) => editor.chain().focus().updateAttributes("image", { caption: e.target.value }).run()}
+        placeholder="사진 아래 들어갈 설명 (선택)"
+        className="w-full rounded-sm border border-hairline bg-surface px-2.5 py-1.5 text-[14px] text-ink outline-none placeholder:text-faint focus:border-focus"
+      />
     </div>
   );
 }
@@ -82,6 +122,9 @@ export function BodyEditor({
   initial: MagazineDoc;
   onChange: (doc: MagazineDoc) => void;
 }) {
+  const [uploading, setUploading] = useState(false);
+  const [imgErr, setImgErr] = useState("");
+
   // 붙여넣기 핸들러가 editor를 참조해야 하는데, 그 시점엔 useEditor가 아직 값을 안 돌려줬다 → ref로 잇는다.
   const editorRef = useRef<Editor | null>(null);
 
@@ -127,14 +170,34 @@ export function BodyEditor({
     editorRef.current = editor ?? null;
   }, [editor]);
 
+  const insertImage = async (file: File) => {
+    setImgErr("");
+    setUploading(true);
+    try {
+      const src = await uploadPhoto(file, MAGAZINE_IMAGE_MAX_DIM, MAGAZINE_STORAGE_PREFIX);
+      // caption은 빈 문자열로 넣고, 아래 캡션 칸에서 채운다(노드 attrs라 이미지와 함께 움직인다).
+      editorRef.current?.chain().focus().setImage({ src, alt: "" }).run();
+    } catch (e) {
+      setImgErr(
+        e instanceof Error && e.message.startsWith("timeout:")
+          ? "업로드가 오래 걸려 멈췄어요. 다시 시도해주세요."
+          : "사진 업로드에 실패했어요."
+      );
+    } finally {
+      setUploading(false);
+    }
+  };
+
   if (!editor) {
     return <div className="min-h-[480px] rounded-md border border-hairline bg-surface-soft" />;
   }
 
   return (
     <div className="overflow-hidden rounded-md border border-hairline bg-surface">
-      <Toolbar editor={editor} />
+      <Toolbar editor={editor} onImage={(f) => void insertImage(f)} uploading={uploading} />
       <EditorContent editor={editor} />
+      {imgErr && <p className="border-t border-hairline px-4 py-2 text-[13px] text-red-600">{imgErr}</p>}
+      <CaptionBar editor={editor} />
     </div>
   );
 }

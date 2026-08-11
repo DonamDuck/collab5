@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { BodyEditor } from "./BodyEditor";
+import { CoverPicker } from "./CoverPicker";
 import { saveArticleAction, lookupBrandAction } from "@/lib/magazine-actions";
 import type { MagazineArticle, MagazineDoc, MagazineStatus } from "@/lib/types";
 
@@ -81,9 +82,8 @@ export function ArticleForm({ initial }: { initial?: MagazineArticle }) {
           <Field label="장소"><input className={inputCls} value={location} onChange={(e) => setLocation(e.target.value)}
             placeholder="고양 일산동구 두더지요가원" /></Field>
         </div>
-        <Field label="커버 이미지 주소" hint="목록 썸네일 + 링크 미리보기 겸용. PR3에서 업로드 버튼이 붙어요">
-          <input className={inputCls} value={coverImage} onChange={(e) => setCoverImage(e.target.value)}
-            placeholder="https://..." />
+        <Field label="커버 사진" hint="목록 썸네일 + 링크 미리보기(카톡·검색) 겸용">
+          <CoverPicker value={coverImage} onChange={setCoverImage} />
         </Field>
         <Field label="요약" hint="목록 카드와 검색 결과에 나가요. 2~3줄">
           <textarea className={`${inputCls} min-h-[80px] leading-relaxed`} value={summary}

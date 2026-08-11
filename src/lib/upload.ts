@@ -28,10 +28,15 @@ function withTimeout<T>(p: Promise<T>, ms: number, step: string): Promise<T> {
   ]);
 }
 
-export async function uploadPhoto(file: File, maxDim: number): Promise<string> {
+export async function uploadPhoto(
+  file: File,
+  maxDim: number,
+  /** 🆕저장 경로 접두사(2026-08-10) — 매거진은 `"magazine"`. 안 주면 기존 위치 그대로. */
+  prefix?: string
+): Promise<string> {
   if (!authEnvReady) return fileToResizedDataUrl(file, maxDim);
   // ① 서명 URL 발급(서버 액션) — 서버가 조용히 안 돌아오는 경우가 여기다
-  const signed = await withTimeout(createUploadUrlAction(), 15_000, "sign");
+  const signed = await withTimeout(createUploadUrlAction("photo", prefix), 15_000, "sign");
   if ("error" in signed) {
     if (signed.error === "storage-disabled") return fileToResizedDataUrl(file, maxDim);
     throw new Error(signed.error);

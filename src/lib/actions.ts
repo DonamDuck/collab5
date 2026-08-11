@@ -526,7 +526,11 @@ const PHOTO_BUCKET = "maker-photos";
 
 /** Storage 서명 업로드 URL 발급. env 미설정 시 error(클라는 base64 폴백). */
 export async function createUploadUrlAction(
-  kind: "photo" | "pdf" = "photo"
+  kind: "photo" | "pdf" = "photo",
+  /** 🆕저장 경로 접두사(2026-08-10, 매거진). 안 주면 기존과 동일 —
+   *  **선택 파라미터로 둔 이유**: 소개서·PDF 호출부가 이미 여럿인데 시그니처를 바꾸면 전부 따라 고쳐야 하고,
+   *  한 곳을 빠뜨리면 그 자리만 조용히 깨진다(지시서 §6이 "optional로 확장"을 명시). */
+  prefix?: string
 ): Promise<
   { path: string; token: string; publicUrl: string } | { error: string }
 > {
@@ -534,10 +538,14 @@ export async function createUploadUrlAction(
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) return { error: "storage-disabled" };
   const admin = createClient(url, key);
+  // ⚠️접두사는 영문·숫자·하이픈·슬래시만 통과 — 클라가 보낸 값이 경로에 그대로 들어가므로
+  //   `../` 같은 값이 섞이면 버킷 밖을 가리키려 든다.
+  const safe = prefix?.replace(/[^a-zA-Z0-9/-]/g, "").replace(/^\/+|\/+$/g, "");
+  const dir = safe ? `${safe}/` : "";
   const path =
     kind === "pdf"
-      ? `d/${crypto.randomUUID()}.pdf`
-      : `p/${crypto.randomUUID()}.jpg`;
+      ? `${dir}d/${crypto.randomUUID()}.pdf`
+      : `${dir}p/${crypto.randomUUID()}.jpg`;
   const { data, error } = await admin.storage
     .from(PHOTO_BUCKET)
     .createSignedUploadUrl(path);
