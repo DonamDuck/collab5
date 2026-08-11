@@ -109,8 +109,14 @@ function Block({ node }: { node: MagazineNode }) {
       if (!src) return null;
       const alt = typeof node.attrs?.alt === "string" ? node.attrs.alt : "";
       const caption = typeof node.attrs?.caption === "string" ? node.attrs.caption : "";
+      const w = Number(node.attrs?.width);
+      const width = Number.isFinite(w) && w > 0 ? w : null;
       return (
-        <figure className="my-2">
+        // ⭐폭은 `max-width`로 준다 — **고정폭이 아니라 상한이다.**
+        //   그래야 대표가 정한 크기를 지키면서도, 화면이 그보다 좁으면(모바일) 화면에 맞춰 줄어든다.
+        //   `width`로 주면 폰에서 사진이 화면 밖으로 삐져나가 가로 스크롤이 생긴다(대표 지시 08-10).
+        //   ⚠️figure를 가운데 정렬해야 좁힌 사진이 왼쪽에 붙지 않는다.
+        <figure className="my-2 mx-auto" style={width ? { maxWidth: width } : undefined}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={src}

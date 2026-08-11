@@ -44,6 +44,25 @@ export const CaptionedImage = Image.extend({
         renderHTML: (attrs) =>
           attrs.caption ? { "data-caption": attrs.caption as string } : {},
       },
+      /** 표시 가로폭(px). `null`이면 본문 폭에 꽉 채운다(기존 동작).
+       *  ⚠️**높이는 저장하지 않는다** — 가로만 정하고 세로는 비율대로 따라가게 둔다.
+       *  둘 다 저장하면 나중에 원본을 바꾸거나 본문 폭이 달라질 때 사진이 찌그러진다.
+       *  ⚠️이 값은 **상한이지 고정폭이 아니다.** 렌더 쪽에서 `max-width`로 쓰므로,
+       *  모바일처럼 화면이 더 좁으면 화면에 맞춰 줄어든다(대표 지시 08-10). */
+      width: {
+        default: null,
+        parseHTML: (el) => {
+          const w = Number(el.getAttribute("data-width"));
+          return Number.isFinite(w) && w > 0 ? w : null;
+        },
+        // `style`을 같이 주는 이유 = **편집 화면에서도 바로 보이게.** data-width만 심으면
+        // 저장 후 상세에서만 크기가 반영돼, 쓰는 사람은 결과를 못 보고 감으로 값을 넣게 된다.
+        // (상세 렌더러는 이 style이 아니라 attrs.width를 직접 읽는다 — 그쪽이 정본.)
+        renderHTML: (attrs) =>
+          attrs.width
+            ? { "data-width": String(attrs.width), style: `max-width:${attrs.width}px` }
+            : {},
+      },
     };
   },
 });

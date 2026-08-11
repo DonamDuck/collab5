@@ -102,15 +102,63 @@ function CaptionBar({ editor }: { editor: Editor }) {
       </p>
     );
   }
+  const width = (editor.getAttributes("image").width as number | null) ?? null;
+  const setWidth = (w: number | null) =>
+    editor.chain().focus().updateAttributes("image", { width: w }).run();
+
   return (
-    <div className="flex items-center gap-2 border-t border-hairline bg-surface-soft px-4 py-2">
-      <span className="shrink-0 text-[13px] font-medium text-mute">캡션</span>
-      <input
-        value={caption}
-        onChange={(e) => editor.chain().focus().updateAttributes("image", { caption: e.target.value }).run()}
-        placeholder="사진 아래 들어갈 설명 (선택)"
-        className="w-full rounded-sm border border-hairline bg-surface px-2.5 py-1.5 text-[14px] text-ink outline-none placeholder:text-faint focus:border-focus"
-      />
+    <div className="space-y-2 border-t border-hairline bg-surface-soft px-4 py-2.5">
+      <div className="flex items-center gap-2">
+        <span className="w-10 shrink-0 text-[13px] font-medium text-mute">캡션</span>
+        <input
+          value={caption}
+          onChange={(e) => editor.chain().focus().updateAttributes("image", { caption: e.target.value }).run()}
+          placeholder="사진 아래 들어갈 설명 (선택)"
+          className="w-full rounded-sm border border-hairline bg-surface px-2.5 py-1.5 text-[14px] text-ink outline-none placeholder:text-faint focus:border-focus"
+        />
+      </div>
+      {/* 크기 — 드래그 핸들 대신 프리셋 + 직접 입력.
+          ⭐드래그를 안 쓴 이유: 모바일에서 손가락으로 핸들을 잡기가 어렵다(대표가 짚은 지점).
+            프리셋이면 폰에서도 한 번 탭으로 끝나고, 정확한 값이 필요하면 옆 칸에 숫자를 넣는다. */}
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className="w-10 shrink-0 text-[13px] font-medium text-mute">크기</span>
+        {[
+          { label: "작게", v: 320 },
+          { label: "보통", v: 480 },
+          { label: "크게", v: 640 },
+          { label: "꽉 차게", v: null },
+        ].map((p) => (
+          <button
+            key={p.label}
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => setWidth(p.v)}
+            className={`h-8 rounded-sm px-2.5 text-[13px] font-medium transition-colors ${
+              width === p.v ? "bg-primary text-primary-on" : "bg-surface text-mute hover:text-ink"
+            }`}
+          >
+            {p.label}
+          </button>
+        ))}
+        <span className="ml-1 inline-flex items-center gap-1">
+          <input
+            type="number"
+            min={80}
+            step={20}
+            value={width ?? ""}
+            onChange={(e) => {
+              const n = Number(e.target.value);
+              setWidth(Number.isFinite(n) && n >= 80 ? n : null);
+            }}
+            placeholder="직접"
+            className="h-8 w-20 rounded-sm border border-hairline bg-surface px-2 text-[13px] text-ink outline-none placeholder:text-faint focus:border-focus"
+          />
+          <span className="text-[13px] text-faint">px</span>
+        </span>
+      </div>
+      <p className="text-[12px] leading-relaxed text-faint">
+        폰처럼 화면이 좁으면 이 값과 상관없이 화면 폭에 맞춰 들어가요.
+      </p>
     </div>
   );
 }
@@ -146,7 +194,7 @@ export function BodyEditor({
     editorProps: {
       attributes: {
         class:
-          "min-h-[420px] px-4 py-4 text-[16px] leading-[1.85] text-body outline-none [&_h3]:mt-6 [&_h3]:text-[19px] [&_h3]:font-bold [&_h3]:text-ink [&_blockquote]:border-l-[3px] [&_blockquote]:border-primary-tint [&_blockquote]:pl-3 [&_blockquote]:text-mute [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_hr]:my-4 [&_hr]:border-hairline [&_a]:text-primary-on [&_a]:underline",
+          "min-h-[420px] px-4 py-4 text-[16px] leading-[1.85] text-body outline-none [&_h3]:mt-6 [&_h3]:text-[19px] [&_h3]:font-bold [&_h3]:text-ink [&_blockquote]:border-l-[3px] [&_blockquote]:border-primary-tint [&_blockquote]:pl-3 [&_blockquote]:text-mute [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_hr]:my-4 [&_hr]:border-hairline [&_a]:text-primary-on [&_a]:underline [&_img]:mx-auto [&_img]:rounded-md [&_img.ProseMirror-selectednode]:outline [&_img.ProseMirror-selectednode]:outline-2 [&_img.ProseMirror-selectednode]:outline-[var(--color-primary)]",
       },
       // ⭐마크다운 붙여넣기 — 지시서가 못 박은 요구사항.
       //   대표 초안이 마크다운이라, 이게 없으면 `###`·`>`가 평문으로 들어가 전부 손으로 다시 잡아야 한다.
