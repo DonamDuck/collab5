@@ -163,7 +163,7 @@ const DNA_SCHEMA = {
         },
         required: ["text", "evidence", "source"],
       },
-      description: "이 브랜드만의 것 0~3개(없으면 빈 배열)",
+      description: "이 브랜드만의 것 0~5개(없으면 빈 배열). 정체 서술만이 아니라 개별 프로그램·만드는 것·콜라보에서 한 행위도 후보",
     },
   },
   required: ["summary", "items", "signature"],

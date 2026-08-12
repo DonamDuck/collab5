@@ -52,11 +52,16 @@ export const HEAVY_METHODS = ["공동 상품","공동 브랜딩","입점 판매"
 
 export const THIN_MIN_TYPES = 4;      // 서로 다른 type 수 미달 = thin
 export const MIN_MATCH_SCORE = 7;     // 접점 채점 통과 하한(10점 만점 합산 기준, A/B로 튜닝)
-export const SIGNATURE_MAX = 3;       // 이 브랜드만의 것 최대 개수(많아지면 '특별함'이 아니라 목록이 된다)
+// 이 브랜드만의 것 최대 개수(많아지면 '특별함'이 아니라 목록이 된다).
+// 🆕08-12 3→5 — 재료를 정체 서술 밖(활동·콜라보 이력)까지 넓히면서 함께 올렸다. **상한만 올리면
+//   억지로 채운다**는 우려는 "가치 있는 것만 담는다"가 그대로 살아 있어 막는다(실측: 캔가는 정원 3에서
+//   2개만 뽑고 멈췄다 — 정원이 병목이 아니었다). 안 올리면 콜라보가 활동을 밀어낼 뿐 총량이 안 는다.
+export const SIGNATURE_MAX = 5;
 // 이 시각 이전 dna는 stale 취급 — **DNA 스키마·프롬프트를 바꾸면 여기를 올려야 실제로 재생성된다.**
 // 지문(input_hash)은 '소개서가 바뀌었나'만 보므로, 소개서가 그대로면 새 필드가 영원히 빈 채로 캐시된다.
 //  2026-07-25: Pool 대개정  /  2026-07-27: signature(이 브랜드만의 것) 신설
-export const DNA_REFRESH_BEFORE = "2026-07-27T03:00:00Z";
+//  2026-08-12: signature 재료를 활동·콜라보 이력까지 확대 + 상한 3→5
+export const DNA_REFRESH_BEFORE = "2026-08-12T09:00:00Z";
 // (은퇴 2026-07-26) DNA_STALE_SLACK_MS 삭제 — stale 판정을 시각 비교에서 내용 지문(input_hash)
 // 비교로 바꿨다. setBrandDna가 brands.updated_at 트리거를 발화시켜 시각 비교는 구조적으로 성립하지
 // 않았고(모든 DNA 영구 stale), 허용 오차로 막으려 해도 DNA 생성 10~20초가 오차를 넘겼다.
