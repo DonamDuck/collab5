@@ -89,6 +89,38 @@ function Toolbar({ editor, onImage, uploading }: { editor: Editor; onImage: (f: 
   );
 }
 
+/** 가로폭 직접 입력 칸.
+ *  🪤**입력 문자열을 따로 들고 있는 이유** — 노드의 `width`에 값을 바로 묶으면(`value={width}`)
+ *    "480"을 치는 도중 첫 글자 `4`가 최소값(80) 미만이라 width가 `null`이 되고, 그 `null`이
+ *    곧바로 칸을 비워버린다. 즉 **한 글자도 못 넣는다**(08-12 실측). 그래서 타이핑 중에는
+ *    화면 값만 두고, **쓸 수 있는 값이 됐을 때만** 노드에 반영한다. */
+function WidthField({ width, onCommit }: { width: number | null; onCommit: (w: number | null) => void }) {
+  const [text, setText] = useState(width ? String(width) : "");
+  // 프리셋을 누르면 바깥에서 값이 바뀐다 → 칸도 따라간다.
+  // (타이핑으로 반영된 경우엔 문자열이 같아 화면이 흔들리지 않는다.)
+  useEffect(() => {
+    setText(width ? String(width) : "");
+  }, [width]);
+
+  return (
+    <input
+      type="number"
+      min={80}
+      step={20}
+      value={text}
+      onChange={(e) => {
+        const t = e.target.value;
+        setText(t);
+        if (!t.trim()) { onCommit(null); return; } // 비우면 = 꽉 차게
+        const n = Number(t);
+        if (Number.isFinite(n) && n >= 80) onCommit(n);
+      }}
+      placeholder="직접"
+      className="h-8 w-20 rounded-sm border border-hairline bg-surface px-2 text-[13px] text-ink outline-none placeholder:text-faint focus:border-focus"
+    />
+  );
+}
+
 /** 선택한 이미지의 캡션 입력 칸.
  *  ⭐사진을 클릭했을 때만 나타난다 — 캡션을 본문 문단으로 두지 않고 **이미지 노드의 속성**으로 두기 때문에
  *  (그래야 이미지를 지우면 캡션도 같이 사라진다), 그 값을 고칠 자리가 따로 필요하다. */
@@ -123,9 +155,11 @@ function CaptionBar({ editor }: { editor: Editor }) {
       <div className="flex flex-wrap items-center gap-1.5">
         <span className="w-10 shrink-0 text-[13px] font-medium text-mute">크기</span>
         {[
+          // ⚠️「크게」가 640이면 **「꽉 차게」와 구분이 안 된다**(편집 칸 638px·상세 본문 ~648px).
+          //   버튼 넷 중 둘이 같은 결과를 내면 UI가 거짓말을 하는 셈이라 560으로 낮췄다(08-12).
           { label: "작게", v: 320 },
-          { label: "보통", v: 480 },
-          { label: "크게", v: 640 },
+          { label: "보통", v: 440 },
+          { label: "크게", v: 560 },
           { label: "꽉 차게", v: null },
         ].map((p) => (
           <button
@@ -141,18 +175,7 @@ function CaptionBar({ editor }: { editor: Editor }) {
           </button>
         ))}
         <span className="ml-1 inline-flex items-center gap-1">
-          <input
-            type="number"
-            min={80}
-            step={20}
-            value={width ?? ""}
-            onChange={(e) => {
-              const n = Number(e.target.value);
-              setWidth(Number.isFinite(n) && n >= 80 ? n : null);
-            }}
-            placeholder="직접"
-            className="h-8 w-20 rounded-sm border border-hairline bg-surface px-2 text-[13px] text-ink outline-none placeholder:text-faint focus:border-focus"
-          />
+          <WidthField width={width} onCommit={setWidth} />
           <span className="text-[13px] text-faint">px</span>
         </span>
       </div>

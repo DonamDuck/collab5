@@ -58,9 +58,19 @@ export const CaptionedImage = Image.extend({
         // `style`을 같이 주는 이유 = **편집 화면에서도 바로 보이게.** data-width만 심으면
         // 저장 후 상세에서만 크기가 반영돼, 쓰는 사람은 결과를 못 보고 감으로 값을 넣게 된다.
         // (상세 렌더러는 이 style이 아니라 attrs.width를 직접 읽는다 — 그쪽이 정본.)
+        //
+        // 🚨**`min(…, 100%)`을 빼면 안 된다.** 이미지가 본문 폭에 맞춰 줄어드는 건
+        //    Tailwind preflight의 `img { max-width: 100% }` 덕분인데, 여기서 `max-width`에
+        //    px만 주면 **같은 속성이라 그 규칙을 덮어써 버린다.** 그러면 상한이 아니라 사실상
+        //    고정폭이 돼, 폰(본문 폭 ~290px)에서 480px 사진이 칸 밖으로 삐져나간다.
+        //    에디터 바깥 상자가 `overflow-hidden`이라 삐져나간 만큼 잘려서, 화면에는
+        //    **"눌러도 크기가 그대로"로 보인다**(08-12 실측 — 대표가 본 증상이 이것).
         renderHTML: (attrs) =>
           attrs.width
-            ? { "data-width": String(attrs.width), style: `max-width:${attrs.width}px` }
+            ? {
+                "data-width": String(attrs.width),
+                style: `max-width:min(${attrs.width}px, 100%)`,
+              }
             : {},
       },
     };
