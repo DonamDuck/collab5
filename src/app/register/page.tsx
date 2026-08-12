@@ -1599,19 +1599,20 @@ function RegisterForm() {
             {/* ⭐**라벨이 답을 정한다** — 「이런 파트너를 찾고 있어요」라고 물으니 답이 전부 *누구*로 나왔고,
                 정작 걸고 싶던 *조건*(계단뿌셔클럽: 10명 이상 기업 워크숍만)은 물어본 적이 없어 안 적혔다. */}
             <Field
-              label="어떤 파트너와, 어떤 조건으로 하고 싶으세요? (선택)"
+              label="어떤 콜라보/파트너를 찾고 있으신가요? (선택)"
               hint={aiFilled.has("seeks") ? <AiBadge /> : null}
             >
-              {/* 🚨**placeholder로는 못 한다** — AI 초안이 칸을 채우면 placeholder는 사라진다.
-                  조건을 적어달라는 말이 정작 **AI 초안이 있는 소개서에서만 안 보이게** 된다(08-12). */}
+              {/* 🚨**이 줄을 placeholder로 옮기지 말 것** — AI 초안이 칸을 채우면 placeholder는 사라져,
+                  조건을 물어보는 말이 정작 **AI 초안이 있는 소개서에서만 안 보이게** 된다(08-12).
+                  예시는 빈 칸에서만 필요하니 placeholder로 가도 되지만, **묻는 말은 여기 남는다.** */}
               <p className="mb-2 text-[13px] leading-relaxed text-mute">
-                <span className="font-medium text-body">받는 조건이 있다면 꼭 적어주세요</span> — 예) 10명 이상 기업 워크숍만 진행하고 있어요.
+                (혹시, 콜라보 제안에 특별한 조건이 있다면 알려주세요.)
               </p>
               <textarea
                 value={seeksNote}
                 onChange={(e) => setSeeksNote(e.target.value)}
                 rows={4}
-                placeholder="예: 지속가능성을 이야기하는 브랜드, 라이프스타일 브랜드, 카페와 함께하고 싶어요."
+                placeholder="예) 수선의 철학에 공감하는 다양한 브랜드, 작가님들과 열린 주제로 콜라보를 논의해보고 싶어요, 10명 이상 기업 워크숍 콜라보만 진행하고 있어요. 등"
                 className="w-full rounded-sm border border-hairline bg-surface px-3 py-2.5 text-base leading-relaxed text-ink outline-none placeholder:text-faint focus:border-focus"
               />
             </Field>
