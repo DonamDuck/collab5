@@ -32,6 +32,22 @@ export function MakerArticle({ maker, isOwner, logoUrl, readOnly }: {
         </Section>
       )}
 
+      {/* ⭐**콜라보 조건은 맨 앞에.** (08-12 대표 지시 — 계단뿌셔클럽 사장님 피드백)
+          이 소개서를 읽는 사람은 둘이다: 브랜드가 궁금해서 온 사람 / 콜라보를 제안하러 온 사람.
+          우리 서비스의 주된 독자는 **후자**인데, 그 사람의 첫 질문("나랑 할 만한가")의 답이
+          아홉 번째 섹션에 있었다. 사장님이 조건을 걸고 싶어도(예: 10명 이상 기업 워크숍만)
+          아무도 거기까지 안 읽어서 엉뚱한 제안이 계속 들어온다.
+          ⚠️여긴 **문장만** 온다 — 유형 칩은 아래(콜라보 이력 뒤)에 남겨뒀다.
+            칩은 offers∪seeks 합집합 한 세트라(07-22 통합) "받고 싶은 것"과 "해줄 수 있는 것"이 섞여 있다.
+            조건 옆에 넓은 칩을 같이 세우면 **사람은 칩을 스캔하고 문장을 건너뛰어** 조건이 도리어 흐려진다. */}
+      {maker.seeksDescription && (
+        <Section title="이런 파트너를 찾고 있어요">
+          <p className="whitespace-pre-line text-[17px] leading-relaxed text-body">
+            {maker.seeksDescription}
+          </p>
+        </Section>
+      )}
+
       {/* ② 우리는 이런 일을 하고 있습니다 — activities */}
       {maker.activities.length > 0 && (
         <Section title="우리는 이런 일을 하고 있어요">
@@ -116,13 +132,11 @@ export function MakerArticle({ maker, isOwner, logoUrl, readOnly }: {
         </Section>
       )}
 
-      {/* 선택 블록 — 배열 순서대로 렌더 */}
-      {maker.showcases.length > 0 && <BlockSections blocks={maker.showcases} Section={Section} />}
-
-      {/* ⑤⑥ 통폐합(2026-07-22) — 콜라보 3형제: 기대(통합 칩)·제공·파트너를 같은 타이틀 위계로.
-          제공·파트너 제목도 Section h2와 동일 스타일(대표 확정), 블록 간격은 활동 아이템 간격(space-y-6).
-          기존 소개서도 합집합 읽기로 그대로 정상 렌더(분기 없음). */}
-      {(maker.offers.length > 0 || maker.seeks.length > 0 || maker.offersDescription || maker.seeksDescription) && (
+      {/* 콜라보 유형 칩 + 제공 서술 — **콜라보 이력 바로 뒤**(08-12 대표 지시).
+          "이런 걸 해왔고 → 이런 걸 해드릴 수 있어요"가 증거→제안 순서라 활동 뒤보다 설득력이 있다.
+          (콜라보 이력이 없는 브랜드는 이 섹션이 자연히 활동·시작이야기 근처로 붙는다 — 손해 없음.)
+          ⚠️칩은 `offers∪seeks` 합집합이다(07-22 통합, seeks 칩은 은퇴해 저장 시 항상 빈 배열). */}
+      {(maker.offers.length > 0 || maker.seeks.length > 0 || maker.offersDescription) && (
         <Section title="이런 콜라보를 기대하고 있어요">
           <div className="space-y-6">
             {(maker.offers.length > 0 || maker.seeks.length > 0) && (
@@ -140,17 +154,12 @@ export function MakerArticle({ maker, isOwner, logoUrl, readOnly }: {
                 </p>
               </div>
             )}
-            {maker.seeksDescription && (
-              <div className="print:break-inside-avoid">
-                <h2 className="mb-4 text-[21px] font-bold leading-snug tracking-tight text-ink print:break-after-avoid-page">이런 파트너를 찾고 있어요</h2>
-                <p className="whitespace-pre-line text-[17px] leading-relaxed text-body">
-                  {maker.seeksDescription}
-                </p>
-              </div>
-            )}
           </div>
         </Section>
       )}
+
+      {/* 선택 블록 — 배열 순서대로 렌더 */}
+      {maker.showcases.length > 0 && <BlockSections blocks={maker.showcases} Section={Section} />}
 
       {/* ⑦ 저희는 이런 고객들과 함께 하고 있어요 — targetAudience */}
       {maker.targetAudience.length > 0 && (

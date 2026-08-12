@@ -214,6 +214,7 @@ export default async function MakerPage({
         contactEmail={ownerProfile?.email || undefined}
         senderName={senderName}
         isOwner={isOwner}
+        collabPaused={maker.collabPaused}
         /* 내 소개서에서의 [콜라보 분석] — 사내 계정만(07-31 실고객 유입 후 원복).
            자기 브랜드끼리의 분석은 결과가 의미 없고 유료 콜만 나가므로 일반 유저에겐 안 연다.
            서버(`/api/collab-report`)에도 같은 가드가 있다 — 여긴 화면 층. */

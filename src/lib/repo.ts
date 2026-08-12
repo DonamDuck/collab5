@@ -16,7 +16,7 @@ export interface Repo {
   updateMakerContent(slug: string, content: Omit<Maker, "id" | "slug" | "createdAt" | "ownerUserId" | "editPasswordHash" | "status">): Promise<Maker | null>;
   /** ⚠️`searchVisible` = 화면상 **[콜라보 찾기에 보이기]**(홈·`/search` 목록). 08-07 개명 전 이름이
    *  「검색에 보이기」라 웹 검색으로 오해됐는데, **구글·네이버 노출과는 무관**하다(사이트맵은 전부 싣는다). */
-  setMakerFlags(slug: string, flags: { searchVisible?: boolean }): Promise<Maker | null>;
+  setMakerFlags(slug: string, flags: { searchVisible?: boolean; collabPaused?: boolean }): Promise<Maker | null>;
   setMakerOwner(slug: string, ownerUserId: number): Promise<void>;
   setMakerPasswordHash(slug: string, hash: string): Promise<void>;
   /** enrichment 스냅샷 교체 — B35 특장점 [지우기] 전용. updateMakerContent는 enrichment를 의도적으로 보존한다. */
@@ -195,6 +195,7 @@ const seedMakers: Maker[] = [
       address: "서울 성동구 성수이로 88 2층 캔버스가든",
     },
     searchVisible: true,
+    collabPaused: false,
     status: "active",
     createdAt: now(),
   },
@@ -221,6 +222,7 @@ const seedMakers: Maker[] = [
       address: "서울 마포구 연남동",
     },
     searchVisible: true,
+    collabPaused: false,
     status: "active",
     createdAt: now(),
   },
@@ -247,6 +249,7 @@ const seedMakers: Maker[] = [
       address: "부산 영도구",
     },
     searchVisible: true,
+    collabPaused: false,
     status: "active",
     createdAt: now(),
   },
@@ -273,6 +276,7 @@ const seedMakers: Maker[] = [
       address: "제주시",
     },
     searchVisible: true,
+    collabPaused: false,
     status: "active",
     createdAt: now(),
   },
@@ -327,6 +331,7 @@ const seedMakers: Maker[] = [
       address: "전북 전주시 완산구 한옥마을길 12",
     },
     searchVisible: false,
+    collabPaused: false,
     status: "active",
     createdAt: now(),
   },
@@ -375,6 +380,7 @@ const seedMakers: Maker[] = [
       address: "대구 중구 종로 24 1층",
     },
     searchVisible: false,
+    collabPaused: false,
     status: "active",
     createdAt: now(),
   },
@@ -426,10 +432,11 @@ class InMemoryRepo implements Repo {
     Object.assign(m, c);
     return m;
   }
-  async setMakerFlags(slug: string, flags: { searchVisible?: boolean }): Promise<Maker | null> {
+  async setMakerFlags(slug: string, flags: { searchVisible?: boolean; collabPaused?: boolean }): Promise<Maker | null> {
     const m = this.makers.find((x) => x.slug === slug);
     if (!m) return null;
     if (flags.searchVisible !== undefined) m.searchVisible = flags.searchVisible;
+    if (flags.collabPaused !== undefined) m.collabPaused = flags.collabPaused;
     return m;
   }
   async setMakerOwner(slug: string, ownerUserId: number): Promise<void> {
@@ -661,7 +668,7 @@ interface MakerRow {
   keywords?: string[] | null; showcases?: Maker["showcases"] | null;
   offers_description?: string | null; seeks_description?: string | null;
   description?: string | null; // 자세히 소개(07-25 trust.description에서 분리 완료)
-  search_visible: boolean | null; status: string | null; created_at: string; updated_at?: string | null;
+  search_visible: boolean | null; collab_paused?: boolean | null; status: string | null; created_at: string; updated_at?: string | null;
   owner_user_id?: number | null;
   // 수정 비밀번호 해시 — 07-25 claim_token_hash → edit_password_hash 이사(옛 컬럼 폴백)
   edit_password_hash?: string | null; claim_token_hash?: string | null;
@@ -745,6 +752,8 @@ function rowToMaker(r: MakerRow): Maker {
     description: r.description ?? "",
     trust: r.trust ?? {},
     searchVisible: r.search_visible ?? true,
+    // ⚠️`?? false` — 컬럼이 아직 없는 환경(마이그레이션 전)에서도 '받는 중'으로 읽힌다. 기본값이 잠금이면 안 된다.
+    collabPaused: r.collab_paused ?? false,
     status: (r.status as MakerStatus) ?? "active",
     createdAt: r.created_at,
     updatedAt: r.updated_at ?? undefined,
@@ -774,6 +783,7 @@ class SupabaseRepo implements Repo {
       showcases: input.showcases, intro_file_url: input.introFileUrl ?? null,
       keywords: input.keywords, trust: input.trust,
       search_visible: input.searchVisible,
+      collab_paused: input.collabPaused,
       status: "active", // 생성 default = active (소프트 삭제 시에만 inactive)
       enrichment: input.enrichment ?? null,
       owner_user_id: input.ownerUserId ?? null, edit_password_hash: input.editPasswordHash ?? null,
@@ -804,6 +814,7 @@ class SupabaseRepo implements Repo {
       photos: c.photos, showcases: c.showcases, intro_file_url: c.introFileUrl ?? null,
       keywords: c.keywords, trust: c.trust,
       search_visible: c.searchVisible,
+      collab_paused: c.collabPaused,
     };
     const { data } = await this.db.from("brands").update(patch).eq("slug", slug).select().maybeSingle();
     return data ? rowToMaker(data as MakerRow) : null;
@@ -974,13 +985,14 @@ class SupabaseRepo implements Repo {
     return rowToArticle(data as MagazineRow);
   }
 
-  // /my 토글 — 소유자 검증은 actions에서. search_visible 만 부분 갱신.
+  // /my 토글 — 소유자 검증은 actions에서. 넘어온 플래그만 부분 갱신한다.
   async setMakerFlags(
     slug: string,
-    flags: { searchVisible?: boolean }
+    flags: { searchVisible?: boolean; collabPaused?: boolean }
   ): Promise<Maker | null> {
     const patch: Record<string, boolean> = {};
     if (flags.searchVisible !== undefined) patch.search_visible = flags.searchVisible;
+    if (flags.collabPaused !== undefined) patch.collab_paused = flags.collabPaused;
     if (Object.keys(patch).length === 0) return this.getMakerBySlug(slug);
     const { data } = await this.db.from("brands").update(patch).eq("slug", slug).select().maybeSingle();
     return data ? rowToMaker(data as MakerRow) : null;

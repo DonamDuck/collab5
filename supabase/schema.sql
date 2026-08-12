@@ -85,7 +85,9 @@ create table brands (
   intro_file_url     text,                           -- 소개자료 PDF URL
   -- (폐지) collab_open: '콜라보 받는 중' 토글 — 07-31 제거. "검색에 노출 = 콜라보 가능"으로 단일화.
   --        기존 DB에는 컬럼이 남아 있을 수 있음(대표가 배포 후 drop). 코드는 더 이상 읽지도 쓰지도 않는다.
-  search_visible     boolean not null default true,  -- 검색 노출 on/off (= 콜라보 제안 수신 가능)
+  --        ⚠️그 "단일화"는 08-07에 우리 손으로 깨졌다(아래 두 컬럼이 서로 다른 걸 뜻한다).
+  search_visible     boolean not null default true,  -- [콜라보 찾기에 보이기] — 홈·/search 목록 노출. 웹 검색(구글·네이버)과는 무관(08-07 개명)
+  collab_paused      boolean not null default false, -- [콜라보 요청 잠시 안받기] — true면 /m 제안 버튼 잠김 + 안내 칩. 목록 노출과는 별개(08-12)
   status             text    not null default 'active' check (status in ('active','inactive')),
                                                      -- 소프트 삭제: /my 삭제 = inactive(행 보관). 전 조회 함수가 active만 필터
   owner_user_id      bigint references users(user_id) on delete set null,  -- 소유 계정(구 owner_uuid)

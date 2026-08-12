@@ -188,7 +188,8 @@ function RegisterForm() {
   const [targetAudience, setTargetAudience] = useState<string[]>([]);
   const [customAudience, setCustomAudience] = useState("");
   const [collabHistory, setCollabHistory] = useState<HistItem[]>([emptyHist()]);
-  const [searchVisible, setSearchVisible] = useState(true); // 검색 노출(기본 on)
+  const [searchVisible, setSearchVisible] = useState(true); // [콜라보 찾기에 보이기](기본 on)
+  const [collabPaused, setCollabPaused] = useState(false); // [콜라보 요청 잠시 안받기](기본 off — 아무도 갑자기 잠기지 않게)
   const [instagram, setInstagram] = useState("");
   const [homepage, setHomepage] = useState("");
   const [mapUrl, setMapUrl] = useState("");
@@ -1010,7 +1011,7 @@ function RegisterForm() {
     ps.filter((x) => !x.uploading && /^https?:\/\//.test(x.url)).map((x) => ({ url: x.url }));
   const draftSnapshot = {
     name, oneLiner, description, story, offersNote, seeksNote,
-    offers, values, targetAudience, searchVisible,
+    offers, values, targetAudience, searchVisible, collabPaused,
     instagram, homepage, mapUrl, address, introFileUrl, blocks,
     photos: keepPhotos(photos),
     activities: activities.map((a) => ({ title: a.title, desc: a.desc, link: a.link, photos: keepPhotos(a.photos) })),
@@ -1039,6 +1040,7 @@ function RegisterForm() {
     setOffersNote(d.offersNote); setSeeksNote(d.seeksNote);
     setOffers(d.offers); setValues(d.values); setTargetAudience(d.targetAudience);
     setSearchVisible(d.searchVisible);
+    setCollabPaused(d.collabPaused ?? false); // 옛 임시저장엔 이 키가 없다 → 받는 중으로
     setInstagram(d.instagram); setHomepage(d.homepage); setMapUrl(d.mapUrl); setAddress(d.address);
     setIntroFileUrl(d.introFileUrl); setBlocks(d.blocks); setPhotos(d.photos);
     setActivities(d.activities.map((a) => ({ title: a.title, desc: a.desc, link: a.link ?? "", photos: a.photos })));
@@ -1094,6 +1096,7 @@ function RegisterForm() {
       setMapUrl(m.trust.mapUrl ?? "");
       setAddress(m.trust.address ?? "");
       setSearchVisible(m.searchVisible ?? true);
+      setCollabPaused(m.collabPaused ?? false);
       setPhotos(m.photos.map((u) => ({ url: u })));
       setBlocks((m.showcases ?? []).map((b) => ({ ...b, uid: crypto.randomUUID() })));
       setIntroFileUrl(m.introFileUrl ?? "");
@@ -1177,6 +1180,7 @@ function RegisterForm() {
         introFileUrl: introFileUrl || undefined,
         photos: wrap(photoUrls),
         searchVisible,
+        collabPaused,
         enrichment,
         instagram,
         homepage,
@@ -2196,34 +2200,24 @@ function RegisterForm() {
           </Field>
         </div>
 
-        {/* 목록 노출 — 07-31부터 이 한 토글이 '콜라보 받는 중'을 겸한다(collab_open 폐지).
-            🆕08-07 개명: 「검색에 보이기」→「콜라보 찾기에 보이기」. 옛 이름은 **웹 검색(구글·네이버)**으로
-            읽혔는데, 이 토글이 정하는 건 사이트 안 [콜라보 찾기] 목록뿐이다(웹 검색은 전부 열려 있다). */}
+        {/* 공개·수신 설정 — **두 토글은 서로 다른 축이다.** 헷갈리면 사장님이 엉뚱한 걸 끈다.
+              · [콜라보 찾기에 보이기] = 사이트 안 목록에 뜨나(웹 검색은 이 토글과 무관, 08-07 개명)
+              · [콜라보 요청 잠시 안받기] = 지금 제안을 받나
+            07-31엔 앞 토글 하나가 뒤 역할까지 겸했는데(구 `collab_open` 폐지), 08-07에 앞 토글의 뜻을
+            목록으로 좁히면서 "요청을 안 받는다"를 말할 자리가 사라졌다 → 08-12 재분리(대표 지시). */}
         <div className="space-y-2">
-          <div className="flex items-center justify-between gap-3 rounded-lg border border-hairline bg-surface px-4 py-3">
-            <div>
-              <p className="text-[15px] font-medium text-ink">콜라보 찾기에 보이기</p>
-              <p className="text-[13px] leading-relaxed break-keep text-mute">
-                켜두면 다른 브랜드가 [콜라보 찾기]에서 나를 발견해 콜라보를 제안할 수 있어요. 꺼두면 목록에 안 뜨고, 링크로는 계속 공유할 수 있어요.
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => setSearchVisible((v) => !v)}
-              role="switch"
-              aria-checked={searchVisible}
-              aria-label="콜라보 찾기에 보이기"
-              className={`flex h-[26px] w-11 shrink-0 items-center rounded-pill p-[2px] transition-colors ${
-                searchVisible ? "bg-primary" : "bg-border-strong"
-              }`}
-            >
-              <span
-                className={`h-[22px] w-[22px] rounded-pill bg-white transition-transform ${
-                  searchVisible ? "translate-x-[18px]" : "translate-x-0"
-                }`}
-              />
-            </button>
-          </div>
+          <SettingToggle
+            label="콜라보 찾기에 보이기"
+            desc="켜두면 다른 브랜드가 [콜라보 찾기]에서 나를 발견해 콜라보를 제안할 수 있어요. 꺼두면 목록에 안 뜨고, 링크로는 계속 공유할 수 있어요."
+            on={searchVisible}
+            onToggle={() => setSearchVisible((v) => !v)}
+          />
+          <SettingToggle
+            label="콜라보 요청 잠시 안받기"
+            desc="켜두면 소개서에 [잠시 콜라보를 쉬고 있어요]가 표시되고 제안 버튼이 잠겨요. 소개서는 그대로 보이고, 찜·콜라보 추천은 계속 받을 수 있어요."
+            on={collabPaused}
+            onToggle={() => setCollabPaused((v) => !v)}
+          />
         </div>
 
       </div>
@@ -2871,6 +2865,38 @@ function ChipRow({
           </button>
         );
       })}
+    </div>
+  );
+}
+
+/** 공개·수신 설정 토글 한 줄 — 라벨 + 설명 + 스위치.
+ *  ⭐두 개 이상이 나란히 서게 되면서 컴포넌트로 뺐다. 같은 모양이어야 **둘이 같은 종류의 결정**
+ *    (내 소개서를 어떻게 열어둘까)으로 읽힌다. */
+function SettingToggle({
+  label, desc, on, onToggle,
+}: { label: string; desc: string; on: boolean; onToggle: () => void }) {
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-lg border border-hairline bg-surface px-4 py-3">
+      <div>
+        <p className="text-[15px] font-medium text-ink">{label}</p>
+        <p className="text-[13px] leading-relaxed break-keep text-mute">{desc}</p>
+      </div>
+      <button
+        type="button"
+        onClick={onToggle}
+        role="switch"
+        aria-checked={on}
+        aria-label={label}
+        className={`flex h-[26px] w-11 shrink-0 items-center rounded-pill p-[2px] transition-colors ${
+          on ? "bg-primary" : "bg-border-strong"
+        }`}
+      >
+        <span
+          className={`h-[22px] w-[22px] rounded-pill bg-white transition-transform ${
+            on ? "translate-x-[18px]" : "translate-x-0"
+          }`}
+        />
+      </button>
     </div>
   );
 }

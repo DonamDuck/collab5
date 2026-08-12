@@ -58,6 +58,7 @@ export function ReportSheet({
   toName,
   sampleMode,
   onPropose,
+  collabPaused = false,
   initialFromSlug = null,
   restoreOnOpen = false,
   initialReport = null,
@@ -74,6 +75,9 @@ export function ReportSheet({
   toName: string;
   sampleMode: boolean; // 소개서 0개 유저 — 샘플 리포트 티저
   onPropose: () => void; // CTA — 리포트 닫고 제안 시트 오픈(부모가 처리)
+  /** 이 브랜드가 [콜라보 요청 잠시 안받기] 중인가(08-12). 켜져 있으면 CTA를 **버튼이 아니라 안내로** 바꾼다.
+   *  ⚠️버튼만 남기고 눌러도 아무 일 없게 두면 안 된다 — 고장으로 읽힌다. */
+  collabPaused?: boolean;
   initialFromSlug?: string | null; // /my 아카이브 딥링크 — 이 slug로 선택 스텝 없이 바로 실행
   /** 제안 시트 [← 뒤로]로 다시 열렸다 — **손에 쥔 결과를 버리지 않고 그대로 되살린다**(08-08 대표 QA).
    *  네트워크·유료 콜 0. 시트를 X로 아예 닫으면 부모가 false로 되돌려, 다음 오픈은 평소대로 처음부터. */
@@ -410,6 +414,13 @@ export function ReportSheet({
           <p className="text-center text-[15px] font-medium text-ink">
             이 제안이 마음에 드셨나요? ✨
           </p>
+          {collabPaused ? (
+            // 쉬는 중 — 분석은 끝까지 보여주되 제안만 막는다. 아이디어는 남으니 나중에 다시 오면 된다.
+            <p className="mt-3 rounded-md border border-hairline bg-surface-soft px-3 py-3 text-center text-[14px] leading-relaxed text-mute">
+              지금은 이 브랜드가 콜라보를 쉬고 있어요.<br />
+              찜해두면 나중에 다시 찾아오기 쉬워요.
+            </p>
+          ) : (
           <button
             type="button"
             onClick={() => {
@@ -420,6 +431,7 @@ export function ReportSheet({
           >
             콜라보 제안 시작하기
           </button>
+          )}
           {/* 넘긴 브랜드의 보관본(08-07) — 왜 다시 만들 수 없는지 한 줄로. 없으면 "왜 갱신이 안 되지"가 된다. */}
           {result?.readOnly && (
             <p className="mt-3 rounded-md border border-hairline bg-surface-soft px-3 py-2 text-[13px] leading-relaxed text-mute">

@@ -39,6 +39,7 @@ export function MakerActionBar({
   senderName,
   viewerBrands = [],
   isOwner = false,
+  collabPaused = false,
   ownerCanReport = false,
   cachedReports,
 }: {
@@ -55,6 +56,11 @@ export function MakerActionBar({
   /** 내가 이 소개서의 주인인가 — 주인에겐 '나에게 제안·찜'이 말이 안 되고, 눌리면 북극성 퍼널이 오염된다
    *  (07-29 디자인팀 QA 지적). 서버에도 같은 가드가 있고 여긴 화면 층. */
   isOwner?: boolean;
+  /** 이 소개서가 [콜라보 요청 잠시 안받기] 중인가(08-12 대표 지시 — 계단뿌셔클럽 사장님 피드백).
+   *  ⚠️**막는 곳이 버튼 하나가 아니다.** 제안 시트로 들어오는 길이 넷이다 —
+   *    버튼 · 로그인 복귀(sessionStorage) · `?report&propose=1` 딥링크 · 리포트 시트 CTA.
+   *    그래서 화면 분기만 하지 않고 `openPropose()` 한 군데에서 잠근다. */
+  collabPaused?: boolean;
   /** 내 소개서에서도 [콜라보 분석]을 열어줄 것인가 — **사내 계정 전용 예외**(`lib/staff.ts`).
    *  자기 브랜드끼리의 분석은 결과가 의미 없고 유료 콜만 나가서, 일반 유저에겐 닫아둔다.
    *  isOwner가 false면 애초에 이 분기를 안 타므로 여기선 소유자일 때만 의미가 있다. */
@@ -225,8 +231,9 @@ export function MakerActionBar({
       setReportSample(viewerBrands.length === 0); // 로그인했지만 소개서 0개 → 샘플 티저
       setReportOpen(true);
     } else {
-      setProposeOpen(true);
+      openPropose();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loggedIn, makerId, viewerBrands.length]);
 
   // /my 리포트 아카이브 딥링크 — ?report={fromSlug}면 그 쌍의 시트를 바로 연다(캐시면 즉시·0콜).
@@ -276,6 +283,13 @@ export function MakerActionBar({
     });
   };
 
+  /** 제안 시트를 여는 **유일한 문**. 쉬는 중이면 어느 경로로 와도 열리지 않는다.
+   *  (버튼은 애초에 잠겨 있지만, 로그인 복귀·딥링크는 버튼을 안 거치고 들어온다.) */
+  const openPropose = () => {
+    if (collabPaused) return;
+    setProposeOpen(true);
+  };
+
   // 콜라보 시작하기 — 비로그인은 로그인 유도, 로그인은 제안 시트.
   const handlePropose = () => {
     if (!loggedIn) {
@@ -284,7 +298,7 @@ export function MakerActionBar({
       setLoginOpen(true);
       return;
     }
-    setProposeOpen(true);
+    openPropose();
   };
 
   // 콜라보 분석 — 비로그인=로그인 유도 / 소개서 0개=샘플 티저 / 그 외=정상 분석 시트.
@@ -615,7 +629,17 @@ export function MakerActionBar({
                 >
                   콜라보 추천받기
                 </button>
-                {/* 콜라보 제안 시작하기 — primary */}
+                {/* 콜라보 제안 시작하기 — primary. 쉬는 중이면 잠근다(08-12 대표 확정).
+                    ⚠️버튼을 **감추지 않고 잠근다** — 없어지면 "제안하는 법이 없는 서비스"로 읽히지만,
+                      잠겨 있으면 "이 브랜드가 지금 쉬는 중"으로 읽힌다. 상태는 사람이 아니라 브랜드의 것. */}
+                {collabPaused ? (
+                  <div
+                    className="flex h-12 flex-1 items-center justify-center rounded-md border border-hairline bg-surface-soft px-2 text-center text-[15px] font-medium leading-tight text-faint"
+                    role="status"
+                  >
+                    잠시 콜라보를 쉬고 있어요
+                  </div>
+                ) : (
                 <button
                   type="button"
                   onClick={handlePropose}
@@ -623,6 +647,7 @@ export function MakerActionBar({
                 >
                   콜라보 제안 시작하기
                 </button>
+                )}
               </>
             )}
             </div>
@@ -748,7 +773,7 @@ export function MakerActionBar({
           if (autoProposeRef.current) {
             autoProposeRef.current = false; // 1회성 — 뒤로가기·재오픈 때 다시 튀지 않게
             setReportOpen(false);
-            setProposeOpen(true);
+            openPropose();
           }
         }}
         open={reportOpen}
@@ -764,9 +789,10 @@ export function MakerActionBar({
         toSlug={slug}
         toName={makerName}
         sampleMode={reportSample}
+        collabPaused={collabPaused}
         onPropose={() => {
           setReportOpen(false);
-          setProposeOpen(true);
+          openPropose();
         }}
       />
 

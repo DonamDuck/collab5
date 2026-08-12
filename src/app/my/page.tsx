@@ -63,6 +63,7 @@ export default async function MyPage({ searchParams }: { searchParams: Promise<{
             name={m.name}
             oneLiner={m.oneLiner}
             searchVisible={m.searchVisible}
+            collabPaused={m.collabPaused}
           />
         ))}
         <div className="flex justify-center pt-2">

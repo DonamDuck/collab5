@@ -62,7 +62,8 @@ export interface RegisterInput {
   photos?: PhotoWire[]; // 브랜드 사진(리사이즈 data URL, 객체 래핑)
   showcases?: Block[]; // 선택 블록(사진=Storage URL이라 그대로 전송)
   introFileUrl?: string; // 소개자료 PDF URL
-  searchVisible: boolean; // 검색 결과 노출 on/off (= 콜라보 제안 수신 가능)
+  searchVisible: boolean; // [콜라보 찾기에 보이기] — 홈·/search 목록 노출(웹 검색과 무관, 08-07)
+  collabPaused?: boolean; // [콜라보 요청 잠시 안받기] — 목록엔 그대로 보이되 제안만 안 받는 상태(08-12). 옛 폼이 안 보내면 false
   instagram?: string;
   homepage?: string;
   mapUrl?: string; // 지도 링크(네이버·카카오·구글). 화이트리스트 밖이면 저장 시 버림
@@ -135,6 +136,7 @@ export async function createMakerAction(
       ...(mapLinkLabel(input.mapUrl) ? parseLatLngFromMapUrl(input.mapUrl) ?? {} : {}),
     },
     searchVisible: input.searchVisible,
+    collabPaused: input.collabPaused ?? false,
     enrichment: input.enrichment,
     ownerUserId,
     editPasswordHash,
@@ -332,6 +334,7 @@ export async function updateMakerAction(
       ...(mapLinkLabel(input.mapUrl) ? parseLatLngFromMapUrl(input.mapUrl) ?? {} : {}),
     },
     searchVisible: input.searchVisible,
+    collabPaused: input.collabPaused ?? false,
   });
   if (!updated) return { error: "업데이트에 실패했어요." };
   return { slug };
@@ -349,10 +352,10 @@ export async function updateProfileImageAction(imageUrl: string): Promise<{ erro
   }
 }
 
-/** /my 토글 — 로그인 소유자만 search_visible 부분 갱신. */
+/** /my 토글 — 로그인 소유자만. 넘어온 플래그만 부분 갱신한다(목록 노출 / 요청 받기). */
 export async function updateMakerFlagsAction(
   slug: string,
-  flags: { searchVisible?: boolean }
+  flags: { searchVisible?: boolean; collabPaused?: boolean }
 ): Promise<{ error?: string }> {
   const sessionUserId = await getSessionUserId();
   if (!sessionUserId) return { error: "로그인이 필요해요." };
