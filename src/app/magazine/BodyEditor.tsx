@@ -49,7 +49,7 @@ function Toolbar({ editor, onImage, uploading }: { editor: Editor; onImage: (f: 
   };
 
   return (
-    <div className="sticky top-0 z-10 flex flex-wrap items-center gap-0.5 border-b border-hairline bg-surface px-2 py-1.5">
+    <div className="flex flex-wrap items-center gap-0.5 border-b border-hairline bg-surface px-2 py-1.5">
       <Btn on={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
         active={editor.isActive("heading", { level: 3 })} label="소제목" title="소제목" />
       <span className="mx-1 h-4 w-px bg-hairline" />
@@ -121,30 +121,31 @@ function WidthField({ width, onCommit }: { width: number | null; onCommit: (w: n
   );
 }
 
-/** 선택한 이미지의 캡션 입력 칸.
+/** 선택한 사진의 캡션·크기 칸.
  *  ⭐사진을 클릭했을 때만 나타난다 — 캡션을 본문 문단으로 두지 않고 **이미지 노드의 속성**으로 두기 때문에
- *  (그래야 이미지를 지우면 캡션도 같이 사라진다), 그 값을 고칠 자리가 따로 필요하다. */
-function CaptionBar({ editor }: { editor: Editor }) {
-  const active = editor.isActive("image");
+ *  (그래야 이미지를 지우면 캡션도 같이 사라진다), 그 값을 고칠 자리가 따로 필요하다.
+ *
+ *  🚨**이 칸은 툴바와 함께 화면 위에 붙어 있어야 한다**(아래 sticky 래퍼). 예전엔 에디터 **맨 아래**에
+ *    있었는데, 본문이 길어지면 사진을 눌러도 칸이 화면 밖(수천 px 아래)이라 **"클릭은 되는데 입력칸이
+ *    안 보인다"**가 된다(08-12 대표 보고). 자리를 옮길 땐 "본문이 A4 열 장일 때도 보이나"를 먼저 물을 것. */
+function ImageBar({ editor }: { editor: Editor }) {
   const caption = (editor.getAttributes("image").caption as string) ?? "";
-  if (!active) {
-    return (
-      <p className="border-t border-hairline px-4 py-2 text-[13px] text-faint">
-        사진을 클릭하면 여기에 캡션을 넣을 수 있어요.
-      </p>
-    );
-  }
+  if (!editor.isActive("image")) return null;
+
   const width = (editor.getAttributes("image").width as number | null) ?? null;
+  // 🚨**`.focus()`를 붙이지 마라.** 붙이면 값을 바꿀 때마다 DOM 포커스가 에디터로 끌려가
+  //    **입력칸이 한 글자 만에 풀린다**(캡션도 px 칸도 첫 글자에서 끊긴다, 08-12).
+  //    포커스 없이도 동작하는 이유 = 사진 선택(NodeSelection)은 에디터가 blur돼도 살아 있다.
   const setWidth = (w: number | null) =>
-    editor.chain().focus().updateAttributes("image", { width: w }).run();
+    editor.chain().updateAttributes("image", { width: w }).run();
 
   return (
-    <div className="space-y-2 border-t border-hairline bg-surface-soft px-4 py-2.5">
+    <div className="space-y-2 border-b border-hairline bg-surface-soft px-4 py-2.5">
       <div className="flex items-center gap-2">
         <span className="w-10 shrink-0 text-[13px] font-medium text-mute">캡션</span>
         <input
           value={caption}
-          onChange={(e) => editor.chain().focus().updateAttributes("image", { caption: e.target.value }).run()}
+          onChange={(e) => editor.chain().updateAttributes("image", { caption: e.target.value }).run()}
           placeholder="사진 아래 들어갈 설명 (선택)"
           className="w-full rounded-sm border border-hairline bg-surface px-2.5 py-1.5 text-[14px] text-ink outline-none placeholder:text-faint focus:border-focus"
         />
@@ -264,11 +265,20 @@ export function BodyEditor({
   }
 
   return (
-    <div className="overflow-hidden rounded-md border border-hairline bg-surface">
-      <Toolbar editor={editor} onImage={(f) => void insertImage(f)} uploading={uploading} />
+    // ⚠️`overflow-hidden`을 다시 넣지 말 것 — 그게 있으면 이 상자가 스크롤 컨테이너가 돼
+    //   **안쪽 sticky가 통째로 죽는다**(툴바도 안 붙어 있었다). 모서리 둥글림은 sticky 머리와
+    //   맨 아랫줄이 각자 `rounded-t/b`로 처리한다.
+    <div className="rounded-md border border-hairline bg-surface">
+      {/* 툴바 + 사진 칸을 한 덩어리로 화면 위에 붙인다. `top-14` = 사이트 헤더(h-14) 아래. */}
+      <div className="sticky top-14 z-10 rounded-t-md bg-surface">
+        <Toolbar editor={editor} onImage={(f) => void insertImage(f)} uploading={uploading} />
+        <ImageBar editor={editor} />
+      </div>
       <EditorContent editor={editor} />
       {imgErr && <p className="border-t border-hairline px-4 py-2 text-[13px] text-red-600">{imgErr}</p>}
-      <CaptionBar editor={editor} />
+      <p className="rounded-b-md border-t border-hairline px-4 py-2 text-[13px] text-faint">
+        사진을 클릭하면 위쪽에 캡션·크기 칸이 나와요.
+      </p>
     </div>
   );
 }
