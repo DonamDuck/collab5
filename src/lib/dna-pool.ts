@@ -112,6 +112,15 @@ export function filterSignatures(
     }))
     .filter((s) => {
       if (!s.text || s.source.length === 0) return false;
+      // 🚨콜라보 이력은 signature 재료가 아니다(08-12 대표 확정 B안). 함께 한 일에서 **우리 몫이
+      //   어디까지인지가 소개서 문장만으로 안 갈린다** — 공간만 빌려줬는데 그날 프로그램이 우리 것처럼,
+      //   참여자가 가르친 기술이 우리 능력으로 적혔다(실측: 프롬프트로 세 번 고쳐도 안 갈렸다).
+      //   ⭐**프롬프트는 요청이고 보장은 여기서 한다** — 모델이 규칙을 어겨도 이 줄이 막는다.
+      //   ⚠️활동([activities])은 반대다. 속성상 본인이 한 일이라 그대로 쓴다.
+      if (s.source.includes("collab_history")) {
+        console.warn(`[dna] signature 출처가 콜라보 이력 → 폐기: "${s.text}"`);
+        return false;
+      }
       if (s.evidence.length < MIN_QUOTE_LEN || !quoted(s.evidence, hay)) {
         console.warn(`[dna] signature 원문 대조 실패 → 폐기: "${s.text}" (evidence="${s.evidence}")`);
         return false;
