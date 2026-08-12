@@ -851,7 +851,8 @@ function RegisterForm() {
         // 구 seeks 칩 은퇴(통합) — 유형은 통합 칩(offers)에 합집합으로 흡수
         if (types.length) setOffers((p) => [...new Set([...p, ...types])] as CollabType[]);
         if (!seeksNote.trim() && fill.seeksHint.note.trim()) setSeeksNote(fill.seeksHint.note);
-        openSection("seeks");
+        // ⚠️`openSection("seeks")`는 08-12부터 무의미 — 그 섹션은 접히지 않는 상시 노출로 승격됐다.
+        //   (`filled`는 살려둔다 — ✨배지가 "AI가 채운 칸"임을 알리는 데 여전히 쓰인다.)
         filled.add("seeks");
       }
       (fill.blockHints ?? [])
@@ -1110,7 +1111,7 @@ function RegisterForm() {
       if ((m.keywords ?? []).length) open.add("keywords");
       if ((m.targetAudience ?? []).length) open.add("customers");
       if ((m.offersDescription ?? "").trim()) open.add("offersNote");
-      if (m.seeks.length || (m.seeksDescription ?? "").trim()) open.add("seeks");
+      // (seeks는 상시 노출이라 펼칠 필요가 없다 — 08-12)
       setOpenSections(open);
       setEditBooting(false);
     }).catch(() => setEditBooting(false));
@@ -1564,33 +1565,58 @@ function RegisterForm() {
             </div>
           </div>
 
-          {/* 협업 유형 칩 — 공급·수요 통합 1세트 (2026-07-22 대표 확정 — 검색이 이미 offers∪seeks OR라 구분에 실체 없음).
-              구 seeks 칩은 은퇴, 저장 시 합집합이 offers로 들어간다. */}
-          <div id="offers-chips" className="scroll-mt-4">
-            <Field label="함께하고 싶은 콜라보를 골라주세요. *" hint={aiFilled.has("offers") ? <AiBadge /> : null}>
-              <ChipRow
-                options={COLLAB_TYPES}
-                selected={offers}
-                onToggle={(t) => toggle(offers, setOffers, t)}
-              />
-              {errField?.anchor === "offers-chips" && (
-                <p className="mt-2 text-[13px] text-danger">{errField.msg}</p>
-              )}
-              {/* 구 sec-offersNote(시트) → ① 칩 하단 상시 노출로 이사. 칩과 한 세트 */}
-              <div className="mt-4">
-                <p className="mb-1.5 flex items-center gap-2 text-[13px] text-mute">이런 콜라보를 제공할 수 있어요 (선택){aiFilled.has("offersNote") ? <AiBadge /> : null}</p>
-                <textarea
-                  value={offersNote}
-                  onChange={(e) => setOffersNote(e.target.value)}
-                  rows={4}
-                  placeholder="매력적인 분들과의 제품 콜라보, 서로의 매력을 담은 원데이 워크숍, 공동 굿즈 등 다양한 콜라보를 기대해요!"
-                  className="w-full rounded-sm border border-hairline bg-surface px-3 py-2.5 text-base leading-relaxed text-ink outline-none placeholder:text-faint focus:border-focus"
+        </div>
+
+        {/* ── 이런 콜라보를 찾고 있어요 (08-12 신설 — 소개서 섹션과 한 덩어리로 맞춤) ──
+            ⭐**소개서에서 한 섹션인 것은 폼에서도 한 섹션이어야 한다.** 전엔 유형 칩이 ①(필수 영역)
+              안에 있고 조건 서술은 한참 아래 시트 섹션이라, 사장님이 둘을 **다른 질문으로** 여겼다.
+            🚨**StubSection으로 만들면 안 된다** — 칩은 필수인데 스텁은 접히고(`hiddenWhenCollapsed`면
+              값 없을 때 아예 안 보임) 삭제도 된다. **필수 항목이 화면에서 사라지면 등록 자체가 막힌다.**
+              그래서 번호 없는 GroupHeader로 세운 상시 노출 섹션이다.
+            🆕**조건 서술이 이제 항상 보인다** — 전엔 시트에서 "추가"를 눌러야 나타나서, 안 누른 사장님은
+              그런 칸이 있는 줄도 몰랐다(계단뿌셔클럽 조건이 안 적힌 층이 하나 더 있었던 셈).
+            ⚠️`id="sec-seeks"`를 유지할 것 — 완성도 칩이 이 id로 스크롤한다. */}
+        <section id="sec-seeks" className="scroll-mt-4">
+          <GroupHeader title="이런 콜라보를 찾고 있어요." />
+          <div className="space-y-8">
+            {/* 협업 유형 칩 — 공급·수요 통합 1세트 (2026-07-22 대표 확정 — 검색이 이미 offers∪seeks OR라 구분에 실체 없음).
+                구 seeks 칩은 은퇴, 저장 시 합집합이 offers로 들어간다.
+                ⭐칩을 서술보다 **먼저** 둔다(소개서는 반대다). 폼은 읽는 곳이 아니라 쓰는 곳이라,
+                  ①필수를 먼저 만나야 하고 ②칩을 골라 워밍업이 돼야 그다음 글이 써진다. */}
+            <div id="offers-chips" className="scroll-mt-4">
+              <Field label="콜라보 유형을 골라주세요. *" hint={aiFilled.has("offers") ? <AiBadge /> : null}>
+                <ChipRow
+                  options={COLLAB_TYPES}
+                  selected={offers}
+                  onToggle={(t) => toggle(offers, setOffers, t)}
                 />
-              </div>
+                {errField?.anchor === "offers-chips" && (
+                  <p className="mt-2 text-[13px] text-danger">{errField.msg}</p>
+                )}
+              </Field>
+            </div>
+
+            {/* ⭐**라벨이 답을 정한다** — 「이런 파트너를 찾고 있어요」라고 물으니 답이 전부 *누구*로 나왔고,
+                정작 걸고 싶던 *조건*(계단뿌셔클럽: 10명 이상 기업 워크숍만)은 물어본 적이 없어 안 적혔다. */}
+            <Field
+              label="어떤 파트너와, 어떤 조건으로 하고 싶으세요? (선택)"
+              hint={aiFilled.has("seeks") ? <AiBadge /> : null}
+            >
+              {/* 🚨**placeholder로는 못 한다** — AI 초안이 칸을 채우면 placeholder는 사라진다.
+                  조건을 적어달라는 말이 정작 **AI 초안이 있는 소개서에서만 안 보이게** 된다(08-12). */}
+              <p className="mb-2 text-[13px] leading-relaxed text-mute">
+                <span className="font-medium text-body">받는 조건이 있다면 꼭 적어주세요</span> — 예) 10명 이상 기업 워크숍만 진행하고 있어요.
+              </p>
+              <textarea
+                value={seeksNote}
+                onChange={(e) => setSeeksNote(e.target.value)}
+                rows={4}
+                placeholder="예: 지속가능성을 이야기하는 브랜드, 라이프스타일 브랜드, 카페와 함께하고 싶어요."
+                className="w-full rounded-sm border border-hairline bg-surface px-3 py-2.5 text-base leading-relaxed text-ink outline-none placeholder:text-faint focus:border-focus"
+              />
             </Field>
           </div>
-
-        </div>
+        </section>
 
         {/* ── 시트 출신 — 우리 브랜드를 표현하는 키워드 (구③ · 정본 위치 = ① 뒤) ── */}
         <StubSection
@@ -1797,42 +1823,6 @@ function RegisterForm() {
           </div>
         </StubSection>
 
-        {/* ── 시트 출신 — 이런 콜라보를 찾고 있어요 (구⑥ 칩+서술) ──
-             🆕08-12 개명(구 「이런 파트너를 찾고 있어요」). ⭐**라벨이 답을 정한다** —
-               「파트너」라고 물으니 사장님들 답이 전부 *누구*로만 나왔고, 정작 걸고 싶던 *조건*
-               (계단뿌셔클럽: 10명 이상 기업 워크숍만)은 물어본 적이 없어 안 적혔다.
-             ※소개서 섹션 제목과 **같은 문장**으로 맞춘다 — 여기 쓴 게 저기 그대로 나간다는 게 보여야 한다. */}
-        <StubSection
-          id="sec-seeks"
-          badge={aiFilled.has("seeks") ? <AiBadge /> : null}
-          label="이런 콜라보를 찾고 있어요."
-          sub={
-            // 🚨**placeholder로는 못 한다** — AI 초안이 칸을 채우면 placeholder는 사라진다.
-            //   조건을 적어달라는 말이 정작 **AI 초안이 있는 소개서에서만 안 보이게** 된다(08-12 실측).
-            //   항상 보이는 설명 줄이어야 한다.
-            <>
-              어떤 파트너와 어떤 형태로 하고 싶은지 알려주세요.{" "}
-              <span className="font-medium text-body">받는 조건이 있다면 꼭 적어주세요</span> — 예) 10명 이상 기업 워크숍만 진행하고 있어요.
-            </>
-          }
-          hiddenWhenCollapsed
-          expanded={openSections.has("seeks")}
-          hasData={hasSeeks}
-          onExpand={() => openSection("seeks")}
-          onCollapse={() => closeSection("seeks")}
-        >
-          {/* ⚠️여긴 **서술만** 있다. 유형 칩은 필수 영역의 통합 1세트(「함께하고 싶은 콜라보를 골라주세요」)가
-              담당한다 — 07-22 통합 때 이 섹션의 칩을 은퇴시켰기 때문. 소개서에서는 둘이 한 섹션으로 붙어 나가는데
-              폼에서는 서로 멀리 떨어져 있다(필수 영역 ↔ 이 시트 섹션). ⏭붙이는 건 별건. */}
-          <textarea
-            value={seeksNote}
-            onChange={(e) => setSeeksNote(e.target.value)}
-            rows={4}
-            placeholder="예: 지속가능성을 이야기하는 브랜드, 라이프스타일 브랜드, 카페와 함께하고 싶어요."
-            className="w-full rounded-sm border border-hairline bg-surface px-3 py-2.5 text-base leading-relaxed text-ink outline-none placeholder:text-faint focus:border-focus"
-          />
-        </StubSection>
-
         {/* ── 스텁 C — 이런 콜라보 경험이 있어요 (구⑦) ── */}
         <StubSection
           id="sec-collabs"
@@ -2010,6 +2000,33 @@ function RegisterForm() {
           </div>
         </StubSection>
 
+        {/* ── 이런 콜라보를 제공할 수 있어요 (08-12 이사 — 소개서와 같은 자리) ──
+            "이런 걸 해왔고 → 이런 걸 해드릴 수 있어요"라 콜라보 이력 바로 뒤가 맞다.
+            ⭐**위 「찾고 있어요」와 방향이 반대다**(문 vs 제안) — 그래서 붙이지 않고 멀리 떼어 둔다.
+            🆕**위계를 올렸다** — 전엔 필수 칩 안에 13px 회색 소제목으로 얹혀 있어서, 소개서에선 독립
+              섹션인데 폼에선 곁다리로 보였다. 이제 다른 섹션과 같은 18px 제목이다(대표 지적 08-12). */}
+        <StubSection
+          id="sec-offersNote"
+          badge={aiFilled.has("offersNote") ? <AiBadge /> : null}
+          label="이런 콜라보를 제공할 수 있어요."
+          sub="우리 쪽에서 내어줄 수 있는 것 — 공간·재료·인력·채널처럼 구체적일수록 제안이 들어와요."
+          /* ⚠️`hiddenWhenCollapsed`를 붙이지 않는다(옆 스텁들과 다른 점). 이 칸은 원래 ① 안에
+             **항상 보이던** 칸이라, 시트 뒤로 숨기면 위계는 올라가는데 노출은 떨어져 요청과 반대가 된다.
+             그래서 빈 상태에서도 점선 스텁으로 남는다 — 대신 추가 시트 목록에서 뺐다(진입점 하나로). */
+          expanded={openSections.has("offersNote")}
+          hasData={hasOffersNote}
+          onExpand={() => openSection("offersNote")}
+          onCollapse={() => closeSection("offersNote")}
+        >
+          <textarea
+            value={offersNote}
+            onChange={(e) => setOffersNote(e.target.value)}
+            rows={4}
+            placeholder="매력적인 분들과의 제품 콜라보, 서로의 매력을 담은 원데이 워크숍, 공동 굿즈 등 다양한 콜라보를 기대해요!"
+            className="w-full rounded-sm border border-hairline bg-surface px-3 py-2.5 text-base leading-relaxed text-ink outline-none placeholder:text-faint focus:border-focus"
+          />
+        </StubSection>
+
         {/* ── 선택 블록(코어 ⑦과 ⑧ 사이) ── */}
         <BlockEditor
           blocks={blocks}
@@ -2019,8 +2036,10 @@ function RegisterForm() {
           suppressFab={layerOpen}
           storyItems={[
             { key: "activities", label: "주로 어떤 활동을 하나요?", hint: "대표 활동을 소개해주세요.", added: openSections.has("activities") || hasActivities, onAdd: () => addStorySection("activities"), group: "recommend" },
-            { key: "seeks", label: "이런 콜라보를 찾고 있어요.", hint: "어떤 파트너와 어떤 형태로 하고 싶은지 — 받는 조건이 있다면 함께.", added: openSections.has("seeks") || hasSeeks, onAdd: () => addStorySection("seeks"), group: "recommend" },
             { key: "collabs", label: "이런 콜라보 경험이 있어요.", hint: "지난 콜라보를 더하면 검증된 파트너 신호가 돼요.", added: openSections.has("collabs") || hasCollabs, onAdd: () => addStorySection("collabs"), group: "recommend" },
+            /* 🆕이 시트에서 빠진 둘(08-12): `seeks`는 상시 노출 섹션으로 승격됐고, `offersNote`는
+               원래부터 상시 노출(구 ① 칩 하단)이라 **진입점이 둘이면 오히려 헷갈린다.**
+               ⚠️둘 다 폼에 자리가 이미 있으니 "추가하기"로 또 부르지 않는다. */
             { key: "customers", label: "저희는 주로 이런 고객과 함께하고 있어요.", hint: "주요 고객을 알려주세요.", added: openSections.has("customers") || hasCustomers, onAdd: () => addStorySection("customers"), group: "recommend" },
             { key: "story", label: "왜 이 브랜드를 시작하셨나요?", hint: "시작하게 된 계기를 편하게 적어주세요.", added: openSections.has("story") || hasStory, onAdd: () => addStorySection("story"), group: "story" },
             { key: "keywords", label: "우리 브랜드를 표현하는 키워드를 골라주세요.", hint: "분위기를 칩으로 골라요.", added: openSections.has("keywords") || hasKeywords, onAdd: () => addStorySection("keywords"), group: "story" },
@@ -2440,8 +2459,8 @@ function RegisterForm() {
         const dismissNudge = nudgeDismiss;
         const items = ([
           ["activities", "주로 어떤 활동을 하나요?", "대표 활동을 소개해주세요.", hasActivities],
-          ["seeks", "이런 콜라보를 찾고 있어요.", "어떤 파트너와 어떤 형태로 하고 싶은지 — 받는 조건이 있다면 함께.", hasSeeks],
           ["collabs", "이런 콜라보 경험이 있어요.", "지난 콜라보를 더하면 검증된 파트너 신호가 돼요.", hasCollabs],
+          ["offersNote", "이런 콜라보를 제공할 수 있어요.", "우리 쪽에서 내어줄 수 있는 것을 알려주세요.", hasOffersNote],
           ["customers", "저희는 주로 이런 고객과 함께하고 있어요.", "주요 고객을 알려주세요.", hasCustomers],
         ] as const).filter(([key, , , has]) => !has && !openSections.has(key));
         return (
@@ -2744,7 +2763,9 @@ function GroupHeader({
   sub,
   action,
 }: {
-  n: string;
+  /** 번호(①②). **없어도 된다** — 번호 없는 섹션 제목으로도 쓴다(펼친 StubSection 헤더와 같은 얼굴).
+   *  ⚠️번호를 붙이는 건 "순서대로 채우는 곳"이라는 뜻이라 아무 데나 달지 말 것. */
+  n?: string;
   title: string;
   sub?: string;
   action?: React.ReactNode; // 제목 행 우측 액션(예: ✨ 초안 받기)
@@ -2753,9 +2774,11 @@ function GroupHeader({
     <div className="mb-[23px] border-b border-hairline pb-2">
       <div className="flex items-center justify-between gap-2">
         <div className="flex min-w-0 items-baseline gap-2">
-          <span className="rounded-pill bg-primary-tint px-2 py-0.5 text-[14px] font-bold text-primary-on">
-            {n}
-          </span>
+          {n && (
+            <span className="rounded-pill bg-primary-tint px-2 py-0.5 text-[14px] font-bold text-primary-on">
+              {n}
+            </span>
+          )}
           {/* 섹션 헤더 18 — 필드 라벨을 16으로 올리면서 함께 올린다(대표 확정 07-31).
               헤더를 17로 두면 라벨(16)과 1px 차이가 되어 위계가 굵기 하나에만 의존한다.
               2px + 굵기 두 겹으로 갈라져 있어야 "섹션 제목 / 필드 이름"이 다른 급으로 읽힌다. */}
