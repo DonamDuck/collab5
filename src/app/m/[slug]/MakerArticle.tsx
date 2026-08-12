@@ -35,16 +35,35 @@ export function MakerArticle({ maker, isOwner, logoUrl, readOnly }: {
       {/* ⭐**콜라보 조건은 맨 앞에.** (08-12 대표 지시 — 계단뿌셔클럽 사장님 피드백)
           이 소개서를 읽는 사람은 둘이다: 브랜드가 궁금해서 온 사람 / 콜라보를 제안하러 온 사람.
           우리 서비스의 주된 독자는 **후자**인데, 그 사람의 첫 질문("나랑 할 만한가")의 답이
-          아홉 번째 섹션에 있었다. 사장님이 조건을 걸고 싶어도(예: 10명 이상 기업 워크숍만)
-          아무도 거기까지 안 읽어서 엉뚱한 제안이 계속 들어온다.
-          ⚠️여긴 **문장만** 온다 — 유형 칩은 아래(콜라보 이력 뒤)에 남겨뒀다.
-            칩은 offers∪seeks 합집합 한 세트라(07-22 통합) "받고 싶은 것"과 "해줄 수 있는 것"이 섞여 있다.
-            조건 옆에 넓은 칩을 같이 세우면 **사람은 칩을 스캔하고 문장을 건너뛰어** 조건이 도리어 흐려진다. */}
-      {maker.seeksDescription && (
-        <Section title="이런 파트너를 찾고 있어요">
-          <p className="whitespace-pre-line text-[17px] leading-relaxed text-body">
-            {maker.seeksDescription}
-          </p>
+          아홉 번째 섹션에 있었다.
+
+          🆕**제목이 「파트너」가 아니라 「콜라보」인 이유**(08-12 2차) — 계단뿌셔클럽 사장님이 걸고 싶었던 건
+            *누구*가 아니라 *무엇*(10명 이상 기업 워크숍)이었는데, 우리가 「이런 **파트너**를 찾고 있어요」라고
+            물으니 답이 전부 "누구"로 나왔다. ⭐**제목은 그릇이 아니라 질문이다** — 물어본 것만 적힌다.
+            반대로 이미 쓰인 파트너 서술은 이 제목 아래서도 안 깨진다(콜라보가 상대를 품는 말이라).
+            ※ 이 이름은 07-22 칩 통합 때 우리가 은퇴시켰던 것이다. 왜 필요했는지가 지금 드러나 되살렸다.
+
+          ⚠️**문장이 먼저, 칩이 나중.** 조건이 주인공이면 문장이 앞에 서야 한다 — 사람은 칩을 스캔하고
+            글은 건너뛰므로, 칩을 위에 두면 넓은 형태 목록이 좁은 조건을 덮는다. */}
+      {(maker.seeksDescription || maker.offers.length > 0 || maker.seeks.length > 0) && (
+        <Section title="이런 콜라보를 찾고 있어요">
+          <div className="space-y-5">
+            {maker.seeksDescription && (
+              <p className="whitespace-pre-line text-[17px] leading-relaxed text-body">
+                {maker.seeksDescription}
+              </p>
+            )}
+            {/* 유형 칩 — 폼에서 「함께하고 싶은 콜라보를 골라주세요」로 고른 값이라 **수요 쪽 어휘**다.
+                (DB 컬럼명이 `offers`라 공급처럼 보이지만 사장님이 답한 질문은 수요다. seeks 칩은
+                 07-22에 은퇴해 저장 시 항상 빈 배열 — 읽기만 합집합으로 호환.) */}
+            {(maker.offers.length > 0 || maker.seeks.length > 0) && (
+              <div className="flex flex-wrap gap-2">
+                {[...new Set([...maker.offers, ...maker.seeks])].map((o) => (
+                  <TypeChip key={o}>{o}</TypeChip>
+                ))}
+              </div>
+            )}
+          </div>
         </Section>
       )}
 
@@ -132,29 +151,16 @@ export function MakerArticle({ maker, isOwner, logoUrl, readOnly }: {
         </Section>
       )}
 
-      {/* 콜라보 유형 칩 + 제공 서술 — **콜라보 이력 바로 뒤**(08-12 대표 지시).
+      {/* 「제공할 수 있어요」 — **콜라보 이력 바로 뒤**(08-12 대표 지시).
           "이런 걸 해왔고 → 이런 걸 해드릴 수 있어요"가 증거→제안 순서라 활동 뒤보다 설득력이 있다.
-          (콜라보 이력이 없는 브랜드는 이 섹션이 자연히 활동·시작이야기 근처로 붙는다 — 손해 없음.)
-          ⚠️칩은 `offers∪seeks` 합집합이다(07-22 통합, seeks 칩은 은퇴해 저장 시 항상 빈 배열). */}
-      {(maker.offers.length > 0 || maker.seeks.length > 0 || maker.offersDescription) && (
-        <Section title="이런 콜라보를 기대하고 있어요">
-          <div className="space-y-6">
-            {(maker.offers.length > 0 || maker.seeks.length > 0) && (
-              <div className="flex flex-wrap gap-2">
-                {[...new Set([...maker.offers, ...maker.seeks])].map((o) => (
-                  <TypeChip key={o}>{o}</TypeChip>
-                ))}
-              </div>
-            )}
-            {maker.offersDescription && (
-              <div className="print:break-inside-avoid">
-                <h2 className="mb-4 text-[21px] font-bold leading-snug tracking-tight text-ink print:break-after-avoid-page">이런 콜라보를 제공할 수 있어요</h2>
-                <p className="whitespace-pre-line text-[17px] leading-relaxed text-body">
-                  {maker.offersDescription}
-                </p>
-              </div>
-            )}
-          </div>
+          (콜라보 이력이 없는 브랜드는 자연히 활동·시작이야기 근처로 붙는다 — 손해 없음.)
+          ⭐위 「찾고 있어요」와 **방향이 반대**다: 위는 문(누가 노크할 수 있나), 여긴 제안(뭘 줄 수 있나).
+            그래서 한 덩어리로 묶지 않고 멀리 떼어 놓았다. */}
+      {maker.offersDescription && (
+        <Section title="이런 콜라보를 제공할 수 있어요">
+          <p className="whitespace-pre-line text-[17px] leading-relaxed text-body">
+            {maker.offersDescription}
+          </p>
         </Section>
       )}
 

@@ -130,7 +130,7 @@ function storyItemsOf(o: EnrichOptions, values: string[]): StoryItem[] {
     const types = o.seeksHint.types ?? [];
     items.push({
       key: "seeks",
-      group: "이런 파트너를 찾고 있어요.",
+      group: "이런 콜라보를 찾고 있어요.", // 08-12 개명 — 폼 라벨·소개서 섹션 제목과 한 문장으로 통일
       title: types.length ? types.join(" · ") : "",
       detail: o.seeksHint.note || "",
       reason: o.seeksHint.reason || "웹에서 봤어요",

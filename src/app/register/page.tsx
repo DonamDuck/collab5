@@ -1797,18 +1797,33 @@ function RegisterForm() {
           </div>
         </StubSection>
 
-        {/* ── 시트 출신 — 이런 파트너를 찾고 있어요 (구⑥ 칩+서술) ── */}
+        {/* ── 시트 출신 — 이런 콜라보를 찾고 있어요 (구⑥ 칩+서술) ──
+             🆕08-12 개명(구 「이런 파트너를 찾고 있어요」). ⭐**라벨이 답을 정한다** —
+               「파트너」라고 물으니 사장님들 답이 전부 *누구*로만 나왔고, 정작 걸고 싶던 *조건*
+               (계단뿌셔클럽: 10명 이상 기업 워크숍만)은 물어본 적이 없어 안 적혔다.
+             ※소개서 섹션 제목과 **같은 문장**으로 맞춘다 — 여기 쓴 게 저기 그대로 나간다는 게 보여야 한다. */}
         <StubSection
           id="sec-seeks"
           badge={aiFilled.has("seeks") ? <AiBadge /> : null}
-          label="이런 파트너를 찾고 있어요."
+          label="이런 콜라보를 찾고 있어요."
+          sub={
+            // 🚨**placeholder로는 못 한다** — AI 초안이 칸을 채우면 placeholder는 사라진다.
+            //   조건을 적어달라는 말이 정작 **AI 초안이 있는 소개서에서만 안 보이게** 된다(08-12 실측).
+            //   항상 보이는 설명 줄이어야 한다.
+            <>
+              어떤 파트너와 어떤 형태로 하고 싶은지 알려주세요.{" "}
+              <span className="font-medium text-body">받는 조건이 있다면 꼭 적어주세요</span> — 예) 10명 이상 기업 워크숍만 진행하고 있어요.
+            </>
+          }
           hiddenWhenCollapsed
           expanded={openSections.has("seeks")}
           hasData={hasSeeks}
           onExpand={() => openSection("seeks")}
           onCollapse={() => closeSection("seeks")}
         >
-          {/* 구 "이런 콜라보를 찾고 있어요" 칩 은퇴(2026-07-22 통합) — 유형은 ① 통합 칩 1세트가 담당, 여기는 파트너상 서술만 */}
+          {/* ⚠️여긴 **서술만** 있다. 유형 칩은 필수 영역의 통합 1세트(「함께하고 싶은 콜라보를 골라주세요」)가
+              담당한다 — 07-22 통합 때 이 섹션의 칩을 은퇴시켰기 때문. 소개서에서는 둘이 한 섹션으로 붙어 나가는데
+              폼에서는 서로 멀리 떨어져 있다(필수 영역 ↔ 이 시트 섹션). ⏭붙이는 건 별건. */}
           <textarea
             value={seeksNote}
             onChange={(e) => setSeeksNote(e.target.value)}
@@ -2004,7 +2019,7 @@ function RegisterForm() {
           suppressFab={layerOpen}
           storyItems={[
             { key: "activities", label: "주로 어떤 활동을 하나요?", hint: "대표 활동을 소개해주세요.", added: openSections.has("activities") || hasActivities, onAdd: () => addStorySection("activities"), group: "recommend" },
-            { key: "seeks", label: "이런 파트너를 찾고 있어요.", hint: "어떤 파트너와 만나고 싶은지 알려주세요.", added: openSections.has("seeks") || hasSeeks, onAdd: () => addStorySection("seeks"), group: "recommend" },
+            { key: "seeks", label: "이런 콜라보를 찾고 있어요.", hint: "어떤 파트너와 어떤 형태로 하고 싶은지 — 받는 조건이 있다면 함께.", added: openSections.has("seeks") || hasSeeks, onAdd: () => addStorySection("seeks"), group: "recommend" },
             { key: "collabs", label: "이런 콜라보 경험이 있어요.", hint: "지난 콜라보를 더하면 검증된 파트너 신호가 돼요.", added: openSections.has("collabs") || hasCollabs, onAdd: () => addStorySection("collabs"), group: "recommend" },
             { key: "customers", label: "저희는 주로 이런 고객과 함께하고 있어요.", hint: "주요 고객을 알려주세요.", added: openSections.has("customers") || hasCustomers, onAdd: () => addStorySection("customers"), group: "recommend" },
             { key: "story", label: "왜 이 브랜드를 시작하셨나요?", hint: "시작하게 된 계기를 편하게 적어주세요.", added: openSections.has("story") || hasStory, onAdd: () => addStorySection("story"), group: "story" },
@@ -2425,7 +2440,7 @@ function RegisterForm() {
         const dismissNudge = nudgeDismiss;
         const items = ([
           ["activities", "주로 어떤 활동을 하나요?", "대표 활동을 소개해주세요.", hasActivities],
-          ["seeks", "이런 파트너를 찾고 있어요.", "어떤 파트너와 만나고 싶은지 알려주세요.", hasSeeks],
+          ["seeks", "이런 콜라보를 찾고 있어요.", "어떤 파트너와 어떤 형태로 하고 싶은지 — 받는 조건이 있다면 함께.", hasSeeks],
           ["collabs", "이런 콜라보 경험이 있어요.", "지난 콜라보를 더하면 검증된 파트너 신호가 돼요.", hasCollabs],
           ["customers", "저희는 주로 이런 고객과 함께하고 있어요.", "주요 고객을 알려주세요.", hasCustomers],
         ] as const).filter(([key, , , has]) => !has && !openSections.has(key));
