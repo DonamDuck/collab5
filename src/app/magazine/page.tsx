@@ -141,10 +141,14 @@ export default async function MagazinePage() {
                ⚠️원인은 면의 부재가 **아니었다.** 5편을 렌더해보니 같은 조건(면 0개)인데도 안 떠
                  보였다 — 항목이 1개라 반복이 없는 게 원인이다. 그런데도 면을 까는 쪽으로 간 건
                  대표 결정이다(0안 "커버 교체 후 재판정"을 권고안으로 드렸으나 ②안 선택).
+               면색은 `surface-faint`(#fafafb) — 08-14에 대표가 `surface-soft`(#f5f5f6)를 보고
+                 "조금 더 옅은 회색"을 골라 신설한 토큰이다(아이보리 후보는 기각 — 07-31 웜톤 폐기가
+                 그대로 유효). ⚠️여기서 `surface-soft`로 되돌리지 말 것: soft는 "여기부터 다른 영역"을
+                 말하는 면이라 이 자리에선 경계가 도드라져 카드로 읽힌다.
                ⛔**테두리는 넣지 않는다.** 배경만 깔면 '지면 강조'로 읽히지만, 테두리까지 두르면
                  「박스 = 고르는 것」이 되어 바로 옆 BrandGrid의 브랜드 카드와 같은 옷이 된다.
                  이 예외를 지난 호 리스트로 넓히지도 말 것 — 거기는 애초에 증상이 없다. */}
-          <article className="mt-10 rounded-xl bg-surface-soft p-5 sm:p-7">
+          <article className="mt-10 rounded-xl bg-surface-faint p-5 sm:p-7">
             <Link href={`/magazine/${lead.slug}`} className="group block">
               <div className="grid items-start gap-6 sm:grid-cols-[1fr_320px] sm:gap-8">
                 {lead.coverImage && (

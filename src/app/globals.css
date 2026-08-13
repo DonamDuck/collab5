@@ -24,7 +24,17 @@
      ⚠️ 대신 회색 계열을 **같이** 중성화해야 한다. hairline·surface-soft가 웜톤(누런기)이면
         순백 대비 때문에 탁하게 뜬다(실측 확인). 웜톤은 여기서 걷어내고, 브랜드의 따뜻함은
         Kiwi/민트/레몬/콘 액센트가 담당한다. 다크 테마는 아래에서 따로 정의 — 영향 없음. */
-  --canvas: #ffffff; --surface: #ffffff; --surface-soft: #f5f5f6; --surface-dark: #2c2c2c;
+  /* surface-faint = **surface와 surface-soft 사이의 네 번째 단계**(2026-08-14 대표 확정).
+     이름은 텍스트 계층의 규칙을 그대로 따랐다 — ink > body > mute > faint에서 faint가 '가장 약한'을
+     뜻하듯, 면도 surface-dark > surface-soft > surface-faint > surface 순으로 약해진다.
+     ⚠️**언제 무엇을 쓰나**(안 정해두면 다음 사람이 둘 중 아무거나 쓴다):
+       · `surface-soft`(#f5f5f6) = **확실히 구분돼야 하는 면.** 섹션 밴드, 입력칸, 썸네일 자리처럼
+         "여기부터 다른 영역"을 말해야 할 때. 흰 배경과 밝기차 4%.
+       · `surface-faint`(#fafafb) = **겨우 감지되는 면.** 지면에서 한 장만 살짝 들어올릴 때.
+         밝기차 2%라 경계가 아니라 '무게'로 읽힌다. 첫 사용처 = 매거진 목록 최신호 히어로.
+     ⛔아이보리(#fbf9f4 등)는 후보에 올랐다가 **대표가 회색을 골라 기각**됐다(08-14). 07-31에
+       "순백 옆 웜톤 회색은 누렇게 떠 보인다"로 웜톤을 걷어낸 결정이 그대로 유효하다. */
+  --canvas: #ffffff; --surface: #ffffff; --surface-faint: #fafafb; --surface-soft: #f5f5f6; --surface-dark: #2c2c2c;
   --hairline: #eaeaec; --border-strong: #d7d7db;
   --success: #3b6d11; --warning: #ba7517; --danger: #e24b4a; --info: #378add;
   /* 성공 면색 — 성공 배너에 --primary-pale(Kiwi)을 쓰면 브랜드색이 '성공'을 뜻하게 되어
@@ -44,7 +54,9 @@
 [data-theme="dark"] {
   /* 다크도 같은 원칙으로 중성화(명도 유지, 색조만 제거). 현재 앱에 테마 토글은 없어
      휴면 상태지만, 켜졌을 때 라이트와 따로 놀지 않도록 함께 맞춰둔다. */
-  --canvas: #222222; --surface: #2c2c2c; --surface-soft: #333333;
+  /* surface-faint는 라이트와 같은 간격 감각으로 — surface(#2c2c2c)보다 아주 살짝만 밝다.
+     라이트가 255→250→245라면 다크는 44→47→51로, 둘 다 '한 칸 반' 차이를 유지한다. */
+  --canvas: #222222; --surface: #2c2c2c; --surface-faint: #2f2f2f; --surface-soft: #333333;
   --ink: #fafafa; --body: #b3b3b3; --mute: #878787; --faint: #6b6b6b;
   --hairline: #3a3a3a; --border-strong: #4a4a4a; --primary-on: #222222;
   --success-pale: #2b3a1e; /* 다크에선 어두운 초록 면 — text-body(#b4b2a9)와 대비 확보 */
@@ -74,6 +86,7 @@
   --color-on-dark: var(--on-dark);
   --color-canvas: var(--canvas);
   --color-surface: var(--surface);
+  --color-surface-faint: var(--surface-faint);
   --color-surface-soft: var(--surface-soft);
   --color-hairline: var(--hairline);
   --color-border-strong: var(--border-strong);
