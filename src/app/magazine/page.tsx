@@ -29,8 +29,10 @@ export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "매거진 — collab5",
+  // ⚠️화면의 소개 문장과 같은 말을 유지한다 — 검색 결과에 뜨는 문장과 들어와서 보는 문장이
+  //   다르면 "다른 데로 왔나" 싶어진다. 문구를 고칠 땐 아래 <p>와 같이 고칠 것.
   description:
-    "작은 브랜드들이 만나 만든 장면을 직접 찾아가 기록합니다. 콜라보가 실제로 어떻게 굴러가는지 담은 현장 기록이에요.",
+    "브랜드들이 만나 만드는 콜라보 이야기를 기록합니다. 콜라보가 실제로 어떻게 굴러가는지 담은 현장 기록이에요.",
   // ⚠️필수 — 루트 layout의 `canonical: "/"`가 자식에 상속돼, 안 덮으면 이 페이지가 '홈의 사본'이 된다.
   alternates: { canonical: "/magazine" },
 };
@@ -117,7 +119,7 @@ export default async function MagazinePage() {
         </p>
         <div className="mt-5 border-t border-hairline" />
         <p className="mt-4 text-[15px] leading-relaxed break-keep text-mute">
-          작은 브랜드들이 만나 만든 장면을 직접 찾아가 기록해요.
+          브랜드들이 만나 만드는 콜라보 이야기를 기록해요.
         </p>
       </header>
 
