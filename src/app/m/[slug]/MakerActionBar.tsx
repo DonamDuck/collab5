@@ -742,7 +742,7 @@ export function MakerActionBar({
 
             {/* 고정 액션 바 — 좌:복사(고스트) / 우:보내기(primary). 연락 수단이 아예 없으면 안 그린다. */}
             {(channel || contactEmail) && (
-              <div className="shrink-0 border-t border-hairline bg-surface px-6 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-3">
+              <div className="shrink-0 border-t border-hairline bg-surface px-6 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3">
                 <div className="flex gap-2">
                   <button
                     type="button"
@@ -805,14 +805,20 @@ export function MakerActionBar({
         //    그건 제안 시트가 버튼 2개를 세로로 쌓던 옛 레이아웃(07-30 이전) 높이에 맞춘 값이었다.
         //    지금은 ①제안 시트=좌우 2버튼 한 줄(고정 푸터) — 실측 갭 16px
         //    ②시트 닫힌 기본 화면 — 걸림돌은 메인 바가 아니라 **그 위에 얹힌 유틸 줄**
-        //    (🔗링크복사·♡찜, `-top-[52px]`로 바 위에 떠 있다. 실측 utilTop=130px) — 실측 갭 15px.
+        //    (🔗링크복사·♡찜, `-top-[52px]`로 바 위에 떠 있다) — 실측 갭 15px.
+        // ⚠️ 08-09 재측정: 메인 바에 소요시간 헬퍼 한 줄이 생겨 바가 20px 높아졌고, 그만큼 유틸 줄도
+        //    올라가 8.5rem이던 ②가 **유틸 줄을 3px 덮었다**(간격 17px → -3px). 갭은 오프셋에 그대로
+        //    비례한다(gap = offset − 148px @375×812)므로 163px = 갭 15px로 되돌린다.
+        //    ⭐**바 높이가 바뀌면 이 값도 다시 재야 한다** — 두 값은 독립이 아니다.
+        // 안전영역 항이 `max()`인 이유는 각 바의 하단 패딩과 같아야 하기 때문이다(08-09 일괄 전환).
+        //    인디케이터 없는 기기에선 ①4.75+1 = 5.75rem으로 종전과 동일하다.
         <div
           role="status"
           aria-live="polite"
           className={`pointer-events-none fixed left-1/2 z-[60] -translate-x-1/2 rounded-pill bg-ink px-4 py-2.5 text-[13px] font-medium text-surface shadow-e2 print:hidden ${
             proposeOpen
-              ? "bottom-[calc(5.75rem+env(safe-area-inset-bottom))]"
-              : "bottom-[calc(8.5rem+env(safe-area-inset-bottom))]"
+              ? "bottom-[calc(4.75rem+max(1rem,env(safe-area-inset-bottom)))]"
+              : "bottom-[calc(150px+max(0.75rem,env(safe-area-inset-bottom)))]"
           }`}
         >
           {toast}

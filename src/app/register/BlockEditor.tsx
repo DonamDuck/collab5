@@ -437,10 +437,13 @@ export function BlockEditor({ blocks, onChange, onUploadingChange, onSheetOpenCh
       </div>
 
       {/* ── 우측 하단 FAB (작게 '+ 추가') — 플로팅 제출 바 위에 위치. 시트·강조카드·레이어 열리면 숨김 ── */}
+      {/* 오프셋은 제출 바 높이를 따라간다 — 그 바의 하단 패딩이 `max(0.75rem, env())`로 바뀌었으니
+          (08-09) 여기도 같은 항을 써야 인디케이터가 있는 기기에서 바만 줄고 FAB은 안 줄어
+          간격이 벌어지는 일이 없다. 인디케이터 없는 기기는 4.25+0.75 = 5rem으로 종전과 동일. */}
       <button
         type="button"
         onClick={() => setOpen(true)}
-        style={{ bottom: "calc(5rem + env(safe-area-inset-bottom))" }}
+        style={{ bottom: "calc(4.25rem + max(0.75rem, env(safe-area-inset-bottom)))" }}
         className={`fixed right-4 z-40 inline-flex h-10 items-center gap-1 rounded-pill bg-primary px-4 text-[13px] font-semibold text-primary-on shadow-xl ring-1 ring-black/5 transition-all duration-300 ease-out sm:right-6 ${
           !cardVisible && !open && !suppressFab
             ? "translate-y-0 opacity-100"
@@ -458,7 +461,7 @@ export function BlockEditor({ blocks, onChange, onUploadingChange, onSheetOpenCh
             className="absolute inset-x-0 bottom-0 mx-auto max-w-[640px] overflow-hidden rounded-t-2xl bg-surface shadow-xl"
           >
             <div
-              style={{ paddingBottom: "calc(1.5rem + env(safe-area-inset-bottom))" }}
+              style={{ paddingBottom: "max(1.5rem, env(safe-area-inset-bottom))" }}
               className="max-h-[60vh] overflow-y-auto slim-scrollbar p-4 sm:max-h-[70vh]"
             >
             <div className="mb-3 flex items-center justify-between">

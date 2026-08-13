@@ -60,7 +60,7 @@ export function EnrichIntroSheet({ enabled }: { enabled: boolean }) {
         }`}
       >
         <div
-          style={{ paddingBottom: "calc(1.5rem + env(safe-area-inset-bottom))" }}
+          style={{ paddingBottom: "max(1.5rem, env(safe-area-inset-bottom))" }}
           className="p-5"
         >
           <div className="flex items-start justify-between gap-3">

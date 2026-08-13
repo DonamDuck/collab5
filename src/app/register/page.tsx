@@ -2264,7 +2264,7 @@ function RegisterForm() {
         }`}
       >
         <div
-          style={{ paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom))" }}
+          style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
           className="mx-auto max-w-[640px] bg-canvas px-4 pt-3 shadow-[0_-2px_12px_rgba(0,0,0,0.05)]"
         >
           <button
@@ -2471,7 +2471,7 @@ function RegisterForm() {
               className="absolute inset-x-0 bottom-0 mx-auto max-w-[640px] overflow-hidden rounded-t-2xl bg-surface shadow-xl"
             >
               <div
-                style={{ paddingBottom: "calc(1.5rem + env(safe-area-inset-bottom))" }}
+                style={{ paddingBottom: "max(1.5rem, env(safe-area-inset-bottom))" }}
                 className="max-h-[60vh] overflow-y-auto slim-scrollbar p-4 sm:max-h-[70vh]"
               >
                 <div className="mb-3 flex items-start justify-between">
@@ -2606,7 +2606,7 @@ function RegisterForm() {
             className="absolute inset-x-0 bottom-0 mx-auto max-w-[640px] overflow-hidden rounded-t-2xl bg-surface shadow-xl"
           >
             <div
-              style={{ paddingBottom: "calc(1.5rem + env(safe-area-inset-bottom))" }}
+              style={{ paddingBottom: "max(1.5rem, env(safe-area-inset-bottom))" }}
               className="max-h-[85vh] overflow-y-auto slim-scrollbar p-4 sm:max-h-[85vh]"
             >
               <div className="mb-4 flex items-start justify-between">

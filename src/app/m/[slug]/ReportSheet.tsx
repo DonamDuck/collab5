@@ -495,7 +495,7 @@ export function ReportSheet({
         className={`relative max-h-[85dvh] w-full max-w-[640px] rounded-t-2xl border border-b-0 border-hairline bg-surface shadow-e2 ${
           isReportView
             ? "flex flex-col" // 고정 바 + 스크롤 영역 — overflow는 아래 스크롤 영역에만 준다
-            : "overflow-y-auto p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))]"
+            : "overflow-y-auto p-6 pb-[max(1.5rem,env(safe-area-inset-bottom))]"
         }`}
       >
         {isReportView ? (
@@ -528,7 +528,7 @@ export function ReportSheet({
                 ⚠️티저는 CTA가 아래 고정 바로 빠지므로 하단 여백을 safe-area 없이 짧게 준다(이중 여백 방지). */}
             <div
               className={`flex-1 overflow-y-auto px-5 pt-4 ${
-                sampleTeaser ? "pb-5" : "pb-[calc(1.5rem+env(safe-area-inset-bottom))]"
+                sampleTeaser ? "pb-5" : "pb-[max(1.5rem,env(safe-area-inset-bottom))]"
               }`}
             >
               {/* 티저 최상단 — **왜 예시를 보고 있는지**를 리포트보다 먼저 말한다(대표 지시 08-07).
@@ -595,7 +595,7 @@ export function ReportSheet({
                 (스크롤 안에 두면 끝까지 내려야 나오는데, 이 사람에게 필요한 건 리포트가 아니라 이 버튼이다.)
                 문구는 안내 없이 버튼만 — 무엇을 하는 버튼인지는 위 타이틀이 이미 말했다. */}
             {sampleTeaser && (
-              <div className="shrink-0 border-t border-hairline bg-surface px-5 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-3">
+              <div className="shrink-0 border-t border-hairline bg-surface px-5 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3">
                 <a
                   href="/register"
                   onClick={() => track("wizard_start_from_report")}
