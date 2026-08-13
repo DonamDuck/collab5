@@ -274,11 +274,14 @@ export default async function Home() {
              hairline 룰로 '지면'임을 표시한다. */}
       {leadArticle && (
         <Reveal as="section" className="mt-12">
+          {/* 카피 = 대표 확정(08-14). 제목이 **질문형**인 게 핵심 — 이 섹션은 기능 설명이 아니라
+              "궁금하면 읽어보세요"라 물음표가 자연스럽다(위 섹션들은 전부 서술형이라 대비도 된다).
+              부제는 매거진의 **이름을 대는 자리**라 문장을 안 닫고 고유명사로 끝낸다. */}
           <h2 className="text-balance break-keep text-center text-[24px] font-bold leading-[1.35] tracking-[-0.02em] text-ink sm:text-[28px]">
-            콜라보, 진짜로 어떻게 굴러가나요.
+            두 브랜드가 만나면, 어떤 이야기가 생길까요?
           </h2>
-          <p className="mx-auto mt-2 max-w-[440px] break-keep text-center text-[16px] leading-[1.65] text-body sm:text-[17px]">
-            실제로 만난 두 브랜드의 하루를 직접 찾아가 기록했어요.
+          <p className="mx-auto mt-2 max-w-[460px] break-keep text-center text-[16px] leading-[1.65] text-body sm:text-[17px]">
+            브랜드들이 만나 만드는 콜라보 이야기를 기록하는 ‘collab5 매거진’
           </p>
 
           <div className="mt-8 border-y border-hairline">
