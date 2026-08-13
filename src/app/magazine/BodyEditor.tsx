@@ -121,6 +121,30 @@ function WidthField({ width, onCommit }: { width: number | null; onCommit: (w: n
   );
 }
 
+/** 캡션 입력칸.
+ *  🚨**한글이 안 써지던 자리다(08-14 대표 제보).** 원인은 「값을 밖에서 되받아 오는 입력칸」이다 —
+ *    전엔 `value={노드의 caption}`이라 한 글자 칠 때마다 **에디터 → React 리렌더 → value 덮어쓰기**가
+ *    한 바퀴 돌았다. 영문·숫자는 글자가 즉시 확정돼 티가 안 나지만, **한글은 조합 중(ㅌ→토→토우)**이라
+ *    그 사이 value가 바뀌면 브라우저가 **조합을 취소**한다. 그래서 크기(숫자·버튼)는 26장 전부
+ *    저장됐는데 캡션(한글)만 0건이었다.
+ *  ⭐고침 = **화면 값은 이 컴포넌트가 갖고**, 노드에는 흘려보내기만 한다(되받지 않는다).
+ *    다른 사진을 고르면 `key`가 바뀌며 새로 마운트돼 값이 갈아끼워진다(아래 ImageBar 참조).
+ *  ⛔`value`를 다시 노드 속성에 묶지 말 것 — 같은 사고가 그대로 재현된다. */
+function CaptionField({ initial, onChange }: { initial: string; onChange: (v: string) => void }) {
+  const [text, setText] = useState(initial);
+  return (
+    <input
+      value={text}
+      onChange={(e) => {
+        setText(e.target.value);
+        onChange(e.target.value);
+      }}
+      placeholder="사진 아래 들어갈 설명 (선택)"
+      className="w-full rounded-sm border border-hairline bg-surface px-2.5 py-1.5 text-[14px] text-ink outline-none placeholder:text-faint focus:border-focus"
+    />
+  );
+}
+
 /** 선택한 사진의 캡션·크기 칸.
  *  ⭐사진을 클릭했을 때만 나타난다 — 캡션을 본문 문단으로 두지 않고 **이미지 노드의 속성**으로 두기 때문에
  *  (그래야 이미지를 지우면 캡션도 같이 사라진다), 그 값을 고칠 자리가 따로 필요하다.
@@ -128,7 +152,15 @@ function WidthField({ width, onCommit }: { width: number | null; onCommit: (w: n
  *  🚨**이 칸은 툴바와 함께 화면 위에 붙어 있어야 한다**(아래 sticky 래퍼). 예전엔 에디터 **맨 아래**에
  *    있었는데, 본문이 길어지면 사진을 눌러도 칸이 화면 밖(수천 px 아래)이라 **"클릭은 되는데 입력칸이
  *    안 보인다"**가 된다(08-12 대표 보고). 자리를 옮길 땐 "본문이 A4 열 장일 때도 보이나"를 먼저 물을 것. */
-function ImageBar({ editor }: { editor: Editor }) {
+function ImageBar({
+  editor,
+  onReplace,
+  replacing,
+}: {
+  editor: Editor;
+  onReplace: (f: File) => void;
+  replacing: boolean;
+}) {
   const caption = (editor.getAttributes("image").caption as string) ?? "";
   if (!editor.isActive("image")) return null;
 
@@ -143,11 +175,13 @@ function ImageBar({ editor }: { editor: Editor }) {
     <div className="space-y-2 border-b border-hairline bg-surface-soft px-4 py-2.5">
       <div className="flex items-center gap-2">
         <span className="w-10 shrink-0 text-[13px] font-medium text-mute">캡션</span>
-        <input
-          value={caption}
-          onChange={(e) => editor.chain().updateAttributes("image", { caption: e.target.value }).run()}
-          placeholder="사진 아래 들어갈 설명 (선택)"
-          className="w-full rounded-sm border border-hairline bg-surface px-2.5 py-1.5 text-[14px] text-ink outline-none placeholder:text-faint focus:border-focus"
+        {/* ⭐`key`가 이 칸의 생명줄이다 — 선택 위치가 바뀌면(=다른 사진을 고르면) 새로 마운트돼
+            그 사진의 캡션으로 갈아끼워진다. key가 없으면 앞 사진의 글이 그대로 남는다.
+            같은 사진을 편집하는 동안엔 key가 그대로라 **타이핑 중 값이 덮이지 않는다**(한글 조합 보호). */}
+        <CaptionField
+          key={editor.state.selection.from}
+          initial={caption}
+          onChange={(v) => editor.chain().updateAttributes("image", { caption: v }).run()}
         />
       </div>
       {/* 크기 — 드래그 핸들 대신 프리셋 + 직접 입력.
@@ -180,6 +214,24 @@ function ImageBar({ editor }: { editor: Editor }) {
           <span className="text-[13px] text-faint">px</span>
         </span>
       </div>
+      {/* 사진 바꾸기 — 지우고 다시 넣지 않아도 되게(대표 지시 08-14).
+          ⭐**캡션·크기는 그대로 두고 사진만 갈아끼운다** — `src`만 바꾸므로 나머지 속성은 살아 있다.
+            지우고 새로 넣으면 캡션을 다시 쓰고 크기를 다시 눌러야 한다. */}
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="w-10 shrink-0 text-[13px] font-medium text-mute">사진</span>
+        <label
+          className={`inline-flex h-8 cursor-pointer items-center rounded-sm border border-border-strong bg-surface px-2.5 text-[13px] font-medium transition-colors ${
+            replacing ? "text-faint" : "text-ink hover:bg-surface-soft"
+          }`}
+          // ⚠️`onMouseDown` preventDefault — 없으면 누르는 순간 사진 선택이 풀려
+          //   업로드가 끝나도 **어느 사진을 바꿔야 할지 모르게 된다**(툴바 버튼들과 같은 이유).
+          onMouseDown={(e) => e.preventDefault()}
+        >
+          {replacing ? "바꾸는 중…" : "다른 사진으로 바꾸기"}
+          <input type="file" accept="image/*" className="hidden" disabled={replacing}
+            onChange={(e) => { const f = e.target.files?.[0]; if (f) onReplace(f); e.target.value = ""; }} />
+        </label>
+      </div>
       <p className="text-[12px] leading-relaxed text-faint">
         폰처럼 화면이 좁으면 이 값과 상관없이 화면 폭에 맞춰 들어가요.
       </p>
@@ -208,6 +260,7 @@ export function BodyEditor({
   onChange: (doc: MagazineDoc) => void;
 }) {
   const [uploading, setUploading] = useState(false);
+  const [replacing, setReplacing] = useState(false);
   const [imgErr, setImgErr] = useState("");
 
   // 붙여넣기 핸들러가 editor를 참조해야 하는데, 그 시점엔 useEditor가 아직 값을 안 돌려줬다 → ref로 잇는다.
@@ -273,6 +326,29 @@ export function BodyEditor({
     }
   };
 
+  /** 선택한 사진만 갈아끼운다. 캡션·크기는 건드리지 않는다.
+   *  🚨**바꿀 자리를 미리 적어둔다**(`pos`) — 파일 고르는 창이 뜨는 동안 에디터는 손을 떠나 있고,
+   *    업로드는 수 초가 걸린다. 그 사이 선택이 풀리면 `updateAttributes`가 **엉뚱한 곳**에 꽂히거나
+   *    아무 일도 안 일어난다. 끝난 뒤 그 자리를 다시 집어(`setNodeSelection`) 주소만 바꾼다. */
+  const replaceImage = async (file: File) => {
+    if (!editor) return;
+    setImgErr("");
+    const pos = editor.state.selection.from;
+    setReplacing(true);
+    try {
+      const src = await uploadPhoto(file, MAGAZINE_IMAGE_MAX_DIM, MAGAZINE_STORAGE_PREFIX);
+      editor.chain().setNodeSelection(pos).updateAttributes("image", { src }).run();
+    } catch (e) {
+      setImgErr(
+        e instanceof Error && e.message.startsWith("timeout:")
+          ? "업로드가 오래 걸려 멈췄어요. 다시 시도해주세요."
+          : "사진을 바꾸지 못했어요. 다시 시도해주세요."
+      );
+    } finally {
+      setReplacing(false);
+    }
+  };
+
   if (!editor) {
     return <div className="min-h-[480px] rounded-md border border-hairline bg-surface-soft" />;
   }
@@ -285,7 +361,7 @@ export function BodyEditor({
       {/* 툴바 + 사진 칸을 한 덩어리로 화면 위에 붙인다. `top-14` = 사이트 헤더(h-14) 아래. */}
       <div className="sticky top-14 z-10 rounded-t-md bg-surface">
         <Toolbar editor={editor} onImage={(f) => void insertImage(f)} uploading={uploading} />
-        <ImageBar editor={editor} />
+        <ImageBar editor={editor} onReplace={(f) => void replaceImage(f)} replacing={replacing} />
       </div>
       <EditorContent editor={editor} />
       {imgErr && <p className="border-t border-hairline px-4 py-2 text-[13px] text-red-600">{imgErr}</p>}
