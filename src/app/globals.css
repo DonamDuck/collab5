@@ -199,6 +199,17 @@ body {
 .slim-scrollbar::-webkit-scrollbar-thumb:hover { background: var(--faint); }
 
 /* ───────────────────────────────────────────────
+   fadeIn — 자리를 잡은 채 내용만 바뀌는 텍스트 교체용(리포트 로딩 진행 단계 등).
+   ⚠️ 슬라이드·스케일을 쓰지 않는 건 design.md Loader 원칙과 같은 이유다 —
+      대기 화면의 움직임은 '살아있음'만 알리면 되고, 그 이상은 시선을 뺏는다.
+   `prefers-reduced-motion`에선 즉시 나타난다(어지럼·전정기관 이슈).
+   ─────────────────────────────────────────────── */
+@keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
+@media (prefers-reduced-motion: reduce) {
+  .animate-\[fadeIn_320ms_ease-out\] { animation: none; }
+}
+
+/* ───────────────────────────────────────────────
    인쇄(지류 포트폴리오) — 데스크탑 브라우저 인쇄/‘PDF로 저장’ 공용.
    마케팅 컨시어지 선물 패키지용(2026-07-20). 나머지 인쇄 규칙은
    컴포넌트의 print: 유틸리티에 콜로케이트.

@@ -13,28 +13,39 @@ import { track } from "@/lib/track";
 import type { CollabReportData } from "@/lib/types";
 import sampleData from "@/lib/sample-report.json";
 
-// 로딩 = **고정 타이틀 + 아래 회색 롤링** (대표 지시 08-02).
-// EnrichWizard `LoadingView`와 같은 얼굴로 맞췄다 — 두 화면 다 "AI가 오래 일하는 중"이라
-// 사장님 입장에선 같은 경험인데, 여기만 타이틀 없이 회색 한 줄이 굴러 **무슨 일이 벌어지는지
-// 모른 채 기다렸다.** 타이틀이 '무엇을'을 고정하고, 롤링이 '지금 어디쯤'을 말한다.
-const LOADING_TITLE = "콜라보 아이디어를 분석하고 있어요";
+// 로딩 = **볼드가 굴러가고, 회색이 고정된다** (대표 지시 08-09 — 08-02 구조를 뒤집었다).
+//
+// 08-02엔 반대였다(볼드 타이틀 고정 + 회색 롤링). 그때 타이틀을 넣은 이유 자체는 지금도 유효하다 —
+// 그전엔 회색 한 줄만 굴러 **무슨 일이 벌어지는지 모른 채** 기다렸다. 그래서 고정 줄은 남긴다.
+// 바뀐 건 **무엇에 무게를 줄 것인가**다.
+//   대표 지적: *"볼드만 고정이니 롤링보다 볼드체를 뚫어지게 보게 된다."* 맞는 관찰이다 —
+//   눈은 제일 굵은 것에 붙는데 그게 안 움직이면 화면 전체가 멈춘 것처럼 읽힌다.
+// ⚠️ 그래서 종결형 규칙도 같이 뒤집혔다 — **롤링이 '-고 있어요' 문장, 고정 줄이 조각**이다.
+//    (예전 주석은 정확히 그 반대를 지시하고 있었다. 되돌린다면 이 짝을 함께 되돌릴 것.)
+const LOADING_SUB = "콜라보 분석 · 약 30초면 완료돼요";
 
-// 롤링 문구 — 타이틀이 큰 그림을 잡아주므로 여기선 **진행 단계**만 말한다.
-// ⚠️ 예전 1번 문구 "두 소개서를 읽고 있어요…"는 **뺐다**(대표: "똑같이 겹치는 건 빼자").
-//    타이틀과 같은 '-고 있어요' 종결형이라 **타이틀이 두 줄로 보였다** — 롤링은 전부 '~중…'
-//    조각으로 통일해야 타이틀과 역할이 갈린다(위저드 CRAWL_STEPS/GEN_STEPS와 같은 규칙).
-// 순환 간격 = **2000ms**(08-09 대표 지적 "전환 속도 쪼금 느려" → 4000ms에서 단축).
-//   EnrichWizard LoadingView가 원래부터 2000ms였다 — "같은 얼굴" 원칙(위 LOADING_TITLE 주석)을
-//   문구 내용뿐 아니라 **템포**까지 맞춘 것. 2번째 자리(소요시간 안내)가 이제 t=2s·10s·18s·26s에
-//   뜬다(실측 25~28초 기준 3~4회) — 07-31 "아직 참을 만할 때 끝을 알린다"는 취지는 그대로 살아있고
-//   더 자주 재확인시켜준다. (⏱ 파이프라인이 빨라지면 간격도 같이 낮출 것)
-const LOADING_INTERVAL_MS = 2000;
-const LOADING_COPY = [
-  "두 소개서를 읽는 중…",
-  "보통 30초 정도 걸려요…",
-  "접점을 찾는 중…",
-  "콜라보를 상상하는 중…",
+// 진행 단계(볼드로 굴러가는 줄) — **순환하지 않는다.**
+// 예전엔 4개를 2초 간격으로 돌려서 t=8s에 1번 문구가 다시 나왔다. 그건 사장님에게
+// "아무것도 진행되지 않았다"고 말하는 것과 같다 — 대표가 느낀 '멈춰 보임'의 나머지 절반이
+// 이 되돌아감이었다. 이제 앞으로만 가고 마지막 단계에서 멈춘다.
+const LOADING_STEPS = [
+  "두 소개서를 읽고 있어요",
+  "겹치는 결을 찾고 있어요",
+  "콜라보를 상상하고 있어요",
+  "아이디어를 다듬고 있어요",
 ];
+// 4단계 × 7.5s ≈ 30s(실측 25~28초). 마지막 단계는 응답이 올 때까지 유지된다.
+// ⚠️ 글자가 7.5초씩 머물러도 죽어 보이지 않는 건 **진행바가 계속 차기 때문**이다.
+//    '살아있음' 신호를 글자 교체가 아니라 바에 넘겼으므로, 문구는 의미가 바뀔 때만 바뀐다.
+//    (08-09 "전환 속도 좀 올려줘"의 답이 여기다 — 더 빨리 굴리는 게 아니라 굴릴 필요를 없앴다.)
+const LOADING_STEP_MS = 7500;
+const LOADING_TICK_MS = 250;
+// 진행바 = 지수 곡선(1-e^(-t/11s)). 초반엔 빠르게 차고 뒤로 갈수록 느려진다.
+// ⚠️ 실제 진행률이 아니라 **경과 시간**이다. 96%에서 멈추는 이유가 그것 — 다 찼는데 안 끝나는
+//    바는 거짓말로 읽히지만, 덜 찬 바는 "아직 남았다"로 정직하게 읽힌다.
+const LOADING_BAR_MAX = 96;
+const loadingProgress = (elapsedMs: number) =>
+  Math.min(LOADING_BAR_MAX, 100 * (1 - Math.exp(-elapsedMs / 11000)));
 
 type Phase =
   "idle" | "select" | "loading" | "ok" | "thin" | "no_match" | "error";
@@ -144,7 +155,10 @@ export function ReportSheet({
   // ⚠️저장본으로 바로 여는 경우 **그 쌍의 slug로 시작해야** 헤더가 "A × B"를 맞게 쓰고
   //   [다른 소개서로 분석]도 올바른 칩이 선택된 채 열린다(안 그러면 fromBrands[0]로 어긋난다).
   const [selectedSlug, setSelectedSlug] = useState(initialArchiveSlug ?? fromBrands[0]?.slug);
-  const [copyIdx, setCopyIdx] = useState(0);
+  // 로딩 경과(ms) — 진행 단계와 진행바가 둘 다 이 하나에서 파생된다(둘이 따로 놀지 않게).
+  const [elapsed, setElapsed] = useState(0);
+  // 마지막 단계에서 멈춘다(순환 금지) — `min`이 그 역할이다.
+  const stepIdx = Math.min(LOADING_STEPS.length - 1, Math.floor(elapsed / LOADING_STEP_MS));
 
   // in-flight 가드 — 생성 중 재요청 금지(이중 지출 차단). 도중에 칩이 바뀌면 완료 후 최신 선택으로 1회 재실행.
   const inFlightRef = useRef(false);
@@ -275,14 +289,14 @@ export function ReportSheet({
     if (open && sampleMode) track("report_locked_view", { source });
   }, [open, sampleMode, source]);
 
-  // 로딩 카피 4단 순환(2초 간격) — 2번째가 소요시간 안내
+  // 로딩 경과 타이머 — 진행 단계·진행바의 단일 소스.
+  // ⚠️ 누적 덧셈(+= TICK)이 아니라 **시작 시각과의 차이**로 잰다. 탭이 백그라운드로 가면 브라우저가
+  //    setInterval을 늦추는데, 덧셈식이면 그만큼 진행이 뒤처져 돌아왔을 때 바가 어색하게 밀린다.
   useEffect(() => {
     if (phase !== "loading") return;
-    setCopyIdx(0);
-    const t = window.setInterval(
-      () => setCopyIdx((i) => (i + 1) % LOADING_COPY.length),
-      LOADING_INTERVAL_MS,
-    );
+    const startedAt = Date.now();
+    setElapsed(0);
+    const t = window.setInterval(() => setElapsed(Date.now() - startedAt), LOADING_TICK_MS);
     return () => window.clearInterval(t);
   }, [phase]);
 
@@ -663,14 +677,25 @@ export function ReportSheet({
                   <ellipse cx="28" cy="28" rx="23" ry="9" stroke="currentColor" strokeWidth="2" opacity="0.45" transform="rotate(-28 28 28)" />
                   <circle cx="28" cy="28" r="6" fill="var(--primary)" />
                 </svg>
-                {/* 고정 타이틀 + 회색 롤링 — 위저드 LoadingView와 같은 사다리(18 bold / 13 mute).
-                    animate-pulse는 안 쓴다 — 문구가 4초마다 바뀌는 것 자체가 '살아있음' 신호다.
-                    ⚠️ 롤링 줄은 길이가 제각각이라 한 줄↔두 줄로 오갈 수 있다 → `min-h`로 자리를 미리
-                       잡아둬야 타이틀·마크가 위아래로 튀지 않는다(13px·leading-relaxed 두 줄 ≈ 40px). */}
-                <p className="mt-5 text-[18px] font-bold break-keep text-ink">{LOADING_TITLE}</p>
-                <p className="mt-1.5 min-h-[40px] text-[13px] leading-relaxed text-mute">
-                  {LOADING_COPY[copyIdx]}
+                {/* 굴러가는 볼드(18) + 고정 회색(13) + 진행바 — 사다리 자체는 위저드 LoadingView와 같다.
+                    ⚠️ 볼드 줄은 문구마다 길이가 달라 한 줄↔두 줄을 오갈 수 있다 → `min-h`로 자리를 미리
+                       잡아둬야 아톰 마크와 아래 줄이 위아래로 튀지 않는다(18px 두 줄 ≈ 52px).
+                    전환은 opacity만 — 슬라이드나 스케일은 대기 화면에서 시선을 뺏는다. */}
+                <p
+                  key={stepIdx}
+                  className="mt-5 min-h-[52px] animate-[fadeIn_320ms_ease-out] text-[18px] font-bold break-keep text-ink"
+                >
+                  {LOADING_STEPS[stepIdx]}
                 </p>
+                <p className="text-[13px] leading-relaxed text-mute">{LOADING_SUB}</p>
+                {/* 진행바 — 폭 150px 고정. 시트 폭을 다 쓰면 '거의 다 됐다'는 인상이 과장된다.
+                    aria-hidden: 위 role=status가 이미 단계 문구를 읽어준다(같은 정보 두 번 금지). */}
+                <div className="mt-3.5 h-[3px] w-[150px] overflow-hidden rounded-pill bg-hairline" aria-hidden="true">
+                  <div
+                    className="h-full rounded-pill bg-primary-strong transition-[width] duration-200 ease-linear"
+                    style={{ width: `${loadingProgress(elapsed).toFixed(1)}%` }}
+                  />
+                </div>
               </div>
             ) : phase === "ok" ? (
               pieces
