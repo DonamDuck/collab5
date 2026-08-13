@@ -51,6 +51,20 @@ function sanitizeBody(doc: MagazineDoc): MagazineDoc {
   return walk(doc as Record<string, unknown>) as MagazineDoc;
 }
 
+/** 🚨**빈 사진 검문** — 주소가 없는 image 노드는 "저장은 됐는데 사진만 사라진" 상태다.
+ *  08-13에 실제로 이렇게 5장이 날아갔다(원인은 클라 직렬화, 정본 주석 = BodyEditor `toPlainDoc`).
+ *  ⭐원인을 고쳤어도 이 검문은 남긴다 — **조용히 반쯤 저장되느니 저장을 멈추는 게 낫다.**
+ *  사진은 다시 올리면 되지만, 사라진 걸 모른 채 덮어쓰면 되돌릴 방법이 없다. */
+function countEmptyImages(doc: MagazineDoc): number {
+  let n = 0;
+  const walk = (node: { type?: string; attrs?: Record<string, unknown>; content?: unknown[] }) => {
+    if (node?.type === "image" && !(typeof node.attrs?.src === "string" && node.attrs.src)) n++;
+    for (const c of (node?.content ?? []) as typeof node[]) walk(c);
+  };
+  walk(doc as Parameters<typeof walk>[0]);
+  return n;
+}
+
 export type SaveResult = { ok: true; slug: string } | { ok: false; error: string };
 
 export async function saveArticleAction(input: {
@@ -71,6 +85,15 @@ export async function saveArticleAction(input: {
   const title = input.title?.trim();
   if (!title) return { ok: false, error: "제목을 입력해주세요." };
 
+  const body = sanitizeBody(input.body ?? {});
+  const empty = countEmptyImages(body);
+  if (empty > 0) {
+    return {
+      ok: false,
+      error: `본문 사진 ${empty}장의 주소가 비어 있어 저장을 멈췄어요. 그대로 저장하면 사진이 사라집니다 — 사진을 다시 넣어주세요.`,
+    };
+  }
+
   // 새 글이면 슬러그를 만들고, 겹치면 뒤에 숫자를 붙인다.
   let slug = input.slug?.trim() || slugify(title);
   if (!input.slug) {
@@ -90,7 +113,7 @@ export async function saveArticleAction(input: {
     // 빈 줄은 저장하지 않는다 — 폼에서 항목을 지웠다 만들었다 하면 빈 칸이 남는다.
     factBox: (input.factBox ?? []).filter((f) => f.label?.trim() || f.value?.trim()),
     brandLinks: (input.brandLinks ?? []).filter((b) => b.slug?.trim()),
-    body: sanitizeBody(input.body ?? {}),
+    body,
   };
 
   try {

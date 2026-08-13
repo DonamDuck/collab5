@@ -187,6 +187,19 @@ function ImageBar({ editor }: { editor: Editor }) {
   );
 }
 
+/** 🚨**Tiptap이 준 JSON을 서버 액션에 그대로 넘기면 `attrs`가 통째로 사라진다**(08-13 사고).
+ *
+ *  왜: ProseMirror는 노드의 `attrs`를 `Object.create(null)`로 만든다(프로토타입이 없는 객체).
+ *  그런데 서버 액션 인자 직렬화기는 **프로토타입 없는 객체를 "일반 객체가 아니다"로 보고 통과시키지
+ *  않는다** — Next가 넘겨주는 temporaryReferences 덕분에 에러조차 안 나고 **조용히 빠진다.**
+ *  결과: 사진의 `src`, 소제목의 `level`, 링크의 `href`가 저장 순간 전부 증발한다.
+ *  (실제 피해: 08-13 창간호 초안의 본문 사진 5장이 `{"type":"image"}`만 남았다.)
+ *
+ *  ⭐한 번 JSON을 왕복시키면 평범한 객체가 되어 그대로 건너간다. **여기가 유일한 진입점이므로
+ *    여기서 막는다** — 이 함수를 걷어내면 같은 사고가 그대로 재현된다.
+ *  ⚠️`structuredClone`으로 바꾸지 말 것(프로토타입 없는 객체를 그대로 복제한다). */
+const toPlainDoc = (doc: unknown): MagazineDoc => JSON.parse(JSON.stringify(doc)) as MagazineDoc;
+
 export function BodyEditor({
   initial,
   onChange,
@@ -234,7 +247,7 @@ export function BodyEditor({
       },
     },
     onUpdate({ editor }) {
-      onChange(editor.getJSON() as MagazineDoc);
+      onChange(toPlainDoc(editor.getJSON()));
     },
   });
 
