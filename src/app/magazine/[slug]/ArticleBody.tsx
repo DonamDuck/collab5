@@ -56,8 +56,9 @@ function plainText(node: MagazineNode): string {
 function Block({ node }: { node: MagazineNode }) {
   switch (node.type) {
     case "paragraph":
-      // 빈 문단 = 사용자가 의도적으로 넣은 여백. 지우지 않고 높이만 준다.
-      if (!node.content?.length) return <p className="h-4" aria-hidden="true" />;
+      // 빈 문단은 그리지 않는다 — 아래 ArticleBody에서 이미 걸러지지만, 다른 블록 안에
+      // 중첩된 경우까지 여기서 막는다.
+      if (!node.content?.length) return null;
       return <p className="text-[17px] leading-[1.85] text-body">{inlines(node.content)}</p>;
 
     case "heading":
@@ -80,7 +81,7 @@ function Block({ node }: { node: MagazineNode }) {
       // 강조 박스 — Tiptap 기본에 없어 PR2에서 커스텀 확장으로 만든다.
       // ⚠️자식이 블록(paragraph)이 아니라 **인라인 텍스트**다(blockquote와 다른 점).
       return (
-        <p className="my-2 text-center text-[19px] font-semibold leading-relaxed text-balance break-keep text-ink">
+        <p className="text-center text-[19px] font-semibold leading-relaxed text-balance break-keep text-ink">
           {inlines(node.content)}
         </p>
       );
@@ -102,7 +103,7 @@ function Block({ node }: { node: MagazineNode }) {
       return <li>{(node.content ?? []).flatMap((c) => inlines(c.content))}</li>;
 
     case "horizontalRule":
-      return <hr className="my-4 border-hairline" />;
+      return <hr className="border-hairline" />;
 
     case "image": {
       const src = typeof node.attrs?.src === "string" ? node.attrs.src : "";
@@ -116,7 +117,7 @@ function Block({ node }: { node: MagazineNode }) {
         //   그래야 대표가 정한 크기를 지키면서도, 화면이 그보다 좁으면(모바일) 화면에 맞춰 줄어든다.
         //   `width`로 주면 폰에서 사진이 화면 밖으로 삐져나가 가로 스크롤이 생긴다(대표 지시 08-10).
         //   ⚠️figure를 가운데 정렬해야 좁힌 사진이 왼쪽에 붙지 않는다.
-        <figure className="my-2 mx-auto" style={width ? { maxWidth: width } : undefined}>
+        <figure className="mx-auto" style={width ? { maxWidth: width } : undefined}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={src}
@@ -144,13 +145,28 @@ function Block({ node }: { node: MagazineNode }) {
 }
 
 export function ArticleBody({ doc }: { doc: MagazineDoc }) {
-  const blocks = doc?.content ?? [];
+  // 🚨**빈 문단은 여백이 아니라 부산물이다**(08-13 대표 제보로 판정을 뒤집음).
+  //   처음엔 "쓴 사람이 일부러 넣은 여백"으로 보고 높이를 줬는데, 실제 원고를 세어 보니
+  //   108블록 중 31개가 빈 문단이었고 **대부분이 사진을 끼워 넣을 때 에디터가 문단을 쪼개며
+  //   남긴 껍데기**였다(사진 앞뒤로 짝을 지어 나온다). 그걸 여백으로 대접하니 문단 사이가
+  //   21 + 17 + 21 = 59px로 벌어져 "한 줄 띄운 게 너무 크다"가 됐다.
+  //   ⭐리듬은 **여기 한 곳(space-y)에서만** 만든다 — 본문 안의 빈 줄이 간격을 좌우하면
+  //     글마다 리듬이 달라져 매거진이 아니라 메모처럼 보인다.
+  const blocks = (doc?.content ?? []).filter(
+    (n) => !(n.type === "paragraph" && !n.content?.length)
+  );
   if (blocks.length === 0) {
     return <p className="text-[16px] text-faint">본문이 아직 비어 있어요.</p>;
   }
   // space-y로 블록 간격을 한 곳에서 준다 — 블록마다 margin을 달면 서로 상쇄돼 간격이 들쭉날쭉해진다.
+  // ⚠️루트 폰트가 17px이라 `space-y-6` = 25.5px다(16px 기준으로 눈대중하지 말 것).
+  //   본문 줄 간격이 31.5px이니 문단 사이는 그보다 조금 좁은 게 한 덩어리로 읽힌다.
+  // 🪤**자식 블록에 `my-*`를 달지 마라 — 조용히 이깁니다.** Tailwind v4의 space-y는
+  //   `:where(...)`로 감싸 특이성이 0이라, 자식의 `my-2`(특이성 0,1,0)가 그냥 덮어쓴다.
+  //   그런데 덮는 건 **아래쪽 여백뿐**이라(위는 앞 블록의 margin이 이긴다) 사진 위 26px·
+  //   아래 9px처럼 **한쪽만 좁아진다.** 그래서 figure·hr·강조박스의 `my-*`를 전부 걷어냈다.
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       {blocks.map((node, i) => <Block key={i} node={node} />)}
     </div>
   );
