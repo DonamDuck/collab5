@@ -70,6 +70,15 @@ export function CoverPicker({
         onChange={(e) => onChange(e.target.value)}
         placeholder="또는 사진 주소를 직접 붙여넣기 (https://...)"
       />
+      {/* 권장 사이즈 안내 — 대표가 물어본 자리(08-13). 화면에 적어두면 다음 편집자도 안 묻는다.
+          ⚠️숫자를 바꿀 땐 실제 코드와 같이 고칠 것: 긴 변 축소는 `MAGAZINE_IMAGE_MAX_DIM`,
+          목록 카드 잘림 비율은 `app/magazine/page.tsx`의 `aspect-[16/9]`. */}
+      <p className="mt-2 text-[13px] leading-relaxed text-faint">
+        가로로 찍은 <b className="font-medium text-mute">3:2 사진(1600×1067)</b>을 권해요. 목록 카드와
+        카톡·검색 미리보기는 <b className="font-medium text-mute">가운데를 16:9로 잘라</b> 쓰거든요.
+        세로 사진도 글 안에서는 통째로 보이지만, 목록에선 가운데 띠만 보이니 중요한 게 한가운데 오게
+        골라주세요. 용량은 올릴 때 알아서 줄여요.
+      </p>
       {err && <p className="mt-1.5 text-[13px] text-red-600">{err}</p>}
     </div>
   );

@@ -80,10 +80,20 @@ export default async function MagazineArticlePage({
           </p>
         </header>
 
+        {/* 커버 — ⭐**본문에선 자르지 않는다**(대표 확정 08-13). 목록 카드는 16:9로 잘라 얼굴을
+             통일하지만, 글을 열면 사장님이 고른 사진이 통째로 보여야 한다.
+             ⚠️대신 **높이에 상한**을 둔다. 안 그러면 세로로 긴 사진(인스타 4:5 등)이 글 폭을 꽉 채워
+             화면 하나를 통째로 잡아먹는다 — 1080×1350 커버가 680px 폭에서 850px로 나왔다(대표 제보).
+             `max-h`+`w-auto`라 **잘리는 게 아니라 통째로 작아진다.** 가로형(3:2)은 680px 폭에서
+             453px이라 상한에 안 걸려 지금과 똑같이 나오고, 폰에서도 폭이 좁아 걸리지 않는다. */}
         {a.coverImage && (
-          <div className="mt-6 overflow-hidden rounded-lg bg-surface-soft">
+          <div className="mt-6 flex justify-center">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={a.coverImage} alt="" className="w-full" />
+            <img
+              src={a.coverImage}
+              alt=""
+              className="max-h-[500px] w-auto max-w-full rounded-lg bg-surface-soft"
+            />
           </div>
         )}
 
