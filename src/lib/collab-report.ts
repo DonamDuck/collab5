@@ -632,7 +632,10 @@ export async function generateReport(
         gainA: gateJargon(i.gainA, "gainA"),
         gainB: gateJargon(i.gainB, "gainB"),
       })),
-      steps: (p.steps ?? []).slice(0, 4).map(String),
+      // 🚨4→5 (08-13). **여기를 안 올리면 수익 논의 단계가 조용히 잘린다** — 프롬프트에
+      //   "최대 5단계"라고 써도 서버가 4개에서 자르면 마지막 단계가 화면에 영영 안 나온다.
+      //   (수익 얘기는 순서상 뒤쪽이라 정확히 잘리는 자리였다.)
+      steps: (p.steps ?? []).slice(0, 5).map(String),
       effects: (p.effects ?? []).slice(0, 3).map(String).filter((s) => !gateJargonHit(s, "effects")),
     },
     candidates,
