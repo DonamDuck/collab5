@@ -11,6 +11,7 @@ import { BrandGrid } from "@/components/BrandGrid";
 import { SampleReportLink, SampleReportPeek } from "@/components/SampleReport";
 import { TrackLink } from "@/components/TrackLink";
 import { repo } from "@/lib/repo";
+import { kstDateLabel } from "@/lib/magazine-format";
 
 // n≤12 동안 전량 노출(대표 확정 07-31 — 상한+오래된 순이면 방금 등록한 씨딩 사장님이 자기 브랜드를 못 본다).
 // 24는 "전량"의 방어적 상한 — 넘으면 P3 큐레이션 재론.
@@ -40,6 +41,11 @@ export const revalidate = 300;
 
 export default async function Home() {
   const fetched = await repo.listHomeMakers(GRID_LIMIT);
+  // 매거진 구좌용 — 최신 1편만 쓴다.
+  // ⚠️홈은 ISR 300초라 새 글이 여기 뜨기까지 최대 5분 걸린다. `/magazine`은 force-dynamic이라
+  //   즉시 뜨므로, 발행 직후 두 화면이 잠깐 어긋나는 건 **버그가 아니라 설계**다.
+  const articles = await repo.listPublishedArticles();
+  const leadArticle = articles[0];
   // HOME_ORDER에 있는 것부터 그 순서대로, 없는 건 뒤에 원래 순서 그대로(Array#sort는 안정 정렬).
   const rank = (slug: string) => {
     const i = HOME_ORDER.indexOf(slug);
@@ -247,6 +253,91 @@ export default async function Home() {
           </div>
         </Reveal>
       </section>
+
+      {/* ── 매거진 구좌 (2026-08-13, 1팀 요청 → 디자인팀) ──
+           🚨**이 자리는 장식이 아니라 유일한 진입로다.** 헤더의 「매거진」은 데스크톱에만 있다 —
+             375px에서 로고+우측메뉴가 306px를 먹어 남는 폭이 35px뿐이라 텍스트 링크(66px)도
+             아이콘(38px)도 안 들어간다(1팀 실측). 「콜라보 찾기」 칩을 아이콘으로 되돌리면 자리가
+             나지만 그건 07-29 가로 스크롤 사고로 겨우 회수한 자리라 되돌릴 수 없다. 풋터에도
+             넣었지만 끝까지 스크롤해야 나오니 진입로 구실을 못 한다.
+             → **모바일에서 매거진에 닿는 길은 지금 여기뿐이다. 지우거나 아래로 밀지 말 것.**
+
+           자리 = 「콜라보의 시작이 이렇게 달라져요」 **바로 다음**(1팀 제안 채택). 설명을 다 읽고
+             "진짜?" 싶어지는 순간에 실물 증거가 나오는 자리다.
+
+           ⭐어휘 — **섹션 헤더는 홈 어휘(중앙정렬), 카드 안쪽은 매거진 어휘(좌측정렬)**로 섞었다.
+             홈은 전부 중앙정렬이라 헤더까지 좌측정렬로 하면 이 구좌만 홈에서 떠 보이고, 반대로
+             카드 안까지 중앙정렬하면 매거진에 도착했을 때 얼굴이 안 이어진다. 지면 한 장을 홈에
+             인용해 붙인 꼴로 읽히게 한 것.
+           ⛔박스로 감싸지 않는다 — 「박스는 고르는 것, 줄은 읽는 것」(디자인-시스템 § 카드 어휘).
+             박스를 입히면 바로 위 BrandGrid의 '고르는 브랜드'와 같은 옷이 된다. 대신 위아래
+             hairline 룰로 '지면'임을 표시한다. */}
+      {leadArticle && (
+        <Reveal as="section" className="mt-12">
+          <h2 className="text-balance break-keep text-center text-[24px] font-bold leading-[1.35] tracking-[-0.02em] text-ink sm:text-[28px]">
+            콜라보, 진짜로 어떻게 굴러가나요.
+          </h2>
+          <p className="mx-auto mt-2 max-w-[440px] break-keep text-center text-[16px] leading-[1.65] text-body sm:text-[17px]">
+            실제로 만난 두 브랜드의 하루를 직접 찾아가 기록했어요.
+          </p>
+
+          <div className="mt-8 border-y border-hairline">
+            <Link
+              href={`/magazine/${leadArticle.slug}`}
+              className="block py-6 transition-opacity hover:opacity-70 sm:py-8"
+            >
+              <div className="grid items-center gap-5 sm:grid-cols-[1fr_280px] sm:gap-8">
+                {leadArticle.coverImage && (
+                  // 폰에선 사진이 먼저 — 잡지는 사진이 붙잡고 글이 따라오는 매체다(목록 히어로와 같은 규칙).
+                  <div className="order-first overflow-hidden rounded-lg bg-surface-soft sm:order-last">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={leadArticle.coverImage}
+                      alt=""
+                      loading="lazy"
+                      className="aspect-[4/3] w-full object-cover"
+                    />
+                  </div>
+                )}
+                <div className="min-w-0 text-left">
+                  {/* 「창간호」 — 1편뿐인 게 흠이 아니라 **사건**으로 읽히게 하는 프레이밍(1팀 제안).
+                      2편부터는 자동으로 「최신호」가 된다. 매거진 목록 히어로도 같은 규칙을 쓴다. */}
+                  <span className="text-[12px] font-medium tracking-[0.1em] text-faint">
+                    {articles.length === 1 ? "창간호" : "최신호"}
+                  </span>
+                  {leadArticle.subtitle && (
+                    <p className="mt-2.5 text-[13px] font-medium break-keep text-primary-on">
+                      {leadArticle.subtitle}
+                    </p>
+                  )}
+                  <h3 className="mt-1.5 text-[22px] font-bold leading-[1.3] tracking-[-0.01em] text-balance break-keep text-ink sm:text-[26px]">
+                    {leadArticle.title}
+                  </h3>
+                  {leadArticle.summary && (
+                    <p className="mt-2.5 line-clamp-2 text-[15px] leading-relaxed break-keep text-body">
+                      {leadArticle.summary}
+                    </p>
+                  )}
+                  <p className="mt-3 text-[13px] text-faint">
+                    {leadArticle.editorName}
+                    {leadArticle.publishedAt && ` · ${kstDateLabel(leadArticle.publishedAt)}`}
+                  </p>
+                </div>
+              </div>
+            </Link>
+          </div>
+
+          {/* 고스트 — 아래 마무리 CTA가 primary Kiwi라, 여기까지 primary면 진짜 CTA와 경쟁한다. */}
+          <div className="mt-6 text-center">
+            <Link
+              href="/magazine"
+              className="inline-flex h-11 items-center justify-center rounded-md border border-border-strong bg-surface px-5 text-[15px] font-medium text-ink transition-colors hover:bg-surface-soft"
+            >
+              매거진 더 보기
+            </Link>
+          </div>
+        </Reveal>
+      )}
 
       {/* 마무리 CTA — eager 필수: 페이지 맨 마지막 요소라 하단 -22% 데드존을 못 벗어나 리빌이 영영 안 터짐 */}
       <Reveal as="section" eager className="mt-12 text-center">

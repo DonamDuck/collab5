@@ -156,8 +156,10 @@ export default async function MagazinePage() {
                         {issueLabel(published, lead.slug)}
                       </span>
                     )}
+                    {/* 1편뿐일 땐 「창간호」 — 흠이 아니라 사건으로 읽히게(1팀 제안, 08-13).
+                        홈 매거진 구좌도 같은 규칙을 쓴다. 2편부터 자동으로 「최신호」. */}
                     <span className="text-[12px] font-medium tracking-[0.1em] text-faint">
-                      최신호
+                      {published.length === 1 ? "창간호" : "최신호"}
                     </span>
                   </div>
                   {lead.subtitle && (
