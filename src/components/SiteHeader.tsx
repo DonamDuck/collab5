@@ -30,6 +30,17 @@ export async function SiteHeader() {
       {/* 14px 정수 — text-sm은 루트 17px 탓에 14.875px(분수)가 된다. 헤더는 전 페이지 공통이라
           여기 하나가 앱 전체에 분수 픽셀을 흩뿌리고 있었다(07-31 실측). */}
       <nav className="flex min-w-0 items-center gap-1.5 text-[14px] sm:gap-2">
+        {/* 매거진 — 🚨**데스크톱에서만 보인다(`hidden sm:flex`)**. 모바일에 넣지 말 것.
+            07-29에 이 헤더가 정확히 그것 때문에 터졌다: 워드마크(123px) + 우측 메뉴(244px)가
+            375px 폰의 가용폭을 넘겨 **전 페이지에 가로 스크롤**이 생겼고, 버튼 하나를 없애
+            겨우 회수한 자리다. 모바일 진입은 풋터와 (예정된) 홈 섹션이 맡는다.
+            ⚠️`overflow-x-hidden`으로 덮는 우회는 금지 — 홈의 100vmax 풀블리드 밴드를 잘라먹는다. */}
+        <Link
+          href="/magazine"
+          className="hidden shrink-0 items-center whitespace-nowrap rounded-md px-3 py-1.5 font-medium text-mute transition-colors hover:text-ink sm:flex"
+        >
+          매거진
+        </Link>
         {/* 콜라보 찾기 — '미니 검색창' 형태의 링크(대표 지시 07-31).
             돋보기 아이콘 + '브랜드 소개서' 버튼 2개를 이걸로 통합했다.
             ⚠️ 진짜 input이 아니라 Link다 — 눌러서 /search로 보내는 게 목적이고,

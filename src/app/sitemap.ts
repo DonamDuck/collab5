@@ -14,15 +14,30 @@ import { repo } from "@/lib/repo";
 import { SITE_URL } from "@/lib/site";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const brands = await repo.listSitemapBrands();
+  const [brands, articles] = await Promise.all([
+    repo.listSitemapBrands(),
+    repo.listPublishedArticles(200),
+  ]);
 
   // 고정 페이지 — 약관·개인정보는 넣되 우선순위를 낮게(있어야 하지만 찾아올 글은 아니다).
   const staticPages: MetadataRoute.Sitemap = [
     { url: SITE_URL, lastModified: new Date(), changeFrequency: "daily", priority: 1 },
     { url: `${SITE_URL}/search`, changeFrequency: "daily", priority: 0.7 },
+    { url: `${SITE_URL}/magazine`, changeFrequency: "weekly", priority: 0.7 },
     { url: `${SITE_URL}/terms`, changeFrequency: "yearly", priority: 0.2 },
     { url: `${SITE_URL}/privacy`, changeFrequency: "yearly", priority: 0.2 },
   ];
+
+  // 매거진 — **발행분만**(초안은 공개 상세가 404라 넣으면 크롤러에게 죽은 주소를 주는 꼴).
+  // ⭐매거진을 만든 이유의 절반이 검색 노출인데 08-13까지 여기서 통째로 빠져 있었다 —
+  //   **색인 통로가 없으면 아무리 잘 써도 아무도 안 온다.** 글은 한 번 쓰면 잘 안 고치니
+  //   changeFrequency는 monthly, 대신 소개서보다 우선순위를 높게 둔다(우리 고유 콘텐츠).
+  const articlePages: MetadataRoute.Sitemap = articles.map((a) => ({
+    url: `${SITE_URL}/magazine/${a.slug}`,
+    lastModified: new Date(a.updatedAt),
+    changeFrequency: "monthly",
+    priority: 0.9,
+  }));
 
   // 소개서 — **살아 있는 것 전부**(대표 확정 08-07 2차). [콜라보 찾기에 보이기] 토글은
   // 사이트 안 목록(홈·`/search`)만 정하고 **웹 검색에는 다 나온다** — `/m`은 어차피 공개 페이지다.
@@ -35,5 +50,5 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.8,
   }));
 
-  return [...staticPages, ...makerPages];
+  return [...staticPages, ...articlePages, ...makerPages];
 }
