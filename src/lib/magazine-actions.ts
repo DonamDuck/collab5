@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { repo } from "./repo";
 import { isMagazineEditor } from "./magazine-auth";
 import { sanitizeHttpUrl } from "./enrich";
+import { normalizeSlug, slugError, SLUG_MIN } from "./magazine-slug";
 import type { MagazineDoc, MagazineSaveInput, MagazineStatus } from "./types";
 
 // 매거진 쓰기 서버 액션 (2026-08-10) — 스펙 = [[매거진-기능-개발지시]] §5
@@ -12,20 +13,12 @@ import type { MagazineDoc, MagazineSaveInput, MagazineStatus } from "./types";
 //   `/magazine/new`에 주소를 직접 치거나 액션을 직접 호출하는 경로는 늘 열려 있다.
 //   08-06 소개서 편집에서 정확히 이 구멍이 났다(화면 분기를 건너뛰고 저장이 통과).
 
-/** 제목 → 슬러그. 한글은 로마자로 못 바꾸므로, 한글만 있으면 날짜 기반으로 떨어진다. */
+/** 제목 → 슬러그. 편집자가 주소 칸을 비워둔 새 글에서만 쓴다.
+ *  ⚠️한글 제목이면 옮길 글자가 없어 `article-mf3k2p`로 떨어진다 — 그래서 폼에 주소 칸을 만들었다(08-13).
+ *  자동 생성은 이제 **마지막 안전망**이지 기본 경로가 아니다. */
 function slugify(title: string): string {
-  const base = title
-    .toLowerCase()
-    .replace(/[^a-z0-9가-힣\s-]/g, "")
-    .trim()
-    .replace(/\s+/g, "-")
-    // 한글은 URL에서 퍼센트 인코딩돼 길고 안 읽힌다 → 뺀다.
-    .replace(/[가-힣]/g, "")
-    .replace(/-+/g, "-")
-    .replace(/^-|-$/g, "");
-  // ⚠️최소 길이 가드 — 한글 제목이면 base가 빈 문자열이 된다.
-  //   소개서에서 같은 문제로 `/m/a` 같은 주소가 나온 적이 있다(07월 slug 가드).
-  return base.length >= 3 ? base.slice(0, 60) : `article-${Date.now().toString(36)}`;
+  const base = normalizeSlug(title);
+  return base.length >= SLUG_MIN ? base : `article-${Date.now().toString(36)}`;
 }
 
 /** 본문 JSON 위생 — 링크 스킴만 검사한다.
@@ -68,7 +61,8 @@ function countEmptyImages(doc: MagazineDoc): number {
 export type SaveResult = { ok: true; slug: string } | { ok: false; error: string };
 
 export async function saveArticleAction(input: {
-  slug?: string;          // 있으면 수정, 없으면 새 글
+  slug?: string;          // 있으면 수정(= 고치기 전 주소), 없으면 새 글
+  desiredSlug?: string;   // 편집자가 주소 칸에 적은 값. 비어 있으면 기존 주소 유지(새 글이면 제목에서 생성)
   status: MagazineStatus;
   title: string;
   subtitle?: string;
@@ -94,15 +88,31 @@ export async function saveArticleAction(input: {
     };
   }
 
-  // 새 글이면 슬러그를 만들고, 겹치면 뒤에 숫자를 붙인다.
-  let slug = input.slug?.trim() || slugify(title);
-  if (!input.slug) {
+  // ── 주소 정하기 ─────────────────────────────────────────────
+  // ⭐**편집자가 적은 게 있으면 그게 이긴다**(08-13 대표 지시). 비워두면 예전처럼 자동으로 만든다.
+  const prevSlug = input.slug?.trim() || undefined;   // 있으면 수정
+  const typed = normalizeSlug(input.desiredSlug ?? "");
+  let slug: string;
+
+  if (typed) {
+    const bad = slugError(typed);
+    if (bad) return { ok: false, error: bad };
+    // 남이 이미 쓰는 주소인가. **자기 자신은 제외** — 안 그러면 주소를 안 바꾼 채 저장만 해도 막힌다.
+    if (typed !== prevSlug && (await repo.articleSlugExists(typed))) {
+      return { ok: false, error: `'${typed}'는 다른 글이 쓰고 있어요. 다른 주소로 적어주세요.` };
+    }
+    slug = typed;
+  } else if (prevSlug) {
+    slug = prevSlug;                                   // 수정인데 안 적었으면 그대로 둔다
+  } else {
+    slug = slugify(title);                             // 새 글 + 안 적음 → 제목에서
     let n = 2;
     while (await repo.articleSlugExists(slug)) slug = `${slugify(title)}-${n++}`;
   }
 
   const payload: MagazineSaveInput = {
     slug,
+    prevSlug,
     status: input.status,
     title,
     subtitle: input.subtitle?.trim() ?? "",
@@ -125,6 +135,8 @@ export async function saveArticleAction(input: {
   // 목록·상세 둘 다 비운다 — 발행했는데 목록에 안 뜨면 저장이 안 된 걸로 읽힌다.
   revalidatePath("/magazine");
   revalidatePath(`/magazine/${slug}`);
+  // 주소를 바꿨으면 **옛 주소도** 비운다 — 안 그러면 이미 없는 글이 캐시로 계속 열린다.
+  if (prevSlug && prevSlug !== slug) revalidatePath(`/magazine/${prevSlug}`);
   return { ok: true, slug };
 }
 

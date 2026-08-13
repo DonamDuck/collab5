@@ -505,7 +505,9 @@ class InMemoryRepo implements Repo {
     return this.articles.some((a) => a.slug === slug);
   }
   async saveArticle(input: MagazineSaveInput): Promise<MagazineArticle> {
-    const prev = this.articles.find((a) => a.slug === input.slug);
+    // 기존 글은 **고치기 전 주소**로 찾는다 — 주소를 바꾸는 중일 수 있다(types.ts prevSlug 주석).
+    const key = input.prevSlug ?? input.slug;
+    const prev = this.articles.find((a) => a.slug === key);
     const publishedAt =
       input.status === "published" ? (prev?.publishedAt ?? now()) : undefined;
     const saved: MagazineArticle = {
@@ -516,7 +518,7 @@ class InMemoryRepo implements Repo {
       updatedAt: now(),
     };
     this.articles = prev
-      ? this.articles.map((a) => (a.slug === input.slug ? saved : a))
+      ? this.articles.map((a) => (a.slug === key ? saved : a))
       : [...this.articles, saved];
     return saved;
   }
@@ -955,7 +957,10 @@ class SupabaseRepo implements Repo {
     // ⭐**발행일은 서버가 정한다.** "draft였다가 처음 published가 되는 순간"에만 찍고, 그 뒤 수정에는 손대지 않는다.
     //   클라가 보내게 하거나 매 저장마다 now()를 넣으면 **글을 고칠 때마다 발행일이 오늘로 밀려**
     //   목록 순서와 아카이브가 통째로 흐트러진다(눈에 잘 안 띄는 종류의 고장).
-    const prev = await this.getArticleForEditor(input.slug);
+    // 🔑기존 글은 **고치기 전 주소**로 찾는다(types.ts prevSlug 주석). 주소를 바꾸는 중이면
+    //   input.slug로는 못 찾아 "새 글"로 오인되고, 발행일이 오늘로 밀린다.
+    const key = input.prevSlug ?? input.slug;
+    const prev = await this.getArticleForEditor(key);
     const publishedAt =
       input.status === "published"
         ? (prev?.publishedAt ?? new Date().toISOString())
@@ -975,12 +980,14 @@ class SupabaseRepo implements Repo {
       body: input.body,
       published_at: publishedAt,
     };
-    // slug가 unique라 onConflict로 upsert. 새 글/수정 분기를 코드에서 하지 않는다(경합에도 안전).
-    const { data, error } = await this.db
-      .from("magazine_articles")
-      .upsert(row, { onConflict: "slug" })
-      .select()
-      .single();
+    // ⚠️upsert(onConflict:"slug")를 쓰지 않는다 — **주소를 바꾸면 같은 글이 하나 더 생긴다**
+    //   (바뀐 주소는 충돌하지 않으니 갱신이 아니라 새 행이 된다). 기존 행이 있으면 옛 주소로
+    //   찾아 갱신하고, 없을 때만 넣는다. 같은 주소로 동시에 새 글을 만드는 경합은 slug UNIQUE가 막고,
+    //   그때는 조용히 덮어쓰는 대신 에러가 나는 게 맞다.
+    const q = prev
+      ? this.db.from("magazine_articles").update(row).eq("slug", key)
+      : this.db.from("magazine_articles").insert(row);
+    const { data, error } = await q.select().single();
     if (error) throw new Error(`아티클 저장에 실패했어요: ${error.message}`);
     return rowToArticle(data as MagazineRow);
   }

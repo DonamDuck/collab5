@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { BodyEditor } from "./BodyEditor";
 import { CoverPicker } from "./CoverPicker";
 import { saveArticleAction, lookupBrandAction } from "@/lib/magazine-actions";
+import { normalizeSlug, suggestSlug, slugError } from "@/lib/magazine-slug";
 import type { MagazineArticle, MagazineDoc, MagazineStatus } from "@/lib/types";
 
 // 매거진 작성·수정 폼 (2026-08-10) — 지시서 §2 "폼 + 에디터 하이브리드".
@@ -28,6 +29,9 @@ export function ArticleForm({ initial }: { initial?: MagazineArticle }) {
   const [err, setErr] = useState("");
 
   const [title, setTitle] = useState(initial?.title ?? "");
+  // 주소는 **적은 그대로 들고 있다가** 저장할 때 다듬는다(다듬은 결과는 아래에 미리 보여준다).
+  // 타이핑 중에 글자를 지워버리면 한글을 칠 때 "아무것도 안 써지는" 화면이 된다.
+  const [slugText, setSlugText] = useState(initial?.slug ?? "");
   const [subtitle, setSubtitle] = useState(initial?.subtitle ?? "");
   const [editorName, setEditorName] = useState(initial?.editorName ?? "안톤");
   const [location, setLocation] = useState(initial?.location ?? "");
@@ -41,11 +45,17 @@ export function ArticleForm({ initial }: { initial?: MagazineArticle }) {
   );
   const [body, setBody] = useState<MagazineDoc>(initial?.body ?? {});
 
+  // 저장하면 실제로 어떤 주소가 될지 — 편집자가 보는 그대로가 결과여야 한다.
+  const cleanSlug = normalizeSlug(slugText);
+  const slugSuggestion = suggestSlug(title);
+  const slugWarn = cleanSlug ? slugError(cleanSlug) : null;
+  const slugChanged = !!initial && !!cleanSlug && cleanSlug !== initial.slug;
+
   const save = (status: MagazineStatus) =>
     start(async () => {
       setErr("");
       const r = await saveArticleAction({
-        slug: initial?.slug, status, title, subtitle, editorName, location,
+        slug: initial?.slug, desiredSlug: slugText, status, title, subtitle, editorName, location,
         coverImage, summary, factBox: facts, brandLinks: links, body,
       });
       if (!r.ok) { setErr(r.error); return; }
@@ -72,6 +82,38 @@ export function ArticleForm({ initial }: { initial?: MagazineArticle }) {
         <Field label="제목" hint="문장형">
           <input className={inputCls} value={title} onChange={(e) => setTitle(e.target.value)}
             placeholder="방금 빚은 요가 자세를, 내 몸으로 해봤어요" />
+        </Field>
+        {/* 주소 — 제목 바로 아래. 제목에서 자동으로 만들던 걸 편집자 손에 돌려준 자리(08-13 대표 지시).
+            ⭐다듬기(normalizeSlug)를 타이핑 중에 하지 않고 **아래 미리보기로만** 보여준다.
+              입력칸에서 바로 글자를 지우면 한글을 칠 때 화면이 고장 난 것처럼 보인다. */}
+        <Field label="주소" hint="영문 소문자·숫자·하이픈">
+          <div className="flex items-center gap-1.5">
+            <span className="shrink-0 text-[14px] text-faint">/magazine/</span>
+            <input className={inputCls} value={slugText} inputMode="url"
+              onChange={(e) => setSlugText(e.target.value)}
+              placeholder={slugSuggestion || "moleyoga-clay-workshop"} />
+          </div>
+          {slugWarn ? (
+            <p className="mt-1.5 text-[13px] text-red-600">{slugWarn}</p>
+          ) : cleanSlug && cleanSlug !== slugText ? (
+            <p className="mt-1.5 text-[13px] text-faint">
+              이렇게 저장돼요 — <b className="font-medium text-mute">/magazine/{cleanSlug}</b>
+              <span className="ml-1">(한글·공백·특수문자는 주소로 못 써서 빠져요)</span>
+            </p>
+          ) : !cleanSlug ? (
+            <p className="mt-1.5 text-[13px] text-faint">
+              {initial
+                ? "비워두면 지금 주소를 그대로 씁니다."
+                : "비워두면 제목에서 자동으로 만들어요. 한글 제목이면 article-xxxx 같은 주소가 되니 직접 적는 걸 권해요."}
+            </p>
+          ) : null}
+          {/* 못 쓰는 주소일 땐 경고를 겹쳐 띄우지 않는다 — 고쳐야 할 게 뭔지부터 하나만 보여준다. */}
+          {slugChanged && !slugWarn && (
+            <p className="mt-1.5 text-[13px] text-amber-700">
+              주소를 바꾸면 <b className="font-medium">이전 주소({initial!.slug})는 열리지 않아요.</b>{" "}
+              이미 공유하셨다면 그 링크가 죽습니다.
+            </p>
+          )}
         </Field>
         <Field label="부제" hint="브랜드 × 브랜드 · 형식">
           <input className={inputCls} value={subtitle} onChange={(e) => setSubtitle(e.target.value)}

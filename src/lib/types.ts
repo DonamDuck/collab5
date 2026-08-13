@@ -329,6 +329,10 @@ export type MagazineListItem = Omit<MagazineArticle, "body">;
  *  (수정할 때마다 발행일이 오늘로 밀리면 아카이브 순서가 무너진다). */
 export interface MagazineSaveInput {
   slug: string;
+  /** 🔑수정 중 **주소를 바꿀 때**, 고치기 전의 주소. 없으면 새 글이다.
+   *  ⚠️저장은 이 값으로 기존 행을 찾는다 — `slug`로 찾으면 바뀐 주소라 못 찾고,
+   *  같은 글이 **두 개로 늘어난다**(발행일도 오늘로 새로 찍힌다). */
+  prevSlug?: string;
   status: MagazineStatus;
   title: string;
   subtitle: string;
