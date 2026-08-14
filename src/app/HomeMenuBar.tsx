@@ -106,9 +106,10 @@ export function HomeMenuBar() {
         // 🔒`border-[0.5px] border-[#DFDFE3]`는 **브랜드 카드·매거진 히어로와 완전히 같은 값**이다
         //   (대표 지시 "브랜드 카드 그거로 참고"). 같은 사이트의 같은 뜻이면 같은 선을 쓴다 —
         //   여기서 값을 새로 만들면 라인 어휘가 셋으로 갈린다.
-        // ⚠️`shadow-e1`은 남긴다. 이제 뒤에 본문이 지나가므로 **테두리만으로는 면이 안 떠 보인다** —
-        //   흰 카드가 흰 지면 위에 얹힌 게 아니라 파묻힌 것처럼 읽힌다.
-        className="no-scrollbar pointer-events-auto inline-flex max-w-full items-center gap-1 overflow-x-auto rounded-pill border-[0.5px] border-[#DFDFE3] bg-surface p-1 shadow-e1"
+        // 📐그림자 **e1 → e2**(08-14). e1은 `0 1px 2px 6%`로 네 단계 중 제일 낮은 값이다 —
+        //   **떠 있어야 할 것에 가장 안 뜨는 그림자**를 쓰고 있었다. 지면을 낮춘 것과 한 쌍으로 올린다.
+        //   ⚠️e3(`0 8px 32px 14%`)까지 가면 알약이 모달처럼 무거워진다. 메뉴는 지면 바로 위 한 층이다.
+        className="no-scrollbar pointer-events-auto inline-flex max-w-full items-center gap-1 overflow-x-auto rounded-pill border-[0.5px] border-[#DFDFE3] bg-surface p-1 shadow-e2"
       >
         {/* 「콜라보 매거진」 — 대표 08-14. 그냥 '매거진'이면 무슨 매거진인지가 안 붙는다.
             ⚠️세 칸 중 이것만 6글자라 폭이 가장 크게 늘었다(실측은 아래 커밋 메시지 참고).

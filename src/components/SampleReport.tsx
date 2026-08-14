@@ -37,25 +37,11 @@ function PortalSheet({ open, onClose }: { open: boolean; onClose: () => void }) 
   );
 }
 
-/** 히어로 보조 버튼 — 주 CTA(소개서) 아래 보더 버튼. 누르면 예시 리포트 시트(페이지 이동 없음).
- *  처음엔 텍스트 링크였는데 대표 QA(07-31) "가시적이지 못하다" → 보더 버튼으로 승격.
- *  주 CTA와의 위계는 면색(primary vs 보더)으로 유지 — 분석을 1번 자리로 올리는 건 아니다. */
-export function SampleReportLink() {
-  const [open, setOpen] = useState(false);
-  return (
-    <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="flex h-12 w-full items-center justify-center gap-1.5 rounded-md border border-border-strong bg-surface text-[16px] font-medium text-ink hover:bg-surface-soft"
-      >
-        콜라보 추천 리포트 미리보기
-        <span aria-hidden="true" className="text-primary-on">→</span>
-      </button>
-      <PortalSheet open={open} onClose={() => setOpen(false)} />
-    </>
-  );
-}
+// 🔻08-14 `SampleReportLink`(히어로 보조 보더 버튼) **은퇴**.
+//    07-31에 텍스트 링크 → 보더 버튼으로 승격시켰던 그 버튼인데, 대표가 히어로에서 내리고
+//    아래 예시 카드 밑으로 옮기기로 했다(08-14). 같은 시트를 열므로 기능 손실은 없다 —
+//    같은 화면에 같은 시트를 여는 입구가 둘이었던 걸 하나로 합친 것이다.
+//    되살릴 일이 생기면 git에서 꺼내면 된다(이 파일 08-14 이전 리비전).
 
 /** ③ 실물 구경 — 리포트 축약 카드.
  *  구성 = ①콜라보 아이디어 예시 ②이런 점이 잘 어울려요 (대표 확정 07-31).
@@ -104,15 +90,20 @@ export function SampleReportPeek() {
             </li>
           ))}
         </ul>
+        {/* 🥝08-14 히어로에서 내려온 버튼이 이 자리를 대신한다(대표 지시). 보더 → **키위 면**.
+            ⚠️Kiwi 면색은 주 CTA 전용이라는 규칙이 있는데, 이건 예외가 아니라 **여기가 이 섹션의
+              주 CTA**가 된 것이다. 히어로의 소개서 등록과는 화면이 멀어 나란히 서지 않는다.
+            ⚠️높이도 h-11(46.75) → h-12로 히어로 주 CTA와 맞춘다 — 같은 무게라고 말했으면 크기도 같아야. */}
         <button
           type="button"
           onClick={() => {
             track("home_report_peek_open");
             setOpen(true);
           }}
-          className="mt-4 flex h-11 w-full items-center justify-center rounded-md border border-border-strong bg-surface text-[15px] font-medium text-ink hover:bg-surface-soft"
+          className="mt-4 flex h-12 w-full items-center justify-center gap-1.5 rounded-md bg-primary text-[16px] font-medium text-primary-on"
         >
-          예시 리포트 전체 보기
+          콜라보 추천 리포트 미리보기
+          <span aria-hidden="true">→</span>
         </button>
       </div>
       {/* 정책을 셀링으로 — "전시되나?" 오해 방지 겸 신뢰 신호 */}

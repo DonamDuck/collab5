@@ -9,7 +9,7 @@ import { HomeMenuBar } from "./HomeMenuBar";
 import { HomeEnrichBanner } from "./HomeEnrichBanner";
 import { Reveal } from "@/components/Reveal";
 import { BrandGrid } from "@/components/BrandGrid";
-import { SampleReportLink, SampleReportPeek } from "@/components/SampleReport";
+import { SampleReportPeek } from "@/components/SampleReport";
 import { TrackLink } from "@/components/TrackLink";
 import { repo } from "@/lib/repo";
 import { kstDateLabel } from "@/lib/magazine-format";
@@ -59,7 +59,16 @@ export default async function Home() {
     //    스크롤 0에서 헤더와 바 사이가 51px 벌어진다. 밖에 두면 헤더에 딱 붙고, 바가 흐름에서
     //    차지하는 높이만큼 아래 콘텐츠가 자연히 내려간다(= 대표가 말한 "메뉴바만큼 살짝 아래로").
     //    sticky 기준 조상은 layout의 `<div className="flex-1">`이라 페이지 끝까지 따라온다.
-    <>
+    // 🎨**홈만 지면을 한 단 낮춘다**(대표 확정 08-14 — `surface-faint` #fafafb).
+    //    이유는 메뉴바다. 흰 알약을 흰 지면에 올려두니 "메뉴로 안 보인다"(대표). 면을 띄우는 장치는
+    //    밝기 차이·그림자·선·재질 넷뿐인데 우리는 **선 하나**(0.5px)에 거의 전부를 걸고 있었다.
+    //    🔬heytaby 실측(08-14): 지면 `#F5F5F5` + 알약 `흰색 75% + blur(40px)`, **테두리도 그림자도 없음**.
+    //      즉 그쪽은 밝기 차이 하나로만 띄운다. 우리와 정확히 반대(우리는 흰 지면에 흰 알약)였다.
+    //    ⚠️taby와 같은 `#f5f5f6`(=surface-soft)까지 내리는 안은 **기각**했다 — 홈의 `bg-surface-soft`
+    //      요소들(「잘 맞는 콜라보」 배지·여정 스트립·섹션 ③ 탭바)이 지면에 녹아 사라진다(실측 확인).
+    //      2%만 내린 `surface-faint`는 알약을 띄우면서 그것들을 살려둔다.
+    //    ⚠️전 페이지가 아니라 **홈만**이다. `--canvas`를 바꾸면 전 페이지의 surface-soft 칩이 다 죽는다.
+    <div className="bg-surface-faint">
       <HomeMenuBar />
       <main className="mx-auto w-full max-w-[960px] px-4 pb-12 pt-6 sm:px-6">
       {/* 온로드 라이즈 키프레임 — 서버가 <style>로 직접 렌더(React 19 head 호이스트).
@@ -104,6 +113,11 @@ export default async function Home() {
             "무료로 시작해보세요"를 읽은 직후 = 뭘 하게 되는지 궁금한 순간이고,
             버튼을 누르기 직전에 기대치를 맞춰준다. 아래에 두면 CTA 뒤라 아무도 안 본다. */}
         <FlowStrip />
+        {/* 🔻08-14 히어로 CTA는 **하나만** 남는다(대표 지시).
+            「콜라보 추천 리포트 미리보기」는 섹션 ③의 예시 카드 밑으로 내려갔다 — 거기가 방금
+            리포트 실물을 본 직후라 "전체를 보고 싶다"가 자연히 생기는 자리다. 히어로에선 소개서
+            등록과 나란히 서서 시선을 나눠 갖고 있었다.
+            ⚠️둘은 **같은 시트**를 연다 — 옮긴 것이지 새로 만든 게 아니다. */}
         <div className="mx-auto mt-7 flex max-w-[420px] flex-col items-stretch gap-2">
           <TrackLink
             href="/register"
@@ -112,9 +126,6 @@ export default async function Home() {
           >
             브랜드 소개서 등록하기(3분)
           </TrackLink>
-          {/* 분석 진입은 보더 버튼으로 승격(대표 07-31 "텍스트 링크는 안 보인다") —
-              단 1번 CTA는 여전히 소개서(레드팀 R1: 분석 1번은 콜드스타트 절벽). 라벨 정직: 목적지=예시 시트. */}
-          <SampleReportLink />
         </div>
       </section>
 
@@ -200,12 +211,20 @@ export default async function Home() {
               ⚠️ id/scroll-mt-[152px]는 위 h2와 같은 규칙(HomeSectionTabs.tsx의 TABS·ANCHOR_LINE_PX와 짝). */}
           <h2
             id="home-collab-report"
-            className="scroll-mt-[152px] text-balance break-keep text-[24px] font-bold leading-[1.35] tracking-[-0.02em] text-ink sm:text-[28px]"
+            className="scroll-mt-[152px] break-keep text-[24px] font-bold leading-[1.35] tracking-[-0.02em] text-ink sm:text-[28px]"
           >
-            소개서를 만들면 이런 콜라보 리포트를 받아볼 수 있어요.
+            {/* 줄바꿈 자리는 대표가 직접 지정(08-14). `text-balance`를 뺀 이유 — 균형 알고리즘이
+                줄을 다시 나누려 들어 지정한 자리와 싸운다. 끊는 자리를 사람이 정했으면 그게 정본이다. */}
+            소개서를 만들면
+            <br />
+            콜라보 아이디어를 받아볼 수 있어요.
           </h2>
-          <p className="mx-auto mt-2 max-w-[440px] break-keep text-[16px] leading-[1.65] text-body sm:text-[17px]">
-            두 브랜드가 왜 함께하면 좋을지, 함께 하면 좋을 만한 콜라보 아이디어를 알려드려요.
+          <p className="mx-auto mt-2 max-w-[520px] break-keep text-[16px] leading-[1.65] text-body sm:text-[17px]">
+            두 브랜드가 왜 함께하면 좋을지, 함께 하면 좋을 만한
+            {/* ⚠️좁은 화면에선 앞줄이 어차피 두 줄로 접혀서, 여기서 또 끊으면 3줄이 된다.
+                → 지정 줄바꿈은 **sm 이상에서만** 먹인다(모바일은 자연 줄바꿈에 맡긴다). */}
+            <br className="hidden sm:inline" />{" "}
+            콜라보 아이디어를 알려드려요.
           </p>
           <div className="mt-6">
             <SampleReportPeek />
@@ -373,7 +392,7 @@ export default async function Home() {
       {/* ⚠️ main 안쪽은 일부러 **재들여쓰기하지 않았다** — 프래그먼트 하나 때문에 340줄을 밀면
           지금 같은 홈을 만지고 있을 수 있는 옆 세션과 통째로 충돌한다(한 작업트리 공유). */}
       </main>
-    </>
+    </div>
   );
 }
 
