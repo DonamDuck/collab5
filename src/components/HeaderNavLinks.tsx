@@ -26,10 +26,16 @@ export function HeaderNavLinks() {
           ⚠️`overflow-x-hidden`으로 덮는 우회는 금지 — 홈의 100vmax 풀블리드 밴드를 잘라먹는다. */}
       <Link
         href="/magazine"
-        className="hidden shrink-0 items-center whitespace-nowrap rounded-md px-3 py-1.5 font-medium text-mute transition-colors hover:text-ink sm:flex"
+        className="hidden h-[44px] shrink-0 items-center whitespace-nowrap rounded-md px-3 font-medium text-mute transition-colors hover:text-ink sm:flex"
       >
         콜라보 매거진
       </Link>
+      {/* 📏 둘 다 **h-[44px]** — 터치 타깃 권장치(08-15 디자인팀).
+          🪤`py-1.5`는 33.75px, `h-9`는 38.25px였다. 루트가 17px이라 rem 유틸이 6.25%씩 크지만
+            44에는 못 미친다 — 절대 기준이 있는 값은 px로 박아야 한다.
+          ⚠️매거진 링크는 배경이 없어 높이를 줘도 **보이는 모습이 안 바뀐다**(터치 영역만 커짐).
+            반면 아래 칩은 pill 배경이 있어 높이가 곧 크기다 — 좌우 패딩도 반 단계 키워
+            (pl-2.5→3 · pr-3.5→4) 세로만 늘어 납작해 보이는 걸 막았다. */}
       {/* 콜라보 찾기 — '미니 검색창' 형태의 링크(대표 지시 07-31).
           돋보기 아이콘 + '브랜드 소개서' 버튼 2개를 이걸로 통합했다.
           ⚠️ 진짜 input이 아니라 Link다 — 눌러서 /search로 보내는 게 목적이고,
@@ -37,7 +43,7 @@ export function HeaderNavLinks() {
              그래서 시각만 검색창(surface-soft 필·pill·좌측 돋보기)으로 빌려오고 동작은 이동. */}
       <Link
         href="/search"
-        className="flex h-9 min-w-0 items-center gap-1.5 rounded-pill bg-surface-soft pl-2.5 pr-3.5 text-mute transition-colors hover:bg-primary-pale hover:text-primary-on"
+        className="flex h-[44px] min-w-0 items-center gap-1.5 rounded-pill bg-surface-soft pl-3 pr-4 text-mute transition-colors hover:bg-primary-pale hover:text-primary-on"
       >
         <svg viewBox="0 0 20 20" className="h-[17px] w-[17px] shrink-0" fill="none" stroke="currentColor" strokeWidth="1.9">
           <circle cx="8.5" cy="8.5" r="5.5" />
