@@ -262,6 +262,9 @@ export function BodyEditor({
   const [uploading, setUploading] = useState(false);
   const [replacing, setReplacing] = useState(false);
   const [imgErr, setImgErr] = useState("");
+  /** 성공 신호. 없으면 **바뀌었는지 아닌지를 사람이 알 수 없다** — 비슷한 사진으로 갈아끼우면
+   *  화면이 거의 그대로라 "아무 반응 없음"과 구분이 안 된다(대표 제보 08-14의 절반이 이것일 수 있다). */
+  const [imgOk, setImgOk] = useState("");
 
   // 붙여넣기 핸들러가 editor를 참조해야 하는데, 그 시점엔 useEditor가 아직 값을 안 돌려줬다 → ref로 잇는다.
   const editorRef = useRef<Editor | null>(null);
@@ -310,6 +313,7 @@ export function BodyEditor({
 
   const insertImage = async (file: File) => {
     setImgErr("");
+    setImgOk("");
     setUploading(true);
     try {
       const src = await uploadPhoto(file, MAGAZINE_IMAGE_MAX_DIM, MAGAZINE_STORAGE_PREFIX);
@@ -333,11 +337,39 @@ export function BodyEditor({
   const replaceImage = async (file: File) => {
     if (!editor) return;
     setImgErr("");
+    setImgOk("");
     const pos = editor.state.selection.from;
+
+    // 🚨**단계마다 결과를 말한다**(08-14 대표 제보 "아무런 반응이 없다" 이후).
+    //    예전엔 세 갈래(자리 잃음 / 업로드 실패 / 반영 실패)가 전부 조용히 끝나거나,
+    //    에디터 상자 **맨 아래**에만 에러가 떠서 — 버튼은 화면 위에 붙어 있는데 —
+    //    쓰는 사람 눈에는 어느 쪽이든 똑같이 "아무 일도 안 일어남"으로 보였다.
+    //    ⭐증상이 하나여도 원인이 여럿이면, 먼저 할 일은 고치는 게 아니라 **가르는 것**이다.
+    // ⚠️`pos`가 사진 노드를 가리키지 **않을 수도** 있다. 그때도 포기하지 않는다 —
+    //   캡션·크기 칸이 쓰는 `updateAttributes`(선택을 손대지 않는 경로)는 이미 잘 동작하는 게
+    //   확인돼 있으므로, 그쪽으로 넘긴다. **되던 길을 막는 가드는 가드가 아니라 새 버그다.**
+    const posIsImage = () => editor.state.doc.nodeAt(pos)?.type.name === "image";
+    if (!posIsImage() && !editor.isActive("image")) {
+      setImgErr("바꿀 사진을 다시 한 번 눌러주세요.");
+      return; // 업로드를 아예 시작하지 않는다 — 꽂을 자리가 없는데 올릴 이유가 없다
+    }
+
     setReplacing(true);
     try {
       const src = await uploadPhoto(file, MAGAZINE_IMAGE_MAX_DIM, MAGAZINE_STORAGE_PREFIX);
-      editor.chain().setNodeSelection(pos).updateAttributes("image", { src }).run();
+      // `.run()`은 명령이 실제로 적용됐는지를 boolean으로 돌려준다 — 이 값을 버리면
+      // "조용히 아무 일도 안 일어나는" 경로가 그대로 남는다.
+      // 업로드는 수 초가 걸린다. 그 사이 본문이 바뀌어 자리가 밀렸을 수 있으니 **다시** 확인한다.
+      const applied = posIsImage()
+        ? editor.chain().setNodeSelection(pos).updateAttributes("image", { src }).run()
+        : editor.isActive("image")
+          ? editor.chain().updateAttributes("image", { src }).run() // 캡션·크기와 같은 경로
+          : false;
+      if (!applied) {
+        setImgErr("바꿀 자리를 잃었어요. 사진을 다시 누르고 시도해주세요.");
+        return;
+      }
+      setImgOk("사진을 바꿨어요.");
     } catch (e) {
       setImgErr(
         e instanceof Error && e.message.startsWith("timeout:")
@@ -362,9 +394,22 @@ export function BodyEditor({
       <div className="sticky top-14 z-10 rounded-t-md bg-surface">
         <Toolbar editor={editor} onImage={(f) => void insertImage(f)} uploading={uploading} />
         <ImageBar editor={editor} onReplace={(f) => void replaceImage(f)} replacing={replacing} />
+        {/* 🚨결과 알림은 **버튼 바로 밑**이어야 한다(08-14 수정).
+            전엔 이게 `EditorContent` **아래**, 즉 에디터 상자 맨 끝에 있었다. 버튼은 sticky라 늘
+            화면 위에 붙어 있는데 알림은 본문 길이만큼 아래 — 긴 글이면 수천 px 떨어진 자리다.
+            **에러가 떠 있어도 쓰는 사람은 평생 못 본다.** 알림은 그 일이 일어난 곳 옆에 둔다. */}
+        {imgErr && (
+          <p role="alert" className="border-t border-hairline px-4 py-2 text-[13px] text-red-600">
+            {imgErr}
+          </p>
+        )}
+        {imgOk && (
+          <p role="status" className="border-t border-hairline px-4 py-2 text-[13px] text-primary-on">
+            {imgOk}
+          </p>
+        )}
       </div>
       <EditorContent editor={editor} />
-      {imgErr && <p className="border-t border-hairline px-4 py-2 text-[13px] text-red-600">{imgErr}</p>}
       <p className="rounded-b-md border-t border-hairline px-4 py-2 text-[13px] text-faint">
         사진을 클릭하면 위쪽에 캡션·크기 칸이 나와요.
       </p>
