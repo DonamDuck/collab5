@@ -537,7 +537,7 @@ export function MakerActionBar({
               type="button"
               onClick={copy}
               aria-label="링크 복사"
-              className="flex h-10 items-center gap-1.5 rounded-pill bg-primary px-4 text-sm font-medium text-primary-on shadow-e2 transition-colors"
+              className="flex h-10 items-center gap-1.5 rounded-pill bg-primary px-4 text-[14px] font-medium text-primary-on shadow-e2 transition-colors"
             >
               🔗 링크 복사
             </button>
@@ -606,14 +606,14 @@ export function MakerActionBar({
                     // ⚠️`onClick={handleReport}` 금지 — 클릭 이벤트가 `restore` 인자로 들어가
                     //    **버튼을 누를 때마다 '되살리기'가 켜진다**(MouseEvent는 truthy). 감싸서 넘긴다.
                     onClick={() => handleReport()}
-                    className="flex h-12 flex-[0.8] items-center justify-center rounded-md border border-border-strong bg-surface text-base font-medium text-ink transition-colors"
+                    className="flex h-12 flex-[0.8] items-center justify-center rounded-md border border-border-strong bg-surface text-[16px] font-medium text-ink transition-colors"
                   >
                     콜라보 추천받기
                   </button>
                 )}
                 <a
                   href={`/register?edit=${slug}`}
-                  className="flex h-12 flex-1 items-center justify-center rounded-md bg-primary text-base font-medium text-primary-on transition-colors"
+                  className="flex h-12 flex-1 items-center justify-center rounded-md bg-primary text-[16px] font-medium text-primary-on transition-colors"
                 >
                   소개서 수정하기
                 </a>
@@ -625,7 +625,7 @@ export function MakerActionBar({
                   type="button"
                   // ⚠️감싸서 넘긴다 — 위 버튼 주석 참조(이벤트가 `restore`로 새어 들어간다)
                   onClick={() => handleReport()}
-                  className="flex h-12 flex-[0.8] items-center justify-center rounded-md border border-border-strong bg-surface text-base font-medium text-ink transition-colors"
+                  className="flex h-12 flex-[0.8] items-center justify-center rounded-md border border-border-strong bg-surface text-[16px] font-medium text-ink transition-colors"
                 >
                   콜라보 추천받기
                 </button>
@@ -643,7 +643,7 @@ export function MakerActionBar({
                 <button
                   type="button"
                   onClick={handlePropose}
-                  className="flex h-12 flex-1 items-center justify-center rounded-md bg-primary text-base font-medium text-primary-on transition-colors"
+                  className="flex h-12 flex-1 items-center justify-center rounded-md bg-primary text-[16px] font-medium text-primary-on transition-colors"
                 >
                   콜라보 제안 시작하기
                 </button>
@@ -845,7 +845,7 @@ export function MakerActionBar({
             </button>
 
             <p className="px-6 text-xl font-bold leading-snug text-balance break-keep text-ink">{loginTitle}</p>
-            <p className="mt-2 text-base leading-relaxed text-balance break-keep text-mute">{loginSub}</p>
+            <p className="mt-2 text-[16px] leading-relaxed text-balance break-keep text-mute">{loginSub}</p>
             <div className="mt-5 flex gap-2">
               <button
                 type="button"
