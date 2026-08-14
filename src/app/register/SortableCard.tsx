@@ -75,7 +75,7 @@ export function SortableCard({
               role="button"
               aria-label="드래그로 순서 바꾸기"
               title="끌어서 순서 바꾸기"
-              className="hidden shrink-0 cursor-grab select-none px-0.5 text-base leading-none text-faint hover:text-mute active:cursor-grabbing sm:inline"
+              className="hidden shrink-0 cursor-grab select-none px-0.5 text-[17px] leading-none text-faint hover:text-mute active:cursor-grabbing sm:inline"
             >
               ⠿
             </span>

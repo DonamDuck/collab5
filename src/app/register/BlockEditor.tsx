@@ -22,11 +22,11 @@ const SPACE_FEATURES = ["대관 가능", "클래스 진행", "촬영 친화", "�
 
 // register 폼과 동일한 인풋·텍스트에어리어 클래스(활동 카드 h-10 기준).
 const inputCls =
-  "h-10 w-full min-w-0 rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus";
+  "h-10 w-full min-w-0 rounded-sm border border-hairline bg-surface px-3 text-[17px] text-ink outline-none placeholder:text-faint focus:border-focus";
 // m-0: textarea 기본 UA 마진(브라우저 기본, Tailwind preflight가 안 지움)이 space-y 간격에
 // 겹쳐 다음 요소와의 간격만 유독 벌어지던 문제 수정 — 다른 필드들과 간격 통일.
 const taCls =
-  "m-0 w-full min-w-0 rounded-sm border border-hairline bg-surface px-3 py-2.5 text-base leading-relaxed text-ink outline-none placeholder:text-faint focus:border-focus";
+  "m-0 w-full min-w-0 rounded-sm border border-hairline bg-surface px-3 py-2.5 text-[17px] leading-relaxed text-ink outline-none placeholder:text-faint focus:border-focus";
 
 export function emptyBlock(type: BlockType): Block {
   const base = { uid: crypto.randomUUID(), photos: [] as string[], links: [] as BlockLink[] };
@@ -221,7 +221,7 @@ export function BlockEditor({ blocks, onChange, onUploadingChange, onSheetOpenCh
                       value={it.value}
                       onChange={(e) => setBlock(i, { ...b, items: b.items.map((x, y) => (y === k ? { ...x, value: e.target.value } : x)) })}
                       placeholder="예: 1.2만"
-                      className="h-10 w-28 shrink-0 rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
+                      className="h-10 w-28 shrink-0 rounded-sm border border-hairline bg-surface px-3 text-[17px] text-ink outline-none placeholder:text-faint focus:border-focus"
                     />
                     {b.items.length > 1 && (
                       <button
@@ -274,7 +274,7 @@ export function BlockEditor({ blocks, onChange, onUploadingChange, onSheetOpenCh
                         placeholder="연도"
                         inputMode="numeric"
                         maxLength={4}
-                        className="h-10 w-20 shrink-0 rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
+                        className="h-10 w-20 shrink-0 rounded-sm border border-hairline bg-surface px-3 text-[17px] text-ink outline-none placeholder:text-faint focus:border-focus"
                       />
                     </div>
                     <textarea
@@ -608,13 +608,13 @@ function BlockAttachments({
             value={l.url}
             onChange={(e) => onSetLink(k, { url: e.target.value })}
             placeholder="https://"
-            className="h-9 min-w-0 flex-1 rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
+            className="h-9 min-w-0 flex-1 rounded-sm border border-hairline bg-surface px-3 text-[17px] text-ink outline-none placeholder:text-faint focus:border-focus"
           />
           <input
             value={l.label ?? ""}
             onChange={(e) => onSetLink(k, { label: e.target.value })}
             placeholder="링크 이름 (선택)"
-            className="h-9 w-32 shrink-0 rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
+            className="h-9 w-32 shrink-0 rounded-sm border border-hairline bg-surface px-3 text-[17px] text-ink outline-none placeholder:text-faint focus:border-focus"
           />
           <button
             type="button"
@@ -722,7 +722,7 @@ function FeatureChips({ features, onChange }: { features: string[]; onChange: (f
             }
           }}
           placeholder="직접 더하기 (예: 루프탑)"
-          className="h-9 min-w-0 flex-1 rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
+          className="h-9 min-w-0 flex-1 rounded-sm border border-hairline bg-surface px-3 text-[17px] text-ink outline-none placeholder:text-faint focus:border-focus"
         />
         <button
           type="button"

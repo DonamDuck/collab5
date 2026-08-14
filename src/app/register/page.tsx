@@ -1310,7 +1310,7 @@ function RegisterForm() {
               }
             }}
             placeholder="예: 캔버스가든"
-            className="h-11 min-w-0 flex-1 rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
+            className="h-11 min-w-0 flex-1 rounded-sm border border-hairline bg-surface px-3 text-[17px] text-ink outline-none placeholder:text-faint focus:border-focus"
           />
           <button
             type="button"
@@ -1439,14 +1439,15 @@ function RegisterForm() {
           </div>
         )}
         <div className="space-y-8">
-          <Field label="상호 *" hint={hintFor("name")}>
+          <Field label="상호" required htmlFor="name-field" hint={hintFor("name")}>
             <input
               id="name-field"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="예: 캔버스가든"
+              aria-required="true"
               aria-invalid={errField?.anchor === "name-field" || undefined}
-              className={`h-11 w-full scroll-mt-20 rounded-sm border bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus ${
+              className={`h-11 w-full scroll-mt-20 rounded-sm border bg-surface px-3 text-[17px] text-ink outline-none placeholder:text-faint focus:border-focus ${
                 errField?.anchor === "name-field" ? "border-danger" : "border-hairline"
               }`}
             />
@@ -1461,7 +1462,7 @@ function RegisterForm() {
               onChange={(e) => setOneLiner(e.target.value)}
               rows={2}
               placeholder="헌옷의 재발견, 나다움을 표현하는 직물 워크숍을 열고 있어요."
-              className="m-0 w-full rounded-sm border border-hairline bg-surface px-3 py-2 text-base leading-relaxed text-ink outline-none placeholder:text-faint focus:border-focus"
+              className="m-0 w-full rounded-sm border border-hairline bg-surface px-3 py-2 text-[17px] leading-relaxed text-ink outline-none placeholder:text-faint focus:border-focus"
             />
           </Field>
 
@@ -1476,7 +1477,7 @@ function RegisterForm() {
               onChange={(e) => setDescription(e.target.value)}
               rows={4}
               placeholder="헌옷과 다양한 소재를 활용한 죠각 워크숍을 열고 있어요. 참가자들은 버려질 뻔한 옷을 작은 소품과 가방, 액자로 다시 만들어가며, 잊고 지냈던 자신만의 취향과 표현을 발견합니다. 때로는 양말이나 비닐봉투처럼 예상하지 못한 소재를 통해, 문자 대신 손으로 자신을 표현하는 즐거움을 함께 나누고 있습니다."
-              className="w-full rounded-sm border border-hairline bg-surface px-3 py-2 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
+              className="w-full rounded-sm border border-hairline bg-surface px-3 py-2 text-[17px] text-ink outline-none placeholder:text-faint focus:border-focus"
             />
             {/* 안내도 버튼과 같은 게이트 — 크롤 안 한 소개서엔 버튼이 없으니 문구도 숨김 */}
             {enrichment && (
@@ -1584,7 +1585,7 @@ function RegisterForm() {
                 ⭐칩을 서술보다 **먼저** 둔다(소개서는 반대다). 폼은 읽는 곳이 아니라 쓰는 곳이라,
                   ①필수를 먼저 만나야 하고 ②칩을 골라 워밍업이 돼야 그다음 글이 써진다. */}
             <div id="offers-chips" className="scroll-mt-4">
-              <Field label="콜라보 유형을 골라주세요. *" hint={aiFilled.has("offers") ? <AiBadge /> : null}>
+              <Field label="콜라보 유형을 골라주세요." required hint={aiFilled.has("offers") ? <AiBadge /> : null}>
                 <ChipRow
                   options={COLLAB_TYPES}
                   selected={offers}
@@ -1613,7 +1614,7 @@ function RegisterForm() {
                 onChange={(e) => setSeeksNote(e.target.value)}
                 rows={4}
                 placeholder="예) 수선의 철학에 공감하는 다양한 브랜드, 작가님들과 열린 주제로 콜라보를 논의해보고 싶어요, 10명 이상 기업 워크숍 콜라보만 진행하고 있어요. 등"
-                className="w-full rounded-sm border border-hairline bg-surface px-3 py-2.5 text-base leading-relaxed text-ink outline-none placeholder:text-faint focus:border-focus"
+                className="w-full rounded-sm border border-hairline bg-surface px-3 py-2.5 text-[17px] leading-relaxed text-ink outline-none placeholder:text-faint focus:border-focus"
               />
             </Field>
           </div>
@@ -1707,7 +1708,7 @@ function RegisterForm() {
                 }}
                 placeholder="직접 더하기 (예: 아날로그)"
                 disabled={values.length >= MAX_VIBES}
-                className="h-10 min-w-0 flex-1 rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus disabled:opacity-40"
+                className="h-10 min-w-0 flex-1 rounded-sm border border-hairline bg-surface px-3 text-[17px] text-ink outline-none placeholder:text-faint focus:border-focus disabled:opacity-40"
               />
               <button
                 type="button"
@@ -1740,7 +1741,7 @@ function RegisterForm() {
             onChange={(e) => setStory(e.target.value)}
             rows={5}
             placeholder="예: 좋은 소재가 버려지는 게 늘 아쉬웠어요. 이미 있는 것의 가치를 다시 발견하는 일이 더 의미 있다고 믿어요."
-            className="w-full rounded-sm border border-hairline bg-surface px-3 py-2.5 text-base leading-relaxed text-ink outline-none placeholder:text-faint focus:border-focus"
+            className="w-full rounded-sm border border-hairline bg-surface px-3 py-2.5 text-[17px] leading-relaxed text-ink outline-none placeholder:text-faint focus:border-focus"
           />
         </StubSection>
 
@@ -1779,14 +1780,14 @@ function RegisterForm() {
                 value={act.title}
                 onChange={(e) => setAct(i, { title: e.target.value })}
                 placeholder="예: 조형수선 워크숍"
-                className="h-10 w-full rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
+                className="h-10 w-full rounded-sm border border-hairline bg-surface px-3 text-[17px] text-ink outline-none placeholder:text-faint focus:border-focus"
               />
               <textarea
                 value={act.desc}
                 onChange={(e) => setAct(i, { desc: e.target.value })}
                 rows={4}
                 placeholder="예: 이야기가 깃든 옷을 수선하고 업사이클링하는 워크숍을 진행해요."
-                className="w-full rounded-sm border border-hairline bg-surface px-3 py-2.5 text-base leading-relaxed text-ink outline-none placeholder:text-faint focus:border-focus"
+                className="w-full rounded-sm border border-hairline bg-surface px-3 py-2.5 text-[17px] leading-relaxed text-ink outline-none placeholder:text-faint focus:border-focus"
               />
               {/* 사진·링크 접힘 버튼 — press와 동일하게 한 줄 인라인(space-y-2로 그룹) */}
               <div className="space-y-2">
@@ -1806,7 +1807,7 @@ function RegisterForm() {
                     value={act.link}
                     onChange={(e) => setAct(i, { link: e.target.value })}
                     placeholder="소개 링크 https:// (블로그·후기 등)"
-                    className="h-10 w-full rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
+                    className="h-10 w-full rounded-sm border border-hairline bg-surface px-3 text-[17px] text-ink outline-none placeholder:text-faint focus:border-focus"
                   />
                 </CollapsedLink>
               </div>
@@ -1861,13 +1862,13 @@ function RegisterForm() {
                       value={h.partner}
                       onChange={(e) => setHist(i, { partner: e.target.value })}
                       placeholder="함께한 곳 (예: 오월의숲)"
-                      className="h-10 min-w-0 flex-1 rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
+                      className="h-10 min-w-0 flex-1 rounded-sm border border-hairline bg-surface px-3 text-[17px] text-ink outline-none placeholder:text-faint focus:border-focus"
                     />
                     <div className="relative w-28 shrink-0">
                       <select
                         value={h.year}
                         onChange={(e) => setHist(i, { year: e.target.value })}
-                        className="h-10 w-full appearance-none rounded-sm border border-hairline bg-surface py-2 pl-3 pr-8 text-base text-ink outline-none focus:border-focus"
+                        className="h-10 w-full appearance-none rounded-sm border border-hairline bg-surface py-2 pl-3 pr-8 text-[17px] text-ink outline-none focus:border-focus"
                       >
                         <option value="">시기</option>
                         {HISTORY_YEARS.map((y) => (
@@ -1934,7 +1935,7 @@ function RegisterForm() {
                             }
                           }}
                           placeholder="유형 직접 더하기"
-                          className="h-9 min-w-0 flex-1 rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
+                          className="h-9 min-w-0 flex-1 rounded-sm border border-hairline bg-surface px-3 text-[17px] text-ink outline-none placeholder:text-faint focus:border-focus"
                         />
                         <button
                           type="button"
@@ -1961,7 +1962,7 @@ function RegisterForm() {
                       onChange={(e) => setHist(i, { desc: e.target.value })}
                       rows={4}
                       placeholder="예: 업사이클링 파우치를 함께 만들어 팝업에서 선보였어요."
-                      className="w-full rounded-sm border border-hairline bg-surface px-3 py-2.5 text-base leading-relaxed text-ink outline-none placeholder:text-faint focus:border-focus"
+                      className="w-full rounded-sm border border-hairline bg-surface px-3 py-2.5 text-[17px] leading-relaxed text-ink outline-none placeholder:text-faint focus:border-focus"
                     />
                   </div>
                   {/* 사진·링크 접힘 버튼 — 카드 최하단, press와 동일하게 한 줄 인라인(space-y-2로 그룹) */}
@@ -1982,7 +1983,7 @@ function RegisterForm() {
                         value={h.link}
                         onChange={(e) => setHist(i, { link: e.target.value })}
                         placeholder="소개 링크 https:// (블로그·후기 등)"
-                        className="h-10 w-full rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
+                        className="h-10 w-full rounded-sm border border-hairline bg-surface px-3 text-[17px] text-ink outline-none placeholder:text-faint focus:border-focus"
                       />
                     </CollapsedLink>
                   </div>
@@ -2024,7 +2025,7 @@ function RegisterForm() {
             onChange={(e) => setOffersNote(e.target.value)}
             rows={4}
             placeholder="매력적인 분들과의 제품 콜라보, 서로의 매력을 담은 원데이 워크숍, 공동 굿즈 등 다양한 콜라보를 기대해요!"
-            className="w-full rounded-sm border border-hairline bg-surface px-3 py-2.5 text-base leading-relaxed text-ink outline-none placeholder:text-faint focus:border-focus"
+            className="w-full rounded-sm border border-hairline bg-surface px-3 py-2.5 text-[17px] leading-relaxed text-ink outline-none placeholder:text-faint focus:border-focus"
           />
         </StubSection>
 
@@ -2104,7 +2105,7 @@ function RegisterForm() {
                   }
                 }}
                 placeholder="직접 더하기 (예: 신혼부부)"
-                className="h-10 min-w-0 flex-1 rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
+                className="h-10 min-w-0 flex-1 rounded-sm border border-hairline bg-surface px-3 text-[17px] text-ink outline-none placeholder:text-faint focus:border-focus"
               />
               <button
                 type="button"
@@ -2130,7 +2131,7 @@ function RegisterForm() {
                 setAddrAuto(null); // 직접 고치기 시작하면 '되돌리기' 안내는 사라진다
               }}
               placeholder="서울 성북구 보문로 56, 5층"
-              className="h-11 w-full rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
+              className="h-11 w-full rounded-sm border border-hairline bg-surface px-3 text-[17px] text-ink outline-none placeholder:text-faint focus:border-focus"
             />
             {/* 덮어쓴 사실을 숨기지 않는다 — 사장님이 쓴 값을 말없이 바꾸면 "내가 쓴 게 어디 갔지"가 된다.
                 되돌리기를 함께 줘서, 네이버가 틀렸을 때 원래 값으로 즉시 복구할 수 있게. */}
@@ -2160,7 +2161,7 @@ function RegisterForm() {
             {/* 포커스 링은 래퍼가 소유 — globals.css의 전역 :focus-visible 규칙이 레이어 밖이라
                 Tailwind outline-none보다 우선한다. 안쪽 input은 `!`로 눌러 링 겹침을 막는다. */}
             <div className="flex h-11 w-full items-center rounded-sm border border-hairline bg-surface px-3 focus-within:[outline:2px_solid_var(--focus)] focus-within:[outline-offset:2px]">
-              <span className="shrink-0 text-base text-mute">@</span>
+              <span className="shrink-0 text-[17px] text-mute">@</span>
               <input
                 value={instagram.replace(/^@+/, "")}
                 onChange={(e) => {
@@ -2172,7 +2173,7 @@ function RegisterForm() {
                   setInstagram(v ? `@${v}` : "");
                 }}
                 placeholder="handle"
-                className="h-full min-w-0 flex-1 bg-transparent text-base text-ink outline-none! placeholder:text-faint"
+                className="h-full min-w-0 flex-1 bg-transparent text-[17px] text-ink outline-none! placeholder:text-faint"
               />
             </div>
           </Field>
@@ -2181,7 +2182,7 @@ function RegisterForm() {
               value={homepage}
               onChange={(e) => setHomepage(e.target.value)}
               placeholder="홈페이지·카카오톡 채널·링크트리 등"
-              className="h-11 w-full rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
+              className="h-11 w-full rounded-sm border border-hairline bg-surface px-3 text-[17px] text-ink outline-none placeholder:text-faint focus:border-focus"
             />
           </Field>
           {/* 지도 링크 — 홈페이지 없는 가게가 대다수라, 주소·시간·전화·사진이 한 번에 딸려오는
@@ -2191,7 +2192,7 @@ function RegisterForm() {
                 원문은 [변경]을 눌렀을 때만 편집. 잘못 넣은 값은 그대로 입력창에 남겨 고치게 한다. */}
             {mapLinkLabel(mapUrl) && !mapUrlEditing ? (
               <div className="flex h-11 items-center gap-2 rounded-sm border border-hairline bg-surface px-3">
-                <span className="text-base text-ink">📍 {mapLinkLabel(mapUrl)}</span>
+                <span className="text-[17px] text-ink">📍 {mapLinkLabel(mapUrl)}</span>
                 <a
                   href={mapUrl}
                   target="_blank"
@@ -2214,7 +2215,7 @@ function RegisterForm() {
                 onChange={(e) => setMapUrl(e.target.value)}
                 onBlur={() => mapLinkLabel(mapUrl) && setMapUrlEditing(false)}
                 placeholder="네이버 지도·카카오맵 공유 링크"
-                className="h-11 w-full rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
+                className="h-11 w-full rounded-sm border border-hairline bg-surface px-3 text-[17px] text-ink outline-none placeholder:text-faint focus:border-focus"
               />
             )}
             {/* ⭐ 지도 한 컷(08-02, 대표 지시) — 링크만 보여주면 **맞게 넣었는지 확인할 방법이
@@ -2277,7 +2278,7 @@ function RegisterForm() {
                 (p) => p.uploading
               )
             }
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-md bg-primary text-base font-medium text-primary-on shadow-e2 disabled:opacity-40"
+            className="flex h-12 w-full items-center justify-center gap-2 rounded-md bg-primary text-[17px] font-medium text-primary-on shadow-e2 disabled:opacity-40"
           >
             {pending && (
               <span className="h-4 w-4 animate-spin rounded-full border-2 border-primary-on border-t-transparent" />
@@ -2558,7 +2559,7 @@ function RegisterForm() {
                     value={editPw}
                     onChange={(e) => setEditPw(e.target.value)}
                     placeholder="비밀번호를 입력해주세요"
-                    className="h-11 w-full rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
+                    className="h-11 w-full rounded-sm border border-hairline bg-surface px-3 text-[17px] text-ink outline-none placeholder:text-faint focus:border-focus"
                   />
                   {pwErr && <p className="mt-2 text-[13px] text-red-600">{pwErr}</p>}
                   <p className="mt-2 text-[13px] leading-relaxed text-faint">
@@ -2571,7 +2572,7 @@ function RegisterForm() {
               type="button"
               onClick={goToPage}
               disabled={goingToPage || savingPw || (!loggedIn && !editPw.trim())}
-              className="mt-6 flex h-12 w-full items-center justify-center gap-2 rounded-md bg-primary text-base font-medium text-primary-on disabled:opacity-50"
+              className="mt-6 flex h-12 w-full items-center justify-center gap-2 rounded-md bg-primary text-[17px] font-medium text-primary-on disabled:opacity-50"
             >
               {goingToPage || savingPw ? "이동 중…" : "소개서 확인하러 가기"}
             </button>
@@ -2587,7 +2588,7 @@ function RegisterForm() {
                   router.push(`/m/${analysisPartner.slug}?report=${createdSlug}`);
                 }}
                 disabled={goingToPage}
-                className="mt-2 flex h-12 w-full items-center justify-center rounded-md border border-border-strong bg-surface text-base font-medium text-ink disabled:opacity-50"
+                className="mt-2 flex h-12 w-full items-center justify-center rounded-md border border-border-strong bg-surface text-[17px] font-medium text-ink disabled:opacity-50"
               >
                 {analysisPartner.name}님과 콜라보 추천받기
               </button>
@@ -2794,11 +2795,22 @@ function GroupHeader({
 
 function Field({
   label,
+  htmlFor,
+  required,
   hint,
   action,
   children,
 }: {
   label: string;
+  /** 짝지을 입력칸의 id — 라벨과 입력칸을 잇는 **유일한 끈**이다(08-14 접근성 QA로 추가).
+   *  없으면 라벨을 눌러도 커서가 안 가고, 스크린리더가 둘을 한 벌로 못 읽는다.
+   *  ⚠️입력칸이 아닌 것(칩 그룹 등)에는 넘기지 말 것 — 가리킬 대상이 없다. */
+  htmlFor?: string;
+  /** 필수 항목 — 라벨 끝에 `*`를 그린다.
+   *  ⚠️예전엔 호출부가 `label="상호 *"`처럼 **문자열에 별표를 박아** 넘겼다. 그러면 별표가
+   *  시각 표시로만 남아 **스크린리더는 필수인지 알 수 없다**(별표를 안 읽거나 "별"이라 읽는다).
+   *  여기서 별표는 `aria-hidden`으로 숨기고 「(필수)」를 sr-only로 따로 읽어준다. */
+  required?: boolean;
   hint?: React.ReactNode;
   action?: React.ReactNode; // 라벨 행 우측 액션 (예: ✨ 초안 받기)
   children: React.ReactNode;
@@ -2806,8 +2818,16 @@ function Field({
   return (
     <div>
       <div className="mb-2 flex items-center justify-between gap-2">
-        <label className="flex items-center gap-2 text-[16px] font-medium text-body">
-          <span>{label}</span>
+        <label htmlFor={htmlFor} className="flex items-center gap-2 text-[16px] font-medium text-body">
+          <span>
+            {label}
+            {required && (
+              <>
+                <span aria-hidden="true"> *</span>
+                <span className="sr-only"> (필수)</span>
+              </>
+            )}
+          </span>
           {hint}
         </label>
         {action}

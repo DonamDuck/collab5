@@ -682,7 +682,7 @@ export function EnrichWizard({
                   value={regionInput}
                   onChange={(e) => setRegionInput(e.target.value)}
                   placeholder="서울 성동구, 세운상가, 강남구 등"
-                  className="h-11 w-full rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
+                  className="h-11 w-full rounded-sm border border-hairline bg-surface px-3 text-[17px] text-ink outline-none placeholder:text-faint focus:border-focus"
                 />
               </div>
               <div>
@@ -693,7 +693,7 @@ export function EnrichWizard({
                   value={btype}
                   onChange={(e) => setBtype(e.target.value)}
                   placeholder="빈티지샵, 의류 워크숍, 젤라또 가게 등"
-                  className="h-11 w-full rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
+                  className="h-11 w-full rounded-sm border border-hairline bg-surface px-3 text-[17px] text-ink outline-none placeholder:text-faint focus:border-focus"
                 />
               </div>
             </div>
@@ -807,7 +807,7 @@ export function EnrichWizard({
                   }
                 }}
                 placeholder="직접 추가 (예: 수제, 비건, 반려동물 동반)"
-                className="h-11 min-w-0 flex-1 rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
+                className="h-11 min-w-0 flex-1 rounded-sm border border-hairline bg-surface px-3 text-[17px] text-ink outline-none placeholder:text-faint focus:border-focus"
               />
               <button
                 type="button"
@@ -1006,7 +1006,7 @@ export function EnrichWizard({
                       value={mapPick.customText}
                       onChange={(e) => setMapPick((m) => ({ ...m, customText: e.target.value }))}
                       placeholder="네이버 지도·카카오맵 공유 링크"
-                      className="mt-1.5 h-11 w-full rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
+                      className="mt-1.5 h-11 w-full rounded-sm border border-hairline bg-surface px-3 text-[17px] text-ink outline-none placeholder:text-faint focus:border-focus"
                     />
                   )}
                 </div>
@@ -1260,7 +1260,7 @@ function LinkPicker({
           })
         }
         placeholder="handle"
-        className="h-full min-w-0 flex-1 bg-transparent text-base text-ink outline-none! placeholder:text-faint"
+        className="h-full min-w-0 flex-1 bg-transparent text-[17px] text-ink outline-none! placeholder:text-faint"
       />
     </div>
   ) : (
@@ -1270,7 +1270,7 @@ function LinkPicker({
         value={pick.customText}
         onChange={(e) => onPick({ sel: null, customOn: true, customText: e.target.value, none: false })}
         placeholder={placeholder}
-        className="mt-1.5 h-11 w-full rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
+        className="mt-1.5 h-11 w-full rounded-sm border border-hairline bg-surface px-3 text-[17px] text-ink outline-none placeholder:text-faint focus:border-focus"
       />
     )
   );
@@ -1388,7 +1388,7 @@ function FieldEdit({
               onChange(v ? fixedPrefix + v : ""); // 빈 값이면 접두어만 남지 않게 진짜 빈 문자열로
             }}
             placeholder="handle"
-            className="h-full min-w-0 flex-1 bg-transparent text-base text-ink outline-none! placeholder:text-faint"
+            className="h-full min-w-0 flex-1 bg-transparent text-[17px] text-ink outline-none! placeholder:text-faint"
           />
         </div>
       ) : (
@@ -1396,7 +1396,7 @@ function FieldEdit({
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
-          className="h-11 w-full rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
+          className="h-11 w-full rounded-sm border border-hairline bg-surface px-3 text-[17px] text-ink outline-none placeholder:text-faint focus:border-focus"
         />
       )}
       {showCandidates && (
