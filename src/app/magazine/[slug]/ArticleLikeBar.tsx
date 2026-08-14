@@ -141,16 +141,17 @@ export function ArticleLikeBar({
             : "border-[#DFDFE3] bg-surface text-ink hover:bg-surface-soft"
         }`}
       >
-        {/* 하트는 이모지 대신 SVG — 이모지는 기기마다 모양·색이 제각각이라 '눌림/안 눌림'을
+        {/* 문구는 상태와 무관하게 그대로 둔다 — 눌림 여부는 하트 채움과 면색이 말한다.
+            라벨까지 같이 바뀌면 버튼 폭이 흔들리고, 무엇이 상태 표시인지 흐려진다. */}
+        <span>잘 읽었어요</span>
+        {/* 하트는 **글자 오른쪽**(대표 지시 08-14) — 「잘 읽었어요 ❤️」라고 말하는 순서 그대로다.
+            하트는 이모지 대신 SVG — 이모지는 기기마다 모양·색이 제각각이라 '눌림/안 눌림'을
             면색으로 말하는 이 버튼에서 상태가 흐려진다. */}
         <svg viewBox="0 0 20 20" className="h-[18px] w-[18px] shrink-0" aria-hidden="true"
           fill={liked ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.7">
           <path d="M10 16.5S3.5 12.6 3.5 8.2A3.7 3.7 0 0 1 10 5.9a3.7 3.7 0 0 1 6.5 2.3c0 4.4-6.5 8.3-6.5 8.3Z"
             strokeLinejoin="round" />
         </svg>
-        {/* 문구는 상태와 무관하게 그대로 둔다 — 눌림 여부는 하트 채움과 면색이 말한다.
-            라벨까지 같이 바뀌면 버튼 폭이 흔들리고, 무엇이 상태 표시인지 흐려진다. */}
-        <span>잘 읽었어요</span>
         {count > 0 && (
           // 숫자는 자릿수가 바뀌어도 버튼이 안 흔들리게 고정폭 숫자(tabular-nums).
           <span className="tabular-nums text-[14px] font-bold">{count}</span>
