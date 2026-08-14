@@ -39,12 +39,16 @@ const ITEM =
 
 /** 칸 사이 세로 구분선(대표 제안 08-14 — "메뉴바처럼 보이게").
  *  ⚠️`aria-hidden` + 빈 요소다 — 스크린리더에는 링크 3개만 들려야 한다.
- *  ⚠️색은 `border-strong`(#d7d7db). `hairline`(#eaeaec)은 트랙 면(#f5f5f6)과 밝기차가 4%뿐이라
- *     1px 선으로는 사실상 안 보인다. 면 위에 선을 얹을 땐 면색 기준으로 다시 골라야 한다.
- *  ⚠️높이는 칸 전체가 아니라 **안쪽으로 인셋**(h-4 = 17px, 알약 42.5px의 40%). 꽉 채우면
- *     알약의 둥근 모서리와 부딪혀 바가 '표(table)'처럼 읽힌다. */
+ *  🎨색은 알약 테두리와 **같은 `#DFDFE3`**. 선이 둘(테두리·구분선)인데 색이 다르면 그 자체가
+ *     위계로 읽힌다 — 여기선 둘 다 "구획"만 말하므로 같은 값이어야 한다.
+ *     ※ C안 이전(회색 트랙일 때)엔 `border-strong`을 썼다. 면이 흰색이 되면서 다시 골랐다 —
+ *       **면 위에 선을 얹을 땐 면색이 바뀔 때마다 선색을 다시 판단해야 한다.**
+ *  ⚠️두께는 테두리(0.5px)와 달리 **1px**로 둔다. 사각 테두리는 0.5px가 일부만 렌더돼도 나머지
+ *     세 변이 형태를 잡아주지만, 홀로 선 세로선은 그 순간 통째로 사라져 보인다.
+ *  ⚠️높이는 칸 전체가 아니라 **안쪽으로 인셋**(h-4 = 17px, 알약 44px의 39%). 꽉 채우면
+ *     알약의 둥근 모서리와 부딪혀 바가 '표(table)'처럼 읽힌다(디자인팀도 인셋 필수 의견). */
 function Divider() {
-  return <span aria-hidden="true" className="h-4 w-px shrink-0 bg-border-strong" />;
+  return <span aria-hidden="true" className="h-4 w-px shrink-0 bg-[#DFDFE3]" />;
 }
 
 export function HomeMenuBar() {
@@ -74,17 +78,30 @@ export function HomeMenuBar() {
   };
 
   return (
-    // 캔버스색 밴드를 풀블리드로 깔아 **본문이 바 밑으로 사라지게** 한다 — 알약만 띄우면 알약 폭이
-    // 화면보다 좁아 제목이 좌우로 삐져나온다(HomeSectionTabs가 08-02에 실제로 당한 버그).
-    // ⚠️ 풀블리드에 `100vw` 금지(스크롤바 폭만큼 넘쳐 가로 스크롤이 생긴다) → box-shadow+clip-path.
-    // ⚠️ 밴드에 보더·그림자를 주지 않는다 — 그 순간 헤더가 두 겹으로 보인다. 같은 배경색이라
-    //    "페이지가 바 밑으로 흘러간다"로만 읽힌다.
+    // 🎈**플로팅**(대표 확정 08-14) — 알약만 콘텐츠 **위에** 뜨고, 알약이 덮지 않는 좌우로는
+    //    본문이 그대로 보인다. heytaby도 이 방식이다(그쪽 캡처에서 헤드라인이 알약 양옆으로 보인다).
+    //    🔻처음엔 캔버스색 풀블리드 밴드를 깔았다(box-shadow+clip-path). 그건 `HomeSectionTabs`가
+    //      08-02에 당한 버그 — "알약 폭이 화면보다 좁아 제목이 좌우로 삐져나온다" — 의 처방인데,
+    //      **대표는 그 삐져나옴을 버그가 아니라 원하는 그림으로 봤다.** 밴드가 본문을 가리는 쪽이
+    //      오히려 손해라는 판단이라 걷어냈다.
+    // 🚨 `pointer-events-none` 필수 — 이 래퍼는 화면 폭 전체를 차지하는 투명 띠다. 그냥 두면
+    //    **알약 좌우의 빈 곳이 뒤 콘텐츠의 클릭을 통째로 먹는다**(보이지도 않는 것이 막으니 원인을 못 찾는다).
+    //    알약에만 `pointer-events-auto`를 되돌려준다.
     // z-[6] = 헤더(z-10) 아래, HomeSectionTabs(z-[5]) 위.
     // top-14 = 헤더 높이. ⚠️루트 폰트가 17px이라 실제 59.5px다(56 아님 — 눈대중 금지).
-    <div className="sticky top-14 z-[6] flex justify-center bg-canvas py-2 [box-shadow:0_0_0_100vmax_var(--canvas)] [clip-path:inset(0_-100vmax)]">
+    <div className="pointer-events-none sticky top-14 z-[6] flex justify-center py-2">
       <nav
         aria-label="홈 바로가기"
-        className="inline-flex items-center gap-1 rounded-pill border border-hairline bg-surface-soft p-1 shadow-e1"
+        // 🎨C안(대표 확정 08-14) — **흰 면 + 0.5px 라인 테두리**.
+        //   A안(회색 트랙)은 순백 페이지에 회색 덩어리가 하나 뜨는 게 걸렸고, B안(면·선 전부 없음)은
+        //   "떠 있는 바"라는 이 개편의 출발점을 잃었다. C는 둘의 가운데 — 면은 지면과 같은 흰색이라
+        //   덩어리로 안 읽히고, 라인이 "여기까지가 메뉴" 구획만 말한다.
+        // 🔒`border-[0.5px] border-[#DFDFE3]`는 **브랜드 카드·매거진 히어로와 완전히 같은 값**이다
+        //   (대표 지시 "브랜드 카드 그거로 참고"). 같은 사이트의 같은 뜻이면 같은 선을 쓴다 —
+        //   여기서 값을 새로 만들면 라인 어휘가 셋으로 갈린다.
+        // ⚠️`shadow-e1`은 남긴다. 이제 뒤에 본문이 지나가므로 **테두리만으로는 면이 안 떠 보인다** —
+        //   흰 카드가 흰 지면 위에 얹힌 게 아니라 파묻힌 것처럼 읽힌다.
+        className="pointer-events-auto inline-flex items-center gap-1 rounded-pill border-[0.5px] border-[#DFDFE3] bg-surface p-1 shadow-e1"
       >
         <Link href="/magazine" onClick={() => track("home_menubar_magazine_click")} className={ITEM}>
           매거진
