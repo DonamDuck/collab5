@@ -28,7 +28,7 @@ export function HeaderNavLinks() {
         href="/magazine"
         className="hidden shrink-0 items-center whitespace-nowrap rounded-md px-3 py-1.5 font-medium text-mute transition-colors hover:text-ink sm:flex"
       >
-        매거진
+        콜라보 매거진
       </Link>
       {/* 콜라보 찾기 — '미니 검색창' 형태의 링크(대표 지시 07-31).
           돋보기 아이콘 + '브랜드 소개서' 버튼 2개를 이걸로 통합했다.

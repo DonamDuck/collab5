@@ -27,8 +27,10 @@ export function SiteFooter() {
             <Link href="/register" className="hover:text-ink">
               브랜드 소개서
             </Link>
+            {/* 「콜라보 매거진」 — 홈 메뉴바·헤더와 같은 이름(대표 08-14 통일 지시).
+                풋터 내비는 `flex-wrap`이라 길어지면 줄만 늘어난다(잘리지 않는다). */}
             <Link href="/magazine" className="hover:text-ink">
-              매거진
+              콜라보 매거진
             </Link>
             <Link href="/terms" className="hover:text-ink">
               이용약관
