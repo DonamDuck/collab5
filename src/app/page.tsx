@@ -115,15 +115,18 @@ export default async function Home() {
           씨딩 사장님·소개서 수신 브랜드의 첫 질문). 그리드 전량 노출, 정렬 최신순(repo).
           soft 밴드·통째 리빌·풀블리드 box-shadow 기법은 캐러셀 시절(07-27~29) 그대로 승계. */}
       {collabBrands.length >= MIN_GRID && (
-        // ⚠️ **Reveal을 쓰지 않는다**(07-31 대표 "최상단이 어색하다" 실측 결과).
-        //    히어로 바로 다음 섹션인데 높이가 738px이라, Reveal의 threshold 0.15는 **110px이 보여야** 터진다.
-        //    스크롤 0에서 이 밴드는 82px만 보이므로 안 터지고 → 첫 화면 바로 아래에 **738px 투명 구멍**이 남았다.
-        //    (`eager`로 하단 컷을 없애도 threshold는 그대로라 해결 안 됨 — 실측 확인)
-        //    이 섹션은 홈의 주 콘텐츠다. 등장 연출보다 "바로 보이는 것"이 우선.
+        // ⭐등장은 **히어로와 한 몸**이다(08-14 대표 지시) — `home-rise`를 딜레이 없이 같이 태운다.
+        //    ⚠️`Reveal`(IntersectionObserver)은 여기서 못 쓴다. 07-31에 한 번 붙였다가 뺐는데,
+        //      threshold 0.15는 이 섹션(높이 738px)의 **110px이 보여야** 터지는데 스크롤 0에서는
+        //      82px만 보여 안 터졌고, 첫 화면 바로 아래에 **738px 투명 구멍**이 남았다.
+        //      (`eager`로 하단 컷을 없애도 threshold는 그대로라 해결 안 됨 — 실측)
+        //    → `home-rise`는 **온로드 CSS 애니메이션**이라 스크롤 위치와 무관하게 항상 재생된다.
+        //      그래서 "안 터지는" 사고가 구조적으로 불가능하다. 아래 섹션 ③이 쓰는 것과 같은 장치인데,
+        //      거긴 `animationDelay: 600ms`로 순차를 만들고 **여기는 딜레이 0** — 히어로와 동시에 뜬다.
         // ⭐밴드(회색 면) 제거 — 08-14 대표 확정. 순백 페이지 한가운데에 회색 섹션 하나만 있으면
         //   "왜 여기만?"으로 읽힌다(redesign-skill: 라이트 페이지의 이질적 섹션 = 복붙 사고처럼 보임).
         //   섹션 구분은 제목과 여백이 맡는다. 풀블리드 box-shadow/clip-path 기법도 같이 걷어냈다.
-        <section className="mt-14 -mx-4 px-4 py-4 sm:-mx-6 sm:px-6">
+        <section className="home-rise mt-14 -mx-4 px-4 py-4 sm:-mx-6 sm:px-6">
           <h2 className="text-balance break-keep text-center text-[24px] font-bold leading-[1.35] tracking-[-0.02em] text-ink sm:text-[28px]">
             지금, 콜라보 가능한 브랜드예요.
           </h2>

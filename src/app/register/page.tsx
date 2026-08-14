@@ -1267,7 +1267,7 @@ function RegisterForm() {
       {editSlug ? (
         <>
           <div className="flex items-start justify-between gap-3">
-            <h1 className="text-[28px] font-bold tracking-tight text-ink sm:text-[32px]">
+            <h1 className="text-[26px] font-bold leading-[1.25] tracking-[-0.025em] text-ink sm:text-[32px]">
               소개서 수정
             </h1>
             <button
@@ -1284,7 +1284,7 @@ function RegisterForm() {
         </>
       ) : (
         <>
-      <h1 className="text-[28px] font-bold tracking-tight text-ink sm:text-[32px]">
+      <h1 className="text-[26px] font-bold leading-[1.25] tracking-[-0.025em] text-ink sm:text-[32px]">
         브랜드 소개서, 생각보다 금방 완성돼요.
       </h1>
       <p className="mt-2 text-[17px] leading-relaxed text-body">
