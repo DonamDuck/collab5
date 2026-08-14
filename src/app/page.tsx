@@ -79,7 +79,7 @@ export default async function Home() {
             넓은 화면일수록 위계 대비를 벌리는 것(모바일 1.5~1.75배 → 데스크탑 2.0배). */}
         {/* 슬로건 B′ — 콜라보 프레임(대표 확정 07-31 아침, "변경" 지시). '시작'만 약속(11곳으로도 이행 가능).
             디자인팀 차별화 변형이 나오면 2안 비교로 교체 가능. */}
-        <h1 className="break-keep text-[28px] font-bold leading-[1.3] tracking-[-0.03em] text-ink sm:text-[40px]">
+        <h1 className="break-keep text-[30px] font-bold leading-[1.28] tracking-[-0.032em] text-ink sm:text-[44px]">
           우리 브랜드,
           <br />
           이제는 콜라보할 차례예요.
@@ -120,9 +120,10 @@ export default async function Home() {
         //    스크롤 0에서 이 밴드는 82px만 보이므로 안 터지고 → 첫 화면 바로 아래에 **738px 투명 구멍**이 남았다.
         //    (`eager`로 하단 컷을 없애도 threshold는 그대로라 해결 안 됨 — 실측 확인)
         //    이 섹션은 홈의 주 콘텐츠다. 등장 연출보다 "바로 보이는 것"이 우선.
-        <section
-          className="mt-10 -mx-4 bg-surface-soft px-4 py-10 [box-shadow:0_0_0_100vmax_var(--surface-soft)] [clip-path:inset(0_-100vmax)] sm:-mx-6 sm:px-6"
-        >
+        // ⭐밴드(회색 면) 제거 — 08-14 대표 확정. 순백 페이지 한가운데에 회색 섹션 하나만 있으면
+        //   "왜 여기만?"으로 읽힌다(redesign-skill: 라이트 페이지의 이질적 섹션 = 복붙 사고처럼 보임).
+        //   섹션 구분은 제목과 여백이 맡는다. 풀블리드 box-shadow/clip-path 기법도 같이 걷어냈다.
+        <section className="mt-14 -mx-4 px-4 py-4 sm:-mx-6 sm:px-6">
           <h2 className="text-balance break-keep text-center text-[24px] font-bold leading-[1.35] tracking-[-0.02em] text-ink sm:text-[28px]">
             지금, 콜라보 가능한 브랜드예요.
           </h2>
@@ -148,7 +149,7 @@ export default async function Home() {
             **같은 값**이어야 한다(눌러 간 자리 ≠ 활성 판정 자리가 되면 안 된다). */}
         <h2
           id="home-brandpage"
-          className="scroll-mt-32 text-balance break-keep text-center text-[24px] font-bold leading-[1.35] tracking-[-0.02em] text-ink sm:text-[28px]"
+          className="mt-7 scroll-mt-32 text-balance break-keep text-center text-[24px] font-bold leading-[1.35] tracking-[-0.02em] text-ink sm:mt-9 sm:text-[28px]"
         >
           3분이면 브랜드 소개서가 완성돼요.
         </h2>
@@ -367,37 +368,28 @@ export default async function Home() {
  *  라벨이 길어져(최대 10자) 375px에서 열당 ~90px → `break-keep`으로 두 줄까지 허용. */
 function FlowStrip() {
   const steps = [
-    { label: "소개서 3분 작성", desc: "AI가 작성 도움" },
-    { label: "콜라보 둘러보기", desc: "등록 브랜드 서칭" },
-    { label: "AI 콜라보 추천", desc: "✨콜라보 아이디어 확인" },
+    { label: "소개서 3분 작성" },
+    { label: "콜라보 둘러보기" },
+    { label: "AI 콜라보 추천" },
   ];
+  // ⭐숫자 배지를 쓰지 않는다(08-14 대표 확정).
+  //   redesign-skill 진단: "3등분 균등 칸을 기능 소개로 쓰는 건 가장 흔한 AI 레이아웃."
+  //   원형 Kiwi 배지 3개가 나란한 게 '템플릿' 인상의 핵심이었다. 순서는 화살표가 이미 말하므로
+  //   숫자는 같은 말을 두 번 하는 것이었고, 빼고 나니 라벨만 남아 훨씬 조용해졌다.
+  //   ⚠️부제("AI가 작성 도움" 등)도 같이 뺐다 — 라벨만으로 흐름이 읽히고, 부제까지 두면
+  //     칸마다 줄 수가 달라져 세 칸의 바닥선이 어긋난다(3번 칸만 두 줄이던 문제).
   return (
-    <div className="mx-auto mt-7 flex max-w-[460px] items-start justify-center rounded-lg bg-surface-soft px-2 py-4 sm:px-4">
+    <div className="mx-auto mt-7 flex max-w-[460px] items-center justify-center gap-1.5 rounded-lg bg-surface-faint px-3 py-3.5 sm:gap-2.5 sm:px-4">
       {steps.map((s, i) => (
-        <div key={s.label} className="flex flex-1 items-start">
+        <div key={s.label} className="flex min-w-0 flex-1 items-center gap-1.5 sm:gap-2.5">
           {i > 0 && (
-            <svg
-              viewBox="0 0 20 20"
-              className="mt-2 h-4 w-4 shrink-0 text-faint"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.8"
-              aria-hidden="true"
-            >
+            <svg viewBox="0 0 20 20" className="h-3.5 w-3.5 shrink-0 text-faint" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
               <path d="M7 4l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           )}
-          <div className="flex-1 px-0.5 text-center">
-            <span className="mx-auto flex h-7 w-7 items-center justify-center rounded-pill bg-primary text-[13px] font-bold text-primary-on">
-              {i + 1}
-            </span>
-            <p className="mt-2 break-keep text-[12.5px] font-bold leading-[1.35] text-ink sm:text-[14px]">
-              {s.label}
-            </p>
-            <p className="mt-1 break-keep text-[11px] leading-[1.35] text-mute sm:text-[12px]">
-              {s.desc}
-            </p>
-          </div>
+          <p className="min-w-0 flex-1 break-keep text-center text-[12.5px] font-bold leading-[1.3] text-ink sm:text-[14px]">
+            {s.label}
+          </p>
         </div>
       ))}
     </div>

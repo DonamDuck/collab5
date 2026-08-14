@@ -136,25 +136,25 @@ export default async function MagazinePage() {
                좌 텍스트 / 우 커버(책방 히어로의 구조). ⚠️모바일에선 커버를 **위로** 올린다
                (`order-first sm:order-last`) — 잡지는 사진이 먼저 붙잡고 글이 따라오는 매체다.
                커버 폭을 320px로 묶는 이유: 텍스트가 최소 500px는 남아야 제목이 3줄로 안 무너진다. */}
-          {/* ⭐히어로에만 은은한 면(대표 확정 08-14 ②안) — **§ 카드 어휘의 유일한 예외다.**
-               대표 피드백: "테두리·배경이 없어서 글자가 떠 보인다."
-               ⚠️원인은 면의 부재가 **아니었다.** 5편을 렌더해보니 같은 조건(면 0개)인데도 안 떠
-                 보였다 — 항목이 1개라 반복이 없는 게 원인이다. 그런데도 면을 까는 쪽으로 간 건
-                 대표 결정이다(0안 "커버 교체 후 재판정"을 권고안으로 드렸으나 ②안 선택).
-               면색은 `surface-faint`(#fafafb) — 08-14에 대표가 `surface-soft`(#f5f5f6)를 보고
-                 "조금 더 옅은 회색"을 골라 신설한 토큰이다(아이보리 후보는 기각 — 07-31 웜톤 폐기가
-                 그대로 유효). ⚠️여기서 `surface-soft`로 되돌리지 말 것: soft는 "여기부터 다른 영역"을
-                 말하는 면이라 이 자리에선 경계가 도드라져 카드로 읽힌다.
-               ⛔**테두리는 넣지 않는다.** 배경만 깔면 '지면 강조'로 읽히지만, 테두리까지 두르면
-                 「박스 = 고르는 것」이 되어 바로 옆 BrandGrid의 브랜드 카드와 같은 옷이 된다.
-                 이 예외를 지난 호 리스트로 넓히지도 말 것 — 거기는 애초에 증상이 없다. */}
-          <article className="mt-10 rounded-xl bg-surface-faint p-5 sm:p-7">
+          {/* ⭐히어로 경계 = **0.5px 라인**(08-14 대표 최종 확정). 여기까지 온 경로를 남긴다 —
+               같은 자리를 네 번 바꿨으므로, 안 적으면 다음 사람이 같은 순회를 반복한다.
+               ①경계 없음 → "글자가 떠 보인다"(대표). ⚠️단 원인은 면의 부재가 아니었다 — 5편을
+                 렌더하니 같은 조건(경계 0개)인데도 멀쩡했다. 항목이 1개라 반복이 없는 게 원인.
+               ②옅은 회색면(`surface-faint`) → "클릭해봄직하지 않다". 면은 "여기 뭔가 있다"만
+                 말하고 "누를 수 있다"는 못 말한다.
+               ③2겹 그림자(Y8→5→3→2까지 4단계로 낮춤) → 폭 넓은 지면형 블록에선 아무리 약해도
+                 '떠 있는 카드'로 읽혀 매거진의 성격(지면)과 어긋났다. 토큰은 걷어냈다.
+               ④**0.5px 라인** — 높이를 만들지 않고 "여기까지가 이 글의 영역"만 말한다.
+               🔒값은 브랜드 카드(`BrandGrid`)와 **완전히 동일**(#DFDFE3 · 0.5px)하다. 같은 사이트로
+                 보이게 하는 최소 조건이라, **한쪽만 바꾸지 말 것.**
+               ⛔이 경계를 지난 호 리스트로 넓히지 말 것 — 거기는 애초에 증상이 없었다. */}
+          <article className="mt-10 rounded-xl border-[0.5px] border-[#DFDFE3] bg-surface p-5 sm:p-7">
             <Link href={`/magazine/${lead.slug}`} className="group block">
               <div className="grid items-start gap-6 sm:grid-cols-[1fr_320px] sm:gap-8">
                 {lead.coverImage && (
-                  // 면 위에 올라가므로 플레이스홀더 배경은 `surface`(흰색) — soft끼리 겹치면
-                  // 이미지 로딩 전에 커버 자리가 통째로 사라져 레이아웃이 비어 보인다.
-                  <div className="order-first overflow-hidden rounded-lg bg-surface sm:order-last">
+                  // 히어로가 흰 면이라 플레이스홀더는 soft — 흰 위에 흰이면 이미지 로딩 전
+                  // 커버 자리가 통째로 사라져 레이아웃이 비어 보인다.
+                  <div className="order-first overflow-hidden rounded-lg bg-surface-soft sm:order-last">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={lead.coverImage}

@@ -13,7 +13,7 @@ export const metadata: Metadata = {
 export default function TermsPage() {
   return (
     <main className="mx-auto max-w-[760px] px-5 py-12 sm:px-6 sm:py-16">
-      <h1 className="text-2xl font-bold tracking-tight text-ink sm:text-[28px]">이용약관</h1>
+      <h1 className="text-[24px] font-bold tracking-tight text-ink sm:text-[26px] leading-[1.25] tracking-[-0.025em]">이용약관</h1>
       <p className="mt-3 text-[15px] leading-relaxed text-mute">
         본 약관은 collab5(이하 &lsquo;회사&rsquo;)가 제공하는 브랜드 소개서 및 콜라보 연결 서비스(이하 &lsquo;서비스&rsquo;)의 이용과
         관련하여 회사와 이용자 간의 권리·의무 및 책임사항을 규정합니다.
