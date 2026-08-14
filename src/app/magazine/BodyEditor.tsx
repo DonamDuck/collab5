@@ -36,6 +36,61 @@ function Btn({
   );
 }
 
+/** 사진 고르기 버튼 — 파일 입력을 숨기고 버튼이 대신 연다.
+ *
+ *  🚨**`<label>`로 감싸지 마라.** 08-14에 대표가 "한 번 누르면 아무 반응이 없고 **더블클릭하면
+ *    창이 뜬다**"고 제보해 잡힌 버그다. 원인은 두 요구가 부딪힌 것:
+ *      ① 누르는 순간 사진 선택(NodeSelection)이 풀리면 안 된다 → `onMouseDown` preventDefault 필요
+ *      ② `<label>`이 안쪽 `<input type=file>`에게 클릭을 넘겨주는 건 **그 기본 동작**이다
+ *    ①이 ②를 같이 죽인다. 그래서 첫 클릭은 먹히지 않고, 더블클릭의 두 번째 클릭에서야 열렸다.
+ *  → 라벨을 버리고 **버튼 + 숨은 input(ref)** 으로 바꿔 `input.click()`을 직접 부른다.
+ *    preventDefault는 그대로 두므로 선택도 지키고, 창도 한 번에 열린다.
+ *
+ *  🪤이 버그가 오래 안 잡힌 이유 — 툴바의 「사진」 넣기도 **같은 라벨 구조라 같이 아팠는데**,
+ *    사진 넣기는 커서만 있으면 되는 일이라 두 번 눌러도 아무도 이상하게 여기지 않았다.
+ *    "저쪽은 되는데 이쪽만 안 된다"로 읽고 그 구조를 용의선상에서 뺐던 게 오진의 출발점이었다.
+ *    ⭐**"저쪽은 된다"는 것도 직접 눌러 확인하기 전엔 증거가 아니다.** */
+function PhotoPickerButton({
+  label,
+  title,
+  busy,
+  onPick,
+  className,
+}: {
+  label: string;
+  title?: string;
+  busy: boolean;
+  onPick: (f: File) => void;
+  className: string;
+}) {
+  const ref = useRef<HTMLInputElement>(null);
+  return (
+    <>
+      <button
+        type="button"
+        title={title}
+        disabled={busy}
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={() => ref.current?.click()}
+        className={className}
+      >
+        {label}
+      </button>
+      <input
+        ref={ref}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (f) onPick(f);
+          e.target.value = ""; // 같은 파일을 다시 골라도 change가 뜨게
+        }}
+      />
+    </>
+  );
+}
+
 function Toolbar({ editor, onImage, uploading }: { editor: Editor; onImage: (f: File) => void; uploading: boolean }) {
   const addLink = () => {
     const prev = editor.getAttributes("link").href as string | undefined;
@@ -73,17 +128,15 @@ function Toolbar({ editor, onImage, uploading }: { editor: Editor; onImage: (f: 
       <Btn on={addLink} active={editor.isActive("link")} label="링크" title="링크" />
       <Btn on={() => editor.chain().focus().setHorizontalRule().run()} label="구분선" title="구분선" />
       {/* 사진 — 업로드가 끝나면 커서 자리에 들어간다. 캡션은 삽입된 사진 아래 칸에서 입력. */}
-      <label
+      <PhotoPickerButton
+        title="사진 넣기"
+        busy={uploading}
+        label={uploading ? "올리는 중…" : "사진"}
+        onPick={onImage}
         className={`inline-flex h-8 shrink-0 cursor-pointer items-center rounded-sm px-2 text-[13px] font-medium transition-colors ${
           uploading ? "text-faint" : "text-mute hover:bg-surface-soft hover:text-ink"
         }`}
-        title="사진 넣기"
-        onMouseDown={(e) => e.preventDefault()}
-      >
-        {uploading ? "올리는 중…" : "사진"}
-        <input type="file" accept="image/*" className="hidden" disabled={uploading}
-          onChange={(e) => { const f = e.target.files?.[0]; if (f) onImage(f); e.target.value = ""; }} />
-      </label>
+      />
       <Btn on={() => editor.chain().focus().unsetAllMarks().clearNodes().run()} label="서식 지우기" title="서식 지우기" />
     </div>
   );
@@ -219,18 +272,17 @@ function ImageBar({
             지우고 새로 넣으면 캡션을 다시 쓰고 크기를 다시 눌러야 한다. */}
       <div className="flex flex-wrap items-center gap-2">
         <span className="w-10 shrink-0 text-[13px] font-medium text-mute">사진</span>
-        <label
+        {/* 누르는 순간 사진 선택(NodeSelection)이 풀리면 업로드가 끝나도 어느 사진을 바꿀지 모르게
+            된다 — 그래서 `onMouseDown` preventDefault가 필요하고, 그것 때문에 라벨을 못 쓴다.
+            상세는 `PhotoPickerButton` 주석(08-14 더블클릭 버그). */}
+        <PhotoPickerButton
+          busy={replacing}
+          label={replacing ? "바꾸는 중…" : "다른 사진으로 바꾸기"}
+          onPick={onReplace}
           className={`inline-flex h-8 cursor-pointer items-center rounded-sm border border-border-strong bg-surface px-2.5 text-[13px] font-medium transition-colors ${
             replacing ? "text-faint" : "text-ink hover:bg-surface-soft"
           }`}
-          // ⚠️`onMouseDown` preventDefault — 없으면 누르는 순간 사진 선택이 풀려
-          //   업로드가 끝나도 **어느 사진을 바꿔야 할지 모르게 된다**(툴바 버튼들과 같은 이유).
-          onMouseDown={(e) => e.preventDefault()}
-        >
-          {replacing ? "바꾸는 중…" : "다른 사진으로 바꾸기"}
-          <input type="file" accept="image/*" className="hidden" disabled={replacing}
-            onChange={(e) => { const f = e.target.files?.[0]; if (f) onReplace(f); e.target.value = ""; }} />
-        </label>
+        />
       </div>
       <p className="text-[12px] leading-relaxed text-faint">
         폰처럼 화면이 좁으면 이 값과 상관없이 화면 폭에 맞춰 들어가요.
