@@ -67,22 +67,22 @@ export function EditButton({
       <button
         type="button"
         onClick={onClick}
-        className="inline-flex h-7 items-center gap-1 rounded-md border border-hairline bg-surface px-2.5 text-xs font-medium text-mute hover:border-border-strong hover:text-ink print:hidden"
+        className="inline-flex h-7 items-center gap-1 rounded-md border border-hairline bg-surface px-2.5 text-[12px] font-medium text-mute hover:border-border-strong hover:text-ink print:hidden"
       >
         수정
       </button>
       {loginNeeded && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4" {...loginDialog.overlayProps}>
           <div {...loginDialog.panelProps} className="w-full max-w-sm rounded-lg border border-hairline bg-surface p-6 shadow-e2">
-            <p className="text-base font-bold break-keep text-ink">로그인이 필요해요</p>
-            <p className="mt-1.5 text-sm leading-relaxed break-keep text-mute">
+            <p className="text-[16px] font-bold break-keep text-ink">로그인이 필요해요</p>
+            <p className="mt-1.5 text-[14px] leading-relaxed break-keep text-mute">
               이 소개서는 계정에 연결되어 있어요. 수정하려면 연결된 계정으로 로그인해주세요.
             </p>
             <div className="mt-4 flex gap-2">
               <button
                 type="button"
                 onClick={() => setLoginNeeded(false)}
-                className="h-11 flex-1 rounded-md border border-border-strong bg-surface text-sm font-medium text-ink"
+                className="h-11 flex-1 rounded-md border border-border-strong bg-surface text-[14px] font-medium text-ink"
               >
                 취소
               </button>
@@ -90,7 +90,7 @@ export function EditButton({
                 type="button"
                 // 로그인 후 보던 소개서로 복귀 — 홈으로 떨어지면 다시 찾아와야 한다
                 onClick={() => router.push(`/login?redirect=${encodeURIComponent(`/m/${slug}`)}`)}
-                className="h-11 flex-1 rounded-md bg-primary text-sm font-medium text-primary-on"
+                className="h-11 flex-1 rounded-md bg-primary text-[14px] font-medium text-primary-on"
               >
                 로그인하러 가기
               </button>
@@ -101,8 +101,8 @@ export function EditButton({
       {open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4" {...pwDialog.overlayProps}>
           <div {...pwDialog.panelProps} className="w-full max-w-sm rounded-lg border border-hairline bg-surface p-6 shadow-e2">
-            <p className="text-base font-bold text-ink">소개서 수정</p>
-            <p className="mt-1.5 text-sm text-mute">소개서 관리 비밀번호를 입력해주세요.</p>
+            <p className="text-[16px] font-bold text-ink">소개서 수정</p>
+            <p className="mt-1.5 text-[14px] text-mute">소개서 관리 비밀번호를 입력해주세요.</p>
             <PasswordInput
               value={pw}
               onChange={(e) => setPw(e.target.value)}
@@ -111,14 +111,14 @@ export function EditButton({
               }}
               placeholder="비밀번호"
               wrapperClassName="mt-4"
-              className="h-11 w-full rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
+              className="h-11 w-full rounded-sm border border-hairline bg-surface px-3 text-[16px] text-ink outline-none placeholder:text-faint focus:border-focus"
             />
-            {err && <p className="mt-2 text-sm text-red-600">{err}</p>}
+            {err && <p className="mt-2 text-[14px] text-red-600">{err}</p>}
             <div className="mt-4 flex gap-2">
               <button
                 type="button"
                 onClick={() => setOpen(false)}
-                className="h-11 flex-1 rounded-md border border-border-strong bg-surface text-sm font-medium text-ink"
+                className="h-11 flex-1 rounded-md border border-border-strong bg-surface text-[14px] font-medium text-ink"
               >
                 취소
               </button>
@@ -126,7 +126,7 @@ export function EditButton({
                 type="button"
                 onClick={go}
                 disabled={pending || !pw.trim()}
-                className="h-11 flex-1 rounded-md bg-primary text-sm font-medium text-primary-on disabled:opacity-50"
+                className="h-11 flex-1 rounded-md bg-primary text-[14px] font-medium text-primary-on disabled:opacity-50"
               >
                 {pending ? "확인 중…" : "수정하기"}
               </button>

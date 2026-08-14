@@ -695,7 +695,7 @@ export function MakerActionBar({
             </div>
 
             <div className="flex-1 overflow-y-auto p-6 pt-4 pb-4">
-              <p className="text-xl font-bold break-keep text-ink">{makerName}님과 콜라보 시작하기</p>
+              <p className="text-[20px] font-bold break-keep text-ink">{makerName}님과 콜라보 시작하기</p>
               {channel ? (
                 <>
                   <p className="mt-2 text-[15px] leading-relaxed text-mute">
@@ -844,20 +844,20 @@ export function MakerActionBar({
               </svg>
             </button>
 
-            <p className="px-6 text-xl font-bold leading-snug text-balance break-keep text-ink">{loginTitle}</p>
+            <p className="px-6 text-[20px] font-bold leading-snug text-balance break-keep text-ink">{loginTitle}</p>
             <p className="mt-2 text-[16px] leading-relaxed text-balance break-keep text-mute">{loginSub}</p>
             <div className="mt-5 flex gap-2">
               <button
                 type="button"
                 onClick={() => setLoginOpen(false)}
-                className="h-11 flex-1 rounded-md border border-border-strong bg-surface text-sm font-medium text-ink"
+                className="h-11 flex-1 rounded-md border border-border-strong bg-surface text-[14px] font-medium text-ink"
               >
                 취소
               </button>
               <a
                 href={`/login?redirect=${encodeURIComponent(`/m/${slug}`)}`}
                 onClick={markPending}
-                className="flex h-11 flex-1 items-center justify-center rounded-md bg-primary text-sm font-medium text-primary-on"
+                className="flex h-11 flex-1 items-center justify-center rounded-md bg-primary text-[14px] font-medium text-primary-on"
               >
                 로그인
               </a>

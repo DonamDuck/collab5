@@ -457,7 +457,7 @@ export function ReportSheet({
               track("report_cta_propose"); // 리포트→제안 전환 = P1→P3 퍼널 핵심 지표
               onPropose();
             }}
-            className="mt-3 flex h-12 w-full items-center justify-center rounded-md bg-primary text-base font-medium text-primary-on"
+            className="mt-3 flex h-12 w-full items-center justify-center rounded-md bg-primary text-[16px] font-medium text-primary-on"
           >
             콜라보 제안 시작하기
           </button>
@@ -565,7 +565,7 @@ export function ReportSheet({
                   이게 없으면 리포트가 띡 하고 나와서 "내 분석인가?"로 읽힌다.
                   ⭐크기 16→**20**(대표 08-07 2차): 16 bold ink는 바로 아래 섹션헤더(15 bold ink)와
                     **한 급 차이도 안 나서** 둘이 겹쳐 보였다. 20은 시트 최상단 안내 타이틀의 기존 슬롯이다
-                    (`phase==="select"`의 "어떤 소개서로 분석할까요"와 같은 `text-xl`) — 새 크기를 만든 게
+                    (`phase==="select"`의 "어떤 소개서로 분석할까요"와 같은 `text-[20px]`) — 새 크기를 만든 게
                     아니라 **같은 역할엔 같은 크기**를 쓴 것. 리포트 본문 사다리(16→15→14→13)는 그대로. */}
               {/* ⭐**문장마다 줄을 바꾼다**(대표 08-07 4차) — 두 문장이 하는 일이 다르다:
                   앞은 *왜 못 보는지*, 뒤는 *대신 무엇을 주는지*. 이어 붙이면 데스크탑에서
@@ -573,7 +573,7 @@ export function ReportSheet({
                   ⚠️한때 `<br>`를 뺐다가 되살렸다 — 뺀 이유(모바일에서 줄이 늘어남)보다
                      **문장 구분이 눈에 보이는 쪽**이 이 화면엔 더 중요하다는 대표 판단. */}
               {sampleTeaser && (
-                <p className="mb-4 text-xl font-bold leading-snug break-keep text-ink">
+                <p className="mb-4 text-[20px] font-bold leading-snug break-keep text-ink">
                   콜라보 추천은 내 소개서 작성 후 받아볼 수 있어요.
                   <br />
                   우선 예시 리포트를 보여드릴게요.
@@ -613,7 +613,7 @@ export function ReportSheet({
                   <a
                     href="/register"
                     onClick={() => track("wizard_start_from_report")}
-                    className="mt-3 flex h-12 w-full items-center justify-center rounded-md bg-primary text-base font-medium text-primary-on"
+                    className="mt-3 flex h-12 w-full items-center justify-center rounded-md bg-primary text-[16px] font-medium text-primary-on"
                   >
                     내 소개서 만들기
                   </a>
@@ -629,7 +629,7 @@ export function ReportSheet({
                 <a
                   href="/register"
                   onClick={() => track("wizard_start_from_report")}
-                  className="flex h-12 w-full items-center justify-center rounded-md bg-primary text-base font-medium text-primary-on"
+                  className="flex h-12 w-full items-center justify-center rounded-md bg-primary text-[16px] font-medium text-primary-on"
                 >
                   내 소개서 만들기
                 </a>
@@ -648,7 +648,7 @@ export function ReportSheet({
                 {/* ⚠️ pr-8(닫기 ✕ 회피)은 **제목 줄에만** 건다 — 예전엔 이 블록 전체(칩·버튼까지)에
                     걸려 있어서, 오른쪽만 여백이 32px 더 붙는 바람에 [분석하기] 버튼이 시트 중앙이 아니라
                     왼쪽으로 치우쳐 보였다(실측 07-31, 대표 QA). 닫기 버튼은 제목 높이에서만 겹칠 수 있다. */}
-                <p className="pr-8 text-xl font-bold break-keep text-ink">
+                <p className="pr-8 text-[20px] font-bold break-keep text-ink">
                   어떤 소개서로 분석할까요
                 </p>
                 <p className="mt-1.5 text-[14px] text-mute">
@@ -677,7 +677,7 @@ export function ReportSheet({
                   type="button"
                   disabled={!selected?.slug}
                   onClick={() => selected?.slug && run(selected.slug)}
-                  className="mt-6 flex h-12 w-full items-center justify-center rounded-md bg-primary text-base font-medium text-primary-on disabled:opacity-50"
+                  className="mt-6 flex h-12 w-full items-center justify-center rounded-md bg-primary text-[16px] font-medium text-primary-on disabled:opacity-50"
                 >
                   분석하기
                 </button>
@@ -719,19 +719,19 @@ export function ReportSheet({
               <div className="py-10 text-center">
                 {thin.side === "from" ? (
                   <>
-                    <p className="text-lg font-bold break-keep text-ink">
+                    <p className="text-[18px] font-bold break-keep text-ink">
                       내 소개서를 보강하면 분석이 더 정확해져요
                     </p>
                     <a
                       href={`/register?edit=${selected?.slug ?? ""}`}
-                      className="mx-auto mt-5 flex h-12 w-full max-w-xs items-center justify-center rounded-md bg-primary text-base font-medium text-primary-on"
+                      className="mx-auto mt-5 flex h-12 w-full max-w-xs items-center justify-center rounded-md bg-primary text-[16px] font-medium text-primary-on"
                     >
                       소개서 보강하기
                     </a>
                   </>
                 ) : (
                   <>
-                    <p className="text-lg font-bold break-keep text-ink">
+                    <p className="text-[18px] font-bold break-keep text-ink">
                       {toName}님의 소개서 정보가 아직 적어요
                     </p>
                     <p className="mt-2 text-[14px] leading-relaxed text-mute">
@@ -742,7 +742,7 @@ export function ReportSheet({
               </div>
             ) : phase === "no_match" ? (
               <div className="py-10 text-center">
-                <p className="text-lg font-bold break-keep text-ink">
+                <p className="text-[18px] font-bold break-keep text-ink">
                   아직 뚜렷한 접점을 찾지 못했어요
                 </p>
                 <p className="mt-2 text-[14px] leading-relaxed break-keep text-mute">
@@ -752,13 +752,13 @@ export function ReportSheet({
               </div>
             ) : (
               <div className="py-10 text-center">
-                <p className="text-lg font-bold break-keep text-ink">
+                <p className="text-[18px] font-bold break-keep text-ink">
                   분석에 실패했어요
                 </p>
                 <button
                   type="button"
                   onClick={() => selected?.slug && run(selected.slug)}
-                  className="mx-auto mt-5 flex h-12 w-full max-w-xs items-center justify-center rounded-md border border-border-strong bg-surface text-base font-medium text-ink"
+                  className="mx-auto mt-5 flex h-12 w-full max-w-xs items-center justify-center rounded-md border border-border-strong bg-surface text-[16px] font-medium text-ink"
                 >
                   다시 시도
                 </button>

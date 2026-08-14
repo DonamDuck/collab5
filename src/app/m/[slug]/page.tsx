@@ -195,7 +195,7 @@ export default async function MakerPage({
           )}
           {maker.introFileUrl && (
             <a href={maker.introFileUrl} target="_blank" rel="noopener noreferrer"
-              className="flex h-12 w-full items-center justify-center rounded-md border border-border-strong bg-surface text-base font-medium text-ink">
+              className="flex h-12 w-full items-center justify-center rounded-md border border-border-strong bg-surface text-[16px] font-medium text-ink">
               소개 자료 받기
             </a>
           )}
