@@ -204,6 +204,22 @@ body {
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 .no-scrollbar::-webkit-scrollbar { display: none; }
 
+/* 매거진 편집기 — 사진 캡션을 **편집 중에도** 사진 아래 보여준다(대표 지시 08-14).
+   ⭐글자를 DOM에 넣지 않고 `::after`로 그리는 이유: 진짜 텍스트로 넣으면 에디터 안에서 사진을
+     복사·붙여넣을 때 캡션이 **본문 문단으로 한 번 더** 들어온다(붙여넣기가 DOM을 다시 파싱하므로).
+     가상 요소는 클립보드에도 안 담기고 파서도 못 본다.
+   ⚠️`white-space: pre-wrap`은 넣지 않는다 — 캡션은 한 줄짜리 설명이고, 사용자가 넣은 공백까지
+     그대로 그리면 실수로 들어간 공백이 화면에 드러난다. */
+.mag-figure::after {
+  content: attr(data-caption);
+  display: block;
+  margin-top: 0.5rem;
+  text-align: center;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--faint);
+}
+
 /* 모달·바텀시트 스크롤 컨테이너용 — 얇고 은은한 스크롤바(데스크탑 기본 스크롤바가 투박한 문제 해소) */
 .slim-scrollbar { scrollbar-width: thin; scrollbar-color: var(--border-strong) transparent; }
 .slim-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }

@@ -339,7 +339,7 @@ export function BodyEditor({
     editorProps: {
       attributes: {
         class:
-          "min-h-[420px] px-4 py-4 text-[16px] leading-[1.85] text-body outline-none [&_h3]:mt-6 [&_h3]:text-[19px] [&_h3]:font-bold [&_h3]:text-ink [&_blockquote]:border-l-[3px] [&_blockquote]:border-primary-tint [&_blockquote]:pl-3 [&_blockquote]:text-mute [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_hr]:my-4 [&_hr]:border-hairline [&_a]:text-primary-on [&_a]:underline [&_img]:mx-auto [&_img]:rounded-md [&_img.ProseMirror-selectednode]:outline [&_img.ProseMirror-selectednode]:outline-2 [&_img.ProseMirror-selectednode]:outline-[var(--color-primary)]",
+          "min-h-[420px] px-4 py-4 text-[16px] leading-[1.85] text-body outline-none [&_h3]:mt-6 [&_h3]:text-[19px] [&_h3]:font-bold [&_h3]:text-ink [&_blockquote]:border-l-[3px] [&_blockquote]:border-primary-tint [&_blockquote]:pl-3 [&_blockquote]:text-mute [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_hr]:my-4 [&_hr]:border-hairline [&_a]:text-primary-on [&_a]:underline [&_img]:mx-auto [&_img]:rounded-md [&_img.ProseMirror-selectednode]:outline [&_img.ProseMirror-selectednode]:outline-2 [&_img.ProseMirror-selectednode]:outline-[var(--color-primary)] [&_figure.ProseMirror-selectednode]:outline [&_figure.ProseMirror-selectednode]:outline-2 [&_figure.ProseMirror-selectednode]:outline-[var(--color-primary)] [&_figure.ProseMirror-selectednode]:rounded-md",
       },
       // ⭐마크다운 붙여넣기 — 지시서가 못 박은 요구사항.
       //   대표 초안이 마크다운이라, 이게 없으면 `###`·`>`가 평문으로 들어가 전부 손으로 다시 잡아야 한다.

@@ -75,4 +75,21 @@ export const CaptionedImage = Image.extend({
       },
     };
   },
+
+  /** 편집 화면에서도 **캡션이 사진 아래 보이게** 한다(대표 지시 08-14).
+   *  전엔 캡션이 `data-caption` 속성으로만 들어가 발행된 글에서만 보였다 — 쓰는 사람은 결과를
+   *  못 본 채 감으로 적어야 했고, 실제로 "캡션이 안 나온다"는 제보로 돌아왔다.
+   *
+   *  ⭐**캡션을 `<figcaption>` 텍스트로 넣지 않고 `data-caption` + CSS `::after`로 그린다.**
+   *    텍스트 노드로 넣으면 에디터 안에서 사진을 복사·붙여넣을 때 그 글자가 **본문 문단으로 한 번 더**
+   *    들어온다(붙여넣기는 DOM을 다시 파싱하므로). 가짜 텍스트는 클립보드에도 안 담기고 파서도 못 본다.
+   *  ⚠️`data-caption`은 `<img>`에도 그대로 남긴다 — `parseHTML`이 img에서 읽는 계약이라
+   *    figure에만 두면 복사·붙여넣기에서 캡션이 증발한다.
+   *  ⚠️캡션이 없으면 예전처럼 `<img>` 하나만 낸다 — 빈 figure가 여백을 만들지 않게. */
+  renderHTML({ HTMLAttributes }) {
+    const attrs = mergeAttributes(this.options.HTMLAttributes, HTMLAttributes);
+    const caption = attrs["data-caption"];
+    if (!caption) return ["img", attrs];
+    return ["figure", { class: "mag-figure", "data-caption": caption }, ["img", attrs]];
+  },
 });
