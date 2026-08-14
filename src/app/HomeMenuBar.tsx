@@ -89,7 +89,14 @@ export function HomeMenuBar() {
     //    알약에만 `pointer-events-auto`를 되돌려준다.
     // z-[6] = 헤더(z-10) 아래, HomeSectionTabs(z-[5]) 위.
     // top-14 = 헤더 높이. ⚠️루트 폰트가 17px이라 실제 59.5px다(56 아님 — 눈대중 금지).
-    <div className="pointer-events-none sticky top-14 z-[6] flex justify-center py-2">
+    // 🛟`px-2` + 아래 nav의 `max-w-full overflow-x-auto` = **가로 스크롤 안전장치**.
+    //    라벨이 「콜라보 매거진」으로 길어지며 375px 기준 알약이 336.2px가 됐다(좌우 여유 19.4씩).
+    //    375·360은 들어가지만 **320px(구형 SE)에서는 알약이 화면을 넘겨 페이지 전체에 가로 스크롤이
+    //    생긴다** — 이 저장소가 07-29에 헤더로 한 번 당한 그 사고다.
+    //    → 넘칠 땐 **알약 안에서만** 스크롤되게 가둔다. 지면이 밀리는 것보다 훨씬 나은 실패 모양이다.
+    //    ⚠️`px-2`(8.5씩)는 360px에서 여유가 남도록(343 > 336.2) 고른 값이다. 더 키우면 360에서도
+    //      불필요하게 스크롤 레일이 생긴다 — 라벨을 또 늘릴 땐 이 숫자부터 다시 재라.
+    <div className="pointer-events-none sticky top-14 z-[6] flex justify-center px-2 py-2">
       <nav
         aria-label="홈 바로가기"
         // 🎨C안(대표 확정 08-14) — **흰 면 + 0.5px 라인 테두리**.
@@ -101,10 +108,13 @@ export function HomeMenuBar() {
         //   여기서 값을 새로 만들면 라인 어휘가 셋으로 갈린다.
         // ⚠️`shadow-e1`은 남긴다. 이제 뒤에 본문이 지나가므로 **테두리만으로는 면이 안 떠 보인다** —
         //   흰 카드가 흰 지면 위에 얹힌 게 아니라 파묻힌 것처럼 읽힌다.
-        className="pointer-events-auto inline-flex items-center gap-1 rounded-pill border-[0.5px] border-[#DFDFE3] bg-surface p-1 shadow-e1"
+        className="no-scrollbar pointer-events-auto inline-flex max-w-full items-center gap-1 overflow-x-auto rounded-pill border-[0.5px] border-[#DFDFE3] bg-surface p-1 shadow-e1"
       >
+        {/* 「콜라보 매거진」 — 대표 08-14. 그냥 '매거진'이면 무슨 매거진인지가 안 붙는다.
+            ⚠️세 칸 중 이것만 6글자라 폭이 가장 크게 늘었다(실측은 아래 커밋 메시지 참고).
+              칸을 더 늘릴 땐 375px에서 반드시 다시 재라 — 여유가 이제 넉넉하지 않다. */}
         <Link href="/magazine" onClick={() => track("home_menubar_magazine_click")} className={ITEM}>
-          매거진
+          콜라보 매거진
         </Link>
         <Divider />
         <Link href="/search" onClick={() => track("home_menubar_search_click")} className={ITEM}>
