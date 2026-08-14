@@ -5,6 +5,7 @@
 import Link from "next/link";
 import { PreviewPhones } from "./PreviewPhones";
 import { HomeSectionTabs } from "./HomeSectionTabs";
+import { HomeMenuBar } from "./HomeMenuBar";
 import { HomeEnrichBanner } from "./HomeEnrichBanner";
 import { Reveal } from "@/components/Reveal";
 import { BrandGrid } from "@/components/BrandGrid";
@@ -54,7 +55,13 @@ export default async function Home() {
   const collabBrands = [...fetched].sort((a, b) => rank(a.slug) - rank(b.slug));
 
   return (
-    <main className="mx-auto w-full max-w-[960px] px-4 py-12 sm:px-6">
+    // ⚠️ 메뉴바는 `<main>` **밖**에 둔다 — main엔 `py-12`(=51px) 상단 패딩이 있어서 안에 넣으면
+    //    스크롤 0에서 헤더와 바 사이가 51px 벌어진다. 밖에 두면 헤더에 딱 붙고, 바가 흐름에서
+    //    차지하는 높이만큼 아래 콘텐츠가 자연히 내려간다(= 대표가 말한 "메뉴바만큼 살짝 아래로").
+    //    sticky 기준 조상은 layout의 `<div className="flex-1">`이라 페이지 끝까지 따라온다.
+    <>
+      <HomeMenuBar />
+      <main className="mx-auto w-full max-w-[960px] px-4 pb-12 pt-6 sm:px-6">
       {/* 온로드 라이즈 키프레임 — 서버가 <style>로 직접 렌더(React 19 head 호이스트).
           ⚠️Tailwind v4(Lightning CSS)가 유틸로 안 잡히는 raw @keyframes를 제거해서 globals.css엔 못 둠 → 여기 인라인.
           순수 CSS라 JS 하이드레이션 전에도 재생 → 히어로가 안 보이는 위화감 없음(Reveal의 opacity-0 문제 회피). */}
@@ -359,7 +366,10 @@ export default async function Home() {
           지금 시작하기
         </Link>
       </Reveal>
-    </main>
+      {/* ⚠️ main 안쪽은 일부러 **재들여쓰기하지 않았다** — 프래그먼트 하나 때문에 340줄을 밀면
+          지금 같은 홈을 만지고 있을 수 있는 옆 세션과 통째로 충돌한다(한 작업트리 공유). */}
+      </main>
+    </>
   );
 }
 

@@ -80,7 +80,14 @@ export function HomeSectionTabs() {
     //    같은 배경색이라 "페이지가 탭 밑으로 흘러간다"로만 읽히고 바가 하나 더 생긴 느낌은 안 난다.
     // ⚠️ 풀블리드는 `100vw` 금지(가로 스크롤바 폭만큼 넘쳐 가로 스크롤이 생긴다) —
     //    브랜드 그리드와 같은 box-shadow+clip-path 기법을 쓴다(page.tsx §② 참고).
-    <div className="sticky top-14 z-[5] flex justify-center bg-canvas py-2 [box-shadow:0_0_0_100vmax_var(--canvas)] [clip-path:inset(0_-100vmax)]">
+    // 🔻08-14 **sticky 해제** — 홈 최상단에 `HomeMenuBar`가 새로 붙어 헤더 밑을 계속 따라온다.
+    //    둘 다 sticky면 섹션 ③에 닿는 순간 알약 바가 두 줄로 쌓인다(헤더 59.5 + 바 63.75 + 바 65.75
+    //    = 상단 189px 고정 = 375×812 폰의 23%). 대표 결정: 이 바는 제자리에 고정한다.
+    //    → 풀블리드 밴드(box-shadow+clip-path)도 같이 걷었다. 그건 "본문이 바 밑으로 지나갈 때
+    //      제목이 알약 좌우로 삐져나오는" 걸 막던 장치라, 안 따라오면 가릴 것 자체가 없다.
+    //    ⚠️ 스크롤스파이는 남겨둔다 — 지금은 바가 화면에 있을 때 늘 첫 칸이 활성이라 사실상 안 움직이지만,
+    //      sticky를 되살릴 때 다시 필요하고 지금 있어도 틀린 표시를 하지 않는다.
+    <div className="flex justify-center py-2">
       <nav
         aria-label="소개서·콜라보 추천 바로가기"
         // 트랙=surface-soft. 활성 썸은 아래 **"선택됨" 키위 조합**을 쓴다(대표 지시 08-02 "탭바에도 키위를").

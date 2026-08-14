@@ -3,6 +3,7 @@ import Link from "next/link";
 import { getSessionUserLight } from "@/lib/supabase/server";
 import { getProfile } from "@/lib/profiles";
 import { Avatar } from "./Avatar";
+import { HeaderNavLinks } from "./HeaderNavLinks";
 
 export async function SiteHeader() {
   const user = await getSessionUserLight();
@@ -30,32 +31,10 @@ export async function SiteHeader() {
       {/* 14px 정수 — text-sm은 루트 17px 탓에 14.875px(분수)가 된다. 헤더는 전 페이지 공통이라
           여기 하나가 앱 전체에 분수 픽셀을 흩뿌리고 있었다(07-31 실측). */}
       <nav className="flex min-w-0 items-center gap-1.5 text-[14px] sm:gap-2">
-        {/* 매거진 — 🚨**데스크톱에서만 보인다(`hidden sm:flex`)**. 모바일에 넣지 말 것.
-            07-29에 이 헤더가 정확히 그것 때문에 터졌다: 워드마크(123px) + 우측 메뉴(244px)가
-            375px 폰의 가용폭을 넘겨 **전 페이지에 가로 스크롤**이 생겼고, 버튼 하나를 없애
-            겨우 회수한 자리다. 모바일 진입은 풋터와 (예정된) 홈 섹션이 맡는다.
-            ⚠️`overflow-x-hidden`으로 덮는 우회는 금지 — 홈의 100vmax 풀블리드 밴드를 잘라먹는다. */}
-        <Link
-          href="/magazine"
-          className="hidden shrink-0 items-center whitespace-nowrap rounded-md px-3 py-1.5 font-medium text-mute transition-colors hover:text-ink sm:flex"
-        >
-          매거진
-        </Link>
-        {/* 콜라보 찾기 — '미니 검색창' 형태의 링크(대표 지시 07-31).
-            돋보기 아이콘 + '브랜드 소개서' 버튼 2개를 이걸로 통합했다.
-            ⚠️ 진짜 input이 아니라 Link다 — 눌러서 /search로 보내는 게 목적이고,
-               헤더에 실검색을 넣으면 페이지마다 상태를 들고 다녀야 한다.
-               그래서 시각만 검색창(surface-soft 필·pill·좌측 돋보기)으로 빌려오고 동작은 이동. */}
-        <Link
-          href="/search"
-          className="flex h-9 min-w-0 items-center gap-1.5 rounded-pill bg-surface-soft pl-2.5 pr-3.5 text-mute transition-colors hover:bg-primary-pale hover:text-primary-on"
-        >
-          <svg viewBox="0 0 20 20" className="h-[17px] w-[17px] shrink-0" fill="none" stroke="currentColor" strokeWidth="1.9">
-            <circle cx="8.5" cy="8.5" r="5.5" />
-            <path d="m13 13 4 4" strokeLinecap="round" />
-          </svg>
-          <span className="truncate">콜라보 찾기</span>
-        </Link>
+        {/* 이동 링크 2개는 `HeaderNavLinks`로 옮겼다 — **홈에서만 숨기기** 위해서다(대표 08-14).
+            홈은 헤더 밑에 `HomeMenuBar`가 같은 두 링크를 들고 있어 헤더에 또 두면 중복이 된다.
+            아래 계정 영역은 서버에서 세션을 읽으므로 여기 그대로 남는다(홈에서도 노출). */}
+        <HeaderNavLinks />
         {user ? (
           /* 프로필 원형(→ 내 소개서). 로그아웃은 /my 페이지에서. */
           <Link
