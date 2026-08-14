@@ -26,12 +26,16 @@ import { track } from "@/lib/track";
 const REPORT_ANCHOR = "home-collab-report";
 
 // 세 칸 공통. 활성/비활성 구분이 없으므로 상태 클래스도 없다.
-// 🔤 크기 — 대표 지적 08-14 *"메뉴 치고 폰트가 너무 작다"*. 13/14 → **15/15.5**.
-//    모바일을 더 크게 올린 건(13→15, +15%) 대표 요청 그대로다. 데스크톱은 조금만(14→15.5).
-//    ⚠️폭은 확인하고 올렸다 — 375px에서 바가 260.7px라 좌우 여유가 114px 있었다.
-//    높이도 h-9(38.25) → h-10(42.5) — 글자가 커지면 알약이 조여 보이고, 모바일 터치 타깃도 넓어진다.
+// 🔤 크기 — 대표 지적 08-14 *"메뉴 치고 폰트가 너무 작다"*. 13/14 → **양쪽 다 15**(디자인팀 확정).
+//    ⚠️처음엔 모바일 15 / 데스크톱 15.5로 갈랐다가 되돌렸다. **1px 안팎의 차이는 위계로 안 읽히고
+//      실수로 읽힌다**(디자인팀). 헤더 nav는 14로 두는데, 그 1px 차이가 위계를 만드는 게 아니라
+//      **성격이 다른 두 바**(홈 주 내비 / 전역 보조 내비)라는 게 크기로 드러나는 것뿐이다.
+//    ⚠️폭은 확인하고 올렸다 — 375px에서 바가 294.6px, 좌우 여유 80.4px.
+// 📏 높이 **h-[44px]** — 터치 타깃 권장치를 정확히 맞춘 값이다.
+//    🪤`h-10`으로 쓰면 40이 아니라 **42.5px**다. 이 저장소는 루트 폰트가 17px이라 rem 유틸이
+//      전부 6.25%씩 크게 나온다(h-9=38.25 / h-10=42.5). 권장 44에 1.5px 모자라서 px로 박았다.
 const ITEM =
-  "flex h-10 shrink-0 items-center whitespace-nowrap rounded-pill px-3.5 text-[15px] font-medium text-mute transition-colors hover:bg-primary-pale hover:text-primary-on sm:px-5 sm:text-[15.5px]";
+  "flex h-[44px] shrink-0 items-center whitespace-nowrap rounded-pill px-3.5 text-[15px] font-medium text-mute transition-colors hover:bg-primary-pale hover:text-primary-on sm:px-5";
 
 /** 칸 사이 세로 구분선(대표 제안 08-14 — "메뉴바처럼 보이게").
  *  ⚠️`aria-hidden` + 빈 요소다 — 스크린리더에는 링크 3개만 들려야 한다.
