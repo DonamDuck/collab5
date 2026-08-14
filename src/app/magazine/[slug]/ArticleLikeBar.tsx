@@ -10,6 +10,7 @@
 // ⚠️`print:hidden` — 인쇄본에 버튼이 찍히면 종이에 누를 수 없는 것이 남는다.
 import { useCallback, useEffect, useState } from "react";
 import { setArticleLikedAction } from "@/lib/magazine-actions";
+import { useDismissable } from "@/components/useDismissable";
 
 /** 로그인하러 떠나기 직전 "이 글에 하트를 누르려던 참이었다"를 남긴다.
  *  ⚠️`sessionStorage` — 탭을 닫으면 사라지는 게 맞다. 며칠 뒤 로그인했다고 옛 의도가
@@ -34,6 +35,14 @@ export function ArticleLikeBar({
   const [needLogin, setNeedLogin] = useState(false);
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
+
+  // 오버레이 공통 동작(ESC·스크롤 잠금·포커스 트랩·포커스 복귀·role/aria-modal)을 한 번에 얻는다.
+  // ⚠️`overlayClose: false` — **얼럿은 딤 클릭으로 닫지 않는다**(대표 정책 07-29). 그래도 ESC로는 닫힌다.
+  //   /m 소개서의 찜·제안 얼럿과 **같은 훅·같은 정책**이다. 새 규칙을 만들지 않는다.
+  const loginDialog = useDismissable(needLogin, {
+    onClose: () => setNeedLogin(false),
+    overlayClose: false,
+  });
 
   const apply = useCallback(
     async (next: boolean) => {
@@ -92,36 +101,10 @@ export function ArticleLikeBar({
   };
 
   return (
-    <div className="fixed inset-x-0 bottom-5 z-20 flex flex-col items-center gap-2 px-4 print:hidden">
-      {/* 로그인 안내 — 버튼 **위**에 뜬다. 아래에 두면 화면 밖으로 밀려 안 보인다. */}
-      {needLogin && (
-        <div
-          role="dialog"
-          className="pointer-events-auto max-w-[calc(100vw-2rem)] rounded-md border-[0.5px] border-[#DFDFE3] bg-surface px-4 py-3 text-center shadow-e2"
-        >
-          <p className="text-[14px] font-medium text-ink">로그인이 필요해요</p>
-          <p className="mt-1 text-[13px] leading-[1.5] text-body">
-            로그인하면 이 글에 하트가 눌린 채로 돌아와요.
-          </p>
-          <div className="mt-3 flex items-center justify-center gap-2">
-            <a
-              href={`/login?redirect=${encodeURIComponent(`/magazine/${slug}`)}`}
-              onClick={markPending}
-              className="flex h-9 items-center rounded-md bg-primary px-4 text-[14px] font-medium text-primary-on"
-            >
-              로그인하기
-            </a>
-            <button
-              type="button"
-              onClick={() => setNeedLogin(false)}
-              className="flex h-9 items-center rounded-md px-3 text-[14px] font-medium text-mute hover:text-ink"
-            >
-              나중에
-            </button>
-          </div>
-        </div>
-      )}
-
+    <>
+    {/* 🚨`pointer-events-none` — 이 띠는 화면 **폭 전체**를 차지한다. 그냥 두면 알약 좌우의 빈 곳이
+        본문 맨 아래 글자·링크의 클릭을 먹는다(HomeMenuBar에서 같은 함정을 이미 밟았다). */}
+    <div className="pointer-events-none fixed inset-x-0 bottom-5 z-20 flex flex-col items-center gap-2 px-4 print:hidden">
       {err && (
         <p role="alert" className="rounded-md bg-surface px-3 py-1.5 text-[13px] text-red-600 shadow-e1">
           {err}
@@ -158,5 +141,57 @@ export function ArticleLikeBar({
         )}
       </button>
     </div>
+
+    {/* 비로그인 → 로그인 유도 **얼럿**(대표 지시 08-14 — "우리 얼럿 UI 디자인시스템 있잖아").
+        전엔 버튼 위에 뜨는 작은 말풍선이었는데, 화면 아래 구석이라 본문에 묻혔다.
+        ⭐/m 소개서의 찜·제안 얼럿과 **완전히 같은 껍데기**를 쓴다 — 딤 `bg-ink/40`, 카드 `max-w-sm`,
+          우측 상단 X, [취소][로그인] 2버튼, 그 아래 회원가입 줄. 뜻이 같은 창은 같은 모양이어야 한다. */}
+    {needLogin && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4 print:hidden" {...loginDialog.overlayProps}>
+        <div
+          {...loginDialog.panelProps}
+          className="relative w-full max-w-sm rounded-lg border border-hairline bg-surface p-6 text-center shadow-e2"
+        >
+          <button
+            type="button"
+            onClick={() => setNeedLogin(false)}
+            aria-label="닫기"
+            className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-md text-faint hover:bg-surface-soft hover:text-ink"
+          >
+            <svg viewBox="0 0 20 20" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8">
+              <path d="M5 5l10 10M15 5L5 15" strokeLinecap="round" />
+            </svg>
+          </button>
+
+          <p className="px-6 text-xl font-bold leading-snug text-balance break-keep text-ink">로그인이 필요해요</p>
+          <p className="mt-2 text-[16px] leading-relaxed text-balance break-keep text-mute">
+            로그인하면 지금 보고 있는 글에 하트를 남길 수 있어요.
+          </p>
+          <div className="mt-5 flex gap-2">
+            <button
+              type="button"
+              onClick={() => setNeedLogin(false)}
+              className="h-11 flex-1 rounded-md border border-border-strong bg-surface text-sm font-medium text-ink"
+            >
+              취소
+            </button>
+            <a
+              href={`/login?redirect=${encodeURIComponent(`/magazine/${slug}`)}`}
+              onClick={markPending}
+              className="flex h-11 flex-1 items-center justify-center rounded-md bg-primary text-sm font-medium text-primary-on"
+            >
+              로그인
+            </a>
+          </div>
+          <p className="mt-4 text-[13px] text-mute">
+            아직 회원이 아니신가요?{" "}
+            <a href="/signup" onClick={markPending} className="font-medium text-ink underline underline-offset-2">
+              회원가입
+            </a>
+          </p>
+        </div>
+      </div>
+    )}
+    </>
   );
 }
