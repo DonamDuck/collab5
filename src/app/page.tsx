@@ -153,13 +153,17 @@ export default async function Home() {
         {/* 앵커 탭 — 섹션 ③은 ⓐ소개서 만들기 / ⓑ콜라보 분석 두 덩어리라, 맨 위에 목차를 세워
             "다른 하나도 있다"를 먼저 알린다(대표 지시 08-02). 섹션 안에서만 sticky. 상세는 HomeSectionTabs.tsx. */}
         <HomeSectionTabs />
-        {/* ⚠️ id는 HomeSectionTabs.tsx의 TABS와 짝. 바꾸면 둘 다.
-            scroll-mt-32 = 8rem인데 이 저장소 루트 폰트가 17px이라 **136px**이다(128 아님).
-            헤더 59.5 + 탭바 65.75 = 125.25를 실측해 얹은 값. HomeSectionTabs의 ANCHOR_LINE_PX와
-            **같은 값**이어야 한다(눌러 간 자리 ≠ 활성 판정 자리가 되면 안 된다). */}
+        {/* ⚠️ id는 HomeSectionTabs.tsx의 TABS·HomeMenuBar의 REPORT_ANCHOR와 짝. 바꾸면 셋 다.
+            🔢 152px = **헤더 59.5 + HomeMenuBar 밴드 70 = 129.5** + 숨 쉴 틈 22.5(실측 08-14).
+               08-14에 상단 메뉴바가 생기고 폰트가 커지면서 가려야 할 높이가 125.25 → 129.5로 올랐다.
+               옛 값 `scroll-mt-32`(=8rem, 루트 17px라 136px)로 두면 여유가 6.5px밖에 안 남아,
+               폰트 로드·기기 배율로 서브픽셀이 반대로 떨어지면 **제목이 바 밑에 깔린다.**
+            ⚠️ rem 유틸을 쓰지 않고 px를 박은 이유 — 이 저장소는 루트 폰트가 17px이라 `scroll-mt-*`가
+               16 기준이 아니다(8rem이 128이 아니라 136). 실측값을 그대로 쓰는 편이 안 헷갈린다.
+            ⚠️ HomeSectionTabs의 ANCHOR_LINE_PX와 **같은 값**이어야 한다. 바꾸면 둘 다. */}
         <h2
           id="home-brandpage"
-          className="mt-7 scroll-mt-32 text-balance break-keep text-center text-[24px] font-bold leading-[1.35] tracking-[-0.02em] text-ink sm:mt-9 sm:text-[28px]"
+          className="mt-7 scroll-mt-[152px] text-balance break-keep text-center text-[24px] font-bold leading-[1.35] tracking-[-0.02em] text-ink sm:mt-9 sm:text-[28px]"
         >
           3분이면 브랜드 소개서가 완성돼요.
         </h2>
@@ -193,10 +197,10 @@ export default async function Home() {
           {/* h3 → h2 승격 + 크기도 형제 제목과 동일(08-02). 원래 이것만 h3/20px이라 "혼자 작아 보인다"(대표 QA).
               단순히 크기만 키우고 h3를 두면 안 된다 — 앵커 탭의 목적지가 되면서 이 구간은
               '소개서 구간의 하위 설명'이 아니라 **동급 섹션**이 됐다. 마크업이 보이는 위계를 따라가야 한다.
-              ⚠️ id/scroll-mt-32는 위 h2와 같은 규칙(HomeSectionTabs.tsx의 TABS·ANCHOR_LINE_PX와 짝). */}
+              ⚠️ id/scroll-mt-[152px]는 위 h2와 같은 규칙(HomeSectionTabs.tsx의 TABS·ANCHOR_LINE_PX와 짝). */}
           <h2
             id="home-collab-report"
-            className="scroll-mt-32 text-balance break-keep text-[24px] font-bold leading-[1.35] tracking-[-0.02em] text-ink sm:text-[28px]"
+            className="scroll-mt-[152px] text-balance break-keep text-[24px] font-bold leading-[1.35] tracking-[-0.02em] text-ink sm:text-[28px]"
           >
             소개서를 만들면 이런 콜라보 리포트를 받아볼 수 있어요.
           </h2>

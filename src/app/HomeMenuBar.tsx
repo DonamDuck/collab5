@@ -22,12 +22,26 @@ import Link from "next/link";
 import { hasOwnBrandAction } from "@/lib/actions";
 import { track } from "@/lib/track";
 
-// ⚠️ page.tsx의 목적지 h2(`scroll-mt-32`)와 짝. HomeSectionTabs도 같은 id를 쓴다 — 바꾸면 셋 다.
+// ⚠️ page.tsx의 목적지 h2(`scroll-mt-[152px]`)와 짝. HomeSectionTabs도 같은 id를 쓴다 — 바꾸면 셋 다.
 const REPORT_ANCHOR = "home-collab-report";
 
 // 세 칸 공통. 활성/비활성 구분이 없으므로 상태 클래스도 없다.
+// 🔤 크기 — 대표 지적 08-14 *"메뉴 치고 폰트가 너무 작다"*. 13/14 → **15/15.5**.
+//    모바일을 더 크게 올린 건(13→15, +15%) 대표 요청 그대로다. 데스크톱은 조금만(14→15.5).
+//    ⚠️폭은 확인하고 올렸다 — 375px에서 바가 260.7px라 좌우 여유가 114px 있었다.
+//    높이도 h-9(38.25) → h-10(42.5) — 글자가 커지면 알약이 조여 보이고, 모바일 터치 타깃도 넓어진다.
 const ITEM =
-  "flex h-9 shrink-0 items-center whitespace-nowrap rounded-pill px-3.5 text-[13px] font-medium text-mute transition-colors hover:bg-primary-pale hover:text-primary-on sm:px-5 sm:text-[14px]";
+  "flex h-10 shrink-0 items-center whitespace-nowrap rounded-pill px-3.5 text-[15px] font-medium text-mute transition-colors hover:bg-primary-pale hover:text-primary-on sm:px-5 sm:text-[15.5px]";
+
+/** 칸 사이 세로 구분선(대표 제안 08-14 — "메뉴바처럼 보이게").
+ *  ⚠️`aria-hidden` + 빈 요소다 — 스크린리더에는 링크 3개만 들려야 한다.
+ *  ⚠️색은 `border-strong`(#d7d7db). `hairline`(#eaeaec)은 트랙 면(#f5f5f6)과 밝기차가 4%뿐이라
+ *     1px 선으로는 사실상 안 보인다. 면 위에 선을 얹을 땐 면색 기준으로 다시 골라야 한다.
+ *  ⚠️높이는 칸 전체가 아니라 **안쪽으로 인셋**(h-4 = 17px, 알약 42.5px의 40%). 꽉 채우면
+ *     알약의 둥근 모서리와 부딪혀 바가 '표(table)'처럼 읽힌다. */
+function Divider() {
+  return <span aria-hidden="true" className="h-4 w-px shrink-0 bg-border-strong" />;
+}
 
 export function HomeMenuBar() {
   const [hasBrand, setHasBrand] = useState(false);
@@ -44,7 +58,7 @@ export function HomeMenuBar() {
     };
   }, []);
 
-  // 앵커 이동 — 오프셋은 CSS(`scroll-mt-32`)가 정본이라 scrollIntoView가 그대로 존중한다.
+  // 앵커 이동 — 오프셋은 CSS(`scroll-mt-[152px]`)가 정본이라 scrollIntoView가 그대로 존중한다.
   // JS에서 좌표를 다시 계산하면 값이 두 군데로 갈라진다(HomeSectionTabs와 같은 규칙).
   const goReport = (e: React.MouseEvent<HTMLAnchorElement>) => {
     const el = document.getElementById(REPORT_ANCHOR);
@@ -66,14 +80,16 @@ export function HomeMenuBar() {
     <div className="sticky top-14 z-[6] flex justify-center bg-canvas py-2 [box-shadow:0_0_0_100vmax_var(--canvas)] [clip-path:inset(0_-100vmax)]">
       <nav
         aria-label="홈 바로가기"
-        className="inline-flex gap-1 rounded-pill border border-hairline bg-surface-soft p-1 shadow-e1"
+        className="inline-flex items-center gap-1 rounded-pill border border-hairline bg-surface-soft p-1 shadow-e1"
       >
         <Link href="/magazine" onClick={() => track("home_menubar_magazine_click")} className={ITEM}>
           매거진
         </Link>
+        <Divider />
         <Link href="/search" onClick={() => track("home_menubar_search_click")} className={ITEM}>
           콜라보 찾기
         </Link>
+        <Divider />
         {hasBrand ? (
           // 소개서를 이미 가진 사람 — 등록으로 보낼 이유가 없다. 홈 안의 콜라보 추천 구간으로 내린다.
           // <button>이 아니라 <a href="#id">인 이유: JS가 죽어도 네이티브 해시 점프가 대신 동작하고
