@@ -4,7 +4,9 @@ import { notFound } from "next/navigation";
 import { repo } from "@/lib/repo";
 import { kstDateLabel } from "@/lib/magazine-format";
 import { isMagazineEditor } from "@/lib/magazine-auth";
+import { getSessionUserId } from "@/lib/profiles";
 import { ArticleBody, BrandLinkCards } from "./ArticleBody";
+import { ArticleLikeBar } from "./ArticleLikeBar";
 
 // 매거진 상세 (2026-08-10)
 // ⭐기본은 **발행분만**이고, 편집자에게만 초안을 여는 예외를 뚫었다(PR2).
@@ -50,8 +52,18 @@ export default async function MagazineArticlePage({
   if (!a && editor) a = await repo.getArticleForEditor(slug); // 편집자만 초안 열람
   if (!a) notFound();
 
+  // 하트 — 이 페이지는 `force-dynamic`이라 서버에서 바로 읽어 첫 화면부터 정확한 값이 뜬다
+  // (홈처럼 캐시되는 화면이었다면 클라에서 따로 물어야 했다).
+  // ⚠️표가 아직 없으면 repo가 조용히 0/false를 준다 — 글이 500이 되는 것보단 하트가 0인 게 낫다.
+  const viewerId = await getSessionUserId();
+  const [likeCount, likedByMe] = await Promise.all([
+    repo.countArticleLikes(a.id),
+    viewerId ? repo.isArticleLiked(viewerId, a.id) : Promise.resolve(false),
+  ]);
+
   return (
-    <main className="mx-auto w-full max-w-[680px] px-4 py-10 sm:px-6">
+    // ⚠️`pb-28` — 하트 버튼이 `fixed`라 본문 맨 끝을 덮는다. 그만큼 아래를 비워 둔다.
+    <main className="mx-auto w-full max-w-[680px] px-4 pt-10 pb-28 sm:px-6">
       {editor && (
         <div className="mb-6 flex items-center justify-between gap-3 rounded-md border border-hairline bg-surface-soft px-4 py-2.5">
           <span className="text-[13px] text-mute">
@@ -144,6 +156,19 @@ export default async function MagazineArticlePage({
           </p>
         </section>
       </article>
+
+      {/* 「잘 읽었어요 ❤️」 — 읽는 내내 화면 아래에 떠 있다.
+          ⚠️초안(draft)에는 안 띄운다 — 아직 아무도 읽을 수 없는 글의 하트는 뜻이 없고,
+            편집자가 자기 글에 하트를 눌러 수를 부풀리는 첫 단추가 된다. */}
+      {a.status === "published" && (
+        <ArticleLikeBar
+          articleId={a.id}
+          slug={a.slug}
+          initialCount={likeCount}
+          initialLiked={likedByMe}
+          loggedIn={!!viewerId}
+        />
+      )}
     </main>
   );
 }

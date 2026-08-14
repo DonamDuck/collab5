@@ -55,6 +55,10 @@ export interface Repo {
   isMakerSaved(userId: number, makerId: number): Promise<boolean>;
   setMakerSaved(userId: number, makerId: number, saved: boolean): Promise<void>;
   listSavedMakers(userId: number): Promise<Maker[]>;
+  // 매거진 하트(「잘 읽었어요」) — 찜과 같은 모양(복합 PK, 취소는 delete).
+  countArticleLikes(articleId: number): Promise<number>;
+  isArticleLiked(userId: number, articleId: number): Promise<boolean>;
+  setArticleLiked(userId: number, articleId: number, liked: boolean): Promise<void>;
   // 콜라보 제안 인텐트(append-only) — "콜라보 시작하기" 계측
   recordCollabRequest(fromUserId: number | null, toBrandId: number, channel: string, fromBrandId?: number | null): Promise<void>;
   // Brand DNA(brands.dna, 파생 해석층) + 콜라보 리포트(collab_reports, append-only 쌍 캐시) — 스펙 2026-07-25
@@ -563,6 +567,20 @@ class InMemoryRepo implements Repo {
   async recordCollabRequest(fromUserId: number | null, toBrandId: number, channel: string, fromBrandId: number | null = null): Promise<void> {
     this.collabRequests.push({ fromUserId, toBrandId, channel, fromBrandId, createdAt: now() });
   }
+  // ── 매거진 하트 ──
+  private articleLikes: { userId: number; articleId: number }[] = [];
+  async countArticleLikes(articleId: number): Promise<number> {
+    return this.articleLikes.filter((l) => l.articleId === articleId).length;
+  }
+  async isArticleLiked(userId: number, articleId: number): Promise<boolean> {
+    return this.articleLikes.some((l) => l.userId === userId && l.articleId === articleId);
+  }
+  async setArticleLiked(userId: number, articleId: number, liked: boolean): Promise<void> {
+    const has = await this.isArticleLiked(userId, articleId);
+    if (liked && !has) this.articleLikes.push({ userId, articleId });
+    if (!liked && has)
+      this.articleLikes = this.articleLikes.filter((l) => !(l.userId === userId && l.articleId === articleId));
+  }
   // ── Brand DNA + 콜라보 리포트 (Map 기반 — Supabase와 동일 시그니처) ──
   private dnaByBrand = new Map<number, BrandDna>();
   // status는 Supabase 구현과 **같은 규칙**으로 들고 있는다(08-02). 여기선 마지막이 곧 최신이라
@@ -1068,6 +1086,44 @@ class SupabaseRepo implements Repo {
   }
   async recordCollabRequest(fromUserId: number | null, toBrandId: number, channel: string, fromBrandId: number | null = null): Promise<void> {
     await this.db.from("collab_requests").insert({ from_user_id: fromUserId, to_brand_id: toBrandId, channel, from_brand_id: fromBrandId });
+  }
+  // ── 매거진 하트(「잘 읽었어요」) ──
+  // 🚨**표가 아직 없어도 글이 열려야 한다.** 코드는 배포로 먼저 나가고 SQL은 대표가 나중에 돌린다
+  //    — 그 사이 여기서 에러를 던지면 매거진 글이 통째로 500이 된다. 조회는 조용히 0/false로,
+  //    쓰기만 에러를 올려 UI가 롤백하게 한다(스키마 축소 사고 08-01과 같은 순서 문제).
+  async countArticleLikes(articleId: number): Promise<number> {
+    const { count, error } = await this.db
+      .from("magazine_likes")
+      .select("user_id", { count: "exact", head: true })
+      .eq("article_id", articleId);
+    if (error) return 0;
+    return count ?? 0;
+  }
+  async isArticleLiked(userId: number, articleId: number): Promise<boolean> {
+    const { data, error } = await this.db
+      .from("magazine_likes")
+      .select("article_id")
+      .eq("user_id", userId)
+      .eq("article_id", articleId)
+      .maybeSingle();
+    if (error) return false;
+    return !!data;
+  }
+  async setArticleLiked(userId: number, articleId: number, liked: boolean): Promise<void> {
+    if (liked) {
+      // 복합 PK라 두 번 눌러도 한 건(멱등) — 찜과 같은 방식.
+      const { error } = await this.db
+        .from("magazine_likes")
+        .upsert({ user_id: userId, article_id: articleId }, { onConflict: "user_id,article_id", ignoreDuplicates: true });
+      if (error) throw new Error(error.message);
+    } else {
+      const { error } = await this.db
+        .from("magazine_likes")
+        .delete()
+        .eq("user_id", userId)
+        .eq("article_id", articleId);
+      if (error) throw new Error(error.message);
+    }
   }
   // ── Brand DNA + 콜라보 리포트 ──
   async getBrandDna(brandId: number): Promise<BrandDna | null> {

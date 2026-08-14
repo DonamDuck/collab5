@@ -148,3 +148,25 @@ export async function lookupBrandAction(
   const m = await repo.getMakerBySlug(slug.trim());
   return m ? { name: m.name, tagline: m.oneLiner ?? "" } : null;
 }
+
+/** 「잘 읽었어요 ❤️」 토글 — 로그인 필수. 찜(`setMakerSavedAction`)과 같은 계약이다.
+ *
+ *  ⭐돌려주는 값에 **최종 개수**를 실어 보낸다. 클라가 자기 숫자를 혼자 ±1 하면, 그 사이
+ *    다른 사람이 누른 하트가 반영되지 않아 화면 숫자가 조용히 진실과 어긋난다.
+ *    누른 사람은 즉시(낙관적) 보고, 서버 응답이 오면 그 숫자로 정정한다.
+ *  ⚠️표(`magazine_likes`)가 아직 없으면 여기서 에러가 난다 — 대표가 SQL을 돌리기 전까진
+ *    "잠시 후 다시" 문구가 뜨는 게 맞다(조용히 성공한 척하면 안 눌린 하트를 눌렸다고 말하게 된다). */
+export async function setArticleLikedAction(
+  articleId: number,
+  liked: boolean
+): Promise<{ error?: string; count?: number; liked?: boolean }> {
+  const { getSessionUserId } = await import("./profiles");
+  const userId = await getSessionUserId();
+  if (!userId) return { error: "로그인이 필요해요." };
+  try {
+    await repo.setArticleLiked(userId, articleId, liked);
+    return { count: await repo.countArticleLikes(articleId), liked };
+  } catch {
+    return { error: "잠시 후 다시 시도해주세요." };
+  }
+}
