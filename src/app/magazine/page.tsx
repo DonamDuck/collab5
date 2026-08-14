@@ -114,11 +114,20 @@ export default async function MagazinePage() {
         <h1 className="text-[32px] font-bold leading-none tracking-[-0.02em] text-ink sm:text-[38px]">
           collab5 매거진
         </h1>
-        <p className="mt-2.5 text-[11px] font-medium uppercase tracking-[0.28em] text-faint">
+        <p className="mt-[10px] text-[11px] font-medium uppercase tracking-[0.28em] text-faint">
           collab5 magazine
         </p>
-        <div className="mt-5 border-t border-hairline" />
-        <p className="mt-4 text-[15px] leading-relaxed break-keep text-mute">
+        {/* 마스트헤드 룰 — **2px `ink`**(대표 확정 08-14). 우리 시스템에서 선은 원래 옅은 회색
+            (`hairline`)이 전담하는데, **여기만 예외**다. 신문·잡지의 제호 아래 굵은 선은 장식이 아니라
+            "여기까지가 간판, 아래부터가 내용"을 선언하는 장치라, 굵기와 검기 자체가 의미를 갖는다.
+            ⛔이 예외를 다른 화면의 구분선으로 번지게 하지 말 것 — 거긴 `hairline`이 맞다.
+            ⚠️여백은 **선 위아래를 같게** 잡는다(실측으로 잡은 문제 — 위 21px·아래 17px이라
+              선이 아래로 치우쳐 설명문에 붙어 보였다). 모바일 20 / 데스크톱 24px.
+              데스크톱에서 넓히는 이유: 제호가 32→38px로 커지는데 여백이 그대로면 상대적으로 좁아진다.
+            ⚠️px로 명시한다 — Tailwind 간격 유틸도 rem이라 루트 17px에서 `mt-5`가 20px이 아니라
+              **21.25px**로 나온다(이 어긋남이 위 문제의 원인이었다). */}
+        <div className="mt-[20px] border-t-2 border-ink sm:mt-[24px]" />
+        <p className="mt-[20px] text-[15px] leading-relaxed break-keep text-mute sm:mt-[24px]">
           브랜드들이 만나 만드는 콜라보 이야기를 기록해요.
         </p>
       </header>
