@@ -115,7 +115,7 @@ export default async function Home() {
             리포트 실물을 본 직후라 "전체를 보고 싶다"가 자연히 생기는 자리다. 히어로에선 소개서
             등록과 나란히 서서 시선을 나눠 갖고 있었다.
             ⚠️둘은 **같은 시트**를 연다 — 옮긴 것이지 새로 만든 게 아니다. */}
-        <div className="mx-auto mt-7 flex max-w-[420px] flex-col items-stretch gap-2">
+        <div className="mx-auto mt-7 max-w-[420px]">
           <TrackLink
             href="/register"
             event="home_hero_register_click"
@@ -141,7 +141,12 @@ export default async function Home() {
         // ⭐밴드(회색 면) 제거 — 08-14 대표 확정. 순백 페이지 한가운데에 회색 섹션 하나만 있으면
         //   "왜 여기만?"으로 읽힌다(redesign-skill: 라이트 페이지의 이질적 섹션 = 복붙 사고처럼 보임).
         //   섹션 구분은 제목과 여백이 맡는다. 풀블리드 box-shadow/clip-path 기법도 같이 걷어냈다.
-        <section className="home-rise mt-14 -mx-4 px-4 py-4 sm:-mx-6 sm:px-6">
+        // 📏간격 `mt-12`(51px) — 밴드를 걷어낼 때 `mt-14`(59.5px)로 잡았다가 08-14에 내렸다.
+        //   히어로 CTA가 둘 → 하나로 줄면서 CTA 덩어리 높이가 104 → 48px로 반토막 났는데
+        //   아래 여백만 그대로라 **버튼이 어디에도 안 붙은 것처럼** 보였다(대표 지적).
+        //   ⚠️51px은 임의값이 아니라 **다른 섹션 간격과 같은 값**이다(실측: 43·51·51·51).
+        //     히어로 다음만 60px으로 혼자 넓었던 것 — 리듬을 맞추면 그 어색함이 사라진다.
+        <section className="home-rise mt-12 -mx-4 px-4 py-4 sm:-mx-6 sm:px-6">
           <h2 className="text-balance break-keep text-center text-[24px] font-bold leading-[1.35] tracking-[-0.02em] text-ink sm:text-[28px]">
             지금, 콜라보 가능한 브랜드예요.
           </h2>
