@@ -65,7 +65,8 @@ export default async function Home() {
     //    🔬heytaby 실측(08-14): 지면 `#F5F5F5` + 알약 `흰색 75% + blur(40px)`, **테두리도 그림자도 없음**.
     //      즉 그쪽은 밝기 차이 하나로만 띄운다. 우리와 정확히 반대(우리는 흰 지면에 흰 알약)였다.
     //    ⚠️taby와 같은 `#f5f5f6`(=surface-soft)까지 내리는 안은 **기각**했다 — 홈의 `bg-surface-soft`
-    //      요소들(「잘 맞는 콜라보」 배지·여정 스트립·섹션 ③ 탭바)이 지면에 녹아 사라진다(실측 확인).
+    //      요소들(여정 스트립·섹션 ③ 탭바)이 지면에 녹아 사라진다(실측 확인).
+    //      ※「잘 맞는 콜라보」 배지도 예시였으나 08-14 대표 지시로 제거됐다.
     //      2%만 내린 `surface-faint`는 알약을 띄우면서 그것들을 살려둔다.
     //    ⚠️전 페이지가 아니라 **홈만**이다. `--canvas`를 바꾸면 전 페이지의 surface-soft 칩이 다 죽는다.
     <div className="bg-surface-faint">
@@ -83,10 +84,6 @@ export default async function Home() {
       `}</style>
       {/* Hero — 온로드 라이즈 1번(순차의 첫 블록) */}
       <section className="home-rise mx-auto max-w-[600px] text-center">
-        <div className="mb-4 inline-flex items-center gap-1.5 rounded-pill bg-surface-soft px-3 py-1">
-          <span className="h-2 w-2 rounded-pill bg-primary" />
-          <span className="text-[12px] font-medium text-mute">잘 맞는 콜라보</span>
-        </div>
         {/* 타이포 스케일 — 계단뿌셔클럽 fresh-load 실측 기준(대표 QA 07-31).
             ⚠️ Framer 사이트는 브레이크포인트 변형을 **로드 시점에** 확정한다. 창만 리사이즈하면
                이전 변형이 남은 채 줌으로 우겨넣어져 DevTools에 엉뚱한 px가 찍힌다 — 반드시 새로고침 후 측정.

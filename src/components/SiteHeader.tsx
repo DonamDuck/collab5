@@ -47,7 +47,7 @@ export async function SiteHeader() {
         ) : (
           <Link
             href="/login"
-            className="ml-0.5 shrink-0 whitespace-nowrap rounded-md px-3 py-1.5 font-medium text-mute hover:text-ink"
+            className="ml-0.5 flex h-[44px] shrink-0 items-center whitespace-nowrap rounded-md px-3 font-medium text-mute hover:text-ink"
           >
             로그인
           </Link>

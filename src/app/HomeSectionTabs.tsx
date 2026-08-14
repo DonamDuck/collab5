@@ -33,6 +33,10 @@ const TABS = [
   { id: "home-collab-report", label: "콜라보 아이디어 찾기" },
 ] as const;
 
+// 📏 탭 높이 **h-[44px]** — 터치 타깃 권장치.
+//    🪤`h-9`은 36이 아니라 **38.25px**다(루트 17px이라 rem 유틸이 6.25% 크다).
+//      권장 44에 5.75px 모자랐고, 바로 위 HomeMenuBar가 44px이라 나란히 놓이면 불일치가 보였다.
+//      같은 성격의 탭이 다른 높이를 갖지 않게 px로 박는다.
 export function HomeSectionTabs() {
   // 기본값 = 첫 번째. 섹션에 아직 닿지 않았을 때(두 제목 모두 판정선 아래)도 이게 맞는 답이다.
   const [active, setActive] = useState(0);
@@ -112,7 +116,7 @@ export function HomeSectionTabs() {
             //    목차가 CTA와 같은 무게로 보이면 "눌러야 할 것"이 둘이 된다. tint(#d6ffc0)는 한 단 아래다.
             // ⚠️ 비활성에도 `border`를 **투명으로** 둔다 — 활성에만 보더를 주면 전환 때 알약 폭이
             //    2px 뛰어 탭이 덜컹거린다.
-            className={`flex h-9 shrink-0 items-center whitespace-nowrap rounded-pill border px-3.5 text-[13px] transition-colors sm:px-5 sm:text-[14px] ${
+            className={`flex h-[44px] shrink-0 items-center whitespace-nowrap rounded-pill border px-3.5 text-[13px] transition-colors sm:px-5 sm:text-[14px] ${
               active === i
                 ? "border-primary bg-primary-tint font-bold text-primary-on"
                 : "border-transparent font-medium text-mute"
