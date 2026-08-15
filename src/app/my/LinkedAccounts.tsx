@@ -31,6 +31,26 @@ type Provider = "kakao" | "google";
 
 const LABEL: Record<Provider, string> = { kakao: "카카오", google: "구글" };
 
+/**
+ * 🚨**실패 이유를 삼키지 않는다**(08-15에 당했다 — "잠시 후 다시 시도해주세요"만 띄웠더니
+ * 연결도 해제도 안 되는데 **왜인지 아무 데도 안 남아** 네트워크를 뒤져야 했다).
+ * 서버 원문을 괄호로 덧붙이고 콘솔에도 남긴다. 화면 문구는 사람 말로, 원인은 그 옆에.
+ *
+ * ⭐가장 흔한 원인은 **Supabase의 manual linking이 꺼져 있는 것**이라 그건 우리 말로 번역해준다.
+ *   (읽기(getUserIdentities)는 되는데 연결·해제만 막히면 십중팔구 이것이다.)
+ */
+function reason(e: unknown): string {
+  const msg = e instanceof Error ? e.message : typeof e === "string" ? e : JSON.stringify(e);
+  console.error("[LinkedAccounts]", e);
+  if (/manual linking|not enabled|disabled/i.test(msg)) {
+    return "(Supabase에서 계정 연결(manual linking)이 꺼져 있어요 — 관리자 설정이 필요합니다)";
+  }
+  if (/already|exists|linked/i.test(msg)) {
+    return "(이미 다른 계정에 연결된 로그인이에요. 그 계정을 정리한 뒤 다시 시도해주세요)";
+  }
+  return msg ? `(${msg})` : "잠시 후 다시 시도해주세요.";
+}
+
 export function LinkedAccounts() {
   const [identities, setIdentities] = useState<UserIdentity[] | null>(null);
   const [busy, setBusy] = useState<Provider | null>(null);
@@ -71,13 +91,11 @@ export function LinkedAccounts() {
       });
       // 성공하면 브라우저가 떠나므로 아래는 실행되지 않는다.
       if (error) {
-        setErr(
-          `${LABEL[p]} 연결을 시작하지 못했어요. 잠시 후 다시 시도해주세요. (계속 안 되면 관리자에게 알려주세요)`
-        );
+        setErr(`${LABEL[p]} 연결을 시작하지 못했어요. ${reason(error)}`);
         setBusy(null);
       }
-    } catch {
-      setErr(`${LABEL[p]} 연결을 시작하지 못했어요. 잠시 후 다시 시도해주세요.`);
+    } catch (e) {
+      setErr(`${LABEL[p]} 연결을 시작하지 못했어요. ${reason(e)}`);
       setBusy(null);
     }
   };
@@ -98,8 +116,8 @@ export function LinkedAccounts() {
       const { error } = await supabase.auth.unlinkIdentity(target);
       if (error) throw error;
       await load(); // 서버 상태를 다시 읽는다 — 화면에서만 지우면 실제와 어긋난다
-    } catch {
-      setErr(`${LABEL[p]} 연결을 해제하지 못했어요. 잠시 후 다시 시도해주세요.`);
+    } catch (e) {
+      setErr(`${LABEL[p]} 연결을 해제하지 못했어요. ${reason(e)}`);
     } finally {
       setBusy(null);
     }
