@@ -262,18 +262,13 @@ export default async function CardPage({
           <RsvpBar cardId={card.id} />
         </div>
 
-        {/* 8. 푸터 — 아톰 마크(mono, currentColor=다크대응) + 카피 */}
+        {/* 8. 푸터 — 아톰 마크 + 카피. 08-16 대표 지정 로고로 교체.
+            ⚠️전엔 `currentColor` 모노(가운데 점도 회색)였는데 PNG라 색을 못 바꾼다 —
+              가운데 점이 브랜드 초록으로 나온다. 12px 글자 옆 13px짜리라 티는 거의 안 난다.
+            🚨`h-4 w-4`(정사각) 였다 → 비율 1.28이라 눌린다. 높이로만 잡고 `shrink-0`. */}
         <div className="mt-5 flex items-center justify-center gap-1.5 text-faint">
-          <svg viewBox="0 0 56 56" className="h-4 w-4" aria-hidden="true" fill="none">
-            <g stroke="currentColor" strokeWidth="2">
-              <ellipse cx="28" cy="28" rx="20" ry="7" transform="rotate(30 28 28)" />
-              <ellipse cx="28" cy="28" rx="20" ry="7" transform="rotate(-30 28 28)" />
-            </g>
-            <circle cx="45.32" cy="38" r="2.8" fill="currentColor" />
-            <circle cx="10.68" cy="18" r="2.8" fill="currentColor" />
-            <circle cx="45.32" cy="18" r="2.8" fill="currentColor" />
-            <circle cx="28" cy="28" r="7" fill="currentColor" />
-          </svg>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo-mark.png" alt="" aria-hidden="true" className="h-[13px] w-auto shrink-0 opacity-55" />
           <span className="text-[12px]">collab5로 만든 카드 · 답장은 편하실 때</span>
         </div>
       </article>

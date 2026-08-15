@@ -35,8 +35,10 @@ function BrandCell({ m }: { m: Maker }) {
           <img src={m.photos[0]} alt="" loading="lazy" className="h-full w-full object-cover" />
         ) : (
           <div className="flex h-full w-full items-center justify-center bg-primary-pale">
+            {/* 🚨정사각(`w-9`) 금지 — 08-16 새 마크는 1.28 비율이라 찌그러진다.
+                여긴 92px 정사각 썸네일이라 높이로만 잡는다(30 → 폭 38.5). */}
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo-mark.svg" alt="collab5" className="h-9 w-9 opacity-70" />
+            <img src="/logo-mark.png" alt="collab5" className="h-[30px] w-auto opacity-70" />
           </div>
         )}
       </div>

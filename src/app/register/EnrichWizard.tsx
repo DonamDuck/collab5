@@ -1544,16 +1544,11 @@ function LoadingView({ name, generating }: { name: string; generating?: boolean 
   }, [msgs.length]);
   return (
     <div className="flex flex-col items-center py-6 text-center" role="status" aria-live="polite">
-      <svg viewBox="0 0 56 56" className="h-11 w-11 text-ink" fill="none" aria-hidden="true">
-        <g stroke="currentColor" strokeWidth="2">
-          <ellipse cx="28" cy="28" rx="20" ry="7" transform="rotate(30 28 28)" />
-          <ellipse cx="28" cy="28" rx="20" ry="7" transform="rotate(-30 28 28)" />
-        </g>
-        <circle cx="45.32" cy="38" r="2.8" fill="currentColor" />
-        <circle cx="10.68" cy="18" r="2.8" fill="currentColor" />
-        <circle cx="45.32" cy="18" r="2.8" fill="currentColor" />
-        <circle cx="28" cy="28" r="7" fill="var(--primary)" stroke="currentColor" strokeWidth="2" />
-      </svg>
+      {/* 08-16 대표 지정 로고 마크로 교체. 여긴 대기 화면의 주인공이라 **진하게**(불투명도 없음),
+          빈 상태 글리프(34px·40%)보다 한 단 크게 40px. 파일은 같은 걸 본다.
+          🚨예전 `h-11 w-11`은 정사각이었다. 새 마크는 비율 1.28이라 그대로 두면 가로로 눌린다. */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src="/logo-mark.png" alt="" aria-hidden="true" className="h-[40px] w-auto" />
       <p className="mt-5 text-[18px] font-bold text-ink">
         {generating
           ? "소개를 만드는 중이에요"

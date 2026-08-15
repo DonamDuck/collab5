@@ -20,12 +20,12 @@ export function SiteFooter() {
               📏 헤더와 짝을 맞춘다: 모바일 20으로 **같게**, 데스크톱은 24로 헤더(28)보다 한 단 아래.
                  풋터 로고는 간판이 아니라 서명이라 위아래가 뒤집히면 안 된다 — 처음에 22로 뒀다가
                  모바일에서 헤더(20)보다 커져서 되돌렸다.
-              ⚠️08-16에 로고 viewBox를 잉크에 맞게 조여서, 같은 `h-6`이라도 이제 잉크가 24.6px다
-                (전엔 13.6px). 헷갈리지 않게 rem 유틸을 버리고 px로 박았다.
+              📏 헤더와 짝: 모바일 20으로 **같게**, 데스크톱은 22로 헤더(24)보다 한 단 아래.
+                 풋터 로고는 간판이 아니라 서명이라 헤더보다 커지면 안 된다.
               🪤20 + py 24 = 44. `py-[10px]`면 40이라 터치 권장치에 모자란다. */}
           <Link href="/" className="inline-flex items-center py-[12px]">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo-lockup.svg" alt="collab5" className="h-[20px] w-auto sm:h-[24px]" />
+            <img src="/logo-lockup.png" alt="collab5" className="h-[20px] w-auto sm:h-[22px]" />
           </Link>
           {/* 📏 링크마다 `py-[12px]` — **글자 크기는 그대로 두고 터치 영역만** 21px → 44px로 넓힌다.
               텍스트 링크는 줄간격이 곧 높이라 21px밖에 안 됐다(권장치의 절반 미만).
