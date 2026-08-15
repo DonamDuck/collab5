@@ -138,13 +138,17 @@ export function LinkedAccounts() {
         </div>
       ) : (
         <ul className="mt-4 space-y-2">
-          {/* 이메일은 연결/해제 대상이 아니다 — 가입 수단이자 계정의 뿌리라 상태만 보여준다 */}
-          {emailIdentity && (
-            <li className="flex items-center justify-between rounded-md border border-hairline bg-surface px-4 py-3">
-              <span className="text-[15px] text-body">이메일</span>
-              <span className="text-[13px] text-mute">연결됨</span>
-            </li>
-          )}
+          {/* 이메일은 여기서 연결/해제하지 않는다(비밀번호는 아래 버튼에서 건다) — 상태만 보여준다.
+              🚨**행 자체는 항상 세운다.** 예전엔 `email` identity가 있을 때만 그렸는데,
+                 소셜로만 가입한 계정은 그게 없어서 **목록에서 통째로 사라졌다**(08-15 카카오 실측).
+                 그러면 "내 이메일 로그인은 어디 갔지"가 되고, 무엇보다 **로그인 문이 하나뿐이라는
+                 사실이 화면에 안 드러난다.** 없으면 없다고 말해주는 게 맞다. */}
+          <li className="flex items-center justify-between rounded-md border border-hairline bg-surface px-4 py-3">
+            <span className="text-[15px] text-body">이메일</span>
+            <span className="text-[13px] text-mute">
+              {emailIdentity ? "연결됨" : "비밀번호 미설정"}
+            </span>
+          </li>
           {available.map((p) => {
             const linked = linkedOf(p);
             return (
