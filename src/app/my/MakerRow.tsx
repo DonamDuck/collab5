@@ -15,11 +15,13 @@ export function MakerRow({
   name,
   oneLiner,
   searchVisible,
+  collabPaused,
 }: {
   slug: string;
   name: string;
   oneLiner?: string;
   searchVisible: boolean;
+  collabPaused: boolean;
 }) {
   const router = useRouter();
   const [confirming, setConfirming] = useState(false);
@@ -82,14 +84,24 @@ export function MakerRow({
         </div>
       </div>
 
-      {/* 토글 행 — 클릭 즉시 저장(낙관적). 한 토글이 '목록 노출 = 콜라보 수신' 두 뜻을 지므로 설명을 붙인다.
+      {/* 토글 행 — 클릭 즉시 저장(낙관적).
           🆕이름이 「검색에 보이기」였는데 **웹 검색으로 오해됐다**(08-07 대표). 이 토글이 정하는 건
-          사이트 안의 [콜라보 찾기] 목록뿐이고, 구글·네이버엔 토글과 무관하게 다 나온다. */}
-      <div className="border-t border-hairline px-4 py-2.5">
-        <FlagToggle slug={slug} label="콜라보 찾기에 보이기" field="searchVisible" initial={searchVisible} />
-        <p className="mt-1 text-[13px] leading-relaxed break-keep text-faint">
-          켜두면 다른 브랜드가 [콜라보 찾기]에서 나를 발견해 콜라보를 제안할 수 있어요. 꺼두면 목록에 안 뜨고, 링크로는 계속 공유할 수 있어요.
-        </p>
+          사이트 안의 [콜라보 찾기] 목록뿐이고, 구글·네이버엔 토글과 무관하게 다 나온다.
+          🆕08-12에 「요청 잠시 안받기」가 합류 — **두 토글은 서로 다른 축**이다(목록에 뜨나 / 제안을 받나).
+             예전엔 앞 토글 하나가 둘을 겸했는데, 08-07에 앞 토글 뜻이 목록으로 좁아지며 뒤가 갈 곳을 잃었다. */}
+      <div className="space-y-2.5 border-t border-hairline px-4 py-2.5">
+        <div>
+          <FlagToggle slug={slug} label="콜라보 찾기에 보이기" field="searchVisible" initial={searchVisible} />
+          <p className="mt-1 text-[13px] leading-relaxed break-keep text-faint">
+            켜두면 다른 브랜드가 [콜라보 찾기]에서 나를 발견해 콜라보를 제안할 수 있어요. 꺼두면 목록에 안 뜨고, 링크로는 계속 공유할 수 있어요.
+          </p>
+        </div>
+        <div>
+          <FlagToggle slug={slug} label="콜라보 요청 잠시 안받기" field="collabPaused" initial={collabPaused} />
+          <p className="mt-1 text-[13px] leading-relaxed break-keep text-faint">
+            켜두면 소개서에 [잠시 콜라보를 쉬고 있어요]가 뜨고 제안 버튼이 잠겨요. 찜과 콜라보 추천은 그대로 받아요.
+          </p>
+        </div>
       </div>
 
       {confirming && (
@@ -136,7 +148,7 @@ function FlagToggle({
 }: {
   slug: string;
   label: string;
-  field: "searchVisible";
+  field: "searchVisible" | "collabPaused";
   initial: boolean;
 }) {
   const [on, setOn] = useState(initial);

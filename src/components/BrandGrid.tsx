@@ -26,7 +26,7 @@ function BrandCell({ m }: { m: Maker }) {
     <Link
       href={`/m/${m.slug}`}
       onClick={() => track("home_grid_brand_click", { slug: m.slug })}
-      className="flex gap-3.5 rounded-lg border border-hairline bg-surface p-3 transition-colors hover:bg-surface-soft"
+      className="flex gap-3.5 rounded-lg border-[0.5px] border-[#DFDFE3] bg-surface p-3 transition-colors hover:bg-surface-soft"
     >
       {/* 썸네일 정방형 — 가로 카드라 3:2 대신 1:1이 정보 영역을 안 잡아먹는다 */}
       <div className="h-[92px] w-[92px] shrink-0 overflow-hidden rounded-md bg-surface-soft">
@@ -70,7 +70,7 @@ function MoreCell() {
     <Link
       href="/search"
       onClick={() => track("home_grid_more_click")}
-      className="flex min-h-[118px] items-center justify-center gap-3 rounded-lg border border-hairline bg-surface px-4 transition-colors hover:bg-primary-pale"
+      className="flex min-h-[118px] items-center justify-center gap-3 rounded-lg border-[0.5px] border-[#DFDFE3] bg-surface px-4 transition-colors hover:bg-primary-pale"
     >
       <span className="flex h-10 w-10 items-center justify-center rounded-pill bg-surface-soft text-primary-on">
         <svg viewBox="0 0 20 20" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8">

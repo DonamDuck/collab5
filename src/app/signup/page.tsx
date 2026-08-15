@@ -107,7 +107,7 @@ export default function SignupPage() {
 
   return (
     <main className="mx-auto w-full max-w-[400px] px-4 py-14 sm:px-6">
-      <h1 className="text-2xl font-bold tracking-tight text-ink">회원가입</h1>
+      <h1 className="text-[24px] font-bold leading-[1.25] tracking-[-0.025em] text-ink">회원가입</h1>
       <p className="mt-2 text-[15px] text-mute">브랜드 계정을 만들고 소개서를 관리해보세요.</p>
 
       {/* ⭐<form> — Enter 제출 + 비밀번호 매니저가 '가입 폼'으로 인식(new-password면 '강력한 비번 제안'이 뜬다).
@@ -127,10 +127,10 @@ export default function SignupPage() {
             autoComplete="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            placeholder="you@brand.com"
+            placeholder="user@email.com"
             className={authInputCls}
           />
-          {dup.email && <p className="mt-1.5 text-sm text-red-600">{DUP_MSG.email}</p>}
+          {dup.email && <p className="mt-1.5 text-[14px] text-red-600">{DUP_MSG.email}</p>}
         </Field>
         <Field label="비밀번호" htmlFor="signup-password">
           <PasswordInput
@@ -168,7 +168,7 @@ export default function SignupPage() {
             maxLength={13}
             className={authInputCls}
           />
-          {dup.phone && <p className="mt-1.5 text-sm text-red-600">{DUP_MSG.phone}</p>}
+          {dup.phone && <p className="mt-1.5 text-[14px] text-red-600">{DUP_MSG.phone}</p>}
         </Field>
         <Field label="브랜드명" htmlFor="signup-brand">
           <input
@@ -180,12 +180,12 @@ export default function SignupPage() {
             placeholder="예: 캔버스가든"
             className={authInputCls}
           />
-          {dup.brandName && <p className="mt-1.5 text-sm text-red-600">{DUP_MSG.brandName}</p>}
+          {dup.brandName && <p className="mt-1.5 text-[14px] text-red-600">{DUP_MSG.brandName}</p>}
         </Field>
         <Field label="로고 또는 브랜드 사진" optional>
           <div className="flex items-center gap-3">
             <Avatar image={image || undefined} name={brandName || "?"} size={48} />
-            <label className="inline-flex h-9 cursor-pointer items-center rounded-md border border-border-strong bg-surface px-3 text-sm font-medium text-ink">
+            <label className="inline-flex h-9 cursor-pointer items-center rounded-md border border-border-strong bg-surface px-3 text-[14px] font-medium text-ink">
               {imgUploading ? "업로드 중…" : "이미지 선택"}
               <input
                 type="file"
@@ -198,7 +198,7 @@ export default function SignupPage() {
               <button
                 type="button"
                 onClick={() => setImage("")}
-                className="text-sm text-faint hover:text-ink"
+                className="text-[14px] text-faint hover:text-ink"
               >
                 지우기
               </button>
@@ -206,7 +206,7 @@ export default function SignupPage() {
           </div>
         </Field>
         <div className="flex items-center justify-between gap-2">
-          <label className="flex cursor-pointer items-start gap-2 text-sm text-body">
+          <label className="flex cursor-pointer items-start gap-2 text-[14px] text-body">
             <input
               type="checkbox"
               checked={agree}
@@ -229,20 +229,20 @@ export default function SignupPage() {
         </div>
       </div>
 
-      {err && <p className="mt-3 text-sm text-red-600">{err}</p>}
+      {err && <p className="mt-3 text-[14px] text-red-600">{err}</p>}
       <button
         type="submit"
         // disabled는 pending/업로드 계열만 — 중복(hasDup)으로 막으면 안내가 화면 위쪽이라
         // 스크롤을 내린 상태에선 "왜 안 눌리지"만 남는다. 제출 앞단에서 잡아 말해준다(QA #17).
         disabled={pending || imgUploading}
-        className="mt-5 h-12 w-full rounded-md bg-primary text-base font-medium text-primary-on disabled:opacity-50"
+        className="mt-5 h-12 w-full rounded-md bg-primary text-[16px] font-medium text-primary-on disabled:opacity-50"
       >
         {pending ? "가입 중…" : "가입하기"}
       </button>
       </form>
       {/* 플래그 off면 아무것도 안 그린다(기본 off 배포). <form> 밖이라 제출과 섞이지 않는다 */}
       <GoogleButton className="mt-2" />
-      <p className="mt-4 text-center text-sm text-mute">
+      <p className="mt-4 text-center text-[14px] text-mute">
         이미 계정이 있나요?{" "}
         <Link href="/login" className="font-medium text-primary-on underline-offset-2 hover:underline">
           로그인

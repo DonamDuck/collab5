@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 export default function PrivacyPage() {
   return (
     <main className="mx-auto max-w-[760px] px-5 py-12 sm:px-6 sm:py-16">
-      <h1 className="text-2xl font-bold tracking-tight text-ink sm:text-[28px]">개인정보처리방침</h1>
+      <h1 className="text-[24px] font-bold tracking-tight text-ink sm:text-[26px] leading-[1.25] tracking-[-0.025em]">개인정보처리방침</h1>
       <p className="mt-3 text-[15px] leading-relaxed text-mute">
         collab5(이하 &lsquo;회사&rsquo;)는 이용자의 개인정보를 소중히 여기며, 「개인정보 보호법」 등 관련 법령을 준수합니다. 본
         방침은 회사가 제공하는 서비스에서 개인정보를 어떻게 수집·이용·보관·파기하는지 안내합니다.

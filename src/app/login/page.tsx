@@ -57,10 +57,10 @@ function LoginForm() {
 
   return (
     <main className="mx-auto w-full max-w-[400px] px-4 py-14 sm:px-6">
-      <h1 className="text-2xl font-bold tracking-tight text-ink">로그인</h1>
+      <h1 className="text-[24px] font-bold leading-[1.25] tracking-[-0.025em] text-ink">로그인</h1>
       <p className="mt-2 text-[15px] text-mute">브랜드를 소개하고 새로운 콜라보를 시작해보세요.</p>
       {!authEnvReady && (
-        <p className="mt-4 rounded-md bg-surface-soft px-3 py-2.5 text-sm text-mute">
+        <p className="mt-4 rounded-md bg-surface-soft px-3 py-2.5 text-[14px] text-mute">
           로그인 설정이 아직 준비되지 않았어요. (로컬 환경)
         </p>
       )}
@@ -84,7 +84,7 @@ function LoginForm() {
               autoComplete="username"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@brand.com"
+              placeholder="user@email.com"
               className={authInputCls}
             />
           </Field>
@@ -100,11 +100,11 @@ function LoginForm() {
             />
           </Field>
         </div>
-        {err && <p className="mt-2 text-sm text-red-600">{err}</p>}
+        {err && <p className="mt-2 text-[14px] text-red-600">{err}</p>}
         <button
           type="submit"
           disabled={pending}
-          className="mt-4 h-12 w-full rounded-md bg-primary text-base font-medium text-primary-on disabled:opacity-50"
+          className="mt-4 h-12 w-full rounded-md bg-primary text-[16px] font-medium text-primary-on disabled:opacity-50"
         >
           {pending ? "로그인 중…" : "로그인"}
         </button>
@@ -113,14 +113,14 @@ function LoginForm() {
         <button
           type="button"
           onClick={kakao}
-          className="mt-2 h-12 w-full rounded-md bg-[#FEE500] text-base font-medium text-[#191919]"
+          className="mt-2 h-12 w-full rounded-md bg-[#FEE500] text-[16px] font-medium text-[#191919]"
         >
           카카오로 시작하기
         </button>
       )}
       {/* 플래그 off면 아무것도 안 그린다(기본 off 배포) — GoogleButton 내부에서 판정 */}
       <GoogleButton className="mt-2" />
-      <div className="mt-5 flex items-center justify-center gap-3 text-sm">
+      <div className="mt-5 flex items-center justify-center gap-3 text-[14px]">
         <Link href="/signup" className="font-medium text-primary-on underline-offset-2 hover:underline">
           회원가입
         </Link>
@@ -135,12 +135,12 @@ function LoginForm() {
       {welcome && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 p-4 sm:items-center">
           <div className="w-full max-w-sm rounded-lg border border-hairline bg-surface p-6 text-center shadow-e2">
-            <p className="text-lg font-bold text-ink">🎉 가입이 완료됐어요!</p>
+            <p className="text-[18px] font-bold text-ink">🎉 가입이 완료됐어요!</p>
             <p className="mt-2 text-[15px] text-body">이제 로그인하고 Collab5를 시작해보세요.</p>
             <button
               type="button"
               onClick={() => setWelcome(false)}
-              className="mt-5 h-12 w-full rounded-md bg-primary text-base font-medium text-primary-on"
+              className="mt-5 h-12 w-full rounded-md bg-primary text-[16px] font-medium text-primary-on"
             >
               로그인하기
             </button>

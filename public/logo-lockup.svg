@@ -7,5 +7,9 @@
   <circle cx="10.68" cy="18" r="2.8" fill="#111111"/>
   <circle cx="45.32" cy="18" r="2.8" fill="#111111"/>
   <circle cx="28" cy="28" r="7" fill="#98FF5C" stroke="#111111" stroke-width="2.5"/>
-  <text x="72" y="38" font-family="Pretendard, -apple-system, system-ui, sans-serif" font-weight="700" font-size="34" letter-spacing="-1" fill="#111111">collab5</text>
+  <!-- 워드마크 — 심볼 대비 작아 보인다는 대표 지적(08-14)으로 34→40.
+       ⚠️viewBox 폭(232)은 그대로 둔다. SVG 루트는 기본이 overflow:hidden이라 viewBox를 넘긴
+         글자는 잘린다 — 폰트 폴백(Pretendard 없는 기기)에서 더 넓게 잡힐 여지를 남겨둔 것.
+         viewBox를 안 건드렸으므로 헤더에서 차지하는 실제 폭(h-6 기준 99px)도 그대로다. -->
+  <text x="72" y="39.5" font-family="Pretendard, -apple-system, system-ui, sans-serif" font-weight="700" font-size="40" letter-spacing="-1.2" fill="#111111">collab5</text>
 </svg>

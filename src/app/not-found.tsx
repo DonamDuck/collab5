@@ -16,13 +16,13 @@ export default function NotFound() {
       <div className="mt-7 flex w-full max-w-[280px] flex-col gap-2">
         <Link
           href="/search"
-          className="flex h-12 w-full items-center justify-center rounded-md bg-primary text-base font-medium text-primary-on"
+          className="flex h-12 w-full items-center justify-center rounded-md bg-primary text-[16px] font-medium text-primary-on"
         >
           브랜드 찾아보기
         </Link>
         <Link
           href="/"
-          className="flex h-12 w-full items-center justify-center rounded-md border border-border-strong bg-surface text-base font-medium text-ink"
+          className="flex h-12 w-full items-center justify-center rounded-md border border-border-strong bg-surface text-[16px] font-medium text-ink"
         >
           홈으로
         </Link>

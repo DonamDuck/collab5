@@ -67,7 +67,7 @@ export default function ResetPasswordPage() {
                 autoComplete="username"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@brand.com"
+                placeholder="user@email.com"
                 className={authInputCls}
               />
             </Field>

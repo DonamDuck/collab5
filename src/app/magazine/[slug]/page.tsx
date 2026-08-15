@@ -4,7 +4,9 @@ import { notFound } from "next/navigation";
 import { repo } from "@/lib/repo";
 import { kstDateLabel } from "@/lib/magazine-format";
 import { isMagazineEditor } from "@/lib/magazine-auth";
+import { getSessionUserId } from "@/lib/profiles";
 import { ArticleBody, BrandLinkCards } from "./ArticleBody";
+import { ArticleLikeBar } from "./ArticleLikeBar";
 
 // 매거진 상세 (2026-08-10)
 // ⭐기본은 **발행분만**이고, 편집자에게만 초안을 여는 예외를 뚫었다(PR2).
@@ -50,8 +52,16 @@ export default async function MagazineArticlePage({
   if (!a && editor) a = await repo.getArticleForEditor(slug); // 편집자만 초안 열람
   if (!a) notFound();
 
+  // 하트 — 이 페이지는 `force-dynamic`이라 서버에서 바로 읽어 첫 화면부터 정확한 값이 뜬다
+  // (홈처럼 캐시되는 화면이었다면 클라에서 따로 물어야 했다).
+  // 🔻08-15 개수 조회(`countArticleLikes`)는 뺐다 — 화면에 숫자를 안 쓰기로 했는데(대표 지시)
+  //   글 열 때마다 세는 건 낭비다. 되살릴 땐 이 자리에 한 줄 되돌리면 된다(repo 함수는 그대로 있다).
+  const viewerId = await getSessionUserId();
+  const likedByMe = viewerId ? await repo.isArticleLiked(viewerId, a.id) : false;
+
   return (
-    <main className="mx-auto w-full max-w-[680px] px-4 py-10 sm:px-6">
+    // ⚠️`pb-28` — 하트 버튼이 `fixed`라 본문 맨 끝을 덮는다. 그만큼 아래를 비워 둔다.
+    <main className="mx-auto w-full max-w-[680px] px-4 pt-10 pb-28 sm:px-6">
       {editor && (
         <div className="mb-6 flex items-center justify-between gap-3 rounded-md border border-hairline bg-surface-soft px-4 py-2.5">
           <span className="text-[13px] text-mute">
@@ -80,10 +90,20 @@ export default async function MagazineArticlePage({
           </p>
         </header>
 
+        {/* 커버 — ⭐**본문에선 자르지 않는다**(대표 확정 08-13). 목록 카드는 16:9로 잘라 얼굴을
+             통일하지만, 글을 열면 사장님이 고른 사진이 통째로 보여야 한다.
+             ⚠️대신 **높이에 상한**을 둔다. 안 그러면 세로로 긴 사진(인스타 4:5 등)이 글 폭을 꽉 채워
+             화면 하나를 통째로 잡아먹는다 — 1080×1350 커버가 680px 폭에서 850px로 나왔다(대표 제보).
+             `max-h`+`w-auto`라 **잘리는 게 아니라 통째로 작아진다.** 가로형(3:2)은 680px 폭에서
+             453px이라 상한에 안 걸려 지금과 똑같이 나오고, 폰에서도 폭이 좁아 걸리지 않는다. */}
         {a.coverImage && (
-          <div className="mt-6 overflow-hidden rounded-lg bg-surface-soft">
+          <div className="mt-6 flex justify-center">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={a.coverImage} alt="" className="w-full" />
+            <img
+              src={a.coverImage}
+              alt=""
+              className="max-h-[500px] w-auto max-w-full rounded-lg bg-surface-soft"
+            />
           </div>
         )}
 
@@ -134,6 +154,18 @@ export default async function MagazineArticlePage({
           </p>
         </section>
       </article>
+
+      {/* 「잘 읽었어요 ❤️」 — 읽는 내내 화면 아래에 떠 있다.
+          ⚠️초안(draft)에는 안 띄운다 — 아직 아무도 읽을 수 없는 글의 하트는 뜻이 없고,
+            편집자가 자기 글에 하트를 눌러 수를 부풀리는 첫 단추가 된다. */}
+      {a.status === "published" && (
+        <ArticleLikeBar
+          articleId={a.id}
+          slug={a.slug}
+          initialLiked={likedByMe}
+          loggedIn={!!viewerId}
+        />
+      )}
     </main>
   );
 }

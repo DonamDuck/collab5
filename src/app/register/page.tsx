@@ -188,7 +188,8 @@ function RegisterForm() {
   const [targetAudience, setTargetAudience] = useState<string[]>([]);
   const [customAudience, setCustomAudience] = useState("");
   const [collabHistory, setCollabHistory] = useState<HistItem[]>([emptyHist()]);
-  const [searchVisible, setSearchVisible] = useState(true); // 검색 노출(기본 on)
+  const [searchVisible, setSearchVisible] = useState(true); // [콜라보 찾기에 보이기](기본 on)
+  const [collabPaused, setCollabPaused] = useState(false); // [콜라보 요청 잠시 안받기](기본 off — 아무도 갑자기 잠기지 않게)
   const [instagram, setInstagram] = useState("");
   const [homepage, setHomepage] = useState("");
   const [mapUrl, setMapUrl] = useState("");
@@ -850,7 +851,8 @@ function RegisterForm() {
         // 구 seeks 칩 은퇴(통합) — 유형은 통합 칩(offers)에 합집합으로 흡수
         if (types.length) setOffers((p) => [...new Set([...p, ...types])] as CollabType[]);
         if (!seeksNote.trim() && fill.seeksHint.note.trim()) setSeeksNote(fill.seeksHint.note);
-        openSection("seeks");
+        // ⚠️`openSection("seeks")`는 08-12부터 무의미 — 그 섹션은 접히지 않는 상시 노출로 승격됐다.
+        //   (`filled`는 살려둔다 — ✨배지가 "AI가 채운 칸"임을 알리는 데 여전히 쓰인다.)
         filled.add("seeks");
       }
       (fill.blockHints ?? [])
@@ -1010,7 +1012,7 @@ function RegisterForm() {
     ps.filter((x) => !x.uploading && /^https?:\/\//.test(x.url)).map((x) => ({ url: x.url }));
   const draftSnapshot = {
     name, oneLiner, description, story, offersNote, seeksNote,
-    offers, values, targetAudience, searchVisible,
+    offers, values, targetAudience, searchVisible, collabPaused,
     instagram, homepage, mapUrl, address, introFileUrl, blocks,
     photos: keepPhotos(photos),
     activities: activities.map((a) => ({ title: a.title, desc: a.desc, link: a.link, photos: keepPhotos(a.photos) })),
@@ -1039,6 +1041,7 @@ function RegisterForm() {
     setOffersNote(d.offersNote); setSeeksNote(d.seeksNote);
     setOffers(d.offers); setValues(d.values); setTargetAudience(d.targetAudience);
     setSearchVisible(d.searchVisible);
+    setCollabPaused(d.collabPaused ?? false); // 옛 임시저장엔 이 키가 없다 → 받는 중으로
     setInstagram(d.instagram); setHomepage(d.homepage); setMapUrl(d.mapUrl); setAddress(d.address);
     setIntroFileUrl(d.introFileUrl); setBlocks(d.blocks); setPhotos(d.photos);
     setActivities(d.activities.map((a) => ({ title: a.title, desc: a.desc, link: a.link ?? "", photos: a.photos })));
@@ -1094,6 +1097,7 @@ function RegisterForm() {
       setMapUrl(m.trust.mapUrl ?? "");
       setAddress(m.trust.address ?? "");
       setSearchVisible(m.searchVisible ?? true);
+      setCollabPaused(m.collabPaused ?? false);
       setPhotos(m.photos.map((u) => ({ url: u })));
       setBlocks((m.showcases ?? []).map((b) => ({ ...b, uid: crypto.randomUUID() })));
       setIntroFileUrl(m.introFileUrl ?? "");
@@ -1107,7 +1111,7 @@ function RegisterForm() {
       if ((m.keywords ?? []).length) open.add("keywords");
       if ((m.targetAudience ?? []).length) open.add("customers");
       if ((m.offersDescription ?? "").trim()) open.add("offersNote");
-      if (m.seeks.length || (m.seeksDescription ?? "").trim()) open.add("seeks");
+      // (seeks는 상시 노출이라 펼칠 필요가 없다 — 08-12)
       setOpenSections(open);
       setEditBooting(false);
     }).catch(() => setEditBooting(false));
@@ -1177,6 +1181,7 @@ function RegisterForm() {
         introFileUrl: introFileUrl || undefined,
         photos: wrap(photoUrls),
         searchVisible,
+        collabPaused,
         enrichment,
         instagram,
         homepage,
@@ -1262,7 +1267,7 @@ function RegisterForm() {
       {editSlug ? (
         <>
           <div className="flex items-start justify-between gap-3">
-            <h1 className="text-[28px] font-bold tracking-tight text-ink sm:text-[32px]">
+            <h1 className="text-[26px] font-bold leading-[1.25] tracking-[-0.025em] text-ink sm:text-[32px]">
               소개서 수정
             </h1>
             <button
@@ -1279,7 +1284,7 @@ function RegisterForm() {
         </>
       ) : (
         <>
-      <h1 className="text-[28px] font-bold tracking-tight text-ink sm:text-[32px]">
+      <h1 className="text-[26px] font-bold leading-[1.25] tracking-[-0.025em] text-ink sm:text-[32px]">
         브랜드 소개서, 생각보다 금방 완성돼요.
       </h1>
       <p className="mt-2 text-[17px] leading-relaxed text-body">
@@ -1305,7 +1310,7 @@ function RegisterForm() {
               }
             }}
             placeholder="예: 캔버스가든"
-            className="h-11 min-w-0 flex-1 rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
+            className="h-11 min-w-0 flex-1 rounded-sm border border-hairline bg-surface px-3 text-[17px] text-ink outline-none placeholder:text-faint focus:border-focus"
           />
           <button
             type="button"
@@ -1434,14 +1439,15 @@ function RegisterForm() {
           </div>
         )}
         <div className="space-y-8">
-          <Field label="상호 *" hint={hintFor("name")}>
+          <Field label="상호" required htmlFor="name-field" hint={hintFor("name")}>
             <input
               id="name-field"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="예: 캔버스가든"
+              aria-required="true"
               aria-invalid={errField?.anchor === "name-field" || undefined}
-              className={`h-11 w-full scroll-mt-20 rounded-sm border bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus ${
+              className={`h-11 w-full scroll-mt-20 rounded-sm border bg-surface px-3 text-[17px] text-ink outline-none placeholder:text-faint focus:border-focus ${
                 errField?.anchor === "name-field" ? "border-danger" : "border-hairline"
               }`}
             />
@@ -1456,7 +1462,7 @@ function RegisterForm() {
               onChange={(e) => setOneLiner(e.target.value)}
               rows={2}
               placeholder="헌옷의 재발견, 나다움을 표현하는 직물 워크숍을 열고 있어요."
-              className="m-0 w-full rounded-sm border border-hairline bg-surface px-3 py-2 text-base leading-relaxed text-ink outline-none placeholder:text-faint focus:border-focus"
+              className="m-0 w-full rounded-sm border border-hairline bg-surface px-3 py-2 text-[17px] leading-relaxed text-ink outline-none placeholder:text-faint focus:border-focus"
             />
           </Field>
 
@@ -1471,7 +1477,7 @@ function RegisterForm() {
               onChange={(e) => setDescription(e.target.value)}
               rows={4}
               placeholder="헌옷과 다양한 소재를 활용한 죠각 워크숍을 열고 있어요. 참가자들은 버려질 뻔한 옷을 작은 소품과 가방, 액자로 다시 만들어가며, 잊고 지냈던 자신만의 취향과 표현을 발견합니다. 때로는 양말이나 비닐봉투처럼 예상하지 못한 소재를 통해, 문자 대신 손으로 자신을 표현하는 즐거움을 함께 나누고 있습니다."
-              className="w-full rounded-sm border border-hairline bg-surface px-3 py-2 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
+              className="w-full rounded-sm border border-hairline bg-surface px-3 py-2 text-[17px] text-ink outline-none placeholder:text-faint focus:border-focus"
             />
             {/* 안내도 버튼과 같은 게이트 — 크롤 안 한 소개서엔 버튼이 없으니 문구도 숨김 */}
             {enrichment && (
@@ -1560,33 +1566,59 @@ function RegisterForm() {
             </div>
           </div>
 
-          {/* 협업 유형 칩 — 공급·수요 통합 1세트 (2026-07-22 대표 확정 — 검색이 이미 offers∪seeks OR라 구분에 실체 없음).
-              구 seeks 칩은 은퇴, 저장 시 합집합이 offers로 들어간다. */}
-          <div id="offers-chips" className="scroll-mt-4">
-            <Field label="함께하고 싶은 콜라보를 골라주세요. *" hint={aiFilled.has("offers") ? <AiBadge /> : null}>
-              <ChipRow
-                options={COLLAB_TYPES}
-                selected={offers}
-                onToggle={(t) => toggle(offers, setOffers, t)}
-              />
-              {errField?.anchor === "offers-chips" && (
-                <p className="mt-2 text-[13px] text-danger">{errField.msg}</p>
-              )}
-              {/* 구 sec-offersNote(시트) → ① 칩 하단 상시 노출로 이사. 칩과 한 세트 */}
-              <div className="mt-4">
-                <p className="mb-1.5 flex items-center gap-2 text-[13px] text-mute">이런 콜라보를 제공할 수 있어요 (선택){aiFilled.has("offersNote") ? <AiBadge /> : null}</p>
-                <textarea
-                  value={offersNote}
-                  onChange={(e) => setOffersNote(e.target.value)}
-                  rows={4}
-                  placeholder="매력적인 분들과의 제품 콜라보, 서로의 매력을 담은 원데이 워크숍, 공동 굿즈 등 다양한 콜라보를 기대해요!"
-                  className="w-full rounded-sm border border-hairline bg-surface px-3 py-2.5 text-base leading-relaxed text-ink outline-none placeholder:text-faint focus:border-focus"
+        </div>
+
+        {/* ── 이런 콜라보를 찾고 있어요 (08-12 신설 — 소개서 섹션과 한 덩어리로 맞춤) ──
+            ⭐**소개서에서 한 섹션인 것은 폼에서도 한 섹션이어야 한다.** 전엔 유형 칩이 ①(필수 영역)
+              안에 있고 조건 서술은 한참 아래 시트 섹션이라, 사장님이 둘을 **다른 질문으로** 여겼다.
+            🚨**StubSection으로 만들면 안 된다** — 칩은 필수인데 스텁은 접히고(`hiddenWhenCollapsed`면
+              값 없을 때 아예 안 보임) 삭제도 된다. **필수 항목이 화면에서 사라지면 등록 자체가 막힌다.**
+              그래서 번호 없는 GroupHeader로 세운 상시 노출 섹션이다.
+            🆕**조건 서술이 이제 항상 보인다** — 전엔 시트에서 "추가"를 눌러야 나타나서, 안 누른 사장님은
+              그런 칸이 있는 줄도 몰랐다(계단뿌셔클럽 조건이 안 적힌 층이 하나 더 있었던 셈).
+            ⚠️`id="sec-seeks"`를 유지할 것 — 완성도 칩이 이 id로 스크롤한다. */}
+        <section id="sec-seeks" className="scroll-mt-4">
+          <GroupHeader title="이런 콜라보를 찾고 있어요." />
+          <div className="space-y-8">
+            {/* 협업 유형 칩 — 공급·수요 통합 1세트 (2026-07-22 대표 확정 — 검색이 이미 offers∪seeks OR라 구분에 실체 없음).
+                구 seeks 칩은 은퇴, 저장 시 합집합이 offers로 들어간다.
+                ⭐칩을 서술보다 **먼저** 둔다(소개서는 반대다). 폼은 읽는 곳이 아니라 쓰는 곳이라,
+                  ①필수를 먼저 만나야 하고 ②칩을 골라 워밍업이 돼야 그다음 글이 써진다. */}
+            <div id="offers-chips" className="scroll-mt-4">
+              <Field label="콜라보 유형을 골라주세요." required hint={aiFilled.has("offers") ? <AiBadge /> : null}>
+                <ChipRow
+                  options={COLLAB_TYPES}
+                  selected={offers}
+                  onToggle={(t) => toggle(offers, setOffers, t)}
                 />
-              </div>
+                {errField?.anchor === "offers-chips" && (
+                  <p className="mt-2 text-[13px] text-danger">{errField.msg}</p>
+                )}
+              </Field>
+            </div>
+
+            {/* ⭐**라벨이 답을 정한다** — 「이런 파트너를 찾고 있어요」라고 물으니 답이 전부 *누구*로 나왔고,
+                정작 걸고 싶던 *조건*(계단뿌셔클럽: 10명 이상 기업 워크숍만)은 물어본 적이 없어 안 적혔다. */}
+            <Field
+              label="어떤 콜라보/파트너를 찾고 있으신가요? (선택)"
+              hint={aiFilled.has("seeks") ? <AiBadge /> : null}
+            >
+              {/* 🚨**이 줄을 placeholder로 옮기지 말 것** — AI 초안이 칸을 채우면 placeholder는 사라져,
+                  조건을 물어보는 말이 정작 **AI 초안이 있는 소개서에서만 안 보이게** 된다(08-12).
+                  예시는 빈 칸에서만 필요하니 placeholder로 가도 되지만, **묻는 말은 여기 남는다.** */}
+              <p className="mb-2 text-[13px] leading-relaxed text-mute">
+                (혹시, 콜라보 제안에 특별한 조건이 있다면 알려주세요.)
+              </p>
+              <textarea
+                value={seeksNote}
+                onChange={(e) => setSeeksNote(e.target.value)}
+                rows={4}
+                placeholder="예) 수선의 철학에 공감하는 다양한 브랜드, 작가님들과 열린 주제로 콜라보를 논의해보고 싶어요, 10명 이상 기업 워크숍 콜라보만 진행하고 있어요. 등"
+                className="w-full rounded-sm border border-hairline bg-surface px-3 py-2.5 text-[17px] leading-relaxed text-ink outline-none placeholder:text-faint focus:border-focus"
+              />
             </Field>
           </div>
-
-        </div>
+        </section>
 
         {/* ── 시트 출신 — 우리 브랜드를 표현하는 키워드 (구③ · 정본 위치 = ① 뒤) ── */}
         <StubSection
@@ -1676,7 +1708,7 @@ function RegisterForm() {
                 }}
                 placeholder="직접 더하기 (예: 아날로그)"
                 disabled={values.length >= MAX_VIBES}
-                className="h-10 min-w-0 flex-1 rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus disabled:opacity-40"
+                className="h-10 min-w-0 flex-1 rounded-sm border border-hairline bg-surface px-3 text-[17px] text-ink outline-none placeholder:text-faint focus:border-focus disabled:opacity-40"
               />
               <button
                 type="button"
@@ -1709,7 +1741,7 @@ function RegisterForm() {
             onChange={(e) => setStory(e.target.value)}
             rows={5}
             placeholder="예: 좋은 소재가 버려지는 게 늘 아쉬웠어요. 이미 있는 것의 가치를 다시 발견하는 일이 더 의미 있다고 믿어요."
-            className="w-full rounded-sm border border-hairline bg-surface px-3 py-2.5 text-base leading-relaxed text-ink outline-none placeholder:text-faint focus:border-focus"
+            className="w-full rounded-sm border border-hairline bg-surface px-3 py-2.5 text-[17px] leading-relaxed text-ink outline-none placeholder:text-faint focus:border-focus"
           />
         </StubSection>
 
@@ -1748,14 +1780,14 @@ function RegisterForm() {
                 value={act.title}
                 onChange={(e) => setAct(i, { title: e.target.value })}
                 placeholder="예: 조형수선 워크숍"
-                className="h-10 w-full rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
+                className="h-10 w-full rounded-sm border border-hairline bg-surface px-3 text-[17px] text-ink outline-none placeholder:text-faint focus:border-focus"
               />
               <textarea
                 value={act.desc}
                 onChange={(e) => setAct(i, { desc: e.target.value })}
                 rows={4}
                 placeholder="예: 이야기가 깃든 옷을 수선하고 업사이클링하는 워크숍을 진행해요."
-                className="w-full rounded-sm border border-hairline bg-surface px-3 py-2.5 text-base leading-relaxed text-ink outline-none placeholder:text-faint focus:border-focus"
+                className="w-full rounded-sm border border-hairline bg-surface px-3 py-2.5 text-[17px] leading-relaxed text-ink outline-none placeholder:text-faint focus:border-focus"
               />
               {/* 사진·링크 접힘 버튼 — press와 동일하게 한 줄 인라인(space-y-2로 그룹) */}
               <div className="space-y-2">
@@ -1775,7 +1807,7 @@ function RegisterForm() {
                     value={act.link}
                     onChange={(e) => setAct(i, { link: e.target.value })}
                     placeholder="소개 링크 https:// (블로그·후기 등)"
-                    className="h-10 w-full rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
+                    className="h-10 w-full rounded-sm border border-hairline bg-surface px-3 text-[17px] text-ink outline-none placeholder:text-faint focus:border-focus"
                   />
                 </CollapsedLink>
               </div>
@@ -1791,27 +1823,6 @@ function RegisterForm() {
             </button>
           )}
           </div>
-        </StubSection>
-
-        {/* ── 시트 출신 — 이런 파트너를 찾고 있어요 (구⑥ 칩+서술) ── */}
-        <StubSection
-          id="sec-seeks"
-          badge={aiFilled.has("seeks") ? <AiBadge /> : null}
-          label="이런 파트너를 찾고 있어요."
-          hiddenWhenCollapsed
-          expanded={openSections.has("seeks")}
-          hasData={hasSeeks}
-          onExpand={() => openSection("seeks")}
-          onCollapse={() => closeSection("seeks")}
-        >
-          {/* 구 "이런 콜라보를 찾고 있어요" 칩 은퇴(2026-07-22 통합) — 유형은 ① 통합 칩 1세트가 담당, 여기는 파트너상 서술만 */}
-          <textarea
-            value={seeksNote}
-            onChange={(e) => setSeeksNote(e.target.value)}
-            rows={4}
-            placeholder="예: 지속가능성을 이야기하는 브랜드, 라이프스타일 브랜드, 카페와 함께하고 싶어요."
-            className="w-full rounded-sm border border-hairline bg-surface px-3 py-2.5 text-base leading-relaxed text-ink outline-none placeholder:text-faint focus:border-focus"
-          />
         </StubSection>
 
         {/* ── 스텁 C — 이런 콜라보 경험이 있어요 (구⑦) ── */}
@@ -1851,13 +1862,13 @@ function RegisterForm() {
                       value={h.partner}
                       onChange={(e) => setHist(i, { partner: e.target.value })}
                       placeholder="함께한 곳 (예: 오월의숲)"
-                      className="h-10 min-w-0 flex-1 rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
+                      className="h-10 min-w-0 flex-1 rounded-sm border border-hairline bg-surface px-3 text-[17px] text-ink outline-none placeholder:text-faint focus:border-focus"
                     />
                     <div className="relative w-28 shrink-0">
                       <select
                         value={h.year}
                         onChange={(e) => setHist(i, { year: e.target.value })}
-                        className="h-10 w-full appearance-none rounded-sm border border-hairline bg-surface py-2 pl-3 pr-8 text-base text-ink outline-none focus:border-focus"
+                        className="h-10 w-full appearance-none rounded-sm border border-hairline bg-surface py-2 pl-3 pr-8 text-[17px] text-ink outline-none focus:border-focus"
                       >
                         <option value="">시기</option>
                         {HISTORY_YEARS.map((y) => (
@@ -1924,7 +1935,7 @@ function RegisterForm() {
                             }
                           }}
                           placeholder="유형 직접 더하기"
-                          className="h-9 min-w-0 flex-1 rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
+                          className="h-9 min-w-0 flex-1 rounded-sm border border-hairline bg-surface px-3 text-[17px] text-ink outline-none placeholder:text-faint focus:border-focus"
                         />
                         <button
                           type="button"
@@ -1951,7 +1962,7 @@ function RegisterForm() {
                       onChange={(e) => setHist(i, { desc: e.target.value })}
                       rows={4}
                       placeholder="예: 업사이클링 파우치를 함께 만들어 팝업에서 선보였어요."
-                      className="w-full rounded-sm border border-hairline bg-surface px-3 py-2.5 text-base leading-relaxed text-ink outline-none placeholder:text-faint focus:border-focus"
+                      className="w-full rounded-sm border border-hairline bg-surface px-3 py-2.5 text-[17px] leading-relaxed text-ink outline-none placeholder:text-faint focus:border-focus"
                     />
                   </div>
                   {/* 사진·링크 접힘 버튼 — 카드 최하단, press와 동일하게 한 줄 인라인(space-y-2로 그룹) */}
@@ -1972,7 +1983,7 @@ function RegisterForm() {
                         value={h.link}
                         onChange={(e) => setHist(i, { link: e.target.value })}
                         placeholder="소개 링크 https:// (블로그·후기 등)"
-                        className="h-10 w-full rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
+                        className="h-10 w-full rounded-sm border border-hairline bg-surface px-3 text-[17px] text-ink outline-none placeholder:text-faint focus:border-focus"
                       />
                     </CollapsedLink>
                   </div>
@@ -1991,6 +2002,33 @@ function RegisterForm() {
           </div>
         </StubSection>
 
+        {/* ── 이런 콜라보를 제공할 수 있어요 (08-12 이사 — 소개서와 같은 자리) ──
+            "이런 걸 해왔고 → 이런 걸 해드릴 수 있어요"라 콜라보 이력 바로 뒤가 맞다.
+            ⭐**위 「찾고 있어요」와 방향이 반대다**(문 vs 제안) — 그래서 붙이지 않고 멀리 떼어 둔다.
+            🆕**위계를 올렸다** — 전엔 필수 칩 안에 13px 회색 소제목으로 얹혀 있어서, 소개서에선 독립
+              섹션인데 폼에선 곁다리로 보였다. 이제 다른 섹션과 같은 18px 제목이다(대표 지적 08-12). */}
+        <StubSection
+          id="sec-offersNote"
+          badge={aiFilled.has("offersNote") ? <AiBadge /> : null}
+          label="이런 콜라보를 제공할 수 있어요."
+          sub="우리 쪽에서 내어줄 수 있는 것 — 공간·재료·인력·채널처럼 구체적일수록 제안이 들어와요."
+          /* ⚠️`hiddenWhenCollapsed`를 붙이지 않는다(옆 스텁들과 다른 점). 이 칸은 원래 ① 안에
+             **항상 보이던** 칸이라, 시트 뒤로 숨기면 위계는 올라가는데 노출은 떨어져 요청과 반대가 된다.
+             그래서 빈 상태에서도 점선 스텁으로 남는다 — 대신 추가 시트 목록에서 뺐다(진입점 하나로). */
+          expanded={openSections.has("offersNote")}
+          hasData={hasOffersNote}
+          onExpand={() => openSection("offersNote")}
+          onCollapse={() => closeSection("offersNote")}
+        >
+          <textarea
+            value={offersNote}
+            onChange={(e) => setOffersNote(e.target.value)}
+            rows={4}
+            placeholder="매력적인 분들과의 제품 콜라보, 서로의 매력을 담은 원데이 워크숍, 공동 굿즈 등 다양한 콜라보를 기대해요!"
+            className="w-full rounded-sm border border-hairline bg-surface px-3 py-2.5 text-[17px] leading-relaxed text-ink outline-none placeholder:text-faint focus:border-focus"
+          />
+        </StubSection>
+
         {/* ── 선택 블록(코어 ⑦과 ⑧ 사이) ── */}
         <BlockEditor
           blocks={blocks}
@@ -2000,8 +2038,10 @@ function RegisterForm() {
           suppressFab={layerOpen}
           storyItems={[
             { key: "activities", label: "주로 어떤 활동을 하나요?", hint: "대표 활동을 소개해주세요.", added: openSections.has("activities") || hasActivities, onAdd: () => addStorySection("activities"), group: "recommend" },
-            { key: "seeks", label: "이런 파트너를 찾고 있어요.", hint: "어떤 파트너와 만나고 싶은지 알려주세요.", added: openSections.has("seeks") || hasSeeks, onAdd: () => addStorySection("seeks"), group: "recommend" },
             { key: "collabs", label: "이런 콜라보 경험이 있어요.", hint: "지난 콜라보를 더하면 검증된 파트너 신호가 돼요.", added: openSections.has("collabs") || hasCollabs, onAdd: () => addStorySection("collabs"), group: "recommend" },
+            /* 🆕이 시트에서 빠진 둘(08-12): `seeks`는 상시 노출 섹션으로 승격됐고, `offersNote`는
+               원래부터 상시 노출(구 ① 칩 하단)이라 **진입점이 둘이면 오히려 헷갈린다.**
+               ⚠️둘 다 폼에 자리가 이미 있으니 "추가하기"로 또 부르지 않는다. */
             { key: "customers", label: "저희는 주로 이런 고객과 함께하고 있어요.", hint: "주요 고객을 알려주세요.", added: openSections.has("customers") || hasCustomers, onAdd: () => addStorySection("customers"), group: "recommend" },
             { key: "story", label: "왜 이 브랜드를 시작하셨나요?", hint: "시작하게 된 계기를 편하게 적어주세요.", added: openSections.has("story") || hasStory, onAdd: () => addStorySection("story"), group: "story" },
             { key: "keywords", label: "우리 브랜드를 표현하는 키워드를 골라주세요.", hint: "분위기를 칩으로 골라요.", added: openSections.has("keywords") || hasKeywords, onAdd: () => addStorySection("keywords"), group: "story" },
@@ -2065,7 +2105,7 @@ function RegisterForm() {
                   }
                 }}
                 placeholder="직접 더하기 (예: 신혼부부)"
-                className="h-10 min-w-0 flex-1 rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
+                className="h-10 min-w-0 flex-1 rounded-sm border border-hairline bg-surface px-3 text-[17px] text-ink outline-none placeholder:text-faint focus:border-focus"
               />
               <button
                 type="button"
@@ -2091,7 +2131,7 @@ function RegisterForm() {
                 setAddrAuto(null); // 직접 고치기 시작하면 '되돌리기' 안내는 사라진다
               }}
               placeholder="서울 성북구 보문로 56, 5층"
-              className="h-11 w-full rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
+              className="h-11 w-full rounded-sm border border-hairline bg-surface px-3 text-[17px] text-ink outline-none placeholder:text-faint focus:border-focus"
             />
             {/* 덮어쓴 사실을 숨기지 않는다 — 사장님이 쓴 값을 말없이 바꾸면 "내가 쓴 게 어디 갔지"가 된다.
                 되돌리기를 함께 줘서, 네이버가 틀렸을 때 원래 값으로 즉시 복구할 수 있게. */}
@@ -2121,7 +2161,7 @@ function RegisterForm() {
             {/* 포커스 링은 래퍼가 소유 — globals.css의 전역 :focus-visible 규칙이 레이어 밖이라
                 Tailwind outline-none보다 우선한다. 안쪽 input은 `!`로 눌러 링 겹침을 막는다. */}
             <div className="flex h-11 w-full items-center rounded-sm border border-hairline bg-surface px-3 focus-within:[outline:2px_solid_var(--focus)] focus-within:[outline-offset:2px]">
-              <span className="shrink-0 text-base text-mute">@</span>
+              <span className="shrink-0 text-[17px] text-mute">@</span>
               <input
                 value={instagram.replace(/^@+/, "")}
                 onChange={(e) => {
@@ -2133,7 +2173,7 @@ function RegisterForm() {
                   setInstagram(v ? `@${v}` : "");
                 }}
                 placeholder="handle"
-                className="h-full min-w-0 flex-1 bg-transparent text-base text-ink outline-none! placeholder:text-faint"
+                className="h-full min-w-0 flex-1 bg-transparent text-[17px] text-ink outline-none! placeholder:text-faint"
               />
             </div>
           </Field>
@@ -2142,7 +2182,7 @@ function RegisterForm() {
               value={homepage}
               onChange={(e) => setHomepage(e.target.value)}
               placeholder="홈페이지·카카오톡 채널·링크트리 등"
-              className="h-11 w-full rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
+              className="h-11 w-full rounded-sm border border-hairline bg-surface px-3 text-[17px] text-ink outline-none placeholder:text-faint focus:border-focus"
             />
           </Field>
           {/* 지도 링크 — 홈페이지 없는 가게가 대다수라, 주소·시간·전화·사진이 한 번에 딸려오는
@@ -2152,7 +2192,7 @@ function RegisterForm() {
                 원문은 [변경]을 눌렀을 때만 편집. 잘못 넣은 값은 그대로 입력창에 남겨 고치게 한다. */}
             {mapLinkLabel(mapUrl) && !mapUrlEditing ? (
               <div className="flex h-11 items-center gap-2 rounded-sm border border-hairline bg-surface px-3">
-                <span className="text-base text-ink">📍 {mapLinkLabel(mapUrl)}</span>
+                <span className="text-[17px] text-ink">📍 {mapLinkLabel(mapUrl)}</span>
                 <a
                   href={mapUrl}
                   target="_blank"
@@ -2175,7 +2215,7 @@ function RegisterForm() {
                 onChange={(e) => setMapUrl(e.target.value)}
                 onBlur={() => mapLinkLabel(mapUrl) && setMapUrlEditing(false)}
                 placeholder="네이버 지도·카카오맵 공유 링크"
-                className="h-11 w-full rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
+                className="h-11 w-full rounded-sm border border-hairline bg-surface px-3 text-[17px] text-ink outline-none placeholder:text-faint focus:border-focus"
               />
             )}
             {/* ⭐ 지도 한 컷(08-02, 대표 지시) — 링크만 보여주면 **맞게 넣었는지 확인할 방법이
@@ -2196,34 +2236,24 @@ function RegisterForm() {
           </Field>
         </div>
 
-        {/* 목록 노출 — 07-31부터 이 한 토글이 '콜라보 받는 중'을 겸한다(collab_open 폐지).
-            🆕08-07 개명: 「검색에 보이기」→「콜라보 찾기에 보이기」. 옛 이름은 **웹 검색(구글·네이버)**으로
-            읽혔는데, 이 토글이 정하는 건 사이트 안 [콜라보 찾기] 목록뿐이다(웹 검색은 전부 열려 있다). */}
+        {/* 공개·수신 설정 — **두 토글은 서로 다른 축이다.** 헷갈리면 사장님이 엉뚱한 걸 끈다.
+              · [콜라보 찾기에 보이기] = 사이트 안 목록에 뜨나(웹 검색은 이 토글과 무관, 08-07 개명)
+              · [콜라보 요청 잠시 안받기] = 지금 제안을 받나
+            07-31엔 앞 토글 하나가 뒤 역할까지 겸했는데(구 `collab_open` 폐지), 08-07에 앞 토글의 뜻을
+            목록으로 좁히면서 "요청을 안 받는다"를 말할 자리가 사라졌다 → 08-12 재분리(대표 지시). */}
         <div className="space-y-2">
-          <div className="flex items-center justify-between gap-3 rounded-lg border border-hairline bg-surface px-4 py-3">
-            <div>
-              <p className="text-[15px] font-medium text-ink">콜라보 찾기에 보이기</p>
-              <p className="text-[13px] leading-relaxed break-keep text-mute">
-                켜두면 다른 브랜드가 [콜라보 찾기]에서 나를 발견해 콜라보를 제안할 수 있어요. 꺼두면 목록에 안 뜨고, 링크로는 계속 공유할 수 있어요.
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => setSearchVisible((v) => !v)}
-              role="switch"
-              aria-checked={searchVisible}
-              aria-label="콜라보 찾기에 보이기"
-              className={`flex h-[26px] w-11 shrink-0 items-center rounded-pill p-[2px] transition-colors ${
-                searchVisible ? "bg-primary" : "bg-border-strong"
-              }`}
-            >
-              <span
-                className={`h-[22px] w-[22px] rounded-pill bg-white transition-transform ${
-                  searchVisible ? "translate-x-[18px]" : "translate-x-0"
-                }`}
-              />
-            </button>
-          </div>
+          <SettingToggle
+            label="콜라보 찾기에 보이기"
+            desc="켜두면 다른 브랜드가 [콜라보 찾기]에서 나를 발견해 콜라보를 제안할 수 있어요. 꺼두면 목록에 안 뜨고, 링크로는 계속 공유할 수 있어요."
+            on={searchVisible}
+            onToggle={() => setSearchVisible((v) => !v)}
+          />
+          <SettingToggle
+            label="콜라보 요청 잠시 안받기"
+            desc="켜두면 소개서에 [잠시 콜라보를 쉬고 있어요]가 표시되고 제안 버튼이 잠겨요. 소개서는 그대로 보이고, 찜·콜라보 추천은 계속 받을 수 있어요."
+            on={collabPaused}
+            onToggle={() => setCollabPaused((v) => !v)}
+          />
         </div>
 
       </div>
@@ -2235,7 +2265,7 @@ function RegisterForm() {
         }`}
       >
         <div
-          style={{ paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom))" }}
+          style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
           className="mx-auto max-w-[640px] bg-canvas px-4 pt-3 shadow-[0_-2px_12px_rgba(0,0,0,0.05)]"
         >
           <button
@@ -2248,7 +2278,7 @@ function RegisterForm() {
                 (p) => p.uploading
               )
             }
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-md bg-primary text-base font-medium text-primary-on shadow-e2 disabled:opacity-40"
+            className="flex h-12 w-full items-center justify-center gap-2 rounded-md bg-primary text-[17px] font-medium text-primary-on shadow-e2 disabled:opacity-40"
           >
             {pending && (
               <span className="h-4 w-4 animate-spin rounded-full border-2 border-primary-on border-t-transparent" />
@@ -2431,8 +2461,8 @@ function RegisterForm() {
         const dismissNudge = nudgeDismiss;
         const items = ([
           ["activities", "주로 어떤 활동을 하나요?", "대표 활동을 소개해주세요.", hasActivities],
-          ["seeks", "이런 파트너를 찾고 있어요.", "어떤 파트너와 만나고 싶은지 알려주세요.", hasSeeks],
           ["collabs", "이런 콜라보 경험이 있어요.", "지난 콜라보를 더하면 검증된 파트너 신호가 돼요.", hasCollabs],
+          ["offersNote", "이런 콜라보를 제공할 수 있어요.", "우리 쪽에서 내어줄 수 있는 것을 알려주세요.", hasOffersNote],
           ["customers", "저희는 주로 이런 고객과 함께하고 있어요.", "주요 고객을 알려주세요.", hasCustomers],
         ] as const).filter(([key, , , has]) => !has && !openSections.has(key));
         return (
@@ -2442,7 +2472,7 @@ function RegisterForm() {
               className="absolute inset-x-0 bottom-0 mx-auto max-w-[640px] overflow-hidden rounded-t-2xl bg-surface shadow-xl"
             >
               <div
-                style={{ paddingBottom: "calc(1.5rem + env(safe-area-inset-bottom))" }}
+                style={{ paddingBottom: "max(1.5rem, env(safe-area-inset-bottom))" }}
                 className="max-h-[60vh] overflow-y-auto slim-scrollbar p-4 sm:max-h-[70vh]"
               >
                 <div className="mb-3 flex items-start justify-between">
@@ -2529,7 +2559,7 @@ function RegisterForm() {
                     value={editPw}
                     onChange={(e) => setEditPw(e.target.value)}
                     placeholder="비밀번호를 입력해주세요"
-                    className="h-11 w-full rounded-sm border border-hairline bg-surface px-3 text-base text-ink outline-none placeholder:text-faint focus:border-focus"
+                    className="h-11 w-full rounded-sm border border-hairline bg-surface px-3 text-[17px] text-ink outline-none placeholder:text-faint focus:border-focus"
                   />
                   {pwErr && <p className="mt-2 text-[13px] text-red-600">{pwErr}</p>}
                   <p className="mt-2 text-[13px] leading-relaxed text-faint">
@@ -2542,7 +2572,7 @@ function RegisterForm() {
               type="button"
               onClick={goToPage}
               disabled={goingToPage || savingPw || (!loggedIn && !editPw.trim())}
-              className="mt-6 flex h-12 w-full items-center justify-center gap-2 rounded-md bg-primary text-base font-medium text-primary-on disabled:opacity-50"
+              className="mt-6 flex h-12 w-full items-center justify-center gap-2 rounded-md bg-primary text-[17px] font-medium text-primary-on disabled:opacity-50"
             >
               {goingToPage || savingPw ? "이동 중…" : "소개서 확인하러 가기"}
             </button>
@@ -2558,7 +2588,7 @@ function RegisterForm() {
                   router.push(`/m/${analysisPartner.slug}?report=${createdSlug}`);
                 }}
                 disabled={goingToPage}
-                className="mt-2 flex h-12 w-full items-center justify-center rounded-md border border-border-strong bg-surface text-base font-medium text-ink disabled:opacity-50"
+                className="mt-2 flex h-12 w-full items-center justify-center rounded-md border border-border-strong bg-surface text-[17px] font-medium text-ink disabled:opacity-50"
               >
                 {analysisPartner.name}님과 콜라보 추천받기
               </button>
@@ -2577,7 +2607,7 @@ function RegisterForm() {
             className="absolute inset-x-0 bottom-0 mx-auto max-w-[640px] overflow-hidden rounded-t-2xl bg-surface shadow-xl"
           >
             <div
-              style={{ paddingBottom: "calc(1.5rem + env(safe-area-inset-bottom))" }}
+              style={{ paddingBottom: "max(1.5rem, env(safe-area-inset-bottom))" }}
               className="max-h-[85vh] overflow-y-auto slim-scrollbar p-4 sm:max-h-[85vh]"
             >
               <div className="mb-4 flex items-start justify-between">
@@ -2735,7 +2765,9 @@ function GroupHeader({
   sub,
   action,
 }: {
-  n: string;
+  /** 번호(①②). **없어도 된다** — 번호 없는 섹션 제목으로도 쓴다(펼친 StubSection 헤더와 같은 얼굴).
+   *  ⚠️번호를 붙이는 건 "순서대로 채우는 곳"이라는 뜻이라 아무 데나 달지 말 것. */
+  n?: string;
   title: string;
   sub?: string;
   action?: React.ReactNode; // 제목 행 우측 액션(예: ✨ 초안 받기)
@@ -2744,9 +2776,11 @@ function GroupHeader({
     <div className="mb-[23px] border-b border-hairline pb-2">
       <div className="flex items-center justify-between gap-2">
         <div className="flex min-w-0 items-baseline gap-2">
-          <span className="rounded-pill bg-primary-tint px-2 py-0.5 text-[14px] font-bold text-primary-on">
-            {n}
-          </span>
+          {n && (
+            <span className="rounded-pill bg-primary-tint px-2 py-0.5 text-[14px] font-bold text-primary-on">
+              {n}
+            </span>
+          )}
           {/* 섹션 헤더 18 — 필드 라벨을 16으로 올리면서 함께 올린다(대표 확정 07-31).
               헤더를 17로 두면 라벨(16)과 1px 차이가 되어 위계가 굵기 하나에만 의존한다.
               2px + 굵기 두 겹으로 갈라져 있어야 "섹션 제목 / 필드 이름"이 다른 급으로 읽힌다. */}
@@ -2761,11 +2795,22 @@ function GroupHeader({
 
 function Field({
   label,
+  htmlFor,
+  required,
   hint,
   action,
   children,
 }: {
   label: string;
+  /** 짝지을 입력칸의 id — 라벨과 입력칸을 잇는 **유일한 끈**이다(08-14 접근성 QA로 추가).
+   *  없으면 라벨을 눌러도 커서가 안 가고, 스크린리더가 둘을 한 벌로 못 읽는다.
+   *  ⚠️입력칸이 아닌 것(칩 그룹 등)에는 넘기지 말 것 — 가리킬 대상이 없다. */
+  htmlFor?: string;
+  /** 필수 항목 — 라벨 끝에 `*`를 그린다.
+   *  ⚠️예전엔 호출부가 `label="상호 *"`처럼 **문자열에 별표를 박아** 넘겼다. 그러면 별표가
+   *  시각 표시로만 남아 **스크린리더는 필수인지 알 수 없다**(별표를 안 읽거나 "별"이라 읽는다).
+   *  여기서 별표는 `aria-hidden`으로 숨기고 「(필수)」를 sr-only로 따로 읽어준다. */
+  required?: boolean;
   hint?: React.ReactNode;
   action?: React.ReactNode; // 라벨 행 우측 액션 (예: ✨ 초안 받기)
   children: React.ReactNode;
@@ -2773,8 +2818,16 @@ function Field({
   return (
     <div>
       <div className="mb-2 flex items-center justify-between gap-2">
-        <label className="flex items-center gap-2 text-[16px] font-medium text-body">
-          <span>{label}</span>
+        <label htmlFor={htmlFor} className="flex items-center gap-2 text-[16px] font-medium text-body">
+          <span>
+            {label}
+            {required && (
+              <>
+                <span aria-hidden="true"> *</span>
+                <span className="sr-only"> (필수)</span>
+              </>
+            )}
+          </span>
           {hint}
         </label>
         {action}
@@ -2871,6 +2924,38 @@ function ChipRow({
           </button>
         );
       })}
+    </div>
+  );
+}
+
+/** 공개·수신 설정 토글 한 줄 — 라벨 + 설명 + 스위치.
+ *  ⭐두 개 이상이 나란히 서게 되면서 컴포넌트로 뺐다. 같은 모양이어야 **둘이 같은 종류의 결정**
+ *    (내 소개서를 어떻게 열어둘까)으로 읽힌다. */
+function SettingToggle({
+  label, desc, on, onToggle,
+}: { label: string; desc: string; on: boolean; onToggle: () => void }) {
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-lg border border-hairline bg-surface px-4 py-3">
+      <div>
+        <p className="text-[15px] font-medium text-ink">{label}</p>
+        <p className="text-[13px] leading-relaxed break-keep text-mute">{desc}</p>
+      </div>
+      <button
+        type="button"
+        onClick={onToggle}
+        role="switch"
+        aria-checked={on}
+        aria-label={label}
+        className={`flex h-[26px] w-11 shrink-0 items-center rounded-pill p-[2px] transition-colors ${
+          on ? "bg-primary" : "bg-border-strong"
+        }`}
+      >
+        <span
+          className={`h-[22px] w-[22px] rounded-pill bg-white transition-transform ${
+            on ? "translate-x-[18px]" : "translate-x-0"
+          }`}
+        />
+      </button>
     </div>
   );
 }

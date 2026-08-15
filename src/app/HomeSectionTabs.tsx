@@ -11,14 +11,16 @@
 //    sticky는 원래 조상 transform에 안 깨지지만, 이 조합은 브라우저에서 실제로 붙는 걸 확인했다(08-02).
 import { useEffect, useState } from "react";
 
-// 판정선 & 앵커 여백 — 브라우저 실측(375px, 08-02):
-//   헤더 59.5 + 탭바 위 패딩 8.5 + 알약 48.75 + 아래 패딩 8.5 = 125.25 → 숨 쉴 틈 ~11px 더해 136.
+// 판정선 & 앵커 여백 — 브라우저 실측(375px).
+//   08-02 최초: 헤더 59.5 + 이 탭바 65.75 = 125.25 → 숨 쉴 틈 ~11px 더해 136.
+//   🔻08-14 개정 **152**: 이 탭바가 sticky를 떼면서 가려야 할 대상이 `HomeMenuBar`로 바뀌었다.
+//      헤더 59.5 + 메뉴바 밴드 70(폰트 15px·알약 h-10으로 커진 뒤) = 129.5 → 숨 쉴 틈 22.5.
 // ⚠️ 이 저장소는 **루트 폰트가 17px**이다(SiteHeader 주석 참고). rem 유틸이 16px 기준이 아니다 —
 //    `h-14`/`top-14`는 56이 아니라 59.5px, `scroll-mt-32`는 128이 아니라 136px. 눈대중으로 56을 넣으면
-//    제목이 헤더 밑에 3.5px 깔린다. 값을 만질 땐 반드시 다시 실측할 것.
-// ⚠️ page.tsx의 두 목적지 h2에 붙은 `scroll-mt-32`(=8rem=136px)와 **같은 값**이어야 한다.
+//    제목이 헤더 밑에 3.5px 깔린다. 그래서 지금은 rem 유틸 대신 `scroll-mt-[152px]`로 px를 박아 뒀다.
+// ⚠️ page.tsx의 두 목적지 h2에 붙은 `scroll-mt-[152px]`와 **같은 값**이어야 한다.
 //    한쪽만 바꾸면 "눌러서 간 자리"와 "활성 판정 자리"가 어긋난다. 바꾸면 둘 다.
-const ANCHOR_LINE_PX = 136;
+const ANCHOR_LINE_PX = 152;
 // 🚨 판정선은 앵커선보다 **조금 아래**여야 한다 — 둘을 같은 값으로 두면 탭을 누른 직후 제목이
 //    정확히 경계 위에 선다(실측 135.9 vs 136 = 여유 0.1px). 폰트 로드·줌·기기 배율로 서브픽셀이
 //    반대로 떨어지는 순간 **눌러놓고 활성이 안 붙는** 상태가 된다. 경계는 가장 불안정한 자리다.
@@ -31,6 +33,10 @@ const TABS = [
   { id: "home-collab-report", label: "콜라보 아이디어 찾기" },
 ] as const;
 
+// 📏 탭 높이 **h-[44px]** — 터치 타깃 권장치.
+//    🪤`h-9`은 36이 아니라 **38.25px**다(루트 17px이라 rem 유틸이 6.25% 크다).
+//      권장 44에 5.75px 모자랐고, 바로 위 HomeMenuBar가 44px이라 나란히 놓이면 불일치가 보였다.
+//      같은 성격의 탭이 다른 높이를 갖지 않게 px로 박는다.
 export function HomeSectionTabs() {
   // 기본값 = 첫 번째. 섹션에 아직 닿지 않았을 때(두 제목 모두 판정선 아래)도 이게 맞는 답이다.
   const [active, setActive] = useState(0);
@@ -60,7 +66,7 @@ export function HomeSectionTabs() {
     return () => io.disconnect();
   }, []);
 
-  // 목적지로 이동. 오프셋은 CSS(`scroll-mt-32`)가 정본이라 scrollIntoView가 그대로 존중한다 —
+  // 목적지로 이동. 오프셋은 CSS(`scroll-mt-[152px]`)가 정본이라 scrollIntoView가 그대로 존중한다 —
   // JS에서 좌표를 다시 계산하면 값이 두 군데로 갈라진다.
   // (MyTabs의 scrollIntoView 경고는 '조상에 가로 스크롤 레일이 있는' 경우다. 여기 조상은 main/section뿐.)
   const go = (e: React.MouseEvent<HTMLAnchorElement>, id: string) => {
@@ -80,7 +86,14 @@ export function HomeSectionTabs() {
     //    같은 배경색이라 "페이지가 탭 밑으로 흘러간다"로만 읽히고 바가 하나 더 생긴 느낌은 안 난다.
     // ⚠️ 풀블리드는 `100vw` 금지(가로 스크롤바 폭만큼 넘쳐 가로 스크롤이 생긴다) —
     //    브랜드 그리드와 같은 box-shadow+clip-path 기법을 쓴다(page.tsx §② 참고).
-    <div className="sticky top-14 z-[5] flex justify-center bg-canvas py-2 [box-shadow:0_0_0_100vmax_var(--canvas)] [clip-path:inset(0_-100vmax)]">
+    // 🔻08-14 **sticky 해제** — 홈 최상단에 `HomeMenuBar`가 새로 붙어 헤더 밑을 계속 따라온다.
+    //    둘 다 sticky면 섹션 ③에 닿는 순간 알약 바가 두 줄로 쌓인다(헤더 59.5 + 바 63.75 + 바 65.75
+    //    = 상단 189px 고정 = 375×812 폰의 23%). 대표 결정: 이 바는 제자리에 고정한다.
+    //    → 풀블리드 밴드(box-shadow+clip-path)도 같이 걷었다. 그건 "본문이 바 밑으로 지나갈 때
+    //      제목이 알약 좌우로 삐져나오는" 걸 막던 장치라, 안 따라오면 가릴 것 자체가 없다.
+    //    ⚠️ 스크롤스파이는 남겨둔다 — 지금은 바가 화면에 있을 때 늘 첫 칸이 활성이라 사실상 안 움직이지만,
+    //      sticky를 되살릴 때 다시 필요하고 지금 있어도 틀린 표시를 하지 않는다.
+    <div className="flex justify-center py-2">
       <nav
         aria-label="소개서·콜라보 추천 바로가기"
         // 트랙=surface-soft. 활성 썸은 아래 **"선택됨" 키위 조합**을 쓴다(대표 지시 08-02 "탭바에도 키위를").
@@ -88,7 +101,7 @@ export function HomeSectionTabs() {
       >
         {TABS.map((t, i) => (
           // <button>이 아니라 <a href="#id"> — 목적지가 실제로 존재하는 문서 내 위치라
-          // JS가 죽어도 네이티브 해시 점프가 대신 동작하고(그때도 scroll-mt-32가 먹는다),
+          // JS가 죽어도 네이티브 해시 점프가 대신 동작하고(그때도 scroll-mt-[152px]가 먹는다),
           // 키보드·새 탭·링크 복사 같은 브라우저 기본 동작을 공짜로 얻는다.
           <a
             key={t.id}
@@ -103,7 +116,7 @@ export function HomeSectionTabs() {
             //    목차가 CTA와 같은 무게로 보이면 "눌러야 할 것"이 둘이 된다. tint(#d6ffc0)는 한 단 아래다.
             // ⚠️ 비활성에도 `border`를 **투명으로** 둔다 — 활성에만 보더를 주면 전환 때 알약 폭이
             //    2px 뛰어 탭이 덜컹거린다.
-            className={`flex h-9 shrink-0 items-center whitespace-nowrap rounded-pill border px-3.5 text-[13px] transition-colors sm:px-5 sm:text-[14px] ${
+            className={`flex h-[44px] shrink-0 items-center whitespace-nowrap rounded-pill border px-3.5 text-[13px] transition-colors sm:px-5 sm:text-[14px] ${
               active === i
                 ? "border-primary bg-primary-tint font-bold text-primary-on"
                 : "border-transparent font-medium text-mute"

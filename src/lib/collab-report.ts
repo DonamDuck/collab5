@@ -163,7 +163,7 @@ const DNA_SCHEMA = {
         },
         required: ["text", "evidence", "source"],
       },
-      description: "이 브랜드만의 것 0~3개(없으면 빈 배열)",
+      description: "이 브랜드만의 것 0~5개(없으면 빈 배열). 정체 서술만이 아니라 개별 프로그램·만드는 것·콜라보에서 한 행위도 후보",
     },
   },
   required: ["summary", "items", "signature"],
@@ -613,7 +613,21 @@ export async function generateReport(
       motif: String(i.motif ?? ""),
     };
   };
-  const pool = [...(p.ideas ?? []).slice(0, 7), ...(p.novel_ideas ?? []).slice(0, 6)].map(toCand);
+  // 🐤카나리아 — 프롬프트 예시의 **가상 어휘**가 결과물에 나오면 그 아이디어를 버린다(08-14 사고 후속).
+  //   예시 어휘는 전부 실존하지 않는 말로 바꿔뒀으므로(종이달문구점·구름빵집·달무리·별밤장터),
+  //   이 말이 나왔다 = 모델이 소개서가 아니라 **예시를 베꼈다**는 100% 확실한 신호다.
+  //   ⚠️실제 브랜드 어휘로는 이 판정을 못 한다 — 「액막이」는 캔버스가든 쌍에선 정당하기 때문.
+  //     그래서 예시를 가상어로 바꾼 것이고, 이 게이트는 그 설계의 반쪽이다(프롬프트와 한 쌍 — 같이 고칠 것).
+  const CANARY = ["종이달문구점", "구름빵집", "달무리", "별밤장터"];
+  const leaked = (i: ScoredIdea) => {
+    const text = `${i.title} ${i.desc} ${i.gainA} ${i.gainB}`;
+    const hit = CANARY.find((w) => text.includes(w));
+    if (hit) console.error(`[report] 🐤카나리아 검출 — 예시 어휘 "${hit}"가 결과물에 나옴, 해당 카드 폐기: ${i.title}`);
+    return !!hit;
+  };
+  const pool = [...(p.ideas ?? []).slice(0, 7), ...(p.novel_ideas ?? []).slice(0, 6)]
+    .map(toCand)
+    .filter((i) => !leaked(i));
   if (pool.length === 0) return { report: null, candidates };
   const picked = pickIdeas(pool, IDEA_CARDS);
   console.log(
@@ -632,7 +646,10 @@ export async function generateReport(
         gainA: gateJargon(i.gainA, "gainA"),
         gainB: gateJargon(i.gainB, "gainB"),
       })),
-      steps: (p.steps ?? []).slice(0, 4).map(String),
+      // 🚨4→5 (08-13). **여기를 안 올리면 수익 논의 단계가 조용히 잘린다** — 프롬프트에
+      //   "최대 5단계"라고 써도 서버가 4개에서 자르면 마지막 단계가 화면에 영영 안 나온다.
+      //   (수익 얘기는 순서상 뒤쪽이라 정확히 잘리는 자리였다.)
+      steps: (p.steps ?? []).slice(0, 5).map(String),
       effects: (p.effects ?? []).slice(0, 3).map(String).filter((s) => !gateJargonHit(s, "effects")),
     },
     candidates,

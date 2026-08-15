@@ -39,6 +39,7 @@ export function MakerActionBar({
   senderName,
   viewerBrands = [],
   isOwner = false,
+  collabPaused = false,
   ownerCanReport = false,
   cachedReports,
 }: {
@@ -55,6 +56,11 @@ export function MakerActionBar({
   /** 내가 이 소개서의 주인인가 — 주인에겐 '나에게 제안·찜'이 말이 안 되고, 눌리면 북극성 퍼널이 오염된다
    *  (07-29 디자인팀 QA 지적). 서버에도 같은 가드가 있고 여긴 화면 층. */
   isOwner?: boolean;
+  /** 이 소개서가 [콜라보 요청 잠시 안받기] 중인가(08-12 대표 지시 — 계단뿌셔클럽 사장님 피드백).
+   *  ⚠️**막는 곳이 버튼 하나가 아니다.** 제안 시트로 들어오는 길이 넷이다 —
+   *    버튼 · 로그인 복귀(sessionStorage) · `?report&propose=1` 딥링크 · 리포트 시트 CTA.
+   *    그래서 화면 분기만 하지 않고 `openPropose()` 한 군데에서 잠근다. */
+  collabPaused?: boolean;
   /** 내 소개서에서도 [콜라보 분석]을 열어줄 것인가 — **사내 계정 전용 예외**(`lib/staff.ts`).
    *  자기 브랜드끼리의 분석은 결과가 의미 없고 유료 콜만 나가서, 일반 유저에겐 닫아둔다.
    *  isOwner가 false면 애초에 이 분기를 안 타므로 여기선 소유자일 때만 의미가 있다. */
@@ -225,8 +231,9 @@ export function MakerActionBar({
       setReportSample(viewerBrands.length === 0); // 로그인했지만 소개서 0개 → 샘플 티저
       setReportOpen(true);
     } else {
-      setProposeOpen(true);
+      openPropose();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loggedIn, makerId, viewerBrands.length]);
 
   // /my 리포트 아카이브 딥링크 — ?report={fromSlug}면 그 쌍의 시트를 바로 연다(캐시면 즉시·0콜).
@@ -276,6 +283,13 @@ export function MakerActionBar({
     });
   };
 
+  /** 제안 시트를 여는 **유일한 문**. 쉬는 중이면 어느 경로로 와도 열리지 않는다.
+   *  (버튼은 애초에 잠겨 있지만, 로그인 복귀·딥링크는 버튼을 안 거치고 들어온다.) */
+  const openPropose = () => {
+    if (collabPaused) return;
+    setProposeOpen(true);
+  };
+
   // 콜라보 시작하기 — 비로그인은 로그인 유도, 로그인은 제안 시트.
   const handlePropose = () => {
     if (!loggedIn) {
@@ -284,7 +298,7 @@ export function MakerActionBar({
       setLoginOpen(true);
       return;
     }
-    setProposeOpen(true);
+    openPropose();
   };
 
   // 콜라보 분석 — 비로그인=로그인 유도 / 소개서 0개=샘플 티저 / 그 외=정상 분석 시트.
@@ -523,7 +537,7 @@ export function MakerActionBar({
               type="button"
               onClick={copy}
               aria-label="링크 복사"
-              className="flex h-10 items-center gap-1.5 rounded-pill bg-primary px-4 text-sm font-medium text-primary-on shadow-e2 transition-colors"
+              className="flex h-10 items-center gap-1.5 rounded-pill bg-primary px-4 text-[14px] font-medium text-primary-on shadow-e2 transition-colors"
             >
               🔗 링크 복사
             </button>
@@ -592,14 +606,14 @@ export function MakerActionBar({
                     // ⚠️`onClick={handleReport}` 금지 — 클릭 이벤트가 `restore` 인자로 들어가
                     //    **버튼을 누를 때마다 '되살리기'가 켜진다**(MouseEvent는 truthy). 감싸서 넘긴다.
                     onClick={() => handleReport()}
-                    className="flex h-12 flex-[0.8] items-center justify-center rounded-md border border-border-strong bg-surface text-base font-medium text-ink transition-colors"
+                    className="flex h-12 flex-[0.8] items-center justify-center rounded-md border border-border-strong bg-surface text-[16px] font-medium text-ink transition-colors"
                   >
                     콜라보 추천받기
                   </button>
                 )}
                 <a
                   href={`/register?edit=${slug}`}
-                  className="flex h-12 flex-1 items-center justify-center rounded-md bg-primary text-base font-medium text-primary-on transition-colors"
+                  className="flex h-12 flex-1 items-center justify-center rounded-md bg-primary text-[16px] font-medium text-primary-on transition-colors"
                 >
                   소개서 수정하기
                 </a>
@@ -611,18 +625,29 @@ export function MakerActionBar({
                   type="button"
                   // ⚠️감싸서 넘긴다 — 위 버튼 주석 참조(이벤트가 `restore`로 새어 들어간다)
                   onClick={() => handleReport()}
-                  className="flex h-12 flex-[0.8] items-center justify-center rounded-md border border-border-strong bg-surface text-base font-medium text-ink transition-colors"
+                  className="flex h-12 flex-[0.8] items-center justify-center rounded-md border border-border-strong bg-surface text-[16px] font-medium text-ink transition-colors"
                 >
                   콜라보 추천받기
                 </button>
-                {/* 콜라보 제안 시작하기 — primary */}
+                {/* 콜라보 제안 시작하기 — primary. 쉬는 중이면 잠근다(08-12 대표 확정).
+                    ⚠️버튼을 **감추지 않고 잠근다** — 없어지면 "제안하는 법이 없는 서비스"로 읽히지만,
+                      잠겨 있으면 "이 브랜드가 지금 쉬는 중"으로 읽힌다. 상태는 사람이 아니라 브랜드의 것. */}
+                {collabPaused ? (
+                  <div
+                    className="flex h-12 flex-1 items-center justify-center rounded-md border border-hairline bg-surface-soft px-2 text-center text-[15px] font-medium leading-tight text-faint"
+                    role="status"
+                  >
+                    잠시 콜라보를 쉬고 있어요
+                  </div>
+                ) : (
                 <button
                   type="button"
                   onClick={handlePropose}
-                  className="flex h-12 flex-1 items-center justify-center rounded-md bg-primary text-base font-medium text-primary-on transition-colors"
+                  className="flex h-12 flex-1 items-center justify-center rounded-md bg-primary text-[16px] font-medium text-primary-on transition-colors"
                 >
                   콜라보 제안 시작하기
                 </button>
+                )}
               </>
             )}
             </div>
@@ -670,7 +695,7 @@ export function MakerActionBar({
             </div>
 
             <div className="flex-1 overflow-y-auto p-6 pt-4 pb-4">
-              <p className="text-xl font-bold break-keep text-ink">{makerName}님과 콜라보 시작하기</p>
+              <p className="text-[20px] font-bold break-keep text-ink">{makerName}님과 콜라보 시작하기</p>
               {channel ? (
                 <>
                   <p className="mt-2 text-[15px] leading-relaxed text-mute">
@@ -717,7 +742,7 @@ export function MakerActionBar({
 
             {/* 고정 액션 바 — 좌:복사(고스트) / 우:보내기(primary). 연락 수단이 아예 없으면 안 그린다. */}
             {(channel || contactEmail) && (
-              <div className="shrink-0 border-t border-hairline bg-surface px-6 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-3">
+              <div className="shrink-0 border-t border-hairline bg-surface px-6 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3">
                 <div className="flex gap-2">
                   <button
                     type="button"
@@ -748,7 +773,7 @@ export function MakerActionBar({
           if (autoProposeRef.current) {
             autoProposeRef.current = false; // 1회성 — 뒤로가기·재오픈 때 다시 튀지 않게
             setReportOpen(false);
-            setProposeOpen(true);
+            openPropose();
           }
         }}
         open={reportOpen}
@@ -764,9 +789,10 @@ export function MakerActionBar({
         toSlug={slug}
         toName={makerName}
         sampleMode={reportSample}
+        collabPaused={collabPaused}
         onPropose={() => {
           setReportOpen(false);
-          setProposeOpen(true);
+          openPropose();
         }}
       />
 
@@ -779,14 +805,20 @@ export function MakerActionBar({
         //    그건 제안 시트가 버튼 2개를 세로로 쌓던 옛 레이아웃(07-30 이전) 높이에 맞춘 값이었다.
         //    지금은 ①제안 시트=좌우 2버튼 한 줄(고정 푸터) — 실측 갭 16px
         //    ②시트 닫힌 기본 화면 — 걸림돌은 메인 바가 아니라 **그 위에 얹힌 유틸 줄**
-        //    (🔗링크복사·♡찜, `-top-[52px]`로 바 위에 떠 있다. 실측 utilTop=130px) — 실측 갭 15px.
+        //    (🔗링크복사·♡찜, `-top-[52px]`로 바 위에 떠 있다) — 실측 갭 15px.
+        // ⚠️ 08-09 재측정: 메인 바에 소요시간 헬퍼 한 줄이 생겨 바가 20px 높아졌고, 그만큼 유틸 줄도
+        //    올라가 8.5rem이던 ②가 **유틸 줄을 3px 덮었다**(간격 17px → -3px). 갭은 오프셋에 그대로
+        //    비례한다(gap = offset − 148px @375×812)므로 163px = 갭 15px로 되돌린다.
+        //    ⭐**바 높이가 바뀌면 이 값도 다시 재야 한다** — 두 값은 독립이 아니다.
+        // 안전영역 항이 `max()`인 이유는 각 바의 하단 패딩과 같아야 하기 때문이다(08-09 일괄 전환).
+        //    인디케이터 없는 기기에선 ①4.75+1 = 5.75rem으로 종전과 동일하다.
         <div
           role="status"
           aria-live="polite"
           className={`pointer-events-none fixed left-1/2 z-[60] -translate-x-1/2 rounded-pill bg-ink px-4 py-2.5 text-[13px] font-medium text-surface shadow-e2 print:hidden ${
             proposeOpen
-              ? "bottom-[calc(5.75rem+env(safe-area-inset-bottom))]"
-              : "bottom-[calc(8.5rem+env(safe-area-inset-bottom))]"
+              ? "bottom-[calc(4.75rem+max(1rem,env(safe-area-inset-bottom)))]"
+              : "bottom-[calc(150px+max(0.75rem,env(safe-area-inset-bottom)))]"
           }`}
         >
           {toast}
@@ -812,20 +844,20 @@ export function MakerActionBar({
               </svg>
             </button>
 
-            <p className="px-6 text-xl font-bold leading-snug text-balance break-keep text-ink">{loginTitle}</p>
-            <p className="mt-2 text-base leading-relaxed text-balance break-keep text-mute">{loginSub}</p>
+            <p className="px-6 text-[20px] font-bold leading-snug text-balance break-keep text-ink">{loginTitle}</p>
+            <p className="mt-2 text-[16px] leading-relaxed text-balance break-keep text-mute">{loginSub}</p>
             <div className="mt-5 flex gap-2">
               <button
                 type="button"
                 onClick={() => setLoginOpen(false)}
-                className="h-11 flex-1 rounded-md border border-border-strong bg-surface text-sm font-medium text-ink"
+                className="h-11 flex-1 rounded-md border border-border-strong bg-surface text-[14px] font-medium text-ink"
               >
                 취소
               </button>
               <a
                 href={`/login?redirect=${encodeURIComponent(`/m/${slug}`)}`}
                 onClick={markPending}
-                className="flex h-11 flex-1 items-center justify-center rounded-md bg-primary text-sm font-medium text-primary-on"
+                className="flex h-11 flex-1 items-center justify-center rounded-md bg-primary text-[14px] font-medium text-primary-on"
               >
                 로그인
               </a>

@@ -16,7 +16,7 @@ export interface Repo {
   updateMakerContent(slug: string, content: Omit<Maker, "id" | "slug" | "createdAt" | "ownerUserId" | "editPasswordHash" | "status">): Promise<Maker | null>;
   /** ⚠️`searchVisible` = 화면상 **[콜라보 찾기에 보이기]**(홈·`/search` 목록). 08-07 개명 전 이름이
    *  「검색에 보이기」라 웹 검색으로 오해됐는데, **구글·네이버 노출과는 무관**하다(사이트맵은 전부 싣는다). */
-  setMakerFlags(slug: string, flags: { searchVisible?: boolean }): Promise<Maker | null>;
+  setMakerFlags(slug: string, flags: { searchVisible?: boolean; collabPaused?: boolean }): Promise<Maker | null>;
   setMakerOwner(slug: string, ownerUserId: number): Promise<void>;
   setMakerPasswordHash(slug: string, hash: string): Promise<void>;
   /** enrichment 스냅샷 교체 — B35 특장점 [지우기] 전용. updateMakerContent는 enrichment를 의도적으로 보존한다. */
@@ -55,6 +55,10 @@ export interface Repo {
   isMakerSaved(userId: number, makerId: number): Promise<boolean>;
   setMakerSaved(userId: number, makerId: number, saved: boolean): Promise<void>;
   listSavedMakers(userId: number): Promise<Maker[]>;
+  // 매거진 하트(「잘 읽었어요」) — 찜과 같은 모양(복합 PK, 취소는 delete).
+  countArticleLikes(articleId: number): Promise<number>;
+  isArticleLiked(userId: number, articleId: number): Promise<boolean>;
+  setArticleLiked(userId: number, articleId: number, liked: boolean): Promise<void>;
   // 콜라보 제안 인텐트(append-only) — "콜라보 시작하기" 계측
   recordCollabRequest(fromUserId: number | null, toBrandId: number, channel: string, fromBrandId?: number | null): Promise<void>;
   // Brand DNA(brands.dna, 파생 해석층) + 콜라보 리포트(collab_reports, append-only 쌍 캐시) — 스펙 2026-07-25
@@ -195,6 +199,7 @@ const seedMakers: Maker[] = [
       address: "서울 성동구 성수이로 88 2층 캔버스가든",
     },
     searchVisible: true,
+    collabPaused: false,
     status: "active",
     createdAt: now(),
   },
@@ -221,6 +226,7 @@ const seedMakers: Maker[] = [
       address: "서울 마포구 연남동",
     },
     searchVisible: true,
+    collabPaused: false,
     status: "active",
     createdAt: now(),
   },
@@ -247,6 +253,7 @@ const seedMakers: Maker[] = [
       address: "부산 영도구",
     },
     searchVisible: true,
+    collabPaused: false,
     status: "active",
     createdAt: now(),
   },
@@ -273,6 +280,7 @@ const seedMakers: Maker[] = [
       address: "제주시",
     },
     searchVisible: true,
+    collabPaused: false,
     status: "active",
     createdAt: now(),
   },
@@ -327,6 +335,7 @@ const seedMakers: Maker[] = [
       address: "전북 전주시 완산구 한옥마을길 12",
     },
     searchVisible: false,
+    collabPaused: false,
     status: "active",
     createdAt: now(),
   },
@@ -375,6 +384,7 @@ const seedMakers: Maker[] = [
       address: "대구 중구 종로 24 1층",
     },
     searchVisible: false,
+    collabPaused: false,
     status: "active",
     createdAt: now(),
   },
@@ -426,10 +436,11 @@ class InMemoryRepo implements Repo {
     Object.assign(m, c);
     return m;
   }
-  async setMakerFlags(slug: string, flags: { searchVisible?: boolean }): Promise<Maker | null> {
+  async setMakerFlags(slug: string, flags: { searchVisible?: boolean; collabPaused?: boolean }): Promise<Maker | null> {
     const m = this.makers.find((x) => x.slug === slug);
     if (!m) return null;
     if (flags.searchVisible !== undefined) m.searchVisible = flags.searchVisible;
+    if (flags.collabPaused !== undefined) m.collabPaused = flags.collabPaused;
     return m;
   }
   async setMakerOwner(slug: string, ownerUserId: number): Promise<void> {
@@ -498,7 +509,9 @@ class InMemoryRepo implements Repo {
     return this.articles.some((a) => a.slug === slug);
   }
   async saveArticle(input: MagazineSaveInput): Promise<MagazineArticle> {
-    const prev = this.articles.find((a) => a.slug === input.slug);
+    // 기존 글은 **고치기 전 주소**로 찾는다 — 주소를 바꾸는 중일 수 있다(types.ts prevSlug 주석).
+    const key = input.prevSlug ?? input.slug;
+    const prev = this.articles.find((a) => a.slug === key);
     const publishedAt =
       input.status === "published" ? (prev?.publishedAt ?? now()) : undefined;
     const saved: MagazineArticle = {
@@ -509,7 +522,7 @@ class InMemoryRepo implements Repo {
       updatedAt: now(),
     };
     this.articles = prev
-      ? this.articles.map((a) => (a.slug === input.slug ? saved : a))
+      ? this.articles.map((a) => (a.slug === key ? saved : a))
       : [...this.articles, saved];
     return saved;
   }
@@ -553,6 +566,20 @@ class InMemoryRepo implements Repo {
   }
   async recordCollabRequest(fromUserId: number | null, toBrandId: number, channel: string, fromBrandId: number | null = null): Promise<void> {
     this.collabRequests.push({ fromUserId, toBrandId, channel, fromBrandId, createdAt: now() });
+  }
+  // ── 매거진 하트 ──
+  private articleLikes: { userId: number; articleId: number }[] = [];
+  async countArticleLikes(articleId: number): Promise<number> {
+    return this.articleLikes.filter((l) => l.articleId === articleId).length;
+  }
+  async isArticleLiked(userId: number, articleId: number): Promise<boolean> {
+    return this.articleLikes.some((l) => l.userId === userId && l.articleId === articleId);
+  }
+  async setArticleLiked(userId: number, articleId: number, liked: boolean): Promise<void> {
+    const has = await this.isArticleLiked(userId, articleId);
+    if (liked && !has) this.articleLikes.push({ userId, articleId });
+    if (!liked && has)
+      this.articleLikes = this.articleLikes.filter((l) => !(l.userId === userId && l.articleId === articleId));
   }
   // ── Brand DNA + 콜라보 리포트 (Map 기반 — Supabase와 동일 시그니처) ──
   private dnaByBrand = new Map<number, BrandDna>();
@@ -661,7 +688,7 @@ interface MakerRow {
   keywords?: string[] | null; showcases?: Maker["showcases"] | null;
   offers_description?: string | null; seeks_description?: string | null;
   description?: string | null; // 자세히 소개(07-25 trust.description에서 분리 완료)
-  search_visible: boolean | null; status: string | null; created_at: string; updated_at?: string | null;
+  search_visible: boolean | null; collab_paused?: boolean | null; status: string | null; created_at: string; updated_at?: string | null;
   owner_user_id?: number | null;
   // 수정 비밀번호 해시 — 07-25 claim_token_hash → edit_password_hash 이사(옛 컬럼 폴백)
   edit_password_hash?: string | null; claim_token_hash?: string | null;
@@ -745,6 +772,8 @@ function rowToMaker(r: MakerRow): Maker {
     description: r.description ?? "",
     trust: r.trust ?? {},
     searchVisible: r.search_visible ?? true,
+    // ⚠️`?? false` — 컬럼이 아직 없는 환경(마이그레이션 전)에서도 '받는 중'으로 읽힌다. 기본값이 잠금이면 안 된다.
+    collabPaused: r.collab_paused ?? false,
     status: (r.status as MakerStatus) ?? "active",
     createdAt: r.created_at,
     updatedAt: r.updated_at ?? undefined,
@@ -774,6 +803,7 @@ class SupabaseRepo implements Repo {
       showcases: input.showcases, intro_file_url: input.introFileUrl ?? null,
       keywords: input.keywords, trust: input.trust,
       search_visible: input.searchVisible,
+      collab_paused: input.collabPaused,
       status: "active", // 생성 default = active (소프트 삭제 시에만 inactive)
       enrichment: input.enrichment ?? null,
       owner_user_id: input.ownerUserId ?? null, edit_password_hash: input.editPasswordHash ?? null,
@@ -804,6 +834,7 @@ class SupabaseRepo implements Repo {
       photos: c.photos, showcases: c.showcases, intro_file_url: c.introFileUrl ?? null,
       keywords: c.keywords, trust: c.trust,
       search_visible: c.searchVisible,
+      collab_paused: c.collabPaused,
     };
     const { data } = await this.db.from("brands").update(patch).eq("slug", slug).select().maybeSingle();
     return data ? rowToMaker(data as MakerRow) : null;
@@ -944,7 +975,10 @@ class SupabaseRepo implements Repo {
     // ⭐**발행일은 서버가 정한다.** "draft였다가 처음 published가 되는 순간"에만 찍고, 그 뒤 수정에는 손대지 않는다.
     //   클라가 보내게 하거나 매 저장마다 now()를 넣으면 **글을 고칠 때마다 발행일이 오늘로 밀려**
     //   목록 순서와 아카이브가 통째로 흐트러진다(눈에 잘 안 띄는 종류의 고장).
-    const prev = await this.getArticleForEditor(input.slug);
+    // 🔑기존 글은 **고치기 전 주소**로 찾는다(types.ts prevSlug 주석). 주소를 바꾸는 중이면
+    //   input.slug로는 못 찾아 "새 글"로 오인되고, 발행일이 오늘로 밀린다.
+    const key = input.prevSlug ?? input.slug;
+    const prev = await this.getArticleForEditor(key);
     const publishedAt =
       input.status === "published"
         ? (prev?.publishedAt ?? new Date().toISOString())
@@ -964,23 +998,26 @@ class SupabaseRepo implements Repo {
       body: input.body,
       published_at: publishedAt,
     };
-    // slug가 unique라 onConflict로 upsert. 새 글/수정 분기를 코드에서 하지 않는다(경합에도 안전).
-    const { data, error } = await this.db
-      .from("magazine_articles")
-      .upsert(row, { onConflict: "slug" })
-      .select()
-      .single();
+    // ⚠️upsert(onConflict:"slug")를 쓰지 않는다 — **주소를 바꾸면 같은 글이 하나 더 생긴다**
+    //   (바뀐 주소는 충돌하지 않으니 갱신이 아니라 새 행이 된다). 기존 행이 있으면 옛 주소로
+    //   찾아 갱신하고, 없을 때만 넣는다. 같은 주소로 동시에 새 글을 만드는 경합은 slug UNIQUE가 막고,
+    //   그때는 조용히 덮어쓰는 대신 에러가 나는 게 맞다.
+    const q = prev
+      ? this.db.from("magazine_articles").update(row).eq("slug", key)
+      : this.db.from("magazine_articles").insert(row);
+    const { data, error } = await q.select().single();
     if (error) throw new Error(`아티클 저장에 실패했어요: ${error.message}`);
     return rowToArticle(data as MagazineRow);
   }
 
-  // /my 토글 — 소유자 검증은 actions에서. search_visible 만 부분 갱신.
+  // /my 토글 — 소유자 검증은 actions에서. 넘어온 플래그만 부분 갱신한다.
   async setMakerFlags(
     slug: string,
-    flags: { searchVisible?: boolean }
+    flags: { searchVisible?: boolean; collabPaused?: boolean }
   ): Promise<Maker | null> {
     const patch: Record<string, boolean> = {};
     if (flags.searchVisible !== undefined) patch.search_visible = flags.searchVisible;
+    if (flags.collabPaused !== undefined) patch.collab_paused = flags.collabPaused;
     if (Object.keys(patch).length === 0) return this.getMakerBySlug(slug);
     const { data } = await this.db.from("brands").update(patch).eq("slug", slug).select().maybeSingle();
     return data ? rowToMaker(data as MakerRow) : null;
@@ -1049,6 +1086,44 @@ class SupabaseRepo implements Repo {
   }
   async recordCollabRequest(fromUserId: number | null, toBrandId: number, channel: string, fromBrandId: number | null = null): Promise<void> {
     await this.db.from("collab_requests").insert({ from_user_id: fromUserId, to_brand_id: toBrandId, channel, from_brand_id: fromBrandId });
+  }
+  // ── 매거진 하트(「잘 읽었어요」) ──
+  // 🚨**표가 아직 없어도 글이 열려야 한다.** 코드는 배포로 먼저 나가고 SQL은 대표가 나중에 돌린다
+  //    — 그 사이 여기서 에러를 던지면 매거진 글이 통째로 500이 된다. 조회는 조용히 0/false로,
+  //    쓰기만 에러를 올려 UI가 롤백하게 한다(스키마 축소 사고 08-01과 같은 순서 문제).
+  async countArticleLikes(articleId: number): Promise<number> {
+    const { count, error } = await this.db
+      .from("magazine_likes")
+      .select("user_id", { count: "exact", head: true })
+      .eq("article_id", articleId);
+    if (error) return 0;
+    return count ?? 0;
+  }
+  async isArticleLiked(userId: number, articleId: number): Promise<boolean> {
+    const { data, error } = await this.db
+      .from("magazine_likes")
+      .select("article_id")
+      .eq("user_id", userId)
+      .eq("article_id", articleId)
+      .maybeSingle();
+    if (error) return false;
+    return !!data;
+  }
+  async setArticleLiked(userId: number, articleId: number, liked: boolean): Promise<void> {
+    if (liked) {
+      // 복합 PK라 두 번 눌러도 한 건(멱등) — 찜과 같은 방식.
+      const { error } = await this.db
+        .from("magazine_likes")
+        .upsert({ user_id: userId, article_id: articleId }, { onConflict: "user_id,article_id", ignoreDuplicates: true });
+      if (error) throw new Error(error.message);
+    } else {
+      const { error } = await this.db
+        .from("magazine_likes")
+        .delete()
+        .eq("user_id", userId)
+        .eq("article_id", articleId);
+      if (error) throw new Error(error.message);
+    }
   }
   // ── Brand DNA + 콜라보 리포트 ──
   async getBrandDna(brandId: number): Promise<BrandDna | null> {

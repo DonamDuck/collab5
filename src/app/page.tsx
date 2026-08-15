@@ -5,12 +5,14 @@
 import Link from "next/link";
 import { PreviewPhones } from "./PreviewPhones";
 import { HomeSectionTabs } from "./HomeSectionTabs";
+import { HomeMenuBar } from "./HomeMenuBar";
 import { HomeEnrichBanner } from "./HomeEnrichBanner";
 import { Reveal } from "@/components/Reveal";
 import { BrandGrid } from "@/components/BrandGrid";
-import { SampleReportLink, SampleReportPeek } from "@/components/SampleReport";
+import { SampleReportPeek } from "@/components/SampleReport";
 import { TrackLink } from "@/components/TrackLink";
 import { repo } from "@/lib/repo";
+import { kstDateLabel } from "@/lib/magazine-format";
 
 // n≤12 동안 전량 노출(대표 확정 07-31 — 상한+오래된 순이면 방금 등록한 씨딩 사장님이 자기 브랜드를 못 본다).
 // 24는 "전량"의 방어적 상한 — 넘으면 P3 큐레이션 재론.
@@ -40,6 +42,11 @@ export const revalidate = 300;
 
 export default async function Home() {
   const fetched = await repo.listHomeMakers(GRID_LIMIT);
+  // 매거진 구좌용 — 최신 1편만 쓴다.
+  // ⚠️홈은 ISR 300초라 새 글이 여기 뜨기까지 최대 5분 걸린다. `/magazine`은 force-dynamic이라
+  //   즉시 뜨므로, 발행 직후 두 화면이 잠깐 어긋나는 건 **버그가 아니라 설계**다.
+  const articles = await repo.listPublishedArticles();
+  const leadArticle = articles[0];
   // HOME_ORDER에 있는 것부터 그 순서대로, 없는 건 뒤에 원래 순서 그대로(Array#sort는 안정 정렬).
   const rank = (slug: string) => {
     const i = HOME_ORDER.indexOf(slug);
@@ -48,7 +55,23 @@ export default async function Home() {
   const collabBrands = [...fetched].sort((a, b) => rank(a.slug) - rank(b.slug));
 
   return (
-    <main className="mx-auto w-full max-w-[960px] px-4 py-12 sm:px-6">
+    // ⚠️ 메뉴바는 `<main>` **밖**에 둔다 — main엔 `py-12`(=51px) 상단 패딩이 있어서 안에 넣으면
+    //    스크롤 0에서 헤더와 바 사이가 51px 벌어진다. 밖에 두면 헤더에 딱 붙고, 바가 흐름에서
+    //    차지하는 높이만큼 아래 콘텐츠가 자연히 내려간다(= 대표가 말한 "메뉴바만큼 살짝 아래로").
+    //    sticky 기준 조상은 layout의 `<div className="flex-1">`이라 페이지 끝까지 따라온다.
+    // 🎨**홈만 지면을 한 단 낮춘다**(대표 확정 08-14 — `surface-faint` #fafafb).
+    //    이유는 메뉴바다. 흰 알약을 흰 지면에 올려두니 "메뉴로 안 보인다"(대표). 면을 띄우는 장치는
+    //    밝기 차이·그림자·선·재질 넷뿐인데 우리는 **선 하나**(0.5px)에 거의 전부를 걸고 있었다.
+    //    🔬heytaby 실측(08-14): 지면 `#F5F5F5` + 알약 `흰색 75% + blur(40px)`, **테두리도 그림자도 없음**.
+    //      즉 그쪽은 밝기 차이 하나로만 띄운다. 우리와 정확히 반대(우리는 흰 지면에 흰 알약)였다.
+    //    ⚠️taby와 같은 `#f5f5f6`(=surface-soft)까지 내리는 안은 **기각**했다 — 홈의 `bg-surface-soft`
+    //      요소들(여정 스트립·섹션 ③ 탭바)이 지면에 녹아 사라진다(실측 확인).
+    //      ※「잘 맞는 콜라보」 배지도 예시였으나 08-14 대표 지시로 제거됐다.
+    //      2%만 내린 `surface-faint`는 알약을 띄우면서 그것들을 살려둔다.
+    //    ⚠️전 페이지가 아니라 **홈만**이다. `--canvas`를 바꾸면 전 페이지의 surface-soft 칩이 다 죽는다.
+    <div className="bg-surface-faint">
+      <HomeMenuBar />
+      <main className="mx-auto w-full max-w-[960px] px-4 pb-12 pt-6 sm:px-6">
       {/* 온로드 라이즈 키프레임 — 서버가 <style>로 직접 렌더(React 19 head 호이스트).
           ⚠️Tailwind v4(Lightning CSS)가 유틸로 안 잡히는 raw @keyframes를 제거해서 globals.css엔 못 둠 → 여기 인라인.
           순수 CSS라 JS 하이드레이션 전에도 재생 → 히어로가 안 보이는 위화감 없음(Reveal의 opacity-0 문제 회피). */}
@@ -61,10 +84,6 @@ export default async function Home() {
       `}</style>
       {/* Hero — 온로드 라이즈 1번(순차의 첫 블록) */}
       <section className="home-rise mx-auto max-w-[600px] text-center">
-        <div className="mb-4 inline-flex items-center gap-1.5 rounded-pill bg-surface-soft px-3 py-1">
-          <span className="h-2 w-2 rounded-pill bg-primary" />
-          <span className="text-[12px] font-medium text-mute">잘 맞는 콜라보</span>
-        </div>
         {/* 타이포 스케일 — 계단뿌셔클럽 fresh-load 실측 기준(대표 QA 07-31).
             ⚠️ Framer 사이트는 브레이크포인트 변형을 **로드 시점에** 확정한다. 창만 리사이즈하면
                이전 변형이 남은 채 줌으로 우겨넣어져 DevTools에 엉뚱한 px가 찍힌다 — 반드시 새로고침 후 측정.
@@ -73,7 +92,7 @@ export default async function Home() {
             넓은 화면일수록 위계 대비를 벌리는 것(모바일 1.5~1.75배 → 데스크탑 2.0배). */}
         {/* 슬로건 B′ — 콜라보 프레임(대표 확정 07-31 아침, "변경" 지시). '시작'만 약속(11곳으로도 이행 가능).
             디자인팀 차별화 변형이 나오면 2안 비교로 교체 가능. */}
-        <h1 className="break-keep text-[28px] font-bold leading-[1.3] tracking-[-0.03em] text-ink sm:text-[40px]">
+        <h1 className="break-keep text-[30px] font-bold leading-[1.28] tracking-[-0.032em] text-ink sm:text-[44px]">
           우리 브랜드,
           <br />
           이제는 콜라보할 차례예요.
@@ -91,7 +110,12 @@ export default async function Home() {
             "무료로 시작해보세요"를 읽은 직후 = 뭘 하게 되는지 궁금한 순간이고,
             버튼을 누르기 직전에 기대치를 맞춰준다. 아래에 두면 CTA 뒤라 아무도 안 본다. */}
         <FlowStrip />
-        <div className="mx-auto mt-7 flex max-w-[420px] flex-col items-stretch gap-2">
+        {/* 🔻08-14 히어로 CTA는 **하나만** 남는다(대표 지시).
+            「콜라보 추천 리포트 미리보기」는 섹션 ③의 예시 카드 밑으로 내려갔다 — 거기가 방금
+            리포트 실물을 본 직후라 "전체를 보고 싶다"가 자연히 생기는 자리다. 히어로에선 소개서
+            등록과 나란히 서서 시선을 나눠 갖고 있었다.
+            ⚠️둘은 **같은 시트**를 연다 — 옮긴 것이지 새로 만든 게 아니다. */}
+        <div className="mx-auto mt-7 max-w-[420px]">
           <TrackLink
             href="/register"
             event="home_hero_register_click"
@@ -99,9 +123,6 @@ export default async function Home() {
           >
             브랜드 소개서 등록하기(3분)
           </TrackLink>
-          {/* 분석 진입은 보더 버튼으로 승격(대표 07-31 "텍스트 링크는 안 보인다") —
-              단 1번 CTA는 여전히 소개서(레드팀 R1: 분석 1번은 콜드스타트 절벽). 라벨 정직: 목적지=예시 시트. */}
-          <SampleReportLink />
         </div>
       </section>
 
@@ -109,14 +130,23 @@ export default async function Home() {
           씨딩 사장님·소개서 수신 브랜드의 첫 질문). 그리드 전량 노출, 정렬 최신순(repo).
           soft 밴드·통째 리빌·풀블리드 box-shadow 기법은 캐러셀 시절(07-27~29) 그대로 승계. */}
       {collabBrands.length >= MIN_GRID && (
-        // ⚠️ **Reveal을 쓰지 않는다**(07-31 대표 "최상단이 어색하다" 실측 결과).
-        //    히어로 바로 다음 섹션인데 높이가 738px이라, Reveal의 threshold 0.15는 **110px이 보여야** 터진다.
-        //    스크롤 0에서 이 밴드는 82px만 보이므로 안 터지고 → 첫 화면 바로 아래에 **738px 투명 구멍**이 남았다.
-        //    (`eager`로 하단 컷을 없애도 threshold는 그대로라 해결 안 됨 — 실측 확인)
-        //    이 섹션은 홈의 주 콘텐츠다. 등장 연출보다 "바로 보이는 것"이 우선.
-        <section
-          className="mt-10 -mx-4 bg-surface-soft px-4 py-10 [box-shadow:0_0_0_100vmax_var(--surface-soft)] [clip-path:inset(0_-100vmax)] sm:-mx-6 sm:px-6"
-        >
+        // ⭐등장은 **히어로와 한 몸**이다(08-14 대표 지시) — `home-rise`를 딜레이 없이 같이 태운다.
+        //    ⚠️`Reveal`(IntersectionObserver)은 여기서 못 쓴다. 07-31에 한 번 붙였다가 뺐는데,
+        //      threshold 0.15는 이 섹션(높이 738px)의 **110px이 보여야** 터지는데 스크롤 0에서는
+        //      82px만 보여 안 터졌고, 첫 화면 바로 아래에 **738px 투명 구멍**이 남았다.
+        //      (`eager`로 하단 컷을 없애도 threshold는 그대로라 해결 안 됨 — 실측)
+        //    → `home-rise`는 **온로드 CSS 애니메이션**이라 스크롤 위치와 무관하게 항상 재생된다.
+        //      그래서 "안 터지는" 사고가 구조적으로 불가능하다. 아래 섹션 ③이 쓰는 것과 같은 장치인데,
+        //      거긴 `animationDelay: 600ms`로 순차를 만들고 **여기는 딜레이 0** — 히어로와 동시에 뜬다.
+        // ⭐밴드(회색 면) 제거 — 08-14 대표 확정. 순백 페이지 한가운데에 회색 섹션 하나만 있으면
+        //   "왜 여기만?"으로 읽힌다(redesign-skill: 라이트 페이지의 이질적 섹션 = 복붙 사고처럼 보임).
+        //   섹션 구분은 제목과 여백이 맡는다. 풀블리드 box-shadow/clip-path 기법도 같이 걷어냈다.
+        // 📏간격 `mt-12`(51px) — 밴드를 걷어낼 때 `mt-14`(59.5px)로 잡았다가 08-14에 내렸다.
+        //   히어로 CTA가 둘 → 하나로 줄면서 CTA 덩어리 높이가 104 → 48px로 반토막 났는데
+        //   아래 여백만 그대로라 **버튼이 어디에도 안 붙은 것처럼** 보였다(대표 지적).
+        //   ⚠️51px은 임의값이 아니라 **다른 섹션 간격과 같은 값**이다(실측: 43·51·51·51).
+        //     히어로 다음만 60px으로 혼자 넓었던 것 — 리듬을 맞추면 그 어색함이 사라진다.
+        <section className="home-rise mt-12 -mx-4 px-4 py-4 sm:-mx-6 sm:px-6">
           <h2 className="text-balance break-keep text-center text-[24px] font-bold leading-[1.35] tracking-[-0.02em] text-ink sm:text-[28px]">
             지금, 콜라보 가능한 브랜드예요.
           </h2>
@@ -136,13 +166,17 @@ export default async function Home() {
         {/* 앵커 탭 — 섹션 ③은 ⓐ소개서 만들기 / ⓑ콜라보 분석 두 덩어리라, 맨 위에 목차를 세워
             "다른 하나도 있다"를 먼저 알린다(대표 지시 08-02). 섹션 안에서만 sticky. 상세는 HomeSectionTabs.tsx. */}
         <HomeSectionTabs />
-        {/* ⚠️ id는 HomeSectionTabs.tsx의 TABS와 짝. 바꾸면 둘 다.
-            scroll-mt-32 = 8rem인데 이 저장소 루트 폰트가 17px이라 **136px**이다(128 아님).
-            헤더 59.5 + 탭바 65.75 = 125.25를 실측해 얹은 값. HomeSectionTabs의 ANCHOR_LINE_PX와
-            **같은 값**이어야 한다(눌러 간 자리 ≠ 활성 판정 자리가 되면 안 된다). */}
+        {/* ⚠️ id는 HomeSectionTabs.tsx의 TABS·HomeMenuBar의 REPORT_ANCHOR와 짝. 바꾸면 셋 다.
+            🔢 152px = **헤더 59.5 + HomeMenuBar 밴드 70 = 129.5** + 숨 쉴 틈 22.5(실측 08-14).
+               08-14에 상단 메뉴바가 생기고 폰트가 커지면서 가려야 할 높이가 125.25 → 129.5로 올랐다.
+               옛 값 `scroll-mt-32`(=8rem, 루트 17px라 136px)로 두면 여유가 6.5px밖에 안 남아,
+               폰트 로드·기기 배율로 서브픽셀이 반대로 떨어지면 **제목이 바 밑에 깔린다.**
+            ⚠️ rem 유틸을 쓰지 않고 px를 박은 이유 — 이 저장소는 루트 폰트가 17px이라 `scroll-mt-*`가
+               16 기준이 아니다(8rem이 128이 아니라 136). 실측값을 그대로 쓰는 편이 안 헷갈린다.
+            ⚠️ HomeSectionTabs의 ANCHOR_LINE_PX와 **같은 값**이어야 한다. 바꾸면 둘 다. */}
         <h2
           id="home-brandpage"
-          className="scroll-mt-32 text-balance break-keep text-center text-[24px] font-bold leading-[1.35] tracking-[-0.02em] text-ink sm:text-[28px]"
+          className="mt-7 scroll-mt-[152px] text-balance break-keep text-center text-[24px] font-bold leading-[1.35] tracking-[-0.02em] text-ink sm:mt-9 sm:text-[28px]"
         >
           3분이면 브랜드 소개서가 완성돼요.
         </h2>
@@ -176,15 +210,23 @@ export default async function Home() {
           {/* h3 → h2 승격 + 크기도 형제 제목과 동일(08-02). 원래 이것만 h3/20px이라 "혼자 작아 보인다"(대표 QA).
               단순히 크기만 키우고 h3를 두면 안 된다 — 앵커 탭의 목적지가 되면서 이 구간은
               '소개서 구간의 하위 설명'이 아니라 **동급 섹션**이 됐다. 마크업이 보이는 위계를 따라가야 한다.
-              ⚠️ id/scroll-mt-32는 위 h2와 같은 규칙(HomeSectionTabs.tsx의 TABS·ANCHOR_LINE_PX와 짝). */}
+              ⚠️ id/scroll-mt-[152px]는 위 h2와 같은 규칙(HomeSectionTabs.tsx의 TABS·ANCHOR_LINE_PX와 짝). */}
           <h2
             id="home-collab-report"
-            className="scroll-mt-32 text-balance break-keep text-[24px] font-bold leading-[1.35] tracking-[-0.02em] text-ink sm:text-[28px]"
+            className="scroll-mt-[152px] break-keep text-[24px] font-bold leading-[1.35] tracking-[-0.02em] text-ink sm:text-[28px]"
           >
-            소개서를 만들면 이런 콜라보 리포트를 받아볼 수 있어요.
+            {/* 줄바꿈 자리는 대표가 직접 지정(08-14). `text-balance`를 뺀 이유 — 균형 알고리즘이
+                줄을 다시 나누려 들어 지정한 자리와 싸운다. 끊는 자리를 사람이 정했으면 그게 정본이다. */}
+            소개서를 만들면
+            <br />
+            콜라보 아이디어를 받아볼 수 있어요.
           </h2>
-          <p className="mx-auto mt-2 max-w-[440px] break-keep text-[16px] leading-[1.65] text-body sm:text-[17px]">
-            두 브랜드가 왜 함께하면 좋을지, 함께 하면 좋을 만한 콜라보 아이디어를 알려드려요.
+          <p className="mx-auto mt-2 max-w-[520px] break-keep text-[16px] leading-[1.65] text-body sm:text-[17px]">
+            두 브랜드가 왜 함께하면 좋을지, 함께 하면 좋을 만한
+            {/* ⚠️좁은 화면에선 앞줄이 어차피 두 줄로 접혀서, 여기서 또 끊으면 3줄이 된다.
+                → 지정 줄바꿈은 **sm 이상에서만** 먹인다(모바일은 자연 줄바꿈에 맡긴다). */}
+            <br className="hidden sm:inline" />{" "}
+            콜라보 아이디어를 알려드려요.
           </p>
           <div className="mt-6">
             <SampleReportPeek />
@@ -248,6 +290,94 @@ export default async function Home() {
         </Reveal>
       </section>
 
+      {/* ── 매거진 구좌 (2026-08-13, 1팀 요청 → 디자인팀) ──
+           🚨**이 자리는 장식이 아니라 유일한 진입로다.** 헤더의 「매거진」은 데스크톱에만 있다 —
+             375px에서 로고+우측메뉴가 306px를 먹어 남는 폭이 35px뿐이라 텍스트 링크(66px)도
+             아이콘(38px)도 안 들어간다(1팀 실측). 「콜라보 찾기」 칩을 아이콘으로 되돌리면 자리가
+             나지만 그건 07-29 가로 스크롤 사고로 겨우 회수한 자리라 되돌릴 수 없다. 풋터에도
+             넣었지만 끝까지 스크롤해야 나오니 진입로 구실을 못 한다.
+             → **모바일에서 매거진에 닿는 길은 지금 여기뿐이다. 지우거나 아래로 밀지 말 것.**
+
+           자리 = 「콜라보의 시작이 이렇게 달라져요」 **바로 다음**(1팀 제안 채택). 설명을 다 읽고
+             "진짜?" 싶어지는 순간에 실물 증거가 나오는 자리다.
+
+           ⭐어휘 — **섹션 헤더는 홈 어휘(중앙정렬), 카드 안쪽은 매거진 어휘(좌측정렬)**로 섞었다.
+             홈은 전부 중앙정렬이라 헤더까지 좌측정렬로 하면 이 구좌만 홈에서 떠 보이고, 반대로
+             카드 안까지 중앙정렬하면 매거진에 도착했을 때 얼굴이 안 이어진다. 지면 한 장을 홈에
+             인용해 붙인 꼴로 읽히게 한 것.
+           ⛔박스로 감싸지 않는다 — 「박스는 고르는 것, 줄은 읽는 것」(디자인-시스템 § 카드 어휘).
+             박스를 입히면 바로 위 BrandGrid의 '고르는 브랜드'와 같은 옷이 된다. 대신 위아래
+             hairline 룰로 '지면'임을 표시한다. */}
+      {leadArticle && (
+        <Reveal as="section" className="mt-12">
+          {/* 카피 = 대표 확정(08-14). 제목이 **질문형**인 게 핵심 — 이 섹션은 기능 설명이 아니라
+              "궁금하면 읽어보세요"라 물음표가 자연스럽다(위 섹션들은 전부 서술형이라 대비도 된다).
+              부제는 매거진의 **이름을 대는 자리**라 문장을 안 닫고 고유명사로 끝낸다. */}
+          <h2 className="text-balance break-keep text-center text-[24px] font-bold leading-[1.35] tracking-[-0.02em] text-ink sm:text-[28px]">
+            두 브랜드가 만나면, 어떤 이야기가 생길까요?
+          </h2>
+          <p className="mx-auto mt-2 max-w-[460px] break-keep text-center text-[16px] leading-[1.65] text-body sm:text-[17px]">
+            브랜드들이 만나 만드는 콜라보 이야기를 기록하는 ‘collab5 매거진’
+          </p>
+
+          <div className="mt-8 border-y border-hairline">
+            <Link
+              href={`/magazine/${leadArticle.slug}`}
+              className="block py-6 transition-opacity hover:opacity-70 sm:py-8"
+            >
+              <div className="grid items-center gap-5 sm:grid-cols-[1fr_280px] sm:gap-8">
+                {leadArticle.coverImage && (
+                  // 폰에선 사진이 먼저 — 잡지는 사진이 붙잡고 글이 따라오는 매체다(목록 히어로와 같은 규칙).
+                  <div className="order-first overflow-hidden rounded-lg bg-surface-soft sm:order-last">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={leadArticle.coverImage}
+                      alt=""
+                      loading="lazy"
+                      className="aspect-[4/3] w-full object-cover"
+                    />
+                  </div>
+                )}
+                <div className="min-w-0 text-left">
+                  {/* 「창간호」 — 1편뿐인 게 흠이 아니라 **사건**으로 읽히게 하는 프레이밍(1팀 제안).
+                      2편부터는 자동으로 「최신호」가 된다. 매거진 목록 히어로도 같은 규칙을 쓴다. */}
+                  <span className="text-[12px] font-medium tracking-[0.1em] text-faint">
+                    {articles.length === 1 ? "창간호" : "최신호"}
+                  </span>
+                  {leadArticle.subtitle && (
+                    <p className="mt-2.5 text-[13px] font-medium break-keep text-primary-on">
+                      {leadArticle.subtitle}
+                    </p>
+                  )}
+                  <h3 className="mt-1.5 text-[22px] font-bold leading-[1.3] tracking-[-0.01em] text-balance break-keep text-ink sm:text-[26px]">
+                    {leadArticle.title}
+                  </h3>
+                  {leadArticle.summary && (
+                    <p className="mt-2.5 line-clamp-2 text-[15px] leading-relaxed break-keep text-body">
+                      {leadArticle.summary}
+                    </p>
+                  )}
+                  <p className="mt-3 text-[13px] text-faint">
+                    {leadArticle.editorName}
+                    {leadArticle.publishedAt && ` · ${kstDateLabel(leadArticle.publishedAt)}`}
+                  </p>
+                </div>
+              </div>
+            </Link>
+          </div>
+
+          {/* 고스트 — 아래 마무리 CTA가 primary Kiwi라, 여기까지 primary면 진짜 CTA와 경쟁한다. */}
+          <div className="mt-6 text-center">
+            <Link
+              href="/magazine"
+              className="inline-flex h-11 items-center justify-center rounded-md border border-border-strong bg-surface px-5 text-[15px] font-medium text-ink transition-colors hover:bg-surface-soft"
+            >
+              매거진 더 보기
+            </Link>
+          </div>
+        </Reveal>
+      )}
+
       {/* 마무리 CTA — eager 필수: 페이지 맨 마지막 요소라 하단 -22% 데드존을 못 벗어나 리빌이 영영 안 터짐 */}
       <Reveal as="section" eager className="mt-12 text-center">
         {/* 미션 한 줄 — 소개서가 쌓이면 발견으로 이어진다(BM 발굴 방향을 고객 언어로, 대표 확정 2026-07-23) */}
@@ -261,7 +391,10 @@ export default async function Home() {
           지금 시작하기
         </Link>
       </Reveal>
-    </main>
+      {/* ⚠️ main 안쪽은 일부러 **재들여쓰기하지 않았다** — 프래그먼트 하나 때문에 340줄을 밀면
+          지금 같은 홈을 만지고 있을 수 있는 옆 세션과 통째로 충돌한다(한 작업트리 공유). */}
+      </main>
+    </div>
   );
 }
 
@@ -273,37 +406,28 @@ export default async function Home() {
  *  라벨이 길어져(최대 10자) 375px에서 열당 ~90px → `break-keep`으로 두 줄까지 허용. */
 function FlowStrip() {
   const steps = [
-    { label: "소개서 3분 작성", desc: "AI가 작성 도움" },
-    { label: "콜라보 둘러보기", desc: "등록 브랜드 서칭" },
-    { label: "AI 콜라보 추천", desc: "✨콜라보 아이디어 확인" },
+    { label: "소개서 3분 작성" },
+    { label: "콜라보 둘러보기" },
+    { label: "AI 콜라보 추천" },
   ];
+  // ⭐숫자 배지를 쓰지 않는다(08-14 대표 확정).
+  //   redesign-skill 진단: "3등분 균등 칸을 기능 소개로 쓰는 건 가장 흔한 AI 레이아웃."
+  //   원형 Kiwi 배지 3개가 나란한 게 '템플릿' 인상의 핵심이었다. 순서는 화살표가 이미 말하므로
+  //   숫자는 같은 말을 두 번 하는 것이었고, 빼고 나니 라벨만 남아 훨씬 조용해졌다.
+  //   ⚠️부제("AI가 작성 도움" 등)도 같이 뺐다 — 라벨만으로 흐름이 읽히고, 부제까지 두면
+  //     칸마다 줄 수가 달라져 세 칸의 바닥선이 어긋난다(3번 칸만 두 줄이던 문제).
   return (
-    <div className="mx-auto mt-7 flex max-w-[460px] items-start justify-center rounded-lg bg-surface-soft px-2 py-4 sm:px-4">
+    <div className="mx-auto mt-7 flex max-w-[460px] items-center justify-center gap-1.5 rounded-lg bg-surface-faint px-3 py-3.5 sm:gap-2.5 sm:px-4">
       {steps.map((s, i) => (
-        <div key={s.label} className="flex flex-1 items-start">
+        <div key={s.label} className="flex min-w-0 flex-1 items-center gap-1.5 sm:gap-2.5">
           {i > 0 && (
-            <svg
-              viewBox="0 0 20 20"
-              className="mt-2 h-4 w-4 shrink-0 text-faint"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.8"
-              aria-hidden="true"
-            >
+            <svg viewBox="0 0 20 20" className="h-3.5 w-3.5 shrink-0 text-faint" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
               <path d="M7 4l6 6-6 6" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           )}
-          <div className="flex-1 px-0.5 text-center">
-            <span className="mx-auto flex h-7 w-7 items-center justify-center rounded-pill bg-primary text-[13px] font-bold text-primary-on">
-              {i + 1}
-            </span>
-            <p className="mt-2 break-keep text-[12.5px] font-bold leading-[1.35] text-ink sm:text-[14px]">
-              {s.label}
-            </p>
-            <p className="mt-1 break-keep text-[11px] leading-[1.35] text-mute sm:text-[12px]">
-              {s.desc}
-            </p>
-          </div>
+          <p className="min-w-0 flex-1 break-keep text-center text-[12.5px] font-bold leading-[1.3] text-ink sm:text-[14px]">
+            {s.label}
+          </p>
         </div>
       ))}
     </div>

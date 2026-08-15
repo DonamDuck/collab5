@@ -44,6 +44,52 @@ export const CaptionedImage = Image.extend({
         renderHTML: (attrs) =>
           attrs.caption ? { "data-caption": attrs.caption as string } : {},
       },
+      /** 표시 가로폭(px). `null`이면 본문 폭에 꽉 채운다(기존 동작).
+       *  ⚠️**높이는 저장하지 않는다** — 가로만 정하고 세로는 비율대로 따라가게 둔다.
+       *  둘 다 저장하면 나중에 원본을 바꾸거나 본문 폭이 달라질 때 사진이 찌그러진다.
+       *  ⚠️이 값은 **상한이지 고정폭이 아니다.** 렌더 쪽에서 `max-width`로 쓰므로,
+       *  모바일처럼 화면이 더 좁으면 화면에 맞춰 줄어든다(대표 지시 08-10). */
+      width: {
+        default: null,
+        parseHTML: (el) => {
+          const w = Number(el.getAttribute("data-width"));
+          return Number.isFinite(w) && w > 0 ? w : null;
+        },
+        // `style`을 같이 주는 이유 = **편집 화면에서도 바로 보이게.** data-width만 심으면
+        // 저장 후 상세에서만 크기가 반영돼, 쓰는 사람은 결과를 못 보고 감으로 값을 넣게 된다.
+        // (상세 렌더러는 이 style이 아니라 attrs.width를 직접 읽는다 — 그쪽이 정본.)
+        //
+        // 🚨**`min(…, 100%)`을 빼면 안 된다.** 이미지가 본문 폭에 맞춰 줄어드는 건
+        //    Tailwind preflight의 `img { max-width: 100% }` 덕분인데, 여기서 `max-width`에
+        //    px만 주면 **같은 속성이라 그 규칙을 덮어써 버린다.** 그러면 상한이 아니라 사실상
+        //    고정폭이 돼, 폰(본문 폭 ~290px)에서 480px 사진이 칸 밖으로 삐져나간다.
+        //    에디터 바깥 상자가 `overflow-hidden`이라 삐져나간 만큼 잘려서, 화면에는
+        //    **"눌러도 크기가 그대로"로 보인다**(08-12 실측 — 대표가 본 증상이 이것).
+        renderHTML: (attrs) =>
+          attrs.width
+            ? {
+                "data-width": String(attrs.width),
+                style: `max-width:min(${attrs.width}px, 100%)`,
+              }
+            : {},
+      },
     };
+  },
+
+  /** 편집 화면에서도 **캡션이 사진 아래 보이게** 한다(대표 지시 08-14).
+   *  전엔 캡션이 `data-caption` 속성으로만 들어가 발행된 글에서만 보였다 — 쓰는 사람은 결과를
+   *  못 본 채 감으로 적어야 했고, 실제로 "캡션이 안 나온다"는 제보로 돌아왔다.
+   *
+   *  ⭐**캡션을 `<figcaption>` 텍스트로 넣지 않고 `data-caption` + CSS `::after`로 그린다.**
+   *    텍스트 노드로 넣으면 에디터 안에서 사진을 복사·붙여넣을 때 그 글자가 **본문 문단으로 한 번 더**
+   *    들어온다(붙여넣기는 DOM을 다시 파싱하므로). 가짜 텍스트는 클립보드에도 안 담기고 파서도 못 본다.
+   *  ⚠️`data-caption`은 `<img>`에도 그대로 남긴다 — `parseHTML`이 img에서 읽는 계약이라
+   *    figure에만 두면 복사·붙여넣기에서 캡션이 증발한다.
+   *  ⚠️캡션이 없으면 예전처럼 `<img>` 하나만 낸다 — 빈 figure가 여백을 만들지 않게. */
+  renderHTML({ HTMLAttributes }) {
+    const attrs = mergeAttributes(this.options.HTMLAttributes, HTMLAttributes);
+    const caption = attrs["data-caption"];
+    if (!caption) return ["img", attrs];
+    return ["figure", { class: "mag-figure", "data-caption": caption }, ["img", attrs]];
   },
 });

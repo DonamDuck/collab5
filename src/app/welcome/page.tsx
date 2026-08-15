@@ -127,13 +127,13 @@ export default function WelcomePage() {
   if (phase === "expired") {
     return (
       <main className="mx-auto w-full max-w-[400px] px-4 py-14 sm:px-6">
-        <h1 className="text-2xl font-bold tracking-tight text-ink">다시 로그인해주세요</h1>
+        <h1 className="text-[24px] font-bold leading-[1.25] tracking-[-0.025em] text-ink">다시 로그인해주세요</h1>
         <p role="alert" className="mt-2 text-[15px] text-mute">
           로그인 정보를 확인하지 못했어요. 한 번 더 시도하면 대부분 해결돼요.
         </p>
         <Link
           href="/login"
-          className="mt-6 flex h-12 w-full items-center justify-center rounded-md bg-primary text-base font-medium text-primary-on"
+          className="mt-6 flex h-12 w-full items-center justify-center rounded-md bg-primary text-[16px] font-medium text-primary-on"
         >
           로그인하러 가기
         </Link>
@@ -143,7 +143,7 @@ export default function WelcomePage() {
 
   return (
     <main className="mx-auto w-full max-w-[400px] px-4 py-14 sm:px-6">
-      <h1 className="text-2xl font-bold tracking-tight text-ink">거의 다 왔어요</h1>
+      <h1 className="text-[24px] font-bold tracking-tight text-ink">거의 다 왔어요</h1>
       <p className="mt-2 text-[15px] text-mute">
         소개서에 쓸 브랜드 이름과 연락받을 번호를 알려주세요.
       </p>
@@ -203,7 +203,7 @@ export default function WelcomePage() {
           <Field label="로고 또는 브랜드 사진" optional>
             <div className="flex items-center gap-3">
               <Avatar image={image || undefined} name={brandName || "?"} size={48} />
-              <label className="inline-flex h-9 cursor-pointer items-center rounded-md border border-border-strong bg-surface px-3 text-sm font-medium text-ink">
+              <label className="inline-flex h-9 cursor-pointer items-center rounded-md border border-border-strong bg-surface px-3 text-[14px] font-medium text-ink">
                 {imgUploading ? "업로드 중…" : "이미지 선택"}
                 <input
                   type="file"
@@ -216,7 +216,7 @@ export default function WelcomePage() {
                 <button
                   type="button"
                   onClick={() => setImage("")}
-                  className="text-sm text-faint hover:text-ink"
+                  className="text-[14px] text-faint hover:text-ink"
                 >
                   지우기
                 </button>
@@ -227,7 +227,7 @@ export default function WelcomePage() {
 
         {/* 라이브 리전 — 없으면 스크린리더는 왜 막혔는지 못 듣는다 */}
         {err && (
-          <p role="alert" className="mt-3 text-sm text-red-600">
+          <p role="alert" className="mt-3 text-[14px] text-red-600">
             {err}
           </p>
         )}
@@ -235,7 +235,7 @@ export default function WelcomePage() {
           type="submit"
           // disabled는 pending 계열만 — 빈 칸으로 눌러도 이유를 문구로 말해준다(확정 폴리시)
           disabled={pending}
-          className="mt-5 h-12 w-full rounded-md bg-primary text-base font-medium text-primary-on disabled:opacity-50"
+          className="mt-5 h-12 w-full rounded-md bg-primary text-[16px] font-medium text-primary-on disabled:opacity-50"
         >
           {pending ? "저장 중…" : "시작하기"}
         </button>

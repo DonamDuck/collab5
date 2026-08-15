@@ -164,7 +164,9 @@ async function cloneOne({ from, to, stripPhotos }: { from: string; to: string; s
     keywords: row.keywords,
     trust: row.trust,
     enrichment: row.enrichment,
-    search_visible: false, // 검색 미노출(= 콜라보 제안도 안 들어옴). 07-31 collab_open 폐지
+    // 목록 미노출(홈·/search). ⚠️08-12부터 이건 **제안 수신과 무관**하다 — 「요청 잠시 안받기」가
+    //   `collab_paused`로 분리됐다. 데모는 링크로 열리므로 제안 버튼은 그대로 살아 있다(의도된 상태).
+    search_visible: false,
     status: "active", // ⚠️필수 — 없으면 읽기 함수(status='active' 필터)가 걸러내 404가 된다
     owner_user_id: row.owner_user_id,
     edit_password_hash: row.edit_password_hash,

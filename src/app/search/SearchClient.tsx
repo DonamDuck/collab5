@@ -60,7 +60,7 @@ export function SearchClient({ all }: { all: Maker[] }) {
 
   return (
     <main className="mx-auto w-full max-w-[640px] px-4 py-8 sm:px-6 lg:max-w-4xl">
-      <h1 className="text-[28px] font-bold tracking-tight text-ink sm:text-[32px]">콜라보 찾기</h1>
+      <h1 className="text-[26px] font-bold leading-[1.25] tracking-[-0.025em] text-ink sm:text-[32px]">콜라보 찾기</h1>
       <p className="mt-2 text-[17px] leading-relaxed text-body">잘 맞는 콜라보 파트너를 찾아보세요.</p>
 
       {/* 검색바 — 데스크탑 폭 캡(QA P2)
@@ -73,7 +73,7 @@ export function SearchClient({ all }: { all: Maker[] }) {
           onChange={(e) => setQ(e.target.value)}
           placeholder="상호, 분위기, 콜라보 유형으로 검색"
           aria-label="브랜드 검색"
-          className="h-full flex-1 bg-transparent text-base text-ink outline-none placeholder:text-faint"
+          className="h-full flex-1 bg-transparent text-[16px] text-ink outline-none placeholder:text-faint"
         />
       </div>
 
@@ -86,7 +86,7 @@ export function SearchClient({ all }: { all: Maker[] }) {
               key={t}
               type="button"
               onClick={() => toggleType(t)}
-              className={`inline-flex h-8 items-center rounded-pill border px-3 text-sm transition-colors ${
+              className={`inline-flex h-8 items-center rounded-pill border px-3 text-[14px] transition-colors ${
                 on
                   ? "border-primary bg-primary-tint text-primary-on"
                   : "border-hairline bg-surface text-mute"
@@ -100,7 +100,7 @@ export function SearchClient({ all }: { all: Maker[] }) {
 
       {/* 결과 */}
       <div className="mt-6">
-        {shown.length > 0 && <p className="mb-3 text-sm text-mute">총 {shown.length}곳</p>}
+        {shown.length > 0 && <p className="mb-3 text-[14px] text-mute">총 {shown.length}곳</p>}
 
         {/* Empty State — **콜드스타트(등록 0건)와 무결과는 다른 상황이다**(QA #33).
             전엔 한 문구로 뭉뚱그려서, 필터를 걸어 0건이 된 사람에게도 "직접 등록해보세요"라고 했다.
@@ -109,8 +109,8 @@ export function SearchClient({ all }: { all: Maker[] }) {
           <div className="rounded-lg border border-hairline bg-surface px-4 py-10 text-center">
             {narrowed ? (
               <>
-                <p className="text-base font-medium text-ink">조건에 맞는 브랜드가 없어요</p>
-                <p className="mt-1 text-sm text-mute">
+                <p className="text-[16px] font-medium text-ink">조건에 맞는 브랜드가 없어요</p>
+                <p className="mt-1 text-[14px] text-mute">
                   검색어나 콜라보 유형을 바꾸면 더 많은 브랜드를 볼 수 있어요.
                 </p>
                 <button
@@ -119,20 +119,20 @@ export function SearchClient({ all }: { all: Maker[] }) {
                     setQ("");
                     setTypes([]);
                   }}
-                  className="mt-4 inline-flex h-10 items-center rounded-md border border-border-strong bg-surface px-4 text-sm font-medium text-ink"
+                  className="mt-4 inline-flex h-10 items-center rounded-md border border-border-strong bg-surface px-4 text-[14px] font-medium text-ink"
                 >
                   검색·필터 초기화
                 </button>
               </>
             ) : (
               <>
-                <p className="text-base font-medium text-ink">아직 등록된 브랜드가 없어요</p>
-                <p className="mt-1 text-sm text-mute">
+                <p className="text-[16px] font-medium text-ink">아직 등록된 브랜드가 없어요</p>
+                <p className="mt-1 text-[14px] text-mute">
                   첫 소개서를 만들어 콜라보를 시작해보세요.
                 </p>
                 <Link
                   href="/register"
-                  className="mt-4 inline-flex h-10 items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-on"
+                  className="mt-4 inline-flex h-10 items-center rounded-md bg-primary px-4 text-[14px] font-medium text-primary-on"
                 >
                   브랜드 소개서 만들기
                 </Link>
@@ -168,11 +168,11 @@ export function SearchClient({ all }: { all: Maker[] }) {
                 <div className="px-4 py-3">
                   <div className="flex min-w-0 items-center gap-2">
                     {/* 공백 없는 긴 상호가 카드(overflow-hidden)에 잘려버리지 않고 말줄임되도록 */}
-                    <span className="min-w-0 truncate text-base font-medium text-ink">{m.name}</span>
-                    {m.region && <span className="shrink-0 text-xs text-mute">· {m.region}</span>}
+                    <span className="min-w-0 truncate text-[16px] font-medium text-ink">{m.name}</span>
+                    {m.region && <span className="shrink-0 text-[12px] text-mute">· {m.region}</span>}
                   </div>
                   {m.oneLiner && (
-                    <p className="mt-0.5 line-clamp-1 text-sm text-body">{m.oneLiner}</p>
+                    <p className="mt-0.5 line-clamp-1 text-[14px] text-body">{m.oneLiner}</p>
                   )}
                   {m.keywords.length > 0 && (
                     <div className="mt-2 flex flex-wrap gap-1.5">
@@ -201,7 +201,7 @@ export function SearchClient({ all }: { all: Maker[] }) {
               type="button"
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               disabled={page === 1}
-              className="flex h-9 items-center rounded-md border border-hairline bg-surface px-3 text-sm text-mute disabled:opacity-40"
+              className="flex h-9 items-center rounded-md border border-hairline bg-surface px-3 text-[14px] text-mute disabled:opacity-40"
             >
               이전
             </button>
@@ -211,7 +211,7 @@ export function SearchClient({ all }: { all: Maker[] }) {
                 type="button"
                 onClick={() => setPage(n)}
                 aria-current={n === page ? "page" : undefined}
-                className={`h-9 min-w-9 rounded-md border px-2.5 text-sm ${
+                className={`h-9 min-w-9 rounded-md border px-2.5 text-[14px] ${
                   n === page
                     ? "border-primary bg-primary-tint font-medium text-primary-on"
                     : "border-hairline bg-surface text-mute hover:text-ink"
@@ -224,7 +224,7 @@ export function SearchClient({ all }: { all: Maker[] }) {
               type="button"
               onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
               disabled={page === totalPages}
-              className="flex h-9 items-center rounded-md border border-hairline bg-surface px-3 text-sm text-mute disabled:opacity-40"
+              className="flex h-9 items-center rounded-md border border-hairline bg-surface px-3 text-[14px] text-mute disabled:opacity-40"
             >
               다음
             </button>

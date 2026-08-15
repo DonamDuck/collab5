@@ -13,28 +13,55 @@ import { track } from "@/lib/track";
 import type { CollabReportData } from "@/lib/types";
 import sampleData from "@/lib/sample-report.json";
 
-// 로딩 = **고정 타이틀 + 아래 회색 롤링** (대표 지시 08-02).
-// EnrichWizard `LoadingView`와 같은 얼굴로 맞췄다 — 두 화면 다 "AI가 오래 일하는 중"이라
-// 사장님 입장에선 같은 경험인데, 여기만 타이틀 없이 회색 한 줄이 굴러 **무슨 일이 벌어지는지
-// 모른 채 기다렸다.** 타이틀이 '무엇을'을 고정하고, 롤링이 '지금 어디쯤'을 말한다.
-const LOADING_TITLE = "콜라보 아이디어를 분석하고 있어요";
+// 로딩 = **볼드가 굴러가고, 회색이 고정된다** (대표 지시 08-09 — 08-02 구조를 뒤집었다).
+//
+// 08-02엔 반대였다(볼드 타이틀 고정 + 회색 롤링).
+//   대표 지적: *"볼드만 고정이니 롤링보다 볼드체를 뚫어지게 보게 된다."* 맞는 관찰이다 —
+//   눈은 제일 굵은 것에 붙는데 그게 안 움직이면 화면 전체가 멈춘 것처럼 읽힌다.
+//
+// 고정 줄은 소요시간만 맡는다. '무엇을 하는 중인가'는 아래 롤링이 말한다.
+const LOADING_SUB = "약 30초 정도 소요돼요.";
 
-// 롤링 문구 — 타이틀이 큰 그림을 잡아주므로 여기선 **진행 단계**만 말한다.
-// ⚠️ 예전 1번 문구 "두 소개서를 읽고 있어요…"는 **뺐다**(대표: "똑같이 겹치는 건 빼자").
-//    타이틀과 같은 '-고 있어요' 종결형이라 **타이틀이 두 줄로 보였다** — 롤링은 전부 '~중…'
-//    조각으로 통일해야 타이틀과 역할이 갈린다(위저드 CRAWL_STEPS/GEN_STEPS와 같은 규칙).
-// 순환 간격 = **2000ms**(08-09 대표 지적 "전환 속도 쪼금 느려" → 4000ms에서 단축).
-//   EnrichWizard LoadingView가 원래부터 2000ms였다 — "같은 얼굴" 원칙(위 LOADING_TITLE 주석)을
-//   문구 내용뿐 아니라 **템포**까지 맞춘 것. 2번째 자리(소요시간 안내)가 이제 t=2s·10s·18s·26s에
-//   뜬다(실측 25~28초 기준 3~4회) — 07-31 "아직 참을 만할 때 끝을 알린다"는 취지는 그대로 살아있고
-//   더 자주 재확인시켜준다. (⏱ 파이프라인이 빨라지면 간격도 같이 낮출 것)
-const LOADING_INTERVAL_MS = 2000;
-const LOADING_COPY = [
+// 볼드로 굴러가는 줄 — **순환한다**(대표 확정 08-09: "반복 롤링 나와도 돼").
+// 한때 단조 진행(3단계 × 10s, 순환 없음)으로 만들었다가 되돌렸다. 되돌린 이유가 중요하다 —
+// 순환을 없애면 되돌아감은 사라지지만 **글자가 10초씩 얼어붙어 그게 더 느리게 읽혔다.**
+// 진행의 정직함은 이제 **진행바가 맡는다**(그건 절대 되돌아가지 않는다). 그래서 글자는
+// 되돌아가도 된다 — 두 신호가 역할을 나눠 가진 것이지, 하나가 다른 하나를 대신하지 않는다.
+//
+// ⚠️**문구는 전부 기존 것 그대로다**(대표 지시 08-09 — "임의로 바꾸지 말고 기존 텍스트열로만").
+//   1번은 08-02의 구 타이틀을 되살린 것(대표 08-09). 나머지 셋은 구 LOADING_COPY 그대로다.
+//   빠진 "보통 30초 정도 걸려요…"는 진행이 아니라 소요시간 안내라 위 고정 줄로 자리를 옮겼다.
+// ⚠️ 1번만 문장이고 2~4번은 '~중…' 조각이라 종결형이 섞인다. 예전엔 이게 문제였지만(고정
+//    타이틀 바로 아래 붙어 "타이틀이 두 줄로" 보였다) 지금은 **같은 자리에서 번갈아 뜨므로**
+//    나란히 놓이는 일이 없다. 오히려 1번이 큰 그림, 2~4번이 지금 하는 일로 읽힌다.
+const LOADING_ROLL = [
+  // 말줄임표는 네 줄 다 붙인다(대표 08-14) — 1번만 없으니 굴러갈 때 그 줄에서 한 번 멈칫해 보였다.
+  "콜라보 아이디어를 분석하고 있어요…",
   "두 소개서를 읽는 중…",
-  "보통 30초 정도 걸려요…",
   "접점을 찾는 중…",
   "콜라보를 상상하는 중…",
 ];
+// 2.5s — 대표가 짚은 "2~3초" 범위. 4문구 × 2.5s = 10s 주기라 30초 동안 3바퀴 돈다.
+// 08-02의 2000ms보다 살짝 느린 건 **이제 굴러가는 글자가 볼드**이기 때문이다. 같은 템포라도
+// 굵은 글자가 바뀌면 훨씬 부산하게 읽힌다(가는 회색일 때 기준을 그대로 쓰면 과해진다).
+const LOADING_ROLL_MS = 2500;
+const LOADING_TICK_MS = 250;
+// 진행바 = **약속한 30초를 그대로 따라간다**(대표 확인 08-09). 0~30초는 선형으로 90%까지,
+// 30초를 넘기면 96%를 향해 점점 느려진다.
+//   처음엔 지수 곡선(1-e^(-t/11s))이었는데, 그건 10초에 벌써 60%를 채워 **바로 옆 "약 30초 정도
+//   소요돼요"와 어긋났다.** 소요시간을 화면에 써 붙인 이상 바도 같은 시계를 써야 한다 —
+//   말과 그림이 다른 속도로 가면 둘 다 못 믿게 된다.
+// ⚠️ 그래도 실제 진행률은 아니다. **끝은 타이머가 아니라 API 응답이 정한다** — 그래서 100%를
+//    절대 안 채운다. 다 찼는데 안 끝나는 바는 거짓말로 읽히지만, 덜 찬 바는 "아직 남았다"로
+//    정직하게 읽힌다. 빨리 끝나면 바는 차던 자리에서 그냥 사라진다(그게 좋은 놀라움이다).
+const LOADING_BAR_MAX = 96; // 상한 — 30초를 한참 넘겨도 여기서 멈춘다
+const LOADING_BAR_AT_30S = 90; // 30초 시점의 눈금. 남은 6%가 '초과분'의 몫이다
+const loadingProgress = (elapsedMs: number) => {
+  const t = elapsedMs / 1000;
+  if (t <= 30) return (LOADING_BAR_AT_30S * t) / 30;
+  // 초과 구간 — 90%에서 96%로 수렴(시정수 12s). t=30에서 값이 이어진다.
+  return LOADING_BAR_MAX - (LOADING_BAR_MAX - LOADING_BAR_AT_30S) * Math.exp(-(t - 30) / 12);
+};
 
 type Phase =
   "idle" | "select" | "loading" | "ok" | "thin" | "no_match" | "error";
@@ -58,6 +85,7 @@ export function ReportSheet({
   toName,
   sampleMode,
   onPropose,
+  collabPaused = false,
   initialFromSlug = null,
   restoreOnOpen = false,
   initialReport = null,
@@ -74,6 +102,9 @@ export function ReportSheet({
   toName: string;
   sampleMode: boolean; // 소개서 0개 유저 — 샘플 리포트 티저
   onPropose: () => void; // CTA — 리포트 닫고 제안 시트 오픈(부모가 처리)
+  /** 이 브랜드가 [콜라보 요청 잠시 안받기] 중인가(08-12). 켜져 있으면 CTA를 **버튼이 아니라 안내로** 바꾼다.
+   *  ⚠️버튼만 남기고 눌러도 아무 일 없게 두면 안 된다 — 고장으로 읽힌다. */
+  collabPaused?: boolean;
   initialFromSlug?: string | null; // /my 아카이브 딥링크 — 이 slug로 선택 스텝 없이 바로 실행
   /** 제안 시트 [← 뒤로]로 다시 열렸다 — **손에 쥔 결과를 버리지 않고 그대로 되살린다**(08-08 대표 QA).
    *  네트워크·유료 콜 0. 시트를 X로 아예 닫으면 부모가 false로 되돌려, 다음 오픈은 평소대로 처음부터. */
@@ -140,7 +171,10 @@ export function ReportSheet({
   // ⚠️저장본으로 바로 여는 경우 **그 쌍의 slug로 시작해야** 헤더가 "A × B"를 맞게 쓰고
   //   [다른 소개서로 분석]도 올바른 칩이 선택된 채 열린다(안 그러면 fromBrands[0]로 어긋난다).
   const [selectedSlug, setSelectedSlug] = useState(initialArchiveSlug ?? fromBrands[0]?.slug);
-  const [copyIdx, setCopyIdx] = useState(0);
+  // 로딩 경과(ms) — 진행 단계와 진행바가 둘 다 이 하나에서 파생된다(둘이 따로 놀지 않게).
+  const [elapsed, setElapsed] = useState(0);
+  // 순환한다 — `%`가 그 역할이다. 되돌아가도 되는 이유는 LOADING_ROLL 주석 참고(진행바가 따로 있다).
+  const rollIdx = Math.floor(elapsed / LOADING_ROLL_MS) % LOADING_ROLL.length;
 
   // in-flight 가드 — 생성 중 재요청 금지(이중 지출 차단). 도중에 칩이 바뀌면 완료 후 최신 선택으로 1회 재실행.
   const inFlightRef = useRef(false);
@@ -271,14 +305,14 @@ export function ReportSheet({
     if (open && sampleMode) track("report_locked_view", { source });
   }, [open, sampleMode, source]);
 
-  // 로딩 카피 4단 순환(2초 간격) — 2번째가 소요시간 안내
+  // 로딩 경과 타이머 — 진행 단계·진행바의 단일 소스.
+  // ⚠️ 누적 덧셈(+= TICK)이 아니라 **시작 시각과의 차이**로 잰다. 탭이 백그라운드로 가면 브라우저가
+  //    setInterval을 늦추는데, 덧셈식이면 그만큼 진행이 뒤처져 돌아왔을 때 바가 어색하게 밀린다.
   useEffect(() => {
     if (phase !== "loading") return;
-    setCopyIdx(0);
-    const t = window.setInterval(
-      () => setCopyIdx((i) => (i + 1) % LOADING_COPY.length),
-      LOADING_INTERVAL_MS,
-    );
+    const startedAt = Date.now();
+    setElapsed(0);
+    const t = window.setInterval(() => setElapsed(Date.now() - startedAt), LOADING_TICK_MS);
     return () => window.clearInterval(t);
   }, [phase]);
 
@@ -410,16 +444,24 @@ export function ReportSheet({
           <p className="text-center text-[15px] font-medium text-ink">
             이 제안이 마음에 드셨나요? ✨
           </p>
+          {collabPaused ? (
+            // 쉬는 중 — 분석은 끝까지 보여주되 제안만 막는다. 아이디어는 남으니 나중에 다시 오면 된다.
+            <p className="mt-3 rounded-md border border-hairline bg-surface-soft px-3 py-3 text-center text-[14px] leading-relaxed text-mute">
+              지금은 이 브랜드가 콜라보를 쉬고 있어요.<br />
+              찜해두면 나중에 다시 찾아오기 쉬워요.
+            </p>
+          ) : (
           <button
             type="button"
             onClick={() => {
               track("report_cta_propose"); // 리포트→제안 전환 = P1→P3 퍼널 핵심 지표
               onPropose();
             }}
-            className="mt-3 flex h-12 w-full items-center justify-center rounded-md bg-primary text-base font-medium text-primary-on"
+            className="mt-3 flex h-12 w-full items-center justify-center rounded-md bg-primary text-[16px] font-medium text-primary-on"
           >
             콜라보 제안 시작하기
           </button>
+          )}
           {/* 넘긴 브랜드의 보관본(08-07) — 왜 다시 만들 수 없는지 한 줄로. 없으면 "왜 갱신이 안 되지"가 된다. */}
           {result?.readOnly && (
             <p className="mt-3 rounded-md border border-hairline bg-surface-soft px-3 py-2 text-[13px] leading-relaxed text-mute">
@@ -483,7 +525,7 @@ export function ReportSheet({
         className={`relative max-h-[85dvh] w-full max-w-[640px] rounded-t-2xl border border-b-0 border-hairline bg-surface shadow-e2 ${
           isReportView
             ? "flex flex-col" // 고정 바 + 스크롤 영역 — overflow는 아래 스크롤 영역에만 준다
-            : "overflow-y-auto p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))]"
+            : "overflow-y-auto p-6 pb-[max(1.5rem,env(safe-area-inset-bottom))]"
         }`}
       >
         {isReportView ? (
@@ -516,14 +558,14 @@ export function ReportSheet({
                 ⚠️티저는 CTA가 아래 고정 바로 빠지므로 하단 여백을 safe-area 없이 짧게 준다(이중 여백 방지). */}
             <div
               className={`flex-1 overflow-y-auto px-5 pt-4 ${
-                sampleTeaser ? "pb-5" : "pb-[calc(1.5rem+env(safe-area-inset-bottom))]"
+                sampleTeaser ? "pb-5" : "pb-[max(1.5rem,env(safe-area-inset-bottom))]"
               }`}
             >
               {/* 티저 최상단 — **왜 예시를 보고 있는지**를 리포트보다 먼저 말한다(대표 지시 08-07).
                   이게 없으면 리포트가 띡 하고 나와서 "내 분석인가?"로 읽힌다.
                   ⭐크기 16→**20**(대표 08-07 2차): 16 bold ink는 바로 아래 섹션헤더(15 bold ink)와
                     **한 급 차이도 안 나서** 둘이 겹쳐 보였다. 20은 시트 최상단 안내 타이틀의 기존 슬롯이다
-                    (`phase==="select"`의 "어떤 소개서로 분석할까요"와 같은 `text-xl`) — 새 크기를 만든 게
+                    (`phase==="select"`의 "어떤 소개서로 분석할까요"와 같은 `text-[20px]`) — 새 크기를 만든 게
                     아니라 **같은 역할엔 같은 크기**를 쓴 것. 리포트 본문 사다리(16→15→14→13)는 그대로. */}
               {/* ⭐**문장마다 줄을 바꾼다**(대표 08-07 4차) — 두 문장이 하는 일이 다르다:
                   앞은 *왜 못 보는지*, 뒤는 *대신 무엇을 주는지*. 이어 붙이면 데스크탑에서
@@ -531,7 +573,7 @@ export function ReportSheet({
                   ⚠️한때 `<br>`를 뺐다가 되살렸다 — 뺀 이유(모바일에서 줄이 늘어남)보다
                      **문장 구분이 눈에 보이는 쪽**이 이 화면엔 더 중요하다는 대표 판단. */}
               {sampleTeaser && (
-                <p className="mb-4 text-xl font-bold leading-snug break-keep text-ink">
+                <p className="mb-4 text-[20px] font-bold leading-snug break-keep text-ink">
                   콜라보 추천은 내 소개서 작성 후 받아볼 수 있어요.
                   <br />
                   우선 예시 리포트를 보여드릴게요.
@@ -571,7 +613,7 @@ export function ReportSheet({
                   <a
                     href="/register"
                     onClick={() => track("wizard_start_from_report")}
-                    className="mt-3 flex h-12 w-full items-center justify-center rounded-md bg-primary text-base font-medium text-primary-on"
+                    className="mt-3 flex h-12 w-full items-center justify-center rounded-md bg-primary text-[16px] font-medium text-primary-on"
                   >
                     내 소개서 만들기
                   </a>
@@ -583,11 +625,11 @@ export function ReportSheet({
                 (스크롤 안에 두면 끝까지 내려야 나오는데, 이 사람에게 필요한 건 리포트가 아니라 이 버튼이다.)
                 문구는 안내 없이 버튼만 — 무엇을 하는 버튼인지는 위 타이틀이 이미 말했다. */}
             {sampleTeaser && (
-              <div className="shrink-0 border-t border-hairline bg-surface px-5 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-3">
+              <div className="shrink-0 border-t border-hairline bg-surface px-5 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3">
                 <a
                   href="/register"
                   onClick={() => track("wizard_start_from_report")}
-                  className="flex h-12 w-full items-center justify-center rounded-md bg-primary text-base font-medium text-primary-on"
+                  className="flex h-12 w-full items-center justify-center rounded-md bg-primary text-[16px] font-medium text-primary-on"
                 >
                   내 소개서 만들기
                 </a>
@@ -606,7 +648,7 @@ export function ReportSheet({
                 {/* ⚠️ pr-8(닫기 ✕ 회피)은 **제목 줄에만** 건다 — 예전엔 이 블록 전체(칩·버튼까지)에
                     걸려 있어서, 오른쪽만 여백이 32px 더 붙는 바람에 [분석하기] 버튼이 시트 중앙이 아니라
                     왼쪽으로 치우쳐 보였다(실측 07-31, 대표 QA). 닫기 버튼은 제목 높이에서만 겹칠 수 있다. */}
-                <p className="pr-8 text-xl font-bold break-keep text-ink">
+                <p className="pr-8 text-[20px] font-bold break-keep text-ink">
                   어떤 소개서로 분석할까요
                 </p>
                 <p className="mt-1.5 text-[14px] text-mute">
@@ -635,7 +677,7 @@ export function ReportSheet({
                   type="button"
                   disabled={!selected?.slug}
                   onClick={() => selected?.slug && run(selected.slug)}
-                  className="mt-6 flex h-12 w-full items-center justify-center rounded-md bg-primary text-base font-medium text-primary-on disabled:opacity-50"
+                  className="mt-6 flex h-12 w-full items-center justify-center rounded-md bg-primary text-[16px] font-medium text-primary-on disabled:opacity-50"
                 >
                   분석하기
                 </button>
@@ -651,14 +693,25 @@ export function ReportSheet({
                   <ellipse cx="28" cy="28" rx="23" ry="9" stroke="currentColor" strokeWidth="2" opacity="0.45" transform="rotate(-28 28 28)" />
                   <circle cx="28" cy="28" r="6" fill="var(--primary)" />
                 </svg>
-                {/* 고정 타이틀 + 회색 롤링 — 위저드 LoadingView와 같은 사다리(18 bold / 13 mute).
-                    animate-pulse는 안 쓴다 — 문구가 4초마다 바뀌는 것 자체가 '살아있음' 신호다.
-                    ⚠️ 롤링 줄은 길이가 제각각이라 한 줄↔두 줄로 오갈 수 있다 → `min-h`로 자리를 미리
-                       잡아둬야 타이틀·마크가 위아래로 튀지 않는다(13px·leading-relaxed 두 줄 ≈ 40px). */}
-                <p className="mt-5 text-[18px] font-bold break-keep text-ink">{LOADING_TITLE}</p>
-                <p className="mt-1.5 min-h-[40px] text-[13px] leading-relaxed text-mute">
-                  {LOADING_COPY[copyIdx]}
+                {/* 굴러가는 볼드(18) + 고정 회색(13) + 진행바 — 사다리 자체는 위저드 LoadingView와 같다.
+                    ⚠️ 볼드 줄은 문구마다 길이가 달라 한 줄↔두 줄을 오갈 수 있다 → `min-h`로 자리를 미리
+                       잡아둬야 아톰 마크와 아래 줄이 위아래로 튀지 않는다(18px 두 줄 ≈ 52px).
+                    전환은 opacity만 — 슬라이드나 스케일은 대기 화면에서 시선을 뺏는다. */}
+                <p
+                  key={rollIdx}
+                  className="mt-5 min-h-[52px] animate-[fadeIn_320ms_ease-out] text-[18px] font-bold break-keep text-ink"
+                >
+                  {LOADING_ROLL[rollIdx]}
                 </p>
+                <p className="text-[13px] leading-relaxed text-mute">{LOADING_SUB}</p>
+                {/* 진행바 — 폭 150px 고정. 시트 폭을 다 쓰면 '거의 다 됐다'는 인상이 과장된다.
+                    aria-hidden: 위 role=status가 이미 단계 문구를 읽어준다(같은 정보 두 번 금지). */}
+                <div className="mt-3.5 h-[3px] w-[150px] overflow-hidden rounded-pill bg-hairline" aria-hidden="true">
+                  <div
+                    className="h-full rounded-pill bg-primary-strong transition-[width] duration-200 ease-linear"
+                    style={{ width: `${loadingProgress(elapsed).toFixed(1)}%` }}
+                  />
+                </div>
               </div>
             ) : phase === "ok" ? (
               pieces
@@ -666,19 +719,19 @@ export function ReportSheet({
               <div className="py-10 text-center">
                 {thin.side === "from" ? (
                   <>
-                    <p className="text-lg font-bold break-keep text-ink">
+                    <p className="text-[18px] font-bold break-keep text-ink">
                       내 소개서를 보강하면 분석이 더 정확해져요
                     </p>
                     <a
                       href={`/register?edit=${selected?.slug ?? ""}`}
-                      className="mx-auto mt-5 flex h-12 w-full max-w-xs items-center justify-center rounded-md bg-primary text-base font-medium text-primary-on"
+                      className="mx-auto mt-5 flex h-12 w-full max-w-xs items-center justify-center rounded-md bg-primary text-[16px] font-medium text-primary-on"
                     >
                       소개서 보강하기
                     </a>
                   </>
                 ) : (
                   <>
-                    <p className="text-lg font-bold break-keep text-ink">
+                    <p className="text-[18px] font-bold break-keep text-ink">
                       {toName}님의 소개서 정보가 아직 적어요
                     </p>
                     <p className="mt-2 text-[14px] leading-relaxed text-mute">
@@ -689,7 +742,7 @@ export function ReportSheet({
               </div>
             ) : phase === "no_match" ? (
               <div className="py-10 text-center">
-                <p className="text-lg font-bold break-keep text-ink">
+                <p className="text-[18px] font-bold break-keep text-ink">
                   아직 뚜렷한 접점을 찾지 못했어요
                 </p>
                 <p className="mt-2 text-[14px] leading-relaxed break-keep text-mute">
@@ -699,13 +752,13 @@ export function ReportSheet({
               </div>
             ) : (
               <div className="py-10 text-center">
-                <p className="text-lg font-bold break-keep text-ink">
+                <p className="text-[18px] font-bold break-keep text-ink">
                   분석에 실패했어요
                 </p>
                 <button
                   type="button"
                   onClick={() => selected?.slug && run(selected.slug)}
-                  className="mx-auto mt-5 flex h-12 w-full max-w-xs items-center justify-center rounded-md border border-border-strong bg-surface text-base font-medium text-ink"
+                  className="mx-auto mt-5 flex h-12 w-full max-w-xs items-center justify-center rounded-md border border-border-strong bg-surface text-[16px] font-medium text-ink"
                 >
                   다시 시도
                 </button>

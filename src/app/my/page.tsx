@@ -63,6 +63,7 @@ export default async function MyPage({ searchParams }: { searchParams: Promise<{
             name={m.name}
             oneLiner={m.oneLiner}
             searchVisible={m.searchVisible}
+            collabPaused={m.collabPaused}
           />
         ))}
         <div className="flex justify-center pt-2">
@@ -198,9 +199,9 @@ export default async function MyPage({ searchParams }: { searchParams: Promise<{
       <div className="flex items-center gap-3">
         <ProfileAvatarEditor image={profile?.profileImage || undefined} name={displayName} />
         <div className="min-w-0">
-          {/* 22 = /m 브랜드명과 같은 단(사내 기준 사다리). text-2xl(25.5px)은 루트 17px 때문에
+          {/* 22 = /m 브랜드명과 같은 단(사내 기준 사다리). text-[24px](25.5px)은 루트 17px 때문에
               생긴 분수 픽셀이었고, 아래 이메일(14.875)과의 간격만 크고 본문 단들은 평평했다. */}
-          <h1 className="truncate text-[22px] font-bold tracking-tight text-ink">{displayName}</h1>
+          <h1 className="truncate text-[26px] font-bold leading-[1.25] tracking-[-0.025em] text-ink">{displayName}</h1>
           <p className="truncate text-[13px] text-mute">{user.email}</p>
         </div>
         <LogoutButton />

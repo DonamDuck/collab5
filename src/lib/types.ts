@@ -96,7 +96,11 @@ export interface Maker {
   introFileUrl?: string; // 소개자료 PDF(코어 위계)
   keywords: string[]; // 브랜드를 표현하는 키워드 칩 (DB=keywords, 구 soul.values)
   trust: TrustSignals;
-  searchVisible: boolean; // 검색 결과 노출 on/off (DB=search_visible, 기본 true)
+  searchVisible: boolean; // [콜라보 찾기에 보이기] — 홈·/search 목록 노출 (DB=search_visible, 기본 true). ⚠️웹 검색과 무관(08-07 개명)
+  /** [콜라보 요청 잠시 안받기] — true면 `/m`의 제안 버튼이 잠기고 타이틀 옆에 안내 칩이 뜬다.
+   *  ⚠️`searchVisible`과 **다른 축**이다: 목록엔 그대로 보이되 지금은 요청만 안 받는 상태.
+   *  (07-31에 둘을 하나로 묶었다가 08-07에 그 전제가 깨져 08-12에 다시 분리 — DB=collab_paused, 기본 false) */
+  collabPaused: boolean;
   status: MakerStatus; // active=정상 / inactive=소프트 삭제(전 노출면 비노출, DB 보관). DB=status, 기본 active
   ownerUserId?: number; // 소유 계정 = profiles.user_id(정수). 07-25 auth uuid→user_id 전환
   editPasswordHash?: string; // 수정 비밀번호 해시(비회원 생성 시). DB=edit_password_hash
@@ -325,6 +329,10 @@ export type MagazineListItem = Omit<MagazineArticle, "body">;
  *  (수정할 때마다 발행일이 오늘로 밀리면 아카이브 순서가 무너진다). */
 export interface MagazineSaveInput {
   slug: string;
+  /** 🔑수정 중 **주소를 바꿀 때**, 고치기 전의 주소. 없으면 새 글이다.
+   *  ⚠️저장은 이 값으로 기존 행을 찾는다 — `slug`로 찾으면 바뀐 주소라 못 찾고,
+   *  같은 글이 **두 개로 늘어난다**(발행일도 오늘로 새로 찍힌다). */
+  prevSlug?: string;
   status: MagazineStatus;
   title: string;
   subtitle: string;

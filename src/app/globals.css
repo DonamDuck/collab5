@@ -24,7 +24,17 @@
      ⚠️ 대신 회색 계열을 **같이** 중성화해야 한다. hairline·surface-soft가 웜톤(누런기)이면
         순백 대비 때문에 탁하게 뜬다(실측 확인). 웜톤은 여기서 걷어내고, 브랜드의 따뜻함은
         Kiwi/민트/레몬/콘 액센트가 담당한다. 다크 테마는 아래에서 따로 정의 — 영향 없음. */
-  --canvas: #ffffff; --surface: #ffffff; --surface-soft: #f5f5f6; --surface-dark: #2c2c2c;
+  /* surface-faint = **surface와 surface-soft 사이의 네 번째 단계**(2026-08-14 대표 확정).
+     이름은 텍스트 계층의 규칙을 그대로 따랐다 — ink > body > mute > faint에서 faint가 '가장 약한'을
+     뜻하듯, 면도 surface-dark > surface-soft > surface-faint > surface 순으로 약해진다.
+     ⚠️**언제 무엇을 쓰나**(안 정해두면 다음 사람이 둘 중 아무거나 쓴다):
+       · `surface-soft`(#f5f5f6) = **확실히 구분돼야 하는 면.** 섹션 밴드, 입력칸, 썸네일 자리처럼
+         "여기부터 다른 영역"을 말해야 할 때. 흰 배경과 밝기차 4%.
+       · `surface-faint`(#fafafb) = **겨우 감지되는 면.** 지면에서 한 장만 살짝 들어올릴 때.
+         밝기차 2%라 경계가 아니라 '무게'로 읽힌다. 첫 사용처 = 매거진 목록 최신호 히어로.
+     ⛔아이보리(#fbf9f4 등)는 후보에 올랐다가 **대표가 회색을 골라 기각**됐다(08-14). 07-31에
+       "순백 옆 웜톤 회색은 누렇게 떠 보인다"로 웜톤을 걷어낸 결정이 그대로 유효하다. */
+  --canvas: #ffffff; --surface: #ffffff; --surface-faint: #fafafb; --surface-soft: #f5f5f6; --surface-dark: #2c2c2c;
   --hairline: #eaeaec; --border-strong: #d7d7db;
   --success: #3b6d11; --warning: #ba7517; --danger: #e24b4a; --info: #378add;
   /* 성공 면색 — 성공 배너에 --primary-pale(Kiwi)을 쓰면 브랜드색이 '성공'을 뜻하게 되어
@@ -44,7 +54,9 @@
 [data-theme="dark"] {
   /* 다크도 같은 원칙으로 중성화(명도 유지, 색조만 제거). 현재 앱에 테마 토글은 없어
      휴면 상태지만, 켜졌을 때 라이트와 따로 놀지 않도록 함께 맞춰둔다. */
-  --canvas: #222222; --surface: #2c2c2c; --surface-soft: #333333;
+  /* surface-faint는 라이트와 같은 간격 감각으로 — surface(#2c2c2c)보다 아주 살짝만 밝다.
+     라이트가 255→250→245라면 다크는 44→47→51로, 둘 다 '한 칸 반' 차이를 유지한다. */
+  --canvas: #222222; --surface: #2c2c2c; --surface-faint: #2f2f2f; --surface-soft: #333333;
   --ink: #fafafa; --body: #b3b3b3; --mute: #878787; --faint: #6b6b6b;
   --hairline: #3a3a3a; --border-strong: #4a4a4a; --primary-on: #222222;
   --success-pale: #2b3a1e; /* 다크에선 어두운 초록 면 — text-body(#b4b2a9)와 대비 확보 */
@@ -74,6 +86,7 @@
   --color-on-dark: var(--on-dark);
   --color-canvas: var(--canvas);
   --color-surface: var(--surface);
+  --color-surface-faint: var(--surface-faint);
   --color-surface-soft: var(--surface-soft);
   --color-hairline: var(--hairline);
   --color-border-strong: var(--border-strong);
@@ -191,12 +204,39 @@ body {
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 .no-scrollbar::-webkit-scrollbar { display: none; }
 
+/* 매거진 편집기 — 사진 캡션을 **편집 중에도** 사진 아래 보여준다(대표 지시 08-14).
+   ⭐글자를 DOM에 넣지 않고 `::after`로 그리는 이유: 진짜 텍스트로 넣으면 에디터 안에서 사진을
+     복사·붙여넣을 때 캡션이 **본문 문단으로 한 번 더** 들어온다(붙여넣기가 DOM을 다시 파싱하므로).
+     가상 요소는 클립보드에도 안 담기고 파서도 못 본다.
+   ⚠️`white-space: pre-wrap`은 넣지 않는다 — 캡션은 한 줄짜리 설명이고, 사용자가 넣은 공백까지
+     그대로 그리면 실수로 들어간 공백이 화면에 드러난다. */
+.mag-figure::after {
+  content: attr(data-caption);
+  display: block;
+  margin-top: 0.5rem;
+  text-align: center;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--faint);
+}
+
 /* 모달·바텀시트 스크롤 컨테이너용 — 얇고 은은한 스크롤바(데스크탑 기본 스크롤바가 투박한 문제 해소) */
 .slim-scrollbar { scrollbar-width: thin; scrollbar-color: var(--border-strong) transparent; }
 .slim-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
 .slim-scrollbar::-webkit-scrollbar-track { background: transparent; }
 .slim-scrollbar::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 9999px; }
 .slim-scrollbar::-webkit-scrollbar-thumb:hover { background: var(--faint); }
+
+/* ───────────────────────────────────────────────
+   fadeIn — 자리를 잡은 채 내용만 바뀌는 텍스트 교체용(리포트 로딩 진행 단계 등).
+   ⚠️ 슬라이드·스케일을 쓰지 않는 건 design.md Loader 원칙과 같은 이유다 —
+      대기 화면의 움직임은 '살아있음'만 알리면 되고, 그 이상은 시선을 뺏는다.
+   `prefers-reduced-motion`에선 즉시 나타난다(어지럼·전정기관 이슈).
+   ─────────────────────────────────────────────── */
+@keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
+@media (prefers-reduced-motion: reduce) {
+  .animate-\[fadeIn_320ms_ease-out\] { animation: none; }
+}
 
 /* ───────────────────────────────────────────────
    인쇄(지류 포트폴리오) — 데스크탑 브라우저 인쇄/‘PDF로 저장’ 공용.

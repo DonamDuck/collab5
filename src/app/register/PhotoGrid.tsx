@@ -121,7 +121,7 @@ export function PhotoGrid({
         ))}
         {items.length < max && (
           <label className="flex h-20 w-20 shrink-0 cursor-pointer flex-col items-center justify-center rounded-md border border-dashed border-border-strong bg-surface text-mute">
-            <span className="text-xl leading-none">＋</span>
+            <span className="text-[21px] leading-none">＋</span>
             <span className="mt-1 text-[11px]">{addLabel}</span>
             <input
               type="file"

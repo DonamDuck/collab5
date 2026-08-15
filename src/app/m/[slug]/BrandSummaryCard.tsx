@@ -31,6 +31,17 @@ export function BrandSummaryCard({
             <h1 className="text-[22px] font-bold leading-tight tracking-tight text-ink">
               {maker.name}
             </h1>
+            {/* 쉬는 중 배지(08-12) — 사장님이 [콜라보 요청 잠시 안받기]를 켠 상태.
+                ⚠️**아래 신뢰 칩(인스타·홈피)과 같은 옷을 입히면 안 된다.** 저건 *누르는* 칩(Kiwi pale,
+                  링크)이고 이건 *읽는* 상태 표시다. 형태가 같으면 눌러보게 되고, 안 눌리면 고장으로 읽힌다
+                  → 회색·무링크·작게. 아이콘 대신 점 하나로 "상태"임을 신호한다.
+                🎨임시안이다 — 디자인팀에 정의 요청 보냄(INDEX 미읽 멘션). 확정되면 여기만 바꾸면 된다. */}
+            {maker.collabPaused && (
+              <span className="inline-flex shrink-0 items-center gap-1.5 rounded-pill bg-surface-soft px-2.5 py-1 text-[12px] font-medium text-mute">
+                <span aria-hidden="true" className="h-1.5 w-1.5 rounded-pill bg-faint" />
+                잠시 콜라보를 쉬고 있어요
+              </span>
+            )}
           </div>
         </div>
         {!readOnly && (

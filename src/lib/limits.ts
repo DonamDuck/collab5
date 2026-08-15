@@ -24,3 +24,10 @@ export const PRINT_ITEM_LIMIT = 7;
  *     다이제스트 문자열 동일 → `input_hash` 동일 → **DNA 재생성 0건**. 8건째를 넣는 브랜드부터만 갈린다.
  *  ⏳7이 맞는 숫자인지는 8건 이상 브랜드가 생기면 5·7·10 A/B로 잰다. */
 export const DNA_ITEM_LIMIT = 7;
+
+// ── 📰 매거진 (2026-08-10) ──
+/** 매거진 사진 최대 변 — 소개서(브랜드 1000·활동 800)보다 크게. 본문 폭이 넓고 표지로도 쓰인다(지시서 §6). */
+export const MAGAZINE_IMAGE_MAX_DIM = 1600;
+/** Storage 경로 접두사. 버킷은 기존 `maker-photos`를 그대로 쓴다 —
+ *  ⛔새 버킷을 만들지 않는다(버킷 생성은 콘솔 작업이라 대표 몫, 지시서 안전규칙 3). */
+export const MAGAZINE_STORAGE_PREFIX = "magazine";

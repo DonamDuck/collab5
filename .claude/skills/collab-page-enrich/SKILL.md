@@ -49,7 +49,7 @@ description: 이미 발행된 소개서 보강 — 웹 검색 + 인스타그램 
 | 키워드(분위기) 칩 | `keywords` | **`keywords` text[]**(구 `soul.values`) | **10개** |
 | 대표 활동 | `activities[]` {title, desc, photos, link} | `activities` | **5건**, 사진 각 5 |
 | 함께한 콜라보 | `collabHistory[]` {partner, types, desc, year, photos, link} | `collab_history` | **5건**, 사진 각 5 |
-| 제공 콜라보 / 찾는 파트너 | `offersDescription` / `seeksDescription` | `offers_description` / `seeks_description`(구 `offers_note`/`seeks_note`) | |
+| 이런 콜라보를 제공할 수 있어요 / **이런 콜라보를 찾고 있어요**(08-13 개명, 구 「이런 파트너를 찾고 있어요」) | `offersDescription` / `seeksDescription` | `offers_description` / `seeks_description`(구 `offers_note`/`seeks_note`) | |
 | 이런 분들과 만나요 | `targetAudience` | `target_audience` | |
 | 선택 블록 | `showcases[]` | **`showcases`**(구 `blocks`) | 블록 6종 |
 | 신뢰 정보 | `trust` {instagram, homepage, address, mapUrl} | `trust` jsonb | |
@@ -88,6 +88,10 @@ description: 이미 발행된 소개서 보강 — 웹 검색 + 인스타그램 
   이 브랜드의 활동도 제품도 아니다. `press` 블록으로 간다.
 - ⭐**협업 산출물을 상시 제품처럼 쓰지 않기** — 팝업 협업으로 낸 향수를 "향수까지 갖추고 있어요"로
   쓰면 틀린 문장이다. "○○와 함께 향수를 선보였어요"로 맥락을 살린다.
+- 🆕**소개서 섹션 순서가 08-12에 바뀌었다** — 「이런 콜라보를 찾고 있어요」(문장+유형 칩)가 **자세히 소개 바로 뒤 두 번째 칸**,
+  「이런 콜라보를 제공할 수 있어요」는 **함께한 콜라보 뒤**. 위는 문(누가 노크할 수 있나) 아래는 제안(뭘 줄 수 있나)이라 떼어 놓았다.
+  ⭐보강 문안을 쓸 때 **「찾고 있어요」엔 조건(형태·규모)을 담을 수 있는지** 보라 — 사장님이 조건을 걸고 싶어도
+  우리가 「파트너」라고만 물어서 *누구*만 적혀 있는 소개서가 많다(계단뿌셔클럽 사례).
 - ⭐**거절 목록 방어** — "유료 홍보·체험단 문의는 받지 않습니다"가 `seeksDescription`에 있으면 정반대 뜻이 된다.
   "A를 제외한 협업엔 열려 있어요" 식으로 감싸는 것도 금지 — 통째로 뺀다.
 - ⭐**[고객]은 사람 집단만** — 임산부·초보자·지역 주민·직장인은 고객, 마음공부·불안·유연성·힐링은 고객이 아니라 주제다.
