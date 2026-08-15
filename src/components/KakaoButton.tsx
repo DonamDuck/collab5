@@ -26,6 +26,7 @@
 //    51px이라 둘이 나란히 서면 정확히 맞는다. 눈대중으로 48을 넣으면 어긋난다.
 import { useState } from "react";
 import { authEnvReady, createBrowserAuthClient } from "@/lib/supabase/client";
+import { ButtonBusyVeil } from "./ButtonBusyVeil";
 
 const KAKAO_ON = process.env.NEXT_PUBLIC_KAKAO_ENABLED === "1";
 
@@ -74,7 +75,8 @@ export function KakaoButton({ className = "" }: { className?: string }) {
   };
 
   return (
-    <div className={className}>
+    // relative — 로딩 막(ButtonBusyVeil)이 이 버튼을 정확히 덮는 기준이 된다
+    <div className={`relative ${className}`}>
       <button
         type="button"
         onClick={signIn}
@@ -91,8 +93,10 @@ export function KakaoButton({ className = "" }: { className?: string }) {
         <svg width="19" height="19" viewBox="0 0 18 18" aria-hidden="true" fill="currentColor">
           <path d="M9 1C4.03 1 0 4.13 0 8c0 2.5 1.67 4.7 4.18 5.94-.18.66-.67 2.47-.77 2.85-.12.48.18.47.37.34.15-.1 2.4-1.63 3.37-2.29.6.09 1.22.13 1.85.13 4.97 0 9-3.13 9-7S13.97 1 9 1z" />
         </svg>
-        {pending ? "카카오로 이동 중…" : "카카오로 시작하기"}
+        {/* 라벨은 로딩 중에도 그대로 둔다 — 위에 덮이는 막 뒤로 비쳐서 "무엇을 눌렀는지"가 남는다 */}
+        카카오로 시작하기
       </button>
+      {pending && <ButtonBusyVeil label="카카오로 이동 중" />}
       {/* 에러는 라이브 리전으로 — role="alert"이 아니면 스크린리더가 아무 안내도 못 듣는다 */}
       {err && (
         <p role="alert" className="mt-1.5 text-sm text-red-600">
