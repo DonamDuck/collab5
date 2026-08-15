@@ -128,12 +128,12 @@ export default async function MyPage({ searchParams }: { searchParams: Promise<{
   const collabList =
     makers.length === 0 ? (
       <EmptyState
-        title="소개서를 먼저 만들어주세요"
+        title="소개서를 등록해주세요."
         desc={
           <>
-            콜라보는 <b className="font-medium text-body">내 소개서</b>와 상대 브랜드를 짝지어 기록해요.
+            콜라보를 기록하려면 먼저 <b className="font-medium text-body">내 소개서</b>가 필요해요.
             <br />
-            소개서가 있어야 기록을 남길 수 있어요.
+            소개서를 만든 뒤, 함께한 콜라보를 하나씩 기록해보세요.
           </>
         }
         ctaLabel="소개서 만들기"
@@ -147,8 +147,9 @@ export default async function MyPage({ searchParams }: { searchParams: Promise<{
           title="아직 기록된 콜라보가 없어요"
           desc={
             <>
-              실제로 하기로 한 콜라보를 남겨두세요.
-              <br />몇 건이 성사됐는지 세는 유일한 기록이에요.
+              함께하기로 한 콜라보를 하나씩 남겨보세요.
+              <br />
+              추가한 콜라보는 내 소개서에 자동으로 추가돼요.
             </>
           }
         >

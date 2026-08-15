@@ -159,7 +159,7 @@ export function CollabRecorder({ myBrands }: { myBrands: MyBrand[] }) {
         //    ConnectMaker와 같은 시그니처로 맞춰 손가락으로 누를 수 있게 한다.
         className="inline-flex h-11 shrink-0 items-center rounded-md border border-border-strong bg-surface px-4 text-[15px] font-medium text-ink"
       >
-        + 성사 기록
+        + 기록 추가
       </button>
 
       {/* 완료 안내 — 전엔 새로고침만 되고 아무 말이 없어서 **목록을 눈으로 뒤져야** 했다.
