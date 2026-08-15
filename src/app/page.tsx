@@ -146,7 +146,13 @@ export default async function Home() {
         //   아래 여백만 그대로라 **버튼이 어디에도 안 붙은 것처럼** 보였다(대표 지적).
         //   ⚠️51px은 임의값이 아니라 **다른 섹션 간격과 같은 값**이다(실측: 43·51·51·51).
         //     히어로 다음만 60px으로 혼자 넓었던 것 — 리듬을 맞추면 그 어색함이 사라진다.
-        <section className="home-rise mt-12 -mx-4 px-4 py-4 sm:-mx-6 sm:px-6">
+        // 🪤08-15 대표 재지적 — 위 주석이 51px이라 적어놨지만 **실제 화면은 68px이었다.**
+        //   `mt-12`(51) 위에 이 섹션 자신의 `py-4`(17)가 얹혀 있었기 때문. 나는 margin 값만 보고
+        //   "리듬 맞췄다"고 적었고, **두 요소 사이의 실제 거리를 안 쟀다.** 60 → 68로 오히려 벌어졌다.
+        //   `py-4`와 `-mx-4 px-4`는 둘 다 **걷어낸 회색 밴드의 잔재**다(밴드는 안쪽 여백이 필요했고,
+        //   풀블리드하려고 음수 마진으로 뺐다가 다시 px로 채워 넣었다 — 배경이 없으면 순전히 무의미).
+        //   ⭐간격은 「무엇을 썼나」가 아니라 **getBoundingClientRect로 잰 두 박스 사이 거리**로 확인한다.
+        <section className="home-rise mt-12">
           <h2 className="text-balance break-keep text-center text-[24px] font-bold leading-[1.35] tracking-[-0.02em] text-ink sm:text-[28px]">
             지금, 콜라보 가능한 브랜드예요.
           </h2>
