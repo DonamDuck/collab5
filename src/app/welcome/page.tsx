@@ -28,11 +28,17 @@ export default function WelcomePage() {
   const [phase, setPhase] = useState<Phase>("checking");
   const [pending, start] = useTransition();
   const [email, setEmail] = useState("");
+  // ⭐소셜이 이메일을 줬는지 — **줬으면 잠그고, 안 줬으면 직접 받는다**(08-15 카카오).
+  //   구글은 항상 이메일을 준다. 카카오는 동의항목·검수 상태에 따라 안 줄 수 있고,
+  //   선택 동의로 두면 사용자가 거부할 수도 있다(Supabase의 "Allow users without an email"이 켜져 있다).
+  //   준 값을 고치게 두면 로그인 계정과 프로필이 어긋나므로, 잠금은 그대로 유지한다.
+  const [emailLocked, setEmailLocked] = useState(true);
   const [brandName, setBrandName] = useState("");
   const [phone, setPhone] = useState("");
   const [image, setImage] = useState(""); // 선택 — 로고/브랜드 사진(가입 폼과 같은 방식)
   const [imgUploading, setImgUploading] = useState(false);
   const [err, setErr] = useState("");
+  const emailRef = useRef<HTMLInputElement>(null);
   const brandRef = useRef<HTMLInputElement>(null);
   const phoneRef = useRef<HTMLInputElement>(null);
 
@@ -70,6 +76,7 @@ export default function WelcomePage() {
         return;
       }
       setEmail(st.email);
+      setEmailLocked(!!st.email); // 빈 채로 왔다 = 소셜이 안 줬다 → 이 화면에서 받는다
       setBrandName(st.brandName);
       setPhone(st.phone);
       setImage(st.profileImage);
@@ -99,16 +106,30 @@ export default function WelcomePage() {
       // ⚠️ 빈 칸이어도 버튼을 잠그지 않는다 — 눌렀을 때 **왜 안 되는지** 말해주고 커서를 보낸다.
       const b = brandName.trim();
       const p = phone.trim();
+      const e = email.trim();
+      // 이메일이 잠겨 있지 않다 = 소셜이 안 줘서 여기서 받는 중이다. 그때만 빈 칸을 잡는다.
+      if (!emailLocked && !e) {
+        setErr("이메일을 입력해주세요.");
+        emailRef.current?.focus();
+        return;
+      }
       if (!b || !p) {
         setErr(!b ? "브랜드명을 입력해주세요." : "휴대폰번호를 입력해주세요.");
         (!b ? brandRef : phoneRef).current?.focus();
         return;
       }
       setErr("");
-      const r = await completeOnboardingAction({ brandName: b, phone: p, profileImage: image });
+      const r = await completeOnboardingAction({
+        brandName: b,
+        phone: p,
+        profileImage: image,
+        // 잠겨 있으면 아예 안 넘긴다 — 서버도 기존 값을 우선하지만, 보낼 이유가 없는 값은 안 보낸다.
+        email: emailLocked ? undefined : e,
+      });
       if (r.error) {
         setErr(r.error);
-        if (/이름/.test(r.error)) brandRef.current?.focus();
+        if (/이메일/.test(r.error)) emailRef.current?.focus();
+        else if (/이름/.test(r.error)) brandRef.current?.focus();
         else if (/번호/.test(r.error)) phoneRef.current?.focus();
         return;
       }
@@ -156,15 +177,26 @@ export default function WelcomePage() {
         }}
       >
         <div className="mt-6 space-y-4">
-          {/* 구글에서 온 값 — 보여주기만 한다(여기서 바꾸면 로그인 계정과 어긋난다) */}
+          {/* 소셜에서 온 값이면 보여주기만 한다(여기서 바꾸면 로그인 계정과 어긋난다).
+              안 왔으면(카카오 등) 직접 받는다 — 위 emailLocked 주석 참고. */}
           <Field label="이메일" htmlFor="welcome-email">
             <input
               id="welcome-email"
+              ref={emailRef}
               type="email"
+              name="email"
+              autoComplete="email"
               value={email}
-              readOnly
-              className={`${authInputCls} bg-surface-soft text-mute`}
+              readOnly={emailLocked}
+              onChange={emailLocked ? undefined : (e) => setEmail(e.target.value)}
+              placeholder={emailLocked ? undefined : "user@email.com"}
+              className={emailLocked ? `${authInputCls} bg-surface-soft text-mute` : authInputCls}
             />
+            {!emailLocked && (
+              <p className="mt-1.5 text-[13px] text-faint">
+                콜라보 제안이나 소식을 받을 주소예요. 카카오에서 이메일을 받지 못해 여쭤봐요.
+              </p>
+            )}
           </Field>
           <Field label="브랜드명" htmlFor="welcome-brand">
             <input

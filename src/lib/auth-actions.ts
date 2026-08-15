@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { authEnabled, createAuthClient, getSessionUser } from "./supabase/server";
 import { upsertProfile, findDuplicates, getProfile, type DuplicateFlags } from "./profiles";
 import { validatePassword } from "./validation";
-import { notifySignup } from "./notify";
+import { notifySignup, type SignupOrigin } from "./notify";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://collab5.vercel.app";
 const NO_AUTH_MSG = "로그인 설정이 아직 준비되지 않았어요. (환경변수 미설정)";
@@ -134,6 +134,12 @@ export async function completeOnboardingAction(input: {
   phone: string;
   /** 선택 — 로고/브랜드 사진. 안 올리면 undefined로 오고, 그때는 기존 값을 그대로 지킨다. */
   profileImage?: string;
+  /**
+   * 선택 — **소셜 쪽에서 이메일이 안 온 경우에만** 화면에서 받아 넘긴다.
+   * ⚠️ 이미 이메일이 있으면 이 값은 무시한다 — 로그인 계정과 프로필이 어긋나면 안 된다.
+   *    (카카오는 동의항목·검수 상태에 따라 이메일을 안 줄 수 있고, 사용자가 선택 동의를 거부해도 빈 값이 온다.)
+   */
+  email?: string;
 }): Promise<{ error?: string }> {
   if (!authEnabled()) return { error: NO_AUTH_MSG };
   const user = await getSessionUser();
@@ -155,7 +161,17 @@ export async function completeOnboardingAction(input: {
   //   이 액션은 재시도·브랜드명 수정으로 여러 번 들어올 수 있어서(위 excludeUuid 주석 참고),
   //   그냥 걸면 같은 사람으로 알림이 반복된다. brandName이 비어 있었다 = 아직 온보딩 전이었다.
   const isNewSignup = !existing?.brandName;
-  const email = existing?.email || user.email || "";
+  // 이메일 출처는 **기존 프로필 → 세션 → 화면 입력** 순. 앞의 둘이 있으면 화면 값은 쓰지 않는다
+  // (읽기 전용으로 보여준 값이라 어차피 같아야 하고, 다르다면 그게 사고다).
+  const known = existing?.email || user.email || "";
+  const typed = input.email?.trim() ?? "";
+  const email = known || typed;
+  // 소셜이 이메일을 안 줬는데 화면에서도 안 받았다면 여기서 막는다 — 빈 이메일로 프로필이 굳으면
+  // 알림 메일도, 나중에 계정을 찾는 길도 없어진다.
+  if (!email) return { error: "이메일을 입력해주세요." };
+  if (!known && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return { error: "이메일 형식을 확인해주세요." };
+  }
   let userId: number | null = null;
   try {
     userId = await upsertProfile({
@@ -171,10 +187,13 @@ export async function completeOnboardingAction(input: {
   } catch {
     return { error: "저장에 실패했어요. 잠시 후 다시 시도해주세요." };
   }
-  // ⚠️ 지금 소셜 로그인은 구글뿐이다. 카카오 등이 붙으면 여기서 경로를 갈라야 한다
-  //    (user.app_metadata.provider로 판별 가능) — 안 갈라면 메일에 전부 "구글 로그인"으로 찍힌다.
+  // ⭐가입 경로는 **세션의 provider**로 가른다(08-15 카카오 추가 때 배선). 예전엔 "google"이 박혀 있어서
+  //   어떤 소셜로 들어와도 메일에 "구글 로그인"으로 찍혔다 — 그때 남긴 예고 주석을 여기서 갚는다.
+  //   ⚠️ 모르는 provider가 오면 라벨이 깨지느니 "이메일 가입"으로 떨어뜨린다(알림은 어떻게든 나가야 한다).
   if (isNewSignup) {
-    await notifySignup({ userId, brandName, email, origin: "google" });
+    const provider = user.app_metadata?.provider;
+    const origin: SignupOrigin = provider === "google" || provider === "kakao" ? provider : "email";
+    await notifySignup({ userId, brandName, email, origin });
   }
   return {};
 }
