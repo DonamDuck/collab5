@@ -14,10 +14,16 @@
 //    Supabase Google 프로바이더의 **Client IDs**에도 같은 클라이언트 ID가 들어가 있어야
 //    signInWithIdToken이 토큰을 받아준다.
 //
-// ⚠️ 버튼 모양은 구글이 그린다(renderButton). 자체 버튼으로 팝업을 띄우는 공식 API는 없다 —
+// ⚠️ **클릭은 반드시 구글 버튼이 받아야 한다.** 자체 버튼으로 팝업을 띄우는 공식 API는 없다 —
 //    `prompt()`는 원탭 전용이고 `use_fedcm_for_prompt`는 폐기돼 무시된다(2026-07 확인).
-//    대신 text/theme/size/locale로 문구와 톤을 맞추고, **보이는 박스(테두리·라운드·높이)는
-//    globals.css의 `[data-gsi]`가 직접 소유한다** — 구글이 그린 건 로고+문구만 얹히는 내용물이다.
+//    그래서 renderButton이 그린 버튼을 **지우지 않고 투명하게 덮는다.**
+//
+// 🎨 **보이는 것은 전부 우리 것이다**(08-15 대표 지시로 여기까지 왔다).
+//    ①겉박스(테두리·라운드·높이) = globals.css `[data-gsi]`
+//    ②로고·문구 = 아래 `[data-gsi-face]` — 구글이 그린 내용물은 `opacity:0`으로 덮인다.
+//    덕분에 **문구를 "구글로 시작하기"로 정할 수 있고**(renderButton의 text로는 불가능했다),
+//    클릭 직후 버튼이 **연한 파랑으로 번지던 것**도 사라졌다(구글이 그리던 active 면이었다).
+//    ⚠️클릭을 삼키면 로그인이 통째로 막힌다 — 우리 라벨은 `pointer-events:none`, z는 구글이 위.
 //    아래 draw()의 "iframe 인수인계 차단"과 한 세트다.
 //
 // ⚠️ 라벨이 "Google로 계속하기"(continue_with)인 이유: 소셜 로그인은 **가입과 로그인이 한 버튼**이다.
@@ -133,7 +139,10 @@ function GoogleIdButton({ className }: { className: string }) {
     const w = Math.min(Math.round(box.clientWidth) || MAX_W, MAX_W);
     if (w === widthRef.current) return;
     widthRef.current = w;
-    box.replaceChildren(); // 재호출 시 이전 버튼이 남지 않게
+    // 재호출 시 이전 버튼이 남지 않게 비운다.
+    // ⚠️ `replaceChildren()`으로 통째로 비우면 **우리 라벨(React가 관리하는 노드)까지 지워진다** —
+    //    그러면 React는 아직 있다고 믿는데 DOM엔 없어서 다시 안 그려진다. 구글이 만든 것만 골라 지운다.
+    box.querySelectorAll(":scope > :not([data-gsi-face])").forEach((el) => el.remove());
     id.renderButton(box, {
       type: "standard",
       theme: "outline",
@@ -144,15 +153,14 @@ function GoogleIdButton({ className }: { className: string }) {
       //    medium이면 글자만 작아지는데, 겉박스는 [data-gsi]가 51px로 잡으므로
       //    옆 버튼과의 정합은 그대로다. 문구도 그대로 나온다(실측).
       size: "medium",
-      // ⚠️ 문구는 **구글이 정한 네 가지 중에서만** 고를 수 있다(signin_with·signup_with·continue_with·signin).
-      //    한국어 locale에서 continue_with = "Google 계정으로 계속하기"다. 임의 문구("구글로 시작하기")는
-      //    renderButton이 받지 않는다 — 자체 버튼을 그리려면 리디렉션 방식으로 돌아가야 하는데,
-      //    그건 동의 화면에 supabase.co가 뜨는 07-31 문제를 되살린다(머리말 참고). 문구는 이대로 둔다.
+      // ⚠️ 아래 셋(text·shape·logo_alignment)은 **이제 화면에 안 보인다** — globals.css가 구글이 그린
+      //    내용물을 투명하게 덮고 우리 라벨("구글로 시작하기")을 대신 그리기 때문이다(08-15).
+      //    그래도 남겨두는 이유: ①인수인계가 끊겨 iframe이 보이는 최악의 경우에도 말이 되는 문구여야 하고
+      //    ②구글이 언젠가 우리 CSS를 못 덮게 바뀌면 이 값이 그대로 화면이 된다.
+      //    문구는 구글이 정한 넷 중에서만 고를 수 있다(signin_with·signup_with·continue_with·signin) —
+      //    한국어 locale에서 continue_with = "Google 계정으로 계속하기". 그게 우리가 못 바꾼 그 문구였다.
       text: "continue_with",
       shape: "rectangular",
-      // 🎨 left → **center**(대표 지시 08-15). left는 로고를 버튼 왼쪽 끝에 붙이고 글자만 가운데 정렬해서
-      //    옆의 카카오 버튼(아이콘+글자가 함께 가운데)과 축이 어긋나 보인다. center면 로고와 글자가
-      //    한 덩어리로 가운데 선다.
       logo_alignment: "center",
       width: String(w),
       locale: "ko",
@@ -268,7 +276,36 @@ function GoogleIdButton({ className }: { className: string }) {
           if (!el || el.contains(e.target as Node)) return;
           el.click();
         }}
-      />
+      >
+        {/* 🎨 **우리가 그리는 라벨.** 구글이 그린 로고·문구는 globals.css가 투명하게 덮고, 이게 보인다.
+            클릭은 통과시키므로(`pointer-events:none`) 실제로 눌리는 건 여전히 구글 버튼이다.
+            ⚠️`ready`일 때만 그린다 — 아직 못 누르는데 버튼처럼 보이면 누르고 아무 일도 안 일어난다.
+            ⚠️G 마크는 구글 공식 4색 로고다. 브랜드 가이드상 **로고는 원형 그대로** 써야 하고
+              색을 단색으로 바꾸거나 회전시키지 않는다. 문구만 우리 말로 바꾼 것이다. */}
+        {phase !== "loading" && phase !== "failed" && (
+          <span data-gsi-face className="text-[16px] font-medium text-body">
+            <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true">
+              <path
+                fill="#EA4335"
+                d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"
+              />
+              <path
+                fill="#4285F4"
+                d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"
+              />
+              <path
+                fill="#FBBC05"
+                d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"
+              />
+              <path
+                fill="#34A853"
+                d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"
+              />
+            </svg>
+            구글로 시작하기
+          </span>
+        )}
+      </div>
       {phase === "signing" && (
         <p className="mt-1.5 text-center text-sm text-mute">구글 계정을 확인하고 있어요…</p>
       )}
