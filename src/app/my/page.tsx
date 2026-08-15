@@ -183,7 +183,10 @@ export default async function MyPage({ searchParams }: { searchParams: Promise<{
                     c.origin === "product" ? "bg-primary-pale text-primary-on" : "bg-surface-soft text-mute"
                   }`}
                 >
-                  {c.origin === "product" ? "제품 경유" : "직접 소개"}
+                  {/* ⚠️입력 얼럿의 선택지와 **글자까지 똑같이** 둔다. 전엔 「제품 경유」였는데, 사용자가 고를 땐
+                      「collab5 보고 연락」이라 **같은 것에 두 이름**이 붙어 있었다(내부 지표 용어가 화면으로 샌 것,
+                      07-29 QA #22). 한쪽만 고치면 다시 갈라지므로 바꿀 땐 얼럿의 `origin` 선택지와 함께 바꿀 것. */}
+                  {c.origin === "product" ? "collab5 보고 연락" : "직접 소개"}
                 </span>
               </div>
               {c.title && <p className="mt-1 truncate text-[14px] text-body">{c.title}</p>}
