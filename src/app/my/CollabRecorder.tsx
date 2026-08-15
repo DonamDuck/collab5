@@ -23,6 +23,9 @@ type Ph = { url: string; uploading?: boolean };
 
 const YEARS = Array.from({ length: 2030 - 1991 + 1 }, (_, i) => String(2030 - i));
 const PHOTO_MAX = 5;
+// 연도 기본값 = 올해(대표 지시 08-15). 전엔 ""(=「아직 안 정했어요」)가 기본이라 대부분 연도 없이 기록됐다.
+// ⚠️SSR 불일치 걱정 없음 — 얼럿이 `{open && …}`이라 서버 HTML엔 이 select가 아예 안 들어간다.
+const THIS_YEAR = String(new Date().getFullYear());
 
 export function CollabRecorder({ myBrands }: { myBrands: MyBrand[] }) {
   const router = useRouter();
@@ -38,7 +41,7 @@ export function CollabRecorder({ myBrands }: { myBrands: MyBrand[] }) {
   const [origin, setOrigin] = useState<"product" | "concierge">("concierge");
   const [title, setTitle] = useState("");
   const titleRef = useRef<HTMLInputElement>(null);
-  const [year, setYear] = useState("");
+  const [year, setYear] = useState(THIS_YEAR);
   const [desc, setDesc] = useState("");
   const [photos, setPhotos] = useState<Ph[]>([]);
   const [link, setLink] = useState("");
@@ -50,7 +53,8 @@ export function CollabRecorder({ myBrands }: { myBrands: MyBrand[] }) {
 
 
   const reset = () => {
-    setQ(""); setHits([]); setPicked(null); setTitle(""); setYear(""); setDesc("");
+    // ⚠️연도는 ""가 아니라 **기본값(올해)** 으로 되돌린다 — ""로 두면 두 번째 기록부터 「아직 안 정했어요」가 된다.
+    setQ(""); setHits([]); setPicked(null); setTitle(""); setYear(THIS_YEAR); setDesc("");
     setPhotos([]); setLink(""); setOrigin("concierge"); setAlsoAdd(true); setErr(null);
   };
 
@@ -171,29 +175,49 @@ export function CollabRecorder({ myBrands }: { myBrands: MyBrand[] }) {
             aria-live="polite"
             className="rounded-pill bg-ink px-4 py-2.5 text-[15px] font-medium text-on-dark shadow-e2"
           >
-            성사 기록을 남겼어요.
+            콜라보를 기록했어요.
           </p>
         </div>
       )}
 
       {open && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 sm:items-center" {...dialog.overlayProps}>
-          {/* max-h는 dvh — iOS Safari의 vh는 'URL바 숨은 큰 뷰포트' 기준이라 URL바가 떠 있으면 상단이 밀린다. */}
+          {/* max-h는 dvh — iOS Safari의 vh는 'URL바 숨은 큰 뷰포트' 기준이라 URL바가 떠 있으면 상단이 밀린다.
+              🚨08-15 구조 변경 — 전엔 **패널 자신이 스크롤 컨테이너**였고, QA에서 나온 결함 4개가 전부 거기서 나왔다.
+                ①스크롤을 내리면 제목과 ✕가 같이 밀려 올라갔다(실측 ✕ top −331px). 이 얼럿은 **딤 클릭으로 안 닫히는
+                  정책**이라 그 순간 남는 탈출구가 ESC뿐인데 **모바일엔 ESC가 없다** → 사실상 갇혔다.
+                ②데스크톱에선 네이티브 스크롤바(15px)가 `rounded-xl`(28px) 안쪽에 직선으로 서서 오른쪽 위·아래
+                  라운드를 가로질렀다(대표가 "스크롤 UI 깨졌다"고 한 것).
+              → **패널은 `overflow-hidden`으로 잠그고(라운드가 스크롤바를 잘라낸다), 본문만 스크롤**한다.
+                헤더는 스크롤 밖 형제라 항상 남는다. ⚠️`min-h-0` 필수 — 없으면 flex 자식이 안 줄어들어 스크롤이 안 생긴다. */}
           <div
             {...dialog.panelProps}
-            className="max-h-[88dvh] w-full max-w-[520px] overflow-y-auto rounded-t-xl bg-surface p-5 sm:rounded-xl"
+            className="flex max-h-[88dvh] w-full max-w-[520px] flex-col overflow-hidden rounded-t-xl bg-surface sm:rounded-xl"
           >
-            <div className="flex items-start justify-between gap-3">
+            {/* ⚠️hairline은 장식이 아니다 — 이게 없으면 스크롤된 본문이 헤더 밑에서 **글자가 반쯤 잘린 채** 멈춰
+                "깨진 화면"으로 읽힌다(실측). 선이 있으면 같은 장면이 "여기 아래로 이어진다"로 읽힌다. */}
+            <div className="flex shrink-0 items-start justify-between gap-3 border-b border-hairline px-5 pb-3 pt-5">
               <div>
-                <h2 className="text-[18px] font-bold text-ink">콜라보 성사 기록</h2>
+                <h2 className="text-[18px] font-bold text-ink">콜라보 기록하기</h2>
                 <p className="mt-1 text-[13px] leading-relaxed text-mute">
-                  실제로 하기로 한 콜라보를 남겨두면, 나중에 몇 건이 성사됐는지 셀 수 있어요.
+                  함께하기로 한 콜라보를 남겨보세요.
+                  <br />
+                  내 소개서에도 함께 올라가요.
                 </p>
               </div>
-              <button type="button" onClick={() => setOpen(false)} aria-label="닫기" className="text-mute">
+              {/* ⚠️`-mr-2 -mt-2` — 44px 타깃을 확보하면서 ✕ 글리프는 원래 모서리 자리에 그대로 둔다(QA: 13×25.5px였다) */}
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                aria-label="닫기"
+                className="-mr-2 -mt-2 flex h-[44px] w-[44px] shrink-0 items-center justify-center rounded-md text-mute"
+              >
                 ✕
               </button>
             </div>
+
+            {/* 여기부터가 스크롤 영역. 하단 여백은 max() — 노치 홈 인디케이터(34px)가 [기록하기]를 덮던 것(QA ③) */}
+            <div className="min-h-0 flex-1 overflow-y-auto px-5 pt-1 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
 
             {/* ① 내 소개서 — A(먼저 제안한 쪽). 소유 검증의 근거라 반드시 내 것 중에서 고른다 */}
             {myBrands.length > 1 && (
@@ -219,7 +243,8 @@ export function CollabRecorder({ myBrands }: { myBrands: MyBrand[] }) {
                 </div>
               ) : (
                 <>
-                  <input value={q} onChange={(e) => search(e.target.value)} placeholder="상호로 검색" className={field} />
+                  {/* 「상호」는 사업자등록 용어라 보이스의 '행정 말투 금지'에 걸린다(08-15). ⚠️`/register` 라벨은 아직 「상호」 — 대표 결정 대기 */}
+                  <input value={q} onChange={(e) => search(e.target.value)} placeholder="브랜드 이름으로 찾아보세요" className={field} />
                   {searching && <p className="mt-1.5 text-[13px] text-faint">찾는 중…</p>}
                   {/* ⚠️ "검색 결과가 없어요"만으론 **왜 없는지**를 모른다 — collab5에 소개서가 있는
                       브랜드만 고를 수 있다는 게 이 화면의 규칙인데 어디에도 안 적혀 있었다(QA #33). */}
@@ -259,7 +284,8 @@ export function CollabRecorder({ myBrands }: { myBrands: MyBrand[] }) {
               <div className="mt-1.5 grid grid-cols-2 gap-2">
                 {([
                   { v: "product", label: "collab5 보고 연락", desc: "소개서·검색을 통해" },
-                  { v: "concierge", label: "직접 소개", desc: "제가 이어줬어요" },
+                  // ⚠️전엔 "제가 이어줬어요"였다 — **운영자(대표) 시점**이라 이 화면을 쓰는 사장님이 읽으면 "제가요?"가 된다(QA 08-15)
+                  { v: "concierge", label: "직접 소개", desc: "원래 알던 사이거나 소개로" },
                 ] as const).map((o) => (
                   <button
                     key={o.v}
@@ -272,7 +298,7 @@ export function CollabRecorder({ myBrands }: { myBrands: MyBrand[] }) {
                   </button>
                 ))}
               </div>
-              <p className="mt-1.5 text-[12px] text-faint">이 항목만 소개서에는 안 나가요 (내부 지표).</p>
+              <p className="mt-1.5 text-[12px] text-faint">이 답은 소개서에 안 나가요.</p>
             </div>
 
             {/* ④~⑦ 여기부터는 소개서 "함께한 콜라보" 카드와 같은 필드 */}
@@ -312,9 +338,12 @@ export function CollabRecorder({ myBrands }: { myBrands: MyBrand[] }) {
             <div className="mt-4">
               <span className="text-[15px] font-medium text-body">사진 (선택)</span>
               <div className="mt-1.5">
+                {/* addLabel 기본값은 "사진(선택)"인데 바로 위 라벨이 「사진 (선택)」이라 같은 말이 두 번 나왔다.
+                    ⚠️PhotoGrid 기본값은 안 건드린다 — `/register`도 같은 컴포넌트를 쓴다. */}
                 <PhotoGrid
                   items={photos}
                   max={PHOTO_MAX}
+                  addLabel="사진 추가"
                   onAdd={addPhotos}
                   onRemove={(i) => setPhotos((p) => p.filter((_, k) => k !== i))}
                   onReorder={(from, to) =>
@@ -344,8 +373,8 @@ export function CollabRecorder({ myBrands }: { myBrands: MyBrand[] }) {
                 className="mt-0.5 h-4 w-4 shrink-0 accent-ink"
               />
               <span className="text-[13px] leading-relaxed text-body">
-                소개서 <span className="font-medium">함께한 콜라보</span>에도 추가할게요
-                <span className="block text-[12px] text-faint">공개되는 내용이에요. 끄면 성사 기록만 남아요.</span>
+                <span className="font-medium">내 소개서</span>에도 함께 올릴게요
+                <span className="block text-[12px] text-faint">소개서에 공개돼요. 끄면 나만 보는 기록으로 남아요.</span>
               </span>
             </label>
 
@@ -364,6 +393,7 @@ export function CollabRecorder({ myBrands }: { myBrands: MyBrand[] }) {
             >
               {uploading ? "사진 올리는 중…" : saving ? "기록 중…" : "기록하기"}
             </button>
+            </div>
           </div>
         </div>
       )}
