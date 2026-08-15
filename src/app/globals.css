@@ -225,10 +225,13 @@ body {
   z-index: 0;
   gap: 0.5rem;
 }
-[data-gsi] > :not([data-gsi-face]) {
+[data-gsi] > :not([data-gsi-face]):not([data-gsi-veil]) {
   opacity: 0; /* 보이지 않게. display:none이면 클릭을 못 받는다 */
   z-index: 1; /* 클릭을 받으려면 우리 라벨보다 위 */
 }
+/* 로딩 막(ButtonBusyVeil)은 **구글 버튼보다도 위**에 얹혀 클릭을 막는다 —
+   인증이 도는 중에 한 번 더 눌러 팝업이 두 번 뜨는 걸 방지한다. 위 :not()에서 제외한 이유가 이것. */
+[data-gsi] > [data-gsi-veil] { z-index: 2; }
 
 /* 스와이프 슬라이드용 — 스크롤바 숨김(넘김 제스처만) */
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }

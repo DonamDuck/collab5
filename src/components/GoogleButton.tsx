@@ -34,6 +34,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { authEnvReady, createBrowserAuthClient } from "@/lib/supabase/client";
+import { ButtonBusyVeil } from "./ButtonBusyVeil";
 
 const GOOGLE_ON = process.env.NEXT_PUBLIC_GOOGLE_ENABLED === "1";
 const CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? "";
@@ -142,7 +143,9 @@ function GoogleIdButton({ className }: { className: string }) {
     // 재호출 시 이전 버튼이 남지 않게 비운다.
     // ⚠️ `replaceChildren()`으로 통째로 비우면 **우리 라벨(React가 관리하는 노드)까지 지워진다** —
     //    그러면 React는 아직 있다고 믿는데 DOM엔 없어서 다시 안 그려진다. 구글이 만든 것만 골라 지운다.
-    box.querySelectorAll(":scope > :not([data-gsi-face])").forEach((el) => el.remove());
+    box
+      .querySelectorAll(":scope > :not([data-gsi-face]):not([data-gsi-veil])")
+      .forEach((el) => el.remove());
     id.renderButton(box, {
       type: "standard",
       theme: "outline",
@@ -305,10 +308,9 @@ function GoogleIdButton({ className }: { className: string }) {
             구글로 시작하기
           </span>
         )}
+        {/* 로딩 막 — 버튼 밖에 문구를 덧붙이면 레이아웃이 밀린다(옛 방식). 버튼 위에 덮는다. */}
+        {phase === "signing" && <ButtonBusyVeil label="계정을 확인하고 있어요" />}
       </div>
-      {phase === "signing" && (
-        <p className="mt-1.5 text-center text-sm text-mute">구글 계정을 확인하고 있어요…</p>
-      )}
       {phase === "failed" && (
         <p role="alert" className="mt-1.5 text-sm text-mute">
           구글 로그인을 불러오지 못했어요. 이메일로 로그인해주세요.
