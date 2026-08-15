@@ -264,15 +264,15 @@ export default async function CardPage({
 
         {/* 8. 푸터 — 아톰 마크(mono, currentColor=다크대응) + 카피 */}
         <div className="mt-5 flex items-center justify-center gap-1.5 text-faint">
-          <svg viewBox="0 0 56 56" className="h-4 w-4" aria-hidden="true" fill="none">
-            <g stroke="currentColor" strokeWidth="2">
-              <ellipse cx="28" cy="28" rx="20" ry="7" transform="rotate(30 28 28)" />
-              <ellipse cx="28" cy="28" rx="20" ry="7" transform="rotate(-30 28 28)" />
+          {/* 08-16 새 마크. 좌표는 [[아톰 마크 정본]](EmptyState 주석)과 같고, 여긴 **모노 변형** —
+              가운데도 currentColor라 다크·인쇄에서 한 색으로 떨어진다(초록을 쓰지 않는 유일한 자리).
+              🚨`h-4 w-4`(정사각) 였다 → 비율 1.285라 눌린다. 옆 12px 글자에 맞춰 13px로 잡는다. */}
+          <svg viewBox="0 0 128.32 100.05" className="h-[13px] w-auto shrink-0" aria-hidden="true" fill="none">
+            <g stroke="currentColor" strokeWidth="8.45">
+              <ellipse cx="64.16" cy="50.03" rx="70.78" ry="23.97" transform="rotate(35.25 64.16 50.03)" />
+              <ellipse cx="64.16" cy="50.03" rx="70.78" ry="23.97" transform="rotate(-35.25 64.16 50.03)" />
             </g>
-            <circle cx="45.32" cy="38" r="2.8" fill="currentColor" />
-            <circle cx="10.68" cy="18" r="2.8" fill="currentColor" />
-            <circle cx="45.32" cy="18" r="2.8" fill="currentColor" />
-            <circle cx="28" cy="28" r="7" fill="currentColor" />
+            <circle cx="64.16" cy="50.03" r="14.27" fill="currentColor" />
           </svg>
           <span className="text-[12px]">collab5로 만든 카드 · 답장은 편하실 때</span>
         </div>

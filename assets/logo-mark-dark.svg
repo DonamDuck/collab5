@@ -1,10 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 56 56" width="56" height="56" role="img" aria-label="collab5">
-  <g fill="none" stroke="#FBFAF6" stroke-width="2">
-    <ellipse cx="28" cy="28" rx="20" ry="7" transform="rotate(30 28 28)"/>
-    <ellipse cx="28" cy="28" rx="20" ry="7" transform="rotate(-30 28 28)"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128.32 100.05" width="128.32" height="100.05" role="img" aria-label="collab5">
+  <g fill="none" stroke="#FBFAF6" stroke-width="8.45">
+    <ellipse cx="64.16" cy="50.02" rx="70.78" ry="23.97" transform="rotate(35.25 64.16 50.02)"/>
+    <ellipse cx="64.16" cy="50.02" rx="70.78" ry="23.97" transform="rotate(-35.25 64.16 50.02)"/>
   </g>
-  <circle cx="45.32" cy="38" r="2.8" fill="#FBFAF6"/>
-  <circle cx="10.68" cy="18" r="2.8" fill="#FBFAF6"/>
-  <circle cx="45.32" cy="18" r="2.8" fill="#FBFAF6"/>
-  <circle cx="28" cy="28" r="7" fill="#98FF5C" stroke="#FBFAF6" stroke-width="2.5"/>
+  <circle cx="64.16" cy="50.02" r="14.27" fill="#98FF5C"/>
 </svg>

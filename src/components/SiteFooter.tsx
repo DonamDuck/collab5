@@ -22,10 +22,10 @@ export function SiteFooter() {
                  모바일에서 헤더(20)보다 커져서 되돌렸다.
               ⚠️08-16에 로고 viewBox를 잉크에 맞게 조여서, 같은 `h-6`이라도 이제 잉크가 24.6px다
                 (전엔 13.6px). 헷갈리지 않게 rem 유틸을 버리고 px로 박았다.
-              🪤20 + py 24 = 44. `py-[10px]`면 40이라 터치 권장치에 모자란다. */}
+              🪤21 + py 24 = 45. `py-[10px]`면 41이라 터치 권장치에 모자란다. */}
           <Link href="/" className="inline-flex items-center py-[12px]">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo-lockup.svg" alt="collab5" className="h-[20px] w-auto sm:h-[24px]" />
+            <img src="/logo-lockup.svg" alt="collab5" className="h-[21px] w-auto sm:h-[26px]" />
           </Link>
           {/* 📏 링크마다 `py-[12px]` — **글자 크기는 그대로 두고 터치 영역만** 21px → 44px로 넓힌다.
               텍스트 링크는 줄간격이 곧 높이라 21px밖에 안 됐다(권장치의 절반 미만).

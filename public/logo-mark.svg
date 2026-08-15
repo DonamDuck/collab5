@@ -1,10 +1,12 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 56 56" width="56" height="56" role="img" aria-label="collab5">
-  <g fill="none" stroke="#111111" stroke-width="2">
-    <ellipse cx="28" cy="28" rx="20" ry="7" transform="rotate(30 28 28)"/>
-    <ellipse cx="28" cy="28" rx="20" ry="7" transform="rotate(-30 28 28)"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128.32 100.05" width="128.32" height="100.05" role="img" aria-label="collab5">
+<!-- collab5 로고 — 2026-08-16 교체(대표 지정 시안).
+     원본은 젠스파크 AI 래스터라 획이 들쭉날쭉하고 끊긴 데가 있어, 형상만 수치 피팅(IoU 0.938)해
+     대칭·균일획으로 새로 그렸다. 파라미터: rx=70.78 ry=23.97 θ=±35.25° 획=8.45 초록r=14.27
+     (잉크높이 100 기준). ⚠️viewBox는 잉크에 딱 맞다 — 높이를 주면 그게 곧 보이는 크기다.
+     정본 생성기 = assets/build-logo.py. 손으로 고치지 말고 거기 상수를 고쳐 다시 구울 것. -->
+  <g fill="none" stroke="#111111" stroke-width="8.45">
+    <ellipse cx="64.16" cy="50.02" rx="70.78" ry="23.97" transform="rotate(35.25 64.16 50.02)"/>
+    <ellipse cx="64.16" cy="50.02" rx="70.78" ry="23.97" transform="rotate(-35.25 64.16 50.02)"/>
   </g>
-  <circle cx="45.32" cy="38" r="2.8" fill="#111111"/>
-  <circle cx="10.68" cy="18" r="2.8" fill="#111111"/>
-  <circle cx="45.32" cy="18" r="2.8" fill="#111111"/>
-  <circle cx="28" cy="28" r="7" fill="#98FF5C" stroke="#111111" stroke-width="2.5"/>
+  <circle cx="64.16" cy="50.02" r="14.27" fill="#98FF5C"/>
 </svg>

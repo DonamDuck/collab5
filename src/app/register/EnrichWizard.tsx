@@ -1544,15 +1544,15 @@ function LoadingView({ name, generating }: { name: string; generating?: boolean 
   }, [msgs.length]);
   return (
     <div className="flex flex-col items-center py-6 text-center" role="status" aria-live="polite">
-      <svg viewBox="0 0 56 56" className="h-11 w-11 text-ink" fill="none" aria-hidden="true">
-        <g stroke="currentColor" strokeWidth="2">
-          <ellipse cx="28" cy="28" rx="20" ry="7" transform="rotate(30 28 28)" />
-          <ellipse cx="28" cy="28" rx="20" ry="7" transform="rotate(-30 28 28)" />
+      {/* 08-16 새 마크. 좌표는 [[아톰 마크 정본]](EmptyState 주석)과 글자까지 같고, 여긴 **진한 변형**
+          (text-ink, opacity 없음) — 대기 화면의 주인공이라 빈 상태 글리프보다 한 단 크고 진하다.
+          🚨예전 `h-11 w-11`은 정사각이었다. 새 마크는 비율 1.285라 그대로 두면 가로로 눌린다. */}
+      <svg viewBox="0 0 128.32 100.05" className="h-[40px] w-auto text-ink" fill="none" aria-hidden="true">
+        <g stroke="currentColor" strokeWidth="8.45">
+          <ellipse cx="64.16" cy="50.03" rx="70.78" ry="23.97" transform="rotate(35.25 64.16 50.03)" />
+          <ellipse cx="64.16" cy="50.03" rx="70.78" ry="23.97" transform="rotate(-35.25 64.16 50.03)" />
         </g>
-        <circle cx="45.32" cy="38" r="2.8" fill="currentColor" />
-        <circle cx="10.68" cy="18" r="2.8" fill="currentColor" />
-        <circle cx="45.32" cy="18" r="2.8" fill="currentColor" />
-        <circle cx="28" cy="28" r="7" fill="var(--primary)" stroke="currentColor" strokeWidth="2" />
+        <circle cx="64.16" cy="50.03" r="14.27" fill="var(--primary)" />
       </svg>
       <p className="mt-5 text-[18px] font-bold text-ink">
         {generating

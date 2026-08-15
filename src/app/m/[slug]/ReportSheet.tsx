@@ -687,11 +687,16 @@ export function ReportSheet({
               //    (브랜드 정체성 + 어지럼 방지). 여기만 `animate-spin`+`animate-pulse`로 어기고 있었다(QA #25).
               //    정적 아톰 마크 + 순환 문구가 기준 구현(EnrichWizard LoadingView)과 같은 얼굴이다.
               <div role="status" aria-live="polite" className="flex flex-col items-center justify-center py-16 text-center">
-                {/* ⚠️ fill은 토큰(var(--primary))으로 — 예전엔 #98ff5c 하드코딩이었다. */}
-                <svg width="44" height="44" viewBox="0 0 56 56" fill="none" className="text-faint" aria-hidden="true">
-                  <ellipse cx="28" cy="28" rx="23" ry="9" stroke="currentColor" strokeWidth="2" opacity="0.45" transform="rotate(28 28 28)" />
-                  <ellipse cx="28" cy="28" rx="23" ry="9" stroke="currentColor" strokeWidth="2" opacity="0.45" transform="rotate(-28 28 28)" />
-                  <circle cx="28" cy="28" r="6" fill="var(--primary)" />
+                {/* ⚠️ fill은 토큰(var(--primary))으로 — 예전엔 #98ff5c 하드코딩이었다.
+                    08-16 새 마크로 교체. 좌표는 [[아톰 마크 정본]](EmptyState 주석)과 **글자까지 같다** —
+                    여기만 옛 rx=23/ry=9/28°로 남아 있으면 리포트 대기 화면만 옛 로고가 된다.
+                    🚨`width`/`height` 속성 대신 className으로 — 비율 1.285라 정사각으로 박으면 찌그러진다. */}
+                <svg viewBox="0 0 128.32 100.05" fill="none" className="h-[34px] w-auto text-faint" aria-hidden="true">
+                  <g stroke="currentColor" strokeWidth="8.45" opacity="0.45">
+                    <ellipse cx="64.16" cy="50.03" rx="70.78" ry="23.97" transform="rotate(35.25 64.16 50.03)" />
+                    <ellipse cx="64.16" cy="50.03" rx="70.78" ry="23.97" transform="rotate(-35.25 64.16 50.03)" />
+                  </g>
+                  <circle cx="64.16" cy="50.03" r="14.27" fill="var(--primary)" />
                 </svg>
                 {/* 굴러가는 볼드(18) + 고정 회색(13) + 진행바 — 사다리 자체는 위저드 LoadingView와 같다.
                     ⚠️ 볼드 줄은 문구마다 길이가 달라 한 줄↔두 줄을 오갈 수 있다 → `min-h`로 자리를 미리
