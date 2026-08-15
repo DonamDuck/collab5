@@ -6,6 +6,7 @@ import { repo } from "@/lib/repo";
 import { ConnectMaker } from "./ConnectMaker";
 import { LogoutButton } from "./LogoutButton";
 import { ChangePasswordButton } from "./ChangePasswordButton";
+import { LinkedAccounts } from "./LinkedAccounts";
 import { MakerRow } from "./MakerRow";
 import { SavedMakerRow } from "./SavedMakerRow";
 import { ReportArchiveCard } from "./ReportArchiveCard";
@@ -223,7 +224,10 @@ export default async function MyPage({ searchParams }: { searchParams: Promise<{
 
       {/* 계정 설정 */}
       <section className="mt-10 border-t border-hairline pt-6">
-        <ChangePasswordButton email={user.email ?? ""} />
+        <LinkedAccounts />
+        <div className="mt-8">
+          <ChangePasswordButton email={user.email ?? ""} />
+        </div>
       </section>
     </main>
   );
