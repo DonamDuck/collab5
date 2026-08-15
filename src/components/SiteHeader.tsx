@@ -25,8 +25,15 @@ export async function SiteHeader() {
         className="-ml-2 flex h-full min-w-0 shrink-0 items-center rounded-md px-2 hover:bg-surface-soft"
         aria-label="collab5 홈"
       >
+        {/* 📏 높이는 **잉크 높이**다 — 08-16에 로고 SVG의 viewBox를 잉크에 맞게 조였다.
+            전엔 viewBox(232×56) 안에 세로 47%가 빈 여백이라, `h-6`(25.5px)을 줘도 실제로
+            보이는 글자는 13.6px뿐이었다. 그래서 "로고 폰트가 작다"(대표)로 보였던 것.
+            지금은 박스≈잉크라, 아래 20/28이 곧 화면에서 보이는 크기다.
+            🪤 폭 예산 — 잉크 종횡비 6.14이라 높이 1px = 폭 6.1px다. 360px 폰의 `/search`
+               헤더(로고+매거진칩+로그인)가 제일 빡빡해서 여기가 상한을 정한다. 20px일 때
+               로고 오른쪽에 15.7px 남는다(실측). 더 키우려면 먼저 그 화면부터 재라. */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/logo-lockup.svg" alt="" aria-hidden="true" className="h-6 w-auto sm:h-7" />
+        <img src="/logo-lockup.svg" alt="" aria-hidden="true" className="h-[20px] w-auto sm:h-[28px]" />
       </Link>
       {/* 14px 정수 — text-sm은 루트 17px 탓에 14.875px(분수)가 된다. 헤더는 전 페이지 공통이라
           여기 하나가 앱 전체에 분수 픽셀을 흩뿌리고 있었다(07-31 실측). */}
