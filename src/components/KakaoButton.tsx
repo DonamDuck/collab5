@@ -49,6 +49,16 @@ export function KakaoButton({ className = "" }: { className?: string }) {
       const supabase = createBrowserAuthClient();
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "kakao",
+        // 🚨🚨 **`scopes`로 요청 항목을 줄이려 하지 마라 — 안 줄어든다**(08-15 KOE205 사고에서 확인).
+        //    Supabase(GoTrue)의 카카오 프로바이더는 기본 3종을 **항상** 넣고, 우리가 넘긴 scope는
+        //    거기에 **더해질 뿐**이다(대체가 아니다). 소스 실측:
+        //      oauthScopes := []string{"account_email", "profile_image", "profile_nickname"}
+        //      if scopes != "" { oauthScopes = append(oauthScopes, ...) }
+        //    → `scopes: "profile_nickname"`을 넣어도 account_email이 그대로 나가고, 카카오 콘솔의
+        //      [동의항목]에 그게 「사용 안 함」이면 로그인 화면 대신 **KOE205**가 뜬다.
+        //    ⭐그래서 해결은 코드가 아니라 **콘솔**이다 — 위 3종이 모두 「사용 안 함」이 아니어야 한다.
+        //      그런데 `account_email`은 **비즈니스 앱 전환 뒤에야** 켤 수 있다(08-15 신청, 3일 소요).
+        //      즉 **전환이 끝나기 전에는 카카오 로그인을 켤 수 없다.** 플래그를 내려두는 게 맞다.
         options: { redirectTo: `${window.location.origin}/welcome` },
       });
       // 성공하면 브라우저가 카카오로 떠나므로 아래는 실행되지 않는다.
