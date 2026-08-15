@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { repo } from "@/lib/repo";
 import { kstDateLabel } from "@/lib/magazine-format";
 import { isMagazineEditor } from "@/lib/magazine-auth";
+import { OG_IMAGE } from "@/lib/site";
 import { getSessionUserId } from "@/lib/profiles";
 import { ArticleBody, BrandLinkCards } from "./ArticleBody";
 import { ArticleLikeBar } from "./ArticleLikeBar";
@@ -36,7 +37,9 @@ export async function generateMetadata({
       title,
       description,
       publishedTime: a.publishedAt,
-      ...(a.coverImage ? { images: [{ url: a.coverImage }] } : {}),
+      // 🆕커버가 없으면 기본 썸네일로 떨어진다(08-16). 전엔 `images`를 통째로 빼서, 커버 없는 글은
+      //    카톡에 **그림 없는 맹숭한 줄**로 떴다 — 매거진은 링크로 퍼뜨리라고 만든 물건이라 뼈아프다.
+      images: [{ url: a.coverImage || OG_IMAGE }],
     },
   };
 }

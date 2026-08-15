@@ -1,8 +1,50 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { repo } from "@/lib/repo";
 import { instagramUrl, instagramHandle, normalizeUrl, prettyUrl } from "@/lib/links";
 import { PhotoSlider } from "@/components/PhotoSlider";
+import { OG_IMAGE } from "@/lib/site";
 import { RsvpBar, ShareBar, ViewTracker } from "./card-client";
+
+// 🆕링크 미리보기(08-16) — 이 페이지엔 **메타데이터가 아예 없었다.**
+//   카드는 DM으로 보내라고 만든 물건인데, 정작 카톡에 붙이면 카드가 안 펼쳐지고 주소만 떴다.
+//   (홈·소개서·매거진은 진작 들어가 있었고 여기만 빠져 있었다.)
+//
+// ⚠️`index: false` — robots.txt가 이미 `/c/`를 막고 있다. 카드는 특정 상대에게 보내는 제안이라
+//   검색에 뜨면 안 된다. 반면 **카톡 미리보기는 og 태그만 읽으므로 이 설정과 무관하게 잘 뜬다.**
+//   즉 "검색엔 안 잡히고, 받은 사람 카톡엔 예쁘게 펼쳐지는" 조합이다.
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}): Promise<Metadata> {
+  const { slug } = await params;
+  const card = await repo.getCardBySlug(slug);
+  if (!card) return { title: "카드를 찾을 수 없어요 — collab5", robots: { index: false, follow: false } };
+  const maker = await repo.getMakerById(card.fromBrandId);
+  if (!maker) return { title: "카드를 찾을 수 없어요 — collab5", robots: { index: false, follow: false } };
+
+  // 제목 형식은 소개서(`[collab5 소개서] 캔가`)와 같은 틀로 맞춘다 — 한 브랜드가 둘 다 보내도 한 식구로 읽힌다.
+  const title = `[콜라보 제안] ${maker.name}`;
+  // 받는 쪽 이름을 앞에 세운다 — 카톡에서 제일 먼저 읽히는 줄이라 "나한테 온 것"이 바로 보여야 한다.
+  const why = card.proposal.why || card.proposal.picture || "";
+  const description = card.proposal.toName ? `${card.proposal.toName}님께 — ${why}` : why;
+
+  return {
+    title,
+    description,
+    robots: { index: false, follow: false },
+    openGraph: {
+      type: "website",
+      siteName: "collab5",
+      url: `/c/${slug}`,
+      title,
+      description,
+      // 보내는 브랜드 사진이 먼저 — 받는 사람 입장에선 "누가 보냈나"가 곧 신뢰다. 없으면 로고 카드.
+      images: [{ url: maker.photos[0] || OG_IMAGE }],
+    },
+  };
+}
 
 // ★ 청첩장형 콜라보 카드 — design.md §9.1 v1. 무계정 열람. North Star = 카드 view.
 export default async function CardPage({

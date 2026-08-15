@@ -3,7 +3,7 @@ import "./globals.css";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { GoogleAnalytics } from "@/components/GoogleAnalytics";
-import { SITE_URL } from "@/lib/site";
+import { SITE_URL, OG_IMAGE } from "@/lib/site";
 
 const TITLE = "collab5 — 마음 맞는 브랜드들의 콜라보 플랫폼";
 // 링크 카드·검색 결과에 나가는 설명(대표 개정 08-07). 앞 문장은 소명, 뒤 문장은 할 일.
@@ -27,8 +27,9 @@ export const metadata: Metadata = {
   alternates: { canonical: "/" },
   // 🆕링크 미리보기 카드(08-07) — 소개서(/m)는 08-02에 넣었는데 **홈은 빠져 있었다.**
   //   영업 DM에 홈 링크를 붙이면 글자만 뜨고 카드가 안 펼쳐졌다는 뜻이다.
-  //   이미지 = 디자인팀 제작(`public/og-image.png`, 1200×630, 08-07) — 로고+브랜드명만,
-  //   장식·슬로건 없음(대표 지정 구성). 소스는 `assets/og-image.svg`.
+  //   이미지 = 디자인팀 제작(`public/og-image.png`, 1200×630) — 로고만, 장식·슬로건 없음(대표 지정 구성).
+  //   08-16 대표 지정 새 로고로 다시 구웠다. **주소는 `OG_IMAGE`(=`?v=` 붙은 값)를 쓴다** —
+  //   카톡·페북은 이미지를 URL 단위로 캐시해서 파일만 갈면 옛 그림이 계속 나간다. 자세한 건 lib/site.ts.
   openGraph: {
     type: "website",
     siteName: "collab5",
@@ -36,7 +37,7 @@ export const metadata: Metadata = {
     url: "/",
     title: TITLE,
     description: DESCRIPTION,
-    images: [{ url: "/og-image.png", width: 1200, height: 630 }],
+    images: [{ url: OG_IMAGE, width: 1200, height: 630 }],
   },
   // 검색엔진 소유확인 — 구글은 `public/google...html` 파일로 이미 확인됨(07-31).
   // 네이버는 서치어드바이저에서 받은 값을 여기 `other`에 넣거나 같은 방식으로 파일을 올리면 된다.
