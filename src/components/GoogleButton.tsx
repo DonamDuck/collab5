@@ -103,9 +103,15 @@ async function makeNonce(): Promise<{ raw: string; hashed: string }> {
   return { raw, hashed };
 }
 
+/**
+ * 이 버튼이 실제로 그려지는가 — **「간편 로그인」 구분선이 이걸 보고 뜬다.**
+ * ⚠️ 아래 조기 return과 **같은 조건**이어야 한다. 어긋나면 버튼 없는 구분선만 남는다.
+ */
+export const googleButtonEnabled = GOOGLE_ON && !!CLIENT_ID && authEnvReady;
+
 /** 플래그·환경 판정은 훅 밖에서 — 아래 본체가 훅을 쓰므로 조기 return을 여기에 둔다(훅 규칙). */
 export function GoogleButton({ className = "" }: { className?: string }) {
-  if (!GOOGLE_ON || !CLIENT_ID || !authEnvReady) return null;
+  if (!googleButtonEnabled) return null;
   return <GoogleIdButton className={className} />;
 }
 
@@ -138,9 +144,16 @@ function GoogleIdButton({ className }: { className: string }) {
       //    medium이면 글자만 작아지는데, 겉박스는 [data-gsi]가 51px로 잡으므로
       //    옆 버튼과의 정합은 그대로다. 문구도 그대로 나온다(실측).
       size: "medium",
+      // ⚠️ 문구는 **구글이 정한 네 가지 중에서만** 고를 수 있다(signin_with·signup_with·continue_with·signin).
+      //    한국어 locale에서 continue_with = "Google 계정으로 계속하기"다. 임의 문구("구글로 시작하기")는
+      //    renderButton이 받지 않는다 — 자체 버튼을 그리려면 리디렉션 방식으로 돌아가야 하는데,
+      //    그건 동의 화면에 supabase.co가 뜨는 07-31 문제를 되살린다(머리말 참고). 문구는 이대로 둔다.
       text: "continue_with",
       shape: "rectangular",
-      logo_alignment: "left",
+      // 🎨 left → **center**(대표 지시 08-15). left는 로고를 버튼 왼쪽 끝에 붙이고 글자만 가운데 정렬해서
+      //    옆의 카카오 버튼(아이콘+글자가 함께 가운데)과 축이 어긋나 보인다. center면 로고와 글자가
+      //    한 덩어리로 가운데 선다.
+      logo_alignment: "center",
       width: String(w),
       locale: "ko",
     });

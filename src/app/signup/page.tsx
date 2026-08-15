@@ -11,6 +11,7 @@ import { Field, authInputCls } from "@/components/Field";
 import { PasswordInput } from "@/components/PasswordInput";
 import { GoogleButton } from "@/components/GoogleButton";
 import { KakaoButton } from "@/components/KakaoButton";
+import { SocialDivider } from "@/components/SocialDivider";
 import { validatePassword, formatPhone } from "@/lib/validation";
 
 export default function SignupPage() {
@@ -241,16 +242,20 @@ export default function SignupPage() {
         {pending ? "가입 중…" : "가입하기"}
       </button>
       </form>
-      {/* 플래그 off면 아무것도 안 그린다(기본 off 배포). <form> 밖이라 제출과 섞이지 않는다.
-          ⭐소셜 로그인은 가입과 로그인이 한 버튼이라 /login과 **같은 순서·같은 구성**으로 둔다 */}
-      <KakaoButton className="mt-2" />
-      <GoogleButton className="mt-2" />
+      {/* 이메일 가입에 딸린 보조 동선이라 가입 버튼 바로 아래에 둔다(/login과 같은 배치) */}
       <p className="mt-4 text-center text-[14px] text-mute">
         이미 계정이 있나요?{" "}
         <Link href="/login" className="font-medium text-primary-on underline-offset-2 hover:underline">
           로그인
         </Link>
       </p>
+      {/* 라벨이 "간편 로그인"인 건 /login과 같다 — 소셜은 가입·로그인이 한 버튼이라
+          가입 화면에서도 사용자가 아는 그 이름으로 부른다. */}
+      <SocialDivider />
+      {/* 플래그 off면 아무것도 안 그린다(기본 off 배포). <form> 밖이라 제출과 섞이지 않는다.
+          ⭐소셜 로그인은 가입과 로그인이 한 버튼이라 /login과 **같은 순서·같은 구성**으로 둔다 */}
+      <KakaoButton className="mt-4" />
+      <GoogleButton className="mt-2" />
 
       {pending && <LoadingOverlay label="계정을 만들고 있어요…" />}
     </main>

@@ -29,12 +29,18 @@ import { authEnvReady, createBrowserAuthClient } from "@/lib/supabase/client";
 
 const KAKAO_ON = process.env.NEXT_PUBLIC_KAKAO_ENABLED === "1";
 
+/**
+ * 이 버튼이 실제로 그려지는가 — **「간편 로그인」 구분선이 이걸 보고 뜬다.**
+ * ⚠️ 아래 조기 return과 **같은 조건**이어야 한다. 어긋나면 버튼 없는 구분선만 남는다.
+ */
+export const kakaoButtonEnabled = KAKAO_ON && authEnvReady;
+
 export function KakaoButton({ className = "" }: { className?: string }) {
   const [pending, setPending] = useState(false);
   const [err, setErr] = useState("");
 
   // 플래그 off거나 auth 환경이 없으면 아무것도 그리지 않는다(기본 off 배포 — 구글과 같은 규칙)
-  if (!KAKAO_ON || !authEnvReady) return null;
+  if (!kakaoButtonEnabled) return null;
 
   const signIn = async () => {
     setErr("");
