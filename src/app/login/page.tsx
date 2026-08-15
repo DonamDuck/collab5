@@ -4,13 +4,12 @@ import { Suspense, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signInAction } from "@/lib/auth-actions";
-import { authEnvReady, createBrowserAuthClient } from "@/lib/supabase/client";
+import { authEnvReady } from "@/lib/supabase/client";
 import { LoadingOverlay } from "@/components/LoadingOverlay";
 import { Field, authInputCls } from "@/components/Field";
 import { PasswordInput } from "@/components/PasswordInput";
 import { GoogleButton } from "@/components/GoogleButton";
-
-const KAKAO_ON = process.env.NEXT_PUBLIC_KAKAO_ENABLED === "1";
+import { KakaoButton } from "@/components/KakaoButton";
 
 export default function LoginPage() {
   return (
@@ -46,14 +45,6 @@ function LoginForm() {
       const dest = redirect && redirect.startsWith("/") && !redirect.startsWith("//") ? redirect : "/";
       router.replace(dest); // push+refresh 중복 제거 — 서버 렌더가 새 세션 헤더 반영
     });
-
-  const kakao = async () => {
-    const supabase = createBrowserAuthClient();
-    await supabase.auth.signInWithOAuth({
-      provider: "kakao",
-      options: { redirectTo: window.location.origin },
-    });
-  };
 
   return (
     <main className="mx-auto w-full max-w-[400px] px-4 py-14 sm:px-6">
@@ -109,16 +100,9 @@ function LoginForm() {
           {pending ? "로그인 중…" : "로그인"}
         </button>
       </form>
-      {KAKAO_ON && (
-        <button
-          type="button"
-          onClick={kakao}
-          className="mt-2 h-12 w-full rounded-md bg-[#FEE500] text-[16px] font-medium text-[#191919]"
-        >
-          카카오로 시작하기
-        </button>
-      )}
-      {/* 플래그 off면 아무것도 안 그린다(기본 off 배포) — GoogleButton 내부에서 판정 */}
+      {/* 플래그 off면 아무것도 안 그린다(기본 off 배포) — 각 버튼 내부에서 판정.
+          카카오를 위에 두는 건 국내 사용자 기준 인지도 순서다. */}
+      <KakaoButton className="mt-2" />
       <GoogleButton className="mt-2" />
       <div className="mt-5 flex items-center justify-center gap-3 text-[14px]">
         <Link href="/signup" className="font-medium text-primary-on underline-offset-2 hover:underline">
