@@ -72,7 +72,15 @@ export default function WelcomePage() {
         return;
       }
       if (st.done) {
-        router.replace("/"); // 다시 로그인할 때마다 이 화면이 뜨면 안 된다
+        // 다시 로그인할 때마다 이 화면이 뜨면 안 된다.
+        // 🚨**하드 내비게이션이어야 한다**(08-15 카카오에서 재현 — 2회 연속).
+        //    이 경로는 **소셜 로그인 직후**라 세션이 브라우저에서만 막 생겼고, Next의
+        //    **클라이언트 라우터 캐시엔 로그인 전 홈 RSC**가 그대로 남아 있다. `router.replace`로 가면
+        //    세션이 멀쩡한데도 홈이 **비로그인 상태로 그려진다**(사용자에겐 "로그인이 안 됐다"로 보인다.
+        //    한 번 더 로그인하면 문서를 새로 받아 되는 것도 이 때문이다).
+        //    ⭐GoogleButton이 `window.location.replace`를 쓰는 이유와 **같은 버그**다(07-31 기록).
+        //      로그인은 세션 경계라 문서를 새로 받는 게 맞다.
+        window.location.replace("/");
         return;
       }
       setEmail(st.email);
@@ -133,7 +141,10 @@ export default function WelcomePage() {
         else if (/번호/.test(r.error)) phoneRef.current?.focus();
         return;
       }
-      router.replace("/"); // 서버 렌더가 새 프로필을 반영
+      // 위 `st.done` 분기와 같은 이유로 **하드 내비게이션**. 여기는 서버액션(completeOnboardingAction)을
+      // 거쳐서 Next가 캐시를 무를 여지가 있지만, 이 경로도 결국 **소셜 로그인 직후**라 라우터 캐시에
+      // 로그인 전 홈이 남아 있을 수 있다. 방금 프로필까지 새로 채웠으니 문서를 새로 받는 게 확실하다.
+      window.location.replace("/");
     });
 
   if (phase === "checking") {
