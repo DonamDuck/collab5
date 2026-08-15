@@ -84,7 +84,7 @@ function LoginForm() {
               autoComplete="username"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@brand.com"
+              placeholder="collab@collab5.co.kr"
               className={authInputCls}
             />
           </Field>
