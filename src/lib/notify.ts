@@ -19,11 +19,12 @@ const RESEND_ENDPOINT = "https://api.resend.com/emails";
 const FROM = process.env.NOTIFY_FROM || "collab5 <onboarding@resend.dev>";
 
 /** 가입 경로 — 이메일 폼과 구글 로그인이 서로 다른 함수를 타서, 어디로 들어왔는지 구분해 담는다. */
-export type SignupOrigin = "email" | "google";
+export type SignupOrigin = "email" | "google" | "kakao";
 
 const ORIGIN_LABEL: Record<SignupOrigin, string> = {
   email: "이메일 가입",
   google: "구글 로그인",
+  kakao: "카카오 로그인",
 };
 
 export interface SignupNotice {
