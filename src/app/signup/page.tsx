@@ -127,7 +127,7 @@ export default function SignupPage() {
             autoComplete="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            placeholder="collab@collab5.co.kr"
+            placeholder="user@email.com"
             className={authInputCls}
           />
           {dup.email && <p className="mt-1.5 text-[14px] text-red-600">{DUP_MSG.email}</p>}
