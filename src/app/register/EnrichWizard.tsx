@@ -1034,7 +1034,7 @@ export function EnrichWizard({
             <p className="pr-8 text-[18px] font-bold text-ink">이제 소개서 작성을 시작할게요!</p>
             <p className="mt-1.5 text-[15px] leading-relaxed text-mute">정보가 틀렸다면 수정해주세요. 빈칸으로 건너뛰어도 돼요.</p>
             <div className="mt-4 space-y-3">
-              <FieldEdit label="상호" value={fName} onChange={setFName} placeholder="예: 캔버스가든" />
+              <FieldEdit label="브랜드 이름" value={fName} onChange={setFName} placeholder="예: 캔버스가든" />
               <FieldEdit label="주소" value={fAddress} onChange={setFAddress} placeholder="예: 서울 성동구 성수동" />
               <FieldEdit
                 label="인스타그램"
