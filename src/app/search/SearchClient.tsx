@@ -71,7 +71,7 @@ export function SearchClient({ all }: { all: Maker[] }) {
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder="상호, 분위기, 콜라보 유형으로 검색"
+          placeholder="브랜드 이름, 분위기, 콜라보 유형으로 검색"
           aria-label="브랜드 검색"
           className="h-full flex-1 bg-transparent text-[16px] text-ink outline-none placeholder:text-faint"
         />

@@ -92,8 +92,10 @@ export function MyTabs({
           <TabButton active={active === "reports"} onClick={() => go("reports")} count={reportCount}>
             콜라보 리포트
           </TabButton>
+          {/* 08-15 대표 확정: 「성사된 콜라보」 → 「콜라보 기록하기」. '성사'는 내부 지표 어휘라 걷어냈다.
+              ⚠️다른 셋은 명사인데 여기만 동사형 — 대표가 세 안을 보고 고른 값이다(추천은 「기록한 콜라보」였다). */}
           <TabButton active={active === "collabs"} onClick={() => go("collabs")} count={collabCount}>
-            성사된 콜라보
+            콜라보 기록하기
           </TabButton>
         </div>
         {/* 우측 페이드 — 넘칠 때만, 끝에 닿으면 사라진다. bottom-px로 밑줄(border-b) 1px은 살린다.

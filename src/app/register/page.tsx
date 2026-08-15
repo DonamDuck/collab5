@@ -1439,7 +1439,9 @@ function RegisterForm() {
           </div>
         )}
         <div className="space-y-8">
-          <Field label="상호" required htmlFor="name-field" hint={hintFor("name")}>
+          {/* 「상호」는 사업자등록 용어라 보이스의 '행정 말투 금지'에 걸린다 → 「브랜드 이름」(08-15 대표 확정).
+              ⚠️개인정보처리방침 본문의 '상호'는 **안 바꾼다** — 법적 고지에선 그게 정확한 용어다. */}
+          <Field label="브랜드 이름" required htmlFor="name-field" hint={hintFor("name")}>
             <input
               id="name-field"
               value={name}
