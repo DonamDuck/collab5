@@ -54,12 +54,10 @@ export default async function MagazineArticlePage({
 
   // 하트 — 이 페이지는 `force-dynamic`이라 서버에서 바로 읽어 첫 화면부터 정확한 값이 뜬다
   // (홈처럼 캐시되는 화면이었다면 클라에서 따로 물어야 했다).
-  // ⚠️표가 아직 없으면 repo가 조용히 0/false를 준다 — 글이 500이 되는 것보단 하트가 0인 게 낫다.
+  // 🔻08-15 개수 조회(`countArticleLikes`)는 뺐다 — 화면에 숫자를 안 쓰기로 했는데(대표 지시)
+  //   글 열 때마다 세는 건 낭비다. 되살릴 땐 이 자리에 한 줄 되돌리면 된다(repo 함수는 그대로 있다).
   const viewerId = await getSessionUserId();
-  const [likeCount, likedByMe] = await Promise.all([
-    repo.countArticleLikes(a.id),
-    viewerId ? repo.isArticleLiked(viewerId, a.id) : Promise.resolve(false),
-  ]);
+  const likedByMe = viewerId ? await repo.isArticleLiked(viewerId, a.id) : false;
 
   return (
     // ⚠️`pb-28` — 하트 버튼이 `fixed`라 본문 맨 끝을 덮는다. 그만큼 아래를 비워 둔다.
@@ -164,7 +162,6 @@ export default async function MagazineArticlePage({
         <ArticleLikeBar
           articleId={a.id}
           slug={a.slug}
-          initialCount={likeCount}
           initialLiked={likedByMe}
           loggedIn={!!viewerId}
         />

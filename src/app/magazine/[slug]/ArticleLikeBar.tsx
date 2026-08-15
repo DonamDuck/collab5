@@ -20,21 +20,22 @@ const PENDING_LIKE_KEY = "collab5:pendingArticleLike";
 export function ArticleLikeBar({
   articleId,
   slug,
-  initialCount,
   initialLiked,
   loggedIn,
 }: {
   articleId: number;
   slug: string;
-  initialCount: number;
   initialLiked: boolean;
   loggedIn: boolean;
 }) {
+  // 🔻08-15 개수 상태(`count`)·진행 상태(`busy`)를 **뺐다**(대표 지시 — 숫자는 나중에).
+  //   ⭐**데이터는 그대로 쌓인다** — `magazine_likes` 행도, 서버 액션이 돌려주는 최종 개수도 살아 있다.
+  //     화면 표시만 없앤 것이라, 되살릴 때 숫자가 0부터 시작하지 않는다.
+  //   ⛔대신 **죽은 state를 남겨두지 않는다.** 안 쓰는 값이 남으면 다음 사람이 "이건 왜 있지"를 묻고,
+  //     린트도 계속 경고한다. 되살리는 건 `initialCount` prop + useState 한 줄이면 된다.
   const [liked, setLiked] = useState(initialLiked);
-  const [count, setCount] = useState(initialCount);
   const [needLogin, setNeedLogin] = useState(false);
   const [err, setErr] = useState("");
-  const [busy, setBusy] = useState(false);
 
   // 오버레이 공통 동작(ESC·스크롤 잠금·포커스 트랩·포커스 복귀·role/aria-modal)을 한 번에 얻는다.
   // ⚠️`overlayClose: false` — **얼럿은 딤 클릭으로 닫지 않는다**(대표 정책 07-29). 그래도 ESC로는 닫힌다.
@@ -46,21 +47,15 @@ export function ArticleLikeBar({
 
   const apply = useCallback(
     async (next: boolean) => {
-      setBusy(true);
       setErr("");
-      // 낙관적 — 누른 사람에겐 즉시 반응해야 한다. 숫자는 서버 응답으로 정정한다.
+      // 낙관적 — 누른 사람에겐 즉시 반응해야 한다. 실패하면 되돌린다.
       setLiked(next);
-      setCount((c) => Math.max(0, c + (next ? 1 : -1)));
       const r = await setArticleLikedAction(articleId, next);
-      setBusy(false);
       if (r.error) {
         setLiked(!next); // 롤백
-        setCount((c) => Math.max(0, c + (next ? -1 : 1)));
         setErr(r.error);
         return;
       }
-      // ⭐서버가 준 최종 개수로 덮는다 — 내가 보는 사이 남이 누른 하트까지 반영된다.
-      if (typeof r.count === "number") setCount(r.count);
     },
     [articleId]
   );
@@ -84,7 +79,9 @@ export function ArticleLikeBar({
   }, [loggedIn, liked, articleId, apply]);
 
   const onClick = () => {
-    if (busy) return;
+    // ⛔`if (busy) return;`를 뺐다(08-15 대표 제보 "투명할 때 눌러도 아무것도 안 되더라").
+    //   저장이 도는 동안 클릭을 삼키니, 쓰는 사람에겐 **버튼이 죽은 것**으로 보였다.
+    //   서버가 멱등이라(upsert / delete) 연타해도 마지막 상태로 수렴한다 — 막을 이유가 없다.
     if (!loggedIn) {
       setNeedLogin(true);
       return;
@@ -114,31 +111,34 @@ export function ArticleLikeBar({
       <button
         type="button"
         onClick={onClick}
-        disabled={busy}
         aria-pressed={liked}
-        // ⭐눌린 상태 = 이 저장소가 이미 쓰는 「선택됨」 어휘(border-primary + tint + primary-on).
-        //   새 표현을 만들지 않는다 — 사용자는 이 색을 이미 배웠다.
-        className={`pointer-events-auto inline-flex h-12 shrink-0 items-center gap-2 rounded-pill border-[0.5px] px-5 text-[15px] font-medium shadow-e2 transition-colors disabled:opacity-60 ${
-          liked
-            ? "border-primary bg-primary-tint text-primary-on"
-            : "border-[#DFDFE3] bg-surface text-ink hover:bg-surface-soft"
-        }`}
+        // 🔻08-15 **버튼은 상태에 따라 안 변한다.** 눌림은 오직 **하트 색**이 말한다(대표 지시).
+        //   ⛔전엔 눌리면 알약 전체가 키위 tint로 바뀌었는데, 그러면 「선택됨」이 CTA만큼 커져
+        //     읽는 화면에서 버튼이 주인공이 된다. 하트 하나면 충분하다.
+        //   ⛔`disabled={busy}` + `disabled:opacity-60`도 뺐다 — 저장되는 동안 버튼이 흐려지며
+        //     **로딩처럼 보이고 그때 눌러도 안 먹었다**(대표 제보). 서버 쪽이 멱등이라(upsert/delete)
+        //     연타해도 상태가 꼬이지 않는다. /m 소개서의 찜 버튼도 같은 방식으로 막지 않는다.
+        className="pointer-events-auto inline-flex h-12 shrink-0 items-center gap-2 rounded-pill border-[0.5px] border-[#DFDFE3] bg-surface px-5 text-[15px] font-medium text-ink shadow-e2 transition-colors hover:bg-surface-soft"
       >
         {/* 문구는 상태와 무관하게 그대로 둔다 — 눌림 여부는 하트 채움과 면색이 말한다.
             라벨까지 같이 바뀌면 버튼 폭이 흔들리고, 무엇이 상태 표시인지 흐려진다. */}
         <span>잘 읽었어요</span>
         {/* 하트는 **글자 오른쪽**(대표 지시 08-14) — 「잘 읽었어요 ❤️」라고 말하는 순서 그대로다.
-            하트는 이모지 대신 SVG — 이모지는 기기마다 모양·색이 제각각이라 '눌림/안 눌림'을
-            면색으로 말하는 이 버튼에서 상태가 흐려진다. */}
-        <svg viewBox="0 0 20 20" className="h-[18px] w-[18px] shrink-0" aria-hidden="true"
+            ⭐**이 하트가 상태를 말하는 유일한 장치다**(08-15) — 누르면 빨갛게 채워지고, 다시 누르면
+              빈 하트로 돌아간다. 색은 `text-red-500` — /m 소개서의 찜 하트와 **같은 값**이다.
+              사이트에서 「내가 눌러둔 하트」는 하나의 색이어야 한다.
+            ⚠️이모지(❤️) 대신 SVG인 이유: 이모지는 기기마다 모양·색이 제각각이라 채움/빔의 대비가
+              흐려진다. 지금은 하트 하나가 상태를 통째로 지고 있어 더 중요해졌다. */}
+        <svg viewBox="0 0 20 20"
+          className={`h-[18px] w-[18px] shrink-0 transition-colors ${liked ? "text-red-500" : "text-ink"}`}
+          aria-hidden="true"
           fill={liked ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.7">
           <path d="M10 16.5S3.5 12.6 3.5 8.2A3.7 3.7 0 0 1 10 5.9a3.7 3.7 0 0 1 6.5 2.3c0 4.4-6.5 8.3-6.5 8.3Z"
             strokeLinejoin="round" />
         </svg>
-        {count > 0 && (
-          // 숫자는 자릿수가 바뀌어도 버튼이 안 흔들리게 고정폭 숫자(tabular-nums).
-          <span className="tabular-nums text-[14px] font-bold">{count}</span>
-        )}
+        {/* 🔻08-15 **개수 숨김**(대표 지시 — "지금은 뺄 거야, 나중에 넣고 싶어").
+            ⭐DB에는 그대로 쌓인다 — 화면에서만 안 보일 뿐이라, 되살릴 때 숫자가 0부터 시작하지 않는다.
+              `count` 상태와 서버가 돌려주는 최종 개수도 그대로 둔다(지금 지우면 나중에 다시 만들어야 한다). */}
       </button>
     </div>
 
