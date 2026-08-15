@@ -10,6 +10,7 @@ import { Field, authInputCls } from "@/components/Field";
 import { PasswordInput } from "@/components/PasswordInput";
 import { GoogleButton } from "@/components/GoogleButton";
 import { KakaoButton } from "@/components/KakaoButton";
+import { SocialDivider } from "@/components/SocialDivider";
 
 export default function LoginPage() {
   return (
@@ -100,11 +101,10 @@ function LoginForm() {
           {pending ? "로그인 중…" : "로그인"}
         </button>
       </form>
-      {/* 플래그 off면 아무것도 안 그린다(기본 off 배포) — 각 버튼 내부에서 판정.
-          카카오를 위에 두는 건 국내 사용자 기준 인지도 순서다. */}
-      <KakaoButton className="mt-2" />
-      <GoogleButton className="mt-2" />
-      <div className="mt-5 flex items-center justify-center gap-3 text-[14px]">
+      {/* ⭐회원가입·비밀번호 찾기를 **로그인 버튼 바로 아래**로 올린다(대표 지시 08-15).
+          이메일 로그인에 딸린 보조 동선이라 그 옆에 붙어야 읽히고, 소셜 버튼과 섞이면
+          "로그인 수단"이 넷처럼 보인다. */}
+      <div className="mt-4 flex items-center justify-center gap-3 text-[14px]">
         <Link href="/signup" className="font-medium text-primary-on underline-offset-2 hover:underline">
           회원가입
         </Link>
@@ -113,6 +113,11 @@ function LoginForm() {
           비밀번호 찾기
         </Link>
       </div>
+      <SocialDivider />
+      {/* 플래그 off면 아무것도 안 그린다(기본 off 배포) — 각 버튼 내부에서 판정.
+          카카오를 위에 두는 건 국내 사용자 기준 인지도 순서다. */}
+      <KakaoButton className="mt-4" />
+      <GoogleButton className="mt-2" />
 
       {pending && <LoadingOverlay label="로그인 중이에요…" />}
 
