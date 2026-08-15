@@ -160,11 +160,8 @@ export function SearchClient({ all }: { all: Maker[] }) {
                     />
                   ) : (
                     <div className="flex h-full w-full items-center justify-center bg-primary-pale">
-                      {/* 🚨`w-10`(정사각)이 아니라 **`w-auto`** — 08-16 새 마크는 가로:세로가
-                          1.285라 폭을 높이와 같게 박으면 찌그러진다. 예전 마크는 viewBox가
-                          56×56 정사각이라 `h-10 w-10`이 우연히 멀쩡했던 것뿐이다. */}
                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src="/logo-mark.svg" alt="collab5" className="h-[34px] w-auto opacity-70" />
+                      <img src="/logo-mark.svg" alt="collab5" className="h-10 w-10 opacity-70" />
                     </div>
                   )}
                 </div>

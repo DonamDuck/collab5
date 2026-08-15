@@ -38,20 +38,13 @@ export function EmptyState({
 // 빈 화면 아톰 아이콘 — currentColor(text-faint)로 라이트·다크 자동 대응, 핵만 Kiwi 고정.
 function AtomGlyph() {
   return (
-    // 08-16 로고 교체에 맞춰 형상을 새 마크로 갈았다 — 궤도점 3개를 빼고 2타원 + 가운데 점.
-    // 여기는 **뮤트 변형**이다: 형상은 로고와 완전히 같고 톤만 낮춘다(text-faint + opacity .45).
-    // 로고만 바꾸고 이걸 두면 빈 화면들만 옛 아이덴티티로 남는다.
-    //
-    // 🔒 좌표는 [[아톰 마크 정본]] — 앱 안에 인라인으로 박힌 아톰 4곳(여기·ReportSheet·
-    //    EnrichWizard·c/[slug] 풋터)이 **모두 이 숫자를 그대로** 쓴다. 예전엔 곳마다 rx/각도가
-    //    달라(20/7@30°, 23/9@28°) 한쪽만 고치면 갈라졌다. 크기는 좌표가 아니라 className으로만 준다.
-    // 🚨 정사각 클래스(w-11 등) 금지 — 비율이 1.285라 폭을 높이와 같게 박으면 찌그러진다.
-    <svg viewBox="0 0 128.32 100.05" fill="none" className="h-[34px] w-auto text-faint" aria-hidden="true">
-      <g stroke="currentColor" strokeWidth="8.45" opacity="0.45">
-        <ellipse cx="64.16" cy="50.03" rx="70.78" ry="23.97" transform="rotate(35.25 64.16 50.03)" />
-        <ellipse cx="64.16" cy="50.03" rx="70.78" ry="23.97" transform="rotate(-35.25 64.16 50.03)" />
-      </g>
-      <circle cx="64.16" cy="50.03" r="14.27" fill="var(--primary)" />
+    <svg width="56" height="56" viewBox="0 0 56 56" fill="none" className="text-faint" aria-hidden="true">
+      <ellipse cx="28" cy="28" rx="23" ry="9" stroke="currentColor" strokeWidth="2" opacity="0.45" transform="rotate(28 28 28)" />
+      <ellipse cx="28" cy="28" rx="23" ry="9" stroke="currentColor" strokeWidth="2" opacity="0.45" transform="rotate(-28 28 28)" />
+      <circle cx="28" cy="28" r="6" fill="#98ff5c" />
+      <circle cx="6.5" cy="32" r="2.4" fill="currentColor" opacity="0.55" />
+      <circle cx="49.5" cy="24" r="2.4" fill="currentColor" opacity="0.55" />
+      <circle cx="33" cy="6.5" r="2.2" fill="currentColor" opacity="0.55" />
     </svg>
   );
 }
