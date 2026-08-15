@@ -158,11 +158,13 @@ export default async function MyPage({ searchParams }: { searchParams: Promise<{
       </div>
     ) : (
       <div>
-        <div className="flex items-start justify-between gap-3">
+        {/* 목록이 있을 때의 안내 — 08-15 대표 지적으로 교체. 전엔 "몇 건이 성사됐는지 세는 유일한 기록이에요"였는데
+            그건 **우리 북극성 지표**지 사장님 이득이 아니다(빈 상태·얼럿에서 같은 이유로 이미 걷어냈다).
+            ⭐이미 기록이 있는 사람에게 필요한 건 '남겨두세요'라는 권유가 아니라, **눈에 안 보이는 동작 하나**다
+              — 여기 쌓은 게 소개서로도 나간다는 것. 그래서 한 줄로 줄이고 `items-center`로 버튼과 높이를 맞춘다. */}
+        <div className="flex items-center justify-between gap-3">
           <p className="text-[13px] leading-relaxed text-mute">
-            실제로 하기로 한 콜라보를 남겨두세요.
-            <br />
-            몇 건이 성사됐는지 세는 유일한 기록이에요.
+            추가한 콜라보는 내 소개서에도 함께 올라가요.
           </p>
           <CollabRecorder myBrands={makers.map((m) => ({ id: m.id, name: m.name }))} />
         </div>
