@@ -16,6 +16,7 @@ import { HomeIdeaCta, IDEA_CTA_ANCHOR } from "./HomeIdeaCta";
 import { HomeFloatingCta } from "./HomeFloatingCta";
 import { BrandGrid } from "@/components/BrandGrid";
 import { SampleReportCard } from "@/components/SampleReport";
+import { PreviewPhones } from "./PreviewPhones";
 
 /** 이보다 적으면 브랜드 구좌를 아예 안 그린다(디자인팀 07-27 규칙 승계). */
 const MIN_GRID = 3;
@@ -49,8 +50,8 @@ export function HomeBody({
           ⚠️`home-rise`(온로드 라이즈)를 안 태운다 — 페이지 최상단이라 애니메이션이 끝나기 전에
             사람이 이미 보고 있다. 첫 화면 요소는 처음부터 떠 있어야 한다. */}
       {article && (
-        // 🎨배경은 **`bannerBg` prop**이 정한다 — 홈은 `page.tsx`가 확정값을 넘기고,
-        // 🎨**확정 = 카본 #0c0c0c**(대표 08-16 2차, 홈 full 상태로 비교 후). 아래는 그 경위다.
+        // 🎨배경은 **`bannerBg` prop**이 정한다 — `page.tsx`가 확정값을 넘긴다.
+        //    **확정 = 카본 #0c0c0c**(대표 08-16 2차, 홈 full 상태로 비교 후). 아래는 그 경위다.
         //    ⭐A를 고른 이유는 이 자리의 미래에도 맞다 — 대표: *"나중에 슬라이드로 업체 소개나
         //      이벤트가 될 자리"*. C안(커버 블러)은 **사진이 있어야 성립**하지만 A는 사진이 없는
         //      이벤트·공지 배너에도 그대로 쓰인다. 캐러셀이 되면 슬라이드마다 배경이 달라지는 것보다
@@ -59,7 +60,7 @@ export function HomeBody({
         <HomeMagazineBanner article={article} isFirstIssue={isFirstIssue} bg={bannerBg} />
       )}
 
-      {/* 📐**본문 폭 1280**(08-16 3차, 대표: *"우리 홈 좌우 패딩 너무 심해"*).
+      {/* 📐**본문 폭 1320**(08-16 3차, 대표: *"우리 홈 좌우 패딩 너무 심해"*).
           🔬실측 @1440 — 원티드 좌우여백 **72**(콘텐츠 1296) · 와사비 **80**(1280) · 우리는 **240**(960)이었다.
             여백이 3배였고, 그게 "비어 보인다·시원하지 않다"의 실체였다. 폭을 키우면 같은 카드가
             **더 크게** 들어가고 한 줄에 더 많이 보인다 — 두 효과가 같이 온다.
@@ -217,6 +218,38 @@ export function HomeBody({
 
         {/* 3분기 게이트 — 비로그인 / 소개서 없음 / 소개서 있음. 상세는 HomeIdeaCta.tsx */}
         <HomeIdeaCta />
+      </section>
+
+      {/* ═══ ④ 소개서 실물 — 08-16 **홈으로 복귀**(대표 확정) ══════════════════════════
+          📜08-16 개편에서 잠깐 내렸다가 되돌렸다. 처음엔 `/about` 소개 페이지를 만들어 옮기자고
+            제안했는데 대표 판단이 이랬다 — *"PreviewPhones가 사실 collab5의 about은 아니거든"*.
+            맞는 지적이다. 이건 **회사 소개가 아니라 제품 실물**이라 회사를 설명하는 페이지에 두면
+            성격이 바뀐다. 제품은 제품이 팔리는 자리에 있어야 한다.
+          ⭐왜 꼭 있어야 하나 — 대표가 받은 피드백 최다 두 마디가 ①"소개서가 이쁘다"
+            ②"콜라보 분석이 재밌다"였다. ②는 바로 위 ③구좌가 실물 리포트로 답하는데,
+            **①은 이게 없으면 사이트 어디에도 답이 없다.** "소개서가 뭔데?"에 등록 버튼만 내미는 꼴.
+          📐**③ 아래**가 맞는 자리다(대표 지시). ③에서 "분석을 받으려면 소개서가 필요하다"를 막
+            읽은 참이라, 그 다음 질문이 정확히 "그 소개서가 뭔데?"다. 순서가 질문을 따라간다.
+          ⚠️길이 비용은 인정하고 넣는다 — 모바일 홈이 그만큼 길어진다. 오늘 내내 줄여온 방향과
+            반대지만, **없어서 답을 못 하는 것**보다는 낫다는 게 대표 판단이다. */}
+      <section className="home-rise mt-16 sm:mt-24" style={{ animationDelay: "560ms" }}>
+        <div className="mb-3 inline-flex items-center gap-1.5 rounded-pill bg-surface-soft px-3 py-1.5 sm:mb-3.5 sm:gap-2 sm:px-3.5 sm:py-2">
+          <span className="h-2 w-2 rounded-pill bg-primary sm:h-2.5 sm:w-2.5" />
+          <span className="text-[12px] font-bold tracking-wide text-mute sm:text-[13px]">
+            소개서 미리보기
+          </span>
+        </div>
+        <h2 className="break-keep text-[24px] font-bold leading-[1.35] tracking-[-0.02em] text-ink sm:text-[32px]">
+          소개서는 이렇게 나와요.
+        </h2>
+        {/* 📝사진이 없어도 된다는 걸 **여기서** 말한다 — 이 갤러리 자체가 사진본/텍스트본 두 종류를
+            나란히 보여주는 물건이라(PreviewPhones 주석), 문장과 실물이 같은 말을 한다. */}
+        <p className="mt-2.5 max-w-[600px] break-keep text-[16px] leading-[1.65] text-body sm:mt-3 sm:text-[18px]">
+          사진이 많지 않아도 괜찮아요. 있는 이야기로 채워드려요.
+        </p>
+        <div className="mt-7">
+          <PreviewPhones />
+        </div>
       </section>
 
       {/* 🔻08-16 「지금 바로 콜라보를 시작해보세요 :)」 마무리 CTA 섹션 **삭제**(대표 지시).
