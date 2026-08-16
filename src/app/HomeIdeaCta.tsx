@@ -78,11 +78,16 @@ export function HomeIdeaCta() {
             (「분석 결과는 요청한 분만…」 줄을 08-16에 뺐는데, 그게 채우던 자리가 그대로 빈 공백으로
              남아 있었던 것도 겹쳤다 — 문구를 지우면 그 자리 여백도 다시 재야 한다.) */}
       <div className="mt-6 max-w-[640px] text-center sm:mx-auto">
+        {/* 🔤`font-medium`이 이 저장소의 버튼 정본이다. 08-16에 여기만 `font-bold`로 썼다가
+            대표가 잡아냈다 — *"우리 원래 버튼 안에 볼드 처리 안 했던 것 같아"*. 실제로 `bg-primary`
+            버튼 87곳 중 75곳이 `font-medium`이고, `font-bold`인 9곳은 대부분 버튼이 아니라 배지·칩이다.
+            ⛔버튼을 굵게 해서 강조하지 않는다. 강조는 **색과 크기**가 이미 하고 있고, 거기에 굵기까지
+              더하면 한 요소가 강조 수단을 셋 쥐게 되어 주변이 눌린다. */}
         <button
           type="button"
           onClick={onClick}
           disabled={busy}
-          className="inline-flex h-13 min-w-[260px] items-center justify-center rounded-md bg-primary px-8 text-[17px] font-bold text-primary-on transition-opacity disabled:opacity-60"
+          className="inline-flex h-13 min-w-[260px] items-center justify-center rounded-md bg-primary px-8 text-[17px] font-medium text-primary-on transition-opacity disabled:opacity-60"
         >
           {/* 📝「나도,」를 앞에 붙였다(대표 08-16). 바로 위에서 **남의 리포트**(캔버스가든 ×
               호락호락도서관)를 한참 읽고 내려온 자리라, 「나도」 한 마디가 그 예시와 자기를 잇는다.

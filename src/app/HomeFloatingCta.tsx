@@ -98,6 +98,14 @@ export function HomeFloatingCta() {
           shown ? "translate-y-0 opacity-100" : "pointer-events-none translate-y-4 opacity-0"
         }`}
       >
+        {/* 🟢키위 점(대표 지시 08-16). 검은 알약에 브랜드색을 **한 점만** 얹는다.
+            면적을 키우면 알약 자체가 형광이 되어 각 섹션의 진짜 CTA와 색이 겹친다(위 🎨주석) —
+            점은 그 위험 없이 "우리 것"이라는 표시만 남긴다.
+            📐지름 6.4px = 라벨 15px의 약 40%. 글머리 점의 통상 비율이고, 더 키우면 배지로 읽힌다.
+            📍**왼쪽**에 둔다 — 같은 홈 ②섹션의 「● 콜라보 ON」 칩이 이미 「점 + 라벨」이라 어휘가
+              맞는다. 오른쪽에 붙이면 알림 배지(읽지 않음 표시)로 읽혀 뜻이 달라진다.
+            ⚠️`shrink-0` 필수 — 없으면 좁은 화면에서 점이 타원으로 눌린다. */}
+        <span aria-hidden="true" className="mr-2.5 h-1.5 w-1.5 shrink-0 rounded-pill bg-primary" />
         3분 만에 소개서 만들기
       </Link>
     </div>
