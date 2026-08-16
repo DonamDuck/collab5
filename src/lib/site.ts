@@ -13,4 +13,4 @@ export const SITE_URL = "https://collab5.co.kr";
  *     그대로일 수 있다 — 급하면 카카오 개발자 도구에서 주소별로 초기화해야 한다
  *     (https://developers.kakao.com/tool/clear/og).
  */
-export const OG_IMAGE = "/og-image.png?v=2";
+export const OG_IMAGE = "/og-image.png?v=3";  // v3 = 로고 초록을 키위(#98FF5C)로 교정(08-16)
