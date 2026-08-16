@@ -194,7 +194,7 @@ export function BrandGrid({ brands }: { brands: Maker[] }) {
           </div>
         ))}
         <div className="w-[210px] shrink-0 snap-start sm:w-[300px]">
-          <EndCard total={brands.length} />
+          <EndCard />
         </div>
       </div>
       {/* 🖱️화살표 — 레일 **위에 겹쳐** 띄운다(와사비 방식). 위에 따로 줄을 만들면 세로를 먹는데,
@@ -292,7 +292,7 @@ function BrandCard({ m }: { m: Maker }) {
 
 /** 레일 끝 칸 — 끝까지 민 사람의 출구. 개수 표기 없음, 흰 면 + 실선 hairline(점선 금지).
  *  이 원칙은 07-27 캐러셀 MoreCard에서 승계했다. */
-function EndCard({ total }: { total: number }) {
+function EndCard() {
   return (
     <Link
       href="/search"
@@ -304,9 +304,11 @@ function EndCard({ total }: { total: number }) {
           <path d="M4 10h12m0 0-4.5-4.5M16 10l-4.5 4.5" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       </span>
-      {/* 🔢개수는 **여기**로 옮겼다(08-16, 하단 버튼을 짧게 줄이면서).
-          끝까지 민 사람은 이미 6곳을 봤으니 "그래서 몇 곳이 더 있나"가 그 자리의 질문이다. */}
-      <span className="text-[14px] font-medium text-ink">{total}곳 모두 보기</span>
+      {/* 🔻08-16 「N곳 모두 보기」에서 **「더보기」**로 줄였다(대표: *"N개가 나오는 게 지금 많지가 않아서"*).
+          ⭐숫자는 **많을 때만 증거**가 된다. 9곳이면 "겨우 9곳"으로 읽혀 오히려 빈약함을 드러낸다.
+            브랜드가 수십 곳이 되면 그때 다시 숫자를 넣는 게 맞다 — 같은 문구가 상황에 따라
+            자랑이 되기도 하고 자백이 되기도 한다. */}
+      <span className="text-[14px] font-medium text-ink">더보기</span>
     </Link>
   );
 }
