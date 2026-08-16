@@ -136,7 +136,7 @@ export default async function Home() {
         </h1>
         {/* 부제는 **한 줄**. 예전엔 세 덩어리였고, 그게 슬로건의 목소리를 나눠 갖던 원인이다. */}
         <p className="mx-auto mt-5 max-w-[480px] break-keep text-[16px] leading-[1.6] text-body sm:text-[18px]">
-          작은 가게도, 1인 브랜드도 괜찮아요. 무료로 시작해보세요.
+          작은 가게도, 1인 브랜드도 괜찮아요!
         </p>
       </section>
 
