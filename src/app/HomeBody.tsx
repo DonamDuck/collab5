@@ -273,7 +273,7 @@ export function HomeBody({
             event="home_preview_example_click"
             className="inline-flex h-12 w-full items-center justify-center rounded-md border border-border-strong bg-surface px-7 text-[16px] font-medium text-ink transition-colors hover:bg-surface-soft sm:w-auto"
           >
-            브랜드 소개서 작성 예시
+            브랜드 소개서 예시
           </TrackLink>
           <TrackLink
             href="/register"

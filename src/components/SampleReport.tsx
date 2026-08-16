@@ -72,7 +72,11 @@ export function SampleReportCard() {
                 📏@360 실측 — 글자가 쓸 수 있는 폭 **260.3px**인데 이 문장은 볼드 기준
                   16px 323.8 / 15px 303.6 / 14px 283.4 / **13px 263.1** 로 전부 초과다.
                   13px까지 내려도 안 되니, 읽히지도 않으면서 두 줄인 최악만 남는다.
-                → **두 줄을 받아들이고 읽히는 크기(모바일 15 / 데스크톱 16)로 둔다.**
+                → **두 줄을 받아들이고 읽히는 크기로 둔다. 모바일·데스크톱 모두 15px**
+                  (데스크톱도 16은 크다는 대표 지적으로 `sm:text-[16px]` 제거 — 한 줄로 통일).
+                  ⭐크기를 갈라놓을 이유가 없어졌다. 16이 필요했던 건 "이 칩이 카드의 머리글"이라
+                    본문(15)보다 커야 한다는 논리였는데, **키위 면 + 진초록 글자**가 이미 머리글
+                    노릇을 다 한다. 면색이 위계를 만들면 크기까지 키울 필요가 없다.
                 ⭐한 줄이 꼭 필요하면 방법은 **문장을 줄이는 것뿐**이다. 실측 @360 여유 260.3 기준:
                   · 「… 콜라보 추천 예시예요.」 현행 → 13px에서도 ❌
                   · 「… 추천 예시예요.」        → 14px ✅(243.8) / 15px ❌
@@ -81,7 +85,11 @@ export function SampleReportCard() {
                   ⛔문안은 대표가 쓴 것이라 내가 임의로 줄이지 않는다. 고를 일이 생기면 위 수치로.
                 ⭐교훈: 칩 안에 스팬이 하나라도 들어가면 `inline-flex`는 **문장을 조각낸다.**
                   아이콘+라벨처럼 안 쪼개질 것에만 flex를 쓰고, **문장에는 쓰지 않는다.**
-              🎨키위 면 + 볼드(대표 지시). ⚠️글자색은 반드시 `primary-on` — `text-mute`(#6b6b6b)를
+              🎨키위 면(대표 지시). 🔻**볼드는 뺐다**(대표: *"너무 눈에 확 들어온다"*) —
+                키위 면만으로 이미 시선을 다 가져가는데 굵기까지 얹으니 **카드의 주인공(리포트
+                내용)보다 캡션이 세졌다.** 강조 수단은 하나면 충분하다. `font-medium`은 이
+                저장소의 기본 굵기이기도 하다.
+              ⚠️글자색은 반드시 `primary-on` — `text-mute`(#6b6b6b)를
                 키위에 얹으면 대비 4.1로 기준(4.5) 미달이다. `primary-on`은 6.49.
                 `×`는 같은 색 55%로 눌러 이름 둘 사이의 구분자로만 읽히게 했다.
             ✍️맞춤법 — 대표 초안은 「예시**에요**」였는데 **「예시예요」가 맞다.**
@@ -90,7 +98,7 @@ export function SampleReportCard() {
             📐칩이 한 문장이라 `rounded-pill`이 아니라 `rounded-md`다 — 알약은 짧은 라벨의 모양이고,
               문장을 넣으면 좁은 화면에서 두 줄이 되며 알약 곡률이 깨져 보인다.
             ⚠️break-keep 필수 — 브랜드명이 길어 두 줄이 된다. 없으면 어절 한가운데서 끊긴다(08-01). */}
-        <span className="inline-block rounded-md bg-primary px-3 py-2 text-[15px] font-bold break-keep text-primary-on sm:text-[16px]">
+        <span className="inline-block rounded-md bg-primary px-3 py-2 text-[15px] font-medium break-keep text-primary-on">
           {sampleData.fromName} <span className="text-primary-on/55">×</span> {sampleData.toName}{" "}
           콜라보 추천 예시예요.
         </span>
