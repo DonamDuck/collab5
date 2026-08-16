@@ -85,7 +85,15 @@ export function SampleReportCard() {
                   ⛔문안은 대표가 쓴 것이라 내가 임의로 줄이지 않는다. 고를 일이 생기면 위 수치로.
                 ⭐교훈: 칩 안에 스팬이 하나라도 들어가면 `inline-flex`는 **문장을 조각낸다.**
                   아이콘+라벨처럼 안 쪼개질 것에만 flex를 쓰고, **문장에는 쓰지 않는다.**
-              🎨키위 면(대표 지시). 🔻**볼드는 뺐다**(대표: *"너무 눈에 확 들어온다"*) —
+              🎨키위 계열 면(대표 지시). 🔻**원색 Kiwi(`bg-primary`)에서 `bg-primary-tint`(#D6FFC0)로
+                한 단 내렸다**(대표 지적: *"칩이랑 버튼이 겹쳐서…"*).
+                ⭐판단 근거 — **원색 Kiwi는 이 사이트에서 "누르는 것"을 뜻하는 색**이다.
+                  이 칩은 못 누르는 라벨인데 바로 옆 플로팅 알약(`bg-primary`, 진짜 버튼)과 같은 면색을
+                  쓰니 겹쳐 보이는 게 당연했다. **역할이 다르면 채도가 달라야 한다.**
+                  tint는 키위 가족이라 정체성은 남기고, 채도가 낮아 "이건 버튼이 아니다"가 읽힌다.
+                  ⛔칩을 회색으로 되돌리는 선택지도 있었지만, 대표가 키위 방향을 원했으므로
+                    **색을 버리지 않고 단계를 내리는 쪽**을 골랐다.
+              🔻**볼드는 뺐다**(대표: *"너무 눈에 확 들어온다"*) —
                 키위 면만으로 이미 시선을 다 가져가는데 굵기까지 얹으니 **카드의 주인공(리포트
                 내용)보다 캡션이 세졌다.** 강조 수단은 하나면 충분하다. `font-medium`은 이
                 저장소의 기본 굵기이기도 하다.
@@ -98,7 +106,7 @@ export function SampleReportCard() {
             📐칩이 한 문장이라 `rounded-pill`이 아니라 `rounded-md`다 — 알약은 짧은 라벨의 모양이고,
               문장을 넣으면 좁은 화면에서 두 줄이 되며 알약 곡률이 깨져 보인다.
             ⚠️break-keep 필수 — 브랜드명이 길어 두 줄이 된다. 없으면 어절 한가운데서 끊긴다(08-01). */}
-        <span className="inline-block rounded-md bg-primary px-3 py-2 text-[15px] font-medium break-keep text-primary-on">
+        <span className="inline-block rounded-md bg-primary-tint px-3 py-2 text-[15px] font-medium break-keep text-primary-on">
           {sampleData.fromName} <span className="text-primary-on/55">×</span> {sampleData.toName}{" "}
           콜라보 추천 예시예요.
         </span>
