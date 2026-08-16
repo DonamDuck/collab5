@@ -13,10 +13,12 @@ import type { MagazineListItem, Maker } from "@/lib/types";
 import { HomeMenuBar } from "./HomeMenuBar";
 import { HomeMagazineBanner, type BannerBg } from "./HomeMagazineBanner";
 import { HomeIdeaCta, IDEA_CTA_ANCHOR } from "./HomeIdeaCta";
+import { PREVIEW_ANCHOR } from "./HomeMenuBar";
 import { HomeFloatingCta } from "./HomeFloatingCta";
 import { BrandGrid } from "@/components/BrandGrid";
 import { SampleReportCard } from "@/components/SampleReport";
 import { PreviewPhones } from "./PreviewPhones";
+import { TrackLink } from "@/components/TrackLink";
 
 /** 이보다 적으면 브랜드 구좌를 아예 안 그린다(디자인팀 07-27 규칙 승계). */
 const MIN_GRID = 3;
@@ -232,23 +234,54 @@ export function HomeBody({
             읽은 참이라, 그 다음 질문이 정확히 "그 소개서가 뭔데?"다. 순서가 질문을 따라간다.
           ⚠️길이 비용은 인정하고 넣는다 — 모바일 홈이 그만큼 길어진다. 오늘 내내 줄여온 방향과
             반대지만, **없어서 답을 못 하는 것**보다는 낫다는 게 대표 판단이다. */}
-      <section className="home-rise mt-16 sm:mt-24" style={{ animationDelay: "560ms" }}>
+      <section
+        id={PREVIEW_ANCHOR}
+        className="home-rise mt-16 scroll-mt-[152px] sm:mt-24"
+        style={{ animationDelay: "560ms" }}
+      >
         <div className="mb-3 inline-flex items-center gap-1.5 rounded-pill bg-surface-soft px-3 py-1.5 sm:mb-3.5 sm:gap-2 sm:px-3.5 sm:py-2">
           <span className="h-2 w-2 rounded-pill bg-primary sm:h-2.5 sm:w-2.5" />
           <span className="text-[12px] font-bold tracking-wide text-mute sm:text-[13px]">
             소개서 미리보기
           </span>
         </div>
+        {/* 📝제목·부제는 **08-16 개편 전 원문 그대로 복원**(대표 지시: *"기존 타이틀 텍스트랑 하단
+            버튼 2개 살리자"*). 내가 임시로 쓴 「소개서는 이렇게 나와요 / 사진이 많지 않아도 괜찮아요」는
+            버렸다 — 옛 문안이 **소요 시간(3분)과 AI가 뭘 해주는지**를 말해서 정보량이 더 크다. */}
         <h2 className="break-keep text-[24px] font-bold leading-[1.35] tracking-[-0.02em] text-ink sm:text-[32px]">
-          소개서는 이렇게 나와요.
+          3분이면 브랜드 소개서가 완성돼요.
         </h2>
-        {/* 📝사진이 없어도 된다는 걸 **여기서** 말한다 — 이 갤러리 자체가 사진본/텍스트본 두 종류를
-            나란히 보여주는 물건이라(PreviewPhones 주석), 문장과 실물이 같은 말을 한다. */}
         <p className="mt-2.5 max-w-[600px] break-keep text-[16px] leading-[1.65] text-body sm:mt-3 sm:text-[18px]">
-          사진이 많지 않아도 괜찮아요. 있는 이야기로 채워드려요.
+          몇 가지만 알려주시면, AI가 소개에 필요한 내용을 먼저 정리해드려요.
         </p>
         <div className="mt-7">
           <PreviewPhones />
+        </div>
+
+        {/* 🔘버튼 둘 — 옛 홈에도 있던 짝을 되살린다(대표 지시).
+            ⭐순서가 중요하다: **예시 보기(보조) → 만들기(주)**. 이 구좌는 "소개서가 뭔데?"에 답하는
+              자리라, 아직 안 만든 사람은 **더 보고 싶지** 바로 만들고 싶지 않다. 구경 → 결심 순서다.
+            📐가운데 정렬은 **버튼 줄만**이다(②구좌의 「브랜드 더 보기」와 같은 처리) — 섹션 제목은
+              왼쪽에 두고 결론만 가운데로 모은다. 제목까지 가운데로 보내면 ②와 축이 갈린다.
+            🪤모바일에서는 세로로 쌓는다(`flex-col`). 나란히 두면 각 버튼이 170px 아래로 좁아져
+              「브랜드 소개서 만들기」가 두 줄이 된다. */}
+        <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
+          {/* ⚠️`<Link onClick={track}>`을 쓸 수 없다 — 이 파일은 **서버 컴포넌트**다.
+              계측이 필요한 링크는 `TrackLink`(클라 조각)를 쓴다. */}
+          <TrackLink
+            href="/preview"
+            event="home_preview_example_click"
+            className="inline-flex h-12 w-full items-center justify-center rounded-md border border-border-strong bg-surface px-7 text-[16px] font-medium text-ink transition-colors hover:bg-surface-soft sm:w-auto"
+          >
+            브랜드 소개서 작성 예시
+          </TrackLink>
+          <TrackLink
+            href="/register"
+            event="home_preview_register_click"
+            className="inline-flex h-12 w-full items-center justify-center rounded-md bg-primary px-7 text-[16px] font-medium text-primary-on transition-opacity hover:opacity-90 sm:w-auto"
+          >
+            브랜드 소개서 만들기
+          </TrackLink>
         </div>
       </section>
 

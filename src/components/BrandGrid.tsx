@@ -85,11 +85,21 @@ export function BrandGrid({ brands }: { brands: Maker[] }) {
   const slide = (dir: -1 | 1) => {
     const el = railRef.current;
     if (!el) return;
-    // 📐한 번에 **보이는 폭의 80%**만 민다. 딱 한 화면을 밀면 경계에 있던 카드가 통째로 사라져
-    //   "어디까지 봤더라"가 끊긴다. 조금 겹치게 미는 게 캐러셀의 통상 규칙이다.
+    // 📐**카드 1장씩** 민다(대표 지적 08-16: *"화살표 누르면 그냥 끝에서 끝으로 가는데?"*).
+    //   원래 「보이는 폭의 80%」였는데, 1440에서 그 값이 1056인 반면 **총 스크롤 여유는 908뿐**이라
+    //   한 번 누르면 끝까지 갔다. 화면이 넓을수록 한 걸음이 커져서 **넓은 화면일수록 캐러셀이
+    //   무의미해지는** 식이었다 — 보이는 폭에 비례시킨 게 애초에 틀렸다.
+    //   ⭐한 걸음은 **카드 폭**이어야 한다. 카드는 화면 폭과 무관하게 210/300px로 고정이라
+    //     걸음도 고정된다. 스냅 단위와도 같아져 "한 칸 넘어갔다"가 눈에 그대로 보인다.
+    //   🪤간격(gap)을 빼먹으면 매번 12.75px씩 어긋나 누적된다 — 실제 두 셀의 left 차이로 잰다.
+    const cells = el.children;
+    const cardStep =
+      cells.length >= 2
+        ? cells[1].getBoundingClientRect().left - cells[0].getBoundingClientRect().left
+        : el.clientWidth * 0.8; // 카드가 하나뿐이면 잴 수 없다 — 옛 방식으로 떨어진다
     const max = el.scrollWidth - el.clientWidth;
     const from = el.scrollLeft;
-    const to = Math.max(0, Math.min(max, from + dir * el.clientWidth * 0.8));
+    const to = Math.max(0, Math.min(max, from + dir * cardStep));
     if (to === from) return;
 
     if (tween.current !== null) cancelAnimationFrame(tween.current);

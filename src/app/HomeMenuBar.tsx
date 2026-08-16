@@ -52,6 +52,11 @@ function Divider() {
   return <span aria-hidden="true" className="h-4 w-px shrink-0 bg-[#DFDFE3]" />;
 }
 
+/** ⚓3번칸 「소개서 등록」의 점프 목적지 id — `HomeBody`의 ④ 소개서 구좌에 붙는다(08-16).
+ *  🔗`IDEA_CTA_ANCHOR`가 `HomeIdeaCta`에 있는 것과 같은 이유로, 값은 **한 곳에만** 둔다.
+ *    여기 둔 건 이 상수를 쓰는 쪽(메뉴바)이 여기라서다 — 바꾸면 두 파일이 같이 따라온다. */
+export const PREVIEW_ANCHOR = "home-preview";
+
 export function HomeMenuBar() {
   // 🔻08-16 `hasBrand` 조회 **삭제**. 3번칸이 소개서 유무로 갈리지 않게 되면서 필요가 없어졌다
   //    (아래 3번칸 주석 참조). 방문마다 돌던 세션 쿼리가 하나 줄었다.
@@ -68,11 +73,11 @@ export function HomeMenuBar() {
   //      거리가 멀수록(=시간이 길수록) 그 사이에 이미지가 뜰 확률이 커진다.
   //    👉그래서 **먼 거리는 즉시 점프**한다. 어차피 4천 px을 부드럽게 흘려보내는 건 몇 초짜리라
   //      UX로도 나쁘다 — 짧은 거리에서만 smooth가 의미 있다.
-  const goIdea = (e: React.MouseEvent<HTMLAnchorElement>) => {
-    const el = document.getElementById(IDEA_CTA_ANCHOR);
+  const goAnchor = (id: string, event: string) => (e: React.MouseEvent<HTMLAnchorElement>) => {
+    const el = document.getElementById(id);
     if (!el) return; // 못 찾으면 네이티브 해시 점프에 맡긴다
     e.preventDefault();
-    track("home_menubar_idea_click");
+    track(event);
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     // 화면 두 개 분량(2×innerHeight)을 넘으면 smooth를 포기한다. 그 이하면 부드럽게.
     const far = Math.abs(el.getBoundingClientRect().top) > window.innerHeight * 2;
@@ -81,6 +86,8 @@ export function HomeMenuBar() {
     //    ⚠️`"center"`로 두면 제목이 화면 한가운데 떠서 위쪽에 이전 섹션 꼬리가 크게 남는다.
     el.scrollIntoView({ behavior: reduce || far ? "auto" : "smooth", block: "start" });
   };
+  const goIdea = goAnchor(IDEA_CTA_ANCHOR, "home_menubar_idea_click");
+  const goPreview = goAnchor(PREVIEW_ANCHOR, "home_menubar_preview_click");
 
   return (
     // 🎈**플로팅**(대표 확정 08-14) — 알약만 콘텐츠 **위에** 뜨고, 알약이 덮지 않는 좌우로는
@@ -142,7 +149,29 @@ export function HomeMenuBar() {
                 목적지(③구좌 버튼)도 「나도, 콜라보 아이디어 추천받기」다. 「만들기」는 소개서 작성과
                 헷갈릴 여지가 있었다. 1번칸 「콜라보 찾기」와 어미가 맞아 두 칸이 한 쌍으로 읽힌다. */}
         <a href={`#${IDEA_CTA_ANCHOR}`} onClick={goIdea} className={ITEM}>
-          콜라보 아이디어 찾기
+          콜라보 아이디어
+        </a>
+        <Divider />
+        {/* 🆕3번칸 「소개서 등록」(대표 지시 08-16) — ④ 소개서 구좌로 **앵커 점프**한다.
+            ⭐`/register`로 바로 보내지 않는 이유 = 대표 지시가 앵커였고, 그게 맞다.
+              메뉴에서 바로 등록 폼으로 던지면 "소개서가 뭔지" 모르는 사람이 빈 폼 앞에 선다.
+              ④구좌는 실물 7장 + 「작성 예시」·「만들기」 버튼을 다 갖고 있어서, 거기서 각자
+              필요한 만큼 보고 넘어간다.
+            🪤**칸이 셋이 되며 폭 압박이 돌아왔다.** 2번칸을 「콜라보 아이디어 찾기」에서
+              **「콜라보 아이디어」**로 줄인 게 그 대가다(대표 지시 — 2글자 덜어냈다).
+              📏실측 @360(가용 343) — 라벨별 알약 폭과 여유:
+                · 「콜라보 아이디어 찾기」 365.0 → **-22.0 ❌** (알약이 화면을 넘는다)
+                · **「콜라보 아이디어」 335.4 → +7.6 ✅** ← 지금 이것
+                · 「아이디어 찾기」      322.4 → +20.6
+              🪤여유 7.6px는 **넉넉하지 않다.** 3칸 시절에도 정확히 이 값이었다(08-16 기록).
+                라벨을 한 글자라도 늘리면 여기부터 다시 재라 — 한글 한 자 ≈ 13px이다.
+              📱320px에서는 알약이 넘쳐 **알약 안에서만 스크롤**된다(페이지 가로 스크롤 아님).
+                이건 이 저장소가 정한 실패 모양이다 — 지면이 밀리는 것보다 낫다.
+              📜같은 일이 08-16에 한 번 있었다 — 3칸 시절 「콜라보 아이디어 만들기」가 360에서
+                넘쳐 「아이디어 추천」으로 줄였고, 2칸이 되며 되돌렸다가, 지금 다시 3칸이 됐다.
+                **칸 수와 라벨 길이는 한 쌍이다.** 칸을 늘리면 라벨은 짧아진다. */}
+        <a href={`#${PREVIEW_ANCHOR}`} onClick={goPreview} className={ITEM}>
+          소개서 등록
         </a>
       </nav>
     </div>
