@@ -6,6 +6,7 @@ import { getSessionUser } from "@/lib/supabase/server";
 import { getProfile, getProfileById } from "@/lib/profiles";
 import { isStaffUser } from "@/lib/staff";
 import { isReportCacheFresh } from "@/lib/collab-report";
+import { OG_IMAGE } from "@/lib/site";
 import { MakerArticle } from "./MakerArticle";
 import { ConnectProfileButton } from "./ConnectProfileButton";
 import { MakerActionBar } from "./MakerActionBar";
@@ -95,9 +96,11 @@ export async function generateMetadata({
   //   소유권을 사장님들께 넘기고 나면 계정=브랜드가 되어 로고도 고유해지지만, 그때도 그 브랜드의
   //   사진이 더 잘 보여준다. 로고는 사진이 아예 없을 때의 폴백으로만 둔다.
   //   (data URL 로고는 크롤러가 http로 다시 요청해 가져가므로 통째로 무시된다 → http만 통과시킨다.)
+  //   🆕맨 끝에 **기본 썸네일**을 둔다(08-16). 전엔 셋 다 없으면 `images`를 통째로 빼서,
+  //     사진 없는 소개서는 카톡에 **그림 없는 맹숭한 줄**로 떴다. 이제 로고 카드라도 나간다.
   const ownerProfile = maker.ownerUserId ? await getProfileById(maker.ownerUserId) : null;
   const logo = ownerProfile?.profileImage?.startsWith("http") ? ownerProfile.profileImage : "";
-  const image = maker.photos[0] || logo || undefined;
+  const image = maker.photos[0] || logo || OG_IMAGE;
   const title = `[collab5 소개서] ${maker.name}`;
   const description = maker.oneLiner || maker.description || "브랜드 소개서";
 
@@ -113,7 +116,7 @@ export async function generateMetadata({
       type: "profile",
       url: `/m/${slug}`,
       siteName: "collab5",
-      ...(image ? { images: [{ url: image }] } : {}),
+      images: [{ url: image }],
     },
   };
 }

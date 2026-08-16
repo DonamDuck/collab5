@@ -687,12 +687,11 @@ export function ReportSheet({
               //    (브랜드 정체성 + 어지럼 방지). 여기만 `animate-spin`+`animate-pulse`로 어기고 있었다(QA #25).
               //    정적 아톰 마크 + 순환 문구가 기준 구현(EnrichWizard LoadingView)과 같은 얼굴이다.
               <div role="status" aria-live="polite" className="flex flex-col items-center justify-center py-16 text-center">
-                {/* ⚠️ fill은 토큰(var(--primary))으로 — 예전엔 #98ff5c 하드코딩이었다. */}
-                <svg width="44" height="44" viewBox="0 0 56 56" fill="none" className="text-faint" aria-hidden="true">
-                  <ellipse cx="28" cy="28" rx="23" ry="9" stroke="currentColor" strokeWidth="2" opacity="0.45" transform="rotate(28 28 28)" />
-                  <ellipse cx="28" cy="28" rx="23" ry="9" stroke="currentColor" strokeWidth="2" opacity="0.45" transform="rotate(-28 28 28)" />
-                  <circle cx="28" cy="28" r="6" fill="var(--primary)" />
-                </svg>
+                {/* 08-16 대표 지정 로고 마크로 교체 — 파일·크기·불투명도를 [[EmptyState 아톰]]과
+                    똑같이 맞춘다. 여기만 옛 아톰으로 남으면 리포트 대기 화면만 옛 로고가 된다.
+                    🚨`width`/`height` 속성 대신 className으로 — 비율 1.28이라 정사각이면 찌그러진다. */}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/logo-mark.png" alt="" aria-hidden="true" className="h-[34px] w-auto opacity-40" />
                 {/* 굴러가는 볼드(18) + 고정 회색(13) + 진행바 — 사다리 자체는 위저드 LoadingView와 같다.
                     ⚠️ 볼드 줄은 문구마다 길이가 달라 한 줄↔두 줄을 오갈 수 있다 → `min-h`로 자리를 미리
                        잡아둬야 아톰 마크와 아래 줄이 위아래로 튀지 않는다(18px 두 줄 ≈ 52px).

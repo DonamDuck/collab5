@@ -25,8 +25,18 @@ export async function SiteHeader() {
         className="-ml-2 flex h-full min-w-0 shrink-0 items-center rounded-md px-2 hover:bg-surface-soft"
         aria-label="collab5 홈"
       >
+        {/* 📏 높이 = 화면에서 보이는 크기다(파일이 잉크에 딱 맞게 잘려 있다).
+            🖼 08-16 대표 지정 로고로 교체 — **PNG다**. 대표가 준 이미지를 그대로 쓰는 게 요구사항이라
+               모양을 손대지 않았다(벡터로 다시 그렸다가 되돌린 이력 있음). 원본 누끼는
+               `assets/logo-lockup-source.png`, 배포본은 730×120로 줄여 64색 감량(6.6KB).
+               ⚠️PNG라 **색을 못 바꾼다** — 어두운 배경/인쇄용이 필요해지면 흰색 파일을 따로 만들어야 한다.
+            🪤 폭 예산 — 종횡비 6.08이라 높이 1px = 폭 6.1px다. 360px 폰의 `/search` 헤더
+               (로고+검색칩+로그인)가 제일 빡빡해서 여기가 상한을 정한다. 20px일 때 로고 오른쪽에
+               17px 남는다(실측). 더 키우려면 먼저 그 화면부터 재라.
+            📐 데스크톱 28 → 24 (대표: "데스크탑 헤더 기준으로 로고가 너무 크다"). 모바일 20은 유지 —
+               "모바일은 지금 좋다"고 해서 폭이 그대로가 되게 뒀다(122.8 → 121.7px). */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/logo-lockup.svg" alt="" aria-hidden="true" className="h-6 w-auto sm:h-7" />
+        <img src="/logo-lockup.png" alt="" aria-hidden="true" className="h-[20px] w-auto sm:h-[24px]" />
       </Link>
       {/* 14px 정수 — text-sm은 루트 17px 탓에 14.875px(분수)가 된다. 헤더는 전 페이지 공통이라
           여기 하나가 앱 전체에 분수 픽셀을 흩뿌리고 있었다(07-31 실측). */}
