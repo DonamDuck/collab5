@@ -6,23 +6,22 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import type { CollabType, Maker } from "@/lib/types";
-
-const COLLAB_TYPES: CollabType[] = [
-  "제품콜라보",
-  "팝업",
-  "워크숍",
-  "공동굿즈",
-  "공동콘텐츠",
-  "행사참여",
-  "공간대여",
-];
+import { COLLAB_TYPES, type CollabType, type Maker } from "@/lib/types";
 
 const PAGE_SIZE = 15; // 페이지당 카드 수 (3열 그리드라 3의 배수 15, 대표 지시 2026-07-23)
 
-export function SearchClient({ all }: { all: Maker[] }) {
+export function SearchClient({
+  all,
+  initialTypes = [],
+}: {
+  all: Maker[];
+  /** 홈 유형 칩에서 넘어온 초기 필터(`/search?type=팝업`, 08-16). 서버가 검증해 내려준다. */
+  initialTypes?: CollabType[];
+}) {
   const [q, setQ] = useState("");
-  const [types, setTypes] = useState<CollabType[]>([]);
+  // ⚠️초기값으로만 쓴다 — 이후엔 사용자가 칩을 눌러 자유롭게 바꾼다. URL을 계속 따라가게 만들면
+  //   "홈에서 팝업으로 들어왔는데 필터를 못 푸는" 화면이 된다(주소는 그대로 남아 있으므로).
+  const [types, setTypes] = useState<CollabType[]>(initialTypes);
   const [page, setPage] = useState(1);
 
   const results = useMemo(() => {

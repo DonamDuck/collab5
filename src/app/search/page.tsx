@@ -3,6 +3,7 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
 import { repo } from "@/lib/repo";
+import { COLLAB_TYPES, type CollabType } from "@/lib/types";
 import { SearchClient } from "./SearchClient";
 import { SearchIdeaGuide } from "./SearchIdeaGuide";
 
@@ -20,11 +21,29 @@ export const metadata: Metadata = {
 // (ISR `revalidate = 60`으로 더 빠르게 갈 수도 있지만, 등록 직후 자기 소개서가 안 보이는 혼란을 피해 매 요청 조회.)
 export const dynamic = "force-dynamic";
 
-export default async function SearchPage() {
+/** 홈에서 유형 칩을 눌러 들어온 경우 그 유형으로 좁힌 채 연다(`/search?type=팝업`, 08-16).
+ *  ⚠️클라에서 `useSearchParams`로 읽지 않는 이유 — `SearchClient`는 Suspense 밖이라 그러면
+ *     Next가 **페이지 전체를 CSR로 강등**시킨다(아래 SearchIdeaGuide 주석과 같은 함정).
+ *     이 페이지는 이미 `force-dynamic`이라 **서버에서 읽어 초기값으로 내려주는 게 공짜**다.
+ *  🔒모르는 값은 `COLLAB_TYPES`에 없으면 걸러진다 — 목록을 좁힐 뿐이라 접근 범위와 무관하다. */
+function parseTypes(raw: string | string[] | undefined): CollabType[] {
+  if (!raw) return [];
+  const list = Array.isArray(raw) ? raw : raw.split(",");
+  return list
+    .map((s) => s.trim())
+    .filter((s): s is CollabType => (COLLAB_TYPES as readonly string[]).includes(s));
+}
+
+export default async function SearchPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ type?: string | string[] }>;
+}) {
+  const { type } = await searchParams;
   const all = await repo.searchMakers("");
   return (
     <>
-      <SearchClient all={all} />
+      <SearchClient all={all} initialTypes={parseTypes(type)} />
       {/* 홈에서 「콜라보 아이디어 추천 받기」를 누르고 온 사람에게만 뜨는 안내 시트(08-16).
           신호는 `?guide=idea` — 상세는 SearchIdeaGuide.tsx.
           🚨`<Suspense>` 필수 — 이 컴포넌트가 `useSearchParams`를 쓴다. 감싸지 않으면 Next가

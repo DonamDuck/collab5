@@ -1,85 +1,169 @@
 "use client";
 
-// 홈 "콜라보 가능한 브랜드" — 정보형 가로 리스트 카드 (07-31 대표 QA 2차: "카드가 단조롭다").
-// v1(세로 2열 그리드)은 사진+이름+키워드뿐이라 밋밋했다 → /search 카드의 정보량(지역·한줄·키워드 3)을
-// 옮기되, 세로 카드로 다 담으면 11곳 × ~300px = 스크롤 폭탄 → **가로형(썸네일 좌 + 정보 우)**으로 압축.
-// 모바일 1열(대표: "1열로 1개씩 길게도 좋다") · sm+ 2열. 정렬은 repo가 최신순으로 준다.
-// 뱃지 없음 — 섹션 자체가 조건(검색 노출 = 콜라보 가능). 07-31 collab_open 토글 폐지로 뱃지 개념도 사라졌다.
-// "use client"인 이유 = 카드 클릭 계측(track) 하나뿐. 데이터는 서버(page.tsx)가 주입.
+// 홈 ②「콜라보 가능한 브랜드」 — **가로 캐러셀 6개 + 출구 둘** (대표 확정 2026-08-16, C1안).
+//
+// 📜왜 바뀌었나 — 07-31에는 "카드가 단조롭다"는 지적에 **정보량**으로 답해 가로형 정보 카드를
+//   전량 나열했다. 그런데 브랜드가 늘면서 문제가 바뀌었다: **모바일에서 이 구좌만 1321px**,
+//   화면 1.6개어치였다(대표: *"세로형으로 나열하다보니 스크롤도 좀 길어지는 감이 있다"*).
+//   → 레퍼런스(팝플리·와사비) 형태인 캐러셀로 전환. 📏실측 1321 → **462px (-65%)**.
+//   비교했던 5안·수치는 [[홈-개편-0816-쇼룸퍼스트]]에 남겼다.
+//
+// 🚪**출구가 둘인 게 핵심이다**(대표 지시).
+//   · 레일 **끝 칸** = 끝까지 민 사람의 출구. 거기서 가장 가까운 다음 행동이다.
+//   · **하단 버튼** = 안 민 사람의 출구. 캐러셀은 대다수가 안 밀기 때문에, 끝 칸만 두면
+//     사실상 출구가 없는 것과 같다. 둘 중 어느 쪽이 먹히는지는 GA로 갈린다(이벤트가 다르다).
+//
+// ⏭️**다음 단계 = C2(유형 칩)**. 대표 확정 — *"나중에 업체가 많아지면 C2로 넘어가고 싶다"*.
+//   켜는 법은 아래 `SHOW_TYPE_CHIPS` 주석에 통째로 적어뒀다. 지금 끈 이유는 **브랜드가 9곳뿐**이라
+//   칩을 누르면 3~6곳이 나와서다 — 셸이 오히려 빈약함을 드러낸다.
 import Link from "next/link";
+import { COLLAB_TYPES, type CollabType, type Maker } from "@/lib/types";
 import { track } from "@/lib/track";
-import type { Maker } from "@/lib/types";
+
+/** 캐러셀에 그릴 최대 개수(대표 지시 08-16). 뒤는 출구 둘이 받는다. */
+const CAROUSEL_LIMIT = 6;
+
+/** ⏭️**C2 전환 스위치.** `true`로 바꾸면 레일 위에 콜라보 유형 칩이 붙는다.
+ *  누르면 `/search?type=팝업` 꼴로 **그 유형으로 좁혀진 검색**이 열린다(서버가 파라미터를 읽는다 —
+ *  `search/page.tsx`의 `parseTypes`). 실측 확인: 전체 9 → 팝업 6 / 공간대여 4 / 공동굿즈 3.
+ *  🕐**켤 시점 = 브랜드가 20곳쯤 됐을 때**(대표 판단 몫). 그 전엔 칩이 빈약함을 드러낸다.
+ *  ⚠️켤 때 `TypeChips`가 **실제 등록된 유형만** 그리는지 확인할 것 — 아무도 안 하는 유형을
+ *    띄우면 눌렀을 때 빈 화면이 나오고, 그 순간 셸이 거짓말이 된다. */
+const SHOW_TYPE_CHIPS = false;
+
+/** 홈에 띄울 유형 순서(전체 7종 중 앞 5개). 어휘 정본은 `lib/types.ts`의 `COLLAB_TYPES`. */
+const HOME_TYPES: CollabType[] = ["제품콜라보", "팝업", "워크숍", "공동굿즈", "공동콘텐츠"];
 
 export function BrandGrid({ brands }: { brands: Maker[] }) {
+  const shown = brands.slice(0, CAROUSEL_LIMIT);
   return (
-    <div className="mx-auto grid max-w-[880px] grid-cols-1 gap-3 sm:grid-cols-2">
-      {brands.map((m) => (
-        <BrandCell key={m.id} m={m} />
-      ))}
-      <MoreCell />
+    <div>
+      {SHOW_TYPE_CHIPS && <TypeChips brands={brands} />}
+      {/* ⚠️`-mx-4 px-4`가 핵심이다 — 레일이 **지면 끝까지 흐르게** 해야 마지막 카드가 잘려 보이고,
+          그래야 "옆에 더 있다"가 손을 대기 전에 읽힌다. 가운데 정렬돼 끝이 딱 맞으면 아무도 안 민다.
+          숫자는 부모(`page.tsx` main)의 좌우 패딩과 같아야 한다(`px-4 sm:px-6`). */}
+      <div
+        className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-3 sm:-mx-6 sm:px-6"
+        style={{ scrollbarWidth: "none" }}
+      >
+        {shown.map((m) => (
+          <div key={m.id} className="w-[210px] shrink-0 snap-start sm:w-[240px]">
+            <BrandCard m={m} />
+          </div>
+        ))}
+        <div className="w-[210px] shrink-0 snap-start sm:w-[240px]">
+          <EndCard />
+        </div>
+      </div>
+      <BottomMore total={brands.length} />
     </div>
   );
 }
 
-function BrandCell({ m }: { m: Maker }) {
+function BrandCard({ m }: { m: Maker }) {
   return (
     <Link
       href={`/m/${m.slug}`}
       onClick={() => track("home_grid_brand_click", { slug: m.slug })}
-      className="flex gap-3.5 rounded-lg border-[0.5px] border-[#DFDFE3] bg-surface p-3 transition-colors hover:bg-surface-soft"
+      className="block h-full overflow-hidden rounded-lg border border-hairline bg-surface transition-colors hover:bg-surface-soft"
     >
-      {/* 썸네일 정방형 — 가로 카드라 3:2 대신 1:1이 정보 영역을 안 잡아먹는다 */}
-      <div className="h-[92px] w-[92px] shrink-0 overflow-hidden rounded-md bg-surface-soft">
+      <div className="aspect-[3/2] w-full overflow-hidden bg-surface-soft">
         {m.photos[0] ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={m.photos[0]} alt="" loading="lazy" className="h-full w-full object-cover" />
         ) : (
           <div className="flex h-full w-full items-center justify-center bg-primary-pale">
-            {/* 🚨정사각(`w-9`) 금지 — 08-16 새 마크는 1.28 비율이라 찌그러진다.
-                여긴 92px 정사각 썸네일이라 높이로만 잡는다(30 → 폭 38.5). */}
+            {/* 🚨정사각 클래스(`w-9` 등) 금지 — 08-16 새 마크는 가로:세로 1.28이라 찌그러진다.
+                높이만 주고 폭은 `w-auto`. */}
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/logo-mark.png" alt="collab5" className="h-[30px] w-auto opacity-70" />
           </div>
         )}
       </div>
-      <div className="flex min-w-0 flex-1 flex-col justify-center">
-        <div className="flex items-baseline gap-1.5">
-          <p className="truncate text-[15px] font-bold text-ink">{m.name}</p>
+      <div className="px-3 py-3">
+        <div className="flex min-w-0 items-center gap-1.5">
+          <span className="min-w-0 truncate text-[15px] font-medium text-ink">{m.name}</span>
           {m.region && <span className="shrink-0 text-[12px] text-mute">· {m.region}</span>}
         </div>
-        {m.oneLiner && (
-          <p className="mt-1 line-clamp-2 text-[13px] leading-[1.5] text-body">{m.oneLiner}</p>
+        {m.oneLiner && <p className="mt-0.5 line-clamp-1 text-[13px] text-body">{m.oneLiner}</p>}
+        {/* 🔒칩은 **한 줄 고정**(`h-[19px]` + `flex-nowrap`). 줄바꿈을 허용하면 카드마다 키가
+            달라져 캐러셀 바닥선이 톱니처럼 어긋난다. 넘치는 칩은 잘린다 —
+            성격은 한 줄로도 전달되고, 자세한 건 눌러서 본다. */}
+        {m.keywords.length > 0 && (
+          <div className="mt-2 flex h-[19px] flex-nowrap gap-1.5 overflow-hidden">
+            {m.keywords.slice(0, 3).map((v) => (
+              <span
+                key={v}
+                className="shrink-0 rounded-sm bg-mint-pale px-1.5 py-0.5 text-[11px] font-medium text-mint-on"
+              >
+                {v}
+              </span>
+            ))}
+          </div>
         )}
-        <div className="mt-1.5 flex h-5 flex-wrap gap-1.5 overflow-hidden">
-          {m.keywords.slice(0, 3).map((v) => (
-            <span
-              key={v}
-              className="rounded-sm bg-mint-pale px-1.5 py-0.5 text-[11px] font-medium text-mint-on"
-            >
-              {v}
-            </span>
-          ))}
-        </div>
       </div>
     </Link>
   );
 }
 
-/** 마지막 셀 = 찾기 페이지 카드. 캐러셀 MoreCard 원칙 승계(07-27 디자인팀):
- *  개수 표기 없음, 흰 면 + 실선 hairline(점선 금지). 가로 카드 높이(~118px)에 맞춘다. */
-function MoreCell() {
+/** 레일 끝 칸 — 끝까지 민 사람의 출구. 개수 표기 없음, 흰 면 + 실선 hairline(점선 금지).
+ *  이 원칙은 07-27 캐러셀 MoreCard에서 승계했다. */
+function EndCard() {
   return (
     <Link
       href="/search"
       onClick={() => track("home_grid_more_click")}
-      className="flex min-h-[118px] items-center justify-center gap-3 rounded-lg border-[0.5px] border-[#DFDFE3] bg-surface px-4 transition-colors hover:bg-primary-pale"
+      className="flex h-full flex-col items-center justify-center gap-2 rounded-lg border border-hairline bg-surface transition-colors hover:bg-primary-pale"
     >
-      <span className="flex h-10 w-10 items-center justify-center rounded-pill bg-surface-soft text-primary-on">
+      <span className="flex h-10 w-10 items-center justify-center rounded-pill bg-surface-soft">
         <svg viewBox="0 0 20 20" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8">
           <path d="M4 10h12m0 0-4.5-4.5M16 10l-4.5 4.5" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       </span>
-      <span className="text-[15px] font-medium text-ink">더 많은 브랜드 보기</span>
+      <span className="text-[14px] font-medium text-ink">브랜드 더 보기</span>
     </Link>
+  );
+}
+
+/** 하단 버튼 — 캐러셀을 **안 민 사람**의 출구(대표 지시 08-16). */
+function BottomMore({ total }: { total: number }) {
+  return (
+    <div className="mt-5 text-center">
+      <Link
+        href="/search"
+        onClick={() => track("home_grid_more_bottom_click")}
+        className="inline-flex h-12 items-center rounded-pill border-[0.5px] border-[#DFDFE3] bg-surface px-6 text-[15px] font-medium text-ink transition-colors hover:bg-surface-soft"
+      >
+        {/* 🔢개수를 넣는다 — 「더 보기」만 있으면 뒤에 몇이 있는지 몰라 안 누른다.
+            숫자 자체가 "여긴 비어 있지 않다"는 증거다. */}
+        콜라보 가능한 브랜드 {total}곳 모두 보기
+        <span className="ml-1.5 text-faint">→</span>
+      </Link>
+    </div>
+  );
+}
+
+/** ⏭️C2용 — `SHOW_TYPE_CHIPS`가 `true`일 때만 그려진다. 위 스위치 주석 참조. */
+function TypeChips({ brands }: { brands: Maker[] }) {
+  // 등록된 브랜드가 실제로 제공하는 유형만 그린다(빈 결과로 보내지 않기 위해).
+  const live = new Set(brands.flatMap((m) => [...m.offers, ...m.seeks]));
+  const types = HOME_TYPES.filter((t) => COLLAB_TYPES.includes(t) && live.has(t));
+  if (!types.length) return null;
+  return (
+    <div
+      className="-mx-4 mb-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:px-0"
+      style={{ scrollbarWidth: "none" }}
+    >
+      {types.map((t) => (
+        <Link
+          key={t}
+          href={`/search?type=${encodeURIComponent(t)}`}
+          onClick={() => track("home_grid_type_click", { type: t })}
+          className="inline-flex h-9 shrink-0 items-center rounded-pill border-[0.5px] border-[#DFDFE3] bg-surface px-3.5 text-[13px] font-medium text-body transition-colors hover:bg-surface-soft"
+        >
+          {t}
+        </Link>
+      ))}
+    </div>
   );
 }

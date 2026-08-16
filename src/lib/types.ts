@@ -11,6 +11,20 @@ export type CollabType =
   | "행사참여"
   | "공간대여";
 
+/** 위 타입의 **런타임 목록**. `/search` 필터 칩과 `?type=` 검증이 같이 쓴다(08-16).
+ *  🚨여기(서버·클라 공용 모듈)에 두는 게 핵심이다 — `"use client"` 파일에 두고 서버 컴포넌트가
+ *    import하면 **값이 아니라 클라이언트 참조 프록시**가 넘어와 `.includes is not a function`으로 죽는다.
+ *    실제로 08-16에 `SearchClient.tsx`에서 가져왔다가 `/search?type=`이 통째로 500이 났다. */
+export const COLLAB_TYPES: readonly CollabType[] = [
+  "제품콜라보",
+  "팝업",
+  "워크숍",
+  "공동굿즈",
+  "공동콘텐츠",
+  "행사참여",
+  "공간대여",
+] as const;
+
 
 /** 검증 가능한 신뢰 시그널 — 표시층(사람이 다각도 검토) */
 export interface TrustSignals {
