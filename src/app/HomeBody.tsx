@@ -136,14 +136,19 @@ export function HomeBody({
                 그래서 서브 문장(「지금 함께할 콜라보를 찾고 있는 브랜드예요」)을 지울 수 있었다 —
                 칩이 같은 말을 더 짧게 한다(대표 지시: 타이틀 하나만).
               🎨점은 `bg-primary`(Kiwi) — 사이트에서 '켜짐/살아있음'을 뜻하는 유일한 색이다. */}
-          <div className="mb-3 inline-flex items-center gap-1.5 rounded-pill bg-surface-soft px-3 py-1.5">
-            <span className="h-2 w-2 rounded-pill bg-primary" />
-            <span className="text-[12px] font-bold tracking-wide text-mute">콜라보 ON</span>
+          {/* 📐08-16 3차 — 데스크톱만 한 단 키웠다(대표: 제목을 32로 올리면서 *"chip도 덩달아"*).
+              ⭐칩은 제목의 **부속**이라 제목만 키우면 옆에서 쪼그라들어 보인다. 위계가 아니라
+                **한 덩어리로 읽히는 관계**라, 둘은 같이 움직여야 한다. */}
+          <div className="mb-3 inline-flex items-center gap-1.5 rounded-pill bg-surface-soft px-3 py-1.5 sm:mb-3.5 sm:gap-2 sm:px-3.5 sm:py-2">
+            <span className="h-2 w-2 rounded-pill bg-primary sm:h-2.5 sm:w-2.5" />
+            <span className="text-[12px] font-bold tracking-wide text-mute sm:text-[13px]">
+              콜라보 ON
+            </span>
           </div>
           {/* ⬅️왼쪽정렬(대표 지시 08-16). 위 히어로만 중앙이고 여기부터는 전부 왼쪽이다.
               🔤크기 30 → **28**. 와사비 섹션 제목이 정확히 28px이고, 히어로 48과의 비가 1.71배다.
                 30이면 1.6배라 히어로와 너무 가까워 "둘 다 제목"으로 읽힌다. */}
-          <h2 className="break-keep text-[24px] font-bold leading-[1.35] tracking-[-0.02em] text-ink sm:text-[28px]">
+          <h2 className="break-keep text-[24px] font-bold leading-[1.35] tracking-[-0.02em] text-ink sm:text-[32px]">
             지금, 콜라보 가능한 브랜드예요.
           </h2>
           <div className="mt-7">
@@ -186,7 +191,7 @@ export function HomeBody({
             → **"선택한 브랜드와의 콜라보 아이디어를 추천해드려요."**
             ⭐바뀐 건 주어다. 옛 문장은 **우리가 찾아주는 것**(우리 자랑)이었고, 새 문장은
               **당신이 고른 상대와 무엇을 할지**(사용자 행동)를 말한다. */}
-        <h2 className="break-keep text-[24px] font-bold leading-[1.35] tracking-[-0.02em] text-ink sm:text-[28px]">
+        <h2 className="break-keep text-[24px] font-bold leading-[1.35] tracking-[-0.02em] text-ink sm:text-[32px]">
           선택한 브랜드와의
           {/* 🔻`hidden sm:inline`을 뺐다 — 대표 제보 *"모바일에서 「선택한 브랜드와의」 다음 줄바꿈이
               안 된다"*. 원래는 좁은 화면에서 3줄이 될까 봐 막았는데, 실제로는 375px에서 이 문장이
@@ -198,7 +203,7 @@ export function HomeBody({
         {/* 🔻모바일에서는 **숨긴다**(대표 지시 08-16). 바로 아래 카드가 같은 말을 실물로 하고 있어서,
             좁은 화면에서는 이 문장이 카드에 닿기까지의 스크롤만 늘렸다.
             📐`sm:mx-auto` — 섹션이 데스크톱에서 중앙정렬이라 이 문단도 가운데로 와야 축이 맞는다. */}
-        <p className="mt-2.5 hidden max-w-[560px] break-keep text-[16px] leading-[1.65] text-body sm:mx-auto sm:block sm:text-[17px]">
+        <p className="mt-3 hidden max-w-[600px] break-keep text-[16px] leading-[1.65] text-body sm:mx-auto sm:block sm:text-[18px]">
           두 브랜드가 왜 함께하면 좋을지, 무엇을 어떻게 하면 될지까지 정리해드려요.
         </p>
 

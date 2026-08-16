@@ -16,6 +16,7 @@
 // ⏭️**다음 단계 = C2(유형 칩)**. 대표 확정 — *"나중에 업체가 많아지면 C2로 넘어가고 싶다"*.
 //   켜는 법은 아래 `SHOW_TYPE_CHIPS` 주석에 통째로 적어뒀다. 지금 끈 이유는 **브랜드가 9곳뿐**이라
 //   칩을 누르면 3~6곳이 나와서다 — 셸이 오히려 빈약함을 드러낸다.
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { COLLAB_TYPES, type CollabType, type Maker } from "@/lib/types";
 import { track } from "@/lib/track";
@@ -36,8 +37,134 @@ const HOME_TYPES: CollabType[] = ["제품콜라보", "팝업", "워크숍", "공
 
 export function BrandGrid({ brands }: { brands: Maker[] }) {
   const shown = brands.slice(0, CAROUSEL_LIMIT);
+
+  // 🖱️**데스크톱 화살표**(대표 지적 08-16: *"데스크탑에서 캐러셀 클릭해서 슬라이드가 안 돼"*).
+  //   맞는 지적이다 — `overflow-x:auto`는 **터치·트랙패드·shift+휠**로만 움직인다. 마우스로
+  //   끌어도 안 움직이는 게 브라우저 기본 동작이고, 그래서 데스크톱 사용자는 레일을 못 민다.
+  //   ⭐원티드·와사비 둘 다 **화살표 버튼**으로 푼다. 드래그 스크롤을 JS로 흉내 낼 수도 있지만
+  //     드래그는 보이지 않는 기능이라 아무도 시도하지 않는다 — 버튼은 보인다.
+  //   📱모바일에는 안 그린다(`hidden sm:flex`) — 거기선 손가락이 이미 자연스러운 입력이고,
+  //     좁은 화면에서 화살표가 카드를 덮는다.
+  const railRef = useRef<HTMLDivElement>(null);
+  // 양 끝에서는 그쪽 화살표를 숨긴다. 안 그러면 눌러도 아무 일이 없는 버튼이 남는다.
+  const [edge, setEdge] = useState<{ start: boolean; end: boolean }>({ start: true, end: false });
+
+  const syncEdge = useCallback(() => {
+    const el = railRef.current;
+    if (!el) return;
+    const max = el.scrollWidth - el.clientWidth;
+    // 🪤`>= max`로 비교하면 안 된다 — 브라우저가 소수점 스크롤을 남겨 끝에 닿아도 1px쯤 모자란다.
+    setEdge({ start: el.scrollLeft <= 1, end: el.scrollLeft >= max - 1 });
+  }, []);
+
+  useEffect(() => {
+    syncEdge();
+    const el = railRef.current;
+    if (!el) return;
+    el.addEventListener("scroll", syncEdge, { passive: true });
+    // 사진이 늦게 로드되면 scrollWidth가 바뀐다 → 창 크기 변화에도 다시 잰다.
+    window.addEventListener("resize", syncEdge);
+    return () => {
+      el.removeEventListener("scroll", syncEdge);
+      window.removeEventListener("resize", syncEdge);
+    };
+  }, [syncEdge]);
+
+  // 🎞️**`scrollBy({behavior:"smooth"})` 대신 직접 트윈한다.**
+  //   ⭐이유는 "smooth가 고장나서"가 아니라 **검증 가능성** 때문이다. 이 저장소에서 `smooth`가
+  //     조용히 죽은 전례가 둘 있고(07-31 시트, 08-16 앵커 점프 — 그건 lazy 이미지가 문서 높이를
+  //     바꿔 브라우저가 애니메이션을 취소한 진짜 사고였다), 브라우저 내부 구현에 맡기면 왜 안 되는지
+  //     알 방법이 없다. 직접 트윈하면 목표값·클램프·종료를 전부 코드에서 확인할 수 있다.
+  //   🪤**검증 함정** — 08-16에 자동화 브라우저에서 `smooth`가 안 먹는 걸 보고 "스냅과 충돌한다"고
+  //     적었다가 정정했다. 진짜 원인은 **그 탭이 `document.hidden`이라 rAF가 한 프레임도 안 돈 것**
+  //     이었다(실측: 500ms 동안 0프레임). 애니메이션은 숨은 탭에서 검증할 수 없다 —
+  //     `requestAnimationFrame`을 스텁해 타임스탬프를 흘려 넣어야 로직을 확인할 수 있다.
+  //   ⭐트윈은 부작용도 없다 — 매 프레임 `scrollLeft`를 넣으면 브라우저는 즉시 스크롤로 처리하고,
+  //     끝난 뒤 스냅이 한 번 붙어 카드 경계에 정확히 선다(실측: 250까지 끌고 놓으면 313으로 붙음).
+  const tween = useRef<number | null>(null);
+  const slide = (dir: -1 | 1) => {
+    const el = railRef.current;
+    if (!el) return;
+    // 📐한 번에 **보이는 폭의 80%**만 민다. 딱 한 화면을 밀면 경계에 있던 카드가 통째로 사라져
+    //   "어디까지 봤더라"가 끊긴다. 조금 겹치게 미는 게 캐러셀의 통상 규칙이다.
+    const max = el.scrollWidth - el.clientWidth;
+    const from = el.scrollLeft;
+    const to = Math.max(0, Math.min(max, from + dir * el.clientWidth * 0.8));
+    if (to === from) return;
+
+    if (tween.current !== null) cancelAnimationFrame(tween.current);
+    // ♿모션을 줄이도록 설정한 사람에겐 애니메이션 없이 바로 옮긴다.
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      el.scrollLeft = to;
+      return;
+    }
+    const DUR = 380;
+    const t0 = performance.now();
+    const step = (now: number) => {
+      const p = Math.min(1, (now - t0) / DUR);
+      const eased = 1 - Math.pow(1 - p, 3); // ease-out cubic
+      el.scrollLeft = from + (to - from) * eased;
+      if (p < 1) tween.current = requestAnimationFrame(step);
+      else tween.current = null;
+    };
+    tween.current = requestAnimationFrame(step);
+  };
+
+  // 트윈이 도는 중에 컴포넌트가 사라지면 프레임을 정리한다.
+  useEffect(() => () => {
+    if (tween.current !== null) cancelAnimationFrame(tween.current);
+  }, []);
+
+  // 🖐️**마우스 드래그로도 밀린다**(대표 지시 08-16). 화살표만으로는 부족하다 — 캐러셀을 보면
+  //   손이 먼저 끌어보고, 안 끌리면 "고장났나"로 읽힌다.
+  //   📱**마우스에만 건다**(`pointerType === "mouse"`). 터치·펜은 브라우저 기본 스크롤이 이미
+  //     관성까지 붙어 훨씬 낫다 — 거기에 JS를 얹으면 오히려 뻑뻑해진다.
+  //   🚨**스냅을 끄고 끌어야 한다.** `snap-mandatory`가 켜진 채로 `scrollLeft`를 매 프레임 넣으면
+  //     스냅이 손가락과 반대로 잡아당겨 덜덜거린다. 놓는 순간 다시 켜면 카드 경계에 붙는다.
+  const drag = useRef({ on: false, startX: 0, startLeft: 0, moved: 0 });
+
+  const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.pointerType !== "mouse" || e.button !== 0) return;
+    const el = railRef.current;
+    if (!el) return;
+    if (tween.current !== null) cancelAnimationFrame(tween.current); // 화살표 트윈 중이면 가로챈다
+    drag.current = { on: true, startX: e.clientX, startLeft: el.scrollLeft, moved: 0 };
+    el.style.scrollSnapType = "none";
+    el.style.cursor = "grabbing";
+  };
+
+  const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    const el = railRef.current;
+    if (!drag.current.on || !el) return;
+    const dx = e.clientX - drag.current.startX;
+    drag.current.moved = Math.max(drag.current.moved, Math.abs(dx));
+    el.scrollLeft = drag.current.startLeft - dx;
+    // 🪤`preventDefault`가 필요하다 — 안 그러면 카드 안 사진·글자가 **브라우저 기본 드래그**(이미지
+    //   끌기·텍스트 선택)로 잡혀서 레일 대신 고스트 이미지가 따라다닌다.
+    e.preventDefault();
+  };
+
+  const endDrag = () => {
+    const el = railRef.current;
+    if (!el) return;
+    drag.current.on = false;
+    el.style.scrollSnapType = "";
+    el.style.cursor = "";
+  };
+
+  // 🚫끌고 나서 손을 뗄 때 **카드 링크가 열리면 안 된다.** 캡처 단계에서 막는다 —
+  //    `<a>`의 기본 동작보다 먼저 가로채야 해서 버블링으로는 늦다.
+  //    📐임계 5px — 그 아래는 클릭으로 본다(사람 손은 클릭할 때도 1~2px은 움직인다).
+  const onClickCapture = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (drag.current.moved > 5) {
+      e.preventDefault();
+      e.stopPropagation();
+      drag.current.moved = 0;
+    }
+  };
+
   return (
-    <div>
+    <div className="relative">
       {SHOW_TYPE_CHIPS && <TypeChips brands={brands} />}
       {/* ⚠️`-mx-4 px-4`가 핵심이다 — 레일이 **지면 끝까지 흐르게** 해야 마지막 카드가 잘려 보이고,
           그래야 "옆에 더 있다"가 손을 대기 전에 읽힌다. 가운데 정렬돼 끝이 딱 맞으면 아무도 안 민다.
@@ -49,7 +176,16 @@ export function BrandGrid({ brands }: { brands: Maker[] }) {
             (증상: 레일 `paddingLeft: 17px`인데 첫 카드 `left: 0`, `scrollLeft: 17`)
             → **`scroll-pl`을 `px`와 같은 값으로 맞춘다.** 둘은 항상 같이 움직여야 한다. */}
       <div
-        className="-mx-4 flex snap-x snap-mandatory scroll-pl-4 gap-3 overflow-x-auto px-4 pb-3 sm:-mx-6 sm:scroll-pl-6 sm:px-6"
+        ref={railRef}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={endDrag}
+        onPointerLeave={endDrag}
+        onPointerCancel={endDrag}
+        onClickCapture={onClickCapture}
+        // 🖐️`sm:cursor-grab` — 데스크톱에서만 "끌 수 있다"를 커서로 알린다. 드래그는 보이지 않는
+        //    기능이라 커서가 유일한 힌트다(끄는 중 `grabbing`은 위 핸들러가 직접 넣는다).
+        className="-mx-4 flex snap-x snap-mandatory scroll-pl-4 gap-3 overflow-x-auto px-4 pb-3 sm:-mx-6 sm:cursor-grab sm:scroll-pl-6 sm:px-6"
         style={{ scrollbarWidth: "none" }}
       >
         {shown.map((m) => (
@@ -61,8 +197,50 @@ export function BrandGrid({ brands }: { brands: Maker[] }) {
           <EndCard total={brands.length} />
         </div>
       </div>
+      {/* 🖱️화살표 — 레일 **위에 겹쳐** 띄운다(와사비 방식). 위에 따로 줄을 만들면 세로를 먹는데,
+          이 구좌는 애초에 "길이를 줄이려고" 캐러셀로 바꾼 자리라 그 비용을 다시 낼 이유가 없다.
+          📐`top-[38%]` — 카드 세로 가운데가 아니라 **사진 영역 가운데**다. 카드 아래쪽엔 글자가 있어서
+            정중앙에 두면 화살표가 이름·키워드를 덮는다.
+          ⚠️`-mx-*`로 밖으로 흐르는 레일 위에 얹히므로 `left/right-0`은 **부모(`relative`) 기준**이다 —
+            즉 콘텐츠 폭 안쪽에 붙는다. 화면 끝에 붙이면 잘린 카드 위에 떠서 뭘 가리키는지 모호해진다. */}
+      <SlideButton dir={-1} onClick={() => slide(-1)} hidden={edge.start} />
+      <SlideButton dir={1} onClick={() => slide(1)} hidden={edge.end} />
       <BottomMore />
     </div>
+  );
+}
+
+function SlideButton({
+  dir,
+  onClick,
+  hidden,
+}: {
+  dir: -1 | 1;
+  onClick: () => void;
+  hidden: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={dir === -1 ? "이전 브랜드 보기" : "다음 브랜드 보기"}
+      // 🚫끝에 닿으면 **`hidden`이 아니라 투명 + 클릭 차단**으로 없앤다. 진짜로 지우면 버튼이
+      //   나타났다 사라지며 레이아웃 밖에서 깜빡이는데, 투명하게 두면 자리만 비운다.
+      //   ♿`aria-hidden`·`tabIndex=-1`을 같이 걸어 스크린리더·키보드에서도 함께 빠진다.
+      aria-hidden={hidden}
+      tabIndex={hidden ? -1 : undefined}
+      className={`absolute top-[38%] z-[2] hidden h-11 w-11 -translate-y-1/2 items-center justify-center rounded-pill border-[0.5px] border-[#DFDFE3] bg-surface text-ink shadow-e2 transition-opacity hover:bg-surface-soft sm:flex ${
+        dir === -1 ? "-left-1" : "-right-1"
+      } ${hidden ? "pointer-events-none opacity-0" : "opacity-100"}`}
+    >
+      <svg viewBox="0 0 20 20" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8">
+        <path
+          d={dir === -1 ? "M12.5 4.5 7 10l5.5 5.5" : "M7.5 4.5 13 10l-5.5 5.5"}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+    </button>
   );
 }
 
