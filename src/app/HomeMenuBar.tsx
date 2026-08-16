@@ -17,13 +17,9 @@
 //    매 요청 렌더로 바뀐다(=캐시 증발). 세 번째 칸만 클라에서 판정하면 홈 HTML은 계속 캐시된다.
 //    첫 페인트는 「소개서 등록」으로 나가고(방문자 대다수가 그렇다) 판정 후 필요할 때만 바뀐다.
 //    → 자리 폭이 흔들리지 않게 두 라벨을 **같은 4글자**로 맞춰뒀다(소개서 등록 / 콜라보 추천).
-import { useEffect, useState } from "react";
 import Link from "next/link";
-import { hasOwnBrandAction } from "@/lib/actions";
 import { track } from "@/lib/track";
-
-// ⚠️ page.tsx의 목적지 h2(`scroll-mt-[152px]`)와 짝. HomeSectionTabs도 같은 id를 쓴다 — 바꾸면 셋 다.
-const REPORT_ANCHOR = "home-collab-report";
+import { IDEA_CTA_ANCHOR } from "./HomeIdeaCta";
 
 // 세 칸 공통. 활성/비활성 구분이 없으므로 상태 클래스도 없다.
 // 🔤 크기 — 대표 지적 08-14 *"메뉴 치고 폰트가 너무 작다"*. 13/14 → **양쪽 다 15**(디자인팀 확정).
@@ -34,8 +30,13 @@ const REPORT_ANCHOR = "home-collab-report";
 // 📏 높이 **h-[44px]** — 터치 타깃 권장치를 정확히 맞춘 값이다.
 //    🪤`h-10`으로 쓰면 40이 아니라 **42.5px**다. 이 저장소는 루트 폰트가 17px이라 rem 유틸이
 //      전부 6.25%씩 크게 나온다(h-9=38.25 / h-10=42.5). 권장 44에 1.5px 모자라서 px로 박았다.
+// 🔻08-16 좌우 패딩 `px-3.5`(29.75) → **`px-3`**(25.5), 모바일만. 데스크톱은 `sm:px-5` 그대로.
+//    3번칸이 「소개서 등록」(4자) → 「아이디어 추천」(6자)으로 길어지면서 360px에서 알약이 넘쳤다.
+//    실측: 라벨만 바꾸면 348.1px(가용 343 초과 ❌) → 패딩 한 단 내리면 335.4px ✅ (여유 7.6px).
+//    ⚠️**높이 44는 손대지 않았다.** 터치 타깃은 세로가 정하고, 좁힌 건 글자 옆 여백뿐이다.
+//    🪤여유가 7.6px밖에 없다 — 라벨을 또 늘리면 여기부터 다시 재라(canvas measureText로).
 const ITEM =
-  "flex h-[44px] shrink-0 items-center whitespace-nowrap rounded-pill px-3.5 text-[15px] font-medium text-mute transition-colors hover:bg-primary-pale hover:text-primary-on sm:px-5";
+  "flex h-[44px] shrink-0 items-center whitespace-nowrap rounded-pill px-3 text-[15px] font-medium text-mute transition-colors hover:bg-primary-pale hover:text-primary-on sm:px-5";
 
 /** 칸 사이 세로 구분선(대표 제안 08-14 — "메뉴바처럼 보이게").
  *  ⚠️`aria-hidden` + 빈 요소다 — 스크린리더에는 링크 3개만 들려야 한다.
@@ -52,29 +53,33 @@ function Divider() {
 }
 
 export function HomeMenuBar() {
-  const [hasBrand, setHasBrand] = useState(false);
-
-  useEffect(() => {
-    let alive = true;
-    hasOwnBrandAction()
-      .then((v) => {
-        if (alive) setHasBrand(v);
-      })
-      .catch(() => {}); // 실패해도 「소개서 등록」이 그대로 — 바가 사라지진 않는다
-    return () => {
-      alive = false;
-    };
-  }, []);
+  // 🔻08-16 `hasBrand` 조회 **삭제**. 3번칸이 소개서 유무로 갈리지 않게 되면서 필요가 없어졌다
+  //    (아래 3번칸 주석 참조). 방문마다 돌던 세션 쿼리가 하나 줄었다.
 
   // 앵커 이동 — 오프셋은 CSS(`scroll-mt-[152px]`)가 정본이라 scrollIntoView가 그대로 존중한다.
-  // JS에서 좌표를 다시 계산하면 값이 두 군데로 갈라진다(HomeSectionTabs와 같은 규칙).
-  const goReport = (e: React.MouseEvent<HTMLAnchorElement>) => {
-    const el = document.getElementById(REPORT_ANCHOR);
+  // JS에서 좌표를 다시 계산하면 값이 두 군데로 갈라진다.
+  //
+  // 🪤**08-16 버그 수정 — `behavior:"smooth"`가 먼 거리에서 죽는다.**
+  //    대표 제보 *"콜라보 아이디어 만들기 누르면 앵커가 제대로 동작 안 해"*.
+  //    실측: 목표가 3739px 아래일 때 `smooth`는 **scrollY가 0에서 꿈쩍도 안 했고**, 같은 요소에
+  //    `auto`를 주면 3579.5px로 정확히 갔다.
+  //    ⭐원인 — 홈은 브랜드 카드·리포트 이미지가 lazy 로드되며 **문서 높이가 계속 변한다.**
+  //      smooth 스크롤은 애니메이션 도중 레이아웃이 바뀌면 브라우저가 조용히 취소한다.
+  //      거리가 멀수록(=시간이 길수록) 그 사이에 이미지가 뜰 확률이 커진다.
+  //    👉그래서 **먼 거리는 즉시 점프**한다. 어차피 4천 px을 부드럽게 흘려보내는 건 몇 초짜리라
+  //      UX로도 나쁘다 — 짧은 거리에서만 smooth가 의미 있다.
+  const goIdea = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    const el = document.getElementById(IDEA_CTA_ANCHOR);
     if (!el) return; // 못 찾으면 네이티브 해시 점프에 맡긴다
     e.preventDefault();
-    track("home_menubar_report_click");
+    track("home_menubar_idea_click");
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    el.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
+    // 화면 두 개 분량(2×innerHeight)을 넘으면 smooth를 포기한다. 그 이하면 부드럽게.
+    const far = Math.abs(el.getBoundingClientRect().top) > window.innerHeight * 2;
+    // 🎯`block:"start"` — 목적지가 **섹션 제목**이라(08-16 대표 지시로 CTA 버튼에서 옮김)
+    //    위에 붙여야 제목부터 읽힌다. 오프셋은 그 섹션의 `scroll-mt-[152px]`가 알아서 준다.
+    //    ⚠️`"center"`로 두면 제목이 화면 한가운데 떠서 위쪽에 이전 섹션 꼬리가 크게 남는다.
+    el.scrollIntoView({ behavior: reduce || far ? "auto" : "smooth", block: "start" });
   };
 
   return (
@@ -111,29 +116,30 @@ export function HomeMenuBar() {
         //   ⚠️e3(`0 8px 32px 14%`)까지 가면 알약이 모달처럼 무거워진다. 메뉴는 지면 바로 위 한 층이다.
         className="no-scrollbar pointer-events-auto inline-flex max-w-full items-center gap-1 overflow-x-auto rounded-pill border-[0.5px] border-[#DFDFE3] bg-surface p-1 shadow-e2"
       >
-        {/* 「콜라보 매거진」 — 대표 08-14. 그냥 '매거진'이면 무슨 매거진인지가 안 붙는다.
-            ⚠️세 칸 중 이것만 6글자라 폭이 가장 크게 늘었다(실측은 아래 커밋 메시지 참고).
-              칸을 더 늘릴 땐 375px에서 반드시 다시 재라 — 여유가 이제 넉넉하지 않다. */}
-        <Link href="/magazine" onClick={() => track("home_menubar_magazine_click")} className={ITEM}>
-          콜라보 매거진
-        </Link>
-        <Divider />
+        {/* 🔻08-16 「콜라보 매거진」칸 **삭제** — 대표: *"플로팅바가 너무 길다. 매거진은 헤더 상단바로
+              다시 올리고, 여기는 콜라보 찾기 | 콜라보 아이디어 2개로 가자"*.
+            ⭐3칸 → 2칸이 되면서 라벨 길이 압박이 통째로 사라졌다. 그래서 아래 3번칸 라벨도
+              「아이디어 추천」에서 **대표가 원래 말한 「콜라보 아이디어 만들기」로 되돌렸다**(실측 재확인).
+            🚨매거진은 이제 헤더(`HeaderNavLinks`)로 갔는데 그건 `hidden sm:flex`라 **폰에선 안 보인다.**
+              → 홈 모바일의 매거진 진입로는 **최상단 매거진 배너**가 맡는다. 배너를 지우면 폰에서
+                매거진에 닿는 길이 풋터 하나만 남는다(둘 중 하나는 반드시 있어야 한다). */}
         <Link href="/search" onClick={() => track("home_menubar_search_click")} className={ITEM}>
           콜라보 찾기
         </Link>
         <Divider />
-        {hasBrand ? (
-          // 소개서를 이미 가진 사람 — 등록으로 보낼 이유가 없다. 홈 안의 콜라보 추천 구간으로 내린다.
-          // <button>이 아니라 <a href="#id">인 이유: JS가 죽어도 네이티브 해시 점프가 대신 동작하고
-          // 키보드·새 탭·링크 복사를 공짜로 얻는다.
-          <a href={`#${REPORT_ANCHOR}`} onClick={goReport} className={ITEM}>
-            콜라보 추천
-          </a>
-        ) : (
-          <Link href="/register" onClick={() => track("home_menubar_register_click")} className={ITEM}>
-            소개서 등록
-          </Link>
-        )}
+        {/* 🔻08-16 대표 지시 — 「소개서 등록」/「콜라보 추천」 분기를 **없애고 한 칸으로 합쳤다.**
+            두 사람 모두 홈 ③구좌의 「콜라보 아이디어 추천 받기」 버튼으로 내려간다.
+            ⭐그 버튼이 이미 3분기(비로그인 / 소개서 없음 / 있음)를 처리하기 때문이다.
+              판정이 두 군데 있으면 **메뉴는 "소개서 등록"이라 하고 버튼은 "로그인하세요"라 하는 식으로
+              어긋난다.** 판정은 한 곳에서만 한다.
+            ⚠️`<button>`이 아니라 `<a href="#id">`인 이유: JS가 죽어도 네이티브 해시 점프가 대신
+              동작하고 키보드·새 탭·링크 복사를 공짜로 얻는다.
+            🪤라벨 폭 — 3칸일 땐 「콜라보 아이디어 만들기」가 360px에서 403.6px로 넘쳐서(가용 343)
+              「아이디어 추천」으로 줄였었다. **매거진 칸이 빠지면서 여유가 생겨 원래 말로 되돌렸다.**
+              라벨을 또 바꿀 땐 canvas measureText로 다시 잴 것 — 2칸이어도 무한하진 않다. */}
+        <a href={`#${IDEA_CTA_ANCHOR}`} onClick={goIdea} className={ITEM}>
+          콜라보 아이디어 만들기
+        </a>
       </nav>
     </div>
   );

@@ -1,8 +1,10 @@
 // 콜라보 찾기 — 서버에서 목록을 조회해 첫 렌더에 카드까지 실어 보낸다(클라 왕복 제거).
 // 필터·페이지네이션은 클라 상태라 SearchClient가 담당. 로딩 표시는 loading.tsx(라우트 레벨).
+import { Suspense } from "react";
 import type { Metadata } from "next";
 import { repo } from "@/lib/repo";
 import { SearchClient } from "./SearchClient";
+import { SearchIdeaGuide } from "./SearchIdeaGuide";
 
 // 🆕08-07 — 이 페이지엔 제목이 없어 검색 결과·탭에 **홈 제목이 그대로** 떴다.
 // ⚠️`alternates`는 더 중요하다: 루트 layout의 `canonical: "/"`가 자식에 상속되므로,
@@ -20,5 +22,17 @@ export const dynamic = "force-dynamic";
 
 export default async function SearchPage() {
   const all = await repo.searchMakers("");
-  return <SearchClient all={all} />;
+  return (
+    <>
+      <SearchClient all={all} />
+      {/* 홈에서 「콜라보 아이디어 추천 받기」를 누르고 온 사람에게만 뜨는 안내 시트(08-16).
+          신호는 `?guide=idea` — 상세는 SearchIdeaGuide.tsx.
+          🚨`<Suspense>` 필수 — 이 컴포넌트가 `useSearchParams`를 쓴다. 감싸지 않으면 Next가
+            **페이지 전체를 CSR로 강등**시키고 빌드에서 경고를 낸다(서버 렌더로 옮긴 이 페이지의
+            이득이 통째로 사라진다). 목록은 그대로 서버에서 오고 이 시트만 늦게 붙는 구조. */}
+      <Suspense fallback={null}>
+        <SearchIdeaGuide />
+      </Suspense>
+    </>
+  );
 }

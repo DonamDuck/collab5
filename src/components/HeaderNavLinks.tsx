@@ -1,8 +1,17 @@
 "use client";
 
-// 헤더의 이동 링크 2개(매거진 · 콜라보 찾기) — **홈에서만 숨는다**(대표 지시 08-14).
-// 홈에는 `HomeMenuBar`가 헤더 바로 밑에 같은 두 링크를 더 크게 들고 있어서, 헤더에 또 두면
-// 같은 목적지가 한 화면에 두 번 나온다. 홈의 헤더는 로고+계정만 남기는 게 이 개편의 요지다.
+// 헤더의 이동 링크 — 경로에 따라 무엇을 보일지가 갈린다.
+//   · 홈 밖  : 매거진 + 콜라보 찾기(칩)  ← 전역 보조 내비
+//   · 홈     : **매거진만**              ← 08-16 대표 지시
+//
+// 🔻이력 — 08-14엔 홈에서 **통째로 숨겼다**(HomeMenuBar가 같은 두 링크를 들고 있어 중복이라서).
+//   08-16에 대표가 메뉴바를 2칸(콜라보 찾기 · 아이디어 추천)으로 줄이면서 매거진이 갈 곳이 없어졌고,
+//   *"콜라보 매거진을 헤더 상단바로 다시 올리자"*는 지시로 홈에서도 매거진만 되살렸다.
+//   ⭐「콜라보 찾기」는 홈에서 여전히 숨긴다 — 그건 메뉴바에 남아 있어서 두 번 나오게 된다.
+//
+// 🚨**모바일에서는 이 매거진 링크가 안 보인다**(`hidden sm:flex`, 아래 주석의 07-29 사고 참조).
+//   그래서 홈의 모바일 매거진 진입로는 이제 **최상단 매거진 배너**가 맡는다(HomeMagazineBanner).
+//   → 배너를 지우면 폰에서 매거진에 닿는 길이 풋터 하나만 남는다. 둘 중 하나는 반드시 있어야 한다.
 //
 // ⚠️ 계정 영역(아바타/로그인)은 여기 없다 — 그건 서버에서 세션을 읽어 그리므로 SiteHeader에 남는다.
 //    특히 **로그인 링크는 홈에서도 지우지 않는다.** 첫 방문자는 아바타가 없어서, 이것까지 빼면
@@ -15,7 +24,7 @@ import { usePathname } from "next/navigation";
 
 export function HeaderNavLinks() {
   const pathname = usePathname();
-  if (pathname === "/") return null;
+  const isHome = pathname === "/";
 
   return (
     <>
@@ -40,17 +49,21 @@ export function HeaderNavLinks() {
           돋보기 아이콘 + '브랜드 소개서' 버튼 2개를 이걸로 통합했다.
           ⚠️ 진짜 input이 아니라 Link다 — 눌러서 /search로 보내는 게 목적이고,
              헤더에 실검색을 넣으면 페이지마다 상태를 들고 다녀야 한다.
-             그래서 시각만 검색창(surface-soft 필·pill·좌측 돋보기)으로 빌려오고 동작은 이동. */}
-      <Link
-        href="/search"
-        className="flex h-[44px] min-w-0 items-center gap-1.5 rounded-pill bg-surface-soft pl-3 pr-4 text-mute transition-colors hover:bg-primary-pale hover:text-primary-on"
-      >
-        <svg viewBox="0 0 20 20" className="h-[17px] w-[17px] shrink-0" fill="none" stroke="currentColor" strokeWidth="1.9">
-          <circle cx="8.5" cy="8.5" r="5.5" />
-          <path d="m13 13 4 4" strokeLinecap="round" />
-        </svg>
-        <span className="truncate">콜라보 찾기</span>
-      </Link>
+             그래서 시각만 검색창(surface-soft 필·pill·좌측 돋보기)으로 빌려오고 동작은 이동.
+          🚫**홈에서는 숨긴다**(08-16) — 홈 메뉴바 1번칸이 같은 「콜라보 찾기」다.
+             같은 목적지가 한 화면에 두 번 나오면 어느 쪽이 진짜인지 고민하게 된다. */}
+      {!isHome && (
+        <Link
+          href="/search"
+          className="flex h-[44px] min-w-0 items-center gap-1.5 rounded-pill bg-surface-soft pl-3 pr-4 text-mute transition-colors hover:bg-primary-pale hover:text-primary-on"
+        >
+          <svg viewBox="0 0 20 20" className="h-[17px] w-[17px] shrink-0" fill="none" stroke="currentColor" strokeWidth="1.9">
+            <circle cx="8.5" cy="8.5" r="5.5" />
+            <path d="m13 13 4 4" strokeLinecap="round" />
+          </svg>
+          <span className="truncate">콜라보 찾기</span>
+        </Link>
+      )}
     </>
   );
 }

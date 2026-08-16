@@ -199,6 +199,22 @@ export async function hasOwnBrandAction(): Promise<boolean> {
   return mine.length > 0;
 }
 
+/** 홈 「콜라보 아이디어 추천 받기」 게이트 판정 (2026-08-16, 대표 지시).
+ *
+ *  ⚠️`hasOwnBrandAction`으로는 **못 푼다.** 그건 비로그인과 "로그인했지만 소개서 없음"을 둘 다
+ *     `false`로 뭉갠다. 그런데 대표가 정한 분기는 셋이고 **셋의 안내가 서로 다르다**:
+ *       ① 비로그인          → "로그인이 필요해요" → 로그인 후 홈 복귀
+ *       ② 로그인 + 소개서 X → "소개서 등록 후 받아볼 수 있어요" → 소개서 만들기
+ *       ③ 로그인 + 소개서 O → 콜라보 찾기로 이동 + 바텀시트 안내
+ *     ①과 ②를 합치면 **이미 로그인한 사람에게 "로그인하세요"가 뜬다.** 그래서 상태를 나눠 돌려준다.
+ *  🔒소개서 목록·이름은 안 돌려준다 — 화면이 쓰지 않는 데이터를 클라로 내보내지 않는다. */
+export async function homeIdeaGateAction(): Promise<{ loggedIn: boolean; hasBrand: boolean }> {
+  const userId = await getSessionUserId();
+  if (!userId) return { loggedIn: false, hasBrand: false };
+  const mine = await repo.listMakersByOwner(userId);
+  return { loggedIn: true, hasBrand: mine.length > 0 };
+}
+
 /** 등록 폼 '텍스트형 소개서 예시' 바텀시트용 — 텍스트 데모 소개서(고정 slug) 조회. 유료 콜 없음(DB 1회). */
 export async function getPreviewDemoNoneAction(): Promise<{ maker: Maker; logoUrl: string | null } | null> {
   const { DEMO_SLUG_NONE } = await import("./demo");
