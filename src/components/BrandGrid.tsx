@@ -41,21 +41,27 @@ export function BrandGrid({ brands }: { brands: Maker[] }) {
       {SHOW_TYPE_CHIPS && <TypeChips brands={brands} />}
       {/* ⚠️`-mx-4 px-4`가 핵심이다 — 레일이 **지면 끝까지 흐르게** 해야 마지막 카드가 잘려 보이고,
           그래야 "옆에 더 있다"가 손을 대기 전에 읽힌다. 가운데 정렬돼 끝이 딱 맞으면 아무도 안 민다.
-          숫자는 부모(`page.tsx` main)의 좌우 패딩과 같아야 한다(`px-4 sm:px-6`). */}
+          숫자는 부모(`page.tsx` main)의 좌우 패딩과 같아야 한다(`px-4 sm:px-6`).
+
+          🚨**`scroll-pl-*`이 없으면 첫 카드가 화면에 쩍 붙는다**(대표 지적 08-16, 실측으로 확인).
+            `snap-start`는 스냅 위치를 **스크롤 패딩 기준**으로 잡는데 그 값이 0이면 패딩을 무시하고
+            정렬해 버린다 — 브라우저가 스스로 `scrollLeft`를 17px 밀어 `px-4`를 상쇄했다.
+            (증상: 레일 `paddingLeft: 17px`인데 첫 카드 `left: 0`, `scrollLeft: 17`)
+            → **`scroll-pl`을 `px`와 같은 값으로 맞춘다.** 둘은 항상 같이 움직여야 한다. */}
       <div
-        className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-3 sm:-mx-6 sm:px-6"
+        className="-mx-4 flex snap-x snap-mandatory scroll-pl-4 gap-3 overflow-x-auto px-4 pb-3 sm:-mx-6 sm:scroll-pl-6 sm:px-6"
         style={{ scrollbarWidth: "none" }}
       >
         {shown.map((m) => (
-          <div key={m.id} className="w-[210px] shrink-0 snap-start sm:w-[240px]">
+          <div key={m.id} className="w-[210px] shrink-0 snap-start sm:w-[300px]">
             <BrandCard m={m} />
           </div>
         ))}
-        <div className="w-[210px] shrink-0 snap-start sm:w-[240px]">
-          <EndCard />
+        <div className="w-[210px] shrink-0 snap-start sm:w-[300px]">
+          <EndCard total={brands.length} />
         </div>
       </div>
-      <BottomMore total={brands.length} />
+      <BottomMore />
     </div>
   );
 }
@@ -108,7 +114,7 @@ function BrandCard({ m }: { m: Maker }) {
 
 /** 레일 끝 칸 — 끝까지 민 사람의 출구. 개수 표기 없음, 흰 면 + 실선 hairline(점선 금지).
  *  이 원칙은 07-27 캐러셀 MoreCard에서 승계했다. */
-function EndCard() {
+function EndCard({ total }: { total: number }) {
   return (
     <Link
       href="/search"
@@ -120,13 +126,15 @@ function EndCard() {
           <path d="M4 10h12m0 0-4.5-4.5M16 10l-4.5 4.5" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       </span>
-      <span className="text-[14px] font-medium text-ink">브랜드 더 보기</span>
+      {/* 🔢개수는 **여기**로 옮겼다(08-16, 하단 버튼을 짧게 줄이면서).
+          끝까지 민 사람은 이미 6곳을 봤으니 "그래서 몇 곳이 더 있나"가 그 자리의 질문이다. */}
+      <span className="text-[14px] font-medium text-ink">{total}곳 모두 보기</span>
     </Link>
   );
 }
 
 /** 하단 버튼 — 캐러셀을 **안 민 사람**의 출구(대표 지시 08-16). */
-function BottomMore({ total }: { total: number }) {
+function BottomMore() {
   return (
     <div className="mt-5 text-center">
       <Link
@@ -134,9 +142,9 @@ function BottomMore({ total }: { total: number }) {
         onClick={() => track("home_grid_more_bottom_click")}
         className="inline-flex h-12 items-center rounded-pill border-[0.5px] border-[#DFDFE3] bg-surface px-6 text-[15px] font-medium text-ink transition-colors hover:bg-surface-soft"
       >
-        {/* 🔢개수를 넣는다 — 「더 보기」만 있으면 뒤에 몇이 있는지 몰라 안 누른다.
-            숫자 자체가 "여긴 비어 있지 않다"는 증거다. */}
-        콜라보 가능한 브랜드 {total}곳 모두 보기
+        {/* ✂️08-16 대표 지시로 「콜라보 가능한 브랜드 N곳 모두 보기」(281px)에서 줄였다.
+            개수는 레일 끝 칸으로 옮겼다 — 두 출구가 같은 말을 하면 하나가 군더더기가 된다. */}
+        브랜드 더 보기
         <span className="ml-1.5 text-faint">→</span>
       </Link>
     </div>

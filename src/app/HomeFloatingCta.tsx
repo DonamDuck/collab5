@@ -9,9 +9,15 @@
 //   🚨이 컴포넌트를 지우면 홈에 소개서 진입점이 하단 CTA 하나만 남는다. 지우려면 히어로 버튼을
 //     되살리는 게 먼저다.
 //
-// 🎨왜 검정인가 — 사이트의 주 CTA는 Kiwi(--primary)다. 이 알약까지 Kiwi면 스크롤 내내 화면에
-//   붙어 있는 형광 초록이 되어, 정작 각 섹션의 진짜 CTA와 색이 겹쳐 위계가 무너진다.
-//   검정은 "언제나 여기 있는 것"이라 배경처럼 물러나 있다가 필요할 때 눈에 든다(리틀리도 검정).
+// 🎨~~왜 검정인가~~ → **08-16 Kiwi로 전환**(대표 지시). 원래 논리는 이랬다:
+//   *"주 CTA가 Kiwi인데 이 알약까지 Kiwi면 스크롤 내내 붙어 있는 형광이 되어 각 섹션의 진짜 CTA와
+//   색이 겹쳐 위계가 무너진다"*. **그 걱정은 지금도 유효하다** — 특히 ③구좌의 「나도, 콜라보 아이디어
+//   추천받기」와 이 알약이 **둘 다 Kiwi인데 목적지가 다르다**(여기는 `/register`, 저기는 분석 게이트).
+//   ⭐그래도 바꾼 이유 = 같은 날 배너를 **카본(#0c0c0c)**으로 확정하면서 첫 화면의 검정 면적이 크게
+//     늘었다. 검은 알약이 그 위에 얹히면 배너와 같은 덩어리로 읽혀 "떠 있는 버튼"이 아니게 된다.
+//     Kiwi는 이 지면에서 유일하게 "누르는 것"을 뜻하는 색이라, 상시 버튼에는 그 뜻이 맞는다.
+//   🔭GA로 갈린다 — `home_floating_cta_click`이 `home_idea_cta_click`을 잠식하면 위계가 무너진 것이니
+//     그때 검정으로 되돌린다(`bg-ink text-on-dark`, 점은 `bg-primary`).
 //
 // ⚠️`pointer-events-none` 필수 — 이 래퍼는 화면 폭 전체를 차지하는 투명 띠다. 그냥 두면
 //   알약 좌우의 빈 곳이 뒤 콘텐츠의 클릭을 통째로 먹는다(HomeMenuBar가 같은 함정을 이미 겪었다).
@@ -110,18 +116,20 @@ export function HomeFloatingCta() {
         // 위치가 바뀌면 "따라 올라온 것"으로 읽혀 상시 레이어라는 성격이 전달된다.
         // 🔻08-16 「무료」 배지 제거(대표 지시) → 좌우 패딩이 `pl-6 pr-3`(배지 자리를 비켜준 비대칭)
         //    이었는데 배지가 빠졌으니 **`px-7`로 대칭 복구**. 안 그러면 오른쪽만 좁아 글자가 치우친다.
-        className={`pointer-events-auto inline-flex h-[52px] items-center rounded-pill bg-ink px-7 text-[15px] font-medium text-on-dark shadow-e3 transition-all duration-[var(--dur-base)] ease-[var(--ease)] ${
+        className={`pointer-events-auto inline-flex h-[52px] items-center rounded-pill bg-primary px-7 text-[15px] font-medium text-primary-on shadow-e3 transition-all duration-[var(--dur-base)] ease-[var(--ease)] ${
           shown ? "translate-y-0 opacity-100" : "pointer-events-none translate-y-4 opacity-0"
         }`}
       >
-        {/* 🟢키위 점(대표 지시 08-16). 검은 알약에 브랜드색을 **한 점만** 얹는다.
-            면적을 키우면 알약 자체가 형광이 되어 각 섹션의 진짜 CTA와 색이 겹친다(위 🎨주석) —
-            점은 그 위험 없이 "우리 것"이라는 표시만 남긴다.
+        {/* ⚫점 — 알약이 Kiwi가 되면서 **검정으로 뒤집었다**(08-16).
+            🔬흰 점을 먼저 검토했다가 접었다: Kiwi(#98FF5C)는 상대휘도 0.77로 흰색(1.0)에 아주 가까워
+              **대비가 1.28밖에 안 난다**(거의 안 보인다). 검정(#222)은 12.72로 또렷하다.
+              색 선택은 취향이 아니라 **면색의 밝기**가 정한다 — Kiwi는 색이 강렬해서 어두운 면으로
+              착각하기 쉽지만 실제로는 흰색에 가까운 밝기다.
             📐지름 6.4px = 라벨 15px의 약 40%. 글머리 점의 통상 비율이고, 더 키우면 배지로 읽힌다.
             📍**왼쪽**에 둔다 — 같은 홈 ②섹션의 「● 콜라보 ON」 칩이 이미 「점 + 라벨」이라 어휘가
               맞는다. 오른쪽에 붙이면 알림 배지(읽지 않음 표시)로 읽혀 뜻이 달라진다.
             ⚠️`shrink-0` 필수 — 없으면 좁은 화면에서 점이 타원으로 눌린다. */}
-        <span aria-hidden="true" className="mr-2.5 h-1.5 w-1.5 shrink-0 rounded-pill bg-primary" />
+        <span aria-hidden="true" className="mr-2.5 h-1.5 w-1.5 shrink-0 rounded-pill bg-ink" />
         3분 만에 소개서 만들기
       </Link>
     </div>

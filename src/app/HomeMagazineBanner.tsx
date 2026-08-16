@@ -27,13 +27,36 @@ import { TrackLink } from "@/components/TrackLink";
 import { kstDateLabel } from "@/lib/magazine-format";
 import type { MagazineListItem } from "@/lib/types";
 
-/** 배경 시안 — 대표가 셋 다 보고 고른다(08-16). `/qa-banner`에서 나란히 볼 수 있다.
+/** 배경 시안 — 대표가 다 보고 고른다(08-16). **확정 = `carbon`**(`page.tsx`가 넘긴다).
+ *  🗑️비교용이던 `/qa-banner`·`/qa-home`은 선택이 끝나 **삭제했다**. 다시 고를 일이 생기면
+ *    `HomeBody`에 `bannerBg`가 prop으로 뚫려 있으니 QA 라우트를 새로 하나 만들면 된다.
  *
  *  🔭이 자리는 매거진 전용이 아니다(대표): *"나중에 슬라이드로 업체 소개나 이벤트가 될 자리"*.
  *    그래서 배경을 **prop으로** 빼 뒀다 — 나중에 캐러셀이 되면 슬라이드마다 다른 안을 쓸 수 있고,
  *    이벤트 배너(커버 사진이 없을 수도 있는)에는 `ink`/`soft`가 맞는다.
- *    ⚠️`photo`는 커버 사진이 있어야 성립한다 — 없으면 자동으로 `ink`로 떨어진다(아래 참조). */
-export type BannerBg = "photo" | "ink" | "soft";
+ *    ⚠️`photo`는 커버 사진이 있어야 성립한다 — 없으면 자동으로 `ink`로 떨어진다(아래 참조).
+ *
+ *  🆕08-16 2차 — 대표가 **키위 단색**을 직접 만들어 보고 두 안을 더 얹었다.
+ *    · `kiwi`   브랜드색 면(#98FF5C). 글자는 **어두운 쪽**으로 뒤집힌다(soft와 같은 경로).
+ *    · `carbon` 거의 검정(#0c0c0c). 지금 쓰는 `ink`(#222222)보다 **한 단 더 어둡다.**
+ *    ⚠️`kiwi`는 07-31에 한 번 반려된 방향과 **다른 것**이다 — 그때는 `primary-pale`(#ecffe0,
+ *      물 빠진 연두)이었고 대표 평이 *"완전 별루"*였다. 이번은 원색 Kiwi다. 반려 사유였던
+ *      "브랜드 색을 큰 면으로 쓰면 버튼의 '눌러라'가 흐려진다"는 **여전히 유효한 걱정**이라,
+ *      고르실 때 홈 아래쪽 Kiwi 버튼과 같이 보고 판단하시면 된다. */
+export type BannerBg = "photo" | "ink" | "soft" | "kiwi" | "carbon";
+
+/** 배경 면색. ⚠️Tailwind는 클래스 문자열을 **소스에서 통째로** 찾아야 CSS를 만든다 —
+ *  `bg-${mode}`처럼 이어 붙이면 빌드에서 클래스가 통째로 누락된다(면색이 사라진다). */
+const BG_CLASS: Record<BannerBg, string> = {
+  photo: "bg-surface-dark",
+  ink: "bg-ink",
+  soft: "bg-surface-soft",
+  kiwi: "bg-primary",
+  // 토큰이 아니라 리터럴이다 — 대표가 이번 비교용으로 직접 지정한 값(#0c0c0c).
+  // ⛔확정되면 `--ink`를 바꾸지 말고 **새 토큰**으로 올릴 것. `--ink`는 본문 글자색이기도 해서
+  //   그걸 건드리면 전 페이지 글자가 같이 어두워진다.
+  carbon: "bg-[#0c0c0c]",
+};
 
 export function HomeMagazineBanner({
   article,
@@ -46,7 +69,10 @@ export function HomeMagazineBanner({
 }) {
   // 사진 배경인데 커버가 없으면 성립하지 않는다 → 잉크로 떨어뜨린다(빈 회색 면이 뜨는 것보다 낫다).
   const mode: BannerBg = bg === "photo" && !article.coverImage ? "ink" : bg;
-  const dark = mode !== "soft"; // 글자색을 뒤집을지 — soft(밝은 회색)만 어두운 글자다.
+  // 글자색을 뒤집을지 — **밝은 면(soft·kiwi)에서만 어두운 글자**다.
+  // ⚠️Kiwi(#98FF5C)는 상대휘도가 매우 높다(흰색에 가깝다). 어두운 면으로 착각해 흰 글자를 얹으면
+  //   대비가 통째로 무너진다 — 색상(hue)이 아니라 **밝기**로 판정할 것.
+  const dark = mode !== "soft" && mode !== "kiwi";
 
   return (
     // 🎨배경 = **커버 사진을 크게 키워 흐린 것 + 어두운 막**(C안, 08-16 대표 지적으로 교체).
@@ -57,11 +83,9 @@ export function HomeMagazineBanner({
     //     저절로 다른 배너가 된다(운영비 0으로 "매번 새 배너"). 잡지 표지 문법이기도 하다.
     //   ⚠️v1(사진 위에 스크림 깔고 글 얹기)과 **다른 것**이다. 여기서 글은 사진 **옆**에 있고,
     //     배경으로 깔린 사진은 blur라 원본 사진(오른쪽 카드)은 하나도 안 죽는다.
-    //   🔁세 안은 `bg` prop으로 고른다(위 `BannerBg` 주석 참조) — `/qa-banner`에서 비교 가능.
+    //   🔁안은 `bg` prop으로 고른다(위 `BannerBg` 주석 참조). 확정값은 `page.tsx`에 있다.
     <section
-      className={`relative overflow-hidden ${
-        mode === "ink" ? "bg-ink" : mode === "soft" ? "bg-surface-soft" : "bg-surface-dark"
-      }`}
+      className={`relative overflow-hidden ${BG_CLASS[mode]}`}
     >
       {mode === "photo" && article.coverImage && (
         // 🖼️배경 레이어 — `scale-110`이 필수다. blur는 가장자리를 투명하게 번지게 해서
@@ -85,7 +109,7 @@ export function HomeMagazineBanner({
         event="home_magazine_banner_click"
         params={{ slug: article.slug }}
         // `relative` 필수 — 위 배경 레이어(absolute)보다 위에 와야 글이 막에 안 묻힌다.
-        className="relative mx-auto block w-full max-w-[960px] px-4 py-7 sm:px-6 sm:py-10"
+        className="relative mx-auto block w-full max-w-[1320px] px-4 py-7 sm:px-6 sm:py-12"
       >
         {/* 📐모바일 1열(사진 위·글 아래) / 데스크톱 2열(글 왼쪽·사진 오른쪽).
             ⚠️모바일에서 사진을 **위**로 올린 건 잡지의 규칙이다 — 사진이 붙잡고 글이 따라온다.
@@ -99,6 +123,9 @@ export function HomeMagazineBanner({
                 alt=""
                 // 📐16:10 — 커버가 콜라보 현장 사진(대체로 4:3)이라 이보다 납작하게 자르면
                 //   인물 머리가 날아간다. 세로로 더 두면 배너가 첫 화면을 다 먹는다.
+                // 🔻08-16에 데스크톱만 4:3으로 키웠다가 **되돌렸다** — 같은 날 본문 폭을 960→1280으로
+                //   넓히면서 사진이 저절로 418→570px이 됐다. 거기에 4:3까지 겹치면 배너 높이가
+                //   564px(비율 0.40)이 되어 와사비(0.32)를 훌쩍 넘는다. **폭을 키웠으면 비율은 되돌린다.**
                 className="aspect-[16/10] w-full object-cover transition-transform duration-[var(--dur-slow)] ease-[var(--ease)] group-hover:scale-[1.03]"
               />
             </div>
@@ -111,7 +138,7 @@ export function HomeMagazineBanner({
                 2편부터는 자동으로 「최신호」. 매거진 목록 히어로도 같은 규칙. */}
             {/* 배지는 어느 배경에서든 **흰 알약 + 초록 글자** — 밝은 회색 면(soft)에서도 흰색이
                 한 단 밝아서 구분되고, 어두운 면에서는 가장 잘 튄다. 유일하게 안 바뀌는 조각. */}
-            <span className="inline-flex items-center rounded-pill bg-surface px-2.5 py-1 text-[11px] font-bold tracking-[0.06em] text-primary-on">
+            <span className="inline-flex items-center rounded-pill bg-surface px-2.5 py-1 text-[11px] font-bold tracking-[0.06em] text-primary-on sm:px-3 sm:py-1.5 sm:text-[12px]">
               collab5 매거진 · {isFirstIssue ? "창간호" : "최신호"}
             </span>
             {/* 🎨어두운 배경(photo·ink)에서는 글자가 전부 흰 계열이다.
@@ -120,7 +147,7 @@ export function HomeMagazineBanner({
                   반대로 밝은 면(soft)에서는 그 토큰들이 정상 동작하므로 그대로 쓴다. */}
             {article.subtitle && (
               <p
-                className={`mt-3 text-[13px] font-medium break-keep sm:text-[14px] ${
+                className={`mt-3 text-[13px] font-medium break-keep sm:text-[15px] ${
                   dark ? "text-white/70" : "text-primary-on"
                 }`}
               >
@@ -130,7 +157,7 @@ export function HomeMagazineBanner({
             {/* 📏배너 안에서는 제목이 주인공 — 아래 히어로 슬로건(32/48)보다는 **작아야** 한다.
                 여기가 더 크면 페이지의 목소리가 매거진 제목으로 넘어간다. */}
             <h2
-              className={`mt-1.5 text-balance text-[24px] font-bold leading-[1.25] tracking-[-0.025em] break-keep sm:text-[34px] ${
+              className={`mt-1.5 text-balance text-[24px] font-bold leading-[1.25] tracking-[-0.025em] break-keep sm:mt-2 sm:text-[40px] ${
                 dark ? "text-white" : "text-ink"
               }`}
             >
@@ -140,20 +167,20 @@ export function HomeMagazineBanner({
               // 모바일에선 숨긴다 — 배지·부제·제목·버튼만으로도 첫 화면이 꽉 찬다.
               // 요약까지 넣으면 배너가 폰 한 화면을 통째로 먹어 아래 슬로건이 안 보인다.
               <p
-                className={`mt-3 hidden line-clamp-2 text-[15px] leading-relaxed break-keep sm:block ${
+                className={`mt-3 hidden line-clamp-2 text-[15px] leading-relaxed break-keep sm:block sm:text-[16px] ${
                   dark ? "text-white/75" : "text-body"
                 }`}
               >
                 {article.summary}
               </p>
             )}
-            <div className="mt-5 flex items-center gap-3">
+            <div className="mt-5 flex items-center gap-3 sm:mt-7">
               {/* 진짜 버튼이 아니라 **버튼처럼 보이는 표식**이다 — 배너 전체가 이미 링크라
                   안에 또 링크를 두면 중첩 앵커(HTML 위반)가 된다. `<span>`인 이유.
                   🎨와사비의 「자세히 보기」와 같은 자리·같은 무게. 다만 그쪽은 밝은 배경이라 검정
                      알약이고, 우리는 배경이 어두워졌으니(C안) **흰 알약**이 같은 역할을 한다. */}
               <span
-                className={`inline-flex h-11 items-center rounded-pill px-5 text-[14px] font-medium ${
+                className={`inline-flex h-11 items-center rounded-pill px-5 text-[14px] font-medium sm:h-13 sm:px-7 sm:text-[15px] ${
                   dark ? "bg-white text-ink" : "bg-ink text-on-dark"
                 }`}
               >

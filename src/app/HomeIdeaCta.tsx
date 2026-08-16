@@ -24,7 +24,7 @@ import { homeIdeaGateAction } from "@/lib/actions";
 import { track } from "@/lib/track";
 import { HomeGateAlert } from "./HomeGateAlert";
 
-/** ⚓메뉴바 「콜라보 아이디어 만들기」의 점프 목적지 id.
+/** ⚓메뉴바 「콜라보 아이디어 찾기」의 점프 목적지 id.
  *
  *  🚨**id가 붙는 곳은 이 파일이 아니라 `page.tsx`의 ③섹션(`<section id={IDEA_CTA_ANCHOR}>`)이다.**
  *    08-16 대표 지시로 CTA 버튼 → 섹션 제목으로 목적지를 옮겼다(버튼만 보면 왜 누르는지가 없다).
