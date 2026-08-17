@@ -477,10 +477,14 @@ A1의 그리드는 **이 브랜드가 올린 글**만 준다. 그런데 **우리
    편집 폼은 공개라 열리지만 저장은 소유자 체크로 막힘.
    → **해결: 먼저 소유자 귀속**(대표가 Supabase SQL, user_id 몰라도 됨):
    ```sql
-   UPDATE brands SET owner_user_id = (SELECT owner_user_id FROM brands WHERE slug='m-1vv8kj')
+   UPDATE brands SET owner_user_id = (SELECT user_id FROM users WHERE email = '<대표 계정 이메일>')
    WHERE slug='<target-slug>';
    ```
-   (`m-1vv8kj`=이미 소유된 로컬페이지 — 그 소유자를 복사.) 실행 후 저장하면 붙는다.
+   🚨**08-16 수정 — 옛 예시(`… FROM brands WHERE slug='m-1vv8kj'`)를 쓰지 마라.**
+   그 방식은 *"이미 소유된 소개서의 주인을 복사한다"*였는데, **참조 대상이 낡으면 조용히 `NULL`을 넣는다**
+   (= 소유권이 소리 없이 풀린다). 실제로 `m-1vv8kj`는 지금 「로컬페이지_아카이빙」(inactive)이고,
+   살아 있는 로컬페이지(`m-vzrlhz`)는 **08-16에 사장님 계정으로 이관돼 더는 우리 것이 아니다.**
+   ⭐**남의 행을 경유하지 말고 이메일로 직접 잡는다.** 절차 정본 = **[[소개서-비번-소유권-런북]]**(대조 쿼리·확인 4종 포함).
 3. **수정 비번 경로 — ⚠️미귀속 소개서 전용이 됐다(08-06 2팀 #109)** — `updateMakerAction(slug, payload, password)`의
    비번 저장은 **`owner_user_id`가 비어 있을 때만** 허용된다. **주인이 붙는 순간 옛 관리비번은 무효**
    (귀속 후에도 비번 아는 쪽이 남의 소개서를 고칠 수 있던 구멍을 막음). 판정 순서 = **"주인 먼저, 비번 나중"**.
