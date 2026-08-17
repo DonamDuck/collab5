@@ -85,7 +85,17 @@ export function HomeFloatingCta() {
       //      (`data-home-end`는 page.tsx 마무리 CTA 섹션에 붙어 있다 — 지우면 이 가드가 죽는다)
       const end = document.querySelector("[data-home-end]");
       const endVisible = end ? end.getBoundingClientRect().top < window.innerHeight - 40 : false;
-      setShown(past && !endVisible);
+      // ③ 🛡️**다른 CTA가 화면에 있으면 숨는다**(08-17 대표 지적 — "스크롤하다 겹쳐 보인다").
+      //    08-16에 알약을 Kiwi로 바꾸면서 ③구좌 CTA와 **같은 색·같은 알약 모양**이 됐고,
+      //    스크롤 중 둘이 위아래로 포개졌다. **목적지가 달라서** 더 나쁘다(분석 게이트 vs `/register`).
+      //    🪤`endVisible`처럼 "지나갔나"로 보면 안 된다 — 이건 **화면 안에 있나**를 물어야 한다.
+      //      버튼은 높이가 있어서 위로 지나가는 동안에도 한참 보이기 때문이다.
+      //    📐위아래 40px 여유 — 알약이 버튼 바로 위에 스칠 듯 붙는 순간에도 이미 겹쳐 보인다.
+      const guardVisible = [...document.querySelectorAll("[data-cta-guard]")].some((el) => {
+        const r = el.getBoundingClientRect();
+        return r.bottom > -40 && r.top < window.innerHeight + 40;
+      });
+      setShown(past && !endVisible && !guardVisible);
     };
     onScroll(); // 새로고침으로 중간에서 시작한 경우 대비
     window.addEventListener("scroll", onScroll, { passive: true });

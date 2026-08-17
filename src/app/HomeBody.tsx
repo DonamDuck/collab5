@@ -265,7 +265,12 @@ export function HomeBody({
               왼쪽에 두고 결론만 가운데로 모은다. 제목까지 가운데로 보내면 ②와 축이 갈린다.
             🪤모바일에서는 세로로 쌓는다(`flex-col`). 나란히 두면 각 버튼이 170px 아래로 좁아져
               「브랜드 소개서 만들기」가 두 줄이 된다. */}
-        <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
+        {/* 🛡️`data-cta-guard` — 플로팅 알약이 이 줄을 덮지 않게(08-17).
+            ⭐여기가 ③보다 더 나쁘다 — 「브랜드 소개서 만들기」는 알약과 **목적지까지 같다**(`/register`).
+              같은 색·같은 뜻의 버튼이 포개지면 둘 다 손해다.
+            📐③과 이어서 가드를 걸면 알약이 **연속으로** 숨는다. 안 걸면 ③과 ④ 사이 250px에서
+              잠깐 떴다 다시 사라져 **깜빡임**이 된다(실측 @390: 2678~2950 구간). */}
+        <div data-cta-guard className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
           {/* ⚠️`<Link onClick={track}>`을 쓸 수 없다 — 이 파일은 **서버 컴포넌트**다.
               계측이 필요한 링크는 `TrackLink`(클라 조각)를 쓴다. */}
           <TrackLink
