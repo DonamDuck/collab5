@@ -252,6 +252,7 @@ export function HomeBody({
         //     거의 통째로 먹힌다. 그래서 이 구간에서만 풋터 가드를 무시하도록 예외를 준다.
         //   🔗판정은 `HomeFloatingCta`가 한다. 지우면 알약 노출 구간이 다시 하나로 돌아간다.
         data-pill-show
+      >
         <div className="mb-3 inline-flex items-center gap-1.5 rounded-pill bg-surface-soft px-3 py-1.5 sm:mb-3.5 sm:gap-2 sm:px-3.5 sm:py-2">
           <span className="h-2 w-2 rounded-pill bg-primary sm:h-2.5 sm:w-2.5" />
           <span className="text-[12px] font-bold tracking-wide text-mute sm:text-[13px]">
