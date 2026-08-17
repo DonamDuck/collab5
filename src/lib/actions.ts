@@ -225,16 +225,11 @@ export async function getPreviewDemoNoneAction(): Promise<{ maker: Maker; logoUr
   return { maker, logoUrl };
 }
 
-/** 등록 완료 얼럿 — 콜라보 분석 파트너 후보(본인 제외 최신 1곳). 없으면 null.
- *  ⚠️ 정렬이 최신순(07-31)이라 1등은 대개 방금 발행한 자기 자신 — 반드시 excludeSlug로 거른다.
- *  로그인 유저 전용 동선(리포트는 로그인+내 소개서 필요)이지만 액션 자체는 공개 데이터만 읽는다. */
-export async function getAnalysisPartnerAction(
-  excludeSlug: string
-): Promise<{ slug: string; name: string } | null> {
-  const list = await repo.listHomeMakers(2);
-  const p = list.find((m) => m.slug !== excludeSlug);
-  return p ? { slug: p.slug, name: p.name } : null;
-}
+/* 🗑 `getAnalysisPartnerAction` 폐지(08-17 대표 지시).
+ *  등록 완료 얼럿에서 「홈 목록 최신 1곳」을 자동으로 골라 "○○님과 콜라보 추천받기"로 띄우던 액션이다.
+ *  ⛔폐지 이유 = **우리가 상대를 고르면 안 된다.** 뽑히는 이름이 방금 발행한 사람과 아무 관련이 없어
+ *  "왜 얘가 나오지?"로 읽힌다(대표가 실제로 그렇게 물었다). 상대 고르기는 [콜라보 찾기]가 할 일.
+ *  → 지금 그 버튼은 「콜라보 추천 받기」로 `/search`에 보낸다(`src/app/register/page.tsx`). */
 
 /** 비회원이 완료 얼럿에서 뒤늦게 비번을 설정(소유자·기존 비번 없을 때만) */
 export async function setMakerPasswordAction(
