@@ -95,7 +95,28 @@ export function HomeFloatingCta() {
         const r = el.getBoundingClientRect();
         return r.bottom > -40 && r.top < window.innerHeight + 40;
       });
-      setShown(past && !endVisible && !guardVisible);
+      // ④ 🎈**알약이 다시 올라오는 두 번째 구간**(대표 지시 08-17: *"소개서 영역으로 내려가면
+      //    내려간 플로팅 버튼이 다시 올라오게. 구간이 2개가 되는 거지"*).
+      //    ⭐노출 구간이 이제 **둘**이다:
+      //      **A** = 히어로를 지나서 ③구좌 CTA가 화면에 들어오기 전까지
+      //      **B** = **④ 소개서 구좌가 화면에 들어와 있는 동안**(`data-pill-show`)
+      //    ⭐B가 필요한 이유 = ③에서 A가 끊긴 뒤, ④는 소개서 실물 7장을 넘겨 보며 마음이 움직이는
+      //      자리인데 **거기서 누를 것이 없었다**(08-17에 그 구좌의 등록 버튼을 뺐고, 그 역할을
+      //      알약이 받기로 했다). 버튼을 지운 게 아니라 **알약에 넘긴 것**이다.
+      //    🪤**풋터 가드보다 B가 우선한다**(`bandVisible || !endVisible`). 안 그러면 B가 안 열린다 —
+      //      실측 @375: 풋터 3650·화면 812라 **2878부터** `endVisible`이 켜지는데 ④는 2850~3650이다.
+      //      풋터의 첫 픽셀이 화면 아래 끝에 걸친 것뿐인데 구좌를 통째로 잃는 셈이었다.
+      //    📐여유 120px — 구좌가 화면에 **충분히** 들어와야 켠다. 끝자락 몇 px에 반응하면 경계에서
+      //      켜졌다 꺼졌다 한다.
+      //    🔒`guardVisible`(③)은 **AND로 남긴다** — B의 예외를 여기까지 넓히면 ③ CTA 위에 알약이
+      //      다시 포개진다(그게 08-17 오전에 고친 바로 그 버그다). 예외는 **풋터 가드에만** 준다.
+      const band = document.querySelector("[data-pill-show]");
+      const bandVisible = (() => {
+        if (!band) return false;
+        const r = band.getBoundingClientRect();
+        return r.bottom > 120 && r.top < window.innerHeight - 120;
+      })();
+      setShown(past && !guardVisible && (bandVisible || !endVisible));
     };
     onScroll(); // 새로고침으로 중간에서 시작한 경우 대비
     window.addEventListener("scroll", onScroll, { passive: true });

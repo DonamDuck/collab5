@@ -243,7 +243,15 @@ export function HomeBody({
         //     읽는 눈이 매 줄 자리를 다시 찾는다. 이것도 ③과 같은 규칙이다.
         className="home-rise mt-16 scroll-mt-[152px] text-left sm:mt-24 sm:text-center"
         style={{ animationDelay: "560ms" }}
-      >
+        // 🎈`data-pill-show` — **플로팅 알약이 다시 올라오는 두 번째 구간**(대표 지시 08-17).
+        //   ⭐이 구좌가 알약에게 가장 좋은 자리다. 소개서 실물 7장을 넘겨 보고 "이게 3분이면 된다고?"가
+        //     되는 지점이라, **마음이 움직인 그 자리에서** 등록 버튼이 손에 올라온다.
+        //     08-17에 여기 있던 등록 버튼을 뺀 것과 한 쌍이다 — 버튼을 지운 게 아니라 **알약에 넘긴 것**.
+        //   🪤이 표식이 없으면 알약이 여기서 안 뜬다. 풋터 감지점(`data-home-end`)이 **먼저** 걸리기 때문이다
+        //     — 실측 @375: 풋터 3650, 화면 812 → **2878부터 숨음**인데 이 구좌는 2850~3650이라
+        //     거의 통째로 먹힌다. 그래서 이 구간에서만 풋터 가드를 무시하도록 예외를 준다.
+        //   🔗판정은 `HomeFloatingCta`가 한다. 지우면 알약 노출 구간이 다시 하나로 돌아간다.
+        data-pill-show
         <div className="mb-3 inline-flex items-center gap-1.5 rounded-pill bg-surface-soft px-3 py-1.5 sm:mb-3.5 sm:gap-2 sm:px-3.5 sm:py-2">
           <span className="h-2 w-2 rounded-pill bg-primary sm:h-2.5 sm:w-2.5" />
           <span className="text-[12px] font-bold tracking-wide text-mute sm:text-[13px]">
@@ -272,9 +280,12 @@ export function HomeBody({
               같은 Kiwi여도 **목적지가 다르므로**(분석 게이트) 중복이 아니라 그대로 둔다.
             ⭐그리고 뺀 쪽이 이 구좌의 성격에 맞는다 — 여기는 "소개서가 뭔데?"에 **답하는** 자리다.
               아직 안 만든 사람은 더 보고 싶지 바로 만들고 싶지 않다(구경 → 결심). 결심은 알약이 받는다.
-            🛡️**`data-cta-guard`도 같이 뗐다.** 덮을 버튼이 없어졌으니 가드를 남기면 알약이
-              **이 구간 내내 이유 없이 숨는다** — 소개서를 보고 마음이 움직인 바로 그 자리에서.
-              ⚠️둘은 한 쌍이다. 등록 버튼을 되살린다면 가드도 같이 되살려라.
+            🛡️**`data-cta-guard`를 떼고 `data-pill-show`를 붙였다** — 뜻이 정반대로 뒤집혔다.
+              「알약아 여기선 숨어라」 → **「알약아 여기서 다시 올라와라」**(대표 지시 08-17).
+              ⭐그래서 등록 버튼이 사라진 게 손실이 아니다. **같은 일을 알약이 더 좋은 자리에서 한다** —
+                항상 엄지 옆에 있고, 실물 7장을 넘겨 보는 내내 따라온다.
+              ⚠️등록 버튼을 되살린다면 `data-pill-show`를 **`data-cta-guard`로 되돌려라.** 둘을 같이
+                두면 알약과 버튼이 같은 자리에서 포개진다.
             📐가운데 정렬은 부모 섹션(`sm:text-center`)이 하고, 이 줄의 `justify-center`가
               `flex` 안에서 마저 잡는다. 🪤`flex-col sm:flex-row`는 버튼이 하나가 돼도 남긴다 —
                 되살릴 때 다시 짜지 않아도 되고, 하나일 땐 어차피 티가 안 난다. */}
