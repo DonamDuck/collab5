@@ -116,7 +116,17 @@ export function HomeFloatingCta() {
         const r = band.getBoundingClientRect();
         return r.bottom > 120 && r.top < window.innerHeight - 120;
       })();
-      setShown(past && !guardVisible && (bandVisible || !endVisible));
+      // ⑤ 🚪**B구간에도 끝은 있다**(대표: *"스크롤 범위 넘어가면 다시 넘어가고"*).
+      //    🪤실측으로 잡은 구멍 — ④ 구좌가 **문서 끝보다 아래에서 끝난다**(@375: ④끝 3582 · 문서끝 3332).
+      //      그래서 `bandVisible`이 맨 아래까지 참으로 남아 **알약이 풋터를 덮은 채 멈춰 있었다.**
+      //      (구간은 `450~1800` / `2850~3300`으로 둘 다 나왔는데, 뒤가 안 닫힌 상태였다.)
+      //    → 풋터가 **깊이** 들어오면 B도 닫는다. `endVisible`(40px)은 A용이라 B에는 너무 예민하고,
+      //      여기서 쓰면 B가 아예 안 열린다(2878부터 켜진다). B에는 **300px**짜리를 따로 쓴다.
+      //      실측: 풋터 3650 기준 y>3138에서 닫힌다 → 마지막 ~200px은 풋터가 깨끗하게 보인다.
+      //    ⭐임계값이 둘인 게 이상해 보이지만 **묻는 게 다르다** — A는 "풋터가 보이기 시작했나",
+      //      B는 "이제 풋터를 읽는 자리인가"다. 하나로 합치면 둘 중 하나가 반드시 틀린다.
+      const endDeep = end ? end.getBoundingClientRect().top < window.innerHeight - 300 : false;
+      setShown(past && !guardVisible && !endDeep && (bandVisible || !endVisible));
     };
     onScroll(); // 새로고침으로 중간에서 시작한 경우 대비
     window.addEventListener("scroll", onScroll, { passive: true });
