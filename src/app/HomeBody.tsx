@@ -236,7 +236,12 @@ export function HomeBody({
             반대지만, **없어서 답을 못 하는 것**보다는 낫다는 게 대표 판단이다. */}
       <section
         id={PREVIEW_ANCHOR}
-        className="home-rise mt-16 scroll-mt-[152px] sm:mt-24"
+        // 📐**데스크톱에서만 가운데 정렬**(대표 지시 08-17) — ③구좌와 **같은 처리**다(`text-left sm:text-center`).
+        //   🔻08-16에 여기 「제목은 왼쪽, 결론(버튼)만 가운데」라고 적어뒀는데 **③과 축이 어긋나 있었다.**
+        //     ③이 이미 데스크톱 중앙정렬이라, ④만 왼쪽이면 연속한 두 섹션의 제목이 서로 다른 선에서 시작한다.
+        //   📱모바일은 왼쪽 그대로 — 좁은 화면에서 긴 한글 문장을 가운데로 두면 줄마다 시작점이 달라져
+        //     읽는 눈이 매 줄 자리를 다시 찾는다. 이것도 ③과 같은 규칙이다.
+        className="home-rise mt-16 scroll-mt-[152px] text-left sm:mt-24 sm:text-center"
         style={{ animationDelay: "560ms" }}
       >
         <div className="mb-3 inline-flex items-center gap-1.5 rounded-pill bg-surface-soft px-3 py-1.5 sm:mb-3.5 sm:gap-2 sm:px-3.5 sm:py-2">
@@ -251,7 +256,9 @@ export function HomeBody({
         <h2 className="break-keep text-[24px] font-bold leading-[1.35] tracking-[-0.02em] text-ink sm:text-[32px]">
           3분이면 브랜드 소개서가 완성돼요.
         </h2>
-        <p className="mt-2.5 max-w-[600px] break-keep text-[16px] leading-[1.65] text-body sm:mt-3 sm:text-[18px]">
+        {/* 📐`sm:mx-auto` — `max-w`가 걸린 **블록**이라 `text-center`만으로는 안 가운데로 간다
+            (가운데로 가는 건 「글자」이고, 상자는 그대로 왼쪽에 붙는다). ③의 부제와 같은 처리. */}
+        <p className="mt-2.5 max-w-[600px] break-keep text-[16px] leading-[1.65] text-body sm:mx-auto sm:mt-3 sm:text-[18px]">
           몇 가지만 알려주시면, AI가 소개에 필요한 내용을 먼저 정리해드려요.
         </p>
         <div className="mt-7">
@@ -261,12 +268,13 @@ export function HomeBody({
         {/* 🔘버튼 둘 — 옛 홈에도 있던 짝을 되살린다(대표 지시).
             ⭐순서가 중요하다: **예시 보기(보조) → 만들기(주)**. 이 구좌는 "소개서가 뭔데?"에 답하는
               자리라, 아직 안 만든 사람은 **더 보고 싶지** 바로 만들고 싶지 않다. 구경 → 결심 순서다.
-            📐가운데 정렬은 **버튼 줄만**이다(②구좌의 「브랜드 더 보기」와 같은 처리) — 섹션 제목은
-              왼쪽에 두고 결론만 가운데로 모은다. 제목까지 가운데로 보내면 ②와 축이 갈린다.
+            🔻~~가운데 정렬은 버튼 줄만~~ → **08-17 대표 지시로 섹션 전체가 데스크톱 중앙정렬**이다
+              (위 `<section>` 주석 참조). 버튼 줄의 `justify-center`는 그대로 둔다 — `flex` 컨테이너라
+              부모의 `text-center`가 아이템 배치에는 영향을 주지 않는다.
             🪤모바일에서는 세로로 쌓는다(`flex-col`). 나란히 두면 각 버튼이 170px 아래로 좁아져
-              「브랜드 소개서 만들기」가 두 줄이 된다. */}
+              「3분 만에 브랜드 소개서 등록하기」가 두 줄이 된다(08-17에 라벨이 길어져 여유가 더 줄었다). */}
         {/* 🛡️`data-cta-guard` — 플로팅 알약이 이 줄을 덮지 않게(08-17).
-            ⭐여기가 ③보다 더 나쁘다 — 「브랜드 소개서 만들기」는 알약과 **목적지까지 같다**(`/register`).
+            ⭐여기가 ③보다 더 나쁘다 — 「3분 만에 브랜드 소개서 등록하기」는 알약과 **목적지까지 같다**(`/register`).
               같은 색·같은 뜻의 버튼이 포개지면 둘 다 손해다.
             📐③과 이어서 가드를 걸면 알약이 **연속으로** 숨는다. 안 걸면 ③과 ④ 사이 250px에서
               잠깐 떴다 다시 사라져 **깜빡임**이 된다(실측 @390: 2678~2950 구간). */}
@@ -285,7 +293,11 @@ export function HomeBody({
             event="home_preview_register_click"
             className="inline-flex h-12 w-full items-center justify-center rounded-md bg-primary px-7 text-[16px] font-medium text-primary-on transition-opacity hover:opacity-90 sm:w-auto"
           >
-            브랜드 소개서 만들기
+            {/* 📝08-17 대표 지시: ~~「브랜드 소개서 만들기」~~ → **「3분 만에 브랜드 소개서 등록하기」**.
+                ⭐두 가지가 바뀌었다 — ①**소요 시간**이 버튼에 들어왔고(제목의 「3분」을 버튼이 이어받는다)
+                  ②**만들기 → 등록하기**. 「만들기」는 창작 노동으로 들리는데 실제로 하는 일은
+                  몇 가지를 알려주면 AI가 정리하는 것이라 **등록**이 사실에 가깝다. 플로팅 알약도 같이 바꿨다. */}
+            3분 만에 브랜드 소개서 등록하기
           </TrackLink>
         </div>
       </section>
