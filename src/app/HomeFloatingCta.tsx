@@ -106,16 +106,27 @@ export function HomeFloatingCta() {
       //    🪤**풋터 가드보다 B가 우선한다**(`bandVisible || !endVisible`). 안 그러면 B가 안 열린다 —
       //      실측 @375: 풋터 3650·화면 812라 **2878부터** `endVisible`이 켜지는데 ④는 2850~3650이다.
       //      풋터의 첫 픽셀이 화면 아래 끝에 걸친 것뿐인데 구좌를 통째로 잃는 셈이었다.
-      //    📐여유 120px — 구좌가 화면에 **충분히** 들어와야 켠다. 끝자락 몇 px에 반응하면 경계에서
-      //      켜졌다 꺼졌다 한다.
-      //    🔒`guardVisible`(③)은 **AND로 남긴다** — B의 예외를 여기까지 넓히면 ③ CTA 위에 알약이
-      //      다시 포개진다(그게 08-17 오전에 고친 바로 그 버그다). 예외는 **풋터 가드에만** 준다.
+      //
+      //    🔻**B의 시작점을 「④ 제목이 화면 절반을 지날 때」로 바꿨다**(대표 지시 08-17 2차).
+      //      🪤그 전엔 ③ 가드가 풀리는 순간(=③ CTA가 화면 밖으로 나갈 때) 열렸는데, 실측해 보니
+      //        그때 **제목은 이미 화면 꼭대기(위에서 53px)에 가 있었다.** 즉 「소개서 구좌에 들어서면
+      //        올라온다」가 아니라 「구좌를 거의 다 지나서야 올라온다」였다.
+      //        📏@375 실측 — 제목 top 2893 · ③가드 2691~2782
+      //          · 제목이 화면 50%를 지나는 y = **2487** ← 대표가 원한 지점
+      //          · ③가드가 화면에서 빠지는 y = **2822** ← 실제로 열리던 지점 (335px 늦다)
+      //      ⭐그래서 **B에서는 ③ 가드를 안 본다.** 겹침 걱정은 `guardVisible`이 아니라 **거리**로 푼다 —
+      //        y=2487에서 ③ CTA는 화면 위에서 204~295px에 있고 알약은 바닥이라 **445px 떨어져 있다.**
+      //        08-17 오전에 고친 사고는 둘이 **위아래로 맞붙은** 그림이었지, 한 화면에 있는 것 자체가
+      //        아니었다. 가드는 여전히 **A구간을 지킨다**(③ CTA가 바닥에서 올라올 때가 그 자리다).
+      //      ⚠️제목을 기준으로 삼은 이유 = 섹션 상자는 폰 목업까지 포함해 730px이라 「구좌가 보인다」가
+      //        너무 이르게 참이 된다. **사람이 무엇을 읽고 있는지는 제목이 정한다.**
+      //      🔗제목은 `[data-pill-show] h2` — 이 구좌의 유일한 h2다. 제목을 h2가 아닌 것으로 바꾸면
+      //        B가 안 열린다(그땐 여기 선택자도 같이 고쳐라).
       const band = document.querySelector("[data-pill-show]");
-      const bandVisible = (() => {
-        if (!band) return false;
-        const r = band.getBoundingClientRect();
-        return r.bottom > 120 && r.top < window.innerHeight - 120;
-      })();
+      const bandTitle = band?.querySelector("h2") ?? null;
+      const bandVisible = bandTitle
+        ? bandTitle.getBoundingClientRect().top < window.innerHeight * 0.5
+        : false;
       // ⑤ 🚪**B구간에도 끝은 있다**(대표: *"스크롤 범위 넘어가면 다시 넘어가고"*).
       //    🪤실측으로 잡은 구멍 — ④ 구좌가 **문서 끝보다 아래에서 끝난다**(@375: ④끝 3582 · 문서끝 3332).
       //      그래서 `bandVisible`이 맨 아래까지 참으로 남아 **알약이 풋터를 덮은 채 멈춰 있었다.**
@@ -126,7 +137,13 @@ export function HomeFloatingCta() {
       //    ⭐임계값이 둘인 게 이상해 보이지만 **묻는 게 다르다** — A는 "풋터가 보이기 시작했나",
       //      B는 "이제 풋터를 읽는 자리인가"다. 하나로 합치면 둘 중 하나가 반드시 틀린다.
       const endDeep = end ? end.getBoundingClientRect().top < window.innerHeight - 300 : false;
-      setShown(past && !guardVisible && !endDeep && (bandVisible || !endVisible));
+      // 🎛️**두 구간을 따로 세우고 OR로 합친다.** 한 줄짜리 AND 식으로 짜면 A의 조건(③ 가드)이 B에도
+      //    따라붙어 B가 늦게 열린다 — 바로 위에서 335px 늦던 그 문제다. 구간이 둘이면 식도 둘이어야 한다.
+      //      **A** = 히어로를 지났고 · ③ CTA가 화면에 없고 · 풋터가 안 보일 때
+      //      **B** = ④ 제목이 화면 절반을 지났고 · 풋터를 읽을 자리가 아닐 때
+      const bandA = past && !guardVisible && !endVisible;
+      const bandB = bandVisible && !endDeep;
+      setShown(bandA || bandB);
     };
     onScroll(); // 새로고침으로 중간에서 시작한 경우 대비
     window.addEventListener("scroll", onScroll, { passive: true });
