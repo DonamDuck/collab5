@@ -79,8 +79,17 @@ export function BrandGrid({ brands }: { brands: Maker[] }) {
   //     적었다가 정정했다. 진짜 원인은 **그 탭이 `document.hidden`이라 rAF가 한 프레임도 안 돈 것**
   //     이었다(실측: 500ms 동안 0프레임). 애니메이션은 숨은 탭에서 검증할 수 없다 —
   //     `requestAnimationFrame`을 스텁해 타임스탬프를 흘려 넣어야 로직을 확인할 수 있다.
-  //   ⭐트윈은 부작용도 없다 — 매 프레임 `scrollLeft`를 넣으면 브라우저는 즉시 스크롤로 처리하고,
-  //     끝난 뒤 스냅이 한 번 붙어 카드 경계에 정확히 선다(실측: 250까지 끌고 놓으면 313으로 붙음).
+  //   🚨🚨**트윈 중에는 스냅을 반드시 꺼야 한다**(대표 지적 08-17: *"뚝뚝 그냥 로드되는데?"*).
+  //     ⛔예전 주석에 "트윈은 부작용이 없다"고 적었는데 **틀렸다.** 그때 잰 건 드래그였고(드래그는
+  //       이미 스냅을 끄고 있다) 트윈은 잰 적이 없었다. 08-17 실측:
+  //         `snap-x mandatory` + `scrollLeft = 40` → 읽으면 **0** (즉시도, 150ms 뒤에도)
+  //         `snap: none`      + `scrollLeft = 40` → 40
+  //     ⭐즉 스냅이 켜져 있으면 브라우저는 **스냅 지점이 아닌 중간값을 통째로 거부한다.** 트윈이
+  //       60프레임을 넣어도 전부 제자리로 되돌려지다가, 절반을 넘는 순간 다음 칸으로 **한 번에** 튄다.
+  //       애니메이션이 죽은 게 아니라 **중간 프레임이 화면에 존재할 수 없었던 것**이다.
+  //     🪤이건 `behavior:"smooth"`로 바꿔도 안 낫는다 — 원인이 애니메이션 방식이 아니라 스냅이다.
+  //       (끝값은 괜찮다. 실측: max=948을 넣으면 947.5로 수용된다 — 마지막은 스냅 지점 취급이라
+  //        도착 후 스냅을 켜도 끌려가지 않는다.)
   const tween = useRef<number | null>(null);
   const slide = (dir: -1 | 1) => {
     const el = railRef.current;
@@ -110,12 +119,19 @@ export function BrandGrid({ brands }: { brands: Maker[] }) {
     }
     const DUR = 380;
     const t0 = performance.now();
+    el.style.scrollSnapType = "none"; // ← 이 줄이 없으면 트윈이 통째로 무시된다(위 주석 참조)
     const step = (now: number) => {
       const p = Math.min(1, (now - t0) / DUR);
       const eased = 1 - Math.pow(1 - p, 3); // ease-out cubic
       el.scrollLeft = from + (to - from) * eased;
-      if (p < 1) tween.current = requestAnimationFrame(step);
-      else tween.current = null;
+      if (p < 1) {
+        tween.current = requestAnimationFrame(step);
+      } else {
+        // 도착지는 정확히 스냅 지점(또는 끝)이라, 여기서 스냅을 되살려도 화면이 움직이지 않는다.
+        el.scrollLeft = to;
+        el.style.scrollSnapType = "";
+        tween.current = null;
+      }
     };
     tween.current = requestAnimationFrame(step);
   };
@@ -130,17 +146,34 @@ export function BrandGrid({ brands }: { brands: Maker[] }) {
   //   📱**마우스에만 건다**(`pointerType === "mouse"`). 터치·펜은 브라우저 기본 스크롤이 이미
   //     관성까지 붙어 훨씬 낫다 — 거기에 JS를 얹으면 오히려 뻑뻑해진다.
   //   🚨**스냅을 끄고 끌어야 한다.** `snap-mandatory`가 켜진 채로 `scrollLeft`를 매 프레임 넣으면
-  //     스냅이 손가락과 반대로 잡아당겨 덜덜거린다. 놓는 순간 다시 켜면 카드 경계에 붙는다.
-  const drag = useRef({ on: false, startX: 0, startLeft: 0, moved: 0 });
+  //     아예 안 먹는다(위 트윈 주석의 실측과 같은 이유 — 중간값이 거부된다).
+  //
+  //   🚨🚨**진짜로 드래그를 막고 있던 건 브라우저의 네이티브 드래그였다**(대표 지적 08-17:
+  //     *"클릭 후 드래그 아직 안 됨"*). 실측: 카드 안 `<img>`와 `<a>` 둘 다 `draggable === true`다.
+  //     ⭐마우스를 누른 채 움직이면 브라우저가 **이미지/링크 끌기**를 시작하고, 그 순간
+  //       **`pointercancel`이 날아와 우리 드래그가 그 자리에서 끝난다.** 고스트 이미지만 따라다니고
+  //       레일은 1px도 안 움직인다 — 카드가 통째로 링크+이미지라 레일 어디를 잡아도 걸린다.
+  //     🪤`pointermove`에서의 `preventDefault()`로는 못 막는다. 네이티브 드래그는 `dragstart`에서
+  //       시작하므로 **`dragstart`를 막아야** 한다(레일에 걸면 자식에서 버블링돼 전부 덮인다).
+  //     🪤`setPointerCapture`도 같이 건다 — 없으면 커서가 레일 밖(위/아래)으로 조금만 나가도
+  //       `pointermove`가 끊겨 드래그가 중간에 죽는다. 캡처하면 창 밖까지 따라온다.
+  //     🪤`user-select: none` — 안 걸면 끄는 동안 카드 글자가 파랗게 선택돼 고장난 것처럼 보인다.
+  const drag = useRef({ on: false, startX: 0, startLeft: 0, moved: 0, id: -1 });
 
   const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     if (e.pointerType !== "mouse" || e.button !== 0) return;
     const el = railRef.current;
     if (!el) return;
     if (tween.current !== null) cancelAnimationFrame(tween.current); // 화살표 트윈 중이면 가로챈다
-    drag.current = { on: true, startX: e.clientX, startLeft: el.scrollLeft, moved: 0 };
+    drag.current = { on: true, startX: e.clientX, startLeft: el.scrollLeft, moved: 0, id: e.pointerId };
+    try {
+      el.setPointerCapture(e.pointerId);
+    } catch {
+      // 캡처는 있으면 좋은 것일 뿐이다 — 실패해도 레일 안에서는 그대로 끌린다.
+    }
     el.style.scrollSnapType = "none";
     el.style.cursor = "grabbing";
+    el.style.userSelect = "none";
   };
 
   const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
@@ -149,17 +182,26 @@ export function BrandGrid({ brands }: { brands: Maker[] }) {
     const dx = e.clientX - drag.current.startX;
     drag.current.moved = Math.max(drag.current.moved, Math.abs(dx));
     el.scrollLeft = drag.current.startLeft - dx;
-    // 🪤`preventDefault`가 필요하다 — 안 그러면 카드 안 사진·글자가 **브라우저 기본 드래그**(이미지
-    //   끌기·텍스트 선택)로 잡혀서 레일 대신 고스트 이미지가 따라다닌다.
     e.preventDefault();
   };
 
   const endDrag = () => {
     const el = railRef.current;
     if (!el) return;
+    if (drag.current.id >= 0) {
+      try {
+        el.releasePointerCapture(drag.current.id);
+      } catch {
+        // 이미 풀렸으면 그만이다.
+      }
+      drag.current.id = -1;
+    }
     drag.current.on = false;
+    // 스냅을 되살리는 순간 브라우저가 가장 가까운 카드 경계로 붙여 준다 — 손이 어중간한 데서
+    // 놓아도 카드가 반쯤 잘린 채로 서지 않는다.
     el.style.scrollSnapType = "";
     el.style.cursor = "";
+    el.style.userSelect = "";
   };
 
   // 🚫끌고 나서 손을 뗄 때 **카드 링크가 열리면 안 된다.** 캡처 단계에서 막는다 —
@@ -192,6 +234,9 @@ export function BrandGrid({ brands }: { brands: Maker[] }) {
         onPointerUp={endDrag}
         onPointerLeave={endDrag}
         onPointerCancel={endDrag}
+        // 🚨브라우저 기본 「이미지·링크 끌기」를 끈다. 이게 드래그가 안 되던 진짜 원인이다
+        //    (자세한 실측은 위 `drag` 주석). 자식에서 버블링되므로 레일 한 곳이면 카드 전부 덮인다.
+        onDragStart={(e) => e.preventDefault()}
         onClickCapture={onClickCapture}
         // 🖐️`sm:cursor-grab` — 데스크톱에서만 "끌 수 있다"를 커서로 알린다. 드래그는 보이지 않는
         //    기능이라 커서가 유일한 힌트다(끄는 중 `grabbing`은 위 핸들러가 직접 넣는다).
