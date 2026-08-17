@@ -265,20 +265,20 @@ export function HomeBody({
           <PreviewPhones />
         </div>
 
-        {/* 🔘버튼 둘 — 옛 홈에도 있던 짝을 되살린다(대표 지시).
-            ⭐순서가 중요하다: **예시 보기(보조) → 만들기(주)**. 이 구좌는 "소개서가 뭔데?"에 답하는
-              자리라, 아직 안 만든 사람은 **더 보고 싶지** 바로 만들고 싶지 않다. 구경 → 결심 순서다.
-            🔻~~가운데 정렬은 버튼 줄만~~ → **08-17 대표 지시로 섹션 전체가 데스크톱 중앙정렬**이다
-              (위 `<section>` 주석 참조). 버튼 줄의 `justify-center`는 그대로 둔다 — `flex` 컨테이너라
-              부모의 `text-center`가 아이템 배치에는 영향을 주지 않는다.
-            🪤모바일에서는 세로로 쌓는다(`flex-col`). 나란히 두면 각 버튼이 170px 아래로 좁아져
-              「3분 만에 브랜드 소개서 등록하기」가 두 줄이 된다(08-17에 라벨이 길어져 여유가 더 줄었다). */}
-        {/* 🛡️`data-cta-guard` — 플로팅 알약이 이 줄을 덮지 않게(08-17).
-            ⭐여기가 ③보다 더 나쁘다 — 「3분 만에 브랜드 소개서 등록하기」는 알약과 **목적지까지 같다**(`/register`).
-              같은 색·같은 뜻의 버튼이 포개지면 둘 다 손해다.
-            📐③과 이어서 가드를 걸면 알약이 **연속으로** 숨는다. 안 걸면 ③과 ④ 사이 250px에서
-              잠깐 떴다 다시 사라져 **깜빡임**이 된다(실측 @390: 2678~2950 구간). */}
-        <div data-cta-guard className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
+        {/* 🔘**버튼 하나 — 「브랜드 소개서 예시」뿐이다.**
+            🔻08-17 대표 확정으로 ~~「3분 만에 브랜드 소개서 등록하기」~~를 **뺐다**(08-16에 되살린 짝의 절반).
+            ⭐뺀 이유 = **이 지면에서 유일하게 진짜 중복이던 버튼**이라서다. 플로팅 알약과
+              문구(「3분 만에 소개서 등록하기」)도 목적지(`/register`)도 같았다. 반면 ③구좌 CTA는
+              같은 Kiwi여도 **목적지가 다르므로**(분석 게이트) 중복이 아니라 그대로 둔다.
+            ⭐그리고 뺀 쪽이 이 구좌의 성격에 맞는다 — 여기는 "소개서가 뭔데?"에 **답하는** 자리다.
+              아직 안 만든 사람은 더 보고 싶지 바로 만들고 싶지 않다(구경 → 결심). 결심은 알약이 받는다.
+            🛡️**`data-cta-guard`도 같이 뗐다.** 덮을 버튼이 없어졌으니 가드를 남기면 알약이
+              **이 구간 내내 이유 없이 숨는다** — 소개서를 보고 마음이 움직인 바로 그 자리에서.
+              ⚠️둘은 한 쌍이다. 등록 버튼을 되살린다면 가드도 같이 되살려라.
+            📐가운데 정렬은 부모 섹션(`sm:text-center`)이 하고, 이 줄의 `justify-center`가
+              `flex` 안에서 마저 잡는다. 🪤`flex-col sm:flex-row`는 버튼이 하나가 돼도 남긴다 —
+                되살릴 때 다시 짜지 않아도 되고, 하나일 땐 어차피 티가 안 난다. */}
+        <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
           {/* ⚠️`<Link onClick={track}>`을 쓸 수 없다 — 이 파일은 **서버 컴포넌트**다.
               계측이 필요한 링크는 `TrackLink`(클라 조각)를 쓴다. */}
           <TrackLink
@@ -288,17 +288,13 @@ export function HomeBody({
           >
             브랜드 소개서 예시
           </TrackLink>
-          <TrackLink
-            href="/register"
-            event="home_preview_register_click"
-            className="inline-flex h-12 w-full items-center justify-center rounded-md bg-primary px-7 text-[16px] font-medium text-primary-on transition-opacity hover:opacity-90 sm:w-auto"
-          >
-            {/* 📝08-17 대표 지시: ~~「브랜드 소개서 만들기」~~ → **「3분 만에 브랜드 소개서 등록하기」**.
-                ⭐두 가지가 바뀌었다 — ①**소요 시간**이 버튼에 들어왔고(제목의 「3분」을 버튼이 이어받는다)
-                  ②**만들기 → 등록하기**. 「만들기」는 창작 노동으로 들리는데 실제로 하는 일은
-                  몇 가지를 알려주면 AI가 정리하는 것이라 **등록**이 사실에 가깝다. 플로팅 알약도 같이 바꿨다. */}
-            3분 만에 브랜드 소개서 등록하기
-          </TrackLink>
+          {/* 🔖되살리려면 — 아래를 이 자리에 되돌리고, 위 `<div>`에 `data-cta-guard`를 다시 붙인다.
+              (라벨은 08-17 대표 확정판 그대로다. `home_preview_register_click` 이벤트도 같이 돌아온다.)
+              <TrackLink href="/register" event="home_preview_register_click"
+                className="inline-flex h-12 w-full items-center justify-center rounded-md bg-primary
+                  px-7 text-[16px] font-medium text-primary-on transition-opacity hover:opacity-90 sm:w-auto">
+                3분 만에 브랜드 소개서 등록하기
+              </TrackLink> */}
         </div>
       </section>
 
