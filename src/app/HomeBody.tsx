@@ -12,6 +12,8 @@
 import type { MagazineListItem, Maker } from "@/lib/types";
 import { HomeMenuBar } from "./HomeMenuBar";
 import { HomeMagazineBanner, type BannerBg } from "./HomeMagazineBanner";
+import { HomeBannerCarousel } from "./HomeBannerCarousel";
+import { HomeConciergeSlide } from "./HomeConciergeSlide";
 import { HomeIdeaCta, IDEA_CTA_ANCHOR } from "./HomeIdeaCta";
 import { PREVIEW_ANCHOR } from "./HomeMenuBar";
 import { HomeFloatingCta } from "./HomeFloatingCta";
@@ -51,6 +53,9 @@ export function HomeBody({
             배너 → 슬로건 → 상품 카드.
           ⚠️`home-rise`(온로드 라이즈)를 안 태운다 — 페이지 최상단이라 애니메이션이 끝나기 전에
             사람이 이미 보고 있다. 첫 화면 요소는 처음부터 떠 있어야 한다. */}
+      {/* 🎠**슬라이드 2장**(대표 지시 08-19) — ①매거진 ②소개서 컨시어지.
+          배경(카본)은 캐러셀이 깔고 슬라이드는 내용만 바꾼다. 자세한 건 HomeBannerCarousel 주석. */}
+      <HomeBannerCarousel>
       {article && (
         // 🎨배경은 **`bannerBg` prop**이 정한다 — `page.tsx`가 확정값을 넘긴다.
         //    **확정 = 카본 #0c0c0c**(대표 08-16 2차, 홈 full 상태로 비교 후). 아래는 그 경위다.
@@ -61,6 +66,8 @@ export function HomeBody({
         //    🔁다른 안: `kiwi` · `photo`(커버 블러) · `soft`(중성 그레이) · `ink` — 타입에 다 살아 있다.
         <HomeMagazineBanner article={article} isFirstIssue={isFirstIssue} bg={bannerBg} />
       )}
+        <HomeConciergeSlide />
+      </HomeBannerCarousel>
 
       {/* 📐**본문 폭 1320**(08-16 3차, 대표: *"우리 홈 좌우 패딩 너무 심해"*).
           🔬실측 @1440 — 원티드 좌우여백 **72**(콘텐츠 1296) · 와사비 **80**(1280) · 우리는 **240**(960)이었다.
