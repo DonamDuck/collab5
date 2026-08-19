@@ -192,6 +192,39 @@ prod press 15항목을 전수 대조한 결과 **창작은 0건**이었지만, �
 A1 그리드 열거 → A2 alt 1차 선별 → A3 내부 API 전문 조회 → A4 웹 검색 합산 → A5 후보 랭킹
 ```
 
+**🆕 A0 — 무엇을 받느냐로 방법이 갈린다** (2026-08-19 엘엠피작업실 실측 · 2팀)
+
+| 대상 | 방법 | 왜 |
+|---|---|---|
+| **피드 전량** | ⭕**API 페이지 넘김**(A1-alt) | 208건을 **요청 ~20번**에 캡션까지. 스크롤도, A3의 글당 1콜(=208콜)도 안 쓴다 |
+| **하이라이트** | ⭕`highlights_tray` → `reels_media` (§A5) | 목록을 통째로 준다 — 스크롤 자체가 불필요 |
+| **태그된 게시물** | ⭕`usertags/{uid}/feed/` (⚠️CSRF 필요) | 그리드에 없는 **「남이 연 행사」**가 여기 있다(§A3-b) |
+
+**🆕 A1-alt — 피드 전량은 페이지 넘김으로** (2026-08-19 실측 · 208/209건 · 2년 6개월치)
+```js
+// ⭐uid 없이 username만으로 된다. 캡션·taken_at·usertags·coauthor_producers가 한 번에 온다.
+'/api/v1/feed/user/{handle}/username/?count=33' + (cursor ? '&max_id=' + encodeURIComponent(cursor) : '')
+// 응답: items[] · more_available · next_max_id → next_max_id를 cursor에 넣어 반복. 요청 간 1.5초.
+```
+- ⭐**이어받기**: 페이지 상한에 걸려 끊겼으면 **마지막 글의 shortcode를 base64 디코드해** `{pk}_{uid}` 커서를 만든다
+  (알파벳 `A-Za-z0-9-_`, 64진 누적). **요청 0번으로 재개**된다 — 처음부터 다시 돌리지 마라.
+- 🚨**`/api/v1/users/web_profile_info/`가 400을 뱉을 수 있다**
+  (`Asset asset://laser.provider/ig_business_category_subvertical has been deleted`). **인스타 쪽 문제라 우리가 못 고친다** —
+  차단으로 오해하지 말고, uid가 필요하면 위 피드 응답의 `items[0].user.pk`에서 꺼내라.
+- 🚨**태그 피드는 `x-csrftoken`이 없으면 403**(`CSRF token missing or incorrect`). 쿠키에서 꺼내 헤더에 넣는다:
+  `{'x-ig-app-id':'936619743392459', 'x-csrftoken': csrf, 'x-requested-with':'XMLHttpRequest'}`
+- 🪤**도구가 긴 JSON 반환을 막는다** — `[BLOCKED: Cookie/query string data]`. 우리 데이터가 아니라 **길이·모양** 때문이다.
+  → 클립보드 버튼을 심고 **실제 클릭**(제스처 없으면 `writeText`가 조용히 실패) → `LANG=en_US.UTF-8 pbpaste`.
+
+⚠️**아래 A1(스크롤 수집)을 폐기하는 게 아니다.** 목록이 짧거나 API가 막힌 경우엔 여전히 쓴다
+(1팀 08-18 전종원 하이라이트 67·45장 누락 0). 다만 **긴 피드 그리드에서는 아래 함정을 먼저 알아야 한다.**
+
+🚨🆕**「3회 연속 무증가 = 끝」이 바닥 스피너가 도는 중에도 걸린다** (2026-08-19 엘엠피작업실)
+뷰포트 0.6배씩 내려가는 방법 **그대로** 돌렸는데 **209건 중 24건**에서 종료 판정이 났다.
+문서 높이도 안 늘어(3880px 고정) "바닥에 닿았다"로 읽혔지만, 실제로는 다음 묶음을 불러오는 중이었다.
+⭐**24/209라는 숫자가 이 경고의 전부다** — 08-02의 33/141과 달리 이번엔 **처방(0.6배씩)을 지켰는데도** 끊겼다.
+→ 긴 피드는 **A1-alt를 먼저**, 스크롤은 API가 막혔을 때의 대비책으로.
+
 **A1 — 프로필 그리드에서 permalink 전수 수집**
 `instagram.com/{handle}` 을 대표 세션 탭에서 열고, 바닥까지 자동 스크롤하며 `a[href*="/p/"]`를 누적한다.
 Set으로 모으고 **길이가 3회 연속 안 늘면 종료**(무한 스크롤 끝 판정).
