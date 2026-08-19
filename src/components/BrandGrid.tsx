@@ -155,8 +155,16 @@ export function BrandGrid({ brands }: { brands: Maker[] }) {
   //       레일은 1px도 안 움직인다 — 카드가 통째로 링크+이미지라 레일 어디를 잡아도 걸린다.
   //     🪤`pointermove`에서의 `preventDefault()`로는 못 막는다. 네이티브 드래그는 `dragstart`에서
   //       시작하므로 **`dragstart`를 막아야** 한다(레일에 걸면 자식에서 버블링돼 전부 덮인다).
-  //     🪤`setPointerCapture`도 같이 건다 — 없으면 커서가 레일 밖(위/아래)으로 조금만 나가도
-  //       `pointermove`가 끊겨 드래그가 중간에 죽는다. 캡처하면 창 밖까지 따라온다.
+  //     🚨🚨`setPointerCapture`는 **누를 때 걸면 안 된다 — 카드 링크가 죽는다**(대표 제보 08-17:
+  //       *"캐러셀 브랜드 카드 클릭해도 안 가져"*). 포인터 캡처가 걸리면 이후 포인터 이벤트의
+  //       타깃이 캡처 요소(=레일)로 바뀌고, `click`은 누른 곳과 뗀 곳의 **공통 조상**에 떨어진다.
+  //       즉 `<a>`가 아니라 레일 `<div>`가 클릭을 받아 **내비게이션이 아예 일어나지 않는다.**
+  //       📏prod 실측: `pointerdown → IMG` / `pointerup → DIV` / `click(막힘=false) → DIV`
+  //         ⭐`막힘=false`가 핵심 단서였다 — 아래 `onClickCapture`가 막은 게 아니라
+  //           **링크에 닿지도 못한 것**이다. 「클릭이 안 먹는다」의 원인이 둘로 갈리는 자리다.
+  //     👉그래서 **움직인 게 확인된 뒤에** 건다(임계값 5px, 클릭 판정과 같은 값).
+  //       단순 클릭은 캡처가 안 걸려 `<a>`가 정상 동작하고, 진짜 드래그일 때만 캡처가 붙어
+  //       커서가 레일 밖으로 나가도 안 끊긴다. 두 목적이 같이 선다.
   //     🪤`user-select: none` — 안 걸면 끄는 동안 카드 글자가 파랗게 선택돼 고장난 것처럼 보인다.
   const drag = useRef({ on: false, startX: 0, startLeft: 0, moved: 0, id: -1 });
 
@@ -165,12 +173,8 @@ export function BrandGrid({ brands }: { brands: Maker[] }) {
     const el = railRef.current;
     if (!el) return;
     if (tween.current !== null) cancelAnimationFrame(tween.current); // 화살표 트윈 중이면 가로챈다
-    drag.current = { on: true, startX: e.clientX, startLeft: el.scrollLeft, moved: 0, id: e.pointerId };
-    try {
-      el.setPointerCapture(e.pointerId);
-    } catch {
-      // 캡처는 있으면 좋은 것일 뿐이다 — 실패해도 레일 안에서는 그대로 끌린다.
-    }
+    // ⛔여기서 `setPointerCapture`를 부르지 마라(위 🚨 참조). `id: -1` = 아직 안 잡았다는 뜻이다.
+    drag.current = { on: true, startX: e.clientX, startLeft: el.scrollLeft, moved: 0, id: -1 };
     el.style.scrollSnapType = "none";
     el.style.cursor = "grabbing";
     el.style.userSelect = "none";
@@ -181,6 +185,17 @@ export function BrandGrid({ brands }: { brands: Maker[] }) {
     if (!drag.current.on || !el) return;
     const dx = e.clientX - drag.current.startX;
     drag.current.moved = Math.max(drag.current.moved, Math.abs(dx));
+    // 🖐️**여기서 처음 캡처한다** — 5px을 넘어야 「끌기」다. 그 전엔 클릭일 수 있으므로 안 잡는다.
+    //    (임계값을 아래 `onClickCapture`와 같은 5로 맞춘다. 두 값이 갈리면 「캡처는 됐는데 클릭은
+    //     안 막힌」 구간이 생겨 끌고 놓았는데 링크가 열린다.)
+    if (drag.current.id < 0 && drag.current.moved > 5) {
+      try {
+        el.setPointerCapture(e.pointerId);
+        drag.current.id = e.pointerId;
+      } catch {
+        // 캡처는 있으면 좋은 것일 뿐이다 — 실패해도 레일 안에서는 그대로 끌린다.
+      }
+    }
     el.scrollLeft = drag.current.startLeft - dx;
     e.preventDefault();
   };
