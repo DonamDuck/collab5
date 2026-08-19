@@ -25,6 +25,15 @@ import { TrackLink } from "@/components/TrackLink";
 /** 이보다 적으면 브랜드 구좌를 아예 안 그린다(디자인팀 07-27 규칙 승계). */
 const MIN_GRID = 3;
 
+/** 🎠**2번 배너 슬라이드(소개서 컨시어지) 스위치.** 현재 **꺼짐**(대표 지시 08-19).
+ *  🔻만들어서 prod에 한 번 올렸다가 대표가 내렸다 — *"색상, 타이틀, 이미지 같은걸 고민하고서 하고 싶어"*.
+ *    ⛔지운 게 아니다. `HomeConciergeSlide.tsx`는 그대로 있고 **이 값을 `true`로 되돌리면 다시 뜬다.**
+ *  ⭐끄면 예전 화면과 **완전히 같아진다** — 슬라이드가 1장이면 캐러셀이 자동 넘김도 점도 안 만든다
+ *    (`HomeBannerCarousel`의 `n < 2` 분기). 배경도 같은 카본이라 겹쳐도 티가 안 난다.
+ *  📌다시 켤 때 대표가 정해야 할 것 셋 = **색(카본 유지? 다른 면색?) · 제목 문안 · 오른쪽 그림.**
+ *    그림은 `<HomeConciergeSlide image={{ src, alt }} />`로 넘기면 1번 슬라이드의 커버 자리에 들어간다. */
+const SHOW_CONCIERGE_SLIDE = false;
+
 export function HomeBody({
   brands,
   article,
@@ -66,7 +75,7 @@ export function HomeBody({
         //    🔁다른 안: `kiwi` · `photo`(커버 블러) · `soft`(중성 그레이) · `ink` — 타입에 다 살아 있다.
         <HomeMagazineBanner article={article} isFirstIssue={isFirstIssue} bg={bannerBg} />
       )}
-        <HomeConciergeSlide />
+        {SHOW_CONCIERGE_SLIDE && <HomeConciergeSlide />}
       </HomeBannerCarousel>
 
       {/* 📐**본문 폭 1320**(08-16 3차, 대표: *"우리 홈 좌우 패딩 너무 심해"*).
