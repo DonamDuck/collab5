@@ -15,7 +15,6 @@ import { HomeMagazineBanner, type BannerBg } from "./HomeMagazineBanner";
 import { HomeIdeaCta, IDEA_CTA_ANCHOR } from "./HomeIdeaCta";
 import { PREVIEW_ANCHOR } from "./HomeMenuBar";
 import { HomeFloatingCta } from "./HomeFloatingCta";
-import { HomeConciergeBanner } from "./HomeConciergeBanner";
 import { BrandGrid } from "@/components/BrandGrid";
 import { SampleReportCard } from "@/components/SampleReport";
 import { PreviewPhones } from "./PreviewPhones";
@@ -310,15 +309,6 @@ export function HomeBody({
               </TrackLink> */}
         </div>
       </section>
-
-      {/* ═══ ⑤ 컨시어지 배너 — 「소개서, 저희가 만들어드릴게요」(대표 지시 08-19) ══════════
-          ⭐**④ 바로 아래가 맞는 자리다.** 소개서 실물을 다 넘겨 본 직후 마음이 둘로 갈린다 —
-            "나도 만들어야지"는 플로팅 알약(/register)이 받고, **"이쁜데 나는 못 쓰겠다"는
-            지금까지 홈에 답이 없었다.** 이 배너가 그 절반을 받는다.
-          🔗목적지는 구글폼(컨시어지 신청)이라 알약(/register)과 **가는 곳이 다르다** — 08-17에 세운
-            중복 판별 기준(「눌렀을 때 같은 데로 가나」)으로 중복이 아니다.
-          ⚠️위로 옮기지 말 것 — 알약이 아직 떠 있는 구간에 Kiwi 버튼이 하나 더 생긴다(컴포넌트 주석 참조). */}
-      <HomeConciergeBanner />
 
       {/* 🔻08-16 「지금 바로 콜라보를 시작해보세요 :)」 마무리 CTA 섹션 **삭제**(대표 지시).
           ⭐없앤 게 맞는 이유 — 바로 위 「콜라보 아이디어 추천 받기」가 이미 이 페이지의 결론이다.

@@ -141,32 +141,9 @@ export function HomeFloatingCta() {
       //    따라붙어 B가 늦게 열린다 — 바로 위에서 335px 늦던 그 문제다. 구간이 둘이면 식도 둘이어야 한다.
       //      **A** = 히어로를 지났고 · ③ CTA가 화면에 없고 · 풋터가 안 보일 때
       //      **B** = ④ 제목이 화면 절반을 지났고 · 풋터를 읽을 자리가 아닐 때
-      // ⑥ 🐱**컨시어지 배너에서 알약이 물러난다**(08-19).
-      //    🪤이건 예측이 아니라 실측으로 잡은 것이다. 배너를 ④ 아래에 넣고 나서 「배너가 뜰 땐 풋터
-      //      가드가 이미 걸렸을 것」이라고 주석에 적었는데, 재 보니 **틀렸다** — 배너를 넣은 만큼
-      //      풋터가 아래로 밀려서 `endDeep`이 늦게 켜졌다(@1280: 배너가 화면 한복판인데 알약 opacity 1).
-      //      ⭐**콘텐츠를 넣으면 그 아래를 기준으로 잡은 판정이 전부 밀린다.** 거리로 잡은 임계값은
-      //        문서 길이가 바뀔 때마다 다시 재야 한다.
-      //    ⭐물러나는 게 맞는 이유 — 둘은 같은 색(Kiwi)에 같은 모양이지만 **가는 곳이 다르다**
-      //      (알약 `/register` = 내가 직접 만든다 / 배너 = 우리가 대신 만들어드린다). 한 화면에
-      //      나란히 두면 "눌러라"가 반으로 갈린다. 순서로 푼다 — ④를 보는 동안은 알약, 배너에
-      //      들어서면 배너.
-      //    🔗표식은 `data-pill-end`. `data-cta-guard`를 재활용하지 않은 이유 = 그건 **A구간 전용**이라
-      //      B에서 같이 보면 ③ 가드까지 딸려 들어와 B가 다시 늦게 열린다(08-17에 335px 늦던 그 문제).
-      //      구간이 다르면 표식도 다르다.
-      const pillEnd = document.querySelector("[data-pill-end]");
-      const pillEndVisible = pillEnd
-        ? pillEnd.getBoundingClientRect().top < window.innerHeight - 80
-        : false;
       const bandA = past && !guardVisible && !endVisible;
       const bandB = bandVisible && !endDeep;
-      // 🐱`pillEndVisible`은 **구간 조건이 아니라 커튼**이라 OR 밖에 건다.
-      //    🪤B에만 걸었다가 실측에서 안 먹었다 — 배너가 떠도 알약이 안 내려갔다. 범인은 **A**였다.
-      //      A는 `!endVisible`(풋터 40px)로만 닫히는데 배너를 넣어 풋터가 밀리는 바람에 A가 페이지
-      //      아래쪽까지 켜져 있었고, B를 닫아도 A가 그대로 이어받았다.
-      //      ⭐**「구간이 둘이면 식도 둘」의 뒷면** — 두 구간에 다 해당하는 규칙은 반대로 식 하나여야 한다.
-      //        한쪽에만 걸면 다른 쪽이 이어받는다.
-      setShown((bandA || bandB) && !pillEndVisible);
+      setShown(bandA || bandB);
     };
     onScroll(); // 새로고침으로 중간에서 시작한 경우 대비
     window.addEventListener("scroll", onScroll, { passive: true });
