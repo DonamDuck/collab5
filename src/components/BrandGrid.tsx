@@ -21,8 +21,12 @@ import Link from "next/link";
 import { COLLAB_TYPES, type CollabType, type Maker } from "@/lib/types";
 import { track } from "@/lib/track";
 
-/** 캐러셀에 그릴 최대 개수(대표 지시 08-16). 뒤는 출구 둘이 받는다. */
-const CAROUSEL_LIMIT = 6;
+/** 캐러셀에 그릴 최대 개수. ~~6~~ → **7**(대표 지시 08-20). 뒤는 출구 둘이 받는다.
+ *  ⭐올린 이유 — 홈 순서(`page.tsx` `HOME_ORDER`)에 전종원 작가를 넣자 6칸이 꽉 차서
+ *    캔앤코르크가 레일 밖으로 밀렸다. 순서를 다투는 대신 **칸을 하나 늘렸다**(대표 판단).
+ *  레일이 가로 스크롤이라 칸 수는 화면을 안 깨뜨린다 — 다만 무한정 늘릴 자리는 아니다
+ *  (여기가 커지면 「모두 보기」 출구가 할 일이 없어진다). */
+const CAROUSEL_LIMIT = 7;
 
 /** ⏭️**C2 전환 스위치.** `true`로 바꾸면 레일 위에 콜라보 유형 칩이 붙는다.
  *  누르면 `/search?type=팝업` 꼴로 **그 유형으로 좁혀진 검색**이 열린다(서버가 파라미터를 읽는다 —

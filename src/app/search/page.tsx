@@ -6,6 +6,7 @@ import { repo } from "@/lib/repo";
 import { COLLAB_TYPES, type CollabType } from "@/lib/types";
 import { SearchClient } from "./SearchClient";
 import { SearchIdeaGuide } from "./SearchIdeaGuide";
+import { dailyOrder, dailySpotlights, todaySeed } from "./daily";
 
 // 🆕08-07 — 이 페이지엔 제목이 없어 검색 결과·탭에 **홈 제목이 그대로** 떴다.
 // ⚠️`alternates`는 더 중요하다: 루트 layout의 `canonical: "/"`가 자식에 상속되므로,
@@ -41,9 +42,18 @@ export default async function SearchPage({
 }) {
   const { type } = await searchParams;
   const all = await repo.searchMakers("");
+  // 「오늘의 순서」 — 서버에서 한 번 섞어 내려보낸다(근거·주의는 daily.ts 머리말).
+  // ⭐서버에서 섞는 게 중요하다: 클라에서 섞으면 서버가 그린 HTML과 첫 렌더가 어긋나 하이드레이션이 깨진다.
+  //   이 페이지는 이미 `force-dynamic`이라 매 요청 서버에서 도니 공짜다.
+  const seed = todaySeed();
+  const ordered = dailyOrder(all, seed);
   return (
     <>
-      <SearchClient all={all} initialTypes={parseTypes(type)} />
+      <SearchClient
+        all={ordered}
+        initialTypes={parseTypes(type)}
+        spotlights={dailySpotlights(ordered, seed)}
+      />
       {/* 홈에서 「콜라보 아이디어 추천 받기」를 누르고 온 사람에게만 뜨는 안내 시트(08-16).
           신호는 `?guide=idea` — 상세는 SearchIdeaGuide.tsx.
           🚨`<Suspense>` 필수 — 이 컴포넌트가 `useSearchParams`를 쓴다. 감싸지 않으면 Next가
