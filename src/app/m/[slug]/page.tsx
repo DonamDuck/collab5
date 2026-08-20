@@ -127,12 +127,17 @@ export default async function MakerPage({
   searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ banner?: string }>;
+  searchParams: Promise<{ banner?: string; film?: string }>;
 }) {
   const { slug } = await params;
+  const sp = await searchParams;
   // ?banner=a|b — 시안 비교용. 주인·사진수·시간 규칙을 모두 건너뛰고 그 안을 강제로 그린다.
-  const bannerParam = (await searchParams)?.banner;
+  const bannerParam = sp?.banner;
   const bannerPreview = bannerParam === "a" || bannerParam === "b";
+  // ?film=1 — 촬영용. 소개서 본문만 남기고 **덧씌운 것**(하단 플로팅바·보강 배너·수정/귀속 진입점)을 전부 뗀다.
+  //   ⭐본문 렌더는 손대지 않는다 — 화면에 찍히는 소개서가 실제와 한 픽셀도 달라지면 안 되므로.
+  //   데이터·권한은 그대로다(숨기는 건 화면뿐). 열람 자체가 공개라 이 파라미터로 새로 열리는 정보는 없다.
+  const film = sp?.film === "1";
   const maker = await repo.getMakerBySlug(slug);
   if (!maker) notFound();
 
@@ -169,9 +174,9 @@ export default async function MakerPage({
   const publicUrl = host ? `${h.get("x-forwarded-proto") ?? "https"}://${host}/m/${slug}` : `/m/${slug}`;
 
   return (
-    <main className="mx-auto w-full max-w-[640px] px-4 pt-10 pb-32 sm:px-6 print:max-w-none print:px-0 print:py-0">
+    <main className={`mx-auto w-full max-w-[640px] px-4 pt-10 sm:px-6 print:max-w-none print:px-0 print:py-0 ${film ? "pb-16" : "pb-32"}`}>
       {/* 소개서 보강 신청 배너 — 주인에게만, 사진이 5장 미만일 때. 나머지(1일 숨김·7일 수명)는 클라 판정 */}
-      {(bannerPreview || (isOwner && countAllPhotos(maker) < ENRICH_MIN_PHOTOS)) && (
+      {!film && (bannerPreview || (isOwner && countAllPhotos(maker) < ENRICH_MIN_PHOTOS)) && (
         <EnrichBanner
           slug={slug}
           formUrl={ENRICH_FORM_URL}
@@ -181,7 +186,7 @@ export default async function MakerPage({
       )}
 
       {/* 소개서 본문 — /preview와 공유하는 단일 렌더 */}
-      <MakerArticle maker={maker} isOwner={isOwner} logoUrl={logoUrl} />
+      <MakerArticle maker={maker} isOwner={isOwner} logoUrl={logoUrl} readOnly={film} />
 
       {/* 인쇄 전용 푸터 — 화면엔 안 보이고 지류에만 URL 노출 */}
       <div className="hidden print:mt-8 print:block print:border-t print:border-hairline print:pt-4 print:text-center print:text-[12px] print:text-mute">
@@ -189,7 +194,7 @@ export default async function MakerPage({
       </div>
 
       {/* 프로필 연결(미점유 귀속) + 소개 자료 — 링크복사·찜은 하단 플로팅바로 이관 */}
-      {(claimable || maker.introFileUrl) && (
+      {!film && (claimable || maker.introFileUrl) && (
         <div className="mt-12 print:hidden">
           {claimable && (
             <div className="mb-3">
@@ -206,6 +211,7 @@ export default async function MakerPage({
       )}
 
       {/* 하단 고정 플로팅 액션바 — 찜 + 콜라보 제안 시작하기(UI) + 링크복사 */}
+      {!film && (
       <MakerActionBar
         slug={slug}
         makerId={maker.id}
@@ -225,6 +231,7 @@ export default async function MakerPage({
         viewerBrands={viewerBrands}
         cachedReports={cachedReports}
       />
+      )}
     </main>
   );
 }
