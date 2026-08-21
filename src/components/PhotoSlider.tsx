@@ -9,9 +9,13 @@ import { ScrollLock } from "./ScrollLock";
 
 export function PhotoSlider({
   photos,
+  sources,
   rounded = "rounded-lg",
 }: {
   photos: string[];
+  /** 사진 주소 → 출처 글자. 소개서 전체가 표 하나를 공유하므로 **슬라이더마다 그대로 넘기면 된다.**
+   *  대부분의 사진엔 출처가 없다 — 있는 장에서만 캡션이 뜬다(대표 확정 08-20). */
+  sources?: Record<string, string>;
   rounded?: string;
 }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -83,6 +87,15 @@ export function PhotoSlider({
 
   if (!photos.length) return null;
   const multi = photos.length > 1;
+  // 지금 보이는 장의 출처. 없으면 빈 문자열 → 줄은 남고 글자만 사라진다.
+  const caption = sources?.[photos[idx]]?.trim() || "";
+  // ⭐**이 슬라이더 안에 출처가 하나라도 있을 때만** 캡션 줄을 만든다.
+  //   대부분의 사진엔 출처가 없어서(대표 확정 08-20), 줄을 늘 그리면 소개서 전체에
+  //   빈 줄이 사진 수만큼 생긴다. 반대로 출처가 섞여 있는 슬라이더에서는 줄을 **미리 잡아둬야**
+  //   출처 있는 장을 지날 때마다 아래 내용이 들썩이지 않는다.
+  const anySource = photos.some((p) => sources?.[p]?.trim());
+  // 인쇄본은 첫 장만 나온다(`:not(:first-child):print:hidden`) → 인쇄용 출처도 첫 장 것으로.
+  const printCaption = sources?.[photos[0]]?.trim() || "";
 
   return (
     <div className="select-none">
@@ -164,6 +177,15 @@ export function PhotoSlider({
         )}
       </div>
 
+      {/* 사진 출처 캡션 — 지금 보이는 장에 출처가 있을 때만 글자가 뜬다.
+          min-h로 한 줄을 잡아둬서 장을 넘겨도 아래가 밀리지 않는다. */}
+      {anySource && (
+        <p className="mt-1.5 min-h-[17px] px-0.5 text-[12px] leading-[17px] text-faint">
+          <span className="print:hidden">{caption}</span>
+          <span className="hidden print:inline">{printCaption}</span>
+        </p>
+      )}
+
       {/* 인디케이터 점 */}
       {multi && (
         <div className="mt-2.5 flex items-center justify-center gap-1.5 print:hidden">
@@ -185,7 +207,7 @@ export function PhotoSlider({
       )}
 
       {zoom !== null && (
-        <Lightbox photos={photos} index={zoom} onIndex={setZoom} onClose={() => setZoom(null)} />
+        <Lightbox photos={photos} sources={sources} index={zoom} onIndex={setZoom} onClose={() => setZoom(null)} />
       )}
     </div>
   );
@@ -195,16 +217,20 @@ export function PhotoSlider({
  *  닫기 = X·배경 탭·Esc / 이동 = 좌우 화살표·키보드 ←→ (사진 여러 장일 때만). */
 function Lightbox({
   photos,
+  sources,
   index,
   onIndex,
   onClose,
 }: {
   photos: string[];
+  sources?: Record<string, string>;
   index: number;
   onIndex: (i: number) => void;
   onClose: () => void;
 }) {
   const multi = photos.length > 1;
+  // 출처는 원본을 크게 볼 때 **가장 필요하다** — 목록보다 여기서 더 확실히 보인다.
+  const caption = sources?.[photos[index]]?.trim() || "";
   const prev = () => onIndex((index - 1 + photos.length) % photos.length);
   const next = () => onIndex((index + 1) % photos.length);
 
@@ -269,6 +295,19 @@ function Lightbox({
             {index + 1} / {photos.length}
           </span>
         </>
+      )}
+
+      {/* 출처 — 사진이 여러 장이면 장수 배지 위로 올린다(겹치지 않게). */}
+      {caption && (
+        <span
+          className={`pointer-events-none absolute left-1/2 max-w-[86%] -translate-x-1/2 rounded-pill bg-ink/60 px-3 py-1 text-center text-[12.5px] leading-snug text-on-dark ${
+            multi
+              ? "bottom-[calc(3.1rem+env(safe-area-inset-bottom))]"
+              : "bottom-[calc(1rem+env(safe-area-inset-bottom))]"
+          }`}
+        >
+          {caption}
+        </span>
       )}
     </div>
   );

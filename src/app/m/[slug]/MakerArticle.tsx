@@ -19,7 +19,7 @@ export function MakerArticle({ maker, isOwner, logoUrl, readOnly }: {
       {/* 브랜드 사진 — 스와이프 슬라이드 */}
       {maker.photos.length > 0 && (
         <div className="mt-7 max-w-[460px] print:max-w-none print:break-inside-avoid">
-          <PhotoSlider photos={maker.photos} />
+          <PhotoSlider photos={maker.photos} sources={maker.photoSources} />
         </div>
       )}
 
@@ -98,7 +98,7 @@ export function MakerArticle({ maker, isOwner, logoUrl, readOnly }: {
                 )}
                 {a.photos.length > 0 && (
                   <div className="mt-3 max-w-[460px] print:mx-auto">
-                    <PhotoSlider photos={a.photos} />
+                    <PhotoSlider photos={a.photos} sources={maker.photoSources} />
                   </div>
                 )}
               </div>
@@ -142,7 +142,7 @@ export function MakerArticle({ maker, isOwner, logoUrl, readOnly }: {
                 {h.desc && <p className="mt-0.5 whitespace-pre-line text-[15px] leading-relaxed text-mute">{h.desc}</p>}
                 {h.photos.length > 0 && (
                   <div className="mt-3 max-w-[460px] print:mx-auto">
-                    <PhotoSlider photos={h.photos} />
+                    <PhotoSlider photos={h.photos} sources={maker.photoSources} />
                   </div>
                 )}
               </div>
@@ -165,7 +165,9 @@ export function MakerArticle({ maker, isOwner, logoUrl, readOnly }: {
       )}
 
       {/* 선택 블록 — 배열 순서대로 렌더 */}
-      {maker.showcases.length > 0 && <BlockSections blocks={maker.showcases} Section={Section} />}
+      {maker.showcases.length > 0 && (
+        <BlockSections blocks={maker.showcases} sources={maker.photoSources} Section={Section} />
+      )}
 
       {/* ⑦ 저희는 이런 고객들과 함께 하고 있어요 — targetAudience */}
       {maker.targetAudience.length > 0 && (

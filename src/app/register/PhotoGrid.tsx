@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { PhotoSourceDialog } from "./PhotoSourceDialog";
 
 // 사진 업로드 그리드 — 업로드 + 삭제 + 드래그로 순서 변경. 브랜드·활동·콜라보 사진 공통.
 export function PhotoGrid({
@@ -11,6 +12,8 @@ export function PhotoGrid({
   onReorder,
   onRetry,
   addLabel = "사진(선택)",
+  sources,
+  onSources,
 }: {
   items: { url: string; uploading?: boolean; failed?: string }[];
   max: number;
@@ -22,8 +25,16 @@ export function PhotoGrid({
   /** 추가 타일 문구. ⚠️이 컴포넌트를 **네 곳이 공유**한다(브랜드·활동·콜라보·성사기록) —
    *  기본값을 바꾸지 말고 필요한 곳에서만 넘겨라. 브랜드 사진만 필수(08-05)라 거기서 "사진(필수)"를 준다. */
   addLabel?: string;
+  /** 소개서 전체의 「사진 주소 → 출처」 표. **이 둘을 다 넘긴 곳에만** 출처 버튼이 생긴다
+   *  — 성사기록(`/my`)처럼 출처가 필요 없는 곳은 안 넘기면 그만이다. */
+  sources?: Record<string, string>;
+  onSources?: (next: Record<string, string>) => void;
 }) {
   const [drag, setDrag] = useState<number | null>(null);
+  const [sourceOpen, setSourceOpen] = useState(false);
+  // 업로드가 끝난 사진만 대상 — 올라가는 중이거나 실패한 건 주소가 blob:이라 표의 열쇠가 될 수 없다.
+  const settled = items.filter((it) => !it.uploading && !it.failed).map((it) => it.url);
+  const filled = settled.filter((u) => sources?.[u]?.trim()).length;
 
   return (
     <div>
@@ -144,6 +155,26 @@ export function PhotoGrid({
             ← → 버튼으로 순서를 바꿀 수 있어요. 첫 번째 사진이 대표로 보여요.
           </p>
         </>
+      )}
+
+      {/* 사진 출처 — **사진을 올린 뒤에만** 생긴다(대표 지시 08-20). 사진이 없으면 적을 대상도 없다.
+          몇 장에 적었는지를 버튼에 띄운다: 안 그러면 팝업을 열어봐야만 채웠는지 알 수 있다. */}
+      {onSources && settled.length > 0 && (
+        <button
+          type="button"
+          onClick={() => setSourceOpen(true)}
+          className="mt-2 inline-flex h-8 items-center rounded-pill border border-border-strong bg-surface px-3 text-[12.5px] font-medium text-ink"
+        >
+          {filled > 0 ? `사진 출처 ${filled}장 · 수정` : "＋ 사진 출처 추가"}
+        </button>
+      )}
+      {sourceOpen && onSources && (
+        <PhotoSourceDialog
+          photos={settled}
+          sources={sources ?? {}}
+          onSave={onSources}
+          onClose={() => setSourceOpen(false)}
+        />
       )}
     </div>
   );
