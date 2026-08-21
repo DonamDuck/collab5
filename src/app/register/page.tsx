@@ -2916,7 +2916,7 @@ function CollapsedLink({ children, hasLink }: { children: React.ReactNode; hasLi
         onClick={() => setOpen(true)}
         className="mr-4 text-[14px] text-mute underline underline-offset-2"
       >
-        ＋링크 추가 (선택)
+        ＋아티클 링크 추가 (선택)
       </button>
     );
   return <>{children}</>;
