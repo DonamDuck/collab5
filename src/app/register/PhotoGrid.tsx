@@ -165,7 +165,7 @@ export function PhotoGrid({
           onClick={() => setSourceOpen(true)}
           className="mt-2 inline-flex h-8 items-center rounded-pill border border-border-strong bg-surface px-3 text-[12.5px] font-medium text-ink"
         >
-          {filled > 0 ? `사진 출처 ${filled}장 · 수정` : "＋ 사진 출처 추가"}
+          출처 입력/수정{filled > 0 && ` (${filled}장)`}
         </button>
       )}
       {sourceOpen && onSources && (

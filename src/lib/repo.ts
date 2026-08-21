@@ -150,11 +150,11 @@ const seedMakers: Maker[] = [
     //   비번 = 0000
     editPasswordHash: "9af15b336e6a9619928537df30b2e6a2376569fcf9d7e773eccede65606529a0",
     photoSources: {
-      "https://picsum.photos/seed/canvasgarden1/900/700": "사진 김유리",
-      "https://picsum.photos/seed/canvasgarden3/900/700": "사진 오월의숲 제공",
-      "https://picsum.photos/seed/cg-act2/900/700": "사진 스튜디오 온",
-      "https://picsum.photos/seed/cg-collab1/900/700": "사진 오월의숲 제공",
-      "https://picsum.photos/seed/cg-team1/900/700": "사진 이든 스튜디오",
+      "https://picsum.photos/seed/canvasgarden1/900/700": "김유리",
+      "https://picsum.photos/seed/canvasgarden3/900/700": "오월의숲 제공",
+      "https://picsum.photos/seed/cg-act2/900/700": "스튜디오 온",
+      "https://picsum.photos/seed/cg-collab1/900/700": "오월의숲 제공",
+      "https://picsum.photos/seed/cg-team1/900/700": "이든 스튜디오",
     },
     showcases: [
       {

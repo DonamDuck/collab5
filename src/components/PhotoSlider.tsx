@@ -178,11 +178,13 @@ export function PhotoSlider({
       </div>
 
       {/* 사진 출처 캡션 — 지금 보이는 장에 출처가 있을 때만 글자가 뜬다.
+          🎨매거진 본문 사진 캡션과 **같은 값**을 쓴다(`ArticleBody.tsx`의 figcaption):
+             가운데 정렬 · 14px · leading-relaxed · text-faint. 두 곳이 갈리면 같은 서비스로 안 보인다.
           min-h로 한 줄을 잡아둬서 장을 넘겨도 아래가 밀리지 않는다. */}
       {anySource && (
-        <p className="mt-1.5 min-h-[17px] px-0.5 text-[12px] leading-[17px] text-faint">
-          <span className="print:hidden">{caption}</span>
-          <span className="hidden print:inline">{printCaption}</span>
+        <p className="mt-2 min-h-[23px] text-center text-[14px] leading-relaxed text-faint">
+          <span className="print:hidden">{caption && `출처: ${caption}`}</span>
+          <span className="hidden print:inline">{printCaption && `출처: ${printCaption}`}</span>
         </p>
       )}
 
@@ -306,7 +308,7 @@ function Lightbox({
               : "bottom-[calc(1rem+env(safe-area-inset-bottom))]"
           }`}
         >
-          {caption}
+          출처: {caption}
         </span>
       )}
     </div>

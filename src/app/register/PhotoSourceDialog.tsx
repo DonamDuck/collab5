@@ -63,7 +63,7 @@ export function PhotoSourceDialog({
           사진 출처 추가
         </h3>
         <p className="mt-1.5 text-[13px] leading-relaxed text-mute">
-          출처를 적은 사진만 소개서에 함께 표시돼요. 비워두면 지금처럼 사진만 보여요.
+          출처 작성이 필요한 사진에 출처 정보를 기입해주세요. 사진 하단에 출처 정보가 표기돼요.
         </p>
 
         <div className="mt-4 flex flex-col gap-3">
@@ -76,13 +76,20 @@ export function PhotoSourceDialog({
                 alt=""
                 className="h-14 w-14 shrink-0 rounded-md border border-hairline object-cover"
               />
-              <input
-                type="text"
-                value={valueOf(url)}
-                onChange={(e) => setDraft((d) => ({ ...d, [url]: e.target.value }))}
-                placeholder="예) 사진 김OO"
-                className="h-11 w-full min-w-0 rounded-md border border-hairline bg-surface px-3 text-[15px] text-ink placeholder:text-faint focus:border-border-strong focus:outline-none"
-              />
+              {/* 「출처:」는 **칸 안에 고정으로 붙여둔다** — 소개서 캡션이 `출처: OOO`로 나가므로
+                  적는 순간 결과 모양이 그대로 보인다. 저장되는 값은 뒤의 입력분뿐이다. */}
+              <label className="flex h-11 w-full min-w-0 items-center rounded-md border border-hairline bg-surface px-3 focus-within:border-border-strong">
+                <span className="shrink-0 text-[15px] text-faint">출처:</span>
+                <input
+                  type="text"
+                  value={valueOf(url)}
+                  onChange={(e) => setDraft((d) => ({ ...d, [url]: e.target.value }))}
+                  // ⚠️안내문구에 **사람 이름 같은 예시를 쓰지 않는다** — 「출처: 김유리」로 채워진 칸과
+                  //   회색 글자 하나 차이로만 갈려서, 적었는지 안 적었는지가 눈으로 구분되지 않는다.
+                  placeholder="촬영자 또는 제공처"
+                  className="h-full w-full min-w-0 bg-transparent pl-1.5 text-[15px] text-ink placeholder:text-faint focus:outline-none"
+                />
+              </label>
             </div>
           ))}
         </div>
