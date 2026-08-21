@@ -198,6 +198,9 @@ function RegisterForm() {
   const [description, setDescription] = useState("");
   const [address, setAddress] = useState("");
   const [photos, setPhotos] = useState<Ph[]>([]);
+  // 사진 출처 — **소개서 전체가 표 하나를 공유한다**(열쇠 = 사진 주소).
+  // 브랜드·활동·콜라보 어디서 적어도 같은 표에 들어가므로, 같은 사진을 두 곳에 썼으면 한 번만 적으면 된다.
+  const [photoSources, setPhotoSources] = useState<Record<string, string>>({});
   // ── 소개서 개편 신규 필드 ──
   const [story, setStory] = useState("");
   const [activities, setActivities] = useState<
@@ -1014,6 +1017,7 @@ function RegisterForm() {
     offers, values, targetAudience, searchVisible, collabPaused,
     instagram, homepage, mapUrl, address, introFileUrl, blocks,
     photos: keepPhotos(photos),
+    photoSources,
     activities: activities.map((a) => ({ title: a.title, desc: a.desc, link: a.link, photos: keepPhotos(a.photos) })),
     collabHistory: collabHistory.map((h) => ({
       partner: h.partner, types: h.types, desc: h.desc, year: h.year, link: h.link, photos: keepPhotos(h.photos),
@@ -1043,6 +1047,7 @@ function RegisterForm() {
     setCollabPaused(d.collabPaused ?? false); // 옛 임시저장엔 이 키가 없다 → 받는 중으로
     setInstagram(d.instagram); setHomepage(d.homepage); setMapUrl(d.mapUrl); setAddress(d.address);
     setIntroFileUrl(d.introFileUrl); setBlocks(d.blocks); setPhotos(d.photos);
+    setPhotoSources(d.photoSources ?? {}); // 옛 임시저장엔 이 키가 없다 → 빈 표
     setActivities(d.activities.map((a) => ({ title: a.title, desc: a.desc, link: a.link ?? "", photos: a.photos })));
     setCollabHistory(
       (d.collabHistory.length ? d.collabHistory : [emptyHist()]).map((h) => ({
@@ -1098,6 +1103,8 @@ function RegisterForm() {
       setSearchVisible(m.searchVisible ?? true);
       setCollabPaused(m.collabPaused ?? false);
       setPhotos(m.photos.map((u) => ({ url: u })));
+      // ⚠️되불러오지 않으면 **수정 저장 한 번에 기존 출처가 통째로 날아간다**(제출부가 빈 표를 덮어쓴다).
+      setPhotoSources(m.photoSources ?? {});
       setBlocks((m.showcases ?? []).map((b) => ({ ...b, uid: crypto.randomUUID() })));
       setIntroFileUrl(m.introFileUrl ?? "");
       // 생성 때 저장한 크롤 스냅샷 → 다시받기 재료·버튼 게이트(크롤한 소개서만 노출)
@@ -1162,6 +1169,23 @@ function RegisterForm() {
       // 사진 base64는 배열에 문자열로 담으면 React Flight 배열 한도(1e6)에 걸린다.
       // → {u} 객체로 감싸 전송(actions.ts에서 되풂). @see PhotoWire
       const wrap = (arr: string[]) => arr.map((u) => ({ u }));
+      // 사진 출처 표 정리 — **실제로 제출되는 사진의 것만** 남긴다.
+      // ⚠️안 그러면 지운 사진·펼쳤다 접은 섹션의 출처가 표에 계속 쌓인다(화면엔 안 보여서 아무도 모른다).
+      const livePhotoUrls = new Set<string>([
+        ...photoUrls,
+        ...activityOut.flatMap((a) => a.photos),
+        ...historyOut.flatMap((h) => h.photos),
+        // 선택 블록 사진은 아직 출처 입력창이 없지만, 브랜드 사진과 **같은 파일을 쓴 경우**가 있어
+        // 여기서 빼면 멀쩡한 출처가 사라진다. 열쇠가 주소라서 생기는 겹침이다.
+        ...blocks.flatMap((b) => [
+          ...(b.photos ?? []),
+          ...("items" in b ? (b.items as { photos?: string[] }[]).flatMap((i) => i.photos ?? []) : []),
+        ]),
+      ]);
+      const photoSourcesOut = Object.fromEntries(
+        Object.entries(photoSources).filter(([url, v]) => livePhotoUrls.has(url) && v.trim()),
+      );
+
       // 빈 섹션 강제 차단 — has*가 false인 섹션은 빈 값으로 전송(단일 관문, 레드팀 CONFIRMED).
       // 펼쳤지만 빈 채로 둔 섹션이 저장·노출되지 않는 유일한 보증 지점. (블록은 서버 sanitizeBlocks가 담당)
       const payload = {
@@ -1179,6 +1203,7 @@ function RegisterForm() {
         showcases: blocks,
         introFileUrl: introFileUrl || undefined,
         photos: wrap(photoUrls),
+        photoSources: photoSourcesOut,
         searchVisible,
         collabPaused,
         enrichment,
@@ -1527,6 +1552,8 @@ function RegisterForm() {
               onRemove={(i) => setPhotos((ps) => ps.filter((_, j) => j !== i))}
               onReorder={(from, to) => setPhotos((ps) => reorder(ps, from, to))}
               onRetry={(i) => retryPhoto(photos, i, 1000, setPhotos)}
+              sources={photoSources}
+              onSources={setPhotoSources}
             />
           </div>
 
@@ -1794,6 +1821,8 @@ function RegisterForm() {
                     onRemove={(k) => removeActPhoto(i, k)}
                     onReorder={(from, to) => moveActPhoto(i, from, to)}
                     onRetry={(k) => retryActPhoto(i, k)}
+                    sources={photoSources}
+                    onSources={setPhotoSources}
                   />
                 </CollapsedPhotos>
                 <CollapsedLink hasLink={!!act.link.trim()}>
@@ -1970,6 +1999,8 @@ function RegisterForm() {
                         onRemove={(k) => removeHistPhoto(i, k)}
                         onReorder={(from, to) => moveHistPhoto(i, from, to)}
                         onRetry={(k) => retryHistPhoto(i, k)}
+                        sources={photoSources}
+                        onSources={setPhotoSources}
                       />
                     </CollapsedPhotos>
                     <CollapsedLink hasLink={!!h.link.trim()}>
@@ -2885,7 +2916,7 @@ function CollapsedLink({ children, hasLink }: { children: React.ReactNode; hasLi
         onClick={() => setOpen(true)}
         className="mr-4 text-[14px] text-mute underline underline-offset-2"
       >
-        ＋링크 추가 (선택)
+        ＋아티클 링크 추가 (선택)
       </button>
     );
   return <>{children}</>;

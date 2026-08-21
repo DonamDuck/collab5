@@ -105,6 +105,16 @@ export interface Maker {
   offersDescription: string; // 협업 직접 설명 (DB=offers_description, 구 offers_note)
   seeksDescription: string;  // 파트너 직접 설명 (DB=seeks_description, 구 seeks_note)
   photos: string[]; // 브랜드 사진(카드·프로필 슬라이드용). MVP=리사이즈 data URL
+  /** 사진별 출처 — **「사진 주소 → 출처 글자」 대조표**(DB=photo_sources jsonb, 기본 없음).
+   *  ⭐**사진 배열 안에 넣지 않은 이유**(08-20 대표 지시): `photos: string[]`가 브랜드·활동·콜라보·
+   *    선택블록·언론 **다섯 군데 넘게** 흩어져 있다. `{주소, 출처}` 묶음으로 바꾸면 그 전부를 고쳐야 하고
+   *    **이미 발행된 소개서의 옛 저장본과 모양이 어긋난다.** 표 하나를 옆에 두면 배열은 그대로 두고
+   *    칸 하나만 늘며, 옛 소개서는 이 값이 없어 **아무 일도 안 일어난다.**
+   *  🔁곁따라오는 이득 — 같은 사진을 활동에도 콜라보에도 썼으면 **출처를 한 번만 적으면 둘 다 따라간다.**
+   *  ⛔출처는 **전부 수기**다. 인스타에서 수확했다고 계정 주인이 그 사진의 권리자라는 보장이 없어
+   *    자동 채움을 넣지 않기로 했다(대표 판단 08-20 — 지인이 찍어준 사진일 수 있다).
+   *  ⚠️값이 빈 문자열인 항목은 저장 전에 버린다(빈 캡션이 자리만 차지하지 않게). */
+  photoSources?: Record<string, string>;
   showcases: Block[]; // 선택 블록(순서 보존) (DB=showcases, 구 blocks)
   enrichment?: Enrichment; // 크롤 스냅샷(생성 시 기록, 수정 시 보존). 없으면 undefined
   introFileUrl?: string; // 소개자료 PDF(코어 위계)

@@ -14,9 +14,12 @@ const TITLES: Record<Block["type"], string> = {
 
 export function BlockSections({
   blocks,
+  sources,
   Section,
 }: {
   blocks: Block[];
+  /** 사진 주소 → 출처(소개서 전체가 표 하나를 공유한다). 자세한 건 [[Maker.photoSources]] 주석. */
+  sources?: Record<string, string>;
   Section: React.ComponentType<{ title: string; children: React.ReactNode }>;
 }) {
   return (
@@ -25,10 +28,10 @@ export function BlockSections({
         const title = b.type === "custom" ? b.title : TITLES[b.type];
         const content = (
           <>
-            <BlockBody b={b} />
+            <BlockBody b={b} sources={sources} />
             {b.photos.length > 0 && (
               <div className="mt-3 max-w-[460px] print:mx-auto print:break-inside-avoid">
-                <PhotoSlider photos={b.photos} />
+                <PhotoSlider photos={b.photos} sources={sources} />
               </div>
             )}
             {b.links.length > 0 && (
@@ -62,7 +65,7 @@ export function BlockSections({
 }
 
 // 블록 타입별 본문 — 유니온을 type으로 좁힌 뒤 고유 필드 접근
-function BlockBody({ b }: { b: Block }) {
+function BlockBody({ b, sources }: { b: Block; sources?: Record<string, string> }) {
   switch (b.type) {
     case "metrics":
       return (
@@ -112,7 +115,7 @@ function BlockBody({ b }: { b: Block }) {
               )}
               {!!it.photos?.length && (
                 <div className="mt-2 max-w-[460px] print:mx-auto">
-                  <PhotoSlider photos={it.photos} />
+                  <PhotoSlider photos={it.photos} sources={sources} />
                 </div>
               )}
             </div>

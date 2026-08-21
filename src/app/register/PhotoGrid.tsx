@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { PhotoSourceDialog } from "./PhotoSourceDialog";
 
 // 사진 업로드 그리드 — 업로드 + 삭제 + 드래그로 순서 변경. 브랜드·활동·콜라보 사진 공통.
 export function PhotoGrid({
@@ -11,6 +12,8 @@ export function PhotoGrid({
   onReorder,
   onRetry,
   addLabel = "사진(선택)",
+  sources,
+  onSources,
 }: {
   items: { url: string; uploading?: boolean; failed?: string }[];
   max: number;
@@ -22,8 +25,16 @@ export function PhotoGrid({
   /** 추가 타일 문구. ⚠️이 컴포넌트를 **네 곳이 공유**한다(브랜드·활동·콜라보·성사기록) —
    *  기본값을 바꾸지 말고 필요한 곳에서만 넘겨라. 브랜드 사진만 필수(08-05)라 거기서 "사진(필수)"를 준다. */
   addLabel?: string;
+  /** 소개서 전체의 「사진 주소 → 출처」 표. **이 둘을 다 넘긴 곳에만** 출처 버튼이 생긴다
+   *  — 성사기록(`/my`)처럼 출처가 필요 없는 곳은 안 넘기면 그만이다. */
+  sources?: Record<string, string>;
+  onSources?: (next: Record<string, string>) => void;
 }) {
   const [drag, setDrag] = useState<number | null>(null);
+  const [sourceOpen, setSourceOpen] = useState(false);
+  // 업로드가 끝난 사진만 대상 — 올라가는 중이거나 실패한 건 주소가 blob:이라 표의 열쇠가 될 수 없다.
+  const settled = items.filter((it) => !it.uploading && !it.failed).map((it) => it.url);
+  const filled = settled.filter((u) => sources?.[u]?.trim()).length;
 
   return (
     <div>
@@ -133,17 +144,48 @@ export function PhotoGrid({
           </label>
         )}
       </div>
-      {/* ⚠️ 안내를 기기별로 가른다 — 전엔 "끌어서 순서를 바꿀 수 있어요"가 모바일에도 떠서
-          **되지 않는 조작을 반복하게** 만들었다(QA #9). 드래그 안내는 데스크탑에만. */}
-      {items.length > 1 && (
-        <>
-          <p className="mt-1.5 hidden text-[12px] text-faint sm:block">
-            끌어서, 또는 ← → 버튼으로 순서를 바꿀 수 있어요. 첫 번째 사진이 대표로 보여요.
-          </p>
-          <p className="mt-1.5 text-[12px] text-faint sm:hidden">
-            ← → 버튼으로 순서를 바꿀 수 있어요. 첫 번째 사진이 대표로 보여요.
-          </p>
-        </>
+      {/* 안내문 + 출처 버튼을 **한 줄에** 둔다(대표 지적 08-20).
+          🪤전엔 출처 버튼이 안내문 아래 따로 서 있었는데, 바로 밑의 「＋아티클 링크 추가」와
+            **세로로 나란히** 놓여 같은 층으로 읽혔다. 출처는 **사진에 딸린 것**이라
+            사진 블록 안(안내문 줄 오른쪽)에 있어야 소속이 눈에 보인다.
+          📐좁은 화면에선 flex-wrap으로 버튼이 아랫줄로 내려간다 — 안내문이 두 줄이라 나란히 두면 끼인다. */}
+      {(items.length > 1 || (onSources && settled.length > 0)) && (
+        <div className="mt-1.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+          {/* ⚠️ 안내를 기기별로 가른다 — 전엔 "끌어서 순서를 바꿀 수 있어요"가 모바일에도 떠서
+              **되지 않는 조작을 반복하게** 만들었다(QA #9). 드래그 안내는 데스크탑에만. */}
+          {items.length > 1 && (
+            <>
+              <p className="hidden text-[12px] text-faint sm:block">
+                끌어서, 또는 ← → 버튼으로 순서를 바꿀 수 있어요. 첫 번째 사진이 대표로 보여요.
+              </p>
+              <p className="text-[12px] text-faint sm:hidden">
+                ← → 버튼으로 순서를 바꿀 수 있어요. 첫 번째 사진이 대표로 보여요.
+              </p>
+            </>
+          )}
+
+          {/* 사진 출처 — **사진을 올린 뒤에만** 생긴다(대표 지시 08-20). 사진이 없으면 적을 대상도 없다.
+              몇 장에 적었는지를 버튼에 띄운다: 안 그러면 팝업을 열어봐야만 채웠는지 알 수 있다. */}
+          {onSources && settled.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setSourceOpen(true)}
+              // ml-auto — 좁은 화면에서 아랫줄로 접혔을 때도 **오른쪽에** 붙게 한다.
+              // 왼쪽에 두면 바로 아래 「＋아티클 링크 추가」와 다시 세로로 나란히 서서 처음 문제로 돌아간다.
+              className="ml-auto inline-flex h-8 shrink-0 items-center rounded-pill border border-border-strong bg-surface px-3 text-[12.5px] font-medium text-ink"
+            >
+              출처 입력/수정{filled > 0 && ` (${filled}장)`}
+            </button>
+          )}
+        </div>
+      )}
+      {sourceOpen && onSources && (
+        <PhotoSourceDialog
+          photos={settled}
+          sources={sources ?? {}}
+          onSave={onSources}
+          onClose={() => setSourceOpen(false)}
+        />
       )}
     </div>
   );

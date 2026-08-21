@@ -142,6 +142,20 @@ const seedMakers: Maker[] = [
       "https://picsum.photos/seed/canvasgarden2/900/700",
       "https://picsum.photos/seed/canvasgarden3/900/700",
     ],
+    // 사진 출처 예시(로컬 시드 전용) — **일부러 군데군데만 채웠다.** 실제로도 출처가 있는 사진은
+    // 소수라, 캡션이 있는 장과 없는 장을 넘나드는 모습이 실제 화면과 같아야 확인이 된다.
+    // 🔧로컬에서 수정 폼을 열어보려면 수정 비번이 있어야 한다(`updateMakerAction`은 주인 세션 아니면 비번을 본다).
+    //   시드 브랜드엔 주인도 비번도 없어서 **저장 단계에서 「수정 권한이 없어요」로 막힌다.**
+    //   ⚠️이 값은 **InMemoryRepo 전용**이다 — 이 저장소는 SUPABASE_URL이 없을 때만 쓰이므로 배포에 안 나간다.
+    //   비번 = 0000
+    editPasswordHash: "9af15b336e6a9619928537df30b2e6a2376569fcf9d7e773eccede65606529a0",
+    photoSources: {
+      "https://picsum.photos/seed/canvasgarden1/900/700": "김유리",
+      "https://picsum.photos/seed/canvasgarden3/900/700": "오월의숲 제공",
+      "https://picsum.photos/seed/cg-act2/900/700": "스튜디오 온",
+      "https://picsum.photos/seed/cg-collab1/900/700": "오월의숲 제공",
+      "https://picsum.photos/seed/cg-team1/900/700": "이든 스튜디오",
+    },
     showcases: [
       {
         type: "metrics",
@@ -683,6 +697,7 @@ interface MakerRow {
   collab_history?: Maker["collabHistory"];
   story?: string; activities?: Maker["activities"];
   photos?: string[] | null;
+  photo_sources?: Record<string, string> | null;
   intro_file_url?: string | null;
   trust?: Maker["trust"];
   keywords?: string[] | null; showcases?: Maker["showcases"] | null;
@@ -766,6 +781,8 @@ function rowToMaker(r: MakerRow): Maker {
     offersDescription: r.offers_description ?? "",
     seeksDescription: r.seeks_description ?? "",
     photos: r.photos ?? [],
+    // ⚠️`?? undefined` — 컬럼이 아직 없는 환경에서도 그냥 '출처 없음'으로 읽힌다(옛 소개서가 그대로 뜬다).
+    photoSources: r.photo_sources ?? undefined,
     showcases: (r.showcases ?? []).map((b) => ({ ...b, photos: b.photos ?? [], links: b.links ?? [] })),
     introFileUrl: r.intro_file_url ?? undefined,
     keywords: r.keywords ?? [],
@@ -800,6 +817,7 @@ class SupabaseRepo implements Repo {
       description: input.description, story: input.story, activities: input.activities,
       offers_description: input.offersDescription, seeks_description: input.seeksDescription,
       photos: input.photos,
+      photo_sources: input.photoSources ?? null,
       showcases: input.showcases, intro_file_url: input.introFileUrl ?? null,
       keywords: input.keywords, trust: input.trust,
       search_visible: input.searchVisible,
@@ -831,7 +849,8 @@ class SupabaseRepo implements Repo {
       target_audience: c.targetAudience, collab_history: c.collabHistory,
       description: c.description, story: c.story, activities: c.activities,
       offers_description: c.offersDescription, seeks_description: c.seeksDescription,
-      photos: c.photos, showcases: c.showcases, intro_file_url: c.introFileUrl ?? null,
+      photos: c.photos, photo_sources: c.photoSources ?? null,
+      showcases: c.showcases, intro_file_url: c.introFileUrl ?? null,
       keywords: c.keywords, trust: c.trust,
       search_visible: c.searchVisible,
       collab_paused: c.collabPaused,

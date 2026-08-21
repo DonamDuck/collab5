@@ -35,6 +35,24 @@ export interface HistoryWire {
 const unwrapPhotos = (photos?: PhotoWire[]): string[] =>
   (photos ?? []).map((p) => p.u).filter(Boolean);
 
+/** 사진 출처 표 정화 — 클라이언트 값을 그대로 믿지 않는다.
+ *  열쇠는 **우리 저장소 주소만**(http/https) 받고, 값은 한 줄 분량으로 자른다.
+ *  ⚠️출처는 소개서에 **그대로 글자로** 나가므로 링크로 만들지 않는다(대표 확정 08-20 — text로 간다). */
+const MAX_PHOTO_SOURCES = 80;   // 브랜드10 + 활동5×5 + 콜라보5×5 + 여유
+const MAX_SOURCE_LEN = 120;
+const sanitizePhotoSources = (m?: Record<string, string>): Record<string, string> | undefined => {
+  if (!m || typeof m !== "object") return undefined;
+  const out: Record<string, string> = {};
+  for (const [url, raw] of Object.entries(m)) {
+    if (Object.keys(out).length >= MAX_PHOTO_SOURCES) break;
+    if (typeof url !== "string" || !/^https?:\/\//i.test(url)) continue;
+    const v = typeof raw === "string" ? raw.trim().replace(/\s+/g, " ").slice(0, MAX_SOURCE_LEN) : "";
+    if (v) out[url] = v;
+  }
+  // 빈 표는 아예 안 넘긴다 — 저장본에 `{}`가 쌓이지 않게.
+  return Object.keys(out).length ? out : undefined;
+};
+
 // 항목 링크 위생 처리 — http(s) 절대 URL만 통과(press·콜라보·활동 항목 공용, 수기입력·크롤 프리필). enrich.ts sanitizeHttpUrl과 동일 규칙.
 function sanitizePressLink(raw?: string): string | undefined {
   const s = raw?.trim();
@@ -60,6 +78,7 @@ export interface RegisterInput {
   offersDescription?: string;
   seeksDescription?: string;
   photos?: PhotoWire[]; // 브랜드 사진(리사이즈 data URL, 객체 래핑)
+  photoSources?: Record<string, string>; // 사진 주소 → 출처 글자(수기 입력). @see Maker.photoSources
   showcases?: Block[]; // 선택 블록(사진=Storage URL이라 그대로 전송)
   introFileUrl?: string; // 소개자료 PDF URL
   searchVisible: boolean; // [콜라보 찾기에 보이기] — 홈·/search 목록 노출(웹 검색과 무관, 08-07)
@@ -120,6 +139,7 @@ export async function createMakerAction(
     offersDescription: input.offersDescription?.trim() ?? "",
     seeksDescription: input.seeksDescription?.trim() ?? "",
     photos: unwrapPhotos(input.photos),
+    photoSources: sanitizePhotoSources(input.photoSources),
     showcases: sanitizeBlocks(input.showcases),
     introFileUrl: input.introFileUrl?.trim() || undefined,
     keywords: input.keywords,
@@ -329,6 +349,7 @@ export async function updateMakerAction(
     offersDescription: input.offersDescription?.trim() ?? "",
     seeksDescription: input.seeksDescription?.trim() ?? "",
     photos: unwrapPhotos(input.photos),
+    photoSources: sanitizePhotoSources(input.photoSources),
     showcases: sanitizeBlocks(input.showcases),
     introFileUrl: input.introFileUrl?.trim() || undefined,
     keywords: input.keywords,
