@@ -73,27 +73,45 @@ export function EditButton({
       </button>
       {loginNeeded && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4" {...loginDialog.overlayProps}>
+          {/* ⭐이 모달은 **두 갈래가 같이 쓴다** — 문구를 `hasOwner`로 가른다(대표 지시 08-22).
+              ⓐ주인 있음 = 남의 소개서 → 그 계정으로 로그인하면 되므로 [로그인하러 가기]가 맞다.
+              ⓑ주인 없음 = 우리가 만들어 **전달 대기 중인 소개서**(owner NULL + 비번 NULL).
+              🪤전엔 ⓑ에도 ⓐ 문구가 떠서 **「계정에 연결되어 있어요」라고 거짓말**을 했다.
+                 어느 계정에도 안 붙어 있는데 「연결된 계정으로 로그인해주세요」라고 하니,
+                 받는 분은 *"내 계정이 연결됐다는 건가? 어느 계정이지?"* 로 읽는다(파랑~ 님 건, 08-22).
+              ⛔ⓑ에서 [로그인하러 가기]도 같이 뺐다 — 로그인해도 달라지는 게 없어서
+                 문구만 고치고 버튼을 두면 여전히 헛걸음을 시킨다. */}
           <div {...loginDialog.panelProps} className="w-full max-w-sm rounded-lg border border-hairline bg-surface p-6 shadow-e2">
-            <p className="text-[16px] font-bold break-keep text-ink">로그인이 필요해요</p>
+            <p className="text-[16px] font-bold break-keep text-ink">
+              {hasOwner ? "로그인이 필요해요" : "아직 연결된 계정이 없어요"}
+            </p>
             <p className="mt-1.5 text-[14px] leading-relaxed break-keep text-mute">
-              이 소개서는 계정에 연결되어 있어요. 수정하려면 연결된 계정으로 로그인해주세요.
+              {hasOwner
+                ? "이 소개서는 계정에 연결되어 있어요. 수정하려면 연결된 계정으로 로그인해주세요."
+                : "이 소개서는 아직 계정에 연결되지 않았어요. 연결을 원하시면 만들어드린 곳으로 문의해주세요."}
             </p>
             <div className="mt-4 flex gap-2">
               <button
                 type="button"
                 onClick={() => setLoginNeeded(false)}
-                className="h-11 flex-1 rounded-md border border-border-strong bg-surface text-[14px] font-medium text-ink"
+                className={
+                  hasOwner
+                    ? "h-11 flex-1 rounded-md border border-border-strong bg-surface text-[14px] font-medium text-ink"
+                    : "h-11 flex-1 rounded-md bg-primary text-[14px] font-medium text-primary-on"
+                }
               >
-                취소
+                {hasOwner ? "취소" : "확인"}
               </button>
-              <button
-                type="button"
-                // 로그인 후 보던 소개서로 복귀 — 홈으로 떨어지면 다시 찾아와야 한다
-                onClick={() => router.push(`/login?redirect=${encodeURIComponent(`/m/${slug}`)}`)}
-                className="h-11 flex-1 rounded-md bg-primary text-[14px] font-medium text-primary-on"
-              >
-                로그인하러 가기
-              </button>
+              {hasOwner && (
+                <button
+                  type="button"
+                  // 로그인 후 보던 소개서로 복귀 — 홈으로 떨어지면 다시 찾아와야 한다
+                  onClick={() => router.push(`/login?redirect=${encodeURIComponent(`/m/${slug}`)}`)}
+                  className="h-11 flex-1 rounded-md bg-primary text-[14px] font-medium text-primary-on"
+                >
+                  로그인하러 가기
+                </button>
+              )}
             </div>
           </div>
         </div>
