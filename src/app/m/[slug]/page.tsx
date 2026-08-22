@@ -101,7 +101,13 @@ export async function generateMetadata({
   const ownerProfile = maker.ownerUserId ? await getProfileById(maker.ownerUserId) : null;
   const logo = ownerProfile?.profileImage?.startsWith("http") ? ownerProfile.profileImage : "";
   const image = maker.photos[0] || logo || OG_IMAGE;
-  const title = `[collab5 소개서] ${maker.name}`;
+  // 공유 제목 = **`[collab5] {브랜드명} 소개서`**(대표 확정 08-22, 4안 비교 후 1안).
+  // ⭐대괄호 안을 서비스명만으로 줄이고 「소개서」를 뒤로 뺐다 — 대괄호가 짧아진 만큼
+  //   **브랜드 이름이 앞으로 당겨져** 카톡 목록에서 먼저 읽힌다. 긴 상호도 한 줄에 들어간다.
+  // 🪤이름만 남기는 안(`[collab5] {이름}`)과 우리 이름을 빼는 안(`[소개서] {이름}`)은 버렸다 —
+  //   전자는 **무엇을 보내는 링크인지**가 사라지고, 후자는 **처음 받는 사람이 우리를 알 고리**가 사라진다.
+  //   영업으로 콜드 링크를 보내는 지금 단계에선 둘 다 필요하다.
+  const title = `[collab5] ${maker.name} 소개서`;
   const description = maker.oneLiner || maker.description || "브랜드 소개서";
 
   return {
