@@ -24,8 +24,11 @@ export async function generateMetadata({
   const maker = await repo.getMakerById(card.fromBrandId);
   if (!maker) return { title: "카드를 찾을 수 없어요 — collab5", robots: { index: false, follow: false } };
 
-  // 제목 형식은 소개서(`[collab5 소개서] 캔가`)와 같은 틀로 맞춘다 — 한 브랜드가 둘 다 보내도 한 식구로 읽힌다.
-  const title = `[콜라보 제안] ${maker.name}`;
+  // 제목 형식은 소개서(`[collab5] 캔가 소개서`)와 **같은 틀**로 맞춘다 — 한 브랜드가 둘 다 보내도 한 식구로 읽힌다.
+  // 🔄08-22 개편(대표 확정): `[콜라보 제안] 캔가` → `[collab5] 캔가 콜라보 제안`.
+  //   ⭐전엔 카드 제목에 **collab5가 아예 없었다.** 카드는 모르는 곳에 먼저 보내는 콜드 링크라
+  //     받는 쪽이 「어디서 온 것인지」를 알 고리가 제목에 하나도 없었던 셈이다.
+  const title = `[collab5] ${maker.name} 콜라보 제안`;
   // 받는 쪽 이름을 앞에 세운다 — 카톡에서 제일 먼저 읽히는 줄이라 "나한테 온 것"이 바로 보여야 한다.
   const why = card.proposal.why || card.proposal.picture || "";
   const description = card.proposal.toName ? `${card.proposal.toName}님께 — ${why}` : why;
