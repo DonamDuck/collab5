@@ -34,8 +34,6 @@ export function ArticleLikeBar({
   //   ⛔대신 **죽은 state를 남겨두지 않는다.** 안 쓰는 값이 남으면 다음 사람이 "이건 왜 있지"를 묻고,
   //     린트도 계속 경고한다. 되살리는 건 `initialCount` prop + useState 한 줄이면 된다.
   const [liked, setLiked] = useState(initialLiked);
-  // 댓글 섹션이 화면에 들어왔나 — 들어오면 댓글 알약을 «슥» 접는다(보고 있는 것을 가리키는 버튼은 중복이다).
-  const [atComments, setAtComments] = useState(false);
   const [needLogin, setNeedLogin] = useState(false);
   const [err, setErr] = useState("");
 
@@ -61,20 +59,6 @@ export function ArticleLikeBar({
     },
     [articleId]
   );
-
-  // 댓글 섹션 감지 — `Reveal.tsx`와 같은 방식(IntersectionObserver, 라이브러리 없음).
-  // ⚠️댓글 섹션은 이 컴포넌트의 자식이 아니라 페이지의 형제라, ref가 아니라 id로 찾는다.
-  //   글이 아직 안 그려졌을 수 있어 못 찾으면 조용히 넘어간다(그럼 댓글 알약이 계속 보일 뿐, 깨지지 않는다).
-  useEffect(() => {
-    const el = document.getElementById("comments");
-    if (!el || typeof IntersectionObserver === "undefined") return;
-    const obs = new IntersectionObserver(
-      ([entry]) => setAtComments(entry.isIntersecting),
-      { threshold: 0 } // 조금이라도 걸치면 접는다
-    );
-    obs.observe(el);
-    return () => obs.disconnect();
-  }, []);
 
   // 로그인하고 돌아왔을 때, 남겨둔 의도가 **이 글**이면 자동으로 눌러준다.
   useEffect(() => {
@@ -124,29 +108,6 @@ export function ArticleLikeBar({
         </p>
       )}
 
-      {/* 알약 두 개를 한 줄에. 📏실측(08-23): 좋아요 138px + 댓글 최대 160px + gap 8px = 306px <
-          375px 화면의 가용폭 343px(px-4 좌우 32px 제외). 들어간다. */}
-      <div className="flex items-center gap-2">
-
-      {/* 댓글로 내려가는 알약 — 댓글 섹션이 보이면 폭이 0으로 접히며 사라진다.
-          ⭐`hidden`이 아니라 폭·투명도 전환이라 좋아요 알약이 **가운데로 미끄러져** 온다(대표 스케치).
-          ⚠️`motion-reduce:transition-none` — 애니메이션을 끈 사람에겐 즉시 전환. */}
-      <a
-        href="#comments"
-        aria-hidden={atComments}
-        tabIndex={atComments ? -1 : 0}
-        className={`pointer-events-auto inline-flex h-12 shrink-0 items-center gap-2 overflow-hidden whitespace-nowrap rounded-pill border-[0.5px] border-[#DFDFE3] bg-surface text-[15px] font-medium text-ink shadow-e2 transition-all duration-300 hover:bg-surface-soft motion-reduce:transition-none ${
-          atComments ? "pointer-events-none max-w-0 border-transparent px-0 opacity-0" : "max-w-[160px] px-5 opacity-100"
-        }`}
-      >
-        <span>댓글</span>
-        <svg viewBox="0 0 20 20" className="h-[18px] w-[18px] shrink-0" aria-hidden="true"
-          fill="none" stroke="currentColor" strokeWidth="1.7">
-          <path d="M17 11.5a5.5 5.5 0 0 1-5.5 5.5H6l-3 2.5V11.5A5.5 5.5 0 0 1 8.5 6h3A5.5 5.5 0 0 1 17 11.5Z"
-            strokeLinejoin="round" />
-        </svg>
-      </a>
-
       <button
         type="button"
         onClick={onClick}
@@ -179,7 +140,6 @@ export function ArticleLikeBar({
             ⭐DB에는 그대로 쌓인다 — 화면에서만 안 보일 뿐이라, 되살릴 때 숫자가 0부터 시작하지 않는다.
               `count` 상태와 서버가 돌려주는 최종 개수도 그대로 둔다(지금 지우면 나중에 다시 만들어야 한다). */}
       </button>
-      </div>
     </div>
 
     {/* 비로그인 → 로그인 유도 **얼럿**(대표 지시 08-14 — "우리 얼럿 UI 디자인시스템 있잖아").

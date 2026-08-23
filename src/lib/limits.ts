@@ -31,10 +31,3 @@ export const MAGAZINE_IMAGE_MAX_DIM = 1600;
 /** Storage 경로 접두사. 버킷은 기존 `maker-photos`를 그대로 쓴다 —
  *  ⛔새 버킷을 만들지 않는다(버킷 생성은 콘솔 작업이라 대표 몫, 지시서 안전규칙 3). */
 export const MAGAZINE_STORAGE_PREFIX = "magazine";
-
-/** 매거진 댓글 본문 최대 글자 수 (2026-08-23).
- *  ⚠️**여기 두는 이유가 하나 더 있다**: 이 값을 서버 액션 파일(`magazine-actions.ts`)에 두면
- *    `"use server"` 파일은 **async 함수만 export할 수 있다**는 규칙에 걸려
- *    그 파일의 **모든 export가 통째로 죽는다**(좋아요 액션까지 같이 깨졌다, 08-23).
- *    🚨`tsc`는 이걸 못 잡는다 — 타입이 아니라 Next.js의 규칙이라 빌드/런타임에서야 터진다. */
-export const COMMENT_MAX = 500;

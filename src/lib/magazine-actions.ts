@@ -6,7 +6,6 @@ import { isMagazineEditor } from "./magazine-auth";
 import { sanitizeHttpUrl } from "./enrich";
 import { normalizeSlug, slugError, SLUG_MIN } from "./magazine-slug";
 import type { MagazineDoc, MagazineSaveInput, MagazineStatus } from "./types";
-import { COMMENT_MAX } from "./limits";
 
 // 매거진 쓰기 서버 액션 (2026-08-10) — 스펙 = [[매거진-기능-개발지시]] §5
 //
@@ -169,92 +168,5 @@ export async function setArticleLikedAction(
     return { count: await repo.countArticleLikes(articleId), liked };
   } catch {
     return { error: "잠시 후 다시 시도해주세요." };
-  }
-}
-
-// ── 매거진 댓글 (2026-08-23) — 설계 = docs/superpowers/specs/2026-08-23-magazine-comments-design.md ──
-//
-// ⭐**표시 이름은 브랜드명이고, 소개서가 «정확히 1개»일 때만 그 소개서로 링크된다.**
-//   마스킹은 폐기됐다 — 개인 이름 필드가 없어서 「캔버스가든」이 「캔**」이 되기 때문이고,
-//   무엇보다 마스킹은 익명 대중(네이버 뉴스)의 장치지 서로 아는 브랜드끼리의 장치가 아니다.
-
-/** 같은 사람이 같은 글에 연속으로 다는 걸 막는 최소 간격(ms). 낙관적 반영이라 클라만으론 못 막는다. */
-const COMMENT_COOLDOWN_MS = 10_000;
-
-/** 저장 직전 본문 다듬기. ⚠️여기서 «내용»을 바꾸진 않는다 — 공백·개행만 정리한다. */
-function tidyBody(raw: string): string {
-  return raw
-    .replace(/\r\n/g, "\n")
-    .replace(/\n{3,}/g, "\n\n") // 3줄 이상 연속 개행 → 2줄(도배 방지)
-    .trim();
-}
-
-/** 댓글 남기기.
- *  ⭐작성자 이름·소개서·이미지를 **여기서 스냅샷해 넣는다**(클라가 보낸 값을 믿지 않는다).
- *  ⚠️표(`magazine_comments`)가 없으면 에러를 돌려준다 — 조용히 성공한 척하면
- *    "남겼는데 안 보인다"가 되고, 그건 안 남긴 것보다 나쁘다(좋아요와 같은 규칙). */
-export async function addArticleCommentAction(
-  articleId: number,
-  body: string
-): Promise<{ error?: string }> {
-  const { getSessionUserId, getProfileById } = await import("./profiles");
-  const userId = await getSessionUserId();
-  if (!userId) return { error: "로그인이 필요해요." };
-
-  const text = tidyBody(body ?? "");
-  if (!text) return { error: "내용을 입력해주세요." };
-  if (text.length > COMMENT_MAX) return { error: `${COMMENT_MAX}자까지 쓸 수 있어요.` };
-
-  try {
-    // 도배 방지 — 마지막 댓글로부터 10초.
-    const last = await repo.lastCommentAt(articleId, userId);
-    if (last && Date.now() - new Date(last).getTime() < COMMENT_COOLDOWN_MS) {
-      return { error: "조금 뒤에 다시 남겨주세요." };
-    }
-
-    const profile = await getProfileById(userId);
-    // 🔗소개서가 **정확히 1개**일 때만 링크를 건다. 0개(아직 안 만든 회원)나 2개 이상(대표 계정)이면
-    //   이름이 «평범한 글자»가 된다 — 죽은 링크를 만들지 않는다(대표 확정 08-23).
-    const mine = await repo.listMakersByOwner(userId);
-    const authorSlug = mine.length === 1 ? mine[0].slug : undefined;
-
-    await repo.addArticleComment({
-      articleId,
-      userId,
-      authorName: profile?.brandName?.trim() || "이름 없음",
-      authorSlug,
-      authorImage: profile?.profileImage || undefined,
-      body: text,
-    });
-    return {};
-  } catch {
-    return { error: "잠시 후 다시 시도해주세요." };
-  }
-}
-
-/** 내 댓글 지우기. **소유 검사는 repo(=DB 쿼리 조건)에서** 한다 —
- *  남의 id를 넣어도 0행이 갱신되고 조용히 끝난다(존재 여부조차 알려주지 않는다). */
-export async function deleteArticleCommentAction(
-  commentId: number
-): Promise<{ error?: string }> {
-  const { getSessionUserId } = await import("./profiles");
-  const userId = await getSessionUserId();
-  if (!userId) return { error: "로그인이 필요해요." };
-  try {
-    await repo.deleteArticleComment(commentId, userId);
-    return {};
-  } catch {
-    return { error: "잠시 후 다시 시도해주세요." };
-  }
-}
-
-/** 댓글 목록 다시 읽기 — 등록·삭제 뒤 화면 갱신용.
- *  ⚠️`revalidatePath`를 쓰지 않는다: 아티클 본문은 그대로인데 페이지 전체를 무효화할 이유가 없고,
- *    댓글만 다시 그리는 편이 빠르다. */
-export async function listArticleCommentsAction(articleId: number) {
-  try {
-    return { comments: await repo.listArticleComments(articleId) };
-  } catch {
-    return { comments: [], error: "댓글을 불러오지 못했어요." };
   }
 }

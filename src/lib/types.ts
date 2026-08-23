@@ -323,23 +323,6 @@ export interface MagazineFact { label: string; value: string }
  *  name·tagline을 같이 저장하는 것도 같은 이유(원본이 사라져도 카드가 빈칸이 되지 않게). */
 export interface MagazineBrandLink { slug: string; name: string; tagline: string }
 
-/** 매거진 댓글 한 줄.
- *  ⭐**작성자 이름·소개서 slug를 «쓸 때 스냅샷»한다** — `user_id`로 조인하면 브랜드명을 바꾸는 순간
- *    과거 댓글의 화자가 소급해서 바뀌고, 소유권을 이전하면 링크가 남의 페이지를 가리킨다.
- *    바로 위 `MagazineBrandLink`가 같은 이유로 FK 대신 스냅샷을 쓴다 — 같은 규칙을 따른다.
- *  ⚠️`authorSlug`는 없을 수 있다: 소개서를 아직 안 만들었거나(당연히 댓글은 쓸 수 있다),
- *    한 계정이 소개서를 여러 개 가져 어느 것을 걸지 정할 수 없을 때. 그땐 이름이 «평범한 글자»다. */
-export interface ArticleComment {
-  id: number;
-  articleId: number;
-  userId: number;      // 삭제 권한 판정용 — 화면 표시에는 쓰지 않는다
-  authorName: string;  // 쓸 때의 브랜드명
-  authorSlug?: string; // 쓸 때의 소개서 slug (없으면 링크 없음)
-  authorImage?: string; // 쓸 때의 프로필 이미지
-  body: string;
-  createdAt: string;
-}
-
 export type MagazineStatus = "draft" | "published";
 
 export interface MagazineArticle {

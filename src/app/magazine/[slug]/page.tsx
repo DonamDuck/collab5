@@ -8,7 +8,6 @@ import { OG_IMAGE } from "@/lib/site";
 import { getSessionUserId } from "@/lib/profiles";
 import { ArticleBody, BrandLinkCards } from "./ArticleBody";
 import { ArticleLikeBar } from "./ArticleLikeBar";
-import { ArticleComments } from "./ArticleComments";
 
 // 매거진 상세 (2026-08-10)
 // ⭐기본은 **발행분만**이고, 편집자에게만 초안을 여는 예외를 뚫었다(PR2).
@@ -62,10 +61,6 @@ export default async function MagazineArticlePage({
   //   글 열 때마다 세는 건 낭비다. 되살릴 땐 이 자리에 한 줄 되돌리면 된다(repo 함수는 그대로 있다).
   const viewerId = await getSessionUserId();
   const likedByMe = viewerId ? await repo.isArticleLiked(viewerId, a.id) : false;
-  // 댓글 — 🚨표(`magazine_comments`)가 아직 없으면 여기서 던진다. **글 전체가 못 열리면 안 되므로**
-  //   빈 목록으로 떨어뜨린다. 「댓글이 없다」와 「표가 없다」는 화면에서 같아 보이지만,
-  //   쓰려고 하면 서버 액션이 에러를 돌려주므로 조용히 성공한 척하는 일은 없다.
-  const comments = await repo.listArticleComments(a.id).catch(() => []);
 
   return (
     // ⚠️`pb-28` — 하트 버튼이 `fixed`라 본문 맨 끝을 덮는다. 그만큼 아래를 비워 둔다.
@@ -166,21 +161,6 @@ export default async function MagazineArticlePage({
       {/* 「잘 읽었어요 ❤️」 — 읽는 내내 화면 아래에 떠 있다.
           ⚠️초안(draft)에는 안 띄운다 — 아직 아무도 읽을 수 없는 글의 하트는 뜻이 없고,
             편집자가 자기 글에 하트를 눌러 수를 부풀리는 첫 단추가 된다. */}
-      {/* 댓글 — 발행분에만. ⭐이름은 브랜드명이고 소개서가 있으면 그리로 링크된다.
-          ⚠️`pb-28`(119px)은 **본문용** 여백이라, 댓글 섹션 아래에 같은 크기를 한 번 더 둔다.
-            안 두면 플로팅 알약이 「댓글 남기기」 버튼을 덮는다. */}
-      {a.status === "published" && (
-        <div className="pb-28">
-          <ArticleComments
-            articleId={a.id}
-            slug={a.slug}
-            initialComments={comments}
-            loggedIn={!!viewerId}
-            viewerUserId={viewerId ?? undefined}
-          />
-        </div>
-      )}
-
       {a.status === "published" && (
         <ArticleLikeBar
           articleId={a.id}
