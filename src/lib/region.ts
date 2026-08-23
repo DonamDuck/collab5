@@ -22,7 +22,11 @@ export function deriveRegion(address: string): string {
     }
   }
   // 시도 토큰(0번) 이후에서 구/군/시 찾고 행정단위 접미 제거
+  // ⚠️ 단 떼고 나서 한 글자만 남으면 그대로 둔다 — "남구"→"남"은 방위사로 읽혀 지명이 아니게 된다
+  //    (남·동·서·북·중구는 광역시마다 있어 "부산 남" 같은 카드가 실제로 나갔다, 대표 지적 08-22).
+  //    반면 "마포구"→"마포", "영도구"→"영도"처럼 두 글자 이상 남으면 접미를 떼는 게 자연스럽다.
   const guRaw = tokens.slice(1).find((t) => /(구|군|시)$/.test(t));
-  const gu = guRaw ? guRaw.replace(/(구|군|시)$/, "") : "";
+  const guTrimmed = guRaw ? guRaw.replace(/(구|군|시)$/, "") : "";
+  const gu = guTrimmed.length >= 2 ? guTrimmed : (guRaw ?? "");
   return [sido, gu].filter(Boolean).join(" ");
 }
