@@ -3,7 +3,7 @@
 // (DB는 '공유 → 타인 열람(view) 루프 = 배포 시점'에 투입 — masterbrain 2026-06-21 결정)
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import type { BrandDna, Collab, CollabCard, CollabInput, CollabOrigin, CollabReportData, CollabReportListItem, CollabStatus, CollabType, MagazineArticle, MagazineListItem, MagazineSaveInput, Maker, MakerStatus, Reaction, ViewEvent } from "./types";
+import type { ArticleComment, BrandDna, Collab, CollabCard, CollabInput, CollabOrigin, CollabReportData, CollabReportListItem, CollabStatus, CollabType, MagazineArticle, MagazineListItem, MagazineSaveInput, Maker, MakerStatus, Reaction, ViewEvent } from "./types";
 import { kstIso } from "./time";
 import { orderedIdeaTitles } from "./report-cards";
 import { isDemoSlug } from "./demo";
@@ -59,6 +59,17 @@ export interface Repo {
   countArticleLikes(articleId: number): Promise<number>;
   isArticleLiked(userId: number, articleId: number): Promise<boolean>;
   setArticleLiked(userId: number, articleId: number, liked: boolean): Promise<void>;
+  // 매거진 댓글 — 좋아요와 같은 표 모양이되 «작성자 스냅샷»을 함께 담는다(types.ts ArticleComment 주석 참조).
+  listArticleComments(articleId: number): Promise<ArticleComment[]>;
+  addArticleComment(input: {
+    articleId: number; userId: number; authorName: string;
+    authorSlug?: string; authorImage?: string; body: string;
+  }): Promise<void>;
+  /** 본인 것만 지운다. 소유 검사는 **여기(서버)**에서 — 클라 검문은 우회된다.
+   *  soft delete: 행은 남기고 `deleted_at`만 찍는다. */
+  deleteArticleComment(commentId: number, userId: number): Promise<void>;
+  /** 마지막 댓글 시각 — 도배 방지(같은 사람이 같은 글에 연속 등록). 없으면 null. */
+  lastCommentAt(articleId: number, userId: number): Promise<string | null>;
   // 콜라보 제안 인텐트(append-only) — "콜라보 시작하기" 계측
   recordCollabRequest(fromUserId: number | null, toBrandId: number, channel: string, fromBrandId?: number | null): Promise<void>;
   // Brand DNA(brands.dna, 파생 해석층) + 콜라보 리포트(collab_reports, append-only 쌍 캐시) — 스펙 2026-07-25
@@ -594,6 +605,31 @@ class InMemoryRepo implements Repo {
     if (liked && !has) this.articleLikes.push({ userId, articleId });
     if (!liked && has)
       this.articleLikes = this.articleLikes.filter((l) => !(l.userId === userId && l.articleId === articleId));
+  }
+  // ── 매거진 댓글 ──
+  private comments: (ArticleComment & { deletedAt?: string })[] = [];
+  private commentSeq = 1;
+  async listArticleComments(articleId: number): Promise<ArticleComment[]> {
+    return this.comments
+      .filter((c) => c.articleId === articleId && !c.deletedAt)
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt)); // 오래된 순 = 대화 흐름
+  }
+  async addArticleComment(input: {
+    articleId: number; userId: number; authorName: string;
+    authorSlug?: string; authorImage?: string; body: string;
+  }): Promise<void> {
+    this.comments.push({ id: this.commentSeq++, createdAt: now(), ...input });
+  }
+  async deleteArticleComment(commentId: number, userId: number): Promise<void> {
+    const c = this.comments.find((x) => x.id === commentId);
+    if (!c || c.userId !== userId) return; // 남의 것이면 조용히 무시(존재 여부도 안 알려준다)
+    c.deletedAt = now();
+  }
+  async lastCommentAt(articleId: number, userId: number): Promise<string | null> {
+    const mine = this.comments
+      .filter((c) => c.articleId === articleId && c.userId === userId)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    return mine[0]?.createdAt ?? null;
   }
   // ── Brand DNA + 콜라보 리포트 (Map 기반 — Supabase와 동일 시그니처) ──
   private dnaByBrand = new Map<number, BrandDna>();
@@ -1143,6 +1179,62 @@ class SupabaseRepo implements Repo {
         .eq("article_id", articleId);
       if (error) throw new Error(error.message);
     }
+  }
+  // ── 매거진 댓글 ──
+  async listArticleComments(articleId: number): Promise<ArticleComment[]> {
+    const { data, error } = await this.db
+      .from("magazine_comments")
+      .select("id, article_id, user_id, author_name, author_slug, author_image, body, created_at")
+      .eq("article_id", articleId)
+      .is("deleted_at", null)
+      .order("created_at", { ascending: true }); // 오래된 순 = 대화 흐름
+    if (error) throw new Error(error.message);
+    return (data ?? []).map((r) => ({
+      id: r.id as number,
+      articleId: r.article_id as number,
+      userId: r.user_id as number,
+      authorName: (r.author_name as string) ?? "",
+      authorSlug: (r.author_slug as string) || undefined,
+      authorImage: (r.author_image as string) || undefined,
+      body: (r.body as string) ?? "",
+      createdAt: r.created_at as string,
+    }));
+  }
+  async addArticleComment(input: {
+    articleId: number; userId: number; authorName: string;
+    authorSlug?: string; authorImage?: string; body: string;
+  }): Promise<void> {
+    const { error } = await this.db.from("magazine_comments").insert({
+      article_id: input.articleId,
+      user_id: input.userId,
+      author_name: input.authorName,
+      author_slug: input.authorSlug ?? null,
+      author_image: input.authorImage ?? null,
+      body: input.body,
+    });
+    if (error) throw new Error(error.message);
+  }
+  async deleteArticleComment(commentId: number, userId: number): Promise<void> {
+    // ⭐`eq("user_id")`가 곧 소유 검사다 — 남의 것이면 0행이 갱신되고 조용히 끝난다.
+    //   존재 여부를 알려주지 않는 게 맞다(다른 사람 댓글 id를 넣어보는 시도에 아무 정보도 주지 않는다).
+    const { error } = await this.db
+      .from("magazine_comments")
+      .update({ deleted_at: new Date().toISOString() })
+      .eq("id", commentId)
+      .eq("user_id", userId)
+      .is("deleted_at", null);
+    if (error) throw new Error(error.message);
+  }
+  async lastCommentAt(articleId: number, userId: number): Promise<string | null> {
+    const { data, error } = await this.db
+      .from("magazine_comments")
+      .select("created_at")
+      .eq("article_id", articleId)
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(1);
+    if (error) throw new Error(error.message);
+    return (data?.[0]?.created_at as string) ?? null;
   }
   // ── Brand DNA + 콜라보 리포트 ──
   async getBrandDna(brandId: number): Promise<BrandDna | null> {
