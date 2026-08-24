@@ -1,13 +1,29 @@
 // 사진 폴더링 검증 — 대표 지시 08-24
 // 🪤과거에 「잘못 들어가기도, 안 들어가기도」 했다. 받았다고 끝이 아니다.
+// 쓰는 법: node verify-photos.mjs "<브랜드 폴더 경로>" [urls.tsv] [폴더맵.json]
 import fs from 'fs'; import path from 'path';
-const BASE = '/Users/youngduck/Desktop/collab5/업체사진정리/나를위한커리어-방혜리';
-const { map } = JSON.parse(fs.readFileSync('사진-폴더맵.json', 'utf8'));
-const rows = fs.readFileSync('사진-urls.tsv', 'utf8').trim().split('\n').map(l => l.split('\t'));
+const BASE = process.argv[2] || (() => { throw new Error('브랜드 폴더 경로를 인자로 주세요'); })();
+const { map } = JSON.parse(fs.readFileSync(process.argv[4] || '사진-폴더맵.json', 'utf8'));
+// ⚠️수확을 여러 번 나눠 했으면 tsv를 «합쳐서» 넘겨라 — 한 파일만 대면 개수가 틀리게 나온다
+// 🪤`cat a b > c`는 a의 마지막 줄에 개행이 없으면 «두 줄을 한 줄로 붙인다». `{ cat a; echo; cat b; }`로 합칠 것
+// 🪤같은 게시물이 두 계정에 걸린 콜라보 글은 양쪽 tsv에 다 들어온다 → «코드+장번호»로 중복을 지운다
+const raw = fs.readFileSync(process.argv[3] || '사진-urls-전체.tsv', 'utf8').trim().split('\n')
+  .map(l => l.split('\t'));
+const 깨진줄 = raw.filter(r => r.length !== 4).length;
+if (깨진줄) console.log(`🚨 tsv에 칸이 4개가 아닌 줄이 ${깨진줄}개 — 이어붙일 때 개행이 빠졌을 수 있다`);
+const seenRow = new Set();
+const rows = raw.filter(r => r.length === 4).filter(r => {
+  const k = r[0] + '_' + r[1]; if (seenRow.has(k)) return false; seenRow.add(k); return true;
+});
+if (seenRow.size !== raw.filter(r => r.length === 4).length)
+  console.log(`ℹ️ 두 계정에 걸린 중복 ${raw.filter(r => r.length === 4).length - seenRow.size}줄은 한 번만 셈`);
 
 const walk = d => fs.readdirSync(d, { withFileTypes: true })
   .flatMap(e => e.isDirectory() ? walk(path.join(d, e.name)) : [path.join(d, e.name)]);
-const files = walk(BASE).filter(f => f.endsWith('.jpg'));
+// 수확본만 센다 — 대표가 직접 넣은 브랜드 사진은 대상이 아니다(파일명이 {날짜}_{코드}_{NN} 꼴이 아님)
+const files = walk(BASE).filter(f => /\d{4}-\d{2}-\d{2}_.+_\d{2}\.jpg$/.test(path.basename(f)));
+const 직접넣은 = walk(BASE).filter(f => f.endsWith('.jpg')).length - files.length;
+if (직접넣은) console.log(`ℹ️ 대표가 직접 넣은 사진 ${직접넣은}장은 검증에서 제외`);
 
 let bad = 0;
 const say = (t, m) => { console.log(`${t} ${m}`); if (t === '🚨') bad++; };
@@ -37,7 +53,10 @@ for (const f of files) {
   const code = base.slice(11, base.length - 3);
   const want = map[code] || null;
   if (want) { if (folder !== want) wrong.push(`${path.basename(f)} → ${folder} (맞는 곳: ${want})`); }
-  else if (!path.dirname(f).includes('_기타')) wrong.push(`${path.basename(f)} → ${folder} (항목 배정 없음인데 항목 폴더에 있음)`);
+  // _로 시작하는 칸(_기타·_브랜드사진 후보)과 그 «하위 폴더», 브랜드 폴더 바로 아래는 항목 폴더가 아니다
+  // 🪤_기타/{날짜}_{코드}/ 처럼 한 겹 더 들어가므로 «잎 이름」만 보면 안 되고 BASE 아래 «경로 전체»를 봐야 한다
+  else if (!path.relative(BASE, path.dirname(f)).split(path.sep).some(seg => seg.startsWith('_'))
+           && path.dirname(f) !== BASE) wrong.push(`${path.basename(f)} → ${folder} (항목 배정 없음인데 항목 폴더에 있음)`);
 }
 say(wrong.length ? '🚨' : '✅', `배치  잘못 들어간 파일 ${wrong.length}장`);
 wrong.slice(0, 8).forEach(w => console.log('     ' + w));
