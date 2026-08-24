@@ -34,6 +34,8 @@ export function ArticleLikeBar({
   //   ⛔대신 **죽은 state를 남겨두지 않는다.** 안 쓰는 값이 남으면 다음 사람이 "이건 왜 있지"를 묻고,
   //     린트도 계속 경고한다. 되살리는 건 `initialCount` prop + useState 한 줄이면 된다.
   const [liked, setLiked] = useState(initialLiked);
+  // 댓글 섹션이 화면에 들어왔나 — 들어오면 댓글 알약을 «슥» 접는다(보고 있는 것을 가리키는 버튼은 중복이다).
+  const [atComments, setAtComments] = useState(false);
   const [needLogin, setNeedLogin] = useState(false);
   const [err, setErr] = useState("");
 
@@ -59,6 +61,20 @@ export function ArticleLikeBar({
     },
     [articleId]
   );
+
+  // 댓글 섹션 감지 — `Reveal.tsx`와 같은 방식(IntersectionObserver, 라이브러리 없음).
+  // ⚠️댓글 섹션은 이 컴포넌트의 자식이 아니라 페이지의 형제라, ref가 아니라 id로 찾는다.
+  //   글이 아직 안 그려졌을 수 있어 못 찾으면 조용히 넘어간다(그럼 댓글 알약이 계속 보일 뿐, 깨지지 않는다).
+  useEffect(() => {
+    const el = document.getElementById("comments");
+    if (!el || typeof IntersectionObserver === "undefined") return;
+    const obs = new IntersectionObserver(
+      ([entry]) => setAtComments(entry.isIntersecting),
+      { threshold: 0 } // 조금이라도 걸치면 접는다
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
 
   // 로그인하고 돌아왔을 때, 남겨둔 의도가 **이 글**이면 자동으로 눌러준다.
   useEffect(() => {
@@ -89,6 +105,60 @@ export function ArticleLikeBar({
     void apply(!liked);
   };
 
+  // 댓글로 «미끄러져» 내려간다.
+  //
+  // 🚨**왜 `scrollIntoView({behavior:"smooth"})`를 안 쓰나** — 이 글엔 사진이 수십 장이고
+  //   모두 lazy 로딩이다. 내려가는 **도중에** 아래쪽 사진이 로드되며 문서가 길어져
+  //   (실측 08-24: 12418 → 12732px) 목적지가 계속 밀린다. 네이티브 smooth는 **누른 순간의
+  //   좌표 하나**로 애니메이션하므로, 도착해 보면 댓글이 또 저 아래에 있다.
+  //   → 대표 증상 **「세 번 눌러야 댓글로 간다」**가 이것이다. 느릴수록 더 어긋난다.
+  //   ⭐그래서 **매 프레임 목적지를 다시 잰다.** 홈(`HomeSectionTabs`)은 목적지 위에 사진이 없어
+  //     네이티브로 충분하다 — 여기만 다른 이유가 이것이고, 그 차이가 없으면 홈 방식을 써라.
+  //
+  // 📏오프셋의 **정본은 여전히 CSS**(`ArticleComments`의 `scroll-mt-[82px]`)다. 여기선 그 값을
+  //   `getComputedStyle`로 **읽기만** 한다 — 숫자를 JS에 또 적으면 두 군데로 갈라진다.
+  // 🖐사용자가 도중에 스크롤하면 즉시 손을 뗀다. 안 그러면 애니메이션과 손가락이 싸운다.
+  const goComments = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    const el = document.getElementById("comments");
+    if (!el) return; // 못 찾으면 네이티브 해시 점프에 맡긴다
+    e.preventDefault();
+
+    const offset = parseFloat(getComputedStyle(el).scrollMarginTop) || 0;
+    const targetY = () => el.getBoundingClientRect().top + window.scrollY - offset;
+
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      window.scrollTo(0, targetY());
+      return;
+    }
+
+    const from = window.scrollY;
+    const t0 = performance.now();
+    const DURATION = 420; // 거리와 무관하게 일정 — 12,000px을 내려가도 체감이 같다
+    let cancelled = false;
+    const stop = () => {
+      cancelled = true;
+    };
+    window.addEventListener("wheel", stop, { once: true, passive: true });
+    window.addEventListener("touchstart", stop, { once: true, passive: true });
+
+    const step = (now: number) => {
+      if (cancelled) return;
+      const p = Math.min(1, (now - t0) / DURATION);
+      const eased = 1 - Math.pow(1 - p, 3); // easeOutCubic — 빠르게 출발해 부드럽게 선다
+      const to = targetY(); // ⭐매 프레임 다시 잰다
+      window.scrollTo(0, from + (to - from) * eased);
+      if (p < 1) requestAnimationFrame(step);
+      else window.scrollTo(0, targetY()); // 마지막 한 번 더 — 끝나는 순간에도 로드될 수 있다
+    };
+    requestAnimationFrame(step);
+
+    // 애니메이션이 끝났으면 리스너를 남기지 않는다(다음 스크롤을 삼키지 않게).
+    window.setTimeout(() => {
+      window.removeEventListener("wheel", stop);
+      window.removeEventListener("touchstart", stop);
+    }, DURATION + 100);
+  };
+
   const markPending = () => {
     try {
       sessionStorage.setItem(PENDING_LIKE_KEY, String(articleId));
@@ -108,38 +178,47 @@ export function ArticleLikeBar({
         </p>
       )}
 
-      <button
-        type="button"
-        onClick={onClick}
-        aria-pressed={liked}
-        // 🔻08-15 **버튼은 상태에 따라 안 변한다.** 눌림은 오직 **하트 색**이 말한다(대표 지시).
-        //   ⛔전엔 눌리면 알약 전체가 키위 tint로 바뀌었는데, 그러면 「선택됨」이 CTA만큼 커져
-        //     읽는 화면에서 버튼이 주인공이 된다. 하트 하나면 충분하다.
-        //   ⛔`disabled={busy}` + `disabled:opacity-60`도 뺐다 — 저장되는 동안 버튼이 흐려지며
-        //     **로딩처럼 보이고 그때 눌러도 안 먹었다**(대표 제보). 서버 쪽이 멱등이라(upsert/delete)
-        //     연타해도 상태가 꼬이지 않는다. /m 소개서의 찜 버튼도 같은 방식으로 막지 않는다.
-        className="pointer-events-auto inline-flex h-12 shrink-0 items-center gap-2 rounded-pill border-[0.5px] border-[#DFDFE3] bg-surface px-5 text-[15px] font-medium text-ink shadow-e2 transition-colors hover:bg-surface-soft"
-      >
-        {/* 문구는 상태와 무관하게 그대로 둔다 — 눌림 여부는 하트 채움과 면색이 말한다.
-            라벨까지 같이 바뀌면 버튼 폭이 흔들리고, 무엇이 상태 표시인지 흐려진다. */}
-        <span>잘 읽었어요</span>
-        {/* 하트는 **글자 오른쪽**(대표 지시 08-14) — 「잘 읽었어요 ❤️」라고 말하는 순서 그대로다.
-            ⭐**이 하트가 상태를 말하는 유일한 장치다**(08-15) — 누르면 빨갛게 채워지고, 다시 누르면
-              빈 하트로 돌아간다. 색은 `text-red-500` — /m 소개서의 찜 하트와 **같은 값**이다.
-              사이트에서 「내가 눌러둔 하트」는 하나의 색이어야 한다.
-            ⚠️이모지(❤️) 대신 SVG인 이유: 이모지는 기기마다 모양·색이 제각각이라 채움/빔의 대비가
-              흐려진다. 지금은 하트 하나가 상태를 통째로 지고 있어 더 중요해졌다. */}
-        <svg viewBox="0 0 20 20"
-          className={`h-[18px] w-[18px] shrink-0 transition-colors ${liked ? "text-red-500" : "text-ink"}`}
+      {/* ⭐**알약은 «하나»다** — 안에서 두 영역으로 나뉜다(대표 지시 08-23: 「각각 떠 있으니 어색하다」).
+          왼쪽 = 댓글로 내려가기 / 오른쪽 = 하트. 가운데 세로선이 경계를 말한다.
+          📏실측: 하트 쪽 138px + 댓글 쪽 최대 150px + 경계선 = 375px 화면(가용 343px) 안에 들어간다. */}
+      <div className="pointer-events-auto flex h-12 items-stretch overflow-hidden rounded-pill border-[0.5px] border-[#DFDFE3] bg-surface shadow-e2">
+        {/* 댓글 영역 — 댓글 섹션이 보이면 폭이 0으로 접히고, 알약은 하트만 남은 크기로 «미끄러진다» */}
+        <a
+          href="#comments"
+          onClick={goComments}
+          aria-hidden={atComments}
+          tabIndex={atComments ? -1 : 0}
+          className={`inline-flex shrink-0 items-center gap-2 overflow-hidden whitespace-nowrap text-[15px] font-medium text-ink transition-all duration-500 ease-in-out hover:bg-surface-soft motion-reduce:transition-none ${
+            atComments ? "pointer-events-none max-w-0 px-0 opacity-0" : "max-w-[150px] px-5 opacity-100"
+          }`}
+        >
+          <span>댓글 남기기</span>
+        </a>
+
+        {/* 경계선 — 댓글 영역이 접히면 같이 사라진다(선만 남으면 그게 더 어색하다) */}
+        <span
           aria-hidden="true"
-          fill={liked ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.7">
-          <path d="M10 16.5S3.5 12.6 3.5 8.2A3.7 3.7 0 0 1 10 5.9a3.7 3.7 0 0 1 6.5 2.3c0 4.4-6.5 8.3-6.5 8.3Z"
-            strokeLinejoin="round" />
-        </svg>
-        {/* 🔻08-15 **개수 숨김**(대표 지시 — "지금은 뺄 거야, 나중에 넣고 싶어").
-            ⭐DB에는 그대로 쌓인다 — 화면에서만 안 보일 뿐이라, 되살릴 때 숫자가 0부터 시작하지 않는다.
-              `count` 상태와 서버가 돌려주는 최종 개수도 그대로 둔다(지금 지우면 나중에 다시 만들어야 한다). */}
-      </button>
+          className={`my-2 w-px shrink-0 bg-[#DFDFE3] transition-all duration-500 ease-in-out motion-reduce:transition-none ${
+            atComments ? "opacity-0" : "opacity-100"
+          }`}
+        />
+
+        <button
+          type="button"
+          onClick={onClick}
+          aria-pressed={liked}
+          className="inline-flex shrink-0 items-center gap-2 whitespace-nowrap px-5 text-[15px] font-medium text-ink transition-colors hover:bg-surface-soft"
+        >
+          <span>잘 읽었어요</span>
+          <svg viewBox="0 0 20 20"
+            className={`h-[18px] w-[18px] shrink-0 transition-colors ${liked ? "text-red-500" : "text-ink"}`}
+            aria-hidden="true"
+            fill={liked ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.7">
+            <path d="M10 16.5S3.5 12.6 3.5 8.2A3.7 3.7 0 0 1 10 5.9a3.7 3.7 0 0 1 6.5 2.3c0 4.4-6.5 8.3-6.5 8.3Z"
+              strokeLinejoin="round" />
+          </svg>
+        </button>
+      </div>
     </div>
 
     {/* 비로그인 → 로그인 유도 **얼럿**(대표 지시 08-14 — "우리 얼럿 UI 디자인시스템 있잖아").
