@@ -7,6 +7,7 @@ import type { ArticleComment, BrandDna, Collab, CollabCard, CollabInput, CollabO
 import { kstIso } from "./time";
 import { orderedIdeaTitles } from "./report-cards";
 import { isDemoSlug } from "./demo";
+import { MAX_COLLABS } from "./limits";
 
 export interface Repo {
   // 업체
@@ -95,8 +96,10 @@ export interface Repo {
 
 const now = () => kstIso(); // 시각 표기 = KST(+09:00), lib/time.ts
 
-/** 소개서 "함께한 콜라보" 카드 상한 — register 폼(`collabHistory.length < 5`)과 같은 값이어야 한다. */
-const HISTORY_MAX = 5;
+/** 소개서 "함께한 콜라보" 카드 상한 = 폼 상한과 **같은 상수**를 쓴다(`lib/limits.ts`).
+ *  🚨08-24에 여기가 **5로 굳어 있는 걸 발견**했다 — 08-10에 폼을 30으로 올릴 때 이 파일이 빠졌다.
+ *     그 사이 콜라보가 5건을 넘는 브랜드는 성사 기록이 이력 카드로 **조용히 안 붙었다**.
+ *     limits.ts 머리말이 경고한 「사람에게 하는 부탁」이 딴 파일에서 그대로 재발한 셈. 숫자를 다시 쓰지 말 것. */
 
 /** 지역의 상위 2토막만 — "서울 마포구 연남동" → "서울 마포구". 카드 한 줄에 들어가는 식별 단위. */
 const topRegion = (region?: string | null): string | undefined => {
@@ -718,7 +721,7 @@ class InMemoryRepo implements Repo {
   }
   async appendCollabHistory(brandId: number, item: Maker["collabHistory"][number]): Promise<void> {
     const m = this.makers.find((x) => x.id === brandId);
-    if (!m || m.collabHistory.length >= HISTORY_MAX) return;
+    if (!m || m.collabHistory.length >= MAX_COLLABS) return;
     m.collabHistory = [...m.collabHistory, item];
   }
 }
@@ -1423,7 +1426,7 @@ class SupabaseRepo implements Repo {
       return;
     }
     const cur = Array.isArray(data.collab_history) ? (data.collab_history as unknown[]) : [];
-    if (cur.length >= HISTORY_MAX) return; // 폼 상한과 같은 5 — 넘치면 조용히 넘어간다(성사 기록 자체는 이미 됨)
+    if (cur.length >= MAX_COLLABS) return; // 폼 상한과 같은 상수 — 넘치면 조용히 넘어간다(성사 기록 자체는 이미 됨)
     const { error: wErr } = await this.db.from("brands").update({ collab_history: [...cur, item] }).eq("id", brandId);
     if (wErr) console.error(`[repo] appendCollabHistory write failed brand=${brandId}: ${wErr.message}`);
   }
