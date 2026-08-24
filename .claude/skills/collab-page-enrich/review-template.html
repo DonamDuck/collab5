@@ -1,4 +1,4 @@
-<title>소개서 보강 검토</title>
+<title>소개서 후보 검토</title>
 
 <!--
   ═══════════════════════════════════════════════════════════════════
@@ -29,11 +29,11 @@
 const BRAND = {
   name: "브랜드명",
   slug: "m-xxxxxx",
-  caps: { "콜라보": 5, "활동": 5 },   // 소개서 상한
+  caps: { "활동": 30, "콜라보": 30, "소개된 곳": 5 },   // 소개서 상한
 };
 
 const ITEMS = [
-  // 여기에 항목들
+  // 여기에 항목들. 필드 = id / kind / title / meta / sources / web / check / frozen / url / photos / current / draft
 ];
 </script>
 
@@ -248,23 +248,72 @@ const ITEMS = [
     .meta, .body, .actions { margin-left: 0; }
     h1 { font-size: 22px; }
   }
+
+  .srcs { margin-top: 2px; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+  .srcs .srclbl { font-weight: 700; color: var(--ink-faint); }
+  .srcs a { color: var(--accent); text-decoration: none; border-bottom: 1px solid currentColor; font-variant-numeric: tabular-nums; }
+  .srcs a:hover { opacity: .75; }
+
+  /* ── 자가검증 배지 (08-24 신설) ───────────────────────────────
+     대표에게 초안을 드리기 전에 내가 먼저 돌린 3패스 결과를 항목마다 붙인다.
+     🟢통과 / 🟡재료 부족(짧게 둠) / 🔴대표 판단 필요. 목적은 "무엇을 안 봐도 되는지"를 알려주는 것. */
+  .rt {
+    display: flex; gap: 8px; align-items: flex-start;
+    margin: 8px 0 0; padding: 9px 11px;
+    border-radius: 8px; font-size: 13px; line-height: 1.55;
+    background: var(--keep-soft); color: var(--ink-soft);
+    border: 1px solid transparent;
+  }
+  .rt[data-f="🟡"] { background: var(--edit-soft); }
+  .rt[data-f="🔴"] { background: var(--drop-soft); border-color: var(--drop); }
+  .rtb { flex: none; font-weight: 700; color: var(--ink); }
+
+  /* 대표가 이미 확정한 항목 — 접어 둔다. 스크롤 길이가 곧 검토 비용이다. */
+  .card.frozen { opacity: .72; }
+  .card.frozen .body, .card.frozen .note-row, .card.frozen .actions, .card.frozen .srcs { display: none; }
+  .card.frozen.open { opacity: 1; }
+  .card.frozen.open .body, .card.frozen.open .note-row,
+  .card.frozen.open .actions, .card.frozen.open .srcs { display: block; }
+  .card.frozen.open .actions { display: flex; }
+  .fz {
+    margin-top: 6px; font-size: 13px; color: var(--keep);
+    background: none; border: 0; padding: 0; cursor: pointer; font-weight: 600;
+    font-family: inherit; text-align: left;
+  }
+  .fz:hover { text-decoration: underline; }
+  .badge.lock { background: var(--keep-soft); color: var(--keep); }
+
+  /* 인스타 밖에서 온 사실의 출처 — 링크가 아니라 «그 자료의 그 줄»을 그대로 보인다.
+     08-24 대표 지적: "여기 있는 20명은 어떤 자료에서 온 거야?"
+     숫자는 맞았는데 인스타 링크만 보이고 있었다. 인스타 목록 글엔 숫자가 없다. */
+  .webs { display: block; margin-top: 5px; }
+  .webs .srclbl { margin-right: 6px; }
+  .webs span.w {
+    display: inline-block; margin: 2px 4px 0 0; padding: 2px 8px;
+    border: 1px solid var(--line); border-radius: 999px;
+    background: var(--card); color: var(--ink-soft); font-size: 12px;
+  }
 </style>
 
 <div class="wrap">
   <header class="top">
     <div class="eyebrow">소개서 보강 검토</div>
     <h1 id="h-title">브랜드</h1>
-    <p class="lede">제가 쓴 문안입니다. <b>마음에 안 드는 문장은 여기서 바로 고쳐주세요.</b></p>
+    <p class="lede">이번엔 <b>대표님께 드리기 전에 제가 먼저 검토</b>했습니다. 항목마다 그 결과를 붙여 뒀어요.</p>
 
     <div class="howto">
-      <b>고르는 법</b>
+      <b>이번에 바뀐 것</b>
       <ol>
-        <li>넣을 항목은 <b>[그대로]</b>, 뺄 항목은 <b>[빼기]</b>를 누르세요.</li>
-        <li>문장을 고치고 싶으면 <b>글상자를 직접 수정</b>하면 됩니다 (자동으로 '수정함'이 됩니다).
-            <b>제목도 눌러서 바로 고칠 수 있어요.</b></li>
-        <li><b>의견 칸에 "왜" 를 한 줄만</b> 남겨주세요 — 고친 결과만으론 규칙을 못 뽑습니다.
-            사실이 틀린 건지, 문체가 별로인 건지에 따라 다음 초안이 달라집니다.</li>
-        <li>다 하셨으면 아래 <b>[결정 전체 복사]</b> → 채팅에 붙여넣기. 한 번이면 끝입니다.</li>
+        <li><b>🟢 통과</b> — 원문과 대조했고 규칙도 맞습니다. 빠르게 넘기셔도 돼요.</li>
+        <li><b>🟡 재료 부족</b> — 원문이 짧아 짧게 뒀습니다. 채우지 않고 그대로 보여드립니다.</li>
+        <li><b>🔴 판단 필요</b> — 제가 사실을 틀렸거나, 대표님이 정하셔야 할 게 있습니다. <b>여기부터 보세요.</b></li>
+        <li><b>확정</b> 딱지가 붙은 건 <b>지난번에 대표님이 확정하신 것</b>이라 이번엔 손대지 않았습니다. 접어 뒀어요.</li>
+      </ol>
+      <b style="display:block;margin-top:12px">고치는 법 (그대로예요)</b>
+      <ol>
+        <li>뺄 항목은 <b>[빼기]</b>. 문장은 <b>글상자에서 바로 수정</b>, 제목도 눌러서 고칠 수 있어요.</li>
+        <li><b>의견 칸에 "왜"를 한 줄만</b> 남겨주세요 — 그게 다음 검증 규칙이 됩니다.</li>
+        <li>다 하셨으면 <b>[결정 전체 복사]</b> → 채팅에 붙여넣기.</li>
       </ol>
     </div>
   </header>
@@ -305,7 +354,7 @@ const ITEMS = [
     items.forEach((it, idx) => {
       state[it.id] = { status: "keep", text: it.draft, edited: false, note: "", title: it.title, titleEdited: false };
       const card = document.createElement("section");
-      card.className = "card";
+      card.className = "card" + (it.frozen ? " frozen" : "");
       card.dataset.state = "keep";
       card.dataset.id = it.id;
       card.dataset.kind = kind;
@@ -314,9 +363,10 @@ const ITEMS = [
           <span class="num">${String(idx + 1).padStart(2, "0")}</span>
           <input class="card-title" value="${esc(it.title)}" spellcheck="false" title="제목도 바로 고칠 수 있어요">
           ${it.photos ? `<span class="badge">사진 ${it.photos}장</span>` : ""}
-          ${it.current ? `<span class="badge">기존 항목</span>` : ""}
+          ${it.frozen ? `<span class="badge lock">확정</span>` : ""}
+          ${it.current && !it.frozen ? `<span class="badge">기존 항목</span>` : ""}
         </div>
-        <div class="meta">${esc(it.meta || "")}${it.url ? ` · <a href="${esc(it.url)}" target="_blank" rel="noopener">원문 보기 ↗</a>` : ""}</div>
+        <div class="meta">${esc(it.meta || "")}${it.url && !(it.sources||[]).length ? ` · <a href="${esc(it.url)}" target="_blank" rel="noopener">원문 보기 ↗</a>` : ""}</div>${it.frozen ? `<button class="fz" type="button">문안 펼쳐 보기 ▾</button>` : ""}${it.check ? `<div class="rt" data-f="${esc(it.check[0])}"><span class="rtb">${esc(it.check[0])} 자가검증</span><span>${esc(it.check[1])}</span></div>` : ""}${(it.web||[]).length ? `<div class="meta webs"><span class="srclbl">인스타 밖 출처</span>${it.web.map(w => `<span class="w">${esc(w)}</span>`).join("")}</div>` : ""}${(it.sources||[]).length ? `<div class="meta srcs"><span class="srclbl">판단에 쓴 글 ${it.sources.length}건</span>${it.sources.map(s => `<a href="https://www.instagram.com/p/${esc(s[1])}/" target="_blank" rel="noopener">${esc(s[0])} ↗</a>`).join("")}</div>` : ""}
         <div class="body">
           ${it.current ? `<div class="current"><span class="lbl">지금 소개서</span>${esc(it.current)}</div>` : ""}
           <textarea class="draft" spellcheck="false">${esc(it.draft)}</textarea>
@@ -332,6 +382,16 @@ const ITEMS = [
           <span class="edited-flag">수정함</span>
         </div>`;
       listEl.appendChild(card);
+
+      const fz = card.querySelector("button.fz");
+      if (fz) fz.addEventListener("click", () => {
+        const on = card.classList.toggle("open");
+        fz.textContent = on ? "접기 ▴" : "문안 펼쳐 보기 ▾";
+        if (on) requestAnimationFrame(() => {
+          const t = card.querySelector("textarea.draft");
+          t.style.height = "auto"; t.style.height = t.scrollHeight + 2 + "px";
+        });
+      });
 
       const ta = card.querySelector("textarea.draft");
       const fit = () => { ta.style.height = "auto"; ta.style.height = ta.scrollHeight + 2 + "px"; };
@@ -410,7 +470,8 @@ const ITEMS = [
           if (note) L.push(`  💬 ${note}`);
           return;
         }
-        L.push(`- ${n} ${title} → ${(s.edited || s.titleEdited) ? "수정함" : "그대로"}`);
+        const mark = (s.edited || s.titleEdited) ? "수정함" : (it.frozen ? "확정(유지)" : "그대로");
+        L.push(`- ${n} ${title} → ${mark}`);
         if (s.titleEdited) L.push(`  ✏️ 제목 수정 (원래: ${it.title})`);
         if (s.edited) L.push(s.text.trim().split("\n").map(l => "  " + l).join("\n"));
         if (note) L.push(`  💬 ${note}`);
