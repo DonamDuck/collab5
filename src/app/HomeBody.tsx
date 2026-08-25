@@ -40,14 +40,10 @@ export function HomeBody({
   isFirstIssue,
   bannerBg,
   newSlugs = [],
-  newHasMore = false,
 }: {
   brands: Maker[];
-  /** 🆕「새로 온 브랜드」 slug — 판정은 `page.tsx`의 `pickNewcomers`가 한다(최신 10곳·30일 이내). */
+  /** 🆕「새로 온 브랜드」 slug — 판정은 `page.tsx`의 `pickNewcomers`가 한다(최신 6곳·30일 이내). */
   newSlugs?: string[];
-  /** 🆕30일 이내 신규가 상한(10)을 «넘쳤나». 넘칠 때만 「더보기」 출구를 켠다 — 안 그러면
-   *  딱 10곳일 때도 버튼이 떠서 **누르면 더 없는** 화면이 된다. */
-  newHasMore?: boolean;
   /** 매거진 배너에 쓸 최신 글. 없으면 배너 자체를 안 그린다. */
   article?: MagazineListItem;
   isFirstIssue: boolean;
@@ -177,7 +173,7 @@ export function HomeBody({
             </span>
           </div>
           <div className="mt-7">
-            <BrandGrid brands={newcomers} showExits={newHasMore} />
+            <BrandGrid brands={newcomers} />
           </div>
         </section>
       )}
