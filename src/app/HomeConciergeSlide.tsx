@@ -59,18 +59,27 @@ export function HomeConciergeSlide({ image }: { image?: { src: string; alt: stri
               모집
             </span>
             <span className="text-[15px] font-bold tracking-[0.01em] text-[#3a4a2e] sm:text-[17px]">
-              소개서 만들기 프로젝트
+              본격! 소개서 만들기 프로젝트
             </span>
           </div>
           </div>
 
           <div>
-          <p className="break-keep text-[13px] font-medium text-[#3a4a2e] sm:mt-3 sm:text-[15px]">
+          {/* 🔻**모바일에서는 숨긴다**(대표 지적 08-25: *"텍스트가 너무 다닥다닥"*).
+              ⭐답답함의 원인은 글자 크기가 아니라 **덩어리 수**였다 — 좁은 폭에서 제호줄·부제·2줄 제목·
+                버튼줄이 넷이나 쌓이면 간격을 아무리 벌려도 빽빽하다. 하나를 덜어내야 나머지가 숨을 쉰다.
+              🗑️부제를 고른 이유 = **제목이 이미 그 일을 한다.** 「그동안 해온 활동, 한 페이지로 만들어
+                드려요」가 무엇을 주는지 말하고 있어서, 「막막하셨다면」은 공감을 한 번 더 얹는 것뿐이다.
+                (대표도 *"이 문장을 빼도 되고"*라고 짚었다)
+              🖥️데스크톱은 가로 여유가 있으니 그대로 남긴다. */}
+          <p className="hidden break-keep font-medium text-[#3a4a2e] sm:mt-3 sm:block sm:text-[15px]">
             콜라보를 제안할 때, 뭘 보여줘야 할지 막막하셨다면
           </p>
           {/* 📏크기(24/40)는 1번 슬라이드 제목과 같다 — 여기가 더 크면 슬라이드마다 목소리가 달라진다.
               🎨글자는 **검정**이다. 밝은 면이라 흰 글자를 쓸 수 없고, 어두운 초록보다 대비가 세다. */}
-          <h2 className="mt-1.5 text-balance break-keep text-[24px] font-bold leading-[1.22] tracking-[-0.03em] text-[#111] sm:mt-2 sm:text-[40px]">
+          <h2 // 📏모바일 간격을 크게 잡는다 — 제목이 **2줄**이라 1줄짜리(1번 슬라이드) 기준으로 붙이면
+          //   덩어리가 서로 밀착해 보인다. 줄 수가 늘면 위아래 여백도 같이 늘어야 한다.
+          className="mt-4 text-balance break-keep text-[24px] font-bold leading-[1.22] tracking-[-0.03em] text-[#111] sm:mt-2 sm:text-[40px]">
             그동안 해온 활동,
             <br />한 페이지로 만들어 드려요.
           </h2>
@@ -80,7 +89,7 @@ export function HomeConciergeSlide({ image }: { image?: { src: string; alt: stri
           </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-2 sm:mt-7">
+          <div className="mt-5 flex flex-wrap items-center gap-x-3 gap-y-2 sm:mt-7">
             {/* 슬라이드 전체가 링크라 이건 `<span>`이다 — 중첩 앵커 금지(1번과 같은 이유). */}
             <span className="inline-flex h-11 items-center rounded-pill bg-[#111] px-5 text-[14px] font-medium text-white sm:h-13 sm:px-7 sm:text-[15px]">
               신청하기
