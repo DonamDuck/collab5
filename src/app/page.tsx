@@ -85,14 +85,19 @@ const HOME_ORDER: string[] = [
  *  📌`createdAt`은 **발행 시점이 맞다**(08-25 확인). 우리는 저장이 곧 발행이라 초안으로 묵는 행이
  *    없다 — 방혜리 소개서를 08-24에 만들었고 값도 08-24였다. (임시저장은 localStorage라 행을 안 만든다.)
  *  ⚠️소유권을 나중에 넘긴 소개서는 **우리가 만든 날**이 기준이다. 그게 맞다 — 플랫폼에 나타난 날이니까. */
-const NEW_MAX = 3;
+// 🆕3 → **10**(대표 지시 08-25). 3칸이면 한 주에 세 곳씩 느는 지금 **바로 다음 주에 밀려난다.**
+//   ⚠️`GRID_LIMIT`(24)보다 작아야 한다 — 신규는 그 24곳 «안에서» 고르는 것이라, 여기를 24 이상으로
+//     올려도 더 나오지 않고 「없는 걸 기다리는」 코드가 된다.
+const NEW_MAX = 10;
 const NEW_WINDOW_DAYS = 30;
-function pickNewcomers(list: Maker[]): Maker[] {
+/** ⭐`total`을 같이 돌려주는 이유 = **「더보기」를 켤지 판정하려면 «자르기 전» 개수가 필요**하다.
+ *  `shown.length === NEW_MAX`로 대신 세면 **정확히 10곳일 때도 더보기가 뜬다**(누르면 더 없다). */
+function pickNewcomers(list: Maker[]): { shown: Maker[]; total: number } {
   const cutoff = Date.now() - NEW_WINDOW_DAYS * 24 * 60 * 60 * 1000;
-  return [...list]
+  const all = [...list]
     .filter((m) => m.createdAt && new Date(m.createdAt).getTime() >= cutoff)
-    .sort((a, b) => (a.createdAt > b.createdAt ? -1 : 1))
-    .slice(0, NEW_MAX);
+    .sort((a, b) => (a.createdAt > b.createdAt ? -1 : 1));
+  return { shown: all.slice(0, NEW_MAX), total: all.length };
 }
 
 // ⚠️이 한 줄이 없으면 목록이 **배포 시점에 얼어붙는다**(서버 컴포넌트 프리렌더 함정, /search·/my와 동일).
@@ -110,7 +115,7 @@ export default async function Home() {
   //   실제로 파랑~(08-21)·임펜사도(08-22)·방혜리(08-24)가 캐러셀 7칸 밖에 있었다 —
   //   그것도 대표가 제일 공들인 것들이. 주에 3곳씩 느는 지금 매번 손으로 목록을 고칠 수는 없다.
   //   ⭐그래서 `HOME_ORDER`는 **「손으로 정한 자리」로만** 남고, 신규는 그 «앞»에 자동으로 선다.
-  const newcomers = pickNewcomers(fetched);
+  const { shown: newcomers, total: newTotal } = pickNewcomers(fetched);
   const isNew = new Set(newcomers.map((m) => m.slug));
   const rank = (slug: string) => {
     const i = HOME_ORDER.indexOf(slug);
@@ -126,6 +131,8 @@ export default async function Home() {
       brands={collabBrands}
       // 🆕「새로 온 브랜드」 — 화면이 이걸 어떻게 쓸지는 `HomeBody`가 정한다(A안=별도 섹션 / B안=칸 안 배지).
       newSlugs={newcomers.map((m) => m.slug)}
+      // 🆕신규가 상한을 «넘칠 때만» 「더보기」를 켠다(대표 지시 08-25).
+      newHasMore={newTotal > NEW_MAX}
       article={leadArticle}
       isFirstIssue={articles.length === 1}
       // 🎨확정 배경 = **카본 #0c0c0c**(대표 08-16 2차, 홈 full 비교 후 선택).
