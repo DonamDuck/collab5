@@ -30,7 +30,8 @@ export interface Repo {
    *  ⭐**소개서를 새로 만들면 자동으로 들어간다** — 사이트맵을 정적으로 적어두지 않고 매번 DB에서 뽑는 이유(대표 지시).
    *  ⚠️`listHomeMakers` 재사용을 일부러 피했다: 그건 카드용이라 사진·블록 jsonb까지 통째로 읽어오는데
    *     사이트맵엔 주소와 날짜뿐이다. 브랜드가 늘수록 이 차이가 커진다. */
-  listSitemapBrands(): Promise<{ slug: string; updatedAt: string }[]>;
+  /** 사이트맵 + RSS 공용. `name`·`oneLiner`는 RSS 항목 제목·요약에만 쓴다(사이트맵은 slug만 본다). */
+  listSitemapBrands(): Promise<{ slug: string; updatedAt: string; name: string; oneLiner: string }[]>;
   // 📰 매거진 (2026-08-10) — PR1은 **읽기만**. 쓰기(작성·수정·발행)는 PR2에서 서버 액션으로.
   /** 목록 — 발행분만 최신순. 본문(body)은 빼고 읽는다(MagazineListItem 주석 참조). */
   listPublishedArticles(limit?: number): Promise<MagazineListItem[]>;
@@ -508,11 +509,11 @@ class InMemoryRepo implements Repo {
       .sort((a, b) => (a.createdAt > b.createdAt ? -1 : 1)) // 최신순 — 인터페이스 주석 참조
       .slice(0, limit);
   }
-  async listSitemapBrands(): Promise<{ slug: string; updatedAt: string }[]> {
+  async listSitemapBrands(): Promise<{ slug: string; updatedAt: string; name: string; oneLiner: string }[]> {
     // ⚠️`searchVisible`로 거르지 않는다 — 사이트맵은 웹 검색용(Supabase 구현 주석 참조).
     return this.makers
       .filter((m) => m.status !== "inactive" && !isDemoSlug(m.slug))
-      .map((m) => ({ slug: m.slug, updatedAt: m.updatedAt || m.createdAt }));
+      .map((m) => ({ slug: m.slug, updatedAt: m.updatedAt || m.createdAt, name: m.name, oneLiner: m.oneLiner || "" }));
   }
 
   // 📰 매거진 — 로컬 mock엔 시드가 없다(빈 목록). 실제 확인은 prod DB에 seed SQL을 넣고 한다.
@@ -937,7 +938,7 @@ class SupabaseRepo implements Repo {
       .limit(limit);
     return (data ?? []).map((r) => rowToMaker(r as MakerRow));
   }
-  async listSitemapBrands(): Promise<{ slug: string; updatedAt: string }[]> {
+  async listSitemapBrands(): Promise<{ slug: string; updatedAt: string; name: string; oneLiner: string }[]> {
     // ⭐조건은 `status='active'` **하나뿐**이다(대표 확정 08-07 2차) — 사이트맵은 **웹 검색**용이라
     //   `search_visible` 토글과 무관하게 전부 싣는다. 그 토글은 이제 이름 그대로
     //   **`콜라보 찾기`(사이트 안 목록)에 보일지**만 정한다(홈 캐러셀·/search).
@@ -947,7 +948,7 @@ class SupabaseRepo implements Repo {
     // 상한 1000은 폭주 방지선이지 정책이 아니다(넘으면 분할 사이트맵을 쓴다).
     const { data, error } = await this.db
       .from("brands")
-      .select("slug, updated_at, created_at")
+      .select("slug, updated_at, created_at, name, one_liner")
       .eq("status", "active")
       .order("updated_at", { ascending: false })
       .limit(1000);
@@ -956,11 +957,16 @@ class SupabaseRepo implements Repo {
       console.error(`[repo] listSitemapBrands failed: ${error.message}`);
       return [];
     }
-    type Row = { slug: string; updated_at: string | null; created_at: string };
+    type Row = { slug: string; updated_at: string | null; created_at: string; name: string | null; one_liner: string | null };
     return (data ?? [])
       .map((r) => {
         const row = r as Row;
-        return { slug: row.slug, updatedAt: row.updated_at || row.created_at };
+        return {
+          slug: row.slug,
+          updatedAt: row.updated_at || row.created_at,
+          name: row.name || row.slug,
+          oneLiner: row.one_liner || "",
+        };
       })
       // ⛔데모 복제본만 예외 — `m-demo-*`는 캔버스가든 소개서를 **글자 그대로 복사**한 것이라
       //   색인되면 진짜 소개서와 똑같은 내용이 둘이 되고, 검색엔진이 둘 중 뭘 보여줄지 자기가 고른다
