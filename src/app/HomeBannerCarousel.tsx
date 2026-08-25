@@ -17,18 +17,48 @@
 //   ③ 숨은 탭은 rAF가 0프레임이라 자동 넘김이 밀린다. → `document.hidden`이면 넘기지 않는다.
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
-const AUTO_MS = 6000;
+const AUTO_MS = 3500;
 const SWIPE_PX = 40; // 이만큼 끌면 넘어간다
+const SLIDE_MS = 420; // 넘어가는 데 걸리는 시간(아래 transition과 같은 값이어야 한다)
 
 export function HomeBannerCarousel({ children }: { children: ReactNode }) {
   // 🪤`{article && <Slide/>}`처럼 조건부로 넘어온 슬라이드는 글이 없을 때 `false`로 온다.
   //    거르지 않으면 **빈 슬라이드 한 장**이 생기고 점도 하나 더 찍힌다(매거진 글이 0편일 때).
   const slides = (Array.isArray(children) ? children : [children]).filter(Boolean);
   const n = slides.length;
-  const [idx, setIdx] = useState(0);
+  const loop = n > 1;
+
+  // 🎠**무한 롤링**(대표 지시 08-25: *"오른쪽 슬라이드만으로도 계속 반복해서 볼 수 있게"*).
+  //   ⭐한 벌만 늘어놓으면 마지막에서 처음으로 갈 때 트랙이 **왼쪽 끝까지 되감기며 역주행**한다.
+  //     그래서 **같은 슬라이드를 3벌** 깔고 **가운데 벌에서만 논다** — 어느 쪽으로 계속 밀어도
+  //     옆에 항상 다음 장이 준비돼 있다.
+  //   🔁끝에 다다르면 애니메이션을 끈 채 가운데 벌의 같은 자리로 **순간 이동**한다.
+  //     그림이 똑같은 자리라 사람 눈에는 아무 일도 안 일어난 것으로 보인다.
+  const reel = loop ? [...slides, ...slides, ...slides] : slides;
+  const [idx, setIdx] = useState(loop ? n : 0); // 가운데 벌의 첫 장에서 시작
   const [dx, setDx] = useState(0); // 끄는 중의 손가락 이동량(px)
   const [paused, setPaused] = useState(false);
+  const [snap, setSnap] = useState(false); // 순간 이동 중(트랜지션 끔)
   const drag = useRef({ on: false, startX: 0, moved: 0, id: -1 });
+  const active = loop ? ((idx % n) + n) % n : idx;
+
+  // 🔁가운데 벌 밖으로 나가면 트랜지션이 끝난 뒤 같은 그림의 가운데 자리로 되돌린다.
+  //   ⚠️`SLIDE_MS`보다 **조금 뒤**에 해야 한다 — 이동 중에 자리를 바꾸면 화면이 튄다.
+  useEffect(() => {
+    if (!loop || (idx >= n && idx < n * 2)) return;
+    const t = setTimeout(() => {
+      setSnap(true);
+      setIdx((i) => (((i % n) + n) % n) + n);
+    }, SLIDE_MS + 30);
+    return () => clearTimeout(t);
+  }, [idx, n, loop]);
+
+  // 순간 이동은 **한 프레임만** 유지한다. 계속 켜 두면 다음 이동도 뚝 끊긴다.
+  useEffect(() => {
+    if (!snap) return;
+    const r = requestAnimationFrame(() => setSnap(false));
+    return () => cancelAnimationFrame(r);
+  }, [snap]);
 
   // 자동 넘김 — 슬라이드가 하나면 돌지 않는다. 손을 올리거나 끄는 중이면 쉰다.
   // ♿`prefers-reduced-motion`이면 자동 넘김을 아예 끈다(스스로 움직이는 것이 그 설정의 핵심 대상이다).
@@ -37,7 +67,7 @@ export function HomeBannerCarousel({ children }: { children: ReactNode }) {
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     const t = setInterval(() => {
       if (document.hidden) return; // 🪤숨은 탭에서 눈치 없이 넘어가 있지 않게
-      setIdx((i) => (i + 1) % n);
+      setIdx((i) => i + 1);
     }, AUTO_MS);
     return () => clearInterval(t);
   }, [n, paused]);
@@ -62,9 +92,9 @@ export function HomeBannerCarousel({ children }: { children: ReactNode }) {
       } catch {}
     }
     if (d.id < 0) return; // 아직 «클릭일지도 모르는» 단계 — 화면을 흔들지 않는다
-    // 양 끝에서는 저항을 준다(고무줄) — 안 그러면 끝인지 모르고 계속 끈다.
-    const atEdge = (idx === 0 && delta > 0) || (idx === n - 1 && delta < 0);
-    setDx(atEdge ? delta * 0.35 : delta);
+    // 🔁고무줄 저항을 뺐다 — 무한 롤링이라 **끝이 없다.** 저항을 두면 「여기가 마지막」이라고
+    //    거짓말을 하는 셈이다.
+    setDx(delta);
     e.preventDefault();
   };
 
@@ -81,7 +111,8 @@ export function HomeBannerCarousel({ children }: { children: ReactNode }) {
     setDx(0);
     setPaused(false);
     if (Math.abs(delta) > SWIPE_PX) {
-      setIdx((i) => Math.min(n - 1, Math.max(0, i + (delta < 0 ? 1 : -1))));
+      // 🔁범위를 자르지 않는다 — 밖으로 나가면 위 훅이 같은 그림의 가운데 자리로 되돌린다.
+      setIdx((i) => i + (delta < 0 ? 1 : -1));
     }
   };
 
@@ -108,7 +139,8 @@ export function HomeBannerCarousel({ children }: { children: ReactNode }) {
         className="flex items-stretch touch-pan-y"
         style={{
           transform: `translateX(calc(${-idx * 100}% + ${dx}px))`,
-          transition: drag.current.on ? "none" : "transform 420ms cubic-bezier(0.22,1,0.36,1)",
+          transition:
+            drag.current.on || snap ? "none" : `transform ${SLIDE_MS}ms cubic-bezier(0.22,1,0.36,1)`,
         }}
         onDragStart={(e) => e.preventDefault()} // 🪤①
         onPointerDown={onPointerDown}
@@ -116,7 +148,7 @@ export function HomeBannerCarousel({ children }: { children: ReactNode }) {
         onPointerUp={endDrag}
         onPointerCancel={endDrag}
       >
-        {slides.map((s, i) => (
+        {reel.map((s, i) => (
           <div
             key={i}
             className="w-full shrink-0"
@@ -139,12 +171,14 @@ export function HomeBannerCarousel({ children }: { children: ReactNode }) {
               <button
                 key={i}
                 type="button"
-                onClick={() => setIdx(i)}
+                // 🔁가운데 벌의 같은 자리로 보낸다 — 점은 «몇 번째 슬라이드인가»를 말하지
+                //    «트랙의 몇 칸째인가»를 말하지 않는다.
+                onClick={() => setIdx(loop ? n + i : i)}
                 aria-label={`${i + 1}번 배너 보기`}
-                aria-current={i === idx}
+                aria-current={i === active}
                 // 📐점은 8px, 현재 것만 가로로 늘어난 알약(18px). 색만 바꾸면 어두운 면에서 잘 안 보인다.
                 className={`h-2 rounded-pill transition-all duration-[var(--dur-base)] ${
-                  i === idx ? "w-[18px] bg-white" : "w-2 bg-white/40 hover:bg-white/70"
+                  i === active ? "w-[18px] bg-white" : "w-2 bg-white/40 hover:bg-white/70"
                 }`}
               />
             ))}
