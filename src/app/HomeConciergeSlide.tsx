@@ -9,10 +9,17 @@
 //   (대표가 준 `docs.google.com/...1FAIpQLSf...` = `forms.gle/6XnnSTCQ2HDVkf2Y7`의 원본 주소).
 //   ⚠️폼을 바꾸면 `src/app/m/[slug]/page.tsx`의 `ENRICH_FORM_URL`도 같이 고친다.
 //
-// 🖼️**오른쪽 그림 자리는 비어 있다**(`image` prop). 1번 슬라이드는 매거진 커버가 그 자리를 채우는데
-//   우리에게 쓸 만한 가로 이미지가 없다 — `/public/preview/*`는 전부 세로 폰 스크린샷이라
-//   16:10으로 자르면 소개서가 잘린다. 대표가 그림(고양이든 뭐든)을 주면 `image`로 넘기면 된다.
-//   ⛔그 그림을 우리가 만들어 넣지 않는다 — 08-16 로고 사고와 같은 자리다(준 것을 다시 만들지 말 것).
+// 🖼️**그림이 없다. 그리고 그게 문제가 아니다**(08-25 대표가 재료를 찾아 해결).
+//   1번(매거진)은 오른쪽 46%를 커버 사진이 채우는데 여기는 빌 수밖에 없었고, 그 빈 자리가
+//   08-19에 이 슬라이드를 내리게 한 이유 중 하나였다.
+//   ⭐대표가 인스타 「브랜드 탐방록」 표지를 가리켰다 — https://www.instagram.com/p/DcQ1tn3EoU0/
+//     **사진 없이 글자만으로 성립하는 판**이라 가로로 옮기면 그대로 맞는다.
+//   📐원본 = 클로드 디자인 「브랜드 소개서 모집 캐러셀」의 `MainDark.dc.html`(1080×1350).
+//     https://claude.ai/code/artifact/fb92301a-5453-4414-8de7-9d74fadc0c47
+//   🎨**대표가 아이폰에서 만진 판을 따랐다.** 원본은 보조 글자가 전부 어두운 초록(#7acb4e)인데
+//     게시본에서는 **회색·흰색**이다. 카본 위에서 #7acb4e는 탁해서 잘 안 읽힌다 — 대표 판단이 맞다.
+//     ⛔우리가 그림을 다시 그리지 않는다. **옮긴 것은 색·크기·배치이고 문안과 구조는 원본 그대로다.**
+
 "use client";
 
 import { track } from "@/lib/track";
@@ -29,49 +36,111 @@ export function HomeConciergeSlide({ image }: { image?: { src: string; alt: stri
       onClick={() => track("home_banner_concierge_click")}
       // 📐1번 슬라이드의 안쪽 상자와 **같은 값**이다(max-w-1320 · px-4/6 · py-7/12).
       //   숫자가 어긋나면 슬라이드가 넘어갈 때 글이 좌우로 튄다.
-      className="relative mx-auto block w-full max-w-[1320px] px-4 py-7 sm:px-6 sm:py-12"
+      // 🎨**배경을 슬라이드가 직접 깐다.** 캐러셀 섹션이 카본을 깔고 있으므로 여기서 덮어야
+      //   2번만 다른 면이 된다. `block w-full`이라 풀블리드가 그대로 유지된다.
+      // 🎨**배경을 슬라이드가 직접 깐다.** 캐러셀 섹션이 카본을 깔고 있으므로 여기서 덮어야
+      //   2번만 다른 면이 된다. 🪤`h-full`이 필수다 — 없으면 칸을 다 못 채워 위아래로 카본이 샌다.
+      className="relative flex h-full w-full items-stretch bg-[#D6FFC0]"
     >
-      <div className="grid items-center gap-5 sm:grid-cols-[1fr_46%] sm:gap-9">
-        {image && (
-          <div className="order-first overflow-hidden rounded-lg bg-surface-soft sm:order-last">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={image.src} alt={image.alt} className="aspect-[16/10] w-full object-cover" />
-          </div>
-        )}
-        <div className="min-w-0">
-          {/* 🏛️1번의 제호(「collab5 매거진」+「창간호」)와 **같은 자리·같은 크기**.
-              여기서는 「collab5팀이 직접」이 이름 노릇을 하고 「무료」가 배지 노릇을 한다. */}
+      <div className="mx-auto flex w-full max-w-[1320px] flex-col px-4 py-7 sm:px-6 sm:py-12">
+      {/* 📐**데스크톱 2열 / 모바일 1열** — 1번 슬라이드와 같은 골격(`[1fr_46%]`)이다.
+          오른쪽 46%는 1번에서 매거진 커버가 먹는 자리다. 여기엔 소개서 실물 목업이 들어간다. */}
+      <div className="grid flex-1 items-center gap-6 sm:grid-cols-[1fr_46%] sm:gap-9">
+        {/* 📱**모바일은 위·가운데·아래 3단**(`justify-between`), 데스크톱은 평범한 세로 흐름(`sm:block`).
+            ⭐인스타 원본이 세로 판이라 좁아질수록 그 구성이 그대로 맞는다 —
+              1번 슬라이드가 「2열 → 1열」로 접히는 것과 **반대 방향의 변형**이다.
+            🪤이게 없으면 모바일에서 글이 가운데 뭉치고 위아래로 연둣빛 여백만 크게 남는다(실측 08-25).
+              배너 높이는 사진이 있는 1번이 정하는데 2번은 글뿐이라 그만큼 비는 것이다. */}
+        <div className="flex min-w-0 flex-col justify-between gap-7 sm:block sm:gap-0">
+          {/* 🏛️1번의 제호 자리와 같은 자리·같은 크기. 「모집」이 배지, 뒤가 이름 노릇을 한다.
+              ⚠️인스타 원본은 알약이 **왼쪽**이다(1번과 순서가 반대). 원본을 따른다 —
+                「모집」이 먼저 눈에 박히는 게 이 판의 문법이다. */}
+          <div>
           <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
-            <span className="text-[15px] font-bold tracking-[0.06em] text-primary sm:text-[17px]">
-              collab5팀이 직접
+            <span className="inline-flex items-center rounded-pill bg-[#111] px-2.5 py-0.5 text-[13px] font-bold text-[#D6FFC0] sm:px-3 sm:py-1 sm:text-[14px]">
+              모집
             </span>
-            <span className="inline-flex items-center rounded-pill bg-white/15 px-2 py-0.5 text-[11px] font-bold text-white/80">
-              무료
+            <span className="text-[15px] font-bold tracking-[0.01em] text-[#3a4a2e] sm:text-[17px]">
+              소개서 만들기 프로젝트
             </span>
           </div>
-          <p className="mt-3 break-keep text-[13px] font-medium text-white/70 sm:text-[15px]">
-            소개서 쓰기 어려우신가요?
+          </div>
+
+          <div>
+          <p className="break-keep text-[13px] font-medium text-[#3a4a2e] sm:mt-3 sm:text-[15px]">
+            콜라보를 제안할 때, 뭘 보여줘야 할지 막막하셨다면
           </p>
-          {/* 📏1번 슬라이드 제목과 같은 크기(24/40). 여기가 더 크면 슬라이드마다 목소리가 달라진다. */}
-          <h2 className="mt-1.5 text-balance break-keep text-[24px] font-bold leading-[1.25] tracking-[-0.025em] text-white sm:mt-2 sm:text-[40px]">
-            소개서, 저희가 만들어드릴게요.
+          {/* 📏크기(24/40)는 1번 슬라이드 제목과 같다 — 여기가 더 크면 슬라이드마다 목소리가 달라진다.
+              🎨글자는 **검정**이다. 밝은 면이라 흰 글자를 쓸 수 없고, 어두운 초록보다 대비가 세다. */}
+          <h2 className="mt-1.5 text-balance break-keep text-[24px] font-bold leading-[1.22] tracking-[-0.03em] text-[#111] sm:mt-2 sm:text-[40px]">
+            그동안 해온 활동,
+            <br />한 페이지로 만들어 드려요.
           </h2>
-          {/* 🔻1번 슬라이드는 요약을 모바일에서 숨기는데(사진이 이미 화면을 채운다) **여기는 반대로 켠다.**
-              🔬실측 @375 — 배너 높이는 사진 있는 1번이 정해서 444인데 이 슬라이드는 219밖에 안 돼
-                **검은 여백이 225px** 남았다. 그림이 없는 슬라이드는 글이 그 자리를 대신해야 한다.
-              ⭐같은 규칙이라도 **무엇이 자리를 채우고 있는지**에 따라 답이 뒤집힌다. */}
-          <p className="mt-3 text-[14px] leading-relaxed break-keep text-white/75 sm:text-[16px]">
-            웹과 인스타그램에 흩어져 있는 사진과 이야기를 모아 collab5팀이 소개서를 만들어드려요.
-            이미 소개서가 있다면 더 풍성하게 채워드리고요.
+          {/* 모바일에서는 숨긴다 — 1번 슬라이드의 요약과 같은 규칙. */}
+          <p className="mt-3 hidden text-[15px] leading-relaxed break-keep text-[#3a4a2e] sm:block sm:text-[16px]">
+            웹과 인스타그램에 흩어져 있는 사진과 이야기를 모아 collab5팀이 한 페이지로 정리해드려요.
           </p>
-          <div className="mt-5 flex items-center gap-3 sm:mt-7">
+          </div>
+
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2 sm:mt-7">
             {/* 슬라이드 전체가 링크라 이건 `<span>`이다 — 중첩 앵커 금지(1번과 같은 이유). */}
-            <span className="inline-flex h-11 items-center rounded-pill bg-white px-5 text-[14px] font-medium text-ink sm:h-13 sm:px-7 sm:text-[15px]">
+            <span className="inline-flex h-11 items-center rounded-pill bg-[#111] px-5 text-[14px] font-medium text-white sm:h-13 sm:px-7 sm:text-[15px]">
               신청하기
             </span>
-            <span className="text-[12px] text-white/55 sm:text-[13px]">신청하고 하루면 완성돼요</span>
+            {/* 📝원본은 「비용 없음 · DM으로 신청」인데 우리는 폼으로 받는다 — 경로가 다르니 조건만 남긴다. */}
+            <span className="text-[12px] text-[#4a5a3e] sm:text-[13px]">
+              비용 없음 · 1인·소규모 브랜드라면 누구나
+            </span>
           </div>
         </div>
+
+        {/* 🖼️**데스크톱에만 뜬다**(`hidden sm:block`, 대표 지시 08-25).
+            🚫모바일에서 뺀 이유 — 폰으로 보는 사람에게 화면 그림을 또 보여줄 이유가 없고,
+              좁은 화면에서 세로만 잡아먹는다. 모바일은 글자만으로 성립하는 원본 구성이 그대로 산다.
+            🔻**데스크톱 스샷 1장 → 모바일 스샷 2장으로 갈아탔다**(대표 판단 08-25).
+              ⭐데스크톱 소개서는 본문이 가운데 좁게 앉아 **16:10 안에 카드 하나밖에 안 들어간다.**
+                모바일 판은 세로로 길어 같은 상자에 **정보가 두 배로** 담기고, 소개서를 실제로 보는
+                기기도 폰이다. 홈 ④구좌 `PreviewPhones`가 창 여러 대를 늘어놓는 것과 같은 그림이 된다.
+            📐두 창은 소개서의 **다른 자리**다 — 왼쪽은 브랜드 카드·대표 사진, 오른쪽은 「우리는 이런 일을
+              하고 있어요」. 같은 화면을 두 번 보여주면 두 대를 둘 이유가 없다. */}
+        <div className="hidden sm:block">
+          {/* 📐1번 슬라이드 커버와 **같은 상자**(16:10). 창은 그보다 길어 아래가 잘린다 —
+              「방금 연 화면」으로 읽히고, 스크롤해 내려간 화면처럼 보이지 않는다. */}
+          <div className="grid aspect-[16/10] grid-cols-[minmax(0,1fr)_minmax(0,1fr)] items-start gap-3 overflow-hidden">
+            {[
+              { src: "/preview/brand-page-m1-v2.jpg", alt: "브랜드 소개서 예시 — 캔가의 소개와 대표 사진" },
+              { src: "/preview/brand-page-m2-v2.jpg", alt: "브랜드 소개서 예시 — 캔가가 하고 있는 일" },
+            ].map((m) => (
+              // 창틀 = 홈 ④구좌 `PreviewPhones`와 같은 옷.
+              // ⛔그림자 없음 — 라인과 그림자는 둘 다 「여기가 끝」을 말해 같이 쓰면 경계가 두 번 그어진다(볼트 08-14).
+              // ⚠️`ring-black/[.10]` — `PreviewPhones`는 흰 지면 위라 `.07`이면 됐지만 여기는 연둣빛 면 위라 한 단 진해야 뜬다.
+              <div
+                key={m.src}
+                // 🪤`min-w-0`이 필수다 — grid 칸은 기본이 `min-width:auto`라 **안에 든 이미지의 원본
+                //   폭(780px)만큼 칸이 벌어진다.** 그러면 창이 상자를 넘쳐 오른쪽이 잘린다(실측 08-25).
+                className="min-w-0 overflow-hidden rounded-[14px] bg-white ring-1 ring-black/[.10]"
+              >
+                <div className="flex items-center gap-1.5 border-b border-black/[.06] bg-[#f5f5f6] px-2.5 py-[7px]">
+                  <svg
+                    viewBox="0 0 12 12"
+                    className="h-[9px] w-[9px] shrink-0 text-[#9a9a9a]"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.4"
+                    aria-hidden="true"
+                  >
+                    <rect x="2.5" y="5.2" width="7" height="5" rx="1.2" />
+                    <path d="M4.2 5.2V3.8a1.8 1.8 0 013.6 0v1.4" />
+                  </svg>
+                  <span className="truncate text-[8.5px] text-[#9a9a9a]">collab5.co.kr/m/…</span>
+                </div>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={m.src} alt={m.alt} className="block h-auto w-full" />
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
       </div>
     </a>
   );

@@ -109,8 +109,13 @@ export function HomeMagazineBanner({
         event="home_magazine_banner_click"
         params={{ slug: article.slug }}
         // `relative` 필수 — 위 배경 레이어(absolute)보다 위에 와야 글이 막에 안 묻힌다.
-        className="relative mx-auto block w-full max-w-[1320px] px-4 py-7 sm:px-6 sm:py-12"
+        // 🖱️**링크가 배너 폭 전체를 덮는다**(대표 지시 08-25: *"배너 영역 클릭하면 다 넘어가게"*).
+        //   🔻예전엔 여기 `mx-auto max-w-[1320px]`가 붙어 있어 **넓은 화면에서 좌우 여백이 링크 밖**이었다
+        //     (@1440 기준 양쪽 60px씩). 배너처럼 보이는 곳을 눌렀는데 아무 일도 안 일어나는 자리였다.
+        //   📐폭 제한은 **안쪽 상자**로 내렸다 — 보이는 그림은 그대로고 누를 수 있는 넓이만 커진다.
+        className="relative block w-full"
       >
+        <div className="mx-auto w-full max-w-[1320px] px-4 py-7 sm:px-6 sm:py-12">
         {/* 📐모바일 1열(사진 위·글 아래) / 데스크톱 2열(글 왼쪽·사진 오른쪽).
             ⚠️모바일에서 사진을 **위**로 올린 건 잡지의 규칙이다 — 사진이 붙잡고 글이 따라온다.
               (매거진 목록 히어로도 같은 규칙이라 도착했을 때 얼굴이 이어진다) */}
@@ -226,6 +231,7 @@ export function HomeMagazineBanner({
               </span>
             </div>
           </div>
+        </div>
         </div>
       </TrackLink>
     </section>

@@ -99,10 +99,13 @@ export function HomeBannerCarousel({ children }: { children: ReactNode }) {
       <div
         // 🖐️`touch-pan-y` — 세로 스크롤은 브라우저에 맡기고 가로만 우리가 받는다.
         //   이게 없으면 폰에서 배너 위에 손이 닿는 순간 페이지가 안 내려간다.
-        // 📐`items-center` — 슬라이드마다 내용 높이가 다르다(매거진은 사진이 있고 컨시어지는 글만).
-        //    stretch로 두면 짧은 슬라이드가 위로 붙고 **아래에 검은 여백 150px**이 남는다(실측).
-        //    가운데로 두면 배너 높이는 긴 쪽이 정하고 짧은 쪽은 그 안에서 중심을 잡는다.
-        className="flex items-center touch-pan-y"
+        // 📐**`items-stretch`다**(08-25 정정). 슬라이드마다 내용 높이가 다른데, 이제 **각 슬라이드가
+        //    자기 배경을 깔기 때문에** 칸을 꽉 채워야 한다.
+        //    🔻08-19에는 `items-center`였다 — 그때는 배경이 캐러셀 것 하나뿐이라 짧은 슬라이드를
+        //      가운데로 두는 게 맞았다. 2번이 자기 면색(뿌연 키위)을 갖게 되자 **전제가 뒤집혔다**:
+        //      가운데로 두면 위아래로 **카본이 드러나 검은 띠**가 생긴다(모바일 실측 08-25).
+        //    ⭐세로 중심잡기는 이제 **슬라이드 안에서** 한다(`h-full` + `items-center`).
+        className="flex items-stretch touch-pan-y"
         style={{
           transform: `translateX(calc(${-idx * 100}% + ${dx}px))`,
           transition: drag.current.on ? "none" : "transform 420ms cubic-bezier(0.22,1,0.36,1)",
