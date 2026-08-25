@@ -39,7 +39,13 @@ const SHOW_TYPE_CHIPS = false;
 /** 홈에 띄울 유형 순서(전체 7종 중 앞 5개). 어휘 정본은 `lib/types.ts`의 `COLLAB_TYPES`. */
 const HOME_TYPES: CollabType[] = ["제품콜라보", "팝업", "워크숍", "공동굿즈", "공동콘텐츠"];
 
-export function BrandGrid({ brands }: { brands: Maker[] }) {
+export function BrandGrid({ brands, showExits = true }: { brands: Maker[];
+  /** 🆕출구(레일 끝 「더보기」 칸 + 하단 버튼)를 그릴지. **짧은 목록 전용 섹션에선 끈다** —
+   *  3곳짜리 「새로 온 브랜드」에 「모두 보기」가 둘이나 붙으면 어디로 가라는 건지 흐려진다.
+   *  ⭐출구가 둘인 건 원래 «다 못 본 사람»을 위한 설계다(레일 끝=민 사람 / 하단=안 민 사람).
+   *    한 화면에 다 보이는 목록엔 그 전제가 없다. */
+  showExits?: boolean;
+}) {
   const shown = brands.slice(0, CAROUSEL_LIMIT);
 
   // 🖱️**데스크톱 화살표**(대표 지적 08-16: *"데스크탑에서 캐러셀 클릭해서 슬라이드가 안 돼"*).
@@ -267,9 +273,11 @@ export function BrandGrid({ brands }: { brands: Maker[] }) {
             <BrandCard m={m} />
           </div>
         ))}
-        <div className="w-[210px] shrink-0 snap-start sm:w-[300px]">
-          <EndCard />
-        </div>
+        {showExits && (
+          <div className="w-[210px] shrink-0 snap-start sm:w-[300px]">
+            <EndCard />
+          </div>
+        )}
       </div>
       {/* 🖱️화살표 — 레일 **위에 겹쳐** 띄운다(와사비 방식). 위에 따로 줄을 만들면 세로를 먹는데,
           이 구좌는 애초에 "길이를 줄이려고" 캐러셀로 바꾼 자리라 그 비용을 다시 낼 이유가 없다.
@@ -279,7 +287,7 @@ export function BrandGrid({ brands }: { brands: Maker[] }) {
             즉 콘텐츠 폭 안쪽에 붙는다. 화면 끝에 붙이면 잘린 카드 위에 떠서 뭘 가리키는지 모호해진다. */}
       <SlideButton dir={-1} onClick={() => slide(-1)} hidden={edge.start} />
       <SlideButton dir={1} onClick={() => slide(1)} hidden={edge.end} />
-      <BottomMore />
+      {showExits && <BottomMore />}
     </div>
   );
 }

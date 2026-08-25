@@ -42,6 +42,7 @@
 // 🔻`Link`·`Reveal` import 제거(08-16) — 마무리 CTA 섹션이 사라지면서 홈에서 쓰는 곳이 없어졌다.
 //    ⚠️`Reveal` 컴포넌트 자체는 남아 있다(다른 페이지가 쓴다). 홈만 안 쓰는 것.
 import { repo } from "@/lib/repo";
+import type { Maker } from "@/lib/types";
 import { HomeBody } from "./HomeBody";
 
 // 🔄~~n≤12 동안 전량 노출~~(07-31) → 08-16부터 캐러셀만 그린다(`BrandGrid`의 `CAROUSEL_LIMIT`, ~~6~~→**7** 08-20).
@@ -71,6 +72,29 @@ const HOME_ORDER: string[] = [
   //   이 목록에 없어 `MAX_SAFE_INTEGER`로 맨 뒤에 밀려 있었다 — 순서가 지정된 적이 없던 셈.
 ];
 
+/** 🆕「새로 온 브랜드」 판정 — **최신 3곳, 단 30일 넘은 건 빼고**(08-25 확정).
+ *
+ *  ⭐**개수 기준인 이유** = 대표가 소개서를 «몰아서» 만든다. 7월 씨딩 때 15~22일 8일 동안 8곳이
+ *    올라왔고 하루에 3곳인 날도 있었다. 기간 기준(「최근 2주」)이면 그때 **12곳 중 8곳(67%)에
+ *    NEW가 붙는다** — 그건 새것 표시가 아니라 배경이다. 반대로 조용한 달엔 0곳이 되어
+ *    섹션이 통째로 사라지고 화면이 튄다. 개수 기준은 **늘 정확히 N개**라 둘 다 안 생긴다.
+ *
+ *  ⭐**그런데도 30일 상한을 두는 이유** = 개수만 쓰면 조용한 달에 **석 달 된 소개서가 NEW를 달고**
+ *    홈에 앉아 있다. 대표가 매일 보는 화면이라 바로 들킨다. 조건 한 줄로 막는다.
+ *
+ *  📌`createdAt`은 **발행 시점이 맞다**(08-25 확인). 우리는 저장이 곧 발행이라 초안으로 묵는 행이
+ *    없다 — 방혜리 소개서를 08-24에 만들었고 값도 08-24였다. (임시저장은 localStorage라 행을 안 만든다.)
+ *  ⚠️소유권을 나중에 넘긴 소개서는 **우리가 만든 날**이 기준이다. 그게 맞다 — 플랫폼에 나타난 날이니까. */
+const NEW_MAX = 3;
+const NEW_WINDOW_DAYS = 30;
+function pickNewcomers(list: Maker[]): Maker[] {
+  const cutoff = Date.now() - NEW_WINDOW_DAYS * 24 * 60 * 60 * 1000;
+  return [...list]
+    .filter((m) => m.createdAt && new Date(m.createdAt).getTime() >= cutoff)
+    .sort((a, b) => (a.createdAt > b.createdAt ? -1 : 1))
+    .slice(0, NEW_MAX);
+}
+
 // ⚠️이 한 줄이 없으면 목록이 **배포 시점에 얼어붙는다**(서버 컴포넌트 프리렌더 함정, /search·/my와 동일).
 export const revalidate = 300;
 
@@ -81,15 +105,27 @@ export default async function Home() {
   //   즉시 뜨므로, 발행 직후 두 화면이 잠깐 어긋나는 건 **버그가 아니라 설계**다.
   const articles = await repo.listPublishedArticles();
   const leadArticle = articles[0];
+  // 🆕**새로 온 곳은 목록에 없어도 앞으로 온다**(08-25). 종전엔 `HOME_ORDER`에 없는 slug가
+  //   전부 `MAX_SAFE_INTEGER`로 맨 뒤에 밀려, **방금 만든 소개서가 홈에서 안 보였다.**
+  //   실제로 파랑~(08-21)·임펜사도(08-22)·방혜리(08-24)가 캐러셀 7칸 밖에 있었다 —
+  //   그것도 대표가 제일 공들인 것들이. 주에 3곳씩 느는 지금 매번 손으로 목록을 고칠 수는 없다.
+  //   ⭐그래서 `HOME_ORDER`는 **「손으로 정한 자리」로만** 남고, 신규는 그 «앞»에 자동으로 선다.
+  const newcomers = pickNewcomers(fetched);
+  const isNew = new Set(newcomers.map((m) => m.slug));
   const rank = (slug: string) => {
     const i = HOME_ORDER.indexOf(slug);
     return i === -1 ? Number.MAX_SAFE_INTEGER : i;
   };
-  const collabBrands = [...fetched].sort((a, b) => rank(a.slug) - rank(b.slug));
+  const collabBrands = [
+    ...newcomers,
+    ...fetched.filter((m) => !isNew.has(m.slug)).sort((a, b) => rank(a.slug) - rank(b.slug)),
+  ];
 
   return (
     <HomeBody
       brands={collabBrands}
+      // 🆕「새로 온 브랜드」 — 화면이 이걸 어떻게 쓸지는 `HomeBody`가 정한다(A안=별도 섹션 / B안=칸 안 배지).
+      newSlugs={newcomers.map((m) => m.slug)}
       article={leadArticle}
       isFirstIssue={articles.length === 1}
       // 🎨확정 배경 = **카본 #0c0c0c**(대표 08-16 2차, 홈 full 비교 후 선택).

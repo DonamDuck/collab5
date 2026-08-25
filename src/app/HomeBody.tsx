@@ -39,13 +39,21 @@ export function HomeBody({
   article,
   isFirstIssue,
   bannerBg,
+  newSlugs = [],
 }: {
   brands: Maker[];
+  /** 🆕「새로 온 브랜드」 slug — 판정은 `page.tsx`의 `pickNewcomers`가 한다(최신 3곳·30일 이내). */
+  newSlugs?: string[];
   /** 매거진 배너에 쓸 최신 글. 없으면 배너 자체를 안 그린다. */
   article?: MagazineListItem;
   isFirstIssue: boolean;
   bannerBg: BannerBg;
 }) {
+  // 🆕「새로 온 브랜드」 — 별도 섹션으로 간다(대표 확정 08-25, A/B 비교 후).
+  //   ⛔진 안(캐러셀 앞칸에 NEW 배지)은 코드째 걷어냈다. 되살릴 일이 생기면 `BrandCard`에
+  //     `isNew` prop을 다시 만들면 된다 — 남겨두면 두 갈래가 조용히 어긋난다.
+  const newSet = new Set(newSlugs);
+  const newcomers = brands.filter((m) => newSet.has(m.slug));
   return (
     // 🎨홈만 지면을 한 단 낮춘다(대표 확정 08-14 — `surface-faint` #fafafb). 이유는 메뉴바다:
     //    흰 알약을 흰 지면에 올려두니 "메뉴로 안 보인다"(대표). 밝기차 2%가 알약을 띄운다.
@@ -131,6 +139,45 @@ export function HomeBody({
             구조적으로 불가능하다.
           📏간격은 「무엇을 썼나」가 아니라 **getBoundingClientRect로 잰 두 박스 사이 거리**로 확인한다
             (08-15 사고: mt-12로 적어놓고 실제로는 py-4가 얹혀 68px이었다). */}
+      {/* ═══ 🆕 새로 온 브랜드 (A안) ══════════════════════════════════════════════
+          🧪대표 비교용. B안이면 이 섹션이 통째로 안 그려지고, 대신 아래 캐러셀 앞칸에 NEW가 붙는다.
+          ⭐아래 캐러셀에서 **이 3곳을 뺀다**(page 쪽이 아니라 BrandGrid 호출부에서) — 13곳뿐이라
+            안 빼면 같은 브랜드가 한 화면에 두 번 나온다. */}
+      {newcomers.length > 0 && (
+        <section className="home-rise mt-12 sm:mt-16" style={{ animationDelay: "200ms" }}>
+          {/* 🏷️NEW 칩은 **제목 옆**이다(대표 지시 08-25). 처음엔 아래 「콜라보 ON」처럼 제목 «위»에
+              뒀는데, 두 섹션이 나란히 `칩 → 제목` 꼴이 되어 **색만 다른 쌍둥이**로 읽혔다.
+              ⭐두 칩은 하는 일이 다르다 — 「콜라보 ON」은 **아래 목록의 상태**(초록 점 = 켜져 있음)라
+                제목 위에서 목록을 여는 게 맞고, NEW는 **이 섹션이 무엇인지**라 제목의 일부에 가깝다.
+                자리를 바꾸면 그 차이가 눈에 보인다.
+              📐`items-center`가 아니라 기본 정렬 — 제목이 두 줄로 접히는 좁은 화면에서 칩이
+                가운데로 떠오르지 않게. */}
+          <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
+            <h2 className="break-keep text-[24px] font-bold leading-[1.35] tracking-[-0.02em] text-ink sm:text-[32px]">
+              새로 온 브랜드예요.
+            </h2>
+            {/* 🎨면은 **tint**다 — 원색이 아니다(디자인팀 판정 08-25).
+                ⭐**Kiwi 원색은 「누르는 것」의 색**이다. 홈에서 `bg-primary` 원색을 쓰는 12곳 중
+                  실제로 눌리는 건 「추천받기」 버튼 하나뿐인데, 나머지 11곳은 8px 점·숫자 원판이라
+                  작아서 버튼으로 안 읽힌다. **NEW만 「알약 + 글자 + 버튼만 한 크기」**라 그 버튼과
+                  `rounded-pill`·`bg-primary`·`text-primary-on`까지 같은 옷이 된다 — 못 누르는데.
+                📊게다가 tint가 **글자가 더 잘 보인다**(실측 대비 6.49 → 7.31) — 원색이 더 밝아서
+                  어두운 초록 글자와의 차이가 오히려 작다. 칩을 읽히게 하는 건 면이 아니라 글자다.
+                  면도 안 죽는다: 「콜라보 ON」 칩의 면 대비가 1.09인데 tint는 1.11로 그보다 진하다.
+                ⭐**띄우는 일은 색이 아니라 자리가 이미 한다** — 32px 제목 바로 옆이라 눈이 반드시
+                  지나간다. 「콜라보 ON」은 독립된 줄이라 스스로 알려야 하지만 NEW는 제목이 데려다준다.
+                🔤**11px 고정**(`sm:` 없음). 콜라보 ON이 12/13이라 **1px 차이는 실수처럼 보인다** —
+                  11 vs 13이어야 「다르게 한 것」으로 읽힌다(디자인팀). */}
+            <span className="rounded-pill bg-primary-tint px-2.5 py-1 text-[11px] font-bold leading-none tracking-wide text-primary-on">
+              NEW
+            </span>
+          </div>
+          <div className="mt-7">
+            <BrandGrid brands={newcomers} showExits={false} />
+          </div>
+        </section>
+      )}
+
       {brands.length >= MIN_GRID && (
         // 📏간격 — **모바일 `mt-16`(68) / 데스크톱 `sm:mt-24`(102)**.
         //    🔬와사비 실측(1280px): 히어로 서브 끝 720.8 → 섹션 제목 top 848.8 = **128px**.
@@ -171,7 +218,9 @@ export function HomeBody({
             지금, 콜라보 가능한 브랜드예요.
           </h2>
           <div className="mt-7">
-            <BrandGrid brands={brands} />
+            {/* ⭐새로 온 3곳은 **위 섹션이 이미 보여줬으니 여기선 뺀다** — 13곳뿐이라 안 빼면
+                같은 브랜드가 한 화면에 두 번 나온다(대표 확정 08-25). */}
+            <BrandGrid brands={brands.filter((m) => !newSet.has(m.slug))} />
           </div>
         </section>
       )}
