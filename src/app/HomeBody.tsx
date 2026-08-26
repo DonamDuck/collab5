@@ -259,7 +259,18 @@ export function HomeBody({
             → **"선택한 브랜드와의 콜라보 아이디어를 추천해드려요."**
             ⭐바뀐 건 주어다. 옛 문장은 **우리가 찾아주는 것**(우리 자랑)이었고, 새 문장은
               **당신이 고른 상대와 무엇을 할지**(사용자 행동)를 말한다. */}
-        <h2 className="break-keep text-[24px] font-bold leading-[1.35] tracking-[-0.02em] text-ink sm:text-[32px]">
+        {/* 🔻`data-pill-hide` — **플로팅 알약이 숨기 시작하는 지점**(대표 지시 08-26).
+            ⭐숨는 트리거가 「③ CTA 버튼이 화면에 들어올 때」에서 **「이 제목이 화면 절반에 닿을 때」**로
+              올라왔다. 대표 원문: *"저기 타이틀 부분이 화면 중앙 height일 때 사라지고 역스크롤일 때는
+              그때 다시 나오게"*. 판정은 `HomeFloatingCta.tsx` A구간에 있다.
+            ⚠️이 속성을 지우면 A구간이 **옛 트리거(`data-cta-guard`)로만** 돌아간다 — 화면이 안 깨지고
+              숨는 시점만 아래로 밀린다. 조용히 되돌아가는 종류라 지울 땐 저쪽 주석도 같이 봐라.
+            📐④구좌(`data-pill-show`)와 **같은 문법**이다 — 둘 다 h2를 기준으로 `innerHeight * 0.5`.
+              사람이 무엇을 읽고 있는지는 상자가 아니라 제목이 정한다는 같은 이유다. */}
+        <h2
+          data-pill-hide
+          className="break-keep text-[24px] font-bold leading-[1.35] tracking-[-0.02em] text-ink sm:text-[32px]"
+        >
           선택한 브랜드와의
           {/* 🔻`hidden sm:inline`을 뺐다 — 대표 제보 *"모바일에서 「선택한 브랜드와의」 다음 줄바꿈이
               안 된다"*. 원래는 좁은 화면에서 3줄이 될까 봐 막았는데, 실제로는 375px에서 이 문장이

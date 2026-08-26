@@ -95,6 +95,20 @@ export function HomeFloatingCta() {
         const r = el.getBoundingClientRect();
         return r.bottom > -40 && r.top < window.innerHeight + 40;
       });
+      // ③′ 🔻**A가 닫히는 진짜 지점 = ③ 제목이 화면 절반에 닿을 때**(대표 지시 08-26).
+      //    대표 원문: *"저기 타이틀 부분이 화면 중앙 height일 때 사라지고 역스크롤일 때는 그때 다시 나오게"*.
+      //    🪤옛 트리거(③ CTA가 화면에 들어올 때)는 **너무 늦었다.** ③ 구좌는 제목 → 리포트 실물 →
+      //      버튼 순서라 그 사이가 600px 넘게 벌어지는데, 그 구간 내내 알약이 리포트 카드 위에 앉아
+      //      **읽는 것을 가렸다**(대표 스크린샷: 알약이 아이디어 카드 본문을 덮고 있었다).
+      //      ⭐**가림은 겹침보다 먼저 온다** — 버튼끼리 포개지기 한참 전에 이미 글을 가리고 있다.
+      //    🔁**역스크롤 복귀는 이 식이 대칭이라 공짜로 따라온다.** "한 번 지나면 잠근다"는 상태를
+      //      두지 않는다 — 스크롤 위치만 보고 매번 새로 판정하니 올라오면 저절로 다시 열린다.
+      //      ⛔`useRef`로 「이미 지났음」을 기억하게 만들지 마라. 그 순간 역스크롤이 죽는다.
+      //    📐0.5 = ④구좌(`bandVisible`)와 **같은 숫자**다. 둘이 다르면 같은 화면에서 기준이 둘이 된다.
+      const ideaTitle = document.querySelector("[data-pill-hide]");
+      const ideaTitlePassed = ideaTitle
+        ? ideaTitle.getBoundingClientRect().top < window.innerHeight * 0.5
+        : false;
       // ④ 🎈**알약이 다시 올라오는 두 번째 구간**(대표 지시 08-17: *"소개서 영역으로 내려가면
       //    내려간 플로팅 버튼이 다시 올라오게. 구간이 2개가 되는 거지"*).
       //    ⭐노출 구간이 이제 **둘**이다:
@@ -139,9 +153,16 @@ export function HomeFloatingCta() {
       const endDeep = end ? end.getBoundingClientRect().top < window.innerHeight - 300 : false;
       // 🎛️**두 구간을 따로 세우고 OR로 합친다.** 한 줄짜리 AND 식으로 짜면 A의 조건(③ 가드)이 B에도
       //    따라붙어 B가 늦게 열린다 — 바로 위에서 335px 늦던 그 문제다. 구간이 둘이면 식도 둘이어야 한다.
-      //      **A** = 히어로를 지났고 · ③ CTA가 화면에 없고 · 풋터가 안 보일 때
+      //      **A** = 히어로를 지났고 · ③ 제목이 화면 절반에 안 닿았고 · 풋터가 안 보일 때
       //      **B** = ④ 제목이 화면 절반을 지났고 · 풋터를 읽을 자리가 아닐 때
-      const bandA = past && !guardVisible && !endVisible;
+      //
+      // 🛡️**`guardVisible`을 왜 남겨 뒀나**(08-26) — 제목이 CTA보다 위에 있으니 거의 항상 `ideaTitlePassed`가
+      //    **먼저** 걸린다. 즉 평소엔 안 쓰인다. 그래도 지우지 않은 이유는 **화면이 아주 낮을 때**
+      //    제목이 아직 절반 아래에 있는 채로 CTA만 화면 밑단에 걸치는 구간이 남기 때문이다
+      //    (조건: 제목→CTA 거리 < `innerHeight/2 + 40`). 지금 마크업에선 그 사이에 리포트 카드가
+      //    있어 안 생기지만, **카드를 줄이거나 빼면 그날로 08-17의 겹침이 되살아난다.**
+      //    ⭐안전장치를 풀어서 문제를 푸는 대신, 더 이른 조건을 «앞에» 세웠다.
+      const bandA = past && !ideaTitlePassed && !guardVisible && !endVisible;
       const bandB = bandVisible && !endDeep;
       setShown(bandA || bandB);
     };
