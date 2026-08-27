@@ -741,6 +741,7 @@ interface MakerRow {
   intro_file_url?: string | null;
   trust?: Maker["trust"];
   keywords?: string[] | null; showcases?: Maker["showcases"] | null;
+  industry_code?: string | null; has_space?: boolean | null; // 08-26 신설(마이그레이션 전 환경 대비 optional)
   offers_description?: string | null; seeks_description?: string | null;
   description?: string | null; // 자세히 소개(07-25 trust.description에서 분리 완료)
   search_visible: boolean | null; collab_paused?: boolean | null; status: string | null; created_at: string; updated_at?: string | null;
@@ -826,6 +827,9 @@ function rowToMaker(r: MakerRow): Maker {
     showcases: (r.showcases ?? []).map((b) => ({ ...b, photos: b.photos ?? [], links: b.links ?? [] })),
     introFileUrl: r.intro_file_url ?? undefined,
     keywords: r.keywords ?? [],
+    // ⚠️`?? undefined` / `?? false` — 컬럼이 아직 없거나 옛 소개서라 비어 있어도 화면이 안 깨진다.
+    industryCode: r.industry_code ?? undefined,
+    hasSpace: r.has_space ?? false,
     description: r.description ?? "",
     trust: r.trust ?? {},
     searchVisible: r.search_visible ?? true,
@@ -860,6 +864,8 @@ class SupabaseRepo implements Repo {
       photo_sources: input.photoSources ?? null,
       showcases: input.showcases, intro_file_url: input.introFileUrl ?? null,
       keywords: input.keywords, trust: input.trust,
+      industry_code: input.industryCode ?? null,
+      has_space: input.hasSpace,
       search_visible: input.searchVisible,
       collab_paused: input.collabPaused,
       status: "active", // 생성 default = active (소프트 삭제 시에만 inactive)
@@ -892,6 +898,8 @@ class SupabaseRepo implements Repo {
       photos: c.photos, photo_sources: c.photoSources ?? null,
       showcases: c.showcases, intro_file_url: c.introFileUrl ?? null,
       keywords: c.keywords, trust: c.trust,
+      industry_code: c.industryCode ?? null,
+      has_space: c.hasSpace,
       search_visible: c.searchVisible,
       collab_paused: c.collabPaused,
     };

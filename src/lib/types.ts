@@ -119,6 +119,20 @@ export interface Maker {
   enrichment?: Enrichment; // 크롤 스냅샷(생성 시 기록, 수정 시 보존). 없으면 undefined
   introFileUrl?: string; // 소개자료 PDF(코어 위계)
   keywords: string[]; // 브랜드를 표현하는 키워드 칩 (DB=keywords, 구 soul.values)
+  /** 업종 소분류 코드 — 목록·검색·풀이는 `lib/industry.ts` (DB=industry_code, 08-26 신설).
+   *  ⭐**키워드 칩과 다른 축이다.** 칩은 「이 브랜드를 표현하는 말」(자유·복수)이고,
+   *    이건 **「무슨 업종인가」(정해진 목록에서 하나)** — 필터·지도·지원사업 자격 매칭이 쓸 축이다.
+   *  📌값은 **정부 상권정보 업종코드**(KSIC 10차) 또는 **collab5 추가분(`X` 접두사)** 중 하나.
+   *  ⛔자유 입력을 받지 않는다(대표 08-26) — 받으면 그 정리가 곧 사람 일이 된다.
+   *  ⚠️옛 소개서는 이 값이 없다(`undefined`). 화면·필터는 없는 경우를 반드시 견뎌야 한다. */
+  industryCode?: string;
+  /** 손님을 맞는 공간이 있는가 (DB=has_space, 기본 false, 08-26 신설).
+   *  ⭐업종과 **일부러 갈라 둔 축**이다 — 업종은 「무엇을 하나」이고 이건 「무엇을 가졌나」다.
+   *    터·호락호락도서관처럼 **업종 칸 하나를 공간에 써버리면 정작 하는 일이 안 담긴다.**
+   *  쓰임 = 콜라보「장소를 내줄 수 있나」 · 지원사업「임대료·시설 지원 대상인가」.
+   *  ⚠️`industryCode`와 마찬가지로 **옛 소개서엔 없다** → optional. 읽을 땐 `!!m.hasSpace`로.
+   *    (DB에서 읽어 올 때는 `rowToMaker`가 `?? false`로 채우므로 실제로는 늘 boolean이다.) */
+  hasSpace?: boolean;
   trust: TrustSignals;
   searchVisible: boolean; // [콜라보 찾기에 보이기] — 홈·/search 목록 노출 (DB=search_visible, 기본 true). ⚠️웹 검색과 무관(08-07 개명)
   /** [콜라보 요청 잠시 안받기] — true면 `/m`의 제안 버튼이 잠기고 타이틀 옆에 안내 칩이 뜬다.

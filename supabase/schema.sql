@@ -67,6 +67,12 @@ create table brands (
   one_liner          text    not null,            -- 한두 문장 소개
   description        text,                        -- 자세히 소개 "우리는 이런 브랜드에요" (07-25 trust.description에서 분리)
   region             text,                        -- 주소에서 deriveRegion() 자동 추출
+  industry_code      text,                        -- 🆕08-26 업종 소분류 코드. 「소상공인 상권정보 업종코드」(KSIC 10차) 또는
+                                                  --   collab5 추가분(X 접두사). 목록·풀이 정본 = src/lib/industry.ts
+                                                  --   ⭐keywords(표현·자유·복수)와 다른 축: 이건 분류(목록·하나)라 필터·지도·지원사업 자격 매칭이 쓴다
+                                                  --   ⛔자유 입력 금지(대표 08-26) — 받으면 그 정리가 사람 일이 된다
+  has_space          boolean not null default false, -- 🆕08-26 손님 맞는 공간 보유. 업종과 «다른 축»이다(무엇을 하나 vs 무엇을 가졌나)
+                                                  --   쓰임 = 콜라보「장소 제공 가능?」· 지원사업「임대료·시설 지원 대상?」
   offers             text[]  not null default '{}',  -- 가능한 콜라보 유형(CollabType 7종)
   seeks              text[]  not null default '{}',  -- 구 희망 유형(07-22 칩 통합으로 사실상 미사용, 읽기 합집합 호환)
   target_audience    text[]  not null default '{}',
@@ -96,6 +102,7 @@ create table brands (
   updated_at         timestamptz not null default now()
 );
 create index idx_brands_slug  on brands(slug);
+create index if not exists idx_brands_industry on brands(industry_code); -- 08-26 업종 필터·매칭용
 create index idx_brands_owner on brands(owner_user_id);
 drop trigger if exists trg_brands_updated on brands;
 create trigger trg_brands_updated before update on brands

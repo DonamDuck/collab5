@@ -81,6 +81,12 @@ export interface RegisterInput {
   photoSources?: Record<string, string>; // 사진 주소 → 출처 글자(수기 입력). @see Maker.photoSources
   showcases?: Block[]; // 선택 블록(사진=Storage URL이라 그대로 전송)
   introFileUrl?: string; // 소개자료 PDF URL
+  /** 업종 소분류 코드(정해진 목록에서 하나) + 공간 보유 — 08-26 신설. 정본 = lib/industry.ts.
+   *  🚨**둘 다 optional이라 «안 넘겨도 tsc가 안 잡는다».** 실제로 이 파일에 배선을 빠뜨렸다가
+   *    `hasSpace`를 optional로 바꾼 순간 컴파일이 통과해 **조용히 유실될 뻔했다**(08-26).
+   *    → **폼에 칸을 더할 때는 반드시 이 파일의 create/update «양쪽»을 같이 고쳐라.** */
+  industryCode?: string;
+  hasSpace?: boolean;
   searchVisible: boolean; // [콜라보 찾기에 보이기] — 홈·/search 목록 노출(웹 검색과 무관, 08-07)
   collabPaused?: boolean; // [콜라보 요청 잠시 안받기] — 목록엔 그대로 보이되 제안만 안 받는 상태(08-12). 옛 폼이 안 보내면 false
   instagram?: string;
@@ -117,6 +123,8 @@ export async function createMakerAction(
     name: input.name.trim(),
     oneLiner: input.oneLiner.trim(),
     region: deriveRegion(input.address ?? "") || undefined,
+    industryCode: input.industryCode,
+    hasSpace: input.hasSpace ?? false,
     offers: input.offers,
     seeks: input.seeks,
     targetAudience: input.targetAudience,
@@ -333,6 +341,8 @@ export async function updateMakerAction(
     name: input.name.trim(),
     oneLiner: input.oneLiner.trim(),
     region: deriveRegion(input.address ?? "") || undefined,
+    industryCode: input.industryCode,
+    hasSpace: input.hasSpace ?? false,
     offers: input.offers,
     seeks: input.seeks,
     targetAudience: input.targetAudience,

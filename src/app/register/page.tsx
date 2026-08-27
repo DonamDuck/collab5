@@ -14,6 +14,7 @@ import {
 } from "@/lib/actions";
 import { MakerArticle } from "../m/[slug]/MakerArticle";
 import type { CollabType, Block, Maker, Enrichment } from "@/lib/types";
+import { IndustryPicker } from "./IndustryPicker";
 import { deriveRegion } from "@/lib/region";
 import { isRichIntro } from "@/lib/completeness";
 import { MAX_ACTIVITIES, MAX_COLLABS } from "@/lib/limits";
@@ -189,6 +190,11 @@ function RegisterForm() {
   const [collabHistory, setCollabHistory] = useState<HistItem[]>([emptyHist()]);
   const [searchVisible, setSearchVisible] = useState(true); // [콜라보 찾기에 보이기](기본 on)
   const [collabPaused, setCollabPaused] = useState(false); // [콜라보 요청 잠시 안받기](기본 off — 아무도 갑자기 잠기지 않게)
+  /** 업종(정해진 목록에서 하나) + 공간 보유 — 08-26 신설. 정본 = lib/industry.ts · 설계 = 볼트 [[BM-전략]] §v0.6.
+   *  ⭐키워드 칩과 **다른 축**이다: 칩은 「이 브랜드를 표현하는 말」(자유·복수), 업종은 「무슨 일인가」(목록·하나).
+   *    필터·지도·**지원사업 자격 매칭**이 쓸 축이라 값이 흔들리면 안 된다. */
+  const [industryCode, setIndustryCode] = useState<string | undefined>(undefined);
+  const [hasSpace, setHasSpace] = useState(false);
   const [instagram, setInstagram] = useState("");
   const [homepage, setHomepage] = useState("");
   const [mapUrl, setMapUrl] = useState("");
@@ -1102,6 +1108,9 @@ function RegisterForm() {
       setAddress(m.trust.address ?? "");
       setSearchVisible(m.searchVisible ?? true);
       setCollabPaused(m.collabPaused ?? false);
+      // ⚠️되불러오지 않으면 수정 저장 한 번에 업종이 지워진다(제출부가 undefined로 덮어쓴다).
+      setIndustryCode(m.industryCode);
+      setHasSpace(!!m.hasSpace);
       setPhotos(m.photos.map((u) => ({ url: u })));
       // ⚠️되불러오지 않으면 **수정 저장 한 번에 기존 출처가 통째로 날아간다**(제출부가 빈 표를 덮어쓴다).
       setPhotoSources(m.photoSources ?? {});
@@ -1206,6 +1215,8 @@ function RegisterForm() {
         photoSources: photoSourcesOut,
         searchVisible,
         collabPaused,
+        industryCode,
+        hasSpace,
         enrichment,
         instagram,
         homepage,
@@ -2180,6 +2191,29 @@ function RegisterForm() {
                 지역 자동 인식: <span className="text-body">{region}</span>
               </p>
             )}
+          </Field>
+          {/* 🏷업종 — 08-26 신설. 주소 바로 다음에 둔다(둘 다 「이 브랜드가 어디서 무얼 하나」라서 묶여 읽힌다).
+              ⭐키워드 칩과 자리를 떨어뜨린 이유 = **축이 다르다.** 칩은 표현이고 이건 분류다.
+                나란히 두면 사장님이 둘을 같은 것으로 보고 한쪽만 채운다. */}
+          {/* 🪤`hint`는 «라벨 안»에 들어간다 — `AiBadge` 같은 짧은 배지 자리다.
+              긴 문장을 넘기면 라벨이 눌려 「업/종」처럼 세로로 쪼개진다(08-26에 실제로 그렇게 나왔다).
+              설명은 입력칸 위 문단으로 둔다. */}
+          <Field label="업종">
+            <p className="mb-2 text-[13px] leading-relaxed text-mute">
+              검색해서 고르거나, 못 찾으면 아래 「분류로 찾아보기」에서 골라주세요. 나중에 바꿀 수 있어요.
+            </p>
+            <IndustryPicker value={industryCode} onChange={setIndustryCode} />
+            {/* 🏠공간 보유 — 업종과 «다른 축»이라 따로 둔다(업종=무엇을 하나 / 이것=무엇을 가졌나).
+                터·호락호락도서관처럼 업종 칸 하나를 공간에 써버리면 정작 하는 일이 안 담긴다. */}
+            <label className="mt-3 flex cursor-pointer items-center gap-2 text-[15px] text-body">
+              <input
+                type="checkbox"
+                checked={hasSpace}
+                onChange={(e) => setHasSpace(e.target.checked)}
+                className="h-4 w-4 accent-[var(--primary)]"
+              />
+              손님을 맞는 공간이 있어요
+            </label>
           </Field>
           <Field label="인스타그램 (선택)" hint={hintFor("instagram", "instagram")}>
             {/* '@' 고정 접두어 — 입력창 밖에 표시해 사용자가 넣거나 빠뜨리는 표기 편차 제거(대표 지시 07-20) */}
