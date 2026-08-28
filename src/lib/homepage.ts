@@ -17,7 +17,35 @@ const MIN_DIGEST_CHARS = 200; // 이보다 작으면 ok:false — 빈 헤더를 
 
 // 데이터센터 IP에서 못 읽거나(네이버 계열) 긁지 않을 호스트 — 시도 자체를 안 함(기존 동작 유지)
 const SKIP_HOSTS =
-  /(^|\.)(naver\.com|naver\.me|modoo\.at|instagram\.com|facebook\.com|youtube\.com|twitter\.com|x\.com|tiktok\.com|litt\.ly|linktr\.ee|inpock\.co\.kr)$/i;
+  /(^|\.)(naver\.com|naver\.me|modoo\.at|instagram\.com|facebook\.com|youtube\.com|twitter\.com|x\.com|tiktok\.com)$/i;
+
+/** 링크 허브(리틀리·링크트리·인포크) — 홈페이지 칸에 이게 적힌 브랜드가 실재한다(08-28 실측: 파랑~·방혜리·터).
+ *  ⭐**08-28까지 이 셋이 SKIP_HOSTS에 있어서, 그런 브랜드는 홈페이지를 «한 글자도 안 읽고» 소개서를 썼다.**
+ *  🪤그런데 SKIP에서 빼기만 하면 아무 일도 안 일어난다 — 두 겹으로 막혀 있었다:
+ *    ①`harvestLinks`가 same-host만 받아 허브에 걸린 브런치·노션을 «남의 집»이라 버린다
+ *    ②허브 본문은 링크 제목뿐이라 ~150자, `MIN_DIGEST_CHARS`(200)에 못 미쳐 ok:false로 떨어진다
+ *  👉그래서 허브는 **「본문을 읽는 곳」이 아니라 「링크 목록을 얻는 곳」**으로 따로 다룬다(아래 harvestLinks의 hub 분기).
+ *  ⛔새 호스트를 여기 더할 땐 **그 페이지가 「본인이 고른 링크 목록」인지** 확인할 것.
+ *    쇼핑몰·포털처럼 남이 채운 링크가 섞이는 곳을 넣으면 엉뚱한 페이지를 브랜드 재료로 읽는다. */
+const HUB_HOSTS = /(^|\.)(litt\.ly|linktr\.ee|inpock\.co\.kr)$/i;
+
+/** 허브에서 링크를 주울 때 «우리 자신»은 제외 — 파랑~ 님 리틀리엔 실제로 collab5 소개서가 걸려 있다.
+ *  읽으면 우리가 쓴 문장을 다시 읽어 재료로 삼는 자기참조가 된다. */
+const SELF_HOST = /(^|\.)collab5\.(co\.kr|vercel\.app)$/i;
+
+/** 🚨허브에만 적용하는 제외 — **남의 물건을 파는 링크**를 브랜드 재료로 읽지 않기 위한 것.
+ *  08-28 실측: 터 님 리틀리에 `미트리 닭가슴살 저렴하게 구매하기!`(metree.co.kr) 제휴 링크가 걸려 있었다.
+ *  그대로 읽으면 **닭가슴살 판매 문구가 「터」의 브랜드 재료로 들어간다.**
+ *  ⚠️**이 필터는 완전하지 않다** — 「이 링크가 이 사람 것인가」는 의미 판정이라 패턴으로 다 못 잡는다.
+ *    앵커에 유도 문구가 없는 제휴 링크는 그대로 통과한다. **여기서 막는 건 명백한 것뿐이고,
+ *    나머지는 위저드 결과를 사람이 검수하는 층에 맡긴다.** 못 잡는다는 걸 알고 쓸 것.
+ *  📌본인 물건은 대개 제목으로 걸린다(파랑~ 님 책 = 「박물관은 조용하지 않다」) — 그건 안 걸린다. */
+const HUB_LINK_EXCLUDE = {
+  /** 내용이 없는 곳(상담 버튼·채팅방) — 열어도 다이제스트에 넣을 글이 없다 */
+  hosts: /(^|\.)(open\.kakao\.com|pf\.kakao\.com|kakao\.com|band\.us|forms\.gle|docs\.google\.com)$/i,
+  /** 판매·제휴 유도 문구 */
+  anchor: /구매하기|최저가|할인가|공동구매|제휴|쿠폰받기|적립|추천인|바로가기 링크/i,
+};
 
 // ── SSRF 가드 ──────────────────────────────────────────────
 
@@ -159,18 +187,32 @@ const tidy = (s: string) => decodeEntities(stripTags(s)).replace(/\s+/g, " ").tr
 
 export function harvestLinks(html: string, base: URL): PageCandidate[] {
   const seen = new Map<string, PageCandidate>();
+  const hub = HUB_HOSTS.test(base.hostname);
+  let order = 0; // 허브에서만 씀 — 문서에 나온 차례
   const re = /<a\b[^>]*href=["']([^"'#]+)["'][^>]*>([\s\S]*?)<\/a>/gi;
   let m: RegExpExecArray | null;
   while ((m = re.exec(html))) {
     let u: URL;
     try {
-      u = new URL(m[1], base);
+      // 🪤href는 HTML 속성값이라 `&`가 `&amp;`로 인코딩돼 있다. 종전엔 쿼리를 통째로 버려서 안 드러났는데,
+      //   허브 링크는 쿼리를 살리므로 여기서 풀지 않으면 `?a=1&amp;b=2`인 죽은 주소를 받는다(08-28 1hows.com 실측).
+      u = new URL(decodeEntities(m[1]), base);
     } catch {
       continue;
     }
-    if (u.hostname !== base.hostname) continue; // same-host만
+    if (hub) {
+      // 허브는 «밖으로 내보내는 것»이 일이라 same-host 규칙을 뒤집는다 — 내부 링크가 오히려 잡음이다
+      // (「MY 페이지 무료로 만들기」 같은 서비스 자체 링크).
+      if (HUB_HOSTS.test(u.hostname)) continue;
+      if (SKIP_HOSTS.test(u.hostname)) continue; // 어차피 assertPublicHost가 막지만, 10칸을 낭비하지 않는다
+      if (SELF_HOST.test(u.hostname)) continue; // 자기참조 방지
+      if (HUB_LINK_EXCLUDE.hosts.test(u.hostname)) continue; // 내용 없는 곳
+      if (HUB_LINK_EXCLUDE.anchor.test(tidy(m[2]))) continue; // 남의 물건 파는 링크
+    } else if (u.hostname !== base.hostname) {
+      continue; // 일반 홈페이지는 종전대로 same-host만
+    }
     const path = u.pathname + u.search;
-    if (path === "/" || path === base.pathname) continue; // 홈 자신 제외
+    if (!hub && (path === "/" || path === base.pathname)) continue; // 홈 자신 제외
     if (LINK_BLOCKLIST.test(path)) continue;
     const anchor = tidy(m[2]);
     if (LINK_BLOCKLIST.test(anchor)) continue;
@@ -180,15 +222,23 @@ export function harvestLinks(html: string, base: URL): PageCandidate[] {
       if (rx.test(path)) score += pts;
       if (anchor && rx.test(anchor)) score += pts;
     }
+    // ⭐허브는 점수 대신 «순서»를 쓴다. 링크 제목이 「11월 애매한 연말모임」·「박물관은 조용하지 않다」처럼
+    //   PATH_SCORES의 어휘(소개·스토리·프로그램…)와 안 겹쳐 점수가 0으로 떨어지는데,
+    //   허브는 애초에 **본인이 순서를 매겨 둔 목록**이라 위에 있을수록 지금 중요한 것이다(08-28 실측: 파랑~ 님은 최신 모집이 위).
+    if (hub) score = Math.max(100 - order++ * 5, 10);
     // 아임웹류 숫자 경로(/42)는 경로 점수가 안 잡혀도 앵커("파트너 감자")로 잡힌다.
     if (score <= 0) continue;
     // 라벨: 앵커텍스트(≤20자, 텍스트만) → 정크면 URL 슬러그 폴백
     const slug = decodeURIComponent(u.pathname.replace(/^\/|\/$/g, "")).slice(0, 20);
     const label =
       anchor && /[가-힣a-zA-Z]/.test(anchor) ? anchor.slice(0, 20) : slug || "페이지";
-    const key = u.pathname; // pathname 기준 중복 제거(쿼리 변형 무시)
+    // 🪤허브는 «쿼리를 버리면 안 된다» — 걸린 링크가 `1hows.com/PEOPLE/?idx=17545793` 처럼
+    //   쿼리에 글 번호를 담는 경우가 실재한다(파랑~ 님 인터뷰). 떼면 목록 첫 화면으로 간다.
+    //   중복 제거 키도 호스트를 포함해야 한다 — 서로 다른 사이트의 루트(`/`)끼리 충돌한다.
+    const url = hub ? u.origin + u.pathname + u.search : u.origin + u.pathname;
+    const key = hub ? url : u.pathname;
     const prev = seen.get(key);
-    if (!prev || score > prev.score) seen.set(key, { url: u.origin + u.pathname, label, score });
+    if (!prev || score > prev.score) seen.set(key, { url, label, score });
   }
   return [...seen.values()].sort((a, b) => b.score - a.score).slice(0, MAX_PAGES - 1);
 }
@@ -350,9 +400,13 @@ export async function fetchHomepageDigest(rawUrl: string): Promise<HomepageDiges
     const disallow = parseRobotsDisallow(robotsTxt);
 
     // 링크 수확은 원본 HTML에서(본문 추출 전) → robots 필터(하위 페이지만)
-    const candidates = harvestLinks(homeHtml, base).filter(
-      (c) => !robotsBlocked(new URL(c.url).pathname, disallow)
-    );
+    // ⚠️robots는 **그 호스트의 것**이다 — 허브에서 주운 링크는 남의 사이트라 base(리틀리)의 robots를 대면 안 된다.
+    //   각자의 robots를 받아오려면 요청이 배로 드는데 8초 예산 안에선 무리라, 같은 호스트일 때만 적용한다.
+    //   (허브에 걸린 링크는 브랜드가 스스로 공개한 자기 채널이고, 페이지 단위 취득이라 부담도 작다.)
+    const candidates = harvestLinks(homeHtml, base).filter((c) => {
+      const cu = new URL(c.url);
+      return cu.hostname !== base.hostname || !robotsBlocked(cu.pathname, disallow);
+    });
 
     // 하위 페이지 병렬 fetch — 전체 데드라인 공유, 늦는 페이지 포기
     const settled = await Promise.allSettled(
