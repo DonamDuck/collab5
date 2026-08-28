@@ -2200,7 +2200,7 @@ function RegisterForm() {
               설명은 입력칸 위 문단으로 둔다. */}
           <Field label="업종">
             <p className="mb-2 text-[13px] leading-relaxed text-mute">
-              검색해서 고르거나, 못 찾으면 아래 「분류로 찾아보기」에서 골라주세요. 나중에 바꿀 수 있어요.
+              업종을 골라주세요. 언제든 바꿀 수 있어요.
             </p>
             <IndustryPicker value={industryCode} onChange={setIndustryCode} />
             {/* 🏠공간 보유 — 업종과 «다른 축»이라 따로 둔다(업종=무엇을 하나 / 이것=무엇을 가졌나).

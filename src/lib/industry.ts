@@ -42,7 +42,7 @@ const GROUP_SHORT: Record<string, string> = {
   Q1: "보건의료",
   R1: "예술·스포츠·여가",
   S2: "수리·개인서비스",
-  X0: "collab5 추가",
+  X0: "그 외 업종",
 };
 
 export function groupShort(code: string, fallback: string) {
@@ -67,7 +67,7 @@ export const GOV_INDUSTRY_GROUPS: IndustryGroup[] = [
  *  ⚠️추가·수정 시 **코드는 절대 재사용하지 마라**(이미 그 코드로 저장된 브랜드가 다른 업종이 된다). */
 export const CUSTOM_INDUSTRIES: IndustryGroup = {
   code: "X0",
-  name: "그 외 (collab5 추가)",
+  name: "그 외 업종",
   items: [
     ["X0101", "공방/수공예"],
     ["X0102", "작가/창작자"],
@@ -88,7 +88,22 @@ export const CUSTOM_INDUSTRIES: IndustryGroup = {
   ],
 };
 
-export const INDUSTRY_GROUPS: IndustryGroup[] = [...GOV_INDUSTRY_GROUPS, CUSTOM_INDUSTRIES];
+/** 정부 원본 이름을 **화면용으로 다듬는 표**. 키 = 소분류 코드.
+ *  ⭐**GOV 배열을 직접 고치지 않는 이유** — 그 배열은 공공데이터 CSV에서 기계로 뽑은 것이라
+ *    규격이 개정돼 다시 받으면 **손으로 고친 게 조용히 덮인다.** 여기 따로 두면 배열만 갈아끼우면 되고,
+ *    **무엇을 왜 다듬었는지도 한곳에서 보인다.**
+ *  ⚠️**코드는 절대 안 바꾼다** — 정부 코드와의 대응은 그대로 살아 있어야 지원사업 자격 매칭이 된다.
+ *  ⚠️검색도 다듬은 이름으로 걸린다(오버라이드가 목록 자체에 적용되므로).
+ *    원래 말로 찾는 사람이 있을 것 같으면 다듬지 말고 그대로 두는 게 낫다. */
+const NAME_OVERRIDE: Record<string, string> = {
+  // 「학원」이 붙으면 두더지요가원처럼 **학원이 아닌 곳**이 자기 것으로 못 알아본다(대표 08-26).
+  P10603: "요가/필라테스",
+};
+
+export const INDUSTRY_GROUPS: IndustryGroup[] = [...GOV_INDUSTRY_GROUPS, CUSTOM_INDUSTRIES].map((g) => ({
+  ...g,
+  items: g.items.map(([c, n]) => [c, NAME_OVERRIDE[c] ?? n] as [string, string]),
+}));
 
 /** 코드 → {코드, 이름, 대분류명}. 없는 코드면 null(옛 코드가 남아 있어도 화면이 안 깨지게). */
 export function findIndustry(code: string | null | undefined) {
