@@ -51,6 +51,8 @@ description: 이미 발행된 소개서 보강 — 웹 검색 + 인스타그램 
 | 자세히 소개 | `description` | **`description`**(최상위. 구 `trust.description`) | |
 | 시작 이야기 | `story` | `story` | |
 | 키워드(분위기) 칩 | `keywords` | **`keywords` text[]**(구 `soul.values`) | **10개** |
+| 🆕업종 | `industryCode` | `industry_code` | **1개**(목록에서만) |
+| 🆕손님 맞는 공간 | `hasSpace` | `has_space` | 체크 |
 | 대표 활동 | `activities[]` {title, desc, photos, link} | `activities` | **30건**(08-10 상향), 사진 각 5 |
 | 함께한 콜라보 | `collabHistory[]` {partner, types, desc, year, photos, link} | `collab_history` | **30건**(08-10 상향), 사진 각 5 |
 | 이런 콜라보를 제공할 수 있어요 / **이런 콜라보를 찾고 있어요**(08-13 개명, 구 「이런 파트너를 찾고 있어요」) | `offersDescription` / `seeksDescription` | `offers_description` / `seeks_description`(구 `offers_note`/`seeks_note`) | |
@@ -61,6 +63,12 @@ description: 이미 발행된 소개서 보강 — 웹 검색 + 인스타그램 
 
 - **블록 6종** = `metrics`(숫자) · `reviews`(리뷰) · `team`(팀) · `press`(소개된 곳들) · `space`(공간) · `custom`(직접 만들기).
   공통으로 `photos`(각 항목 5) + `links`를 가진다. press item = {title, year, desc, link, photos}.
+- 🆕**업종·공간은 «칩과 다른 축»이다**(08-26 신설). 칩은 「표현」(자유·복수)이고 업종은 「분류」(정해진 목록·하나)다.
+  보강할 때 **칩을 채웠다고 업종이 채워진 게 아니다** — 둘을 따로 본다.
+  · 목록 정본 = `src/lib/industry.ts` (소상공인 상권정보 업종코드 247 + collab5 추가 10, `X` 접두사)
+  · ⛔**자유 입력이 없다.** 못 찾는 업종이 나오면 폼에서 우겨넣지 말고 **`CUSTOM_INDUSTRIES`에 칸을 더한다**(코드 재사용 금지)
+  · `hasSpace`는 **추측으로 채우지 마라** — 「장소 제공 가능한 곳」 필터가 통째로 어긋난다. 사장님이 체크하거나 대표가 안다
+  · 정책·근거 = 볼트 [[제품-정책서]] §🏷
 - 테이블은 `makers`→**`brands`**, `owner_uuid`→**`owner_user_id` bigint**. 옛 이름 SQL은 실패한다([[schema-rename-checklist]]).
 - ⚠️ `enrichment`(크롤 스냅샷)는 **수정 저장 시 보존**된다 — `updateMakerAction`이 의도적으로 안 넘긴다.
   보강해도 크롤 스냅샷은 안 바뀌니, 진단에서 "칩이 옛날 것"이라 해도 그건 정상이다.
