@@ -1,12 +1,14 @@
 // POST /api/collab-report — 콜라보 분석 리포트 오케스트레이션.
-// 인증(from은 내 브랜드만) → DNA 병렬 확보(stale만 재생성) → thin 가드 → 캐시 3조건 → 생성·저장.
+// 인증(from은 내 브랜드만) → **캐시 먼저**(내 소개서 기준) → DNA 병렬 확보(stale만) → thin 가드 → 생성·저장.
+// ⭐08-31: 캐시 판정이 DNA 확보보다 «앞»이고, 판정 기준은 **내 소개서만** 본다 —
+//   상대가 자기 소개서를 고쳐도 내 저장본은 무효가 되지 않는다(대표 확정).
 // 클라이언트가 보낸 텍스트는 프롬프트에 절대 넣지 않는다 — slug만 받고 소개서·DNA는 서버가 DB에서 읽음
 // (주입 차단, enrich 관례). 스펙: docs/superpowers/specs/2026-07-25-collab-report-dna-design.md
 import { NextResponse } from "next/server";
 import { repo } from "@/lib/repo";
 import { getSessionUserId } from "@/lib/profiles";
 import { isStaffUser } from "@/lib/staff";
-import { generateDna, generateReport, isDnaStale, isThin, REPORT_MODEL } from "@/lib/collab-report";
+import { generateDna, generateReport, isDnaStale, isReportCacheFresh, isThin, REPORT_MODEL } from "@/lib/collab-report";
 import { logTotal, type CallMeter } from "@/lib/ai-cost";
 import { distinctTypeCount } from "@/lib/dna-pool";
 import type { BrandDna, Maker } from "@/lib/types";
@@ -83,18 +85,43 @@ export async function POST(req: Request) {
     let dnaCalls = 0;
     costTag = `${from.slug}→${to.slug}`;
 
-    // ④ DNA 확보(양쪽 병렬, stale만 재생성 — 소개서 '내용 지문' 변화 + DNA_REFRESH_BEFORE 기준)
-    const ensureDna = async (m: Maker): Promise<BrandDna> => {
-      const prev = await repo.getBrandDna(m.id);
+    // ④ 캐시 먼저 판정 — **DNA를 만들기 전에**(2026-08-31 대표 확정).
+    //   🔁 순서를 바꾼 것이 이번 변경의 핵심이다. 전엔 ⑥에서 DNA를 양쪽 다 확보한 «뒤에» 캐시를 봤다.
+    //      그러면 상대 사장님이 자기 소개서를 고친 것만으로 `ensureDna(to)`가 먼저 돌아
+    //      **DNA 1콜이 이미 나간 뒤에** 캐시 미스가 나고 리포트 1콜이 또 나갔다.
+    //      대표 지시: *"상대방이 수정한 건 이미 생성한 리포트에는 영향 안 주도록."*
+    //      → 저장본이 있고 **내 쪽**이 안 바뀌었으면 여기서 끝난다(유료 콜 0, DNA도 안 만든다).
+    //   ⚠️ 판정 규칙은 `lib/collab-report.ts`의 `isReportCacheFresh` 한 곳뿐이다 —
+    //      소개서 페이지(`/m/[slug]`)의 사전 훑기와 **같은 함수**를 부른다(복제 제거).
+    //   ⚠️ thin 가드(⑥)보다 앞에 있다. 의도한 것 — thin은 «만들기»를 막는 장치지
+    //      이미 만들어 둔 저장본을 못 읽게 하는 장치가 아니다.
+    const latest = force ? null : await repo.getLatestCollabReport(from.id, to.id);
+    const cachedFromDna = latest ? await repo.getBrandDna(from.id) : null;
+    if (latest && isReportCacheFresh(latest, cachedFromDna, from)) {
+      return NextResponse.json({
+        state: "ok",
+        report: latest.report,
+        cached: true,
+        model: latest.model,
+      });
+    }
+
+    // ⑤ DNA 확보(양쪽 병렬, stale만 재생성 — 소개서 '내용 지문' 변화 + DNA_REFRESH_BEFORE 기준)
+    //   ④에서 이미 읽어 둔 내 DNA는 다시 읽지 않는다(같은 요청 안에서 중복 조회 제거).
+    const ensureDna = async (m: Maker, known?: BrandDna | null): Promise<BrandDna> => {
+      const prev = known !== undefined ? known : await repo.getBrandDna(m.id);
       if (prev && !isDnaStale(prev, m)) return prev;
       dnaCalls += 1;
       const dna = await generateDna(m, prev ?? undefined, meters); // 재생성 시 created_at 보존
       await repo.setBrandDna(m.id, dna);
       return dna;
     };
-    const [fromDna, toDna] = await Promise.all([ensureDna(from), ensureDna(to)]);
+    const [fromDna, toDna] = await Promise.all([
+      ensureDna(from, latest ? cachedFromDna : undefined),
+      ensureDna(to),
+    ]);
 
-    // ⑤ thin 가드(양쪽 — 둘 다면 from 우선: 자기개선 퍼널이 먼저)
+    // ⑥ thin 가드(양쪽 — 둘 다면 from 우선: 자기개선 퍼널이 먼저)
     if (isThin(fromDna)) {
       return NextResponse.json({ state: "thin", side: "from" });
     }
@@ -106,27 +133,9 @@ export async function POST(req: Request) {
       });
     }
 
-    // ⑥ 캐시 3조건(스펙 §2-2): 최신 행 존재 + 양쪽 DNA non-stale(④ 후 항상 참)
-    //    + 행 created_at이 양쪽 dna.updated_at보다 최신 → 저장본 즉시 반환(Gemini 0콜)
-    // 🪤 이 3조건, `lib/collab-report.ts`의 `isReportCacheFresh()`가 **읽기 전용 버전으로
-    //    복제**하고 있다(08-09, 소개서 페이지가 로딩 화면을 스킵할지 미리 훑는 용도).
-    //    아래 if 조건을 고치면 그쪽도 같이 고칠 것 — 안 고치면 두 판정이 갈라져
-    //    "캐시 있는데 스킵 안 됨"류 눈에 안 띄는 버그가 난다(1팀 08-09 지적).
-    const latest = force ? null : await repo.getLatestCollabReport(from.id, to.id);
-    if (
-      latest &&
-      Date.parse(latest.createdAt) > Date.parse(fromDna.updated_at) &&
-      Date.parse(latest.createdAt) > Date.parse(toDna.updated_at)
-    ) {
-      return NextResponse.json({
-        state: "ok",
-        report: latest.report,
-        cached: true,
-        model: latest.model,
-      });
-    }
-
-    // 캐시 미스 사유 관측 — "저장본 없음"인지 "DNA가 리포트보다 최신"인지 로그로 즉시 구분.
+    // 캐시 미스 사유 관측 — "저장본 없음"인지 "내 소개서가 바뀌었나"인지 로그로 즉시 구분.
+    //   ⭐`toDna`도 계속 찍는다 — 판정에선 뺐지만, 뺀 뒤에도 상대 변화가 실제로 재생성을
+    //     일으키지 않는지 **로그로 확인**할 수 있어야 한다(뺐다는 사실 자체가 검증 대상이다).
     console.log(
       `[collab-report] cache-miss ${from.slug}→${to.slug} force=${force} ` +
         `latest=${latest?.createdAt ?? "none"} fromDna=${fromDna.updated_at} toDna=${toDna.updated_at} dnaCalls=${dnaCalls}`

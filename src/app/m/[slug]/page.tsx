@@ -52,7 +52,8 @@ async function computeCachedReports(
   const reports = await repo.listLatestCollabReportsTo(fromCandidates.map((m) => m.id), to.id);
   if (reports.size === 0) return {};
   const hits = fromCandidates.filter((m) => reports.has(m.id));
-  const toDna = await repo.getBrandDna(to.id);
+  // ⭐08-31: **상대(to) DNA는 더 이상 읽지 않는다.** 판정이 내 쪽만 보게 바뀌어서
+  //   (`isReportCacheFresh` 주석 참조) 이 조회는 결과에 아무 영향이 없어졌다 — 쿼리 1회 절약.
   const entries = await Promise.all(
     hits.map(async (card) => {
       // 🪤**`viewerMakers`는 카드용 경량 투영이라 여기 그대로 쓰면 안 된다**(08-09 실측으로 잡은 버그).
@@ -67,7 +68,7 @@ async function computeCachedReports(
       ]);
       if (!from) return null;
       const latest = reports.get(card.id)!;
-      return isReportCacheFresh(latest, fromDna, toDna, from, to)
+      return isReportCacheFresh(latest, fromDna, from)
         ? ([from.slug, latest.report] as const)
         : null;
     }),

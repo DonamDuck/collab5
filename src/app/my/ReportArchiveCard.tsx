@@ -70,10 +70,14 @@ function PreviewRow({ label, children }: { label: string; children: React.ReactN
 export function ReportArchiveCard({
   item,
   myBrands,
+  canRefresh = false,
 }: {
   item: CollabReportListItem;
   /** 내 소개서 전체 — 시트의 "다른 소개서로 분석"이 동작하려면 목록이 필요하다(한 개만 넘기면 그 기능이 죽는다) */
   myBrands: { id: number; slug: string; name: string }[];
+  /** 이 리포트를 만든 뒤 **내 소개서가 바뀌었다** — 시트에 [다시 분석하기]가 뜬다(08-31 대표).
+   *  서버(`/my/page.tsx`의 `findEditedPairs`)가 판정한다. ⛔상대가 고친 건 여기 안 들어온다. */
+  canRefresh?: boolean;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -171,6 +175,7 @@ export function ReportArchiveCard({
             toSlug={item.toSlug}
             toName={item.toName}
             sampleMode={false}
+            refreshable={canRefresh}
             source="my"
             onPropose={() => {
               // 제안은 소개서 페이지에서 — `propose=1`이면 리포트를 화면에 세우지 않고

@@ -92,6 +92,7 @@ export function ReportSheet({
   initialReadOnly = false,
   initialFromName,
   cachedReports,
+  refreshable = false,
   source = "maker_page",
   onReportLoaded,
 }: {
@@ -122,6 +123,12 @@ export function ReportSheet({
    *  `isReportCacheFresh`가 라우트 ⑥ 캐시 3조건과 같은 판정을 쓴다).
    *  키에 없는 fromSlug는 지금처럼 fetch+로딩 화면을 그대로 탄다(신규 쌍·DNA 변경분). */
   cachedReports?: Record<string, CollabReportData>;
+  /** 저장본을 다시 보는 중인데 **내 소개서가 그새 바뀌었다** — [다시 분석하기]를 띄운다(08-31 대표).
+   *  ⭐서버가 판정해서 내려준다(`lib/collab-report.ts`의 `isMyBrandEditedSince`).
+   *  ⚠️**상대가 고친 건 여기 안 들어온다** — 리포트는 그때 두 소개서를 읽고 쓴 기록이라
+   *     상대 변화로 「다시 만드세요」를 권하지 않는다(대표 확정). 그래서 버튼 문구도
+   *     "새 버전이 있어요"가 아니라 **"소개서를 고치셨어요"**다 — 원인을 정확히 말한다. */
+  refreshable?: boolean;
   /** 그 쌍의 내 브랜드 이름 — **넘긴 브랜드는 `fromBrands`에 없어서** 이름을 그쪽에서 못 찾는다.
    *  없이 두면 헤더가 `?? fromBrands[0]`으로 **엉뚱한 내 소개서 이름**을 박는다
    *  (08-07 prod 실측: 아그레아블 카드를 열었는데 제목이 "로컬페이지 × 두더지요가원"). */
@@ -187,13 +194,16 @@ export function ReportSheet({
     fromBrands.find((b) => b.slug === selectedSlug) ?? fromBrands[0];
 
   const run = useCallback(
-    async (fromSlug: string) => {
+    async (fromSlug: string, opts?: { force?: boolean }) => {
+      const force = opts?.force === true;
       // 캐시 신선 쌍(DNA 변경 없음)이면 네트워크 없이 즉시 연다 — /my 아카이브와 같은 경험(08-09).
       // 위 `archived`(딥링크·단일 소개서 자동선택)가 못 잡는 경로가 하나 있다 — **멀티 소개서 select
       // 스텝에서 칩 고르고 [분석하기]를 누르는 경우**는 useEffect를 안 타고 run()을 직접 부르므로
       // 여기서 한 번 더 확인해야 한다. 대표 지적: "콜라보 분석중이에요 이거 안 보여주고!" — 소개서
       // 페이지의 모든 실행 경로가 /my와 같은 대우를 받아야 한다는 뜻.
-      const hit = cachedReports?.[fromSlug];
+      // ⚠️force면 손에 쥔 저장본을 **일부러 버린다** — 사장님이 "다시"를 누른 것이므로
+      //   여기서 캐시를 내주면 버튼이 아무 일도 안 하는 것처럼 보인다.
+      const hit = force ? undefined : cachedReports?.[fromSlug];
       if (hit) {
         const ok: OkPayload = { report: hit, cached: true, model: "cache" };
         setResult(ok);
@@ -213,7 +223,7 @@ export function ReportSheet({
         const res = await fetch("/api/collab-report", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ fromSlug, toSlug }),
+          body: JSON.stringify({ fromSlug, toSlug, ...(force ? { force: true } : {}) }),
         });
         const data = await res.json().catch(() => null);
         if (wantSlugRef.current === fromSlug) {
@@ -467,6 +477,30 @@ export function ReportSheet({
             <p className="mt-3 rounded-md border border-hairline bg-surface-soft px-3 py-2 text-[13px] leading-relaxed text-mute">
               🗄 예전에 만들어 둔 보관본이에요. 이 소개서는 이제 다른 분 것이라 새로 분석할 수는 없어요.
             </p>
+          )}
+          {/* 🆕 내 소개서를 고친 뒤 저장본을 다시 보는 중 — 여기서만 재생성을 «명시»로 만든다(08-31 대표).
+              ⭐**안 바뀌었으면 아무것도 안 보인다**(대표 원문). 그래서 조건이 셋 다 필요하다:
+                ①서버가 "내 소개서가 바뀌었다"고 판정했고(`refreshable`)
+                ②지금 화면이 방금 «만든» 결과가 아니고(`cached !== false` — 누른 직후엔 스스로 사라진다)
+                ③보관본이 아니다(`readOnly` — 소유권이 떠나 재생성 자체가 불가).
+              🪤 유료 콜이 나가는 유일한 «사장님 손» 자리다 — 그래서 문구가 버튼 «위»에 온다.
+                 무슨 일이 왜 벌어지는지 읽고 나서 누르게. */}
+          {refreshable && result?.cached !== false && !result?.readOnly && (
+            <div className="mt-4 rounded-md border border-hairline bg-surface-soft px-3 py-3">
+              <p className="text-[13px] leading-relaxed break-keep text-mute">
+                이 분석 뒤에 소개서를 고치셨어요. 바뀐 내용으로 다시 볼 수 있어요.
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  track("report_refresh_click");
+                  if (selected?.slug) run(selected.slug, { force: true });
+                }}
+                className="mt-2.5 flex h-10 w-full items-center justify-center rounded-md border border-border-strong bg-surface text-[14px] font-medium text-ink"
+              >
+                바뀐 내용으로 다시 분석하기
+              </button>
+            </div>
           )}
           {/* 다른 소개서로 분석 — 상단 바에서 이사(07-31). 제안 버튼 아래 보조 위치로 격 낮춤. */}
           {fromBrands.length > 1 && (

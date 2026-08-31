@@ -14,6 +14,8 @@ import { MyTabs } from "./MyTabs";
 import { ProfileAvatarEditor } from "./ProfileAvatarEditor";
 import { CollabRecorder } from "./CollabRecorder";
 import { EmptyState } from "@/components/EmptyState";
+import { isMyBrandEditedSince } from "@/lib/collab-report";
+import type { CollabReportListItem } from "@/lib/types";
 
 // 🚨 로그인 사용자별 화면이라 절대 프리렌더되면 안 된다.
 // 쿠키 접근으로 자동 dynamic이 되긴 하지만, 그 판정이 "빌드 시점에 auth env가 있느냐"에 달려 있어
@@ -36,6 +38,8 @@ export default async function MyPage({ searchParams }: { searchParams: Promise<{
   ]);
   // 성사된 콜라보 — 내 소개서가 한쪽이라도 낀 건. makers를 알아야 해서 위 병렬 뒤에 따로 조회.
   const collabs = makers.length ? await repo.listCollabsForBrands(makers.map((m) => m.id)) : [];
+  // 🆕 [다시 분석하기]를 띄울 쌍 — **내 소개서가 리포트 뒤에 바뀐 것만**(08-31 대표). 유료 콜 0(전부 읽기).
+  const editedPairs = await findEditedPairs(reports);
   const displayName = profile?.brandName || user.email?.split("@")[0] || "내 브랜드";
 
   // 내 소개서 탭 콘텐츠
@@ -114,6 +118,7 @@ export default async function MyPage({ searchParams }: { searchParams: Promise<{
             // 시트가 제자리(/my)에서 뜨므로 "다른 소개서로 분석"에 쓸 내 소개서 목록이 필요하다.
             // Maker 통째로 넘기면 클라이언트 번들에 사진·본문까지 실린다 — 시트가 쓰는 3개만.
             myBrands={makers.map((m) => ({ id: m.id, slug: m.slug, name: m.name }))}
+            canRefresh={editedPairs.has(`${r.fromSlug}:${r.toSlug}`)}
           />
         ))}
       </div>
@@ -237,4 +242,38 @@ export default async function MyPage({ searchParams }: { searchParams: Promise<{
       </section>
     </main>
   );
+}
+
+/** 저장본 목록에서 «내 소개서가 그새 바뀐» 쌍을 골라 `fromSlug:toSlug` 키 집합으로 돌려준다.
+ *
+ *  ⭐**유료 콜 0** — 전부 읽기다. DNA가 없거나 지문이 없는 구버전이면 그냥 안 들어간다
+ *  (`isMyBrandEditedSince`가 "모르면 false"). 없는 걸 만들어내지 않는다.
+ *
+ *  🪤**`listMakersByOwner`의 결과를 여기 쓰면 안 된다**(08-09 /m 페이지에서 같은 함정을 밟았다).
+ *     그건 카드용 경량 투영이라 `description`·`story`·`activities`가 비어 있는데, 판정은
+ *     **소개서 본문 전체의 지문**을 비교한다 — 빈 필드로 지문을 내면 영원히 "바뀌었다"가 되고
+ *     [다시 분석하기]가 모든 카드에 뜬다(그리고 누를 때마다 유료 콜이 나간다).
+ *     → 리포트에 실제로 등장하는 **내 소개서 slug만** 골라 전문을 다시 읽는다(보통 1~3건).
+ *  ⚠️ 저장본이 없는 쌍은 애초에 목록에 없으므로 "다시"의 대상이 아니다. */
+async function findEditedPairs(reports: CollabReportListItem[]): Promise<Set<string>> {
+  const out = new Set<string>();
+  if (reports.length === 0) return out;
+  const fromSlugs = [...new Set(reports.map((r) => r.fromSlug))];
+  const loaded = await Promise.all(
+    fromSlugs.map(async (slug) => {
+      const from = await repo.getMakerBySlug(slug);
+      if (!from) return null;
+      const dna = await repo.getBrandDna(from.id);
+      return [slug, { from, dna }] as const;
+    }),
+  );
+  const bySlug = new Map(loaded.filter((e): e is NonNullable<typeof e> => e !== null));
+  for (const r of reports) {
+    const hit = bySlug.get(r.fromSlug);
+    if (!hit) continue; // 소유권이 떠난 브랜드 등 — 보관본이라 재생성 자체가 안 된다
+    if (isMyBrandEditedSince({ createdAt: r.createdAt }, hit.dna, hit.from)) {
+      out.add(`${r.fromSlug}:${r.toSlug}`);
+    }
+  }
+  return out;
 }

@@ -393,32 +393,51 @@ export function isDnaStale(dna: BrandDna | null, brand?: Maker): boolean {
   return false;
 }
 
-/** **읽기 전용** 캐시 신선 판정 — `/api/collab-report`의 ⑥ 캐시 3조건과 같은 로직이지만
- *  이쪽은 DNA를 만들지 않는다(stale이면 그냥 false — 유료 콜 0). 라우트는 생성 경로라 먼저
- *  `ensureDna`로 DNA를 채워둔 뒤 판정하지만, 여긴 "지금 있는 그대로"만 본다.
+/** **읽기 전용** 캐시 신선 판정 — 저장본을 그대로 내줘도 되는가(유료 콜 0).
+ *
+ *  ⭐**2026-08-31 대표 확정 — 「상대가 고친 건 이미 만든 리포트에 영향 주지 않는다」.**
+ *  전엔 양쪽(from·to) DNA를 다 봤다. 그래서 **내가 아무것도 안 했는데** 상대 사장님이
+ *  자기 소개서를 고치면 그 순간 내 저장본이 무효가 되고, 다음에 열 때 DNA 1콜 + 리포트 1콜이
+ *  조용히 나갔다. 리포트는 **그때 두 소개서를 읽고 쓴 기록**이지 실시간 시세가 아니다.
+ *  → 판정을 **내 쪽(from)만** 본다. 상대 변화로는 절대 재생성되지 않는다.
+ *
+ *  ⚠️ 그래서 「내 소개서를 고쳤다」는 이제 **유일한 재생성 트리거**다. 화면은 그걸
+ *     `isMyBrandEditedSince`로 물어 [다시 분석하기]를 띄운다(§아래).
  *
  *  용도(08-09) — 소개서 페이지(`/m/[slug]`)가 [콜라보 분석]을 열기 **전에** 미리 훑어서,
- *  DNA가 안 바뀐 쌍은 로딩 화면 없이 바로 리포트를 보여주기 위함(`ReportSheet`의 `cachedReports`).
- *  /my 아카이브가 이미 하던 것(저장본을 손에 쥐고 열기)과 같은 경험을 소개서 페이지에도 준다.
+ *  내 DNA가 안 바뀐 쌍은 로딩 화면 없이 바로 리포트를 보여주기 위함(`ReportSheet`의 `cachedReports`).
  *
- *  ⚠️ 라우트(`route.ts`)는 건드리지 않았다 — 거긴 이미 `ensureDna` 이후라 fromDna/toDna가
- *     항상 non-stale임이 보장돼 있어 이 함수를 끼워 넣을 이유가 없고, 유료 생성 경로라
- *     리스크를 더 얹지 않는 편이 안전하다. 판정 로직만 여기 한 곳에 두고 두 쪽이 같은 규칙을
- *     참조하게 하고 싶었지만, route.ts 쪽은 이미 스스로 같은 조건(3줄)을 인라인으로 쓰고
- *     있어 중복은 딱 그 3줄뿐이다 — 갈라질 위험보다 라이브 코드 미변경이 우선이었다. */
+ *  🪤 라우트(`/api/collab-report`)의 캐시 판정도 **이 함수를 부른다**(08-31). 전엔 같은 3조건을
+ *     인라인으로 복제해 두 판정이 갈라질 위험이 있었다 — 이제 규칙은 여기 한 곳뿐이다. */
 export function isReportCacheFresh(
   latest: { createdAt: string } | null,
   fromDna: BrandDna | null,
-  toDna: BrandDna | null,
   from: Maker,
-  to: Maker,
 ): boolean {
   if (!latest) return false;
-  if (isDnaStale(fromDna, from) || isDnaStale(toDna, to)) return false;
-  return (
-    Date.parse(latest.createdAt) > Date.parse(fromDna!.updated_at) &&
-    Date.parse(latest.createdAt) > Date.parse(toDna!.updated_at)
-  );
+  if (isDnaStale(fromDna, from)) return false;
+  return Date.parse(latest.createdAt) > Date.parse(fromDna!.updated_at);
+}
+
+/** 저장본을 **다시 보는** 화면에서 [다시 분석하기]를 띄울지 — 「내 소개서가 그새 바뀌었나」만 본다.
+ *
+ *  ⭐`!isReportCacheFresh`와 **일부러 다르다.** 저쪽은 "저장본을 내줘도 되나"(넓게 false),
+ *  이쪽은 "사장님께 «바뀌었어요»라고 말해도 되나"(좁게 true)다. 둘을 한 함수로 합치면
+ *  **DNA가 없거나 Pool 대개정으로 낡은 경우까지** "소개서를 고치셨어요"라고 거짓말하게 된다.
+ *  (그건 우리 사정이지 사장님이 한 일이 아니다.)
+ *
+ *  참인 경우 둘 —
+ *   ① `input_hash`가 지금 소개서 지문과 다르다 → 고친 뒤 DNA를 아직 안 만들었다.
+ *   ② 리포트가 DNA보다 오래됐다 → 고쳤고 DNA는 이미 다시 만들어졌다(리포트만 옛것).
+ *  ⛔지문이 없는 구버전 DNA는 **판단 불가라 false** — 모르면 말하지 않는다. */
+export function isMyBrandEditedSince(
+  latest: { createdAt: string } | null,
+  fromDna: BrandDna | null,
+  from: Maker,
+): boolean {
+  if (!latest || !fromDna || !fromDna.input_hash) return false;
+  if (fromDna.input_hash !== digestHash(from)) return true;
+  return Date.parse(latest.createdAt) <= Date.parse(fromDna.updated_at);
 }
 
 // ── 리포트 생성 ────────────────────────────────────────────────
