@@ -598,9 +598,9 @@ export function MakerActionBar({
                     // ⚠️`onClick={handleReport}` 금지 — 클릭 이벤트가 `restore` 인자로 들어가
                     //    **버튼을 누를 때마다 '되살리기'가 켜진다**(MouseEvent는 truthy). 감싸서 넘긴다.
                     onClick={() => handleReport()}
-                    className="flex h-12 flex-[0.8] items-center justify-center rounded-md border border-border-strong bg-surface text-[16px] font-medium text-ink transition-colors"
+                    className="flex h-12 flex-[0.8] items-center justify-center rounded-md border border-border-strong bg-surface text-center text-[16px] font-medium leading-tight break-keep text-ink transition-colors"
                   >
-                    콜라보 추천받기
+                    콜라보 미리 그려보기
                   </button>
                 )}
                 <a
@@ -612,14 +612,18 @@ export function MakerActionBar({
               </>
             ) : (
               <>
-                {/* 콜라보 분석 — 고스트(왼쪽) */}
+                {/* 콜라보 미리 그려보기 — 고스트(왼쪽).
+                    📏`break-keep`은 라벨이 「콜라보 추천받기」(8자) → 「콜라보 미리 그려보기」(11자)로
+                       길어지며 붙였다(08-31 대표 지시). **320px에서만** 두 줄이 되는데, 없으면
+                       「…그려보 / 기」로 끊겨 마지막 한 글자가 혼자 떨어진다 → 어절 단위로 끊는다.
+                       360·375·390은 한 줄 그대로다(실측). */}
                 <button
                   type="button"
                   // ⚠️감싸서 넘긴다 — 위 버튼 주석 참조(이벤트가 `restore`로 새어 들어간다)
                   onClick={() => handleReport()}
-                  className="flex h-12 flex-[0.8] items-center justify-center rounded-md border border-border-strong bg-surface text-[16px] font-medium text-ink transition-colors"
+                  className="flex h-12 flex-[0.8] items-center justify-center rounded-md border border-border-strong bg-surface text-center text-[16px] font-medium leading-tight break-keep text-ink transition-colors"
                 >
-                  콜라보 추천받기
+                  콜라보 미리 그려보기
                 </button>
                 {/* 콜라보 제안 시작하기 — primary. 쉬는 중이면 잠근다(08-12 대표 확정).
                     ⚠️버튼을 **감추지 않고 잠근다** — 없어지면 "제안하는 법이 없는 서비스"로 읽히지만,

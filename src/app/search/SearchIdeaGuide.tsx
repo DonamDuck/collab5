@@ -118,7 +118,7 @@ export function SearchIdeaGuide() {
             <p className="mt-1.5 break-keep text-[14px] leading-relaxed text-mute">
               마음에 드는 브랜드의 소개서를 연 다음,
               <br />
-              아래 <b className="font-medium text-body">콜라보 추천받기</b>를 누르면 분석이 시작돼요.
+              아래 <b className="font-medium text-body">콜라보 미리 그려보기</b>를 누르면 분석이 시작돼요.
             </p>
           </div>
           <button
@@ -181,7 +181,7 @@ export function SearchIdeaGuide() {
                   또 거짓말이 된다) **바깥에 링만 두른다** — 실물 모양은 보존하면서 "여기"만 얹는 방식.
                   링 색은 primary가 아니라 ink 계열이다: 키위 링이면 옆 키위 버튼과 한 덩어리로 읽힌다. */}
               <span className="flex h-[32px] flex-[0.8] items-center justify-center rounded-md border border-border-strong bg-surface text-[11px] font-medium text-ink ring-2 ring-ink ring-offset-2 ring-offset-surface">
-                콜라보 추천받기
+                콜라보 미리 그려보기
               </span>
               <span className="flex h-[32px] flex-1 items-center justify-center rounded-md bg-primary text-[11px] font-medium text-primary-on">
                 콜라보 제안 시작하기
