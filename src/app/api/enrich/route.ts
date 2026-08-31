@@ -2,7 +2,6 @@
 // 지금은 mock(키 불필요). 키 발급 후 lib/enrich.ts의 provider만 Claude로 교체하면
 // 이 라우트는 그대로 동작한다(응답 스키마 동일).
 import { NextResponse } from "next/server";
-import Anthropic from "@anthropic-ai/sdk";
 import {
   enrichLookup,
   enrichRecrawl,
@@ -80,26 +79,6 @@ async function digestsOf(
   // 판단 기준: 이 total이 생성 콜(24~40초) 대비 유의미한가. p95가 6초를 넘지 않으면 프리페치는 과잉이다.
   console.log("[digest-time]", JSON.stringify({ total: Date.now() - t0, ...each }));
   return { homepageDigest, instagramDigest, pressDigest: pressDigest || undefined };
-}
-
-// 임시 진단: web_search 없는 최소 호출 — 전반 과부하 vs web_search 특정 구분용.
-export async function GET() {
-  try {
-    const client = new Anthropic({ maxRetries: 1 });
-    const res = await client.messages.create({
-      model: "claude-sonnet-4-6",
-      max_tokens: 20,
-      messages: [{ role: "user", content: "'OK'라고만 답해줘." }],
-    });
-    const text = res.content
-      .filter((b): b is Anthropic.TextBlock => b.type === "text")
-      .map((b) => b.text)
-      .join("");
-    return NextResponse.json({ ok: true, text });
-  } catch (e) {
-    const status = e instanceof Anthropic.APIError ? e.status : undefined;
-    return NextResponse.json({ ok: false, status, message: String(e) });
-  }
 }
 
 export async function POST(req: Request) {
