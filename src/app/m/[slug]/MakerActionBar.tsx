@@ -17,16 +17,6 @@ const PENDING_SAVE_KEY = "collab5:pendingSave";
 const PENDING_PROPOSE_KEY = "collab5:pendingPropose";
 const PENDING_REPORT_KEY = "collab5:pendingReport";
 
-// 🚧🚧 임시 스위치 (2026-07-29, 대표 콜라보 분석 테스트) 🚧🚧
-//   내 소개서 페이지에서도 [콜라보 분석]·[콜라보 시작하기]가 보이게 소유자 모드를 잠시 끈다.
-//   ⭐**되돌릴 때는 이 한 줄만 `true`로** — 아래 두 군데(하트 숨김·액션 분기)가 이 값을 본다.
-//
-//   ⚠️ 지표는 안전하다: 자기 자신에게 제안해도 `recordCollabRequestAction`의 서버 가드(`ownsBrand`)가
-//      no-op이라 `collab_requests`엔 안 쌓인다. **UI만 열고 서버 안전망은 그대로 둔 것**이다.
-//   ⚠️ 다만 **리포트는 진짜로 생성된다**(유료 콜 + `collab_reports`에 캐시 + `/my` 아카이브에 노출).
-//      테스트로 만든 쌍은 나중에 대표가 직접 지우거나 그대로 둘지 판단할 것.
-const OWNER_MODE = true; // 정상값. 07-29~31 대표 콜라보 분석 테스트 동안만 false였다(07-31 복귀)
-
 export function MakerActionBar({
   slug,
   makerId,
@@ -69,8 +59,6 @@ export function MakerActionBar({
    *  ReportSheet로 그대로 전달만 한다(08-09) — /my와 같은 "로딩 화면 없이 바로 열기" 경험. */
   cachedReports?: Record<string, CollabReportData>;
 }) {
-  // 🚧 위 OWNER_MODE 스위치를 통과시킨 값 — 화면 분기는 전부 이걸 본다(원래는 isOwner 그대로였다)
-  const ownerUi = isOwner && OWNER_MODE;
   const [saved, setSaved] = useState(initialSaved);
   const [loginOpen, setLoginOpen] = useState(false);
   const [loginReason, setLoginReason] = useState<"save" | "propose" | "report">("save");
@@ -543,7 +531,7 @@ export function MakerActionBar({
             </button>
 
             {/* 찜 하트 — 빈 → 채워진 빨강 토글. 내 소개서면 숨김(내가 나를 찜하는 건 신호가 아니다) */}
-            {!ownerUi && (
+            {!isOwner && (
             <button
               type="button"
               onClick={toggleHeart}
@@ -584,7 +572,7 @@ export function MakerActionBar({
                 라벨은 '무엇을 하는가', 헬퍼는 '얼마가 드는가'로 역할을 나눈다. */}
             {/* 헬퍼는 아래 버튼 행과 **같은 flex 비율**을 써서 분석 버튼 위 정중앙에 앉는다(대표 08-09).
                 바 기준 좌측 정렬이면 어느 버튼 얘긴지가 위치로 안 드러난다. */}
-            {(ownerUi ? ownerCanReport : true) && (
+            {(isOwner ? ownerCanReport : true) && (
               <div className="mb-2 flex items-center gap-2.5">
                 <p className="flex-[0.8] text-center text-[12px] leading-none text-faint">
                   🕐 약 30초면 완료돼요
@@ -593,7 +581,7 @@ export function MakerActionBar({
               </div>
             )}
             <div className="flex items-center gap-2.5">
-            {ownerUi ? (
+            {isOwner ? (
               /* 내 소개서 모드 — '제안'은 자기 자신에게 보내는 거라 말이 안 된다(북극성 퍼널 오염).
                  **분석도 기본은 닫는다**(대표 지시 07-31, 첫 실고객 유입 시점에 원복):
                  내 브랜드 × 내 브랜드 조합은 매칭 정보로서 의미가 없는데 유료 콜은 그대로 나간다.
