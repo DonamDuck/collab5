@@ -157,10 +157,12 @@ export function ArticleComments({
           {comments.map((c, i) => (
             <li key={c.id} className={`flex gap-3 ${i >= shown ? "hidden" : ""}`}>
               {/* 로고·이름은 «쓸 때 스냅샷»한 값이다 — 그 뒤 브랜드명이 바뀌어도 이 댓글은 그대로다 */}
-              {/* 🔗`<a>` → `<Link>`(08-31, B27) — **새로고침 없이 넘어가게.**
-                  ⚠️프리페치 때문이 아니다: 실측 결과 `/m/[slug]`는 Link여도 미리 읽어두지 않는다
-                     (`magazine/[slug]/loading.tsx` 주석에 대조군까지 적어 뒀다).
-                     버는 것은 **문서 통째 재로딩이 사라지는 것** — JS·CSS를 다시 받지 않는다. */}
+              {/* 🔗`<a>` → `<Link>`(08-31, B27) — 여기만 앵커라 **새로고침으로 넘어가고 있었다.**
+                  ⭐버는 것 둘 — ①문서 통째 재로딩이 사라진다(JS·CSS를 다시 안 받는다)
+                    ②`<Link>`라서 **미리 받아두기(prefetch)도 붙는다.**
+                  🩸이 주석의 초판은 *"프리페치는 어차피 안 된다"*고 적었는데 **틀린 실측이었다**
+                    (탭이 `hidden`이라 브라우저가 프리페치를 안 한 것). 정정 경위 =
+                    `magazine/[slug]/loading.tsx` 주석. */}
               {c.authorSlug ? (
                 <Link href={`/m/${c.authorSlug}`} className="shrink-0" aria-label={`${c.authorName} 소개서`}>
                   <Avatar image={c.authorImage} name={c.authorName} size={36} shape="square" />
