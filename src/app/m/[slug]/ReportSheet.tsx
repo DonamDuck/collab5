@@ -75,6 +75,9 @@ type OkPayload = {
   dnaCalls?: number;
   /** 소유권이 떠난 브랜드의 옛 리포트 — 읽기만 된다(08-07). 재생성 UI를 숨기는 신호. */
   readOnly?: boolean;
+  /** 저장본이지만 낡았다(08-31 대표 2차). **그래도 새로 만들지 않는다** — 버튼만 띄운다.
+   *  "mine" = 사장님이 소개서를 고쳤다 / "other" = 우리 쪽 사정(Pool 대개정 등 — 원인을 지어내지 않는다). */
+  stale?: "mine" | "other";
 };
 
 export function ReportSheet({
@@ -92,6 +95,7 @@ export function ReportSheet({
   initialReadOnly = false,
   initialFromName,
   cachedReports,
+  staleReports,
   refreshable = false,
   source = "maker_page",
   onReportLoaded,
@@ -123,6 +127,8 @@ export function ReportSheet({
    *  `isReportCacheFresh`가 라우트 ⑥ 캐시 3조건과 같은 판정을 쓴다).
    *  키에 없는 fromSlug는 지금처럼 fetch+로딩 화면을 그대로 탄다(신규 쌍·DNA 변경분). */
   cachedReports?: Record<string, CollabReportData>;
+  /** `cachedReports` 중 낡은 것 — 소개서 페이지가 알려준다(08-31 대표 2차). */
+  staleReports?: Record<string, "mine" | "other">;
   /** 저장본을 다시 보는 중인데 **내 소개서가 그새 바뀌었다** — [다시 분석하기]를 띄운다(08-31 대표).
    *  ⭐서버가 판정해서 내려준다(`lib/collab-report.ts`의 `isMyBrandEditedSince`).
    *  ⚠️**상대가 고친 건 여기 안 들어온다** — 리포트는 그때 두 소개서를 읽고 쓴 기록이라
@@ -162,7 +168,12 @@ export function ReportSheet({
   const archived: OkPayload | null = initialReport
     ? { report: initialReport, cached: true, model: "archive", readOnly: initialReadOnly }
     : initialArchiveSlug && cachedReports?.[initialArchiveSlug]
-      ? { report: cachedReports[initialArchiveSlug], cached: true, model: "cache" }
+      ? {
+          report: cachedReports[initialArchiveSlug],
+          cached: true,
+          model: "cache",
+          ...(staleReports?.[initialArchiveSlug] ? { stale: staleReports[initialArchiveSlug] } : {}),
+        }
       : null;
   // ⚠️초기 phase를 **정확히** 세운다 — `idle`은 아래에서 로딩 화면을 그리므로, 실제로 fetch가
   //   따라오지 않는 상황에서 idle로 두면 **"분석하고 있어요"를 한 프레임 거짓말**하게 된다.
@@ -205,7 +216,12 @@ export function ReportSheet({
       //   여기서 캐시를 내주면 버튼이 아무 일도 안 하는 것처럼 보인다.
       const hit = force ? undefined : cachedReports?.[fromSlug];
       if (hit) {
-        const ok: OkPayload = { report: hit, cached: true, model: "cache" };
+        const ok: OkPayload = {
+          report: hit,
+          cached: true,
+          model: "cache",
+          ...(staleReports?.[fromSlug] ? { stale: staleReports[fromSlug] } : {}),
+        };
         setResult(ok);
         setPhase("ok");
         loadedCbRef.current?.(ok.report);
@@ -266,7 +282,7 @@ export function ReportSheet({
           run(wantSlugRef.current);
       }
     },
-    [toSlug, cachedReports],
+    [toSlug, cachedReports, staleReports],
   );
 
   // 열릴 때: 소개서 1개면 바로 fetch(캐시면 서버가 즉시 반환), 2개+면 선택(select)이 첫 depth.
@@ -480,15 +496,20 @@ export function ReportSheet({
           )}
           {/* 🆕 내 소개서를 고친 뒤 저장본을 다시 보는 중 — 여기서만 재생성을 «명시»로 만든다(08-31 대표).
               ⭐**안 바뀌었으면 아무것도 안 보인다**(대표 원문). 그래서 조건이 셋 다 필요하다:
-                ①서버가 "내 소개서가 바뀌었다"고 판정했고(`refreshable`)
+                ①서버가 낡았다고 판정했고(`/my`는 `refreshable`, 소개서 페이지는 `result.stale`)
                 ②지금 화면이 방금 «만든» 결과가 아니고(`cached !== false` — 누른 직후엔 스스로 사라진다)
                 ③보관본이 아니다(`readOnly` — 소유권이 떠나 재생성 자체가 불가).
               🪤 유료 콜이 나가는 유일한 «사장님 손» 자리다 — 그래서 문구가 버튼 «위»에 온다.
                  무슨 일이 왜 벌어지는지 읽고 나서 누르게. */}
-          {refreshable && result?.cached !== false && !result?.readOnly && (
+          {(refreshable || !!result?.stale) && result?.cached !== false && !result?.readOnly && (
             <div className="mt-4 rounded-md border border-hairline bg-surface-soft px-3 py-3">
+              {/* 🗣문구를 «왜 낡았나»로 가른다 — 원인을 지어내지 않기 위해서다.
+                  "other"(우리 쪽 사정: Pool 대개정·구버전 DNA)에 대고 "소개서를 고치셨어요"라고 하면
+                  **사장님이 하지도 않은 일을 했다고 말하는 것**이 된다. 모르면 사실만 말한다. */}
               <p className="text-[13px] leading-relaxed break-keep text-mute">
-                이 분석 뒤에 소개서를 고치셨어요. 바뀐 내용으로 다시 볼 수 있어요.
+                {result?.stale === "other"
+                  ? "저장해 둔 분석이에요. 지금 기준으로 다시 볼 수 있어요."
+                  : "이 분석 뒤에 소개서를 고치셨어요. 바뀐 내용으로 다시 볼 수 있어요."}
               </p>
               <button
                 type="button"
@@ -498,7 +519,7 @@ export function ReportSheet({
                 }}
                 className="mt-2.5 flex h-10 w-full items-center justify-center rounded-md border border-border-strong bg-surface text-[14px] font-medium text-ink"
               >
-                바뀐 내용으로 다시 분석하기
+                {result?.stale === "other" ? "지금 기준으로 다시 분석하기" : "바뀐 내용으로 다시 분석하기"}
               </button>
             </div>
           )}

@@ -2,13 +2,15 @@
 // 인증(from은 내 브랜드만) → **캐시 먼저**(내 소개서 기준) → DNA 병렬 확보(stale만) → thin 가드 → 생성·저장.
 // ⭐08-31: 캐시 판정이 DNA 확보보다 «앞»이고, 판정 기준은 **내 소개서만** 본다 —
 //   상대가 자기 소개서를 고쳐도 내 저장본은 무효가 되지 않는다(대표 확정).
+// ⭐⭐08-31(2차): **저장본이 있으면 새로 만들지 않는다.** 새로 만드는 길은 `force` 하나뿐 —
+//   즉 «내가 고쳤고» + «내가 [다시 분석하기]를 눌렀을 때»만 유료 콜이 나간다(대표 확정).
 // 클라이언트가 보낸 텍스트는 프롬프트에 절대 넣지 않는다 — slug만 받고 소개서·DNA는 서버가 DB에서 읽음
 // (주입 차단, enrich 관례). 스펙: docs/superpowers/specs/2026-07-25-collab-report-dna-design.md
 import { NextResponse } from "next/server";
 import { repo } from "@/lib/repo";
 import { getSessionUserId } from "@/lib/profiles";
 import { isStaffUser } from "@/lib/staff";
-import { generateDna, generateReport, isDnaStale, isReportCacheFresh, isThin, REPORT_MODEL } from "@/lib/collab-report";
+import { generateDna, generateReport, isDnaStale, isMyBrandEditedSince, isReportCacheFresh, isThin, REPORT_MODEL } from "@/lib/collab-report";
 import { logTotal, type CallMeter } from "@/lib/ai-cost";
 import { distinctTypeCount } from "@/lib/dna-pool";
 import type { BrandDna, Maker } from "@/lib/types";
@@ -97,12 +99,28 @@ export async function POST(req: Request) {
     //      이미 만들어 둔 저장본을 못 읽게 하는 장치가 아니다.
     const latest = force ? null : await repo.getLatestCollabReport(from.id, to.id);
     const cachedFromDna = latest ? await repo.getBrandDna(from.id) : null;
-    if (latest && isReportCacheFresh(latest, cachedFromDna, from)) {
+    if (latest) {
+      // ⭐⭐**저장본이 있으면 «절대» 새로 만들지 않는다**(2026-08-31 대표 확정 2차).
+      //   대표 규칙: *"내가 소개서 고쳤을 때만 + 내가 분석 요청할 때만 새로 분석한다."*
+      //   **둘 다여야 한다.** 전엔 앞 조건만 봤다 — 내 소개서가 바뀌면 소개서 페이지에서
+      //   [콜라보 분석]을 여는 것만으로 «묻지도 않고» DNA+리포트 2콜이 나갔다.
+      //   (08-31 prod 실측: 캔가×호락호락도서관 쌍이 `cachedReports`에서 빠져 있어 그 길이 열려 있었다.)
+      //   → 이제 새로 만드는 길은 **`force`(사장님이 [다시 분석하기]를 누른 것) 하나뿐**이다.
+      //   ⚠️`force`는 위에서 `latest`를 null로 만들므로 이 블록을 아예 타지 않는다.
+      //   ⚠️저장본을 폐기하는 길은 그대로 있다 — `collab_reports.status='inactive'`로 내리면
+      //     `getLatestCollabReport`가 null을 주고 다음 열람에서 자동 재생성된다(운영 장치, 07-02 주석).
+      const fresh = isReportCacheFresh(latest, cachedFromDna, from);
       return NextResponse.json({
         state: "ok",
         report: latest.report,
         cached: true,
         model: latest.model,
+        // 낡았으면 «왜»까지 준다 — 화면이 문구를 고르는 데 쓴다.
+        //   "mine"  = 사장님이 소개서를 고쳤다 → 그렇게 말해도 된다.
+        //   "other" = 우리 쪽 사정(DNA 없음·지문 없는 구버전·Pool 대개정) → **원인을 지어내지 않는다.**
+        ...(fresh
+          ? {}
+          : { stale: isMyBrandEditedSince(latest, cachedFromDna, from) ? "mine" : "other" }),
       });
     }
 
@@ -133,12 +151,13 @@ export async function POST(req: Request) {
       });
     }
 
-    // 캐시 미스 사유 관측 — "저장본 없음"인지 "내 소개서가 바뀌었나"인지 로그로 즉시 구분.
-    //   ⭐`toDna`도 계속 찍는다 — 판정에선 뺐지만, 뺀 뒤에도 상대 변화가 실제로 재생성을
-    //     일으키지 않는지 **로그로 확인**할 수 있어야 한다(뺐다는 사실 자체가 검증 대상이다).
+    // 여기까지 왔다 = **유료 콜이 나가는 길은 이제 딱 둘뿐**이다:
+    //   ①저장본이 아예 없는 새 쌍 ②`force`(사장님이 [다시 분석하기]를 누름).
+    //   ⭐`toDna`도 계속 찍는다 — 판정에서 뺐지만, 뺀 뒤에도 상대 변화가 재생성을 «안» 일으키는지
+    //     로그로 확인할 수 있어야 한다(뺐다는 사실 자체가 검증 대상이다).
     console.log(
-      `[collab-report] cache-miss ${from.slug}→${to.slug} force=${force} ` +
-        `latest=${latest?.createdAt ?? "none"} fromDna=${fromDna.updated_at} toDna=${toDna.updated_at} dnaCalls=${dnaCalls}`
+      `[collab-report] generate ${from.slug}→${to.slug} reason=${force ? "force" : "no-saved-report"} ` +
+        `fromDna=${fromDna.updated_at} toDna=${toDna.updated_at} dnaCalls=${dnaCalls}`
     );
 
     // ⑦ 리포트 생성 → 접점<2 또는 아이디어 0개면 no_match(정직한 빈손)

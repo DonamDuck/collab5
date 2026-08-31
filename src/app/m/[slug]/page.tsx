@@ -5,7 +5,7 @@ import { repo } from "@/lib/repo";
 import { getSessionUser } from "@/lib/supabase/server";
 import { getProfile, getProfileById } from "@/lib/profiles";
 import { isStaffUser } from "@/lib/staff";
-import { isReportCacheFresh } from "@/lib/collab-report";
+import { isMyBrandEditedSince, isReportCacheFresh } from "@/lib/collab-report";
 import { OG_IMAGE } from "@/lib/site";
 import { MakerArticle } from "./MakerArticle";
 import { ConnectProfileButton } from "./ConnectProfileButton";
@@ -43,14 +43,18 @@ function countAllPhotos(m: Maker): number {
 async function computeCachedReports(
   viewerMakers: Maker[],
   to: Maker,
-): Promise<Record<string, CollabReportData>> {
+): Promise<{
+  reports: Record<string, CollabReportData>;
+  stale: Record<string, "mine" | "other">;
+}> {
+  const EMPTY = { reports: {}, stale: {} };
   const fromCandidates = viewerMakers.filter((m) => m.id !== to.id);
-  if (fromCandidates.length === 0) return {};
+  if (fromCandidates.length === 0) return EMPTY;
   // ⚠️**리포트가 있는 쌍부터 좁힌다**(08-09 수정). 처음엔 브랜드마다 DNA·리포트를 낱개로 조회했는데,
   //    대표 계정은 소개서가 14개라 /m 페이지 로드마다 왕복이 29번 붙었다 — 그중 리포트가 실제로
   //    있는 건 1개였다. 쿼리 1번으로 후보를 좁히면 DNA 조회는 그 몇 건에만 든다.
   const reports = await repo.listLatestCollabReportsTo(fromCandidates.map((m) => m.id), to.id);
-  if (reports.size === 0) return {};
+  if (reports.size === 0) return EMPTY;
   const hits = fromCandidates.filter((m) => reports.has(m.id));
   // ⭐08-31: **상대(to) DNA는 더 이상 읽지 않는다.** 판정이 내 쪽만 보게 바뀌어서
   //   (`isReportCacheFresh` 주석 참조) 이 조회는 결과에 아무 영향이 없어졌다 — 쿼리 1회 절약.
@@ -68,12 +72,30 @@ async function computeCachedReports(
       ]);
       if (!from) return null;
       const latest = reports.get(card.id)!;
-      return isReportCacheFresh(latest, fromDna, from)
-        ? ([from.slug, latest.report] as const)
-        : null;
+      // ⭐⭐08-31(2차): **낡은 쌍도 저장본을 같이 넘긴다.** 전엔 신선한 것만 넘겨서, 낡은 쌍은
+      //   시트가 fetch를 타고 → 라우트가 **묻지도 않고 새로 만들었다**(유료 2콜).
+      //   대표 규칙 = *"내가 고쳤을 때 «그리고» 내가 요청했을 때만"* → 여는 것만으로는 안 만든다.
+      //   ⚠️라우트도 같은 규칙으로 막아 뒀다(저장본 있으면 생성 안 함). 여긴 그 위의 화면 층 —
+      //     **여기서 넘겨줘야 fetch·로딩 화면 자체가 없어진다**(0 왕복).
+      const stale: "mine" | "other" | null = isReportCacheFresh(latest, fromDna, from)
+        ? null
+        : isMyBrandEditedSince(latest, fromDna, from)
+          ? "mine"
+          : "other";
+      return [from.slug, latest.report, stale] as const;
     }),
   );
-  return Object.fromEntries(entries.filter((e): e is [string, CollabReportData] => e !== null));
+  const out = { reports: {}, stale: {} } as {
+    reports: Record<string, CollabReportData>;
+    stale: Record<string, "mine" | "other">;
+  };
+  for (const e of entries) {
+    if (!e) continue;
+    const [slug, report, stale] = e;
+    out.reports[slug] = report;
+    if (stale) out.stale[slug] = stale;
+  }
+  return out;
 }
 
 
@@ -170,7 +192,7 @@ export default async function MakerPage({
     .map((m) => ({ id: m.id, slug: m.slug, name: m.name }));
   // [콜라보 분석] 사전 캐시 확인 — viewerMakers 확정 후에만 계산 가능해 별도 await(위 배치와 병렬 불가).
   // isOwner 여부와 무관하게 계산해도 무해하지만 viewerBrands가 보통 비어 있어(비로그인·미등록) 대부분 즉시 {}.
-  const cachedReports = await computeCachedReports(viewerMakers, maker);
+  const { reports: cachedReports, stale: staleReports } = await computeCachedReports(viewerMakers, maker);
   // 점유 가능 = 아직 소유 계정 없음(비회원 생성) + 관리 비번 존재(비번으로 점유 검증 가능).
   // 이미 소유(회원 생성 or 점유됨)면 버튼 미노출. 비번 없는 익명 소개서는 점유 불가라 미노출.
   const claimable = !maker.ownerUserId && !!maker.editPasswordHash;
@@ -237,6 +259,7 @@ export default async function MakerPage({
         ownerCanReport={isOwner && isStaffUser(viewerUserId)}
         viewerBrands={viewerBrands}
         cachedReports={cachedReports}
+        staleReports={staleReports}
       />
       )}
     </main>
