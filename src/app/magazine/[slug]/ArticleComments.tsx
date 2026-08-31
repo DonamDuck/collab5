@@ -10,6 +10,7 @@
 //   ⚠️단 **자동 등록은 하지 않는다.** 좋아요는 되돌릴 수 있는 사적 행동이지만
 //     댓글은 되돌릴 수 없는 «공개 발언»이라, 돌아오면 쓰던 글을 복원해 두고 등록은 본인이 누른다.
 //     (이 차이를 지우고 좋아요와 똑같이 맞추면 안 된다.)
+import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ArticleComment } from "@/lib/types";
 import { Avatar } from "@/components/Avatar";
@@ -156,10 +157,14 @@ export function ArticleComments({
           {comments.map((c, i) => (
             <li key={c.id} className={`flex gap-3 ${i >= shown ? "hidden" : ""}`}>
               {/* 로고·이름은 «쓸 때 스냅샷»한 값이다 — 그 뒤 브랜드명이 바뀌어도 이 댓글은 그대로다 */}
+              {/* 🔗`<a>` → `<Link>`(08-31, B27) — **새로고침 없이 넘어가게.**
+                  ⚠️프리페치 때문이 아니다: 실측 결과 `/m/[slug]`는 Link여도 미리 읽어두지 않는다
+                     (`magazine/[slug]/loading.tsx` 주석에 대조군까지 적어 뒀다).
+                     버는 것은 **문서 통째 재로딩이 사라지는 것** — JS·CSS를 다시 받지 않는다. */}
               {c.authorSlug ? (
-                <a href={`/m/${c.authorSlug}`} className="shrink-0" aria-label={`${c.authorName} 소개서`}>
+                <Link href={`/m/${c.authorSlug}`} className="shrink-0" aria-label={`${c.authorName} 소개서`}>
                   <Avatar image={c.authorImage} name={c.authorName} size={36} shape="square" />
-                </a>
+                </Link>
               ) : (
                 <Avatar image={c.authorImage} name={c.authorName} size={36} shape="square" />
               )}
@@ -167,9 +172,9 @@ export function ArticleComments({
                 <p className="flex flex-wrap items-center gap-x-2 text-[14px]">
                   {/* ⛔소개서가 없으면 «평범한 글자»다 — 링크처럼 보이는데 안 눌리는 죽은 링크를 만들지 않는다 */}
                   {c.authorSlug ? (
-                    <a href={`/m/${c.authorSlug}`} className="font-semibold text-ink underline underline-offset-2">
+                    <Link href={`/m/${c.authorSlug}`} className="font-semibold text-ink underline underline-offset-2">
                       {c.authorName}
-                    </a>
+                    </Link>
                   ) : (
                     <span className="font-semibold text-ink">{c.authorName}</span>
                   )}
