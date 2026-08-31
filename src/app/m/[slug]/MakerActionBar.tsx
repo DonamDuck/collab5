@@ -32,6 +32,7 @@ export function MakerActionBar({
   collabPaused = false,
   ownerCanReport = false,
   cachedReports,
+  staleReports,
 }: {
   slug: string;
   makerId: number;
@@ -58,6 +59,9 @@ export function MakerActionBar({
   /** 서버(`page.tsx`)가 미리 훑어 둔 "DNA 안 바뀐" 쌍들 — fromSlug별 리포트 맵.
    *  ReportSheet로 그대로 전달만 한다(08-09) — /my와 같은 "로딩 화면 없이 바로 열기" 경험. */
   cachedReports?: Record<string, CollabReportData>;
+  /** 그중 «낡은» 것 — 저장본은 그대로 보여주되 [다시 분석하기]를 띄운다(08-31 대표 2차).
+   *  "mine" = 사장님이 소개서를 고쳤다 / "other" = 우리 쪽 사정(원인을 지어내지 않는다). */
+  staleReports?: Record<string, "mine" | "other">;
 }) {
   const [saved, setSaved] = useState(initialSaved);
   const [loginOpen, setLoginOpen] = useState(false);
@@ -774,6 +778,7 @@ export function MakerActionBar({
         restoreOnOpen={restoreReport}
         fromBrands={viewerBrands}
         cachedReports={cachedReports}
+        staleReports={staleReports}
         toSlug={slug}
         toName={makerName}
         sampleMode={reportSample}
