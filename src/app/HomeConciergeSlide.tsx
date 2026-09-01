@@ -5,9 +5,10 @@
 //   고른 이유가 정확히 이거였다(*"나중에 슬라이드로 업체 소개나 이벤트가 될 자리"*).
 //   ⚠️슬라이드마다 배경을 다르게 하면 배너가 아니라 **서로 다른 섹션 두 개**가 번갈아 뜨는 것처럼 보인다.
 //
-// 🔗목적지 = 구글폼(컨시어지 신청). `/m/[slug]`의 보강 배너와 **같은 폼**이다
-//   (대표가 준 `docs.google.com/...1FAIpQLSf...` = `forms.gle/6XnnSTCQ2HDVkf2Y7`의 원본 주소).
-//   ⚠️폼을 바꾸면 `src/app/m/[slug]/page.tsx`의 `ENRICH_FORM_URL`도 같이 고친다.
+// 🔗목적지 = **우리 인스타 「모집」 게시글**(대표 지시 08-31). 자세한 건 아래 `POST_URL` 주석.
+//   🔻~~구글폼(컨시어지 신청)~~ — 08-31 이전엔 여기였다.
+//   ⚠️**`/m/[slug]`의 보강 배너는 그대로 구글폼이다**(`ENRICH_FORM_URL`). 둘은 이제 갈라졌으니
+//     한쪽을 고칠 때 다른 쪽을 따라 고치지 마라 — 목적지가 서로 다른 배너다.
 //
 // 🖼️**그림이 없다. 그리고 그게 문제가 아니다**(08-25 대표가 재료를 찾아 해결).
 //   1번(매거진)은 오른쪽 46%를 커버 사진이 채우는데 여기는 빌 수밖에 없었고, 그 빈 자리가
@@ -24,13 +25,26 @@
 
 import { track } from "@/lib/track";
 
-const FORM_URL =
-  "https://docs.google.com/forms/d/e/1FAIpQLSfMfp0FOtQtmHx4dlY46iF5JR0y-mv107JYMpa4al2JJdz4JQ/viewform";
+// 🔗목적지 = **우리 인스타 「모집」 게시글**(대표 지시 08-31). 전엔 구글폼이었다.
+//   ⭐이 배너의 그림이 원래 «이 게시글의 표지»였다(아래 08-25 주석) — 이제 눌러도 그 글로 간다.
+//     보던 것과 눌러서 가는 곳이 같아졌다.
+//
+//   📱**딥링크는 따로 만들 게 없다.** 인스타 앱이 `instagram.com` 주소를 자기 것으로 등록해 둬서
+//     (iOS 유니버설 링크 / 안드로이드 앱 링크), 앱이 깔린 폰에서 이 주소를 누르면 **앱이 열리고
+//     로그인 상태 그대로 그 글이 뜬다.** 소개서의 아티클 링크와 **같은 방식**이다
+//     (`<a href target="_blank">` — `MakerArticle.tsx` 참조).
+//   ⛔`instagram://` 스킴을 쓰지 않는다 — 그건 **숫자 media id**를 요구해서 이 짧은 코드로는 못 만들고,
+//     데스크톱에서는 아예 안 열린다. https 주소 하나가 폰·PC 양쪽을 다 덮는다.
+//
+//   📌주소는 **아이디가 붙은 정식형**을 쓴다. `/p/{코드}/`도 열리지만, 인스타 자신이
+//     `og:url`로 이 형태를 정식 주소라고 밝힌다(08-31 실측).
+//   ✅실재 확인(08-31): og:title = `collab5 on Instagram: "[모집_브랜드 소개서 프로젝트] 🦦…"`
+const POST_URL = "https://www.instagram.com/collab5_official/p/DcQ1tn3EoU0/";
 
 export function HomeConciergeSlide({ image }: { image?: { src: string; alt: string } }) {
   return (
     <a
-      href={FORM_URL}
+      href={POST_URL}
       target="_blank"
       rel="noopener noreferrer"
       onClick={() => track("home_banner_concierge_click")}
