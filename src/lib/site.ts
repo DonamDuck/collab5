@@ -11,6 +11,9 @@ export const SITE_URL = "https://collab5.co.kr";
  *
  *  🪤 카톡은 이미지뿐 아니라 **페이지 스크랩 결과도** 따로 캐시한다. v를 올려도 이미 퍼진 링크는
  *     그대로일 수 있다 — 급하면 카카오 개발자 도구에서 주소별로 초기화해야 한다
- *     (https://developers.kakao.com/tool/clear/og).
+ *     (https://developers.kakao.com/tool/debugger — 「카카오톡 URL 메타정보 관리」).
+ *     🚨09-04에 대표가 눌렀더니 404였다. 옛 주소 `/tool/clear/og`는 카카오가 없앴다.
+ *     ⭐**남의 서비스 주소는 조용히 죽는다** — 문서에 박아두고 몇 달 뒤 그대로 안내하면
+ *     받는 사람이 막힌다. 안내하기 «전»에 한 번 열어 볼 것.
  */
-export const OG_IMAGE = "/og-image.png?v=3";  // v3 = 로고 초록을 키위(#98FF5C)로 교정(08-16)
+export const OG_IMAGE = "/og-image.png?v=4";  // v4 = 홈 헤더와 «같은» 워드마크로 교체(09-04). v3 = 로고 초록을 키위(#98FF5C)로 교정(08-16)
