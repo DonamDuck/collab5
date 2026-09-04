@@ -6,6 +6,7 @@ import { getSessionUser } from "@/lib/supabase/server";
 import { getProfile, getProfileById } from "@/lib/profiles";
 import { isStaffUser } from "@/lib/staff";
 import { isMyBrandEditedSince, isReportCacheFresh } from "@/lib/collab-report";
+import { makerJsonLd, jsonLdString } from "@/lib/jsonld";
 import { OG_IMAGE } from "@/lib/site";
 import { MakerArticle } from "./MakerArticle";
 import { ConnectProfileButton } from "./ConnectProfileButton";
@@ -204,6 +205,16 @@ export default async function MakerPage({
 
   return (
     <main className={`mx-auto w-full max-w-[640px] px-4 pt-10 sm:px-6 print:max-w-none print:px-0 print:py-0 ${film ? "pb-16" : "pb-32"}`}>
+      {/* 🤖 기계용 요약(JSON-LD) — 검색엔진·AI가 읽는 층. 사람 눈엔 안 보이고 인쇄에도 안 나온다.
+          ⭐09-01 실측으로 **전 페이지에 0개**였던 것을 여기서 채운다(백로그 B73 → 41·89번).
+          🔻`film`(=/preview 데모)에서는 내보내지 않는다 — 남의 예시를 실재 브랜드로 색인시키면 안 된다.
+          🚨문자열 만들기는 `lib/jsonld.ts`가 한다 — XSS 방어(`<`→`\u003c`)가 거기 한 곳에 있다. */}
+      {!film && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: jsonLdString(makerJsonLd(maker)) }}
+        />
+      )}
       {/* 소개서 보강 신청 배너 — 주인에게만, 사진이 5장 미만일 때. 나머지(1일 숨김·7일 수명)는 클라 판정 */}
       {!film && (bannerPreview || (isOwner && countAllPhotos(maker) < ENRICH_MIN_PHOTOS)) && (
         <EnrichBanner
