@@ -25,6 +25,9 @@
     photos:  8,                            // 사진 장수(0이면 배지 없음)
     current: '지금 소개서에 있는 문장',        // 신규면 ''
     draft:   '내가 제안하는 문안 전문',
+    sources: [['2025-11-20','DRR7lz_ErFQ'], ...],   // 인스타 근거 → 자동으로 클릭 링크가 된다
+    web:     ['자료명 — 그 줄 그대로',               // 인스타 밖 출처. 문자열이면 그냥 표시
+              ['유튜브 「제목」', 'https://...']],   // 🆕[라벨, URL] 꼴이면 «클릭되는 링크»가 된다 (09-04)
   }
   ═══════════════════════════════════════════════════════════════════
 -->
@@ -370,7 +373,7 @@ const ITEMS = [
           ${it.frozen ? `<span class="badge lock">확정</span>` : ""}
           ${it.current && !it.frozen ? `<span class="badge">기존 항목</span>` : ""}
         </div>
-        <div class="meta">${esc(it.meta || "")}${it.url && !(it.sources||[]).length ? ` · <a href="${esc(it.url)}" target="_blank" rel="noopener">원문 보기 ↗</a>` : ""}</div>${it.frozen ? `<button class="fz" type="button">문안 펼쳐 보기 ▾</button>` : ""}${it.check ? `<div class="rt" data-f="${esc(it.check[0])}"><span class="rtb">${esc(it.check[0])} 자가검증</span><span>${esc(it.check[1])}</span></div>` : ""}${(it.web||[]).length ? `<div class="meta webs"><span class="srclbl">인스타 밖 출처</span>${it.web.map(w => `<span class="w">${esc(w)}</span>`).join("")}</div>` : ""}${(it.sources||[]).length ? `<div class="meta srcs"><span class="srclbl">판단에 쓴 글 ${it.sources.length}건</span>${it.sources.map(s => `<a href="https://www.instagram.com/p/${esc(s[1])}/" target="_blank" rel="noopener">${esc(s[0])} ↗</a>`).join("")}</div>` : ""}
+        <div class="meta">${esc(it.meta || "")}${it.url && !(it.sources||[]).length ? ` · <a href="${esc(it.url)}" target="_blank" rel="noopener">원문 보기 ↗</a>` : ""}</div>${it.frozen ? `<button class="fz" type="button">문안 펼쳐 보기 ▾</button>` : ""}${it.check ? `<div class="rt" data-f="${esc(it.check[0])}"><span class="rtb">${esc(it.check[0])} 자가검증</span><span>${esc(it.check[1])}</span></div>` : ""}${(it.web||[]).length ? `<div class="meta webs"><span class="srclbl">인스타 밖 출처</span>${it.web.map(w => Array.isArray(w) ? `<a class="w" href="${esc(w[1])}" target="_blank" rel="noopener">${esc(w[0])} \u2197</a>` : `<span class="w">${esc(w)}</span>`).join("")}</div>` : ""}${(it.sources||[]).length ? `<div class="meta srcs"><span class="srclbl">판단에 쓴 글 ${it.sources.length}건</span>${it.sources.map(s => `<a href="https://www.instagram.com/p/${esc(s[1])}/" target="_blank" rel="noopener">${esc(s[0])} ↗</a>`).join("")}</div>` : ""}
         <div class="body">
           ${it.current ? `<div class="current"><span class="lbl">지금 소개서</span>${esc(it.current)}</div>` : ""}
           <textarea class="draft" spellcheck="false">${esc(it.draft)}</textarea>
