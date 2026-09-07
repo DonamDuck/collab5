@@ -38,12 +38,50 @@ import re, sys, html, json, argparse, pathlib
 
 PAIRS = [("«", "»"), ("「", "」"), ("‘", "’"), ("“", "”")]
 
-# 표본에서 뽑은 선 — v1은 셋 다 넘고, v2·확정본은 셋 다 안 넘는다.
-LIMITS = {
-    "quote_per_1k":    (6.0, "강조부호가 잦다. 남의 말 인용과 그 문단의 결론 하나만 남기고 벗겨라"),
-    "dash_per_1k":     (3.0, "대시로 문장을 잇고 있다. 마침표로 끊거나 연결어미로 이어라"),
-    "contrast_per_1k": (1.5, "「A가 아니라 B」 대구가 반복된다. 대조가 곧 정보인 곳만 남기고 평서로 풀어라"),
+# 🚦막는 것은 «하나»다. 나머지는 숫자만 보이고 판단은 사람이 한다.
+#
+# 표본 6종을 라벨 제외 후 다시 재니 이렇게 갈렸다(09-07, 2팀 반증 반영):
+#           소개서확정본 46k   파랑브리프확정본   도바생브리프초안   내초안v1   스킬거친v2
+#   부호      0.8              2.7               6.1              13.6      3.6
+#   대시      0.2              2.1               1.9               2.0      0.0
+#   대구      0.3              2.1               0.2               2.5      1.0
+#
+# ⭕부호만 갈라낸다 — 내 초안이 나머지 전부의 «두 배»다.
+# ❌대시·대구는 못 가른다 — 라벨을 빼고 나니 **확정본과 내 초안이 0.1~0.4 차이**다.
+#   특히 파랑 브리프 확정본이 대구 2.1로 내 초안(2.5)에 붙는다. 그 글이 파랑님의
+#   「A가 아니라 B」 습관을 «다루는» 글이라 예시를 넷 인용해서다. 인용과 장식을
+#   기계가 못 가른다 → 그 둘을 막는 자리에 두면 브리프가 통째로 거짓양성이 난다.
+# 🚨0.4 차이를 규칙으로 굳히는 건 표본 하나에 임계를 맞추는 것이다. 안 한다.
+BLOCKING = {
+    "quote_per_1k": (7.0, "강조부호가 잦다. 남의 말 인용과 그 문단의 결론 하나만 남기고 벗겨라"),
 }
+# 숫자만 보인다. 넘어도 막지 않는다.
+REPORT_ONLY = ("dash_per_1k", "contrast_per_1k")
+
+# ⚠️규칙 4(섹션마다 같은 틀 반복)는 «세지 않는다». 내 초안의 진짜 병이 그거였는데
+#   (조각 여섯이 전부 「진단 → 훔칠 것」 2단 틀) 형식이 아니라 의미라 코드로 안 옮긴다.
+#   그건 눈으로 보거나 `/humanize-korean` 진단 콜이 잡는다.
+LIMITS = BLOCKING
+
+# 라벨 «구분자» 대시만 잡는다. 줄머리(- · * · >)나 표 칸(|) 뒤의 짧은 머리말 + 대시.
+_LABEL_LINE = re.compile(
+    r"(?m)^(\s*(?:[-*>]\s*)?(?:\*\*[^*\n]{1,40}\*\*|[^\s|—][^—\n|]{0,24})\s*)—")
+_LABEL_CELL = re.compile(
+    r"(\|\s*(?:\*\*[^*\n]{1,40}\*\*|[^\s|—][^—\n|]{0,24})\s*)—")
+
+def strip_labels(text: str) -> str:
+    """헤딩과 라벨은 «글»이 아니다. 세는 대상에서 뺀다 (2팀 반증 09-07).
+
+    🩸브리프 대시 29회를 갈라 보니 **헤딩 5 + 라벨·표 16 = 21회가 라벨**이었고
+      본문은 8회(1.8/1k, 통과)뿐이었다. 라벨을 세면 브리프·리서치 노트가
+      **통째로 거짓양성**이 난다. 규칙 2도 「라벨엔 남긴다」로 이미 열어 둔 자리다.
+    ⛔단 «따옴표 안»은 빼지 않는다. 「인용이냐 장식이냐」는 **의미** 판단이라
+      코드로 옮기면 틀린다. 숫자는 그대로 보이고 사람이 판단한다.
+    """
+    text = re.sub(r"(?m)^\s{0,3}#{1,6}\s.*$", " ", text)   # 마크다운 헤딩 줄
+    text = _LABEL_LINE.sub(r"\1", text)                      # `- **라벨** —` 의 대시
+    text = _LABEL_CELL.sub(r"\1", text)                      # `| **라벨** —` 의 대시
+    return text
 
 def extract_prose(text: str, path: str = "") -> str:
     """HTML이면 본문만 — style·script·태그·속성값은 글이 아니다."""
@@ -53,6 +91,7 @@ def extract_prose(text: str, path: str = "") -> str:
         text = re.sub(r"<[^>]+>", " ", text)
         text = html.unescape(text)
     text = re.sub(r"<!--\s*HUMANIZE-SUMMARY.*?-->", " ", text, flags=re.S)
+    text = strip_labels(text)
     return re.sub(r"[ \t]+", " ", text).strip()
 
 def measure(prose: str) -> dict:
@@ -66,7 +105,7 @@ def measure(prose: str) -> dict:
             "contrast": contrast, "contrast_per_1k": k(contrast)}
 
 def flags(m: dict) -> list:
-    return [f"{k} {m[k]} (기준 {lim}) — {msg}" for k, (lim, msg) in LIMITS.items() if m[k] > lim]
+    return [f"{k} {m[k]} (기준 {lim}) — {msg}" for k, (lim, msg) in BLOCKING.items() if m[k] > lim]
 
 def main():
     ap = argparse.ArgumentParser(description="글의 AI 티를 센다 (LLM 콜 0회)")
