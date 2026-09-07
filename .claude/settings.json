@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/artifact-prose-gate.py\""
+            "command": "d=\"${CLAUDE_PROJECT_DIR:-$PWD}\"; h=\"\"; while [ \"$d\" != \"/\" ]; do if [ -f \"$d/.claude/hooks/artifact-prose-gate.py\" ]; then h=\"$d/.claude/hooks/artifact-prose-gate.py\"; break; fi; d=$(dirname \"$d\"); done; [ -n \"$h\" ] || exit 0; exec python3 \"$h\""
           }
         ]
       }
