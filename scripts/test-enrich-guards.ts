@@ -23,7 +23,7 @@ import {
   ownerNoteCovered,
 } from "../src/lib/enrich";
 import { regionMatches, regionConflict } from "../src/lib/regionSynonyms";
-import { mapLinkLabel, channelLabel } from "../src/lib/links";
+import { mapLinkLabel, channelLabel, resolveCollabChannel } from "../src/lib/links";
 import { sanitizeHandle, extractPostUrls } from "../src/lib/instagram";
 
 let pass = 0;
@@ -507,6 +507,15 @@ check("⛔ 디렉토리 계속 차단(오귀속 방지)", !passes("https://www.1
 check("칩 라벨: 카카오톡 채널", channelLabel("http://pf.kakao.com/_rgAlX/chat") === "카카오톡 채널");
 check("칩 라벨: 리틀리·링크트리", channelLabel("https://litt.ly/x") === "리틀리" && channelLabel("https://linktr.ee/x") === "링크트리");
 check("일반 도메인은 null → 도메인 표시로 폴백", channelLabel("https://canvasgarden.shop") === null);
+check("칩 라벨: 노션(notion.site 하위 도메인)", channelLabel("https://earth-stitch-lyfe.notion.site/d38d7afff1ef43de86ef5c2925b689e4") === "노션");
+check("칩 라벨: 노션(notion.so)", channelLabel("https://www.notion.so/abc") === "노션" && channelLabel("notion.so/x") === "노션");
+check("notion 흉내 도메인은 안 걸린다", channelLabel("https://notion.site.evil.com/x") === null && channelLabel("https://mynotion.so") === null);
+check("연락 버튼 조사: 노션으로·카카오톡으로·리틀리로·카카오톡 채널로",
+  resolveCollabChannel({ homepage: "https://x.notion.site/y" })?.label === "노션으로 연락하기" &&
+  resolveCollabChannel({ homepage: "https://open.kakao.com/o/x" })?.label === "카카오톡으로 연락하기" &&
+  resolveCollabChannel({ homepage: "https://litt.ly/x" })?.label === "리틀리로 연락하기" &&
+  resolveCollabChannel({ homepage: "http://pf.kakao.com/_x" })?.label === "카카오톡 채널로 연락하기" &&
+  resolveCollabChannel({ homepage: "https://canvasgarden.shop" })?.label === "홈페이지로 연락하기");
 
 // ── 07-21 실크롤 10곳 QA에서 나온 칩 오염 (대표 확정) ──
 console.log("[07-21 칩 오염 회귀]");
