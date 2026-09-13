@@ -71,7 +71,9 @@ function LoginForm() {
           <Field label="이메일" htmlFor="login-email">
             <input
               id="login-email"
-              type="email"
+              // 🧪개발 빌드만 text — 로컬 테스트 로그인 아이디 `collab5`가 이메일 형식 검사에 걸리지 않게.
+              //   NODE_ENV는 빌드 때 상수로 박히므로 운영 번들엔 "email"만 남는다(auth-actions §로컬 테스트 로그인).
+              type={process.env.NODE_ENV === "development" ? "text" : "email"}
               name="email"
               autoComplete="username"
               value={email}

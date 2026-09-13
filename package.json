@@ -21,6 +21,7 @@
     "@tiptap/extension-underline": "^2.27.2",
     "@tiptap/react": "^2.27.2",
     "@tiptap/starter-kit": "^2.27.2",
+    "@tosspayments/tosspayments-sdk": "^2.8.1",
     "html-to-image": "^1.11.13",
     "jspdf": "^4.2.1",
     "next": "16.2.9",

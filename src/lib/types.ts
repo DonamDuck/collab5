@@ -399,3 +399,107 @@ export interface MagazineSaveInput {
   brandLinks: MagazineBrandLink[];
   body: MagazineDoc;
 }
+
+// ─────────────────────────────────────────────────────────────
+// 하루 가게 — 공간 대여 (2026-09-13)
+// 스펙 = docs/superpowers/specs/2026-09-13-daily-shop-design.md
+// DB   = supabase/migrations/2026-09-13-daily-shop.sql
+// ─────────────────────────────────────────────────────────────
+
+/** 공간을 어떻게 쓰게 할 것인가 — 대표가 09-13에 두 갈래로 나눴다.
+ *  `as_is`  원래 목적대로 (요가원을 요가로, 공방을 공방으로). 고르는 축 = **설비**
+ *  `open`   대관 (호스트 규칙 안에서 게스트가 용도를 정한다). 고르는 축 = **인원·시간**
+ *  `both`   둘 다 */
+export type SpaceUseType = "as_is" | "open" | "both";
+
+export type SpaceStatus = "draft" | "pending" | "open" | "paused";
+
+export interface Space {
+  id: number;
+  slug: string;
+  ownerUserId: number;
+  /** 연결된 소개서. ⚠️FK가 아니라 **문자열**이다 — 소개서가 지워지거나 개명돼도 거래 기록은 남아야 한다.
+   *  ⭐빈 문자열이 정상값이다. 이 기능은 소개서 «없는» 사람도 쓴다(대표 09-13). */
+  brandSlug: string;
+
+  name: string;
+  tagline: string;
+  body: string;
+  photos: string[];
+
+  /** 동네까지만. 확정 전 화면에 나가는 유일한 위치 정보다. */
+  area: string;
+  /** 🚨전체 주소 — **확정된 예약의 당사자에게만** 준다. 목록·상세의 공개 투영에는 넣지 말 것. */
+  address: string;
+  lat?: number;
+  lng?: number;
+
+  useType: SpaceUseType;
+  facilities: string[];
+  capacity?: number;
+  hours: string;
+
+  /** ⭐「우리 집 규칙」 — 이 기능에서 제일 중요한 칸이다. 열쇠를 넘기는 두려움이 여기서 풀린다. 빈칸 금지. */
+  rules: string;
+  priceDay: number;
+  /** 사장님이 알려주는 시간(분). 0이면 그 상품을 안 판다. */
+  mentorMinutes: number;
+  mentorPrice: number;
+  /** 비는 날 `YYYY-MM-DD`. ⭐실사에서 이 데이터를 가진 소개서가 23곳 중 0곳이었다. 폼의 필수 칸. */
+  openDates: string[];
+
+  /** 🚨1단계는 음식·음료를 안 받는다(무신고 영업 — 식품위생법 제37조 ④). true면 등록을 막는다. */
+  servesFood: boolean;
+  /** 임대인 동의를 받았거나 본인 소유인가. 등록 시 확인받는다. */
+  subleaseOk: boolean;
+
+  status: SpaceStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** 확정 «전» 화면에 나가는 투영 — 주소와 연락처를 뺀다.
+ *  ⭐대표 09-13: *「사장님과 연결을 미리 해버리면 우리 결제 없이 그들끼리 거래로 해버릴 수도 있을 것 같아서」*.
+ *  그래서 확정 전에는 그 가게를 **특정할 수 없어야** 한다. 이 타입이 그 계약이다. */
+export type SpacePublic = Omit<Space, "address" | "lat" | "lng">;
+
+/** ⭐`pending`만 돈이 오기 «전»이다. 나머지는 전부 결제가 끝난 뒤의 이야기다.
+ *  pending   결제창으로 보내기 직전에 잡아 둔 자리. 🚨**호스트에게는 안 보인다**
+ *  paid      결제 완료, 호스트 답 기다리는 중
+ *  confirmed 호스트 수락 → 주소·연락처·소개서 링크가 열린다
+ *  rejected  호스트 거절 (→ refunded로 이어진다)
+ *  refunded  환불 완료
+ *  cancelled 게스트 취소. ⚠️환불률은 **우리가** 정한다 — 호스트 자율은 전자상거래법 제35조로 무효가 될 수 있다
+ *  done      그날이 지났다 */
+export type BookingStatus =
+  | "pending" | "paid" | "confirmed" | "rejected" | "refunded" | "cancelled" | "done";
+
+export interface SpaceBooking {
+  id: number;
+  spaceId: number;
+  guestUserId: number;
+  guestBrandSlug: string;
+
+  useDate: string;
+  hours: string;
+  /** ⭐게스트가 쓴 「그날 무엇을 할 건지」. 호스트가 수락을 결정하는 근거이자,
+   *  나중에 이 사람 소개서의 첫 활동 기록이 되는 문장이다. */
+  plan: string;
+  headcount?: number;
+
+  withMentor: boolean;
+  amountSpace: number;
+  amountMentor: number;
+  amountTotal: number;
+  /** ⚠️행마다 박아 둔다 — 요율이 바뀌어도 옛 거래는 **그때 값**으로 정산해야 한다. */
+  feeRate: number;
+  amountPayout: number;
+
+  paymentKey: string;
+  orderId: string;
+  status: BookingStatus;
+  hostMessage: string;
+  decidedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}

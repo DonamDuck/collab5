@@ -1,0 +1,124 @@
+// 하루 가게 — 네 화면이 같이 쓰는 작은 조각들 (2026-09-13)
+//
+// ⚠️`src/components/`가 아니라 여기에 둔 이유: 지금 이 어휘(하루 값·비는 날·쓰임새)를 쓰는 화면은
+//   `/rent/**` 넷뿐이다. 공용 폴더로 올리면 다른 팀이 동시에 만지는 파일이 하나 늘고,
+//   이름도 서비스 전체 어휘인 척하게 된다. 두 번째 사용처가 밖에서 생기면 그때 올린다.
+//
+// 🚨전부 훅 없는 순수 함수라 서버·클라이언트 어느 쪽에서도 부를 수 있다.
+//   `"use client"`를 붙이지 않은 것이 그 계약이다 — 훅을 더하려거든 파일을 쪼갤 것.
+//
+// 🎨09-13 디자인 재작업 — 대표 평가 *「그냥 막 만든 것 같아. 리틀리처럼 감각적으로」*.
+//   여기 있던 옷(회색 각진 칩 · 12px 배지 · 15px 입력칸 · 검정 버튼)이 네 화면 전부를 행정 화면으로
+//   만들고 있었다. 소개서(`/m`) 사다리와 디자인-시스템 정본에 맞춰 통째로 갈았다.
+//   ⛔`rem` 유틸 금지(루트 17px라 6.25% 부푼다) — 전부 px로 박는다.
+import type { ReactNode } from "react";
+import type { SpaceUseType, BookingStatus } from "@/lib/types";
+
+/** 금액은 늘 「12,000원」 한 모양으로. 숫자만 던져두면 자릿수를 눈으로 세게 된다. */
+export function won(n: number): string {
+  return `${n.toLocaleString("ko-KR")}원`;
+}
+
+/** 쓰임새 라벨 — 설계 §화면의 두 갈래를 사람 말로.
+ *  ⚠️`both`를 「둘 다」로 적지 않는다. 빌리는 사람 입장에선 「골라서 쓸 수 있다」가 정보다. */
+export function usageLabel(t: SpaceUseType): string {
+  if (t === "as_is") return "원래 목적대로";
+  if (t === "open") return "대관";
+  return "원래 목적대로 · 대관";
+}
+
+/** 날짜를 「10월 5일 (월)」로. `YYYY-MM-DD` 외의 값이 오면 받은 그대로 돌려준다.
+ *  ⚠️`new Date("2026-10-05")`는 UTC 자정으로 읽혀 KST에선 하루 전으로 밀린다.
+ *    그래서 Date를 거치지 않고 글자를 쪼갠 뒤, 요일만 정오 기준으로 계산한다. */
+export function dateLabel(iso: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+  if (!m) return iso;
+  const [, y, mo, d] = m;
+  const dow = "일월화수목금토"[new Date(`${iso}T12:00:00+09:00`).getDay()];
+  void y;
+  return `${Number(mo)}월 ${Number(d)}일 (${dow})`;
+}
+
+/** 오늘(KST) `YYYY-MM-DD` — 날짜 입력칸의 `min`으로 쓴다. 지난 날짜를 고르는 실수를 미리 막는다. */
+export function todayKst(): string {
+  return new Date(Date.now() + 9 * 3_600_000).toISOString().slice(0, 10);
+}
+
+/** 읽고 지나가는 칩 — 설비·쓰임새·날짜. 소개서 상단 카드의 pill과 같은 얼굴.
+ *  ⭐한 덩어리 안에서는 이 한 종류만 쓴다(디자인-시스템 §형태가 의미를 만든다).
+ *    각진 `rounded-sm` 회색 칩은 표 안의 셀처럼 읽혀서 pill로 바꿨다. */
+export function Chip({ children }: { children: ReactNode }) {
+  return (
+    <span className="inline-flex items-center rounded-pill bg-surface-soft px-3 py-1.5 text-[15px] text-body">
+      {children}
+    </span>
+  );
+}
+
+/** 상태는 배지가 아니라 **글자**로 말한다(09-13 대표 지시 — pill 금지, 색만).
+ *  기다리는 중은 레몬, 열린 것은 민트, 끝나거나 막힌 것은 회색.
+ *  ⛔Kiwi(primary)는 안 쓴다. 브랜드색이 「성공」을 뜻하기 시작하면 희소성이 무너진다
+ *    (globals.css의 `--success-pale` 주석과 같은 규율). */
+const BOOKING_TONE: Record<BookingStatus, { label: string; cls: string }> = {
+  // ⭐`pending`은 결제창까지 갔다가 안 내고 돌아온 자리다. 게스트 화면에만 뜨고 호스트에겐 안 보인다.
+  //   말투를 「실패」로 쓰지 않는 이유 — 대개는 실패가 아니라 마음이 바뀐 것이다.
+  pending: { label: "결제가 안 끝났어요", cls: "text-faint" },
+  paid: { label: "사장님 답 기다리는 중", cls: "text-lemon-on" },
+  confirmed: { label: "확정됐어요", cls: "text-mint-on" },
+  rejected: { label: "거절됐어요", cls: "text-faint" },
+  refunded: { label: "환불됐어요", cls: "text-faint" },
+  cancelled: { label: "취소했어요", cls: "text-faint" },
+  done: { label: "다녀왔어요", cls: "text-faint" },
+};
+
+export function BookingBadge({ status }: { status: BookingStatus }) {
+  const t = BOOKING_TONE[status] ?? BOOKING_TONE.paid;
+  return <span className={`shrink-0 text-[15px] ${t.cls}`}>{t.label}</span>;
+}
+
+const SPACE_TONE: Record<string, { label: string; cls: string }> = {
+  draft: { label: "초안", cls: "text-faint" },
+  pending: { label: "검토 기다리는 중", cls: "text-lemon-on" },
+  open: { label: "공개 중", cls: "text-mint-on" },
+  paused: { label: "쉬는 중", cls: "text-faint" },
+};
+
+export function SpaceBadge({ status }: { status: string }) {
+  const t = SPACE_TONE[status] ?? SPACE_TONE.draft;
+  return <span className={`shrink-0 text-[15px] ${t.cls}`}>{t.label}</span>;
+}
+
+/** 폼 입력칸 얼굴 — `/rent/new`와 신청 폼이 같은 모양이어야 한다.
+ *  높이 48 · `rounded-md`(16px) · `border-strong` · 글자 16px(iOS 확대 하한). */
+export const rentInputCls =
+  "h-[48px] w-full rounded-md border border-border-strong bg-surface px-4 text-[16px] text-ink outline-none placeholder:text-faint focus:border-focus";
+
+/** 여러 줄 칸 — 높이만 빼고 입력칸과 같은 얼굴. `h-[48px]`를 textarea에 주면 두 줄부터 잘린다. */
+export const rentTextareaCls =
+  "w-full rounded-md border border-border-strong bg-surface px-4 py-3 text-[16px] leading-relaxed text-ink outline-none placeholder:text-faint focus:border-focus";
+
+/** 화면당 하나뿐인 키위 버튼. 폼 제출은 52px, 히어로·로그인 유도는 48px로 호출부가 높이를 얹는다. */
+export const primaryBtnCls =
+  "inline-flex items-center justify-center rounded-md bg-primary px-6 text-[16px] font-medium text-primary-on transition-colors hover:bg-primary-strong disabled:opacity-60";
+
+/** 보조 버튼 = 흰 면 + `border-strong`. ⛔검정 버튼(`bg-ink`)은 이 사이트에 없는 어휘라 전부 이걸로 갈았다. */
+export const secondaryBtnCls =
+  "inline-flex h-[44px] items-center justify-center rounded-md border border-border-strong bg-surface px-5 text-[16px] font-medium text-ink transition-colors hover:bg-surface-soft disabled:opacity-60";
+
+/** 목록 카드·상세 상단이 쓰는 흰 카드. ⛔점선 테두리 금지(대표 지시) — 실선 hairline 한 종류만 쓴다. */
+export function CardBox({ children, className = "" }: { children: ReactNode; className?: string }) {
+  return (
+    <div className={`rounded-lg border border-hairline bg-surface p-5 ${className}`}>{children}</div>
+  );
+}
+
+/** 사진이 없을 때 커버 자리 — 회색 면에 아톰 마크를 옅게. 「사진 준비 중」 글자보다 조용하다.
+ *  🚨정사각 클래스 금지 — 마크 비율이 1.28이라 `w-*`를 높이와 같게 박으면 찌그러진다. */
+export function CoverPlaceholder() {
+  return (
+    <div className="flex h-full w-full items-center justify-center bg-surface-soft">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src="/logo-mark.png" alt="" aria-hidden="true" className="h-[34px] w-auto opacity-30" />
+    </div>
+  );
+}
