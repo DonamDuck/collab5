@@ -43,6 +43,7 @@
 //    ⚠️`Reveal` 컴포넌트 자체는 남아 있다(다른 페이지가 쓴다). 홈만 안 쓰는 것.
 import { repo } from "@/lib/repo";
 import type { Maker } from "@/lib/types";
+import { SITE_URL } from "@/lib/site";
 import { HomeBody } from "./HomeBody";
 
 // 🔄~~n≤12 동안 전량 노출~~(07-31) → 08-16부터 캐러셀만 그린다(`BrandGrid`의 `CAROUSEL_LIMIT`, ~~6~~→**7** 08-20).
@@ -138,7 +139,48 @@ export default async function Home() {
     ...fetched.filter((m) => !isNew.has(m.slug)).sort((a, b) => rank(a.slug) - rank(b.slug)),
   ];
 
+  // 🔎구조화 데이터(JSON-LD) — 09-12 신설. 그전엔 홈에 **하나도 없었다.**
+  //   🩸계기: `collab5` 검색 결과의 하단 링크에 브랜드 페이지들이 섞여 나왔다(대표 지적).
+  //   ⚠️**하단 링크(사이트링크)는 지정할 수 없다** — 구글이 제 알고리즘으로 고르고, 예전에 있던
+  //     「내리기」 기능도 구글이 없앴다. 이건 명령이 아니라 **「주메뉴는 이 셋입니다」라는 힌트**다.
+  //     효과는 보장되지 않고 반영에 몇 주 걸린다. 그래도 지금은 힌트 자체가 0이라 밑질 게 없다.
+  //   📌주소는 **색인되는 것만** 넣는다 — `/register`는 robots.txt에서 막아 둬서 후보가 못 된다.
+  //     그래서 「소개서」 자리는 그 이야기를 담은 매거진이 아니라 **검색·매거진 둘**로 두고,
+  //     소개서 설명은 홈 안의 구좌가 맡는다(구글이 그 자리를 앵커로 뽑아 쓰고 있다).
+  //   🧪검증 = search.google.com/test/rich-results · validator.schema.org
+  //   🚨`JSON.stringify` 결과의 `<`는 반드시 이스케이프한다(Next 공식 가이드 — XSS 차단).
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "Organization",
+        "@id": `${SITE_URL}/#org`,
+        name: "collab5",
+        url: SITE_URL,
+        logo: `${SITE_URL}/logo-mark.png`,
+      },
+      {
+        "@type": "WebSite",
+        "@id": `${SITE_URL}/#site`,
+        name: "collab5",
+        url: SITE_URL,
+        inLanguage: "ko-KR",
+        publisher: { "@id": `${SITE_URL}/#org` },
+      },
+      {
+        "@type": "SiteNavigationElement",
+        name: ["콜라보 찾기", "매거진", "브랜드 소개서"],
+        url: [`${SITE_URL}/search`, `${SITE_URL}/magazine`, `${SITE_URL}/#home-preview`],
+      },
+    ],
+  };
+
   return (
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }}
+      />
     <HomeBody
       brands={collabBrands}
       // 🆕「새로 온 브랜드」 — 화면이 이걸 어떻게 쓸지는 `HomeBody`가 정한다(A안=별도 섹션 / B안=칸 안 배지).
@@ -150,5 +192,6 @@ export default async function Home() {
       //    잉크(#222222)보다 한 단 어두워 지면이 확실히 닫히고 커버 사진·흰 배지가 더 튄다.
       bannerBg="carbon"
     />
+    </>
   );
 }
