@@ -7,6 +7,7 @@ import { repo } from "@/lib/repo";
 import { PhotoSlider } from "@/components/PhotoSlider";
 import { BookingForm } from "./BookingForm";
 import { Chip, dateLabel, primaryBtnCls, usageLabel, won } from "../ui";
+import { AreaMap } from "./AreaMap";
 
 // 하루 가게 — 공간 한 곳 + 신청 (2026-09-13)
 //
@@ -179,6 +180,14 @@ export default async function SpaceDetailPage({
               {sp.facilitiesNote}
             </p>
           )}
+        </Section>
+      )}
+
+      {/* 📍09-14 신설 — 대표 지시(아워플레이스 참고). 좌표는 사장님이 주소를 넣을 때 한 번 재서
+          `spaces.lat/lng`에 굳혀 둔다(`lib/geocode.ts`). 좌표가 없으면 이 절은 통째로 안 뜬다. */}
+      {sp.areaLat != null && sp.areaLng != null && (
+        <Section title="위치">
+          <AreaMap lat={sp.areaLat} lng={sp.areaLng} area={sp.area} />
         </Section>
       )}
 

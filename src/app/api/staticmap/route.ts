@@ -15,12 +15,15 @@ export async function GET(req: Request) {
   // 폭·높이는 화면에서만 결정하게 두되, 남용 방지로 상한(NCP 자체 상한 1024와 별개로 우리 쪽도 캡).
   const w = Math.min(Math.max(Number(searchParams.get("w")) || 640, 1), 1024);
   const h = Math.min(Math.max(Number(searchParams.get("h")) || 320, 1), 1024);
+  // 🚨`pin=0` = 핀 없이. 하루 가게가 확정 «전»에 쓰는 모드다 — 건물을 짚지 않고 「이 근처」만 말한다.
+  const pin = searchParams.get("pin") !== "0";
+  const level = Math.min(Math.max(Number(searchParams.get("level")) || 16, 6), 20);
 
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
     return new Response("bad coordinates", { status: 400 });
   }
 
-  const map = await fetchStaticMap({ lat, lng, w, h });
+  const map = await fetchStaticMap({ lat, lng, w, h, pin, level });
   if (!map) return new Response("unavailable", { status: 503 });
 
   return new Response(new Uint8Array(map.buf), {

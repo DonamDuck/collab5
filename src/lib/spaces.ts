@@ -59,9 +59,12 @@ function toSpace(r: Row): Space {
  *  그래서 확정 전에는 그 가게를 특정할 수 없어야 한다. 목록·상세는 **반드시 이 함수를 거친 값**을 쓴다.
  *  ⚠️`Omit` 타입만 믿지 마라 — 타입은 컴파일 때만 있고 런타임 객체엔 주소가 그대로 실려 나간다. 여기서 실제로 지운다. */
 export function toPublic(sp: Space): SpacePublic {
-  const { address: _a, lat: _lat, lng: _lng, accessNote: _n, ...rest } = sp;
-  void _a; void _lat; void _lng; void _n;
-  return rest;
+  const { address: _a, lat, lng, accessNote: _n, ...rest } = sp;
+  void _a; void _n;
+  // 🗺소수 셋째 자리에서 끊는다(≈110m). 줌 14 + 원형 표시와 합쳐지면 건물이 안 짚힌다.
+  //   ⚠️`toFixed`는 문자열을 주므로 다시 숫자로. 목적은 반올림이 아니라 «정밀도 낮추기»다.
+  const blur = (v: number | undefined) => (typeof v === "number" ? Number(v.toFixed(3)) : undefined);
+  return { ...rest, areaLat: blur(lat), areaLng: blur(lng) };
 }
 
 function toBooking(r: Row): SpaceBooking {

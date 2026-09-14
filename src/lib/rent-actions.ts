@@ -9,6 +9,7 @@ import {
   type SpaceSaveInput,
 } from "./spaces";
 import { approvePayment, cancelPayment, guestCancelRefundRate } from "./rent-payment";
+import { geocode } from "./geocode";
 import {
   notifyBookingPaid, notifyBookingConfirmed, notifyBookingRejected, notifyBookingCancelled,
 } from "./rent-notify";
@@ -92,11 +93,21 @@ export async function saveSpaceAction(input: SpaceFormInput): Promise<ActionResu
     if (cur.ownerUserId !== uid) return { ok: false, message: "내 공간만 고칠 수 있어요." };
   }
 
+  // 📍주소가 «바뀔 때만» 좌표를 다시 잰다(대표 09-14 지도 요청). 유료 호출이라 매번 부르지 않고,
+  //   실패해도 저장은 그대로 간다 — 지도는 있으면 좋은 것이지 올리기를 막을 것이 아니다.
+  const prev = input.slug ? await getSpaceFull(input.slug) : null;
+  let lat = prev?.lat;
+  let lng = prev?.lng;
+  if (input.address.trim() && input.address.trim() !== (prev?.address ?? "")) {
+    const hit = await geocode(input.address);
+    if (hit) { lat = hit.lat; lng = hit.lng; }
+  }
+
   const slug = input.slug || makeSlug(input.name);
   const row: SpaceSaveInput = {
     slug, ownerUserId: uid, brandSlug: input.brandSlug,
     name: input.name.trim(), tagline: input.tagline.trim(), body: input.body, photos: input.photos,
-    area: input.area.trim(), address: input.address.trim(), accessNote: input.accessNote.trim(),
+    area: input.area.trim(), address: input.address.trim(), lat, lng, accessNote: input.accessNote.trim(),
     useType: input.useType, facilities: input.facilities,
     facilitiesNote: input.facilitiesNote.trim(), capacity: input.capacity,
     hours: input.hours, rules: input.rules.trim(),
