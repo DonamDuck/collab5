@@ -45,37 +45,45 @@ export const BRIEF_NODES = [
 
 /** `**굵게**` `*기울임*` `[텍스트](url)` 파싱.
  *  ⚠️순서 주의 — `**`를 `*`보다 먼저 잡아야 굵게가 기울임 둘로 쪼개지지 않는다(매거진과 같은 함정). */
-function inlineOne(text: string): BriefNode[] {
-  const out: BriefNode[] = [];
-  const re = /(\*\*(.+?)\*\*)|(\*(.+?)\*)|(\[(.+?)\]\((.+?)\))/g;
-  let last = 0;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(text))) {
-    if (m.index > last) out.push({ type: "text", text: text.slice(last, m.index) });
-    if (m[2]) out.push({ type: "text", text: m[2], marks: [{ type: "bold" }] });
-    else if (m[4]) out.push({ type: "text", text: m[4], marks: [{ type: "italic" }] });
-    else if (m[6]) {
-      out.push({ type: "text", text: m[6], marks: [{ type: "link", attrs: { href: m[7] } }] });
-    }
-    last = re.lastIndex;
-  }
-  if (last < text.length) out.push({ type: "text", text: text.slice(last) });
-  return out.length ? out : [{ type: "text", text }];
-}
-
 /** 🩸**노션이 «표 안 줄바꿈»을 `<br>` 태그로 내보낸다** (09-14 라파의 숲에서 실측).
- *  그냥 파싱하면 카드 표의 「collab5가 읽은 글」 칸에 `<br>`이 **글자 그대로** 찍힌다.
- *  ⚠️여기서만 HTML을 인정한다 — 범용 HTML 파서를 붙이지 않는다(파싱 범위 = 렌더 범위). */
-function inline(text: string): BriefNode[] {
-  const parts = text.split(/<br\s*\/?>/i);
-  if (parts.length === 1) return inlineOne(text);
+ *  그냥 두면 카드 표의 「collab5가 읽은 글」 칸에 `<br>`이 **글자 그대로** 찍힌다.
+ *  ⚠️여기서만 HTML을 인정한다 — 범용 HTML 파서를 붙이지 않는다(파싱 범위 = 렌더 범위).
+ *
+ *  🪤**`<br>`을 «먼저» 쪼개면 안 된다** (09-14 2차 변환에서 드러났다). `**굵게 안에 <br>**`이 오면
+ *    먼저 쪼갠 조각에서 닫는 `**`가 짝을 잃어 별표가 화면에 글자로 남는다.
+ *    ⭐그래서 **강조를 먼저 읽고, 그 «안»에서 줄바꿈을 처리한다.** 순서가 규칙이다. */
+const BR = /<br\s*\/?>/i;
+
+function splitBr(text: string, marks?: BriefNode["marks"]): BriefNode[] {
+  const parts = text.split(BR);
   const out: BriefNode[] = [];
   parts.forEach((p, i) => {
     if (i > 0) out.push({ type: "hardBreak" });
-    const trimmed = p.trim();
-    if (trimmed) out.push(...inlineOne(trimmed));
+    if (p) out.push(marks ? { type: "text", text: p, marks } : { type: "text", text: p });
   });
   return out;
+}
+
+/** `***굵은기울임***` `**굵게**` `*기울임*` `[텍스트](url)` 파싱.
+ *  ⚠️순서 주의 — 긴 것부터 잡아야 한다. `**`를 `*`보다, `***`를 `**`보다 먼저.
+ *    안 그러면 굵게가 기울임 둘로 쪼개지고, 굵은기울임은 별표가 남는다(09-14 lmp에서 나왔다). */
+function inline(text: string): BriefNode[] {
+  const out: BriefNode[] = [];
+  const re = /(\*\*\*(.+?)\*\*\*)|(\*\*(.+?)\*\*)|(\*(.+?)\*)|(\[(.+?)\]\((.+?)\))/g;
+  let last = 0;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text))) {
+    if (m.index > last) out.push(...splitBr(text.slice(last, m.index)));
+    if (m[2]) out.push(...splitBr(m[2], [{ type: "bold" }, { type: "italic" }]));
+    else if (m[4]) out.push(...splitBr(m[4], [{ type: "bold" }]));
+    else if (m[6]) out.push(...splitBr(m[6], [{ type: "italic" }]));
+    else if (m[8]) {
+      out.push({ type: "text", text: m[8], marks: [{ type: "link", attrs: { href: m[9] } }] });
+    }
+    last = re.lastIndex;
+  }
+  if (last < text.length) out.push(...splitBr(text.slice(last)));
+  return out.length ? out : [{ type: "text", text }];
 }
 
 const para = (t: string): BriefNode => ({ type: "paragraph", content: inline(t) });
