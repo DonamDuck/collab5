@@ -57,9 +57,20 @@ for (let h = 6; h <= 24; h++) {
 }
 const DEFAULT_START = "10:00";
 const DEFAULT_END = "20:00";
-/** 「알려드려요」 토글은 한 시간으로 고정한다. 분 단위 칸이 있던 09-13 폼에서 그 칸을 채운 값이
+/** 30분 단위, 최대 8시간(=하루). 대표 09-14. */
+const MENTOR_CHOICES = Array.from({ length: 16 }, (_, i) => (i + 1) * 30);
+
+/** 90 → 「1시간 30분」. 분만 남으면 「30분」, 딱 떨어지면 「2시간」. */
+function minutesLabel(m: number): string {
+  const h = Math.floor(m / 60);
+  const r = m % 60;
+  if (!h) return `${r}분`;
+  return r ? `${h}시간 ${r}분` : `${h}시간`;
+}
+
+/** 🔻09-14 폐기 — 한 시간 고정이 30분 단위 고르기로 바뀌었다. 아래 설명은 그때의 판단 기록.
+ *  「알려드려요」 토글은 한 시간으로 고정한다. 분 단위 칸이 있던 09-13 폼에서 그 칸을 채운 값이
  *  전부 60이었고, 30분·90분 상품은 사장님도 값을 못 정했다. */
-const MENTOR_MINUTES = 60;
 
 /** `"10:00~20:00"` → 두 시각. 옛 자유 입력 값(「10시부터」 같은 것)은 기본값으로 떨어진다. */
 function parseHours(s: string): [string, string] {
@@ -117,6 +128,8 @@ export function SpaceForm({
   const [ruleInput, setRuleInput] = useState("");
   const [priceDay, setPriceDay] = useState<number>(initial?.priceDay ?? 0);
   const [mentorOn, setMentorOn] = useState((initial?.mentorMinutes ?? 0) > 0);
+  /** 🔁09-14 한 시간 «고정»에서 **30분 단위 고르기**로(대표). 기본은 60분 — 제일 흔한 답을 미리 얹어 둔다. */
+  const [mentorMin, setMentorMin] = useState(String(initial?.mentorMinutes || 60));
   const [mentorPrice, setMentorPrice] = useState<number>(initial?.mentorPrice ?? 0);
   const [openDates, setOpenDates] = useState<string[]>([...(initial?.openDates ?? [])].sort());
   const [servesFood, setServesFood] = useState(initial?.servesFood ?? false);
@@ -225,7 +238,7 @@ export function SpaceForm({
         hours: `${hourStart}~${hourEnd}`,
         rules,
         priceDay,
-        mentorMinutes: mentorOn ? MENTOR_MINUTES : 0,
+        mentorMinutes: mentorOn ? Number(mentorMin) : 0,
         mentorPrice: mentorOn ? mentorPrice : 0,
         openDates,
         servesFood,
@@ -587,16 +600,59 @@ export function SpaceForm({
           )}
         </L>
 
+        {/* 🔁09-14 토글 → **물음 + 예/아니요 + 시간 고르기**(대표: *「별도 타이틀 하나만 만들자.
+            대여전 잠깐 일을 알려주실 수 있나요? 아니요가 default고, 예도 가능하게 하고,
+            드롭다운으로 30분, 1시간, 1시간 30분, 2시간 등 30분 단위씩 최대 8시간까지」*).
+            ⭐토글은 「켜고 끄는 설정」처럼 읽혔다. 이건 설정이 아니라 **대답**이라 물음의 모양이어야 한다.
+            ⏱상한 8시간 = 하루다. 그 위는 「잠깐 알려주기」가 아니라 그냥 같이 일하는 것이 된다. */}
         <div>
-          <Toggle
-            on={mentorOn}
-            onChange={setMentorOn}
-            label="한 시간 알려드려요"
-            desc="빌리는 분이 원하면 사장님이 한 시간 같이 있어 주는 상품이에요. 따로 값을 받아요."
-          />
+          <p className="text-[16px] font-medium leading-[28px] text-body">
+            대여전 잠깐 일을 알려주실 수 있나요?
+          </p>
+          <p className="mt-1 text-[15px] leading-relaxed break-keep text-mute">
+            문 열기 전에 이 일을 어떻게 하는지 알려주시는 상품이에요. 따로 값을 받습니다.
+          </p>
+
+          {/* 아니요가 먼저이자 기본 — 대부분의 사장님에게 「안 해도 된다」가 먼저 보여야 부담이 없다. */}
+          <div role="radiogroup" aria-label="알려주기 여부" className="mt-3 flex gap-2">
+            {[
+              { v: false, label: "아니요" },
+              { v: true, label: "예" },
+            ].map((o) => (
+              <button
+                key={String(o.v)}
+                type="button"
+                role="radio"
+                aria-checked={mentorOn === o.v}
+                onClick={() => setMentorOn(o.v)}
+                className={`inline-flex h-[44px] min-w-[88px] items-center justify-center rounded-pill px-5 text-[15px] font-medium transition-colors ${
+                  mentorOn === o.v
+                    ? "bg-primary-tint text-primary-on"
+                    : "border-[0.5px] border-[#DFDFE3] bg-surface text-body hover:bg-surface-soft"
+                }`}
+              >
+                {o.label}
+              </button>
+            ))}
+          </div>
+
           {mentorOn && (
-            <div className="mt-4">
-              <L label="그 한 시간 값" htmlFor="sp-mp">
+            <div className="mt-5 space-y-6">
+              <L label="얼마나 알려주실까요" htmlFor="sp-mm">
+                <RentSelect
+                  id="sp-mm"
+                  className="sm:max-w-[240px]"
+                  value={mentorMin}
+                  onChange={(e) => setMentorMin(e.target.value)}
+                >
+                  {MENTOR_CHOICES.map((m) => (
+                    <option key={m} value={m}>
+                      {minutesLabel(m)}
+                    </option>
+                  ))}
+                </RentSelect>
+              </L>
+              <L label="그 시간 값" htmlFor="sp-mp">
                 <WonInput id="sp-mp" value={mentorPrice} onChange={setMentorPrice} placeholder="예) 50,000" />
               </L>
             </div>
