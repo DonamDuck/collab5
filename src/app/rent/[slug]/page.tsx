@@ -221,6 +221,7 @@ export default async function SpaceDetailPage({
           <BookingForm
             spaceId={sp.id}
             spaceSlug={sp.slug}
+            spaceName={sp.name}
             openDates={openDates}
             priceDay={sp.priceDay}
             mentorMinutes={sp.mentorMinutes}

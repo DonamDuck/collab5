@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
   const r = await confirmBookingAction(paymentKey, orderId);
   if (!r.ok) return fail(r.message);
 
-  // 🔑`/rent/my`로 보낸다 — 신청이 실제로 어떻게 됐는지 보이는 유일한 화면이고,
-  //   여기서 사장님 답을 기다리는 상태가 그대로 뜬다.
-  return NextResponse.redirect(new URL("/rent/my?paid=1", req.url));
+  // 🔑완료 화면(`/rent/done/{id}`)으로 — 방금 한 그 한 건만 보여 준다. 목록(`/rent/my`)으로 떨어뜨리면
+  //   「내가 방금 한 게 뭐지」가 안 잡힌다(09-14). id를 못 받은 경우(이론상 없음)만 목록으로.
+  return NextResponse.redirect(new URL(r.bookingId ? `/rent/done/${r.bookingId}` : "/rent/my", req.url));
 }

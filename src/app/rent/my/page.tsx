@@ -6,12 +6,14 @@ import {
   listBookingsForGuest,
   isRevealed,
   listSpacesByIds,
+  getSpaceFull,
   type SpaceBrief,
 } from "@/lib/spaces";
 import { getSessionUserId, getProfileById, type Profile } from "@/lib/profiles";
 import type { Space, SpaceBooking } from "@/lib/types";
 import { isRentAdmin } from "@/lib/rent-actions";
 import { HostDecide, GuestCancel, PublishButton } from "./Actions";
+import { ContactBlock } from "../ContactBlock";
 import { BookingBadge, SpaceBadge, dateLabel, primaryBtnCls, won } from "../ui";
 
 // 하루 가게 — 내 공간 · 받은 신청 · 보낸 신청 (2026-09-13)
@@ -37,22 +39,8 @@ export const metadata: Metadata = {
 const emptyCls = "mt-5 text-[15px] leading-relaxed break-keep text-faint";
 const h2Cls = "text-[21px] font-bold leading-snug tracking-tight text-ink";
 
-/** 확정된 예약에서만 그리는 연락처 — 상자 없이 16px로 조용히.
- *  ⚠️여기 오기 전에 호출부가 `isRevealed`로 걸렀다. 이 컴포넌트는 그 판정을 다시 하지 않는다 —
- *    두 군데서 판정하면 둘이 어긋나는 날이 온다. 문은 하나로 둔다. */
-function Revealed({ who, profile, address }: { who: string; profile: Profile | null; address?: string }) {
-  return (
-    <div className="mt-3">
-      <p className="text-[16px] leading-relaxed break-keep text-body">
-        <span className="text-mute">{who} · </span>
-        {profile?.brandName || "이름 미등록"}
-        {profile?.phone && ` · ${profile.phone}`}
-        {profile?.email && ` · ${profile.email}`}
-      </p>
-      {address && <p className="mt-0.5 text-[16px] leading-relaxed break-keep text-body">{address}</p>}
-    </div>
-  );
-}
+// 연락처 블록은 `../ContactBlock`(09-14) — `/rent/done`과 같은 얼굴이어야 해서 밖으로 뺐다.
+//   ⚠️여기 오기 전에 호출부가 `isRevealed`로 거른다. 블록은 그 판정을 다시 하지 않는다.
 
 /** 아직 안 열린 연락처 — 회색 상자 대신 한 줄. */
 function Locked({ text }: { text: string }) {
@@ -108,6 +96,17 @@ export default async function MyRentPage() {
   const spaceById = new Map<number, Space>(mySpaces.map((sp) => [sp.id, sp]));
   // 내가 «빌린» 곳은 남의 공간이라 `listSpacesByOwner`에 없다. id로 따로 읽는다(`listSpacesByIds` 주석 참조).
   const bookedSpaces = await listSpacesByIds(guestBookings.map((b) => b.spaceId));
+  // 「들어오는 법」은 요약본에 없다(주소와 같은 급의 비밀). 확정된 예약의 공간만 원본을 한 번 더 읽는다.
+  const accessNotes = new Map<number, string>(
+    await Promise.all(
+      guestBookings
+        .filter((b) => isRevealed(b) && bookedSpaces.has(b.spaceId))
+        .map(async (b) => {
+          const full = await getSpaceFull(bookedSpaces.get(b.spaceId)!.slug);
+          return [b.spaceId, full?.accessNote ?? ""] as [number, string];
+        }),
+    ),
+  );
 
   // 🔑연락처 조회는 **열린 예약 것만** 한다. 전부 미리 읽어 두고 화면에서 가리는 방식은,
   //   서버 컴포넌트라 HTML에 안 실리긴 하지만 「가리기」가 판정을 대신하게 만든다.
@@ -222,10 +221,10 @@ export default async function MyRentPage() {
                     <span className="text-faint"> · 신청자가 낸 돈 {won(b.amountTotal)}</span>
                   </p>
 
-                  {b.status === "paid" && <HostDecide bookingId={b.id} />}
+                  {b.status === "paid" && <HostDecide bookingId={b.id} amountTotal={b.amountTotal} />}
 
                   {open ? (
-                    <Revealed who="신청하신 분" profile={contacts.get(b.guestUserId) ?? null} />
+                    <ContactBlock who="신청하신 분" profile={contacts.get(b.guestUserId) ?? null} />
                   ) : b.status === "paid" ? (
                     <Locked text="수락하시면 신청하신 분의 연락처가 열려요." />
                   ) : null}
@@ -275,10 +274,11 @@ export default async function MyRentPage() {
                   status={<BookingBadge status={b.status} />}
                 >
                   {open ? (
-                    <Revealed
+                    <ContactBlock
                       who="사장님"
                       profile={contacts.get(sp?.ownerUserId ?? -1) ?? null}
                       address={sp?.address}
+                      accessNote={accessNotes.get(b.spaceId)}
                     />
                   ) : (
                     <Locked text="사장님이 수락하면 주소와 연락처가 열려요." />

@@ -30,6 +30,7 @@ import { useRouter } from "next/navigation";
 import { startBookingAction, confirmBookingAction } from "@/lib/rent-actions";
 import type { SpaceUseType } from "@/lib/types";
 import { dateLabel, primaryBtnCls, rentInputCls, rentTextareaCls, won } from "../ui";
+import { ConfirmDialog } from "../ConfirmDialog";
 
 const labelCls = "mb-2 block text-[16px] font-medium text-body";
 const hintCls = "mt-2 text-[15px] leading-relaxed break-keep text-faint";
@@ -80,9 +81,12 @@ export function BookingForm({
   hours,
   useType,
   myBrands,
+  spaceName,
 }: {
   spaceId: number;
   spaceSlug: string;
+  /** 확인 팝업 문장(「{공간}을 신청할까요」)에 쓴다. */
+  spaceName: string;
   openDates: string[];
   priceDay: number;
   mentorMinutes: number;
@@ -105,6 +109,8 @@ export function BookingForm({
   /** 2단계 — 서버가 자리를 잡아 준 뒤 토스 위젯을 그리는 단계. null이면 아직 1단계(신청 내용 쓰기). */
   const [pay, setPay] = useState<{ orderId: string; amount: number; orderName: string } | null>(null);
   const [widgetReady, setWidgetReady] = useState(false);
+  /** 결제 직전 확인 팝업(대표 09-14: 의사 확인은 팝업으로). 열린 채로 `submit`이 돌지 않게 닫고 시작한다. */
+  const [confirming, setConfirming] = useState(false);
   // 위젯 인스턴스는 렌더와 무관하게 살아 있어야 해서 ref에 둔다(state에 두면 리렌더마다 다시 그린다).
   const widgetsRef = useRef<{ requestPayment: (p: Record<string, unknown>) => Promise<void> } | null>(null);
 
@@ -114,11 +120,18 @@ export function BookingForm({
   //   이게 관문이라서가 아니다 — 관문은 늘 서버 쪽이다.
   const planShort = plan.trim().length < 10;
 
+  /** 버튼이 부르는 건 이것 — 싼 검사만 하고 팝업을 연다. 서버 왕복은 팝업에서 [신청하기]를 누른 뒤다. */
+  const askConfirm = () => {
+    setErr("");
+    if (!useDate) { setErr("어느 날 쓰실지 골라 주세요."); return; }
+    if (planShort) { setErr("그날 무엇을 하실지 열 글자 이상 적어 주세요."); return; }
+    setConfirming(true);
+  };
+
   const submit = () =>
     start(async () => {
+      setConfirming(false);
       setErr("");
-      if (!useDate) { setErr("어느 날 쓰실지 골라 주세요."); return; }
-      if (planShort) { setErr("그날 무엇을 하실지 열 글자 이상 적어 주세요."); return; }
 
       // ① 서버가 검사하고 자리를 잡는다. 주문번호와 청구액도 여기서 «서버가» 정해 돌려준다.
       const r = await startBookingAction({
@@ -137,7 +150,7 @@ export function BookingForm({
       if (!clientKey) {
         const done = await confirmBookingAction("", r.orderId);
         if (!done.ok) { setErr(done.message); return; }
-        router.push("/rent/my");
+        router.push(done.bookingId ? `/rent/done/${done.bookingId}` : "/rent/my");
         router.refresh();
         return;
       }
@@ -338,7 +351,7 @@ export function BookingForm({
         <div className="hidden sm:block">
           <button
             type="button"
-            onClick={submit}
+            onClick={askConfirm}
             disabled={pending}
             className={`${primaryBtnCls} h-[52px] w-full`}
           >
@@ -352,8 +365,22 @@ export function BookingForm({
         amount={total}
         label={pending ? "신청하는 중…" : "결제하고 신청하기"}
         disabled={pending}
-        onClick={submit}
+        onClick={askConfirm}
       />
+
+      <ConfirmDialog
+        open={confirming}
+        title="이대로 신청할까요"
+        confirmLabel="신청하기"
+        busy={pending}
+        onConfirm={submit}
+        onCancel={() => setConfirming(false)}
+      >
+        <p>
+          {dateLabel(useDate)}에 <span className="font-medium text-ink">{spaceName}</span>을 {won(total)}에 신청할까요?
+        </p>
+        <p className="text-mute">사장님이 거절하시면 전액 돌려드려요.</p>
+      </ConfirmDialog>
     </div>
   );
 }

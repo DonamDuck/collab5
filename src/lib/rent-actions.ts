@@ -5,11 +5,14 @@ import { getSessionUserId, getProfileById } from "./profiles";
 import {
   saveSpace, getSpaceFull, getBooking, createPendingBooking, getBookingByOrderId,
   markBookingPaid, decideBooking,
-  setBookingStatus, setOpenDate, listSpacesByOwner, payout, FEE_RATE,
+  setBookingStatus, setOpenDate, listSpacesByOwner, listSpacesByIds, payout, FEE_RATE,
   type SpaceSaveInput,
 } from "./spaces";
 import { approvePayment, cancelPayment, guestCancelRefundRate } from "./rent-payment";
-import type { Space, SpaceUseType } from "./types";
+import {
+  notifyBookingPaid, notifyBookingConfirmed, notifyBookingRejected, notifyBookingCancelled,
+} from "./rent-notify";
+import type { Space, SpaceBooking, SpaceUseType } from "./types";
 
 // 하루 가게 — 쓰기 서버 액션 (2026-09-13)
 // 스펙 = docs/superpowers/specs/2026-09-13-daily-shop-design.md
@@ -172,6 +175,23 @@ export async function startBookingAction(input: BookingFormInput): Promise<Start
   };
 }
 
+/** 알림에 실을 세 당사자 — 공간 원본(주소 포함)·사장님·손님. 없으면 null(알림만 빠지고 본작업은 그대로).
+ *  ⚠️예약 행엔 공간 id만 있고 `getSpaceFull`은 slug를 받는다. 그래서 요약본으로 slug를 찾아 한 번 더 읽는다. */
+async function notifyParties(b: SpaceBooking): Promise<{ space: Space; host: Awaited<ReturnType<typeof getProfileById>>; guest: Awaited<ReturnType<typeof getProfileById>> } | null> {
+  const brief = (await listSpacesByIds([b.spaceId])).get(b.spaceId);
+  if (!brief) return null;
+  const space = await getSpaceFull(brief.slug);
+  if (!space) return null;
+  const [host, guest] = await Promise.all([getProfileById(space.ownerUserId), getProfileById(b.guestUserId)]);
+  return { space, host, guest };
+}
+
+/** 알림 한 통 — 🚨**결과에 영향을 주면 안 된다.** `rent-notify.ts`가 스스로 삼키지만, 조회 단계(`notifyParties`)가
+ *  던질 수도 있어 한 겹 더 감싼다. 결제는 끝났는데 메일 때문에 「실패」가 뜨는 일은 없어야 한다. */
+async function safeNotify(run: () => Promise<unknown>): Promise<void> {
+  try { await run(); } catch (e) { console.error("[rent-actions] 알림 실패(본작업은 정상)", e); }
+}
+
 /** ② 결제창에서 돌아온 뒤 — 승인하고 신청을 성립시킨다.
  *
  *  🚨**돌아온 금액을 안 믿는다.** `pending` 행에 적어 둔 금액으로 승인을 건다.
@@ -202,6 +222,10 @@ export async function confirmBookingAction(
   await setOpenDate(b.spaceId, b.useDate, false);
   revalidatePath("/rent");
   revalidatePath("/rent/my");
+  await safeNotify(async () => {
+    const p = await notifyParties(paid);
+    if (p) await notifyBookingPaid(paid, p.space, p.host, p.guest);
+  });
   return { ok: true, message: "신청했어요. 사장님 답을 기다려 주세요.", bookingId: paid.id };
 }
 
@@ -227,12 +251,42 @@ export async function decideBookingAction(
     await setBookingStatus(bookingId, refunded ? "refunded" : "rejected");
     await setOpenDate(sp.id, b.useDate, true);   // 그날을 다시 판다
     revalidatePath("/rent/my");
+    await safeNotify(async () => {
+      const p = await notifyParties(decided);
+      if (p) await notifyBookingRejected(decided, p.space, p.host, p.guest);
+    });
     return refunded
       ? { ok: true, message: "거절하고 전액 환불했어요." }
       : { ok: true, message: "거절했어요. 환불이 지연되고 있어 확인 중입니다." };
   }
   revalidatePath("/rent/my");
+  await safeNotify(async () => {
+    const p = await notifyParties(decided);
+    if (p) await notifyBookingConfirmed(decided, p.space, p.host, p.guest);
+  });
   return { ok: true, message: "수락했어요. 이제 신청자 연락처가 보입니다." };
+}
+
+/** 취소 환불액 — 견적과 실제 취소가 **같은 계산**을 써야 한다. 둘이 따로 계산하면 팝업엔 70%라 적고 50%만 돌려주는 날이 온다. */
+function cancelRefund(b: SpaceBooking): { rate: number; refund: number } {
+  const days = Math.floor((new Date(b.useDate).getTime() - Date.now()) / 86_400_000);
+  const rate = guestCancelRefundRate(days);
+  return { rate, refund: Math.floor(b.amountTotal * rate) };
+}
+
+/** 취소 «전» 팝업에 보여줄 환불액. 환불표는 서버 전용 파일(`rent-payment.ts`)에만 있다 —
+ *  화면에 표를 다시 적으면 표가 바뀌는 날 화면만 뒤처진다. 그래서 화면은 늘 이걸 부른다. */
+export async function quoteCancelAction(
+  bookingId: number,
+): Promise<{ ok: boolean; message: string; total: number; refund: number; rate: number }> {
+  const none = { total: 0, refund: 0, rate: 0 };
+  const uid = await getSessionUserId();
+  if (!uid) return { ok: false, message: "로그인이 필요해요.", ...none };
+  const b = await getBooking(bookingId);
+  if (!b || b.guestUserId !== uid) return { ok: false, message: "내 신청만 볼 수 있어요.", ...none };
+  if (b.status !== "paid" && b.status !== "confirmed") return { ok: false, message: "이미 끝난 신청이에요.", ...none };
+  const { rate, refund } = cancelRefund(b);
+  return { ok: true, message: "", total: b.amountTotal, refund, rate };
 }
 
 /** 게스트 취소 — 환불률은 우리 규정표가 정한다(호스트 자율 금지). */
@@ -243,14 +297,16 @@ export async function cancelBookingAction(bookingId: number): Promise<ActionResu
   if (!b || b.guestUserId !== uid) return { ok: false, message: "내 신청만 취소할 수 있어요." };
   if (b.status !== "paid" && b.status !== "confirmed") return { ok: false, message: "이미 끝난 신청이에요." };
 
-  const days = Math.floor((new Date(b.useDate).getTime() - Date.now()) / 86_400_000);
-  const rate = guestCancelRefundRate(days);
-  const refund = Math.floor(b.amountTotal * rate);
+  const { refund } = cancelRefund(b);
   if (refund > 0) await cancelPayment(b.paymentKey, "게스트 취소", refund === b.amountTotal ? undefined : refund);
 
   await setBookingStatus(bookingId, "cancelled");
   await setOpenDate(b.spaceId, b.useDate, true);
   revalidatePath("/rent/my");
+  await safeNotify(async () => {
+    const p = await notifyParties(b);
+    if (p) await notifyBookingCancelled({ ...b, status: "cancelled" }, p.space, p.host, p.guest);
+  });
   return { ok: true, message: refund > 0 ? `취소했어요. ${refund.toLocaleString()}원이 환불됩니다.` : "취소했어요. 당일 취소라 환불은 없습니다." };
 }
 

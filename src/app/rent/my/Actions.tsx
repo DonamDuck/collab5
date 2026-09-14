@@ -8,17 +8,22 @@
 //
 // 🎨09-13 재작업 — 버튼은 보조(흰 면 + border-strong) 44px 한 종류, 수락만 키위.
 //   `rounded-sm` 각진 버튼을 `rounded-md`로, 13px 글자를 15로 올렸다.
+// 🪟09-14 — 거절·취소의 「한 번 더 묻기」를 줄 안의 두 번째 버튼에서 **팝업**(`ConfirmDialog`)으로 옮겼다
+//   (대표: 의사 확인은 팝업으로). 취소 팝업은 환불액을 서버에 물어서 보여 준다 — 환불표가 서버 전용이라
+//   화면엔 숫자를 안 적는다(적으면 표가 바뀌는 날 화면만 뒤처진다).
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   decideBookingAction,
   cancelBookingAction,
+  quoteCancelAction,
   publishSpaceAction,
 } from "@/lib/rent-actions";
-import { primaryBtnCls, rentTextareaCls, secondaryBtnCls } from "../ui";
+import { primaryBtnCls, rentTextareaCls, secondaryBtnCls, won } from "../ui";
+import { ConfirmDialog } from "../ConfirmDialog";
 
 /** 받은 신청 — 수락 · 거절. 거절은 전액 환불이라 되돌릴 수 없다(대표 09-13). */
-export function HostDecide({ bookingId }: { bookingId: number }) {
+export function HostDecide({ bookingId, amountTotal }: { bookingId: number; amountTotal: number }) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [message, setMessage] = useState("");
@@ -27,6 +32,7 @@ export function HostDecide({ bookingId }: { bookingId: number }) {
 
   const run = (accept: boolean) =>
     start(async () => {
+      setConfirmReject(false);
       setErr("");
       const r = await decideBookingAction(bookingId, accept, message);
       if (!r.ok) {
@@ -52,39 +58,35 @@ export function HostDecide({ bookingId }: { bookingId: number }) {
       <div className="flex gap-2">
         {/* ⭐항목마다 키위가 하나씩 나올 수 있는 화면이라(받은 신청 여러 건) 예외로 허용하되 작게 —
             폭을 내용만큼만. 높이는 옆 보조 버튼과 같은 44px(한 줄에서 높이가 다르면 어긋나 보인다). */}
+        {/* 수락은 팝업 없이 — 문구가 결과를 미리 말한다(누르면 연락처가 열린다는 것). */}
         <button
           type="button"
           onClick={() => run(true)}
           disabled={pending}
           className={`${primaryBtnCls} h-[44px] px-5 text-[15px]`}
         >
-          수락
+          {pending ? "처리 중…" : "수락하고 연락처 열기"}
         </button>
-        {confirmReject ? (
-          <button
-            type="button"
-            onClick={() => run(false)}
-            disabled={pending}
-            className={`${secondaryBtnCls} border-danger text-[15px] text-danger hover:bg-surface`}
-          >
-            정말 거절할까요
-          </button>
-        ) : (
-          <button
-            type="button"
-            onClick={() => setConfirmReject(true)}
-            disabled={pending}
-            className={`${secondaryBtnCls} text-[15px]`}
-          >
-            거절
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={() => setConfirmReject(true)}
+          disabled={pending}
+          className={`${secondaryBtnCls} text-[15px]`}
+        >
+          거절
+        </button>
       </div>
-      {confirmReject && (
-        <p className="text-[15px] leading-relaxed break-keep text-mute">
-          거절하시면 신청하신 분께 전액 돌려드리고, 그날은 다시 빌려줄 수 있는 날로 돌아가요.
-        </p>
-      )}
+      <ConfirmDialog
+        open={confirmReject}
+        title="이 신청을 거절할까요"
+        confirmLabel="거절하기"
+        busy={pending}
+        onConfirm={() => run(false)}
+        onCancel={() => setConfirmReject(false)}
+      >
+        <p>거절하면 {won(amountTotal)} 전액이 손님께 돌아가요. 그날은 다시 비는 날이 돼요.</p>
+        {message.trim() && <p className="text-mute">남기신 말도 같이 전해드려요.</p>}
+      </ConfirmDialog>
     </div>
   );
 }
@@ -95,12 +97,26 @@ export function HostDecide({ bookingId }: { bookingId: number }) {
 export function GuestCancel({ bookingId }: { bookingId: number }) {
   const router = useRouter();
   const [pending, start] = useTransition();
-  const [confirming, setConfirming] = useState(false);
+  /** 서버가 계산해 준 환불 견적. 있으면 팝업이 열려 있다는 뜻. */
+  const [quote, setQuote] = useState<{ total: number; refund: number; rate: number } | null>(null);
   const [err, setErr] = useState("");
   const [done, setDone] = useState("");
 
+  /** 팝업을 열기 «전에» 환불액을 서버에 묻는다. 「얼마 돌려받는지」를 모른 채 확인을 누르게 하지 않는다. */
+  const ask = () =>
+    start(async () => {
+      setErr("");
+      const q = await quoteCancelAction(bookingId);
+      if (!q.ok) {
+        setErr(q.message);
+        return;
+      }
+      setQuote({ total: q.total, refund: q.refund, rate: q.rate });
+    });
+
   const run = () =>
     start(async () => {
+      setQuote(null);
       setErr("");
       const r = await cancelBookingAction(bookingId);
       if (!r.ok) {
@@ -115,41 +131,36 @@ export function GuestCancel({ bookingId }: { bookingId: number }) {
 
   return (
     <div className="mt-2">
-      {confirming ? (
-        <div className="space-y-3">
-          <p className="text-[15px] leading-relaxed break-keep text-mute">
-            취소하시면 되돌릴 수 없어요. 환불 금액은 취소 시점에 따라 달라져요.
-          </p>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={run}
-              disabled={pending}
-              className={`${secondaryBtnCls} border-danger text-[15px] text-danger hover:bg-surface`}
-            >
-              네, 취소할게요
-            </button>
-            <button
-              type="button"
-              onClick={() => setConfirming(false)}
-              disabled={pending}
-              className="h-[44px] px-4 text-[15px] text-mute disabled:opacity-60"
-            >
-              그냥 둘게요
-            </button>
-          </div>
-        </div>
-      ) : (
-        <button
-          type="button"
-          onClick={() => setConfirming(true)}
-          // 배경 없는 글자 버튼은 세로 패딩으로 44px를 채운다(디자인-시스템 §터치 타깃).
-          className="py-[12px] text-[15px] text-mute underline underline-offset-2"
-        >
-          신청 취소하기
-        </button>
-      )}
+      <button
+        type="button"
+        onClick={ask}
+        disabled={pending}
+        // 배경 없는 글자 버튼은 세로 패딩으로 44px를 채운다(디자인-시스템 §터치 타깃).
+        className="py-[12px] text-[15px] text-mute underline underline-offset-2 disabled:opacity-60"
+      >
+        {pending && !quote ? "확인하는 중…" : "신청 취소하기"}
+      </button>
       {err && <p className="mt-2 text-[15px] leading-relaxed break-keep text-danger">{err}</p>}
+      <ConfirmDialog
+        open={quote !== null}
+        title="이 신청을 취소할까요"
+        confirmLabel="취소하기"
+        cancelLabel="그냥 둘게요"
+        busy={pending}
+        onConfirm={run}
+        onCancel={() => setQuote(null)}
+      >
+        {quote && (
+          <>
+            <p>
+              낸 돈 {won(quote.total)} 중{" "}
+              <span className="font-medium text-ink">{won(quote.refund)}</span>
+              {quote.refund > 0 ? `(${Math.round(quote.rate * 100)}%)이 돌아와요.` : "이 돌아와요. 당일 취소라 환불이 없어요."}
+            </p>
+            <p className="text-mute">취소하면 되돌릴 수 없어요.</p>
+          </>
+        )}
+      </ConfirmDialog>
     </div>
   );
 }
