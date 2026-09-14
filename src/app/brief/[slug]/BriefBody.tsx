@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import Link from "next/link";
 import type { BriefDoc, BriefNode } from "@/lib/brief-doc";
 
@@ -38,8 +39,12 @@ function marks(node: BriefNode): React.ReactNode {
   return el;
 }
 
+/** 🪤**`<span>`으로 감싸지 않는다.** React가 배열에 key를 요구해서 처음엔 span을 둘렀는데,
+ *  그러면 **DOM에 의미 없는 껍데기가 글자마다 생긴다.** 09-14에 코멘트 위젯으로 표 머리글을
+ *  찍어 보니 선택자가 `… > th > span`으로 잡히고 크기가 셀(120x38)이 아니라 껍데기(23x16)로 왔다.
+ *  Fragment는 key를 받으면서 DOM 노드를 안 만든다 — 클릭한 자리가 «진짜 그 자리»로 잡힌다. */
 function inlines(nodes?: BriefNode[]): React.ReactNode {
-  return (nodes ?? []).map((n, i) => <span key={i}>{marks(n)}</span>);
+  return (nodes ?? []).map((n, i) => <Fragment key={i}>{marks(n)}</Fragment>);
 }
 
 /** 셀 안의 문단을 인라인으로 편다 — 셀은 한 문단만 담는다(표 34개 실측: 여러 문단 0건). */
