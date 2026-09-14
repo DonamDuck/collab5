@@ -39,6 +39,8 @@ export async function POST(req: NextRequest) {
     /** 누른 요소의 잰 값 — 「작다」는 말을 숫자로 받는다(디자인팀 제안 09-14). 터치 타깃 44px·글자 16px 하한 대조용. */
     box: s(b.box, 40),
     font: s(b.font, 20),
+    /** 글자색 + 실제로 깔린 배경색. 「안 보여」는 대비 문제라 이 짝이 없으면 사후에 못 되살린다. */
+    color: s(b.color, 60),
     viewport: s(b.viewport, 20),
     done: false,
   };

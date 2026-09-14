@@ -13,7 +13,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 type Mode = "off" | "picking" | "writing";
-type Target = { selector: string; text: string; rect: DOMRect | null; box: string; font: string };
+type Target = { selector: string; text: string; rect: DOMRect | null; box: string; font: string; color: string };
 
 /** 요소를 다시 찾아갈 수 있을 만큼의 경로. id를 만나면 거기서 끊는다(그 위는 볼 필요가 없다). */
 function cssPath(el: Element): string {
@@ -37,6 +37,18 @@ function cssPath(el: Element): string {
     node = parent;
   }
   return parts.join(" > ");
+}
+
+/** 눈에 보이는 배경색. 누른 요소 자신은 대개 투명이라 그 값을 적으면 늘 `rgba(0,0,0,0)`이 되고,
+ *  「안 보여」를 판정하는 데 아무 쓸모가 없다. 투명이 아닌 첫 조상까지 올라가야 «대비»를 잴 수 있다. */
+function effectiveBg(el: Element): string {
+  let node: Element | null = el;
+  while (node) {
+    const bg = getComputedStyle(node).backgroundColor;
+    if (bg && bg !== "transparent" && !/rgba\(\s*0,\s*0,\s*0,\s*0\s*\)/.test(bg)) return bg;
+    node = node.parentElement;
+  }
+  return getComputedStyle(document.body).backgroundColor || "rgb(255,255,255)";
 }
 
 export function DevComments() {
@@ -78,6 +90,9 @@ export function DevComments() {
         rect: r,
         box: `${Math.round(r.width)}x${Math.round(r.height)} @ ${Math.round(r.left)},${Math.round(r.top)}`,
         font: `${cs.fontSize} ${cs.fontWeight}`,
+        // 🎨「안 보여」는 대비 문제다(디자인팀 09-14). 글자색과 «실제로 깔린» 배경색을 짝으로 담는다 —
+        //   다크 모드나 hover 상태였다면 나중에 경로만으로는 절대 되살릴 수 없는 값이다.
+        color: `${cs.color} on ${effectiveBg(el)}`,
       });
       setMode("writing");
     };
@@ -107,6 +122,7 @@ export function DevComments() {
         text: target?.text ?? "",
         box: target?.box ?? "",
         font: target?.font ?? "",
+        color: target?.color ?? "",
         viewport: `${window.innerWidth}x${window.innerHeight}`,
       }),
     }).catch(() => {});
