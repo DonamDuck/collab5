@@ -122,11 +122,29 @@ export function DevComments() {
    *  그래도 손이 올라가 있으면 안 고치고 버튼만 띄운다(위 `hasUnsavedWork`). */
   useEffect(() => {
     const es = new EventSource("/api/dev-reload");
+    // 한 번이라도 붙은 적이 있나. 재시작 중의 끊김과 «애초에 없는 주소»를 가르는 유일한 단서다.
+    let everOpened = false;
+    let warned = false;
+
+    es.onopen = () => (everOpened = true);
     es.onmessage = () => {
       if (hasUnsavedWork()) setStale(true);
       else location.reload();
     };
-    es.onerror = () => {}; // 서버 재시작 중엔 EventSource가 알아서 다시 붙는다
+    // 🚨**여기를 빈 함수로 두면 「기능이 꺼진 채로 멀쩡해 보인다」**(2팀 적발 09-14).
+    //   위젯만 가져가고 `api/dev-reload`를 안 가져간 트리에서는 이 스트림이 영영 안 붙는데,
+    //   화면엔 아무 표시가 없다 — 버튼도 눌리고 코멘트도 저장된다. **자동 새로고침만 조용히 죽는다.**
+    //   그 상태로 「되고 있습니다」라고 말하게 된다.
+    // ⭐**한 번도 안 붙었을 때만** 외친다. 서버 재시작 중의 끊김은 정상이고(곧 다시 붙는다),
+    //   그걸 같이 외치면 경고가 소음이 돼서 진짜일 때 아무도 안 본다.
+    es.onerror = () => {
+      if (everOpened || warned) return;
+      warned = true;
+      console.warn(
+        "[DevComments] /api/dev-reload 에 못 붙었어요. 자동 새로고침이 동작하지 않습니다.\n" +
+          "위젯만 가져오고 `src/app/api/dev-reload/route.ts` 를 빠뜨렸는지 확인하세요."
+      );
+    };
     return () => es.close();
   }, [hasUnsavedWork]);
 
