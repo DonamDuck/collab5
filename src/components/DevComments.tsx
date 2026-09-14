@@ -66,6 +66,9 @@ export function DevComments() {
   const [note, setNote] = useState("");
   const [count, setCount] = useState(0);
   const [toast, setToast] = useState("");
+  /** 지금 고른 자리에 «이미» 달려 있는 코멘트들. 같은 자리를 다시 누르면 앞서 쓴 말이 보여야
+   *  고쳐 쓰거나 덧붙일 수 있다(대표 09-14). 새 코멘트는 지우지 않고 그 아래로 쌓인다. */
+  const [prior, setPrior] = useState<string[]>([]);
   const rootRef = useRef<HTMLDivElement>(null);
   const [stale, setStale] = useState(false);
 
@@ -96,6 +99,16 @@ export function DevComments() {
     return false;
   }, [mode, note]);
 
+  // 고른 자리가 정해지면 그 자리의 지난 코멘트를 불러온다. 「화면 전체」는 자리가 없으니 건너뛴다.
+  useEffect(() => {
+    if (mode !== "writing" || !target) { setPrior([]); return; }
+    const q = new URLSearchParams({ selector: target.selector, url: location.pathname + location.search });
+    fetch(`/api/dev-comment?${q}`)
+      .then((r) => r.json())
+      .then((d) => setPrior(Array.isArray(d.mine) ? d.mine : []))
+      .catch(() => setPrior([]));
+  }, [mode, target]);
+
   /** 🪤**새로고침은 콘솔을 안 비운다** (2팀 실측 09-14). 이 기능이 코드는 최신으로 갈아끼우지만
    *  **브라우저 콘솔 버퍼는 새로고침 전 것을 그대로 들고 있다.** 재시작 창에서 한 번 난 에러가
    *  그 뒤 모든 콘솔 읽기에 같은 digest로 계속 나와서, 서버 로그·curl·DOM 셋이 멀쩡하다고 말하는데
@@ -109,11 +122,29 @@ export function DevComments() {
    *  그래도 손이 올라가 있으면 안 고치고 버튼만 띄운다(위 `hasUnsavedWork`). */
   useEffect(() => {
     const es = new EventSource("/api/dev-reload");
+    // 한 번이라도 붙은 적이 있나. 재시작 중의 끊김과 «애초에 없는 주소»를 가르는 유일한 단서다.
+    let everOpened = false;
+    let warned = false;
+
+    es.onopen = () => (everOpened = true);
     es.onmessage = () => {
       if (hasUnsavedWork()) setStale(true);
       else location.reload();
     };
-    es.onerror = () => {}; // 서버 재시작 중엔 EventSource가 알아서 다시 붙는다
+    // 🚨**여기를 빈 함수로 두면 「기능이 꺼진 채로 멀쩡해 보인다」**(2팀 적발 09-14).
+    //   위젯만 가져가고 `api/dev-reload`를 안 가져간 트리에서는 이 스트림이 영영 안 붙는데,
+    //   화면엔 아무 표시가 없다 — 버튼도 눌리고 코멘트도 저장된다. **자동 새로고침만 조용히 죽는다.**
+    //   그 상태로 「되고 있습니다」라고 말하게 된다.
+    // ⭐**한 번도 안 붙었을 때만** 외친다. 서버 재시작 중의 끊김은 정상이고(곧 다시 붙는다),
+    //   그걸 같이 외치면 경고가 소음이 돼서 진짜일 때 아무도 안 본다.
+    es.onerror = () => {
+      if (everOpened || warned) return;
+      warned = true;
+      console.warn(
+        "[DevComments] /api/dev-reload 에 못 붙었어요. 자동 새로고침이 동작하지 않습니다.\n" +
+          "위젯만 가져오고 `src/app/api/dev-reload/route.ts` 를 빠뜨렸는지 확인하세요."
+      );
+    };
     return () => es.close();
   }, [hasUnsavedWork]);
 
@@ -242,12 +273,24 @@ export function DevComments() {
               {target?.text ? `「${target.text.slice(0, 40)}」` : target?.selector.split(" > ").pop()}
               {target?.box && <span style={{ color: "#9a9a9a" }}> · {target.box} · {target.font}</span>}
             </p>
+            {prior.length > 0 && (
+              // 📚지난 코멘트 — 번호를 붙여 「(1)로 남겼다가 (2)로 또」를 눈에 보이게 한다.
+              //   ⚠️높이를 가둔다. 한 자리에 다섯 개가 쌓이면 입력칸이 화면 밖으로 밀린다.
+              <div style={{ maxHeight: 96, overflowY: "auto", display: "flex", flexDirection: "column", gap: 6 }}>
+                {prior.map((t, i) => (
+                  <p key={i} style={{ margin: 0, fontSize: 13, lineHeight: 1.45, color: "#4a4a4a",
+                    background: "#f5f5f6", borderRadius: 8, padding: "6px 9px", whiteSpace: "pre-wrap" }}>
+                    <span style={{ color: "#9a9a9a" }}>({i + 1}) </span>{t}
+                  </p>
+                ))}
+              </div>
+            )}
             <textarea
               autoFocus
               value={note}
               onChange={(e) => setNote(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) save(); }}
-              placeholder="뭐가 아쉬운지 한 줄로 적어주세요"
+              placeholder={prior.length ? `(${prior.length + 1}) 더 하실 말씀` : "뭐가 아쉬운지 한 줄로 적어주세요"}
               style={{ width: "100%", minHeight: 76, resize: "vertical", fontSize: 14, lineHeight: 1.5,
                 padding: 10, borderRadius: 10, border: "1px solid #d7d7db", outline: "none", fontFamily: "inherit", boxSizing: "border-box" }}
             />

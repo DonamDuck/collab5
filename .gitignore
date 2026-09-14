@@ -42,3 +42,4 @@ next-env.d.ts
 .dev-comments.jsonl
 .dev-comments.go
 .dev-reload
+.dev-comments-done-*.jsonl
