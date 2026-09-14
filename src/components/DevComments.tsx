@@ -140,8 +140,11 @@ export function DevComments() {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action: "go", url: location.pathname + location.search }),
     }).catch(() => {});
-    setToast("보냈어요. 이제 고칠게요");
-    setTimeout(() => setToast(""), 2400);
+    // 🪤**이 안내가 여기 있어야 하는 이유**(2팀 지적 09-14) — 고치기 시작하면 화면이 저절로 다시 불러와져
+    //   **대표가 쓰던 게 날아간다.** 그 손해를 보는 사람이 대표인데, 인수인계 DM은 대표가 읽지 않는다.
+    //   경고는 손해를 보는 사람 눈앞에, 그 일이 일어나기 직전에 있어야 한다.
+    setToast("보냈어요 · 이제 고칩니다. 화면이 저절로 새로고침돼요");
+    setTimeout(() => setToast(""), 4000);
   };
 
   const btn = (bg: string, fg: string): React.CSSProperties => ({
