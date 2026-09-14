@@ -106,6 +106,16 @@ export function DevComments() {
     setTimeout(() => setToast(""), 1600);
   };
 
+  /** 「다 남겼어요」 — 깃발을 세우면 담당 세션이 그걸 보고 바로 작업에 들어간다. */
+  const go = async () => {
+    await fetch("/api/dev-comment", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "go", url: location.pathname + location.search }),
+    }).catch(() => {});
+    setToast("보냈어요. 이제 고칠게요");
+    setTimeout(() => setToast(""), 2400);
+  };
+
   const btn = (bg: string, fg: string): React.CSSProperties => ({
     height: 36, padding: "0 14px", borderRadius: 10, border: "none",
     background: bg, color: fg, fontSize: 13, fontWeight: 600, cursor: "pointer",
@@ -160,10 +170,9 @@ export function DevComments() {
 
         <div style={{ display: "flex", gap: 8 }}>
           {mode === "off" && count > 0 && (
-            <span style={{ alignSelf: "center", fontSize: 12, color: "#6b6b6b", background: "#fff",
-              padding: "6px 10px", borderRadius: 999, boxShadow: "0 1px 6px rgba(0,0,0,.12)" }}>
-              {count}건
-            </span>
+            <button style={{ ...btn("#222", "#fff"), boxShadow: "0 2px 10px rgba(0,0,0,.16)" }} onClick={go}>
+              {count}건 보내고 작업 시작
+            </button>
           )}
           {mode === "off" && (
             <button style={{ ...btn("#fff", "#222"), boxShadow: "0 2px 10px rgba(0,0,0,.16)" }}
