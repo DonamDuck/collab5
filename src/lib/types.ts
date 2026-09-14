@@ -433,6 +433,8 @@ export interface Space {
   address: string;
   lat?: number;
   lng?: number;
+  /** 🚨「들어오는 법」 — 도어락·열쇠·스위치. 주소와 같은 급의 비밀이라 **확정 뒤에만** 연다. */
+  accessNote: string;
 
   useType: SpaceUseType;
   facilities: string[];
@@ -461,7 +463,7 @@ export interface Space {
 /** 확정 «전» 화면에 나가는 투영 — 주소와 연락처를 뺀다.
  *  ⭐대표 09-13: *「사장님과 연결을 미리 해버리면 우리 결제 없이 그들끼리 거래로 해버릴 수도 있을 것 같아서」*.
  *  그래서 확정 전에는 그 가게를 **특정할 수 없어야** 한다. 이 타입이 그 계약이다. */
-export type SpacePublic = Omit<Space, "address" | "lat" | "lng">;
+export type SpacePublic = Omit<Space, "address" | "lat" | "lng" | "accessNote">;
 
 /** ⭐`pending`만 돈이 오기 «전»이다. 나머지는 전부 결제가 끝난 뒤의 이야기다.
  *  pending   결제창으로 보내기 직전에 잡아 둔 자리. 🚨**호스트에게는 안 보인다**

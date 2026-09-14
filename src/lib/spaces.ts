@@ -40,6 +40,7 @@ function toSpace(r: Row): Space {
     area: s(r.area), address: s(r.address),
     lat: typeof r.lat === "number" ? r.lat : undefined,
     lng: typeof r.lng === "number" ? r.lng : undefined,
+    accessNote: s(r.access_note),
     useType: (s(r.use_type) || "both") as Space["useType"],
     facilities: arr(r.facilities),
     capacity: typeof r.capacity === "number" ? r.capacity : undefined,
@@ -58,8 +59,8 @@ function toSpace(r: Row): Space {
  *  그래서 확정 전에는 그 가게를 특정할 수 없어야 한다. 목록·상세는 **반드시 이 함수를 거친 값**을 쓴다.
  *  ⚠️`Omit` 타입만 믿지 마라 — 타입은 컴파일 때만 있고 런타임 객체엔 주소가 그대로 실려 나간다. 여기서 실제로 지운다. */
 export function toPublic(sp: Space): SpacePublic {
-  const { address: _a, lat: _lat, lng: _lng, ...rest } = sp;
-  void _a; void _lat; void _lng;
+  const { address: _a, lat: _lat, lng: _lng, accessNote: _n, ...rest } = sp;
+  void _a; void _lat; void _lng; void _n;
   return rest;
 }
 
@@ -174,6 +175,7 @@ export async function saveSpace(input: SpaceSaveInput): Promise<Space | null> {
     slug: input.slug, owner_user_id: input.ownerUserId, brand_slug: input.brandSlug,
     name: input.name, tagline: input.tagline, body: input.body, photos: input.photos,
     area: input.area, address: input.address, lat: input.lat ?? null, lng: input.lng ?? null,
+    access_note: input.accessNote,
     use_type: input.useType, facilities: input.facilities, capacity: input.capacity ?? null,
     hours: input.hours, rules: input.rules,
     price_day: input.priceDay, mentor_minutes: input.mentorMinutes, mentor_price: input.mentorPrice,

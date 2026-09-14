@@ -50,7 +50,7 @@ function makeSlug(name: string): string {
 export interface SpaceFormInput {
   slug?: string;
   name: string; tagline: string; body: string; photos: string[];
-  area: string; address: string;
+  area: string; address: string; accessNote: string;
   useType: SpaceUseType; facilities: string[]; capacity?: number; hours: string;
   rules: string; priceDay: number;
   mentorMinutes: number; mentorPrice: number;
@@ -79,6 +79,7 @@ export async function saveSpaceAction(input: SpaceFormInput): Promise<ActionResu
   }
   if (!input.name.trim()) return { ok: false, message: "공간 이름을 적어 주세요." };
   if (input.openDates.length === 0) return { ok: false, message: "빌려줄 수 있는 날을 하루 이상 골라 주세요." };
+  if (input.photos.length === 0) return { ok: false, message: "사진을 한 장 이상 올려 주세요. 사진 없는 공간은 아무도 안 빌려요." };
   if (input.priceDay < 0) return { ok: false, message: "값이 이상해요." };
 
   // 수정이면 주인 확인부터. ⚠️입력에 실린 slug를 믿지 않고 DB에서 소유자를 다시 읽는다.
@@ -92,7 +93,7 @@ export async function saveSpaceAction(input: SpaceFormInput): Promise<ActionResu
   const row: SpaceSaveInput = {
     slug, ownerUserId: uid, brandSlug: input.brandSlug,
     name: input.name.trim(), tagline: input.tagline.trim(), body: input.body, photos: input.photos,
-    area: input.area.trim(), address: input.address.trim(),
+    area: input.area.trim(), address: input.address.trim(), accessNote: input.accessNote.trim(),
     useType: input.useType, facilities: input.facilities, capacity: input.capacity,
     hours: input.hours, rules: input.rules.trim(),
     priceDay: input.priceDay, mentorMinutes: input.mentorMinutes, mentorPrice: input.mentorPrice,

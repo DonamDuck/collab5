@@ -166,7 +166,18 @@ export default async function MyRentPage() {
                     </p>
                   </>
                 }
-                status={<SpaceBadge status={sp.status} />}
+                status={
+                  <div className="flex shrink-0 items-center gap-3">
+                    <SpaceBadge status={sp.status} />
+                    {/* 고치기는 글자 링크로 — 이 줄에서 누르는 것은 이름(보기)과 이것뿐이라 버튼 얼굴이 필요 없다. */}
+                    <Link
+                      href={`/rent/${sp.slug}/edit`}
+                      className="py-[12px] text-[15px] text-mute underline underline-offset-2"
+                    >
+                      고치기
+                    </Link>
+                  </div>
+                }
               >
                 {/* 대표에게만 보이는 손잡이. 남의 등록을 세상에 내보내는 판정이라 화면에도 문을 둔다. */}
                 {admin && sp.status === "pending" && <PublishButton slug={sp.slug} />}

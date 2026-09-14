@@ -227,6 +227,7 @@ export default async function SpaceDetailPage({
             mentorPrice={sp.mentorPrice}
             capacity={sp.capacity}
             hours={sp.hours}
+            useType={sp.useType}
             myBrands={myBrands}
           />
         )}

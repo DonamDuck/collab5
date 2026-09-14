@@ -28,6 +28,7 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { startBookingAction, confirmBookingAction } from "@/lib/rent-actions";
+import type { SpaceUseType } from "@/lib/types";
 import { dateLabel, primaryBtnCls, rentInputCls, rentTextareaCls, won } from "../ui";
 
 const labelCls = "mb-2 block text-[16px] font-medium text-body";
@@ -77,6 +78,7 @@ export function BookingForm({
   mentorPrice,
   capacity,
   hours,
+  useType,
   myBrands,
 }: {
   spaceId: number;
@@ -87,6 +89,8 @@ export function BookingForm({
   mentorPrice: number;
   capacity?: number;
   hours: string;
+  /** 「몇 분이나」는 대관(`open`·`both`)에서만 묻는다. 원래 목적대로(`as_is`) 쓰는 자리엔 인원이 정보가 아니다. */
+  useType: SpaceUseType;
   myBrands: { slug: string; name: string }[];
 }) {
   const router = useRouter();
@@ -247,22 +251,24 @@ export function BookingForm({
         {hours && <p className={hintCls}>이용 시간은 {hours}예요.</p>}
       </div>
 
-      <div>
-        <label htmlFor="rent-head" className={labelCls}>
-          몇 분이나 오실까요 <span className="ml-1 text-[15px] font-normal text-faint">· 선택</span>
-        </label>
-        <input
-          id="rent-head"
-          type="number"
-          inputMode="numeric"
-          min={1}
-          max={capacity}
-          className={rentInputCls}
-          value={headcount}
-          onChange={(e) => setHeadcount(e.target.value)}
-          placeholder={capacity ? `최대 ${capacity}명` : "예: 8"}
-        />
-      </div>
+      {useType !== "as_is" && (
+        <div>
+          <label htmlFor="rent-head" className={labelCls}>
+            몇 분이나 오실까요 <span className="ml-1 text-[15px] font-normal text-faint">· 선택</span>
+          </label>
+          <input
+            id="rent-head"
+            type="number"
+            inputMode="numeric"
+            min={1}
+            max={capacity}
+            className={rentInputCls}
+            value={headcount}
+            onChange={(e) => setHeadcount(e.target.value)}
+            placeholder={capacity ? `최대 ${capacity}명` : "예: 8"}
+          />
+        </div>
+      )}
 
       <div>
         <label htmlFor="rent-plan" className={labelCls}>
