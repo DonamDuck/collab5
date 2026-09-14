@@ -15,6 +15,14 @@ import type { BriefDoc, BriefNode } from "@/lib/brief-doc";
 //   *「줄바꿈이 어색해 좌우여백까지 다 채우고 넘어가면 되는데」*, *「아래 모든 타이틀에 동일한 규칙」*).
 //   `text-balance`는 줄 길이를 «고르게» 맞추는 기능이라 좌우 여백이 남은 채로 일찍 꺾인다.
 //   한글 제목에선 그게 「덜 채우고 내려간」 것으로 읽힌다. ⭕`break-keep`은 남긴다 — 낱말 중간을 안 자른다.
+//
+// 📐**들여쓰기 단계는 «0»과 «20px» 둘뿐이다** (09-14 대표: *「좌우여백이나 줄바꿈 규칙… 뒤죽박죽이얌」*).
+//   재 보니 글자 시작점이 **여섯 가지**였다 — 제목·문단 0 / 표 18 / 인용 20 «그리고 41» / 목록 21 / ✨ 22.
+//   ⭐18·20·21·22처럼 2px씩 어긋난 값은 «단계»로 안 읽히고 **실수로 읽힌다.** 그래서 하나로 맞춘다.
+//   ⛔인용 «안»의 목록을 한 번 더 들여쓰지 않는다(41 → 20). 인용의 세로선이 이미 층을 표시한다.
+//
+// 📏**본문 크기 글의 줄간격도 하나로 맞춘다(1.8).** p 1.85 · 목록 1.625 · ✨ 1.625 · 인용 1.625로 갈려 있었다.
+//   나란히 놓이면 줄 간격이 블록마다 달라 보여서 그것도 「뒤죽박죽」의 한 축이었다. 표 칸만 1.6으로 좁게 둔다.
 
 function marks(node: BriefNode): React.ReactNode {
   // 노션 표의 칸 안 줄바꿈(`<br>`)이 여기로 온다 — 파서가 hardBreak으로 바꿔 둔다.
@@ -80,7 +88,7 @@ function Table({ node }: { node: BriefNode }) {
                 key={i}
                 scope="col"
                 className={[
-                  "bg-surface-soft px-4 py-2.5 align-bottom",
+                  "bg-surface-soft px-[20px] py-2.5 align-bottom",
                   "text-[13px] font-semibold tracking-[0.01em] text-mute",
                   // 🪤**숫자 열은 «내용만큼만» 차지하게 한다.** 안 그러면 2열 표에서 반반으로 나뉘어
                   //    값이 저 멀리 오른쪽 끝에 붙고, 머리글과 숫자가 딴 데를 본다(09-14 관찰 넷에서 나왔다).
@@ -104,7 +112,7 @@ function Table({ node }: { node: BriefNode }) {
                   <td
                     key={i}
                     className={[
-                      "border-t border-hairline px-4 py-3 align-top",
+                      "border-t border-hairline px-[20px] py-3 align-top",
                       "text-[15px] leading-[1.6] break-keep",
                       i > 0 ? "border-l border-hairline" : "",
                       // 숫자 열 — 자릿수를 맞추고 무게를 올린다. 숫자 표의 「숫자」 칸이 이 자리다.
@@ -126,11 +134,11 @@ function Table({ node }: { node: BriefNode }) {
 
 /* ───────────────────────── 블록 ───────────────────────── */
 
-function block(node: BriefNode, key: number): React.ReactNode {
+function block(node: BriefNode, key: number, inQuote = false): React.ReactNode {
   switch (node.type) {
     case "paragraph":
       return (
-        <p key={key} className="text-[17px] leading-[1.85] break-keep text-body">
+        <p key={key} className="text-[17px] leading-[1.8] break-keep text-body">
           {inlines(node.content)}
         </p>
       );
@@ -151,7 +159,7 @@ function block(node: BriefNode, key: number): React.ReactNode {
       return (
         <p
           key={key}
-          className="rounded-lg border border-primary-tint bg-primary-pale px-5 py-4 text-[17px] font-semibold leading-relaxed break-keep text-ink">
+          className="rounded-lg border border-primary-tint bg-primary-pale px-[20px] py-4 text-[17px] font-semibold leading-[1.8] break-keep text-ink">
           {inlines(node.content)}
         </p>
       );
@@ -161,16 +169,32 @@ function block(node: BriefNode, key: number): React.ReactNode {
       return (
         <blockquote
           key={key}
-          className="space-y-2 border-l-[3px] border-primary-tint pl-4 text-[16px] leading-relaxed break-keep text-mute">
-          {(node.content ?? []).map((c, i) => block(c, i))}
+          className="space-y-2 border-l-[3px] border-primary-tint pl-[17px] text-[16px] leading-[1.8] break-keep text-mute">
+          {(node.content ?? []).map((c, i) => block(c, i, true))}
         </blockquote>
       );
 
     case "bulletList":
+      // ⛔인용 «안»에서는 한 번 더 들여쓰지 않는다 — 09-14에 후기 넷만 41px로 저 혼자 튀어나와 있었다.
+      //   인용의 세로선이 이미 「여긴 인용이다」를 말하고 있어서 목록 표식까지 밀어낼 이유가 없다.
+      //   🪤`list-inside`도 답이 아니었다 — 첫 줄만 표식 뒤 42px에서 시작하고 이어지는 줄은 20px이라
+      //   오히려 한 항목 안에서 들쭉날쭉해진다. ⭕**표식을 뺀다.** 인용 안에서 항목을 가르는 일은
+      //   세로선과 줄 사이 여백이 이미 하고 있다(09-14 후기 넷이 그렇게 읽힌다).
+      if (inQuote) {
+        return (
+          <ul
+            key={key}
+            className="list-none space-y-2.5 pl-0 text-[16px] leading-[1.8] break-keep">
+            {(node.content ?? []).map((li, i) => (
+              <li key={i}>{inlines(li.content?.[0]?.content)}</li>
+            ))}
+          </ul>
+        );
+      }
       return (
         <ul
           key={key}
-          className="list-disc space-y-1.5 pl-5 text-[17px] leading-relaxed break-keep text-body marker:text-faint">
+          className="list-disc space-y-1.5 pl-[20px] text-[17px] leading-[1.8] break-keep text-body marker:text-faint">
           {(node.content ?? []).map((li, i) => (
             <li key={i}>{inlines(li.content?.[0]?.content)}</li>
           ))}
@@ -181,7 +205,7 @@ function block(node: BriefNode, key: number): React.ReactNode {
       return (
         <ol
           key={key}
-          className="list-decimal space-y-1.5 pl-5 text-[17px] leading-relaxed break-keep text-body marker:text-faint">
+          className="list-decimal space-y-1.5 pl-[20px] text-[17px] leading-[1.8] break-keep text-body marker:text-faint">
           {(node.content ?? []).map((li, i) => (
             <li key={i}>{inlines(li.content?.[0]?.content)}</li>
           ))}
