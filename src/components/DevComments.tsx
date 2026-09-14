@@ -12,6 +12,17 @@
 //   토큰이나 클래스가 잘못된 상황에서도 자기는 멀쩡히 떠야 해서 페이지 CSS에 기대지 않는다.
 import { useCallback, useEffect, useRef, useState } from "react";
 
+/** 🚨**4초 · 스물세 자. 둘 다 길어 보이지만 줄이면 안 된다.**
+ *  이 문장을 읽어야 하는 사람은 «방금 화면에 무언가를 타이핑하던 대표»이고, 읽기 전에 사라지면
+ *  **자기 타이핑이 왜 날아갔는지 영영 모른다.** 짧은 토스트는 놓쳐도 되지만 이건 아니다.
+ *  📌인라인 숫자로 두면 나중에 누가 2000으로 바꾸면서 «결정을 내렸다는 자각조차 없이» 뒤집는다.
+ *    이름을 붙이는 건 그래서다 — 선언 자리는 「왜 이 값인가」를 찾으러 오는 자리라 주석이 붙는다(2팀 09-14). */
+const GO_TOAST = "보냈어요 · 이제 고칩니다. 화면이 저절로 새로고침돼요";
+const GO_TOAST_MS = 4000;
+
+/** 서버 재시작 감지 주기. 개발 빌드 전용이라 비용이 없고, 5초면 대표가 다음 코멘트를 쓰기 전에 갈린다. */
+const BOOT_POLL_MS = 5000;
+
 type Mode = "off" | "picking" | "writing";
 type Target = { selector: string; text: string; rect: DOMRect | null; box: string; font: string; color: string };
 
@@ -81,7 +92,7 @@ export function DevComments() {
   //   든 채로 남고, 그 상태로 남긴 코멘트는 새 칸이 비어서 온다(09-14 1호 코멘트가 그랬다).
   //   ⚠️개발 빌드에서만 도는 5초 폴링이라 비용은 없다.
   useEffect(() => {
-    const t = setInterval(refreshCount, 5000);
+    const t = setInterval(refreshCount, BOOT_POLL_MS);
     return () => clearInterval(t);
   }, [refreshCount]);
 
@@ -167,11 +178,9 @@ export function DevComments() {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action: "go", url: location.pathname + location.search }),
     }).catch(() => {});
-    // 🪤**이 안내가 여기 있어야 하는 이유**(2팀 지적 09-14) — 고치기 시작하면 화면이 저절로 다시 불러와져
-    //   **대표가 쓰던 게 날아간다.** 그 손해를 보는 사람이 대표인데, 인수인계 DM은 대표가 읽지 않는다.
-    //   경고는 손해를 보는 사람 눈앞에, 그 일이 일어나기 직전에 있어야 한다.
-    setToast("보냈어요 · 이제 고칩니다. 화면이 저절로 새로고침돼요");
-    setTimeout(() => setToast(""), 4000);
+    // 길이·유지시간을 손대기 전에 `GO_TOAST` 선언부의 주석을 읽을 것.
+    setToast(GO_TOAST);
+    setTimeout(() => setToast(""), GO_TOAST_MS);
   };
 
   const btn = (bg: string, fg: string): React.CSSProperties => ({
