@@ -10,6 +10,11 @@ import type { BriefDoc, BriefNode } from "@/lib/brief-doc";
 //    전부 6.25% 부풀어 나온다(볼트 [[디자인-시스템]] §함정1). `text-lg` 같은 걸 쓰면 사다리가 어긋난다.
 //
 // ⭐**표가 이 렌더러의 존재 이유다.** 매거진이 못 그리는 유일한 블록이고, 브리프는 그게 뼈대다.
+//
+// 🪤**제목에 `text-balance`를 쓰지 않는다** (09-14 대표, 제목 둘을 따로 지적 —
+//   *「줄바꿈이 어색해 좌우여백까지 다 채우고 넘어가면 되는데」*, *「아래 모든 타이틀에 동일한 규칙」*).
+//   `text-balance`는 줄 길이를 «고르게» 맞추는 기능이라 좌우 여백이 남은 채로 일찍 꺾인다.
+//   한글 제목에선 그게 「덜 채우고 내려간」 것으로 읽힌다. ⭕`break-keep`은 남긴다 — 낱말 중간을 안 자른다.
 
 function marks(node: BriefNode): React.ReactNode {
   // 노션 표의 칸 안 줄바꿈(`<br>`)이 여기로 온다 — 파서가 hardBreak으로 바꿔 둔다.
@@ -136,7 +141,7 @@ function block(node: BriefNode, key: number): React.ReactNode {
         return (
           <h2
             key={key}
-            className="mt-14 text-[22px] font-bold leading-snug text-balance break-keep text-ink first:mt-0">
+            className="mt-14 text-[22px] font-bold leading-snug break-keep text-ink first:mt-0">
             {inlines(node.content)}
           </h2>
         );
@@ -146,7 +151,7 @@ function block(node: BriefNode, key: number): React.ReactNode {
       return (
         <p
           key={key}
-          className="rounded-lg border border-primary-tint bg-primary-pale px-5 py-4 text-[17px] font-semibold leading-relaxed text-balance break-keep text-ink">
+          className="rounded-lg border border-primary-tint bg-primary-pale px-5 py-4 text-[17px] font-semibold leading-relaxed break-keep text-ink">
           {inlines(node.content)}
         </p>
       );
