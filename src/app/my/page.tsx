@@ -18,6 +18,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { isMyBrandEditedSince } from "@/lib/collab-report";
 import type { CollabReportListItem } from "@/lib/types";
 import { BRIEFS } from "@/lib/brief-samples/registry";
+import { listBriefsByOwner } from "@/lib/briefs";
 import { DEV_OWNED_SLUGS } from "@/lib/dev-session";
 
 // 🚨 로그인 사용자별 화면이라 절대 프리렌더되면 안 된다.
@@ -45,14 +46,15 @@ export default async function MyPage({ searchParams }: { searchParams: Promise<{
   const editedPairs = await findEditedPairs(reports);
   const displayName = profile?.brandName || user.email?.split("@")[0] || "내 브랜드";
 
-  // 📄 내 요약 보고서 = **내가 가진 소개서의 slug와 맞는 브리프**. 브리프는 아직 DB가 아니라
-  //    코드 안 목록이라(기획서 §데이터 모델) 여기서 걸러 쓴다.
-  //    ⏭`brand_briefs` 테이블이 생기면 이 줄이 `repo.listBriefsByOwner(profile.id)`로 바뀐다.
-  const myBrandSlugs = new Set(makers.map((m) => m.slug));
-  // 🔒로컬에서만 — 가짜 세션엔 소유 소개서가 없어 이 절이 영영 안 보인다. 그래서 «입력»만 보태고
-  //   거르는 규칙은 아래 그대로 탄다(운영에선 `isDevSession()`이 false라 이 줄이 죽는다).
-  if (isDevSession()) DEV_OWNED_SLUGS.forEach((s) => myBrandSlugs.add(s));
-  const myBriefs = BRIEFS.filter((b) => myBrandSlugs.has(b.slug));
+  // 📄 내 요약 보고서 = **`brand_briefs`에서 나에게 «연결된» 것**(대표가 손으로 연결한다).
+  //    ⚠️표가 없으면 빈 목록이다 — 연결이라는 개념이 표에만 있어서, 코드 안 목록으로 흉내 내면 거짓이 된다.
+  //    🔒로컬만 예외 — 가짜 세션엔 프로필이 없어 이 절을 영영 못 본다. 그래서 «입력»만 보탠다.
+  //       운영에선 `isDevSession()`이 false라 아래 한 줄이 죽고, 진짜 연결만 남는다.
+  const myBriefs = isDevSession()
+    ? BRIEFS.filter((b) => DEV_OWNED_SLUGS.includes(b.slug))
+    : profile
+      ? await listBriefsByOwner(profile.id)
+      : [];
 
   // 내 소개서 탭 콘텐츠
   const mine =
