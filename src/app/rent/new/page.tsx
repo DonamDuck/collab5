@@ -1,3 +1,4 @@
+import { RentMenuBar } from "../RentMenuBar";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getSessionUserId } from "@/lib/profiles";
@@ -26,7 +27,9 @@ export default async function NewSpacePage() {
 
   if (!uid) {
     return (
-      <main className="mx-auto w-full max-w-[560px] px-4 py-14 sm:px-6">
+      <>
+      <RentMenuBar />
+      <main className="mx-auto w-full max-w-[560px] px-4 pb-14 pt-6 sm:px-6">
         <h1 className="text-[28px] font-bold leading-[1.25] tracking-[-0.02em] break-keep text-ink">
           안 쓰는 날, 빌려주세요
         </h1>
@@ -38,6 +41,7 @@ export default async function NewSpacePage() {
           로그인하고 올리기
         </Link>
       </main>
+      </>
     );
   }
 
@@ -46,7 +50,9 @@ export default async function NewSpacePage() {
   const myBrands = (await repo.listMakersByOwner(uid)).map((m) => ({ slug: m.slug, name: m.name }));
 
   return (
-    <main className="mx-auto w-full max-w-[560px] px-4 pt-8 pb-16 sm:px-6 sm:pt-12">
+    <>
+    <RentMenuBar />
+    <main className="mx-auto w-full max-w-[560px] px-4 pt-4 pb-16 sm:px-6 sm:pt-6">
       <header>
         <Link href="/rent" className="inline-block py-[12px] text-[15px] text-mute underline underline-offset-2">
           ← 하루 가게
@@ -63,5 +69,6 @@ export default async function NewSpacePage() {
           화면만 옛 값을 말한다(그리고 그 어긋남은 아무 에러도 안 낸다). */}
       <SpaceForm myBrands={myBrands} feeRate={FEE_RATE} />
     </main>
+    </>
   );
 }

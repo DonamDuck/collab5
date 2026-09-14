@@ -3,6 +3,7 @@ import Link from "next/link";
 import { listOpenSpaces } from "@/lib/spaces";
 import type { SpacePublic, SpaceUseType } from "@/lib/types";
 import { EmptyState } from "@/components/EmptyState";
+import { RentMenuBar } from "./RentMenuBar";
 import { RentFilters, type UseFilter } from "./RentFilters";
 import { CoverPlaceholder, primaryBtnCls, secondaryBtnCls, won } from "./ui";
 
@@ -92,9 +93,12 @@ export default async function RentPage({
   const filtered = !!(area?.trim() || date || useFilter);
 
   return (
-    <main className="mx-auto w-full max-w-[880px] px-4 py-10 sm:px-6 sm:py-14">
-      {/* 히어로 — 큰 제목 한 문장 + 넉넉한 여백 + 강조는 버튼 하나(리틀리에서 가져온 「덜어냄」). */}
-      <header className="flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
+    <>
+      <RentMenuBar />
+      <main className="mx-auto w-full max-w-[880px] px-4 pb-10 pt-4 sm:px-6 sm:pb-14 sm:pt-6">
+      {/* 히어로 — 큰 제목 한 문장 + 넉넉한 여백(리틀리에서 가져온 「덜어냄」).
+          🔻09-14 오른쪽 「안 쓰는 날 올리기」 키위 버튼 삭제 — 위 `RentMenuBar`가 그 일을 한다(대표 지시). */}
+      <header className="flex flex-col gap-6">
         <div className="max-w-[680px]">
           <h1 className="text-[28px] font-bold leading-[1.25] tracking-[-0.02em] break-keep text-ink">
             안 쓰는 날, 하루만 빌려드려요
@@ -103,10 +107,6 @@ export default async function RentPage({
             가게를 열어보고 싶은 분이 그날 하루 사장님이 돼요.
           </p>
         </div>
-        {/* ⭐이 화면의 유일한 키위. 공급이 병목이라(설계 §조사 ④) 부르는 버튼이 목록보다 먼저 보여야 한다. */}
-        <Link href="/rent/new" className={`${primaryBtnCls} h-[48px] shrink-0`}>
-          안 쓰는 날 올리기
-        </Link>
       </header>
 
       <RentFilters
@@ -150,5 +150,6 @@ export default async function RentPage({
         </>
       )}
     </main>
+    </>
   );
 }
