@@ -21,7 +21,7 @@ import { useRouter } from "next/navigation";
 import { saveSpaceAction } from "@/lib/rent-actions";
 import { uploadPhoto } from "@/lib/upload";
 import type { Space, SpaceUseType } from "@/lib/types";
-import { primaryBtnCls, rentInputCls, rentTextareaCls, secondaryBtnCls, won } from "../ui";
+import { primaryBtnCls, RentSelect, rentInputCls, rentTextareaCls, secondaryBtnCls, won } from "../ui";
 import { AddressField } from "./AddressField";
 import { OpenDatesCalendar } from "./OpenDatesCalendar";
 
@@ -114,6 +114,7 @@ export function SpaceForm({
   const [hourStart, setHourStart] = useState(() => parseHours(initial?.hours ?? "")[0]);
   const [hourEnd, setHourEnd] = useState(() => parseHours(initial?.hours ?? "")[1]);
   const [rules, setRules] = useState(initial?.rules ?? "");
+  const [ruleInput, setRuleInput] = useState("");
   const [priceDay, setPriceDay] = useState<number>(initial?.priceDay ?? 0);
   const [mentorOn, setMentorOn] = useState((initial?.mentorMinutes ?? 0) > 0);
   const [mentorPrice, setMentorPrice] = useState<number>(initial?.mentorPrice ?? 0);
@@ -132,9 +133,26 @@ export function SpaceForm({
 
   const onPickAddress = useCallback((base: string, picked: string) => {
     setAddrBase(base);
-    // 동네는 비어 있을 때만 덮는다 — 사장님이 먼저 고쳐 둔 동네 이름을 주소 검색이 되돌리면 안 된다.
-    setArea((cur) => (cur.trim() ? cur : picked));
+    // 🔁09-14 「동네」 칸이 없어지면서 **주소가 곧 동네의 출처**가 됐다. 이제 항상 덮는다 —
+    //   전엔 사장님이 손으로 고친 값을 지키느라 비어 있을 때만 덮었는데, 고칠 칸 자체가 사라졌다.
+    setArea(picked);
   }, []);
+
+  /** 주소 찾기를 못 쓰고 «직접» 적은 경우의 동네. 앞 세 토막이면 「서울 중구 을지로」까지 온다.
+   *  ⚠️완벽할 필요 없다 — 이 값은 목록 카드와 지도 설명에만 쓰이고, 정확한 자리는 주소가 말한다. */
+  const areaFromAddress = (addr: string) => addr.trim().split(/\s+/).slice(0, 3).join(" ");
+
+  /** 저장은 그대로 «줄바꿈 문자열»이다(DB·상세 화면을 안 건드린다). 화면에서만 목록으로 다룬다. */
+  const ruleList = rules.split(/\n+/).map((r) => r.trim()).filter(Boolean);
+  const addRule = () => {
+    const v = ruleInput.trim();
+    if (!v || ruleList.includes(v)) {
+      setRuleInput("");
+      return;
+    }
+    setRules([...ruleList, v].join("\n"));
+    setRuleInput("");
+  };
 
   const addFacility = () => {
     const v = facilityInput.trim();
@@ -175,7 +193,8 @@ export function SpaceForm({
     if (!name.trim()) return "공간 이름을 적어 주세요.";
     if (readyPhotos.length === 0) return "사진을 한 장 이상 올려 주세요. 사진 없는 공간은 아무도 안 빌려요.";
     if (hoursBad) return "끝나는 시각이 시작보다 늦어야 해요.";
-    if (rules.trim().length < 10) return "우리 집 규칙을 열 글자 이상 적어 주세요.";
+    if (!addrBase.trim()) return "주소를 찾아 주세요.";
+    if (rules.trim().length < 10) return "사용 유의 사항을 열 글자 이상 적어 주세요.";
     if (openDates.length === 0) return "빌려줄 수 있는 날을 하루 이상 골라 주세요.";
     if (!subleaseOk) return "내 소유이거나 임대인 동의를 받았는지 확인해 주세요.";
     return "";
@@ -196,7 +215,7 @@ export function SpaceForm({
         tagline,
         body,
         photos: readyPhotos.map((p) => p.url),
-        area,
+        area: area.trim() || areaFromAddress(addrBase),
         address,
         accessNote,
         useType,
@@ -318,15 +337,9 @@ export function SpaceForm({
             onDetail={setAddrDetail}
           />
         </L>
-        <L label="동네" htmlFor="sp-area" hint="여기까지만 모두에게 보여요. 주소를 찾으면 저절로 채워지고, 고치셔도 돼요.">
-          <input
-            id="sp-area"
-            className={rentInputCls}
-            value={area}
-            onChange={(e) => setArea(e.target.value)}
-            placeholder="예) 중구 을지로3가"
-          />
-        </L>
+        {/* 🔻09-14 「동네」 칸 삭제 — 대표: *「주소를 필수로 하고, 동네 섹션 삭제해도 될 거 같아」*.
+            ⭐주소를 받으면 동네는 «거기서 나온다». 같은 것을 두 번 묻는 칸이었고, 둘이 어긋나면
+              어느 쪽이 맞는지 아무도 모른다. 이제 `area`는 주소에서 뽑아 조용히 채운다. */}
         <L
           label="들어오는 법"
           htmlFor="sp-access"
@@ -422,25 +435,35 @@ export function SpaceForm({
           />
         </L>
 
-        <L label="최대 몇 명까지" htmlFor="sp-cap" optional>
-          <input
-            id="sp-cap"
-            type="number"
-            inputMode="numeric"
-            min={1}
-            className={`${rentInputCls} sm:max-w-[200px]`}
-            value={capacity}
-            onChange={(e) => setCapacity(e.target.value)}
-            placeholder="예) 12"
-          />
+        <L label="최대 몇 명까지 수용이 가능한가요?" htmlFor="sp-cap" optional>
+          {/* 🔁09-14 대표 — *「숫자 input으로 바꾸고 input 옆에 「명」으로 default로 넣어주라」*.
+              단위를 칸 «안»에 박는다. 밖에 두면 좁은 화면에서 줄이 바뀌어 떨어진다(신청 폼과 같은 처리). */}
+          <div className="relative w-[200px]">
+            <input
+              id="sp-cap"
+              type="number"
+              inputMode="numeric"
+              min={1}
+              className={`${rentInputCls} pr-11`}
+              value={capacity}
+              onChange={(e) => setCapacity(e.target.value)}
+              placeholder="숫자를 입력해주세요"
+            />
+            <span
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-[16px] text-mute"
+            >
+              명
+            </span>
+          </div>
         </L>
 
-        <L label="이용 시간" htmlFor="sp-hour-start">
+        <L label="이용 가능 시간" htmlFor="sp-hour-start">
           {/* 네이티브 select 둘 — iOS에서 휠이 뜨는 쪽이 커스텀 드롭다운보다 자연스럽다. */}
           <div className="flex items-center gap-2">
-            <select
+            <RentSelect
               id="sp-hour-start"
-              className={`${rentInputCls} min-w-0`}
+              className="min-w-0"
               value={hourStart}
               onChange={(e) => setHourStart(e.target.value)}
               aria-label="시작 시각"
@@ -450,10 +473,10 @@ export function SpaceForm({
                   {t}
                 </option>
               ))}
-            </select>
+            </RentSelect>
             <span className="shrink-0 text-[16px] text-mute">부터</span>
-            <select
-              className={`${rentInputCls} min-w-0`}
+            <RentSelect
+              className="min-w-0"
               value={hourEnd}
               onChange={(e) => setHourEnd(e.target.value)}
               aria-label="끝나는 시각"
@@ -463,7 +486,7 @@ export function SpaceForm({
                   {t}
                 </option>
               ))}
-            </select>
+            </RentSelect>
             <span className="shrink-0 text-[16px] text-mute">까지</span>
           </div>
           {hoursBad && (
@@ -474,37 +497,79 @@ export function SpaceForm({
         </L>
       </Group>
 
-      {/* ── 우리 집 규칙 ── ⭐이 서비스에서 제일 중요한 칸. 다른 섹션과 같은 옷을 입되
-           설명 한 줄과 예시 pill로 무게를 준다(민트 상자로 감싸던 것을 걷어냈다 — 상자는 고르는 것에만). */}
-      <Group title="우리 집 규칙" sub="열쇠를 넘기는 일이라 이 칸이 사장님을 지켜 줘요. 사소해 보여도 다 적어 주세요.">
-        {/* 예시를 「누르면 들어가는 pill」로 둔다 — 읽고 나서 자기 말로 옮겨 적게 하는 것보다,
-            한 줄 넣어 두고 고치게 하는 쪽이 빈칸으로 넘어갈 확률을 훨씬 낮춘다. */}
+      {/* ── 사용 유의 사항 ── ⭐이 서비스에서 제일 중요한 칸.
+           🔁09-14 대표 — 제목 「우리 집 규칙」 → **「사용 유의 사항」**(중간에 「공간 사용 규칙」을 거쳐 확정),
+             설명은 「공간 사용시 유의 사항을 적어주세요.」로. */}
+      <Group title="사용 유의 사항" sub="공간 사용시 유의 사항을 적어주세요.">
+        {/* 🔁09-14 여러 줄 textarea → **한 줄 입력 + 담기**(대표: *「한 줄에 하나씩 말고 하나 쓰고 우측에
+            입력 버튼, 추가하면 하단에 +규칙 추가 이런 식으로」*).
+            ⭐줄바꿈으로 나누라는 건 «규칙»이 아니라 «약속»이었다 — 지키는 사람이 없으면 한 덩어리로 저장되고
+              상세 화면의 번호 매기기가 통째로 무너진다. 한 줄씩 담게 하면 그 약속이 필요 없어진다.
+            🔗저장 형식은 그대로 줄바꿈 문자열이다(상세 화면·DB를 안 건드린다). 바뀐 건 넣는 방법뿐. */}
         <div>
-          <div className="flex flex-wrap gap-2">
-            {RULE_EXAMPLES.map((ex) => (
+          <div className="flex gap-2">
+            <input
+              id="sp-rules"
+              className={`${rentInputCls} min-w-0`}
+              value={ruleInput}
+              onChange={(e) => setRuleInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  // 폼 제출로 새지 않게 막는다 — 이 화면의 제출은 맨 아래 버튼 하나뿐이다.
+                  e.preventDefault();
+                  addRule();
+                }
+              }}
+              placeholder="예) 신발은 벗고 들어와 주세요"
+              aria-label="사용 유의 사항"
+            />
+            <button type="button" onClick={addRule} className={`${secondaryBtnCls} h-[48px] shrink-0`}>
+              담기
+            </button>
+          </div>
+
+          {/* 담은 것 — 번호를 붙인다. 상세 화면에서도 번호로 보이니 넣을 때부터 같은 모양이어야
+              「몇 개를 적었나」가 여기서 이미 읽힌다. */}
+          {ruleList.length > 0 && (
+            <ol className="mt-3 space-y-2">
+              {ruleList.map((r, i) => (
+                <li
+                  key={`${r}-${i}`}
+                  className="flex items-start gap-2.5 rounded-md bg-surface-soft px-4 py-3"
+                >
+                  <span className="shrink-0 pt-[2px] text-[15px] font-medium tabular-nums text-mute">{i + 1}.</span>
+                  <span className="min-w-0 flex-1 text-[16px] leading-relaxed break-keep text-ink">{r}</span>
+                  <button
+                    type="button"
+                    onClick={() => setRules(ruleList.filter((_, j) => j !== i).join("\n"))}
+                    aria-label={`${i + 1}번 지우기`}
+                    className="-my-2 -mr-2 flex size-[44px] shrink-0 items-center justify-center text-[17px] text-faint transition-colors hover:text-danger"
+                  >
+                    ×
+                  </button>
+                </li>
+              ))}
+            </ol>
+          )}
+
+          {/* 예시 — 누르면 그대로 담긴다. 읽고 자기 말로 옮겨 적게 하는 것보다 빈칸으로 넘어갈 확률이 낮다. */}
+          <div className="mt-3 flex flex-wrap gap-2">
+            {RULE_EXAMPLES.filter((ex) => !ruleList.includes(ex)).map((ex) => (
               <button
                 key={ex}
                 type="button"
-                onClick={() => setRules((p) => (p.trim() ? `${p.replace(/\n+$/, "")}\n${ex}` : ex))}
+                onClick={() => setRules([...ruleList, ex].join("\n"))}
                 className="inline-flex min-h-[44px] items-center rounded-pill bg-surface-soft px-4 py-2 text-left text-[15px] leading-snug break-keep text-body transition-colors hover:bg-primary-pale"
               >
                 + {ex}
               </button>
             ))}
           </div>
-          <textarea
-            id="sp-rules"
-            rows={5}
-            className={`${rentTextareaCls} mt-3 resize-y`}
-            value={rules}
-            onChange={(e) => setRules(e.target.value)}
-            placeholder="한 줄에 하나씩 적어 주세요."
-            aria-label="우리 집 규칙"
-          />
-          <p className="mt-2 text-[15px] text-faint">
+
+          <p className="mt-3 text-[15px] text-faint">
             {rules.trim().length < 10
               ? "열 글자 이상 적어 주셔야 올릴 수 있어요."
-              : `${rules.trim().length}자 적으셨어요.`}
+              : `${ruleList.length}가지 적으셨어요.`}
           </p>
         </div>
       </Group>
@@ -581,9 +646,8 @@ export function SpaceForm({
 
         {myBrands.length > 0 && (
           <L label="소개서 붙이기" htmlFor="sp-brand" optional hint="이름만 보여드려요. 연락처는 안 나가요.">
-            <select
+            <RentSelect
               id="sp-brand"
-              className={rentInputCls}
               value={brandSlug}
               onChange={(e) => setBrandSlug(e.target.value)}
             >
@@ -593,7 +657,7 @@ export function SpaceForm({
                   {b.name}
                 </option>
               ))}
-            </select>
+            </RentSelect>
           </L>
         )}
       </Group>

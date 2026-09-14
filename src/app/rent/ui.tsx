@@ -93,6 +93,38 @@ export function SpaceBadge({ status }: { status: string }) {
 export const rentInputCls =
   "h-[48px] w-full rounded-md border border-border-strong bg-surface px-4 text-[16px] text-ink outline-none placeholder:text-faint focus:border-focus";
 
+/** 🔽고르는 칸. 대표 09-14: *「드롭다운 UI들 로컬에 구현한 거 싹 다 봐줘. 아래쪽 화살표가 너무 다
+ *  우측에 붙어 있어」*.
+ *  ⭐브라우저가 그려 주는 기본 화살표는 **칸 오른쪽 끝에 딱 붙는다.** 우리 입력칸은 좌우 패딩이 16px인데
+ *  화살표만 0px에 서 있으니 그 칸만 여백이 깨져 보인다. `appearance-none`으로 기본 화살표를 끄고
+ *  같은 16px 자리에 우리 것을 그린다. 🚨훅이 없어 서버·클라 양쪽에서 쓸 수 있다(이 파일의 규율). */
+export function RentSelect({
+  className = "",
+  children,
+  ...rest
+}: React.SelectHTMLAttributes<HTMLSelectElement>) {
+  return (
+    <div className="relative w-full">
+      <select className={`${rentInputCls} appearance-none pr-11 ${className}`} {...rest}>
+        {children}
+      </select>
+      {/* `pointer-events-none` — 화살표가 클릭을 먹으면 그 자리를 눌렀을 때 목록이 안 열린다. */}
+      <svg
+        aria-hidden="true"
+        viewBox="0 0 20 20"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className="pointer-events-none absolute right-4 top-1/2 size-[18px] -translate-y-1/2 text-mute"
+      >
+        <path d="m5 7.5 5 5 5-5" />
+      </svg>
+    </div>
+  );
+}
+
 /** 여러 줄 칸 — 높이만 빼고 입력칸과 같은 얼굴. `h-[48px]`를 textarea에 주면 두 줄부터 잘린다. */
 export const rentTextareaCls =
   "w-full rounded-md border border-border-strong bg-surface px-4 py-3 text-[16px] leading-relaxed text-ink outline-none placeholder:text-faint focus:border-focus";

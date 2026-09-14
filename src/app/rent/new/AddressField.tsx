@@ -129,10 +129,37 @@ export function AddressField({
         </p>
       )}
 
+      {/* 🪟09-14 대표 — *「주소 찾기 누르면 이거 팝업으로 나오게 못하나? 모바일의 경우도 뭔가 레이어가
+          잠깐 하나 나오고(바텀으로 쭉 올라오거나)」*.
+          🔻전엔 폼 «안»에 그대로 펼쳐졌다. 그러면 아래 칸들이 440px씩 밀려 내려가서, 고르고 나면
+            내가 어디에 있었는지 잃는다. 레이어는 지면을 안 밀고 닫으면 원래 자리로 돌아온다.
+          📱`items-end sm:items-center` — 폰은 바닥에서 올라오고 데스크톱은 가운데. `ConfirmDialog`와 같은 문법이다. */}
       {open && (
-        <div className="overflow-hidden rounded-md border border-border-strong">
-          {/* 우편번호 서비스가 이 안을 채운다. 높이는 서비스 권장값(460px)에 가깝게. */}
-          <div ref={boxRef} className="h-[440px] w-full" />
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="주소 찾기"
+          className="fixed inset-0 z-[60] flex items-end justify-center bg-ink/55 backdrop-blur-[2px] sm:items-center sm:p-4"
+          onClick={() => setOpen(false)}
+        >
+          <div
+            // 🚨바깥 클릭으로만 닫는다 — 안쪽 클릭이 부모로 올라가면 주소를 고르는 순간 닫힌다.
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-[480px] overflow-hidden rounded-t-lg bg-surface shadow-e3 sm:rounded-lg"
+          >
+            <div className="flex items-center justify-between border-b border-hairline px-4 py-3">
+              <p className="text-[17px] font-medium text-ink">주소 찾기</p>
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                aria-label="닫기"
+                className="-mr-2 flex size-[44px] items-center justify-center text-[20px] text-mute"
+              >
+                ×
+              </button>
+            </div>
+            {/* 우편번호 서비스가 이 안을 채운다. 높이는 서비스 권장값(460px)에 가깝게. */}
+            <div ref={boxRef} className="h-[440px] w-full" />
           <div className="flex justify-end border-t border-hairline px-2 py-1.5">
             <button
               type="button"
@@ -141,6 +168,7 @@ export function AddressField({
             >
               닫기
             </button>
+          </div>
           </div>
         </div>
       )}

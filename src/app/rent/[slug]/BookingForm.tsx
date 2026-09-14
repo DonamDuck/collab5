@@ -29,7 +29,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { startBookingAction, confirmBookingAction } from "@/lib/rent-actions";
 import type { SpaceUseType } from "@/lib/types";
-import { dateLabel, primaryBtnCls, rentInputCls, rentTextareaCls, won } from "../ui";
+import { dateLabel, primaryBtnCls, RentSelect, rentInputCls, rentTextareaCls, won } from "../ui";
 import { ConfirmDialog } from "../ConfirmDialog";
 import { PickDateCalendar } from "./PickDateCalendar";
 import { MentorOptions } from "./MentorOption";
@@ -322,9 +322,8 @@ export function BookingForm({
           <label htmlFor="rent-brand" className={labelCls}>
             내 소개서도 같이 보여드릴까요 <span className="ml-1 text-[15px] font-normal text-faint">· 선택</span>
           </label>
-          <select
+          <RentSelect
             id="rent-brand"
-            className={rentInputCls}
             value={brandSlug}
             onChange={(e) => setBrandSlug(e.target.value)}
           >
@@ -334,7 +333,7 @@ export function BookingForm({
                 {b.name}
               </option>
             ))}
-          </select>
+          </RentSelect>
           <p className={hintCls}>사장님이 어떤 분인지 알면 수락이 훨씬 빨라져요.</p>
         </div>
       )}
