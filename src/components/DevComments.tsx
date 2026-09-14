@@ -1,0 +1,183 @@
+"use client";
+
+// 🗒 화면 위에서 바로 남기는 코멘트 위젯 (2026-09-14)
+//
+// 대표 09-14: *「스샷 찍고 번호로 설명하지 말고 보면서 바로바로 코멘트 남기고 싶다」*.
+// [코멘트] → 고치고 싶은 걸 클릭 → 한 줄. 어느 화면·어느 요소·화면 폭까지 같이 저장돼서
+// 내가 «무엇을 말하는지 되묻지 않고» 바로 찾아간다.
+//
+// 🚨**개발 빌드에서만 붙는다**(layout.tsx의 게이트). `NODE_ENV`는 빌드 때 상수로 박혀 운영 번들에서 통째로 빠진다.
+//
+// 🎨스타일을 Tailwind가 아니라 **인라인**으로 쓴 이유 — 이 위젯은 «화면이 깨졌을 때» 쓰는 물건이다.
+//   토큰이나 클래스가 잘못된 상황에서도 자기는 멀쩡히 떠야 해서 페이지 CSS에 기대지 않는다.
+import { useCallback, useEffect, useRef, useState } from "react";
+
+type Mode = "off" | "picking" | "writing";
+type Target = { selector: string; text: string; rect: DOMRect | null };
+
+/** 요소를 다시 찾아갈 수 있을 만큼의 경로. id를 만나면 거기서 끊는다(그 위는 볼 필요가 없다). */
+function cssPath(el: Element): string {
+  const parts: string[] = [];
+  let node: Element | null = el;
+  while (node && node.nodeType === 1 && node !== document.body && parts.length < 6) {
+    let part = node.tagName.toLowerCase();
+    if (node.id) {
+      parts.unshift(`${part}#${node.id}`);
+      break;
+    }
+    // ⚠️Tailwind 클래스를 다 붙이면 한 줄이 수백 자가 된다. 두 개까지만 — 사람이 알아볼 힌트면 충분하다.
+    const cls = Array.from(node.classList).filter((c) => !c.startsWith("__")).slice(0, 2);
+    if (cls.length) part += "." + cls.join(".");
+    const parent: Element | null = node.parentElement;
+    if (parent) {
+      const same = Array.from(parent.children).filter((c) => c.tagName === node!.tagName);
+      if (same.length > 1) part += `:nth-of-type(${same.indexOf(node) + 1})`;
+    }
+    parts.unshift(part);
+    node = parent;
+  }
+  return parts.join(" > ");
+}
+
+export function DevComments() {
+  const [mode, setMode] = useState<Mode>("off");
+  const [hover, setHover] = useState<DOMRect | null>(null);
+  const [target, setTarget] = useState<Target | null>(null);
+  const [note, setNote] = useState("");
+  const [count, setCount] = useState(0);
+  const [toast, setToast] = useState("");
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  const refreshCount = useCallback(() => {
+    fetch("/api/dev-comment").then((r) => r.json()).then((d) => setCount(d.count ?? 0)).catch(() => {});
+  }, []);
+  useEffect(refreshCount, [refreshCount]);
+
+  /** 내 UI 안을 고르려다 실수하는 걸 막는다 — 위젯이 자기를 가리키면 아무 쓸모가 없다. */
+  const isMine = useCallback((el: Element | null) => !!el && !!rootRef.current?.contains(el), []);
+
+  useEffect(() => {
+    if (mode !== "picking") return;
+    const move = (e: MouseEvent) => {
+      const el = document.elementFromPoint(e.clientX, e.clientY);
+      setHover(el && !isMine(el) ? el.getBoundingClientRect() : null);
+    };
+    const click = (e: MouseEvent) => {
+      const el = document.elementFromPoint(e.clientX, e.clientY);
+      if (!el || isMine(el)) return;
+      // 🚨capture 단계에서 먹는다 — 안 그러면 링크를 고르는 순간 페이지가 넘어가 버린다.
+      e.preventDefault();
+      e.stopPropagation();
+      setTarget({ selector: cssPath(el), text: (el.textContent ?? "").trim().slice(0, 120), rect: el.getBoundingClientRect() });
+      setMode("writing");
+    };
+    const esc = (e: KeyboardEvent) => e.key === "Escape" && setMode("off");
+    document.addEventListener("mousemove", move, true);
+    document.addEventListener("click", click, true);
+    document.addEventListener("keydown", esc, true);
+    document.body.style.cursor = "crosshair";
+    return () => {
+      document.removeEventListener("mousemove", move, true);
+      document.removeEventListener("click", click, true);
+      document.removeEventListener("keydown", esc, true);
+      document.body.style.cursor = "";
+      setHover(null);
+    };
+  }, [mode, isMine]);
+
+  const save = async () => {
+    if (!note.trim()) return;
+    await fetch("/api/dev-comment", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        url: location.pathname + location.search,
+        note,
+        selector: target?.selector ?? "(화면 전체)",
+        text: target?.text ?? "",
+        viewport: `${window.innerWidth}x${window.innerHeight}`,
+      }),
+    }).catch(() => {});
+    setNote("");
+    setTarget(null);
+    setMode("off");
+    setToast("남겼어요");
+    refreshCount();
+    setTimeout(() => setToast(""), 1600);
+  };
+
+  const btn = (bg: string, fg: string): React.CSSProperties => ({
+    height: 36, padding: "0 14px", borderRadius: 10, border: "none",
+    background: bg, color: fg, fontSize: 13, fontWeight: 600, cursor: "pointer",
+  });
+
+  return (
+    <div ref={rootRef} style={{ position: "fixed", zIndex: 2147483000, fontFamily: "Pretendard, sans-serif" }}>
+      {/* 고르는 중 하이라이트 — pointer-events:none 이라야 그 아래 요소를 계속 집을 수 있다 */}
+      {mode === "picking" && hover && (
+        <div style={{
+          position: "fixed", left: hover.left, top: hover.top, width: hover.width, height: hover.height,
+          border: "2px solid #98ff5c", background: "rgba(152,255,92,.18)", borderRadius: 6,
+          pointerEvents: "none", transition: "all .06s",
+        }} />
+      )}
+      {mode === "writing" && target?.rect && (
+        <div style={{
+          position: "fixed", left: target.rect.left, top: target.rect.top, width: target.rect.width, height: target.rect.height,
+          border: "2px solid #98ff5c", borderRadius: 6, pointerEvents: "none",
+        }} />
+      )}
+
+      {/* 바닥 패널 — 왼쪽 아래는 Next 개발 표시가 쓰고 있어 오른쪽에 붙인다 */}
+      <div style={{ position: "fixed", right: 16, bottom: 16, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8 }}>
+        {toast && (
+          <div style={{ background: "#222", color: "#fff", fontSize: 13, padding: "8px 12px", borderRadius: 10 }}>{toast}</div>
+        )}
+
+        {mode === "writing" && (
+          <div style={{
+            width: 320, background: "#fff", borderRadius: 14, boxShadow: "0 8px 32px rgba(0,0,0,.18)",
+            padding: 14, display: "flex", flexDirection: "column", gap: 10,
+          }}>
+            <p style={{ margin: 0, fontSize: 12, color: "#6b6b6b", wordBreak: "break-all" }}>
+              {target?.text ? `「${target.text.slice(0, 40)}」` : target?.selector.split(" > ").pop()}
+            </p>
+            <textarea
+              autoFocus
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) save(); }}
+              placeholder="뭐가 아쉬운지 한 줄로 적어주세요"
+              style={{ width: "100%", minHeight: 76, resize: "vertical", fontSize: 14, lineHeight: 1.5,
+                padding: 10, borderRadius: 10, border: "1px solid #d7d7db", outline: "none", fontFamily: "inherit", boxSizing: "border-box" }}
+            />
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+              <button style={btn("#f5f5f6", "#4a4a4a")} onClick={() => { setMode("off"); setNote(""); setTarget(null); }}>그만</button>
+              <button style={btn("#98ff5c", "#1f5c00")} onClick={save}>남기기</button>
+            </div>
+          </div>
+        )}
+
+        <div style={{ display: "flex", gap: 8 }}>
+          {mode === "off" && count > 0 && (
+            <span style={{ alignSelf: "center", fontSize: 12, color: "#6b6b6b", background: "#fff",
+              padding: "6px 10px", borderRadius: 999, boxShadow: "0 1px 6px rgba(0,0,0,.12)" }}>
+              {count}건
+            </span>
+          )}
+          {mode === "off" && (
+            <button style={{ ...btn("#fff", "#222"), boxShadow: "0 2px 10px rgba(0,0,0,.16)" }}
+              onClick={() => { setTarget(null); setMode("writing"); }}>이 화면</button>
+          )}
+          <button
+            style={{ ...btn(mode === "picking" ? "#222" : "#98ff5c", mode === "picking" ? "#fff" : "#1f5c00"),
+              boxShadow: "0 2px 10px rgba(0,0,0,.16)" }}
+            onClick={() => setMode(mode === "picking" ? "off" : "picking")}
+          >
+            {mode === "picking" ? "고를 곳 클릭 (ESC 취소)" : "코멘트"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
