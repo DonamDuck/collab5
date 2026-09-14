@@ -106,18 +106,8 @@ export default async function SpaceDetailPage({
         )}
         {/* 🚨동네까지만. 상세 주소는 예약이 확정된 뒤 `/rent/my`에서 열린다. */}
         <p className="mt-1.5 text-[15px] text-mute">{meta}</p>
-        {/* 💰09-14 대표 — *「여기 금액 정보 꼭 나와야 해. 하루 40,000원 이런 식으로」*.
-            ⭐값은 «맨 아래 값 절»에도 있지만, 그건 한참 스크롤한 뒤다. 빌릴지 말지는 값을 보고
-              정하는데 그 전에 사진·이야기·규칙을 다 읽게 만들면 순서가 거꾸로다.
-            🎨본문(17)보다 한 단 크고 bold — 이 카드에서 이름 다음으로 눈에 들어와야 한다. */}
-        <p className="mt-3 text-[18px] font-medium text-ink">
-          하루 {won(sp.priceDay)}
-          {sp.mentorMinutes > 0 && (
-            <span className="ml-2 text-[15px] font-normal text-mute">
-              · 사장님 {sp.mentorMinutes}분 +{won(sp.mentorPrice)}
-            </span>
-          )}
-        </p>
+        {/* 🔁09-14 여기 있던 금액 줄을 **아래 「비용」 절로 내렸다**(대표: *「이거 금액 별도 하단으로
+            금액을 빼자」*, 아워플레이스 참고). 카드는 «무엇인지»를 말하고 값은 «비용» 절이 맡는다. */}
         {/* 칩 줄 — 쓰임새 하나 + 설비 몇 개, 전부 같은 pill. 설비 전체는 아래 섹션에서 본다. */}
         <div className="mt-4 flex flex-wrap gap-2">
           <Chip>{usageLabel(sp.useType)}</Chip>
@@ -206,7 +196,23 @@ export default async function SpaceDetailPage({
         )}
       </Section>
 
-      <Section title="값">
+      {/* 📚09-14 신설 — 대표: *「이거 체크박스 빼고 여기 정보 영역으로 하고 (선택 사항)으로.
+          「사장님께 잠깐 배워 볼 수 있어요」로 정규 타이틀로 섹션으로 다루자」*.
+          ⭐설명하는 자리와 고르는 자리를 갈랐다. 고르는 일은 결제 단계의 옵션이 맡는다. */}
+      {sp.mentorMinutes > 0 && (
+        <Section title="사장님께 잠깐 배워 볼 수 있어요">
+          <p className="text-[17px] leading-relaxed break-keep text-body">
+            문 열기 전 {sp.mentorMinutes}분 동안 이 일을 어떻게 하는지 들을 수 있어요. 손님은 언제 오는지,
+            재료는 어디서 떼는지 같은 것들이요.
+          </p>
+          <p className="mt-3 text-[15px] text-mute">
+            <span className="font-medium text-ink">+{won(sp.mentorPrice)}</span> · 신청하실 때 고르시면 돼요
+            <span className="ml-1 text-faint">(선택 사항)</span>
+          </p>
+        </Section>
+      )}
+
+      <Section title="비용">
         <p className="text-[17px] text-ink">하루 {won(sp.priceDay)}</p>
         {sp.mentorMinutes > 0 && (
           <p className="mt-1.5 text-[16px] text-mute">

@@ -32,33 +32,37 @@ import type { SpaceUseType } from "@/lib/types";
 import { dateLabel, primaryBtnCls, rentInputCls, rentTextareaCls, won } from "../ui";
 import { ConfirmDialog } from "../ConfirmDialog";
 import { PickDateCalendar } from "./PickDateCalendar";
+import { MentorOptions } from "./MentorOption";
 
 const labelCls = "mb-2 block text-[16px] font-medium text-body";
 const hintCls = "mt-2 text-[15px] leading-relaxed break-keep text-faint";
 
 /** 모바일 하단 고정 바 — 금액 + 이 화면의 키위 버튼. 640px부터는 폼 안의 버튼이 대신한다.
  *  하단 여백은 `max()`다(MakerActionBar 08-09 실측): 홈 인디케이터가 있는 기기는 안전영역만, 없는 기기는 12px. */
-function MobilePayBar({
+function PayBar({
   amount,
   label,
   disabled,
   onClick,
+  options,
 }: {
   amount: number;
   label: string;
   disabled: boolean;
   onClick: () => void;
+  /** 데스크톱에서 바 «안»에 들어갈 옵션 줄. 폰에서는 시트가 대신 맡아서 안 받는다. */
+  options?: React.ReactNode;
 }) {
   return (
-    // 🖥09-14 `sm:hidden` 제거 — 대표: *「여기랑 하단 버튼 모바일처럼 플로팅으로 가자, 소개서 페이지처럼」*.
-    //   소개서(`MakerActionBar`)가 이미 640px 중앙 고정 바를 모바일·데스크톱 공통으로 쓴다.
-    //   금액과 버튼은 **폼 어디를 보고 있든 손 닿는 곳**에 있어야 해서 화면 크기와 상관이 없다.
     <div className="fixed inset-x-0 bottom-0 z-40">
       <div className="mx-auto w-full max-w-[640px] rounded-t-2xl border border-b-0 border-hairline bg-surface px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 shadow-e2">
+        {/* 🖥데스크톱만 — 대표: *「데스크탑은 결제 버튼과 비슷한 위계에 옵션 선택 가능한 UI로」*.
+            폰에서 여기 두면 바가 화면 절반을 먹어서, 그쪽은 버튼을 누를 때 시트로 올라온다. */}
+        {options && <div className="mb-3 hidden sm:block">{options}</div>}
         <div className="flex items-center gap-3">
           <div className="min-w-0 flex-1">
-            {/* 🔁09-14 「지금 내실 돈」 → **「대여 비용」**(대표). 「지금 내실」은 재촉으로 읽히고,
-                 무엇에 대한 돈인지는 말해 주지 않는다. */}
+            {/* 🔁09-14 「지금 내실 돈」 → **「대여 비용」**(대표). 「지금 내실」은 재촉으로 읽히고
+                무엇에 대한 돈인지는 말해 주지 않는다. */}
             <p className="text-[13px] text-faint">대여 비용</p>
             <p className="truncate text-[17px] font-medium text-ink">{won(amount)}</p>
           </div>
@@ -75,6 +79,7 @@ function MobilePayBar({
     </div>
   );
 }
+
 
 export function BookingForm({
   spaceId,
@@ -242,7 +247,7 @@ export function BookingForm({
         >
           ← 신청 내용 고치기
         </button>
-        <MobilePayBar amount={pay.amount} label={payLabel} disabled={pending || !widgetReady} onClick={requestPay} />
+        <PayBar amount={pay.amount} label={payLabel} disabled={pending || !widgetReady} onClick={requestPay} />
       </div>
     );
   }
@@ -309,38 +314,9 @@ export function BookingForm({
         <p className={hintCls}>사장님이 이 글만 보고 정하세요. 열 글자면 충분해요.</p>
       </div>
 
-      {mentorMinutes > 0 && (
-        // 🔁09-14 대표 — *「별도 타이틀 하나 필요해. title 「사장님께 잠깐 배워보기」, 서브 타이틀
-        //   「일 배우는 것까지 요청하고 싶어요」, 60분(이건 별도 chip UI?) +40,000원」*.
-        //   ⭐한 줄짜리 체크박스였을 땐 **옵션 상품이 아니라 부가 문구처럼** 읽혔다. 이건 값이 붙는
-        //     별개 상품이라 제목·설명·값이 각자 자리를 가져야 고를지 말지 판단이 선다.
-        //   🎨고르면 면이 켜진다(`primary-pale`) — 체크 표시만으로는 골랐는지 한눈에 안 들어온다.
-        <label
-          className={`flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition-colors ${
-            withMentor ? "border-primary-tint bg-primary-pale" : "border-hairline bg-surface hover:bg-surface-soft"
-          }`}
-        >
-          <input
-            type="checkbox"
-            className="mt-[3px] size-[18px] shrink-0 accent-primary"
-            checked={withMentor}
-            onChange={(e) => setWithMentor(e.target.checked)}
-          />
-          <span className="min-w-0 flex-1">
-            <span className="block text-[17px] font-medium text-ink">사장님께 잠깐 배워보기</span>
-            <span className="mt-1 block text-[15px] leading-relaxed break-keep text-mute">
-              일 배우는 것까지 요청하고 싶어요.
-            </span>
-            <span className="mt-2.5 flex flex-wrap items-center gap-2">
-              <span className="inline-flex h-[28px] items-center rounded-pill bg-surface-soft px-2.5 text-[14px] font-medium text-body">
-                {mentorMinutes}분
-              </span>
-              <span className="text-[15px] font-medium text-ink">+{won(mentorPrice)}</span>
-            </span>
-          </span>
-        </label>
-      )}
-
+      {/* 🔻09-14 「사장님께 잠깐 배워보기」 체크박스 삭제 — 대표 [3][5].
+          설명은 상세 본문의 «정보 절»로 올라갔고, 고르는 일은 결제 단계(아래 옵션)로 내려왔다.
+          ⭐**설명하는 자리와 고르는 자리를 갈랐다.** 한 줄 체크박스는 둘 다 하려다 둘 다 못 했다. */}
       {myBrands.length > 0 && (
         <div>
           <label htmlFor="rent-brand" className={labelCls}>
@@ -377,11 +353,16 @@ export function BookingForm({
           같은 버튼이 화면에 둘이면 어느 쪽이 진짜인지 고민하게 된다. */}
       <p className="text-[14px] text-faint">지금은 시험 결제예요.</p>
 
-      <MobilePayBar
+      <PayBar
         amount={total}
         label={pending ? "신청하는 중…" : "결제하고 신청하기"}
         disabled={pending}
         onClick={askConfirm}
+        options={
+          mentorMinutes > 0 ? (
+            <MentorOptions minutes={mentorMinutes} price={mentorPrice} value={withMentor} onChange={setWithMentor} dense />
+          ) : undefined
+        }
       />
 
       <ConfirmDialog
@@ -392,8 +373,17 @@ export function BookingForm({
         onConfirm={submit}
         onCancel={() => setConfirming(false)}
       >
+        {/* 📱**폰에서 「버튼 → 옵션 바텀」이 바로 이 자리다**(대표 [5]). 이 팝업은 375px에서 바닥 시트로
+            올라온다(`ConfirmDialog`). 데스크톱은 옵션이 이미 바 안에 보이므로 여기선 접는다 —
+            같은 고르개가 한 화면에 둘이면 어느 쪽이 진짜인지 고민하게 된다. */}
+        {mentorMinutes > 0 && (
+          <div className="sm:hidden">
+            <MentorOptions minutes={mentorMinutes} price={mentorPrice} value={withMentor} onChange={setWithMentor} />
+          </div>
+        )}
         <p>
-          {dateLabel(useDate)}에 <span className="font-medium text-ink">{spaceName}</span>을 {won(total)}에 신청할까요?
+          {dateLabel(useDate)}에 <span className="font-medium text-ink">{spaceName}</span>을{" "}
+          <span className="font-medium text-ink">{won(total)}</span>에 신청할까요?
         </p>
         <p className="text-mute">사장님이 거절하시면 전액 돌려드려요.</p>
       </ConfirmDialog>
