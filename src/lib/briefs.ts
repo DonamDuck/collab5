@@ -38,7 +38,31 @@ function isMissingTable(err: { code?: string; message?: string } | null): boolea
   return err.code === "42P01" || /relation .*brand_briefs.* does not exist/i.test(err.message ?? "");
 }
 
-/** 주소 하나로 브리프 한 건. 없으면 null. */
+/** DB 한 줄 → Brief. `getBrief`와 `listBriefsByOwner`가 같은 모양을 쓴다. */
+function toBrief(r: {
+  markdown: string | null;
+  notion_url: string | null;
+  owner_user_id: number | null;
+  published_at: string | null;
+  brands: unknown;
+}): Brief {
+  const brand = r.brands as { slug: string; name: string };
+  return {
+    slug: brand.slug,
+    brandName: brand.name,
+    publishedAt: (r.published_at ?? "").slice(0, 10),
+    notionUrl: r.notion_url ?? "",
+    markdown: r.markdown ?? "",
+    ownerUserId: r.owner_user_id ?? null,
+  };
+}
+
+/** 주소 하나로 브리프 한 건. 없으면 null.
+ *
+ *  🩸**폴백 조건을 한 번 틀렸다** (09-14, 대조군이 잡았다). 처음엔 «행이 없으면» 목록으로 떨어지게
+ *    썼는데, 그러면 표에서 `draft`로 내린 브리프가 **목록 때문에 계속 보인다.** 대표가 내려도 안 내려간다.
+ *    ⭐고친 규칙 = **표가 «있으면» 표의 답이 최종이다.** 목록은 표가 «아직 없을 때»만 쓴다.
+ *    🪤화면이 200을 주고 있어서 겉으론 멀쩡했다 — 한 줄을 draft로 내려 보고서야 알았다. */
 export async function getBrief(slug: string): Promise<Brief | null> {
   const client = db();
   if (client) {
@@ -49,17 +73,8 @@ export async function getBrief(slug: string): Promise<Brief | null> {
       .eq("status", "published")
       .maybeSingle();
     if (error && !isMissingTable(error)) throw error;
-    if (data) {
-      const brand = data.brands as unknown as { slug: string; name: string };
-      return {
-        slug: brand.slug,
-        brandName: brand.name,
-        publishedAt: (data.published_at ?? "").slice(0, 10),
-        notionUrl: data.notion_url ?? "",
-        markdown: data.markdown ?? "",
-        ownerUserId: data.owner_user_id ?? null,
-      };
-    }
+    // 표가 «있는데» 못 찾았다 = 없거나 내려간 것이다. 목록으로 되살리지 않는다.
+    if (!error) return data ? toBrief(data) : null;
   }
   const sample = BRIEF_BY_SLUG.get(slug);
   return sample ? fromSample(sample) : null;
@@ -80,17 +95,7 @@ export async function listBriefsByOwner(userId: number): Promise<Brief[]> {
     if (isMissingTable(error)) return [];
     throw error;
   }
-  return (data ?? []).map((r) => {
-    const brand = r.brands as unknown as { slug: string; name: string };
-    return {
-      slug: brand.slug,
-      brandName: brand.name,
-      publishedAt: (r.published_at ?? "").slice(0, 10),
-      notionUrl: r.notion_url ?? "",
-      markdown: r.markdown ?? "",
-      ownerUserId: r.owner_user_id ?? null,
-    };
-  });
+  return (data ?? []).map(toBrief);
 }
 
 /** 미리 만들어 둘 주소들. 표가 없던 시절의 일곱 건이 기준이라 **정적 생성은 목록이 맡는다.**
