@@ -3,6 +3,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import type { User } from "@supabase/supabase-js";
+import { devSessionActive, devUser } from "@/lib/dev-session";
 
 export function authEnabled(): boolean {
   return !!(
@@ -33,7 +34,15 @@ export async function createAuthClient() {
 }
 
 /** 현재 로그인 유저 — getUser()로 서버 검증(네트워크 왕복). 보안 게이트(예: /my 리다이렉트)에 사용. */
+/** 지금 «로컬 가짜 로그인»으로 도는 중인가. 화면이 개발용 입력을 섞을지 판단할 때만 쓴다.
+ *  🚨판정은 `lib/dev-session.ts` 한 곳에만 있다 — 게이트를 여러 벌 두지 않는다. */
+export function isDevSession(): boolean {
+  return devSessionActive(authEnabled());
+}
+
 export async function getSessionUser(): Promise<User | null> {
+  // 🔒로컬 전용 가짜 로그인 — 진짜 인증이 «설정돼 있으면 절대 안 탄다**(`lib/dev-session.ts` 게이트 참조).
+  if (devSessionActive(authEnabled())) return devUser();
   if (!authEnabled()) return null;
   try {
     const supabase = await createAuthClient();
@@ -47,6 +56,8 @@ export async function getSessionUser(): Promise<User | null> {
 /** 현재 로그인 유저 — 쿠키의 세션만 읽음(네트워크 없음). 미들웨어가 매 요청 getUser로 이미 검증·갱신하므로
  *  헤더 등 표시용 조회는 이걸로 왕복을 아낀다. (보안 게이트에는 getSessionUser 사용) */
 export async function getSessionUserLight(): Promise<User | null> {
+  // 🔒로컬 전용 가짜 로그인 — 진짜 인증이 «설정돼 있으면 절대 안 탄다**(`lib/dev-session.ts` 게이트 참조).
+  if (devSessionActive(authEnabled())) return devUser();
   if (!authEnabled()) return null;
   try {
     const supabase = await createAuthClient();

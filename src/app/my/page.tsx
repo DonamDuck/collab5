@@ -1,6 +1,6 @@
 // 내 소개서 / 찜한 콜라보 / 콜라보 리포트 — 로그인 필수. 목록을 서버에서 병렬 조회해 탭으로 즉시 전환.
 import { redirect } from "next/navigation";
-import { getSessionUser } from "@/lib/supabase/server";
+import { getSessionUser, isDevSession } from "@/lib/supabase/server";
 import { getProfile } from "@/lib/profiles";
 import { repo } from "@/lib/repo";
 import { ConnectMaker } from "./ConnectMaker";
@@ -10,12 +10,16 @@ import { LinkedAccounts } from "./LinkedAccounts";
 import { MakerRow } from "./MakerRow";
 import { SavedMakerRow } from "./SavedMakerRow";
 import { ReportArchiveCard } from "./ReportArchiveCard";
+import { BriefCard } from "./BriefCard";
 import { MyTabs } from "./MyTabs";
 import { ProfileAvatarEditor } from "./ProfileAvatarEditor";
 import { CollabRecorder } from "./CollabRecorder";
 import { EmptyState } from "@/components/EmptyState";
 import { isMyBrandEditedSince } from "@/lib/collab-report";
 import type { CollabReportListItem } from "@/lib/types";
+import { BRIEFS } from "@/lib/brief-samples/registry";
+import { listBriefsByOwner } from "@/lib/briefs";
+import { DEV_OWNED_SLUGS } from "@/lib/dev-session";
 
 // 🚨 로그인 사용자별 화면이라 절대 프리렌더되면 안 된다.
 // 쿠키 접근으로 자동 dynamic이 되긴 하지만, 그 판정이 "빌드 시점에 auth env가 있느냐"에 달려 있어
@@ -41,6 +45,16 @@ export default async function MyPage({ searchParams }: { searchParams: Promise<{
   // 🆕 [다시 분석하기]를 띄울 쌍 — **내 소개서가 리포트 뒤에 바뀐 것만**(08-31 대표). 유료 콜 0(전부 읽기).
   const editedPairs = await findEditedPairs(reports);
   const displayName = profile?.brandName || user.email?.split("@")[0] || "내 브랜드";
+
+  // 📄 내 요약 보고서 = **`brand_briefs`에서 나에게 «연결된» 것**(대표가 손으로 연결한다).
+  //    ⚠️표가 없으면 빈 목록이다 — 연결이라는 개념이 표에만 있어서, 코드 안 목록으로 흉내 내면 거짓이 된다.
+  //    🔒로컬만 예외 — 가짜 세션엔 프로필이 없어 이 절을 영영 못 본다. 그래서 «입력»만 보탠다.
+  //       운영에선 `isDevSession()`이 false라 아래 한 줄이 죽고, 진짜 연결만 남는다.
+  const myBriefs = isDevSession()
+    ? BRIEFS.filter((b) => DEV_OWNED_SLUGS.includes(b.slug))
+    : profile
+      ? await listBriefsByOwner(profile.id)
+      : [];
 
   // 내 소개서 탭 콘텐츠
   const mine =
@@ -232,6 +246,23 @@ export default async function MyPage({ searchParams }: { searchParams: Promise<{
           collabCount={collabs.length}
         />
       </section>
+
+      {/* 📄 요약 보고서 — 소개서를 만들며 드린 브리프. 없으면 이 절 자체를 안 그린다.
+          ⭐**이 카드가 브리프 페이지의 존재 이유다** — 지금은 DM 링크 한 번이 전부라
+             고객이 다시 읽으려면 카톡을 뒤져야 한다(기획서 §이 기능의 존재 이유). */}
+      {myBriefs.length > 0 && (
+        <section className="mt-10 border-t border-hairline pt-8">
+          <h2 className="text-[17px] font-bold text-ink">요약 보고서</h2>
+          <p className="mt-1.5 text-[14px] leading-relaxed text-mute">
+            소개서를 만들며 읽은 글을 세어 정리한 리포트예요.
+          </p>
+          <div className="mt-4 space-y-2.5">
+            {myBriefs.map((b) => (
+              <BriefCard key={b.slug} brief={b} />
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* 계정 설정 */}
       <section className="mt-10 border-t border-hairline pt-6">
