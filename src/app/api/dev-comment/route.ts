@@ -36,6 +36,11 @@ export async function POST(req: NextRequest) {
     note: s(b.note, 1000),
     selector: s(b.selector, 300),
     text: s(b.text, 200),
+    /** 누른 요소의 잰 값 — 「작다」는 말을 숫자로 받는다(디자인팀 제안 09-14). 터치 타깃 44px·글자 16px 하한 대조용. */
+    box: s(b.box, 40),
+    font: s(b.font, 20),
+    /** 글자색 + 실제로 깔린 배경색. 「안 보여」는 대비 문제라 이 짝이 없으면 사후에 못 되살린다. */
+    color: s(b.color, 60),
     viewport: s(b.viewport, 20),
     done: false,
   };
@@ -44,10 +49,23 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({ ok: true });
 }
 
-/** 위젯이 「지금까지 몇 건」을 보여주려고 부른다. 내용 확인은 내가 파일을 직접 읽는 게 빠르다. */
-export async function GET() {
+/** 위젯이 부른다 — 「지금까지 몇 건」, 그리고 `selector`를 주면 **그 자리에 이미 달린 코멘트**.
+ *
+ *  ⭐대표 09-14: *「코멘트 남기고 또 남길려고 했더니 기존 코멘트가 안 나오거든? 하나의 컴포넌트당
+ *    코멘트는 하나의 저장소를 쓰도록 하자, 누적으로. (1)로 남겼다가 다시 그거 클릭하고 코멘트하면
+ *    (2)로 또 쓸 수 있게. 아이디어는 계속 생길 수 있으니깐」*
+ *  👉같은 자리를 다시 누르면 앞서 쓴 말이 보인다. 그래야 **고쳐 쓰거나 덧붙일 수** 있다. */
+export async function GET(req: NextRequest) {
   if (!DEV) return new NextResponse(null, { status: 404 });
   const raw = await readFile(FILE, "utf8").catch(() => "");
-  const rows = raw.split("\n").filter(Boolean);
-  return NextResponse.json({ count: rows.length, recent: rows.slice(-3).map((l) => JSON.parse(l)) });
+  const rows = raw.split("\n").filter(Boolean).map((l) => JSON.parse(l) as Record<string, string>);
+
+  const sel = req.nextUrl.searchParams.get("selector");
+  if (sel) {
+    // ⚠️화면 주소까지 맞춘다 — 같은 생김새의 요소가 다른 페이지에도 있다(버튼·입력칸이 그렇다).
+    const url = req.nextUrl.searchParams.get("url") ?? "";
+    const mine = rows.filter((r) => r.selector === sel && r.url === url).map((r) => r.note);
+    return NextResponse.json({ count: rows.length, mine });
+  }
+  return NextResponse.json({ count: rows.length });
 }
