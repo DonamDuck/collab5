@@ -65,32 +65,12 @@ export function RentFilters({
 
   return (
     <div className="mt-10 space-y-3">
-      {/* 쓰임새는 pill 칩 셋 — 값이 셋뿐이라 select보다 한 번에 보이는 쪽이 낫다.
-          고른 칩만 키위 틴트. 이 덩어리 안의 pill은 이 한 종류뿐이다. */}
-      <div className="flex flex-wrap gap-2">
-        {USE_TABS.map((t) => {
-          const on = use === t.v;
-          return (
-            <button
-              key={t.v || "all"}
-              type="button"
-              aria-pressed={on}
-              onClick={() => {
-                setUse(t.v);
-                apply({ use: t.v });
-              }}
-              className={`inline-flex h-[44px] items-center rounded-pill px-4 text-[15px] font-medium transition-colors ${
-                on
-                  ? "bg-primary-tint text-primary-on"
-                  : "border-[0.5px] border-[#DFDFE3] bg-surface text-body hover:bg-surface-soft"
-              }`}
-            >
-              {t.label}
-            </button>
-          );
-        })}
-      </div>
-
+      {/* 🔻09-14 쓰임새 칩(전체·원래 목적대로·대관) **삭제** — 대표: *「여기 카테고리는 일단 전체만
+          남기고 제거, 나중에 한번 싹 업데이트 할게. 다만 등록 type DB는 등록할때 입력하도록 할거야」*.
+          ⭐**칩을 「전체」 하나만 남기지 않고 줄을 통째로 뺐다.** 고를 게 하나뿐인 고르개는 고르개가 아니라
+            아무것도 안 하는 버튼이다. 「전체」는 이제 «상태»로만 있다(아무 조건도 안 건 상태).
+          ⭐`use_type`은 **DB·등록 폼·상세 화면에 그대로 살아 있다.** 없앤 건 목록의 «거르개»뿐이라
+            되살릴 땐 이 줄만 복구하면 된다(`UseFilter`·`apply`의 `use` 배선을 남겨 둔 이유). */}
       <form
         className="flex gap-2"
         onSubmit={(e) => {

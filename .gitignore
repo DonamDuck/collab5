@@ -41,3 +41,4 @@ yarn-error.log*
 next-env.d.ts
 .dev-comments.jsonl
 .dev-comments.go
+.dev-reload
