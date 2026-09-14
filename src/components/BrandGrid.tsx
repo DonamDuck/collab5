@@ -346,7 +346,15 @@ function BrandCard({ m }: { m: Maker }) {
           </div>
         )}
       </div>
-      <div className="px-3 py-3">
+      {/* 🔎`data-nosnippet` — 구글이 **홈 스니펫 재료로 이 카드 글을 못 쓰게** 막는다(09-12 대표 지적).
+          🩸실제 사고: `collab5` 검색 결과의 설명이 우리 소개문이 아니라 **캔앤코르크 카드의 한 줄**로
+            나갔다. 홈 메타 description은 멀쩡했는데 구글이 그걸 버리고 본문에서 주워간 것이다
+            (게다가 지금은 없는 옛 문안이었다 — 오래된 크롤을 물고 있었다).
+          ⭐막지 않으면 재크롤 뒤에도 «다른 브랜드 글»로 바뀌기만 한다. 카드가 깔린 화면
+            (홈·검색·매거진)이 다 같은 위험을 갖는다.
+          ⚠️색인·순위에는 영향이 없다 — 구글이 **스니펫에 인용하는 것만** 막는 표시다.
+            그래서 브랜드 페이지(`/m/…`) 자기 검색에는 아무 영향이 없다(거기선 본문이자 제 설명이다). */}
+      <div className="px-3 py-3" data-nosnippet>
         <div className="flex min-w-0 items-center gap-1.5">
           <span className="min-w-0 truncate text-[15px] font-medium text-ink">{m.name}</span>
           {m.region && <span className="shrink-0 text-[12px] text-mute">· {m.region}</span>}

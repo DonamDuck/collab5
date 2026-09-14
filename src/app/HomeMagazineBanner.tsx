@@ -84,7 +84,17 @@ export function HomeMagazineBanner({
     //   ⚠️v1(사진 위에 스크림 깔고 글 얹기)과 **다른 것**이다. 여기서 글은 사진 **옆**에 있고,
     //     배경으로 깔린 사진은 blur라 원본 사진(오른쪽 카드)은 하나도 안 죽는다.
     //   🔁안은 `bg` prop으로 고른다(위 `BannerBg` 주석 참조). 확정값은 `page.tsx`에 있다.
+    // 🔎`data-nosnippet` — 구글이 **홈 스니펫 재료로 이 배너 글을 못 쓰게** 막는다(대표 확정 09-12).
+    //   🩸09-12에 브랜드 카드를 막고 나서 «그 다음 순번»을 실제로 재봤더니 이 배너였다.
+    //     그러면 `collab5` 검색 결과에 「캔가 × 두더지요가원 요가 토우…」가 뜨는데,
+    //     그건 «collab5가 뭐하는 곳인가»에 대한 답이 아니다. 대표 판단 = *「검색 후에는 우리 소개가 나오는 게 낫다」*.
+    //   ⭐막고 나면 순번이 «홈 description → 우리 자기소개 문안»이 된다
+    //     (「웹과 인스타그램에 흩어져 있는 사진과 이야기를 모아 collab5팀이 한 페이지로 정리해드려요」).
+    //   ⚠️색인·순위에는 영향이 없다 — 스니펫에 인용하는 것만 막는 표시다.
+    //     매거진 글은 **자기 페이지(`/magazine/[slug]`)에서 자기 description으로** 그대로 검색된다.
+    //   📌이 컴포넌트는 홈(`HomeBody`)에서만 쓰인다 — 매거진 목록·본문은 영향 없다.
     <section
+      data-nosnippet
       className={`relative overflow-hidden ${BG_CLASS[mode]}`}
     >
       {mode === "photo" && article.coverImage && (

@@ -40,6 +40,7 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 .dev-comments.jsonl
+# 「작업 시작」 깃발 — 세션이 읽고 지운다. 짧게 살지만 그 사이 `git add -A`에 딸려갈 수 있다.
 .dev-comments.go
 .dev-reload
 .dev-comments-done-*.jsonl

@@ -40,7 +40,7 @@ export function resolveCollabChannel(trust?: { instagram?: string; homepage?: st
   const hp = trust?.homepage?.trim();
   if (hp) {
     const svc = channelLabel(hp);
-    return { label: `${svc ?? "홈페이지"}로 연락하기`, url: normalizeUrl(hp), channel: "homepage" };
+    return { label: `${withRo(svc ?? "홈페이지")} 연락하기`, url: normalizeUrl(hp), channel: "homepage" };
   }
   return null;
 }
@@ -73,7 +73,21 @@ const CHANNEL_HOSTS: [RegExp, string][] = [
   [/^(cafe\.naver\.com|cafe\.daum\.net)$/i, "카페"],
   [/^(www\.)?youtube\.com$|^youtu\.be$/i, "유튜브"],
   [/^(www\.)?threads\.(net|com)$/i, "스레드"],
+  // 노션 공개 페이지는 `<워크스페이스>.notion.site/<32자 해시>`라 원문이 칩을 통째로 먹는다(09-12 땡스클럽).
+  [/^([a-z0-9-]+\.)?notion\.site$|^(www\.)?notion\.so$/i, "Notion"],
 ];
+
+/** 영문 라벨의 읽는 소리 — 조사(로/으로)를 고를 때만 쓴다. Notion → 노션 → 「Notion으로」. */
+const LABEL_READING: Record<string, string> = { Notion: "노션" };
+
+/** 한글 뒤 조사 로/으로 — 받침이 없거나 ㄹ이면 「로」, 나머지는 「으로」. 한글이 아니면 LABEL_READING으로 읽고, 거기도 없으면 「로」. */
+function withRo(word: string): string {
+  const read = LABEL_READING[word] ?? word;
+  const c = read.charCodeAt(read.length - 1);
+  if (c < 0xac00 || c > 0xd7a3) return `${word}로`;
+  const jong = (c - 0xac00) % 28;
+  return `${word}${jong === 0 || jong === 8 ? "로" : "으로"}`;
+}
 
 /** 대표 URL을 사람이 읽는 라벨로. 알려진 채널이면 서비스명, 아니면 null(도메인 표시로 폴백). */
 export function channelLabel(url?: string): string | null {
