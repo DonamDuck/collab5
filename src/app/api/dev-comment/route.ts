@@ -11,6 +11,12 @@ import path from "node:path";
 //   ⛔인증이 없는 쓰기 경로라 이 게이트를 풀면 아무나 서버 디스크에 글을 쓴다. 조건을 손대지 말 것.
 const DEV = process.env.NODE_ENV === "development";
 
+/** 이 서버 프로세스가 뜬 시각. **모듈이 처음 불릴 때 한 번** 정해지므로 서버를 껐다 켜면 값이 바뀐다.
+ *  ⭐위젯이 이 값을 지켜보다 달라지면 스스로 새로고침한다 — 파일 수정은 Next가 알아서 바꿔치지만
+ *  **서버 재시작은 열린 탭이 알아챌 길이 없어** 옛 코드를 든 채로 남는다(09-14에 실제로 당했다:
+ *  대표가 남긴 첫 코멘트에 크기·색 칸이 통째로 비어 왔다). */
+const BOOT = String(Date.now());
+
 /** 저장 위치 = 작업 트리 뿌리. `.gitignore`에 올려 뒀다 — 코멘트는 우리 둘 사이의 메모지 코드가 아니다. */
 const FILE = path.join(process.cwd(), ".dev-comments.jsonl");
 /** 「작업 시작」 깃발. 세션이 이 파일을 지켜보다가 생기면 깨어나 코멘트를 읽는다(읽고 나면 지운다).
@@ -54,5 +60,5 @@ export async function GET() {
   if (!DEV) return new NextResponse(null, { status: 404 });
   const raw = await readFile(FILE, "utf8").catch(() => "");
   const rows = raw.split("\n").filter(Boolean);
-  return NextResponse.json({ count: rows.length, recent: rows.slice(-3).map((l) => JSON.parse(l)) });
+  return NextResponse.json({ count: rows.length, boot: BOOT, recent: rows.slice(-3).map((l) => JSON.parse(l)) });
 }
