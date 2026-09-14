@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { stat } from "node:fs/promises";
+import { rename, stat } from "node:fs/promises";
 import path from "node:path";
 
 // 🔁 로컬 새로고침 신호 (2026-09-14)
@@ -16,6 +16,7 @@ import path from "node:path";
 //   서버 쪽 1초 검사는 브라우저에 안 보이고 비용도 없다.
 const DEV = process.env.NODE_ENV === "development";
 const FLAG = path.join(process.cwd(), ".dev-reload");
+const COMMENTS = path.join(process.cwd(), ".dev-comments.jsonl");
 
 export const dynamic = "force-dynamic";
 
@@ -33,7 +34,15 @@ export async function GET() {
       const tick = async () => {
         const st = await stat(FLAG).catch(() => null);
         const cur = st ? String(st.mtimeMs) : "0";
-        if (last !== null && cur !== last) controller.enqueue(enc.encode("data: reload\n\n"));
+        if (last !== null && cur !== last) {
+          // 🧹**새로고침이 곧 「처리 완료」다**(대표 09-14: *「개발이 되서 새로고침되면 clear하고,
+          //   clear 안 됐으면 코멘트 남아있는 거지」*). 내가 밀었다 = 다 고쳤다 = 그 코멘트들은 끝났다.
+          //   ⭐지우지 않고 **옆으로 옮긴다** — 대표가 무슨 말을 했는지는 남아야 한다.
+          //   ⚠️탭이 여럿이면 이 스트림도 여럿이라 rename이 여러 번 불린다. 두 번째부터는 원본이
+          //     없어서 그냥 실패하고 끝난다(그래서 `.catch`가 곧 멱등성이다).
+          await rename(COMMENTS, COMMENTS.replace(".jsonl", `-done-${Date.now()}.jsonl`)).catch(() => {});
+          controller.enqueue(enc.encode("data: reload\n\n"));
+        }
         last = cur;
       };
       void tick();

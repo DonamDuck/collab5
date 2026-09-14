@@ -38,7 +38,16 @@ export function RentMenuBar() {
   const navRef = useRef<HTMLElement>(null);
   const [pill, setPill] = useState<{ left: number; top: number; width: number; height: number } | null>(null);
 
-  const activeIndex = TABS.findIndex((t) => t.href === pathname);
+  /** 🩸**누른 «즉시» 옮긴다**(대표 09-14: *「부드럽긴 한데 좀 처음에 느려 바로 안넘어 가고」*).
+   *  `usePathname()`은 **이동이 «끝난 뒤»에** 바뀐다. 그래서 알약이 서버 렌더를 다 기다렸다 움직였고,
+   *  개발 빌드는 그 화면을 그때 처음 컴파일하느라 특히 길었다(운영에선 훨씬 짧지만 0은 아니다).
+   *  ⭐**누른 곳을 먼저 믿고 옮긴 다음, 주소가 따라오면 그때 놓는다.** 손가락이 먼저고 서버가 나중이다.
+   *  ⚠️이동이 실패하면 잠깐 어긋나는데, 그땐 주소가 안 바뀌므로 다음 클릭에서 제자리를 찾는다. */
+  const [clicked, setClicked] = useState<string | null>(null);
+  useEffect(() => setClicked(null), [pathname]);
+  const current = clicked ?? pathname;
+
+  const activeIndex = TABS.findIndex((t) => t.href === current);
 
   /** 켜진 칸을 재서 알약을 그 자리에 놓는다. 좌표는 `nav` 기준(그래서 `nav`가 `relative`여야 한다). */
   const measure = useCallback(() => {
@@ -48,7 +57,7 @@ export function RentMenuBar() {
 
   // ⚠️`useLayoutEffect` — 페인트 «전»에 자리를 잡아야 한다. `useEffect`로 하면 알약이 왼쪽 끝에
   //   한 프레임 번쩍였다가 제자리로 미끄러진다(첫 진입마다 눈에 띈다).
-  useLayoutEffect(measure, [measure, pathname]);
+  useLayoutEffect(measure, [measure, current]);
 
   // 글꼴이 늦게 오거나 화면 폭이 바뀌면 글자 폭이 달라져 알약이 어긋난다.
   useEffect(() => {
@@ -97,6 +106,7 @@ export function RentMenuBar() {
               key={t.href}
               href={t.href}
               data-on={on ? "1" : "0"}
+              onClick={() => setClicked(t.href)}
               aria-current={on ? "page" : undefined}
               className={`${BASE} ${on ? "text-primary-on" : "text-mute hover:text-primary-on"}`}
             >
