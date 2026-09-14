@@ -106,6 +106,18 @@ export default async function SpaceDetailPage({
         )}
         {/* 🚨동네까지만. 상세 주소는 예약이 확정된 뒤 `/rent/my`에서 열린다. */}
         <p className="mt-1.5 text-[15px] text-mute">{meta}</p>
+        {/* 💰09-14 대표 — *「여기 금액 정보 꼭 나와야 해. 하루 40,000원 이런 식으로」*.
+            ⭐값은 «맨 아래 값 절»에도 있지만, 그건 한참 스크롤한 뒤다. 빌릴지 말지는 값을 보고
+              정하는데 그 전에 사진·이야기·규칙을 다 읽게 만들면 순서가 거꾸로다.
+            🎨본문(17)보다 한 단 크고 bold — 이 카드에서 이름 다음으로 눈에 들어와야 한다. */}
+        <p className="mt-3 text-[18px] font-medium text-ink">
+          하루 {won(sp.priceDay)}
+          {sp.mentorMinutes > 0 && (
+            <span className="ml-2 text-[15px] font-normal text-mute">
+              · 사장님 {sp.mentorMinutes}분 +{won(sp.mentorPrice)}
+            </span>
+          )}
+        </p>
         {/* 칩 줄 — 쓰임새 하나 + 설비 몇 개, 전부 같은 pill. 설비 전체는 아래 섹션에서 본다. */}
         <div className="mt-4 flex flex-wrap gap-2">
           <Chip>{usageLabel(sp.useType)}</Chip>

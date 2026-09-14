@@ -31,6 +31,7 @@ import { startBookingAction, confirmBookingAction } from "@/lib/rent-actions";
 import type { SpaceUseType } from "@/lib/types";
 import { dateLabel, primaryBtnCls, rentInputCls, rentTextareaCls, won } from "../ui";
 import { ConfirmDialog } from "../ConfirmDialog";
+import { PickDateCalendar } from "./PickDateCalendar";
 
 const labelCls = "mb-2 block text-[16px] font-medium text-body";
 const hintCls = "mt-2 text-[15px] leading-relaxed break-keep text-faint";
@@ -49,11 +50,16 @@ function MobilePayBar({
   onClick: () => void;
 }) {
   return (
-    <div className="fixed inset-x-0 bottom-0 z-40 sm:hidden">
+    // 🖥09-14 `sm:hidden` 제거 — 대표: *「여기랑 하단 버튼 모바일처럼 플로팅으로 가자, 소개서 페이지처럼」*.
+    //   소개서(`MakerActionBar`)가 이미 640px 중앙 고정 바를 모바일·데스크톱 공통으로 쓴다.
+    //   금액과 버튼은 **폼 어디를 보고 있든 손 닿는 곳**에 있어야 해서 화면 크기와 상관이 없다.
+    <div className="fixed inset-x-0 bottom-0 z-40">
       <div className="mx-auto w-full max-w-[640px] rounded-t-2xl border border-b-0 border-hairline bg-surface px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 shadow-e2">
         <div className="flex items-center gap-3">
           <div className="min-w-0 flex-1">
-            <p className="text-[13px] text-faint">지금 내실 돈</p>
+            {/* 🔁09-14 「지금 내실 돈」 → **「대여 비용」**(대표). 「지금 내실」은 재촉으로 읽히고,
+                 무엇에 대한 돈인지는 말해 주지 않는다. */}
+            <p className="text-[13px] text-faint">대여 비용</p>
             <p className="truncate text-[17px] font-medium text-ink">{won(amount)}</p>
           </div>
           <button
@@ -244,42 +250,45 @@ export function BookingForm({
   return (
     <div className="space-y-7">
       <div>
-        <label htmlFor="rent-date" className={labelCls}>
-          어느 날 쓰실까요
-        </label>
-        {/* 달력 라이브러리를 안 쓴다 — 고를 수 있는 날이 애초에 사장님이 올린 목록뿐이라,
-            달력을 띄우면 못 고르는 날이 화면의 대부분을 차지한다. */}
-        <select
-          id="rent-date"
-          className={rentInputCls}
-          value={useDate}
-          onChange={(e) => setUseDate(e.target.value)}
-        >
-          {openDates.map((d) => (
-            <option key={d} value={d}>
-              {dateLabel(d)}
-            </option>
-          ))}
-        </select>
+        <p className={labelCls}>신청 날짜를 선택해주세요.</p>
+        {/* 🔁09-14 `<select>` → 달력(대표). 못 고르는 날이 흐리게 «보이는» 것이 오히려 정보다 —
+            「이 공간은 화요일만 열린다」가 격자에서 한눈에 읽힌다. 목록은 그 규칙을 안 보여준다. */}
+        <PickDateCalendar openDates={openDates} value={useDate} onChange={setUseDate} />
         {hours && <p className={hintCls}>이용 시간은 {hours}예요.</p>}
       </div>
 
       {useType !== "as_is" && (
         <div>
           <label htmlFor="rent-head" className={labelCls}>
-            몇 분이나 오실까요 <span className="ml-1 text-[15px] font-normal text-faint">· 선택</span>
+            예상 참여 인원을 알려주세요. <span className="ml-1 text-[15px] font-normal text-faint">(선택)</span>
           </label>
-          <input
-            id="rent-head"
-            type="number"
-            inputMode="numeric"
-            min={1}
-            max={capacity}
-            className={rentInputCls}
-            value={headcount}
-            onChange={(e) => setHeadcount(e.target.value)}
-            placeholder={capacity ? `최대 ${capacity}명` : "예: 8"}
-          />
+          {/* 🔁09-14 대표 — 「input이 이렇게 길지 않아도 될 거 같은데」. 숫자 두세 자리를 받는 칸이
+              화면 폭을 다 쓰면 **긴 글을 기대하는 칸처럼** 보인다. 폭이 곧 기대 길이다.
+              그리고 단위 「명」을 칸 «안»에 박아 둔다 — 밖에 두면 좁은 화면에서 줄이 바뀌어 떨어진다. */}
+          {/* 📐폭 200px — 대표가 「이렇게 길지 않아도」라 했지만 **너무 좁히면 플레이스홀더가 잘린다**
+              140px에선 「숫자를 입력…」, 200px에서도 한 글자가 끊겼다. **재서 240px**로 잡았다
+              (글자 자리 ~196 + 「명」 자리 44). 전체 폭 380의 63%라 여전히 「짧은 칸」으로 읽힌다.
+              ⭐폭은 기대 길이를 말하는 장치지 최소화할 값이 아니다 — 문구가 잘리면 그 장치가 거짓말을 한다. */}
+          <div className="relative w-[240px]">
+            <input
+              id="rent-head"
+              type="number"
+              inputMode="numeric"
+              min={1}
+              max={capacity}
+              className={`${rentInputCls} pr-11`}
+              value={headcount}
+              onChange={(e) => setHeadcount(e.target.value)}
+              placeholder="숫자를 입력해주세요"
+            />
+            <span
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-[16px] text-mute"
+            >
+              명
+            </span>
+          </div>
+          {capacity ? <p className={hintCls}>최대 {capacity}명까지 들어가요.</p> : null}
         </div>
       )}
 
@@ -301,16 +310,33 @@ export function BookingForm({
       </div>
 
       {mentorMinutes > 0 && (
-        <label className="flex cursor-pointer items-start gap-3">
+        // 🔁09-14 대표 — *「별도 타이틀 하나 필요해. title 「사장님께 잠깐 배워보기」, 서브 타이틀
+        //   「일 배우는 것까지 요청하고 싶어요」, 60분(이건 별도 chip UI?) +40,000원」*.
+        //   ⭐한 줄짜리 체크박스였을 땐 **옵션 상품이 아니라 부가 문구처럼** 읽혔다. 이건 값이 붙는
+        //     별개 상품이라 제목·설명·값이 각자 자리를 가져야 고를지 말지 판단이 선다.
+        //   🎨고르면 면이 켜진다(`primary-pale`) — 체크 표시만으로는 골랐는지 한눈에 안 들어온다.
+        <label
+          className={`flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition-colors ${
+            withMentor ? "border-primary-tint bg-primary-pale" : "border-hairline bg-surface hover:bg-surface-soft"
+          }`}
+        >
           <input
             type="checkbox"
             className="mt-[3px] size-[18px] shrink-0 accent-primary"
             checked={withMentor}
             onChange={(e) => setWithMentor(e.target.checked)}
           />
-          <span className="min-w-0 text-[16px] leading-relaxed break-keep text-body">
-            사장님께 {mentorMinutes}분 배우고 싶어요
-            <span className="ml-1.5 text-mute">+{won(mentorPrice)}</span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-[17px] font-medium text-ink">사장님께 잠깐 배워보기</span>
+            <span className="mt-1 block text-[15px] leading-relaxed break-keep text-mute">
+              일 배우는 것까지 요청하고 싶어요.
+            </span>
+            <span className="mt-2.5 flex flex-wrap items-center gap-2">
+              <span className="inline-flex h-[28px] items-center rounded-pill bg-surface-soft px-2.5 text-[14px] font-medium text-body">
+                {mentorMinutes}분
+              </span>
+              <span className="text-[15px] font-medium text-ink">+{won(mentorPrice)}</span>
+            </span>
           </span>
         </label>
       )}
@@ -340,26 +366,16 @@ export function BookingForm({
       {/* ── 금액 ── 낼 돈을 버튼 «위»에 적는다. 누른 뒤에 금액을 처음 보면 그건 함정이다.
           표 대신 한 문장 — 항목이 둘뿐이라 표를 그리면 영수증이 된다. */}
       <p className="border-t border-hairline pt-6 text-[17px] leading-relaxed break-keep text-body">
-        지금 내실 돈 <span className="font-medium text-ink">{won(total)}</span>
+        대여 비용 <span className="font-medium text-ink">{won(total)}</span>
         {mentorAmount > 0 && <span className="text-mute"> (사장님 시간 포함)</span>} · 사장님이 거절하시면
         전액 돌려드려요. 수락하시면 그때 주소와 연락처가 열려요.
       </p>
 
       {err && <p className="text-[15px] leading-relaxed break-keep text-danger">{err}</p>}
 
-      <div>
-        <div className="hidden sm:block">
-          <button
-            type="button"
-            onClick={askConfirm}
-            disabled={pending}
-            className={`${primaryBtnCls} h-[52px] w-full`}
-          >
-            {pending ? "신청하는 중이에요…" : `${won(total)} 결제하고 신청하기`}
-          </button>
-        </div>
-        <p className="mt-3 text-[14px] text-faint sm:text-center">지금은 시험 결제예요.</p>
-      </div>
+      {/* 🔻09-14 데스크톱 인라인 버튼 삭제 — 하단 고정 바가 이제 모든 폭에서 뜬다(대표 지시).
+          같은 버튼이 화면에 둘이면 어느 쪽이 진짜인지 고민하게 된다. */}
+      <p className="text-[14px] text-faint">지금은 시험 결제예요.</p>
 
       <MobilePayBar
         amount={total}
