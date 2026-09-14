@@ -13,7 +13,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 type Mode = "off" | "picking" | "writing";
-type Target = { selector: string; text: string; rect: DOMRect | null };
+type Target = { selector: string; text: string; rect: DOMRect | null; box: string; font: string };
 
 /** 요소를 다시 찾아갈 수 있을 만큼의 경로. id를 만나면 거기서 끊는다(그 위는 볼 필요가 없다). */
 function cssPath(el: Element): string {
@@ -68,7 +68,17 @@ export function DevComments() {
       // 🚨capture 단계에서 먹는다 — 안 그러면 링크를 고르는 순간 페이지가 넘어가 버린다.
       e.preventDefault();
       e.stopPropagation();
-      setTarget({ selector: cssPath(el), text: (el.textContent ?? "").trim().slice(0, 120), rect: el.getBoundingClientRect() });
+      const r = el.getBoundingClientRect();
+      const cs = getComputedStyle(el);
+      // 📐**잰 값을 같이 담는다** (디자인팀 제안 09-14). 「이 버튼 작아」가 숫자로 오면 그 화면을 다시
+      //   만들어 보지 않고도 바로 고칠 수 있다. 크기는 터치 타깃 44px, 글자는 16px 하한을 재는 데 쓴다.
+      setTarget({
+        selector: cssPath(el),
+        text: (el.textContent ?? "").trim().slice(0, 120),
+        rect: r,
+        box: `${Math.round(r.width)}x${Math.round(r.height)} @ ${Math.round(r.left)},${Math.round(r.top)}`,
+        font: `${cs.fontSize} ${cs.fontWeight}`,
+      });
       setMode("writing");
     };
     const esc = (e: KeyboardEvent) => e.key === "Escape" && setMode("off");
@@ -95,6 +105,8 @@ export function DevComments() {
         note,
         selector: target?.selector ?? "(화면 전체)",
         text: target?.text ?? "",
+        box: target?.box ?? "",
+        font: target?.font ?? "",
         viewport: `${window.innerWidth}x${window.innerHeight}`,
       }),
     }).catch(() => {});
@@ -151,6 +163,7 @@ export function DevComments() {
           }}>
             <p style={{ margin: 0, fontSize: 12, color: "#6b6b6b", wordBreak: "break-all" }}>
               {target?.text ? `「${target.text.slice(0, 40)}」` : target?.selector.split(" > ").pop()}
+              {target?.box && <span style={{ color: "#9a9a9a" }}> · {target.box} · {target.font}</span>}
             </p>
             <textarea
               autoFocus

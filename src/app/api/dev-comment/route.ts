@@ -36,6 +36,9 @@ export async function POST(req: NextRequest) {
     note: s(b.note, 1000),
     selector: s(b.selector, 300),
     text: s(b.text, 200),
+    /** 누른 요소의 잰 값 — 「작다」는 말을 숫자로 받는다(디자인팀 제안 09-14). 터치 타깃 44px·글자 16px 하한 대조용. */
+    box: s(b.box, 40),
+    font: s(b.font, 20),
     viewport: s(b.viewport, 20),
     done: false,
   };
