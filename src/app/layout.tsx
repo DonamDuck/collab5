@@ -3,6 +3,7 @@ import "./globals.css";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { GoogleAnalytics } from "@/components/GoogleAnalytics";
+import { DevComments } from "@/components/DevComments";
 import { SITE_URL, OG_IMAGE } from "@/lib/site";
 
 // ⭐브랜드 슬로건 그대로(08-19 대표 확정 · 정본 = 볼트 [[브랜드-보이스]] §슬로건).
@@ -71,6 +72,9 @@ export default function RootLayout({
         <div className="flex-1">{children}</div>
         <SiteFooter />
         <GoogleAnalytics />
+        {/* 🗒 화면에서 바로 남기는 코멘트 위젯 (09-14 대표 요청) — **개발 빌드 전용**.
+            `NODE_ENV`는 빌드 때 상수로 박히므로 운영 번들에선 이 줄과 컴포넌트가 통째로 사라진다. */}
+        {process.env.NODE_ENV === "development" && <DevComments />}
       </body>
     </html>
   );
