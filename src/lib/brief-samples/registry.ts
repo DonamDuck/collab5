@@ -25,7 +25,13 @@ export interface BriefSample {
 }
 
 import { RAPHA } from "./rapha";
+import { THANKSCLUB } from "./thanksclub";
+import { LMP } from "./lmp";
+import { DOSIBAKKAT } from "./dosibakkat";
+import { PARAN } from "./paran";
+import { CANGARDEN } from "./cangarden";
+import { GOYO } from "./goyo";
 
-export const BRIEFS: BriefSample[] = [RAPHA];
+export const BRIEFS: BriefSample[] = [RAPHA, THANKSCLUB, LMP, DOSIBAKKAT, PARAN, CANGARDEN, GOYO];
 
 export const BRIEF_BY_SLUG = new Map(BRIEFS.map((b) => [b.slug, b]));

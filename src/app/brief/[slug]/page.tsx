@@ -18,6 +18,11 @@ export function generateStaticParams() {
   return BRIEFS.map((b) => ({ slug: b.slug }));
 }
 
+/** ⛔**목록에 없는 주소는 아예 그리지 않는다.** 기본값(`true`)이면 처음 보는 slug도 서버가 한 번
+ *  렌더해 보고 `notFound()`를 만난다 — 결과는 같아도 «없는 문서를 찾는 요청»이 매번 페이지를 돈다.
+ *  고객 문서라 그 표면을 안 열어 둔다. 새 브리프를 더하면 목록에 한 줄 넣는 것으로 열린다. */
+export const dynamicParams = false;
+
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const brief = BRIEF_BY_SLUG.get(slug);
