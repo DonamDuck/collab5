@@ -1,7 +1,9 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { markdownToBriefDoc } from "@/lib/brief-doc";
-import { BRIEFS, BRIEF_BY_SLUG } from "@/lib/brief-samples/registry";
+import { getBrief, briefSlugsForPrerender } from "@/lib/briefs";
+import { getSessionUser } from "@/lib/supabase/server";
+import { getProfile } from "@/lib/profiles";
 import { BriefBody } from "./BriefBody";
 
 // 브리프 페이지 (2026-09-14) — 기획서 `docs/superpowers/specs/2026-09-14-brief-page-design.md`
@@ -15,17 +17,20 @@ import { BriefBody } from "./BriefBody";
 //   🔗매거진이 같은 구멍을 겪었다(`magazine-auth.ts`): *「클라이언트의 버튼 숨김은 UX일 뿐 보안이 아니다」*.
 
 export function generateStaticParams() {
-  return BRIEFS.map((b) => ({ slug: b.slug }));
+  return briefSlugsForPrerender().map((slug) => ({ slug }));
 }
 
-/** ⛔**목록에 없는 주소는 아예 그리지 않는다.** 기본값(`true`)이면 처음 보는 slug도 서버가 한 번
- *  렌더해 보고 `notFound()`를 만난다 — 결과는 같아도 «없는 문서를 찾는 요청»이 매번 페이지를 돈다.
- *  고객 문서라 그 표면을 안 열어 둔다. 새 브리프를 더하면 목록에 한 줄 넣는 것으로 열린다. */
-export const dynamicParams = false;
+/** 🔁**표에만 있는 브리프도 열려야 한다.** 코드 안 목록은 표가 생기기 전의 일곱 건이라
+ *  그걸로 문을 닫으면 앞으로 «표에 넣은» 브리프가 영영 404가 된다.
+ *  ⛔없는 주소는 그래도 `notFound()`로 떨어진다(아래). */
+export const dynamicParams = true;
+
+/** 🔑주인이 붙은 브리프는 «그 사람»만 본다. 로그인 세션을 봐야 하므로 정적으로 굳히지 않는다. */
+export const dynamic = "force-dynamic";
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const brief = BRIEF_BY_SLUG.get(slug);
+  const brief = await getBrief(slug);
   if (!brief) return {};
   return {
     title: `[collab5] ${brief.brandName} 요약 리포트`,
@@ -36,8 +41,20 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 
 export default async function BriefPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const brief = BRIEF_BY_SLUG.get(slug);
+  const brief = await getBrief(slug);
   if (!brief) notFound();
+
+  // 🔑**주인이 붙어 있으면 그 사람만 본다** (대표 확정 09-14 「브리프 주인만」).
+  //   ⭐판정은 «서버»에서 한다. 매거진이 같은 자리에서 구멍을 냈다(`magazine-auth.ts`):
+  //     *「클라이언트의 버튼 숨김은 UX일 뿐 보안이 아니다」*.
+  //   ⚠️주인이 «없으면»(아직 연결 전) 링크를 아는 사람까지 본다 — 오늘 노션과 같은 수준이다.
+  //     대표가 손으로 연결하는 순간(대표 확정) 그 브리프만 문이 닫힌다.
+  //   ⛔없는 문서와 «못 볼» 문서를 같은 404로 돌린다. 「있는데 못 본다」를 알려 주지 않는다.
+  if (brief.ownerUserId !== null) {
+    const user = await getSessionUser();
+    const profile = user ? await getProfile(user.id) : null;
+    if (!profile || profile.id !== brief.ownerUserId) notFound();
+  }
 
   const doc = markdownToBriefDoc(brief.markdown);
 
