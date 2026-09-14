@@ -20,9 +20,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 const GO_TOAST = "보냈어요 · 이제 고칩니다. 화면이 저절로 새로고침돼요";
 const GO_TOAST_MS = 4000;
 
-/** 서버 재시작 감지 주기. 개발 빌드 전용이라 비용이 없고, 5초면 대표가 다음 코멘트를 쓰기 전에 갈린다. */
-const BOOT_POLL_MS = 5000;
-
 type Mode = "off" | "picking" | "writing";
 type Target = { selector: string; text: string; rect: DOMRect | null; box: string; font: string; color: string };
 
@@ -70,38 +67,55 @@ export function DevComments() {
   const [count, setCount] = useState(0);
   const [toast, setToast] = useState("");
   const rootRef = useRef<HTMLDivElement>(null);
-  /** 이 탭이 처음 만난 서버의 부팅 시각. 이게 달라지면 서버가 재시작된 것 = 내 코드가 낡았다는 뜻. */
-  const bootRef = useRef<string | null>(null);
   const [stale, setStale] = useState(false);
 
   const refreshCount = useCallback(() => {
-    fetch("/api/dev-comment")
-      .then((r) => r.json())
-      .then((d) => {
-        setCount(d.count ?? 0);
-        if (!d.boot) return;
-        if (bootRef.current === null) bootRef.current = d.boot;
-        else if (bootRef.current !== d.boot) setStale(true);
-      })
-      .catch(() => {}); // 재시작 중엔 잠깐 안 닿는다 — 다음 차례에 잡힌다
+    fetch("/api/dev-comment").then((r) => r.json()).then((d) => setCount(d.count ?? 0)).catch(() => {});
   }, []);
   useEffect(refreshCount, [refreshCount]);
 
-  // 🔁**서버 재시작 감시** (대표 09-14: *"로컬에서 작업하면 자동으로 새로고침 해줄 수 있어?"*).
-  //   파일 수정은 Next가 알아서 바꿔치지만 **서버 재시작은 열린 탭이 못 알아챈다** — 그 탭은 옛 코드를
-  //   든 채로 남고, 그 상태로 남긴 코멘트는 새 칸이 비어서 온다(09-14 1호 코멘트가 그랬다).
-  //   ⚠️개발 빌드에서만 도는 5초 폴링이라 비용은 없다.
-  useEffect(() => {
-    const t = setInterval(refreshCount, BOOT_POLL_MS);
-    return () => clearInterval(t);
-  }, [refreshCount]);
+  /** 🚨**지금 화면에 「잃을 것」이 있는가.**
+   *
+   *  🩸09-14에 이걸 «코멘트 입력창만» 보고 판정했다가 대표가 등록 폼을 채우던 중에 화면이 갈렸다.
+   *    새로고침은 **위젯 밖 입력**도 똑같이 날린다 — 지키는 범위가 도구 자신에서 끝나면 안 된다.
+   *  ⭐판정은 «넉넉하게» 한다. 잘못 막으면 대표가 버튼 한 번 더 누르면 되지만,
+   *    잘못 통과시키면 쓰던 게 사라지고 되돌릴 방법이 없다. 두 실패의 값이 다르다. */
+  const hasUnsavedWork = useCallback(() => {
+    if (mode !== "off" || note.trim()) return true;
+    const els = document.querySelectorAll<HTMLElement>("input, textarea, select, [contenteditable='true']");
+    for (const el of Array.from(els)) {
+      if (rootRef.current?.contains(el)) continue;
+      if (el === document.activeElement) return true; // 지금 손이 올라가 있다
+      const f = el as HTMLInputElement;
+      if (f.type === "checkbox" || f.type === "radio") {
+        if (f.checked) return true;
+      } else if ((f.value ?? el.textContent ?? "").trim()) {
+        return true;
+      }
+    }
+    return false;
+  }, [mode, note]);
 
-  // 🚨**쓰던 글이 있으면 안 고친다.** 자동 새로고침이 대표가 타이핑하던 코멘트를 날리면
-  //   이 위젯은 도우려다 손해를 끼치는 물건이 된다. 손이 비었을 때만 조용히 갈아끼운다.
+  /** 🪤**새로고침은 콘솔을 안 비운다** (2팀 실측 09-14). 이 기능이 코드는 최신으로 갈아끼우지만
+   *  **브라우저 콘솔 버퍼는 새로고침 전 것을 그대로 들고 있다.** 재시작 창에서 한 번 난 에러가
+   *  그 뒤 모든 콘솔 읽기에 같은 digest로 계속 나와서, 서버 로그·curl·DOM 셋이 멀쩡하다고 말하는데
+   *  콘솔 하나만 고장났다고 말한다. 그리고 **고장났다는 쪽이 제일 시끄럽다.**
+   *  ⭐**재시작 뒤 깨끗한 콘솔은 «새 탭»뿐이다.** 자동 새로고침 뒤에 콘솔로 뭔가를 판정하려거든
+   *    탭을 새로 열어라. 이건 브라우저 동작이라 우리가 고칠 수 있는 자리가 아니다.
+   *
+   *  🔁**새로고침은 내가 밀 때만 온다**(대표 09-14). 시계가 정하면 언제 터질지 아무도 모르고,
+   *  그게 대표 입력을 날린 원인이었다. 이제 내가 일을 끝내고 신호를 보낸 «그 순간»에만 나간다 —
+   *  대표가 기다리는 시점이지 타이핑하는 시점이 아니다.
+   *  그래도 손이 올라가 있으면 안 고치고 버튼만 띄운다(위 `hasUnsavedWork`). */
   useEffect(() => {
-    if (!stale) return;
-    if (mode === "off" && !note.trim()) location.reload();
-  }, [stale, mode, note]);
+    const es = new EventSource("/api/dev-reload");
+    es.onmessage = () => {
+      if (hasUnsavedWork()) setStale(true);
+      else location.reload();
+    };
+    es.onerror = () => {}; // 서버 재시작 중엔 EventSource가 알아서 다시 붙는다
+    return () => es.close();
+  }, [hasUnsavedWork]);
 
   /** 내 UI 안을 고르려다 실수하는 걸 막는다 — 위젯이 자기를 가리키면 아무 쓸모가 없다. */
   const isMine = useCallback((el: Element | null) => !!el && !!rootRef.current?.contains(el), []);
@@ -212,7 +226,7 @@ export function DevComments() {
             style={{ ...btn("#f2d81e", "#5c4a00"), boxShadow: "0 2px 10px rgba(0,0,0,.16)" }}
             onClick={() => location.reload()}
           >
-            새 버전이 있어요 · 새로고침
+            다 고쳤어요 · 눌러서 새로고침
           </button>
         )}
         {toast && (
