@@ -93,13 +93,9 @@ export default async function SpaceDetailPage({
         showForm ? "pb-[120px]" : "pb-12"
       }`}
     >
-      <Link
-        href="/rent"
-        className="inline-block py-[12px] text-[15px] text-mute underline underline-offset-2"
-      >
-        ← 하루 가게
-      </Link>
-
+      {/* 🔻09-14 「← 하루 가게」 삭제 — 대표: *「앱이 아닌 경우 다들 모바일 기기의 뒤로 가기 버튼을
+          잘 쓸 거 같은데, 일단 뒤로 가기 버튼은 지워도 될 거 같아」*.
+          ⭐브라우저가 이미 하는 일을 화면이 또 하지 않는다. 상단 메뉴바로도 목록에 닿는다. */}
       {/* ── 상단 카드 — 소개서 `BrandSummaryCard`와 같은 자리·같은 사다리 ── */}
       <header className="mt-3 rounded-lg border border-hairline bg-surface p-5">
         <h1 className="text-[22px] font-bold leading-tight tracking-tight break-keep text-ink">
@@ -136,7 +132,7 @@ export default async function SpaceDetailPage({
       )}
 
       {sp.body && (
-        <Section title="이 공간 이야기">
+        <Section title="공간 소개">
           <p className="whitespace-pre-line text-[17px] leading-relaxed break-keep text-body">
             {sp.body}
           </p>
@@ -147,22 +143,40 @@ export default async function SpaceDetailPage({
           열쇠를 넘기는 두려움이 실제로 풀리는 자리다. 면색 대신 **한 줄씩 세운 구분선**과 ink 글자로
           무게를 준다 — 줄로 세우면 세 줄이 세 가지 약속으로 읽히고, 문단이면 한 덩어리로 넘어간다. */}
       <Section title="우리 집 규칙">
-        <ul className="divide-y divide-hairline border-y border-hairline">
+        {/* 🔁09-14 구분선 → **번호**(대표: *「여기 라인을 빼주고, 불렛이나 1, 2, 3 식으로 하는 거 어떨까.
+            규칙이니 마크다운 형태로 보여도 이쁠 거 같음」*).
+            ⭐선은 「여기까지가 한 덩어리」만 말하고, 번호는 **몇 개인지와 몇 번째인지**를 같이 말한다.
+              약속은 세어지는 편이 낫다 — 「셋 중 둘째」가 「가운데 줄」보다 분명하다. */}
+        <ol className="space-y-2.5">
           {ruleLines.map((line, i) => (
-            <li key={i} className="py-3.5 text-[17px] leading-relaxed break-keep text-ink">
-              {line}
+            <li key={i} className="flex gap-2.5 text-[17px] leading-relaxed break-keep text-ink">
+              {/* 번호는 본문보다 한 단 물러난 색·크기 — 세는 표지지 내용이 아니다.
+                  `tabular-nums`로 폭을 고정해 두 자리가 와도 글줄 시작점이 안 흔들린다. */}
+              <span className="shrink-0 pt-[3px] text-[15px] font-medium tabular-nums text-mute">{i + 1}.</span>
+              <span className="min-w-0">{line}</span>
             </li>
           ))}
-        </ul>
+        </ol>
       </Section>
 
-      {sp.facilities.length > 0 && (
-        <Section title="이런 것들이 있어요">
-          <div className="flex flex-wrap gap-2">
-            {sp.facilities.map((f) => (
-              <Chip key={f}>{f}</Chip>
-            ))}
-          </div>
+      {/* 🔁09-14 「이런 것들이 있어요」 → **「공간·시설 안내」**(대표 지시).
+          ⭐그리고 **태그와 줄글을 같이 싣는다** — 대표: *「여기는 태그도 좋은데, 줄글도 쓸 수 있는
+            구조로 짜야 할 거 같아」*. 태그는 훑어서 고르는 것이고, 줄글은 「HDMI 케이블은 없어요」처럼
+            태그로 못 담는 단서다. 둘 중 하나만 있어도 그 절은 뜬다. */}
+      {(sp.facilities.length > 0 || sp.facilitiesNote) && (
+        <Section title="공간·시설 안내">
+          {sp.facilities.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {sp.facilities.map((f) => (
+                <Chip key={f}>{f}</Chip>
+              ))}
+            </div>
+          )}
+          {sp.facilitiesNote && (
+            <p className={`whitespace-pre-line text-[17px] leading-relaxed break-keep text-body ${sp.facilities.length > 0 ? "mt-4" : ""}`}>
+              {sp.facilitiesNote}
+            </p>
+          )}
         </Section>
       )}
 

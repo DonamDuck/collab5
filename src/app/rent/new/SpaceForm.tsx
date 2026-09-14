@@ -108,6 +108,7 @@ export function SpaceForm({
   const [accessNote, setAccessNote] = useState(initial?.accessNote ?? "");
   const [useType, setUseType] = useState<SpaceUseType>(initial?.useType ?? "both");
   const [facilities, setFacilities] = useState<string[]>(initial?.facilities ?? []);
+  const [facilitiesNote, setFacilitiesNote] = useState(initial?.facilitiesNote ?? "");
   const [facilityInput, setFacilityInput] = useState("");
   const [capacity, setCapacity] = useState(initial?.capacity ? String(initial.capacity) : "");
   const [hourStart, setHourStart] = useState(() => parseHours(initial?.hours ?? "")[0]);
@@ -200,6 +201,7 @@ export function SpaceForm({
         accessNote,
         useType,
         facilities,
+        facilitiesNote,
         capacity: capacity ? Number(capacity) : undefined,
         hours: `${hourStart}~${hourEnd}`,
         rules,
@@ -362,7 +364,8 @@ export function SpaceForm({
           </p>
         </L>
 
-        <L label="여기 있는 것들" optional hint="빌리는 분이 이걸 보고 고르세요. 누르면 담겨요.">
+        {/* 🏷태그 = **고르는 것**. 대표 09-14: *「태그는 사용 가능한 시설을 추가할 때 키워드로 추가되게」* */}
+        <L label="쓸 수 있는 시설" optional hint="빌리는 분이 이걸 보고 고르세요. 누르면 담겨요.">
           <div className="flex flex-wrap gap-2">
             {facilityPool.map((f) => {
               const on = facilities.includes(f);
@@ -399,6 +402,24 @@ export function SpaceForm({
               담기
             </button>
           </div>
+        </L>
+
+        {/* 📝줄글 = **읽는 것**. 대표 09-14: *「줄글은 시설 안내, multi text input으로 등록할 때 등록하게」*.
+            ⭐태그로는 「빔프로젝터 있음」까지만 말할 수 있고 「HDMI 케이블은 없어서 가져오셔야 해요」는
+              여기라야 한다. 둘은 대체재가 아니라 층이 다르다. */}
+        <L
+          label="시설 안내"
+          htmlFor="sp-facnote"
+          optional
+          hint="태그로 못 담는 말을 적어 주세요. 쓰는 법, 조심할 것, 없는 것 같은 것들이요."
+        >
+          <textarea
+            id="sp-facnote"
+            className={`${rentTextareaCls} min-h-[110px]`}
+            value={facilitiesNote}
+            onChange={(e) => setFacilitiesNote(e.target.value)}
+            placeholder="예) 빔프로젝터는 있는데 HDMI 케이블은 없어요. 음향은 블루투스로 연결하시면 돼요."
+          />
         </L>
 
         <L label="최대 몇 명까지" htmlFor="sp-cap" optional>

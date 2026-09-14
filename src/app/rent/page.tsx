@@ -101,7 +101,7 @@ export default async function RentPage({
             안 쓰는 날, 하루만 빌려보세요
           </h1>
           <p className="mt-3 text-[17px] leading-relaxed break-keep text-mute">
-            가게를 열어보고 싶은 분이 그날 하루 사장님이 돼요.
+            영업 공간 그대로, 하루를 대여해 보실 수 있어요.
           </p>
         </div>
       </header>

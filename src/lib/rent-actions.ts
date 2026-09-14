@@ -54,7 +54,7 @@ export interface SpaceFormInput {
   slug?: string;
   name: string; tagline: string; body: string; photos: string[];
   area: string; address: string; accessNote: string;
-  useType: SpaceUseType; facilities: string[]; capacity?: number; hours: string;
+  useType: SpaceUseType; facilities: string[]; facilitiesNote: string; capacity?: number; hours: string;
   rules: string; priceDay: number;
   mentorMinutes: number; mentorPrice: number;
   openDates: string[];
@@ -97,7 +97,8 @@ export async function saveSpaceAction(input: SpaceFormInput): Promise<ActionResu
     slug, ownerUserId: uid, brandSlug: input.brandSlug,
     name: input.name.trim(), tagline: input.tagline.trim(), body: input.body, photos: input.photos,
     area: input.area.trim(), address: input.address.trim(), accessNote: input.accessNote.trim(),
-    useType: input.useType, facilities: input.facilities, capacity: input.capacity,
+    useType: input.useType, facilities: input.facilities,
+    facilitiesNote: input.facilitiesNote.trim(), capacity: input.capacity,
     hours: input.hours, rules: input.rules.trim(),
     priceDay: input.priceDay, mentorMinutes: input.mentorMinutes, mentorPrice: input.mentorPrice,
     openDates: input.openDates, servesFood: false, subleaseOk: true,

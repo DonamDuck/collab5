@@ -438,6 +438,9 @@ export interface Space {
 
   useType: SpaceUseType;
   facilities: string[];
+  /** 시설 «줄글» 안내. 태그(`facilities`)는 고르는 것이고 이건 읽는 것이다 — 「빔프로젝터 있음」은
+   *  태그로 되지만 「HDMI 케이블은 없어서 가져오셔야 해요」는 줄글이라야 한다(대표 09-14). */
+  facilitiesNote: string;
   capacity?: number;
   hours: string;
 
