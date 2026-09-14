@@ -21,6 +21,18 @@
         "dev"
       ],
       "autoPort": true
+    },
+    {
+      "name": "collab5-brief",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev",
+        "--",
+        "-p",
+        "3007"
+      ],
+      "port": 3007
     }
   ]
 }
