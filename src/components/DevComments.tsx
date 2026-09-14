@@ -59,11 +59,38 @@ export function DevComments() {
   const [count, setCount] = useState(0);
   const [toast, setToast] = useState("");
   const rootRef = useRef<HTMLDivElement>(null);
+  /** 이 탭이 처음 만난 서버의 부팅 시각. 이게 달라지면 서버가 재시작된 것 = 내 코드가 낡았다는 뜻. */
+  const bootRef = useRef<string | null>(null);
+  const [stale, setStale] = useState(false);
 
   const refreshCount = useCallback(() => {
-    fetch("/api/dev-comment").then((r) => r.json()).then((d) => setCount(d.count ?? 0)).catch(() => {});
+    fetch("/api/dev-comment")
+      .then((r) => r.json())
+      .then((d) => {
+        setCount(d.count ?? 0);
+        if (!d.boot) return;
+        if (bootRef.current === null) bootRef.current = d.boot;
+        else if (bootRef.current !== d.boot) setStale(true);
+      })
+      .catch(() => {}); // 재시작 중엔 잠깐 안 닿는다 — 다음 차례에 잡힌다
   }, []);
   useEffect(refreshCount, [refreshCount]);
+
+  // 🔁**서버 재시작 감시** (대표 09-14: *"로컬에서 작업하면 자동으로 새로고침 해줄 수 있어?"*).
+  //   파일 수정은 Next가 알아서 바꿔치지만 **서버 재시작은 열린 탭이 못 알아챈다** — 그 탭은 옛 코드를
+  //   든 채로 남고, 그 상태로 남긴 코멘트는 새 칸이 비어서 온다(09-14 1호 코멘트가 그랬다).
+  //   ⚠️개발 빌드에서만 도는 5초 폴링이라 비용은 없다.
+  useEffect(() => {
+    const t = setInterval(refreshCount, 5000);
+    return () => clearInterval(t);
+  }, [refreshCount]);
+
+  // 🚨**쓰던 글이 있으면 안 고친다.** 자동 새로고침이 대표가 타이핑하던 코멘트를 날리면
+  //   이 위젯은 도우려다 손해를 끼치는 물건이 된다. 손이 비었을 때만 조용히 갈아끼운다.
+  useEffect(() => {
+    if (!stale) return;
+    if (mode === "off" && !note.trim()) location.reload();
+  }, [stale, mode, note]);
 
   /** 내 UI 안을 고르려다 실수하는 걸 막는다 — 위젯이 자기를 가리키면 아무 쓸모가 없다. */
   const isMine = useCallback((el: Element | null) => !!el && !!rootRef.current?.contains(el), []);
@@ -171,6 +198,14 @@ export function DevComments() {
 
       {/* 바닥 패널 — 왼쪽 아래는 Next 개발 표시가 쓰고 있어 오른쪽에 붙인다 */}
       <div style={{ position: "fixed", right: 16, bottom: 16, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8 }}>
+        {stale && (
+          <button
+            style={{ ...btn("#f2d81e", "#5c4a00"), boxShadow: "0 2px 10px rgba(0,0,0,.16)" }}
+            onClick={() => location.reload()}
+          >
+            새 버전이 있어요 · 새로고침
+          </button>
+        )}
         {toast && (
           <div style={{ background: "#222", color: "#fff", fontSize: 13, padding: "8px 12px", borderRadius: 10 }}>{toast}</div>
         )}
