@@ -39,8 +39,14 @@ export default async function EditSpacePage({ params }: { params: Promise<{ slug
         <h1 className="mt-3 text-[28px] font-bold leading-[1.25] tracking-[-0.02em] break-keep text-ink">
           공간 고치기
         </h1>
+        {/* 🔁09-16 문안 교체 — 그 전엔 *「고친 내용은 한 번 더 읽어보고 다시 공개해 드려요.
+            그동안 공간은 잠시 안 보여요」*였는데, 같은 날 **고쳐도 공개가 유지되게** 바뀌었다
+            (`saveSpaceAction`: 이름·주소가 바뀔 때만 검토로 내려간다).
+            🩸그래서 이 줄은 사장님께 «일어나지 않을 일»을 예고하고 있었다. 값 하나 고치려다
+            목록에서 사라진다고 읽히면 아예 안 고친다. */}
         <p className="mt-3 text-[17px] leading-relaxed break-keep text-mute">
-          고친 내용은 한 번 더 읽어보고 다시 공개해 드려요. 그동안 공간은 잠시 안 보여요.
+          고치시는 동안에도 공간은 그대로 보여요. 매장 이름이나 주소를 바꾸시면 그때만 한 번 더 확인해
+          드릴게요.
         </p>
       </header>
 
