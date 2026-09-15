@@ -46,7 +46,7 @@ export function RentFilters({
   const [category, setCategory] = useState<SpaceCategory>(initialCategory);
   const [use, setUse] = useState<UseFilter>(initialUse);
 
-  /** 세 값을 한 번에 주소로 옮긴다. 빈 값은 아예 안 싣는다 — `?area=&date=` 같은 껍데기가 남으면
+  /** 세 값을 한 번에 주소로 옮긴다. 빈 값은 아예 안 싣는다 — `?area=&category=` 같은 껍데기가 남으면
    *  「지금 걸린 조건이 있나」를 주소만 보고 알 수 없게 된다. */
   const apply = (next: { area?: string; category?: SpaceCategory; use?: UseFilter }) => {
     const a = next.area ?? area;
