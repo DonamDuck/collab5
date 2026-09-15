@@ -126,6 +126,12 @@ export function SpaceForm({
   const router = useRouter();
   const [pending, start] = useTransition();
   const [err, setErr] = useState("");
+  /** 🚨**한 번 눌러 보기 전엔 지적하지 않는다** (대표 09-16: *「엥 이건 뭐지 갑자기!」*).
+   *  전엔 화면을 열자마자 「어떤 업종인지 골라 주세요」가 아래에 떠 있었다 — 아직 아무것도 안 했는데
+   *  틀렸다는 말부터 듣는 셈이라, 대표가 그 줄을 보고 무슨 일이 난 줄 알았다.
+   *  ⭐**막는 것과 지적하는 것은 다르다.** 버튼은 처음부터 잠가 두되(못 넘어가는 건 사실이니),
+   *    이유는 누른 «뒤»에 말한다. 그때는 듣고 싶어서 누른 것이다. */
+  const [tried, setTried] = useState(false);
   const editing = !!initial;
 
   // 🆕09-16 등록 항목 개편 — 대표가 아티팩트 「항목 판」에서 항목마다 남김·뺌·바꿈을 적어 준 결과다.
@@ -248,6 +254,7 @@ export function SpaceForm({
   const submit = () =>
     start(async () => {
       setErr("");
+      setTried(true);
       if (blocked) {
         setErr(blocked);
         return;
@@ -772,7 +779,7 @@ export function SpaceForm({
       </Group>
 
       <div>
-        {(err || blocked) && (
+        {(err || (tried && blocked)) && (
           // 서버가 돌려준 말이 있으면 그것을, 없으면 지금 막고 있는 이유를. 둘이 같이 뜨면 잔소리가 된다.
           <p className={`mb-4 text-[15px] leading-relaxed break-keep ${err ? "text-danger" : "text-faint"}`}>
             {err || blocked}
@@ -781,7 +788,7 @@ export function SpaceForm({
         <button
           type="button"
           onClick={submit}
-          disabled={pending || uploading || !!blocked}
+          disabled={pending || uploading}
           className={`${primaryBtnCls} h-[52px] w-full`}
         >
           {pending
