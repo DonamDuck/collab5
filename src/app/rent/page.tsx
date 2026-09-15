@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { listOpenSpaces } from "@/lib/spaces";
-import type { SpacePublic, SpaceUseType } from "@/lib/types";
+import type { SpaceCategory, SpacePublic, SpaceUseType } from "@/lib/types";
 import { EmptyState } from "@/components/EmptyState";
 import { RentFilters, type UseFilter } from "./RentFilters";
 import { categoryLabel, CoverPlaceholder, primaryBtnCls, scopeLabel, secondaryBtnCls, won } from "./ui";
@@ -79,19 +79,19 @@ function SpaceCard({ sp }: { sp: SpacePublic }) {
 export default async function RentPage({
   searchParams,
 }: {
-  searchParams: Promise<{ area?: string; date?: string; use?: string }>;
+  searchParams: Promise<{ area?: string; category?: string; use?: string }>;
 }) {
-  const { area, date, use } = await searchParams;
+  const { area, category, use } = await searchParams;
   const useFilter = parseUse(use);
   // ⚠️`listOpenSpaces`는 `useType`이 "both"면 거르기를 건너뛴다. 그래서 「전체」는 값을 **안 넘긴다** —
   //   "both"를 넘겨도 결과는 같지만, 뜻이 다른 두 값(전체 / 둘 다 가능한 공간)을 한 글자로 섞으면
   //   다음 사람이 필터 로직을 고칠 때 반드시 헷갈린다.
   const spaces = await listOpenSpaces({
     area: area?.trim() || undefined,
-    date: date || undefined,
+    category: (category || undefined) as SpaceCategory | undefined,
     useType: (useFilter || undefined) as SpaceUseType | undefined,
   });
-  const filtered = !!(area?.trim() || date || useFilter);
+  const filtered = !!(area?.trim() || category || useFilter);
 
   return (
     <main className="mx-auto w-full max-w-[880px] px-4 pb-10 pt-4 sm:px-6 sm:pb-14 sm:pt-6">
@@ -110,7 +110,7 @@ export default async function RentPage({
 
       <RentFilters
         initialArea={area?.trim() ?? ""}
-        initialDate={date ?? ""}
+        initialCategory={(category ?? "") as SpaceCategory}
         initialUse={useFilter}
       />
 
@@ -121,7 +121,7 @@ export default async function RentPage({
         //   여기선 children으로 보조 버튼을 넣는다.
         <div className="mt-6">
           {filtered ? (
-            <EmptyState title="조건에 맞는 공간이 아직 없어요" desc="동네나 날짜를 조금 넓혀 보시겠어요?">
+            <EmptyState title="조건에 맞는 공간이 아직 없어요" desc="동네나 업종을 조금 넓혀 보시겠어요?">
               <Link href="/rent" className={secondaryBtnCls}>
                 조건 지우고 전체 보기
               </Link>

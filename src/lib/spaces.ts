@@ -119,8 +119,10 @@ function toBooking(r: Row): SpaceBooking {
 export interface SpaceFilter {
   /** 동네 부분일치 */
   area?: string;
-  /** 이 날짜가 비어 있는 곳만 */
+  /** 이 날짜에 열린 시간대가 있는 곳만. 화면엔 고르개가 없고 주소로만 들어온다(09-16 B84). */
   date?: string;
+  /** 업종. 목록 거르개의 축이다(09-16 B84). */
+  category?: Space["category"];
   useType?: Space["useType"];
   limit?: number;
 }
@@ -131,13 +133,16 @@ export async function listOpenSpaces(f: SpaceFilter = {}): Promise<SpacePublic[]
   if (!c) return [];
   let q = c.from("spaces").select("*").eq("status", "open").order("created_at", { ascending: false });
   if (f.area) q = q.ilike("area", `%${f.area}%`);
+  if (f.category) q = q.eq("category", f.category);
   if (f.useType && f.useType !== "both") q = q.in("use_type", [f.useType, "both"]);
   q = q.limit(f.limit ?? 60);
   const { data, error } = await q;
   if (error) { console.error(`[spaces] list failed: ${error.message}`); return []; }
   let out = (data ?? []).map((r) => toSpace(r as Row));
-  // 날짜 거르기는 jsonb 배열 안을 봐야 해서 코드에서 한다 — 공간 수가 수백 단위일 동안은 이게 싸다.
-  if (f.date) out = out.filter((sp) => sp.openDates.includes(f.date!));
+  // 날짜 거르기는 jsonb 안을 봐야 해서 코드에서 한다 — 공간 수가 수백 단위일 동안은 이게 싸다.
+  // 🩸09-16까지 여기가 옛 `open_dates`를 보고 있었다. 시간 단위로 바뀌면서 새 등록은 그 칸을 안 채우니
+  //   날짜를 고르면 «항상 0건»이었다. 열린 시간대(`openSlots`)가 정본이다.
+  if (f.date) out = out.filter((sp) => sp.openSlots.some((sl) => sl.date === f.date));
   return out.map(toPublic);
 }
 

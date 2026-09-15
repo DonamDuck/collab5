@@ -1,10 +1,15 @@
 "use client";
 
-// 하루 가게 목록 거르개 — 쓰임새 · 동네 · 날짜 (2026-09-13)
+// 하루 가게 목록 거르개 — 동네 · 업종 (2026-09-13 · 2026-09-16 날짜→업종)
 //
 // ⭐거른 결과를 **주소(query string)에 담는다.** 클라 상태로만 들고 있으면 새로고침·뒤로가기에서
-//   조건이 사라지고, 「성수동 목록」을 남에게 링크로 줄 수도 없다. 거르기는 서버가 한다
-//   (`listOpenSpaces`의 날짜 거르기가 jsonb 안을 봐야 해서 클라가 흉내 낼 수 없다).
+//   조건이 사라지고, 「성수동 목록」을 남에게 링크로 줄 수도 없다. 거르기는 서버가 한다.
+//
+// 🔁**09-16에 날짜 칸을 업종으로 갈았다** (백로그 B84).
+//   🩸날짜 거르개는 시간 단위 개편 이후 «항상 0건»이었다. 옛 `open_dates` 칸을 보고 있었는데
+//     새 등록은 그 칸을 안 채운다. 화면엔 멀쩡한 달력이 서 있고 고르면 목록이 비는 상태였다.
+//   ⭐그리고 고르는 축으로도 날짜가 맞지 않는다. 훑는 사람은 「이 날 되는 곳」보다
+//     「어떤 가게인가」를 먼저 본다. 날짜는 그 가게를 고른 «다음»에 상세에서 고른다.
 //
 // ⚠️초기값을 `useSearchParams`로 읽지 않고 **props로 받는다.** 이 컴포넌트는 Suspense 밖이라
 //   그 훅을 쓰면 Next가 페이지 전체를 CSR로 강등시킨다(`/search/page.tsx`가 같은 함정을 적어 뒀다).
@@ -12,10 +17,11 @@
 //
 // 🎨09-13 재작업 — 검정 [찾기] 버튼을 뺐다. 이 화면의 버튼은 히어로의 키위 하나뿐이어야 하고,
 //   검정 면은 우리 사이트 어디에도 없는 어휘다. 대신 값이 바뀌는 순간 주소에 싣는다
-//   (칩·날짜는 고르는 즉시, 동네는 Enter나 칸을 벗어날 때 — 글자마다 새로고침하면 목록이 떨린다).
+//   (업종은 고르는 즉시, 동네는 Enter나 칸을 벗어날 때. 글자마다 새로고침하면 목록이 떨린다).
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { todayKst } from "./ui";
+import type { SpaceCategory } from "@/lib/types";
+import { CATEGORY_OPTIONS, RentSelect, rentQuietInputCls } from "./ui";
 
 export type UseFilter = "" | "as_is" | "open";
 
@@ -25,35 +31,30 @@ const USE_TABS: { v: UseFilter; label: string }[] = [
   { v: "open", label: "대관" },
 ];
 
-/** 거르개 입력칸 — 폼 입력칸(`rentInputCls`, border-strong)보다 한 단 조용하다.
- *  여긴 채우는 곳이 아니라 훑는 곳이라, 테두리가 진하면 「써야 하는 칸」처럼 보인다. */
-const quietInputCls =
-  "h-[44px] rounded-md border border-hairline bg-surface px-4 text-[16px] text-ink outline-none placeholder:text-faint focus:border-focus";
-
 export function RentFilters({
   initialArea,
-  initialDate,
+  initialCategory,
   initialUse,
 }: {
   initialArea: string;
-  initialDate: string;
+  initialCategory: SpaceCategory;
   initialUse: UseFilter;
 }) {
   const router = useRouter();
   const [, start] = useTransition();
   const [area, setArea] = useState(initialArea);
-  const [date, setDate] = useState(initialDate);
+  const [category, setCategory] = useState<SpaceCategory>(initialCategory);
   const [use, setUse] = useState<UseFilter>(initialUse);
 
   /** 세 값을 한 번에 주소로 옮긴다. 빈 값은 아예 안 싣는다 — `?area=&date=` 같은 껍데기가 남으면
    *  「지금 걸린 조건이 있나」를 주소만 보고 알 수 없게 된다. */
-  const apply = (next: { area?: string; date?: string; use?: UseFilter }) => {
+  const apply = (next: { area?: string; category?: SpaceCategory; use?: UseFilter }) => {
     const a = next.area ?? area;
-    const d = next.date ?? date;
+    const c = next.category ?? category;
     const u = next.use ?? use;
     const q = new URLSearchParams();
     if (a.trim()) q.set("area", a.trim());
-    if (d) q.set("date", d);
+    if (c) q.set("category", c);
     if (u) q.set("use", u);
     const qs = q.toString();
     // replace를 쓰는 이유 — 거르개를 만질 때마다 뒤로가기 기록이 쌓이면, 목록에서 빠져나가려고
@@ -61,7 +62,7 @@ export function RentFilters({
     start(() => router.replace(qs ? `/rent?${qs}` : "/rent"));
   };
 
-  const hasAny = !!area.trim() || !!date || !!use;
+  const hasAny = !!area.trim() || !!category || !!use;
 
   return (
     <div className="mt-10 space-y-3">
@@ -79,7 +80,7 @@ export function RentFilters({
         }}
       >
         <input
-          className={`${quietInputCls} min-w-0 flex-1`}
+          className={`${rentQuietInputCls} min-w-0 flex-1`}
           value={area}
           onChange={(e) => setArea(e.target.value)}
           onBlur={() => {
@@ -88,18 +89,26 @@ export function RentFilters({
           placeholder="동네로 찾기"
           aria-label="동네"
         />
-        <input
-          type="date"
-          className={`${quietInputCls} w-[160px] shrink-0`}
-          value={date}
-          min={todayKst()}
-          onChange={(e) => {
-            setDate(e.target.value);
-            // 날짜는 고르는 순간이 곧 확정이다 — 달력을 닫고 버튼을 또 누르게 하면 한 번 더 일을 시킨다.
-            apply({ date: e.target.value });
-          }}
-          aria-label="날짜"
-        />
+        {/* 업종도 고르는 순간이 곧 확정이다. 고른 뒤 버튼을 또 누르게 하면 한 번 더 일을 시킨다. */}
+        <div className="w-[150px] shrink-0">
+          <RentSelect
+            tone="quiet"
+            value={category}
+            onChange={(e) => {
+              const v = e.target.value as SpaceCategory;
+              setCategory(v);
+              apply({ category: v });
+            }}
+            aria-label="업종"
+          >
+            <option value="">업종 전체</option>
+            {CATEGORY_OPTIONS.map(([v, t]) => (
+              <option key={v} value={v}>
+                {t}
+              </option>
+            ))}
+          </RentSelect>
+        </div>
       </form>
 
       {hasAny && (
@@ -107,7 +116,7 @@ export function RentFilters({
           type="button"
           onClick={() => {
             setArea("");
-            setDate("");
+            setCategory("");
             setUse("");
             start(() => router.replace("/rent"));
           }}

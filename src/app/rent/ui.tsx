@@ -27,30 +27,33 @@ export function usageLabel(t: SpaceUseType): string {
   return "원래 목적대로 · 대관";
 }
 
-/** 날짜를 「10월 5일 (월)」로. `YYYY-MM-DD` 외의 값이 오면 받은 그대로 돌려준다.
- *  ⚠️`new Date("2026-10-05")`는 UTC 자정으로 읽혀 KST에선 하루 전으로 밀린다.
- *    그래서 Date를 거치지 않고 글자를 쪼갠 뒤, 요일만 정오 기준으로 계산한다. */
 /** 📂업종·범위 라벨 (2026-09-16). ⚠️화면에 쓰는 말은 여기 한 곳에만 둔다 —
  *  목록·상세·카드가 각자 적으면 언젠가 「카페」와 「카페·디저트」가 같이 돌아다닌다. */
+/** 업종 목록 — **등록 폼의 고르개와 목록의 거르개가 같은 줄을 본다.**
+ *  🩸09-16까지 이 목록이 두 벌이었다(여기 하나, `SpaceForm`에 하나). 두 벌이면 한쪽에 업종을 더한 날
+ *    다른 쪽에서 그 업종이 조용히 안 걸린다 — 목록에 있는데 거르개엔 없는 상태가 된다.
+ *  ⭐순서도 정보다. 흔한 것부터 두고 「그 밖에」가 맨 뒤다. */
+export const CATEGORY_OPTIONS: [Exclude<SpaceCategory, "">, string][] = [
+  ["cafe", "카페"],
+  ["restaurant", "음식점"],
+  ["workshop", "공방"],
+  ["studio", "스튜디오"],
+  ["shop", "소품샵·편집숍"],
+  ["lounge", "사무실·라운지"],
+  ["etc", "그 밖에"],
+];
+
 export function categoryLabel(c: SpaceCategory): string {
-  return (
-    {
-      "": "업종 미정",
-      cafe: "카페",
-      restaurant: "음식점",
-      workshop: "공방",
-      studio: "스튜디오",
-      shop: "소품샵·편집숍",
-      lounge: "사무실·라운지",
-      etc: "그 밖에",
-    }[c] ?? "업종 미정"
-  );
+  return CATEGORY_OPTIONS.find(([v]) => v === c)?.[1] ?? "업종 미정";
 }
 
 export function scopeLabel(v: SpaceScope): string {
   return { space_only: "공간만", with_gear: "공간과 장비까지", whole_shop: "가게 그대로" }[v] ?? "공간만";
 }
 
+/** 날짜를 「10월 5일 (월)」로. `YYYY-MM-DD` 외의 값이 오면 받은 그대로 돌려준다.
+ *  ⚠️`new Date("2026-10-05")`는 UTC 자정으로 읽혀 KST에선 하루 전으로 밀린다.
+ *    그래서 Date를 거치지 않고 글자를 쪼갠 뒤, 요일만 정오 기준으로 계산한다. */
 export function dateLabel(iso: string): string {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
   if (!m) return iso;
@@ -119,14 +122,23 @@ export const rentInputCls =
  *  ⭐브라우저가 그려 주는 기본 화살표는 **칸 오른쪽 끝에 딱 붙는다.** 우리 입력칸은 좌우 패딩이 16px인데
  *  화살표만 0px에 서 있으니 그 칸만 여백이 깨져 보인다. `appearance-none`으로 기본 화살표를 끄고
  *  같은 16px 자리에 우리 것을 그린다. 🚨훅이 없어 서버·클라 양쪽에서 쓸 수 있다(이 파일의 규율). */
+/** 훑는 칸 — 폼 입력칸(`rentInputCls`, border-strong)보다 한 단 조용하다.
+ *  여긴 채우는 곳이 아니라 훑는 곳이라, 테두리가 진하면 「써야 하는 칸」처럼 보인다. */
+export const rentQuietInputCls =
+  "h-[44px] w-full rounded-md border border-hairline bg-surface px-4 text-[16px] text-ink outline-none placeholder:text-faint focus:border-focus";
+
 export function RentSelect({
   className = "",
+  tone = "form",
   children,
   ...rest
-}: React.SelectHTMLAttributes<HTMLSelectElement>) {
+}: React.SelectHTMLAttributes<HTMLSelectElement> & { tone?: "form" | "quiet" }) {
+  // ⚠️두 얼굴을 `className`으로 덮어쓰지 않고 «고른다». Tailwind는 나중에 적은 클래스가 이기는 게 아니라
+  //   스타일시트 안의 순서가 이겨서, 덮어쓰기는 되는 날도 있고 안 되는 날도 있다.
+  const base = tone === "quiet" ? rentQuietInputCls : rentInputCls;
   return (
     <div className="relative w-full">
-      <select className={`${rentInputCls} appearance-none pr-11 ${className}`} {...rest}>
+      <select className={`${base} appearance-none pr-11 ${className}`} {...rest}>
         {children}
       </select>
       {/* `pointer-events-none` — 화살표가 클릭을 먹으면 그 자리를 눌렀을 때 목록이 안 열린다. */}

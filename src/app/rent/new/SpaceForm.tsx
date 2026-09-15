@@ -23,23 +23,16 @@ import { uploadPhoto } from "@/lib/upload";
 import { PhotoGrid } from "@/app/register/PhotoGrid";
 import type { Space, SpaceUseType, SpaceCategory, SpaceScope, OpenSlot, AccessHow } from "@/lib/types";
 import { hoursBetween } from "@/lib/rent-time";
-import { primaryBtnCls, RentSelect, rentInputCls, rentTextareaCls, secondaryBtnCls, won } from "../ui";
+import { CATEGORY_OPTIONS, primaryBtnCls, RentSelect, rentInputCls, rentTextareaCls, secondaryBtnCls, won } from "../ui";
 import { AddressField } from "./AddressField";
 import { OpenSlotsCalendar } from "./OpenSlotsCalendar";
 
 /** 사장님이 처음부터 다 적게 하지 않으려고 미리 깔아 두는 설비 후보.
  *  ⚠️여기 없는 게 훨씬 많다(가마·재봉틀·오븐·암실…). 그래서 **직접 적는 칸이 주고 칩은 보조**다 —
  *    목록을 관문으로 만들면 우리가 상상한 업종만 올라온다. */
-/** 📂업종 — 검색·목록 거르개가 보는 축(대표 09-16). 「그 밖에」를 둔 건 여기 없는 가게를 막지 않기 위해서다. */
-const CATEGORIES: [SpaceCategory, string][] = [
-  ["cafe", "카페"],
-  ["restaurant", "음식점"],
-  ["workshop", "공방"],
-  ["studio", "스튜디오"],
-  ["shop", "소품샵·편집숍"],
-  ["lounge", "사무실·라운지"],
-  ["etc", "그 밖에"],
-];
+/** 📂업종은 `../ui`의 `CATEGORY_OPTIONS` 한 벌을 쓴다 (2026-09-16).
+ *  🩸여기 같은 목록을 따로 들고 있었는데, 목록 거르개도 업종 축으로 바뀌면서 **두 벌이 세 벌이 될 뻔했다.**
+ *    고르개와 거르개가 다른 목록을 보면 올릴 수는 있는데 걸리지는 않는 업종이 생긴다. */
 
 /** 📂빌려드리는 범위 — 값의 근거가 되는 축. 대표가 말한 네 경우가 여기 다 들어간다
  *  (카페 공간만 / 카페 + 머신 / 국밥집 화구까지 / 예쁜 식당을 라운지로). */
@@ -316,7 +309,7 @@ export function SpaceForm({
         <L label="업종" htmlFor="sp-category">
           <RentSelect id="sp-category" value={category} onChange={(e) => setCategory(e.target.value as SpaceCategory)}>
             <option value="">고르지 않음</option>
-            {CATEGORIES.map(([v, t]) => (
+            {CATEGORY_OPTIONS.map(([v, t]) => (
               <option key={v} value={v}>
                 {t}
               </option>
