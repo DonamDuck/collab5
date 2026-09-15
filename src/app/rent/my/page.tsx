@@ -279,7 +279,17 @@ export default async function MyRentPage() {
                   }
                   status={<BookingBadge status={b.status} />}
                 >
-                  {open ? (
+                  {/* 🩸09-16 — `pending`에도 「사장님이 수락하면…」이 붙어 있었다. 그 신청은 **사장님에게
+                      보이지도 않는다**(`listBookingsForHost`가 거른다). 기다릴 것이 없는데 기다리라고 말하고,
+                      이어서 낼 길도 없어서 목록에 쌓이기만 했다. 결제 화면은 주문번호로 되돌아갈 수 있다. */}
+                  {b.status === "pending" ? (
+                    <p className="mt-3 text-[15px] leading-relaxed break-keep text-faint">
+                      아직 결제가 끝나지 않아 사장님께 전달되지 않았어요.{" "}
+                      <Link href={`/rent/pay/${b.orderId}`} className="text-body underline underline-offset-2">
+                        이어서 결제하기
+                      </Link>
+                    </p>
+                  ) : open ? (
                     <ContactBlock
                       who="사장님"
                       profile={contacts.get(sp?.ownerUserId ?? -1) ?? null}
