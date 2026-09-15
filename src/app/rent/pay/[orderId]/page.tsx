@@ -44,7 +44,8 @@ export default async function RentPayPage({ params }: { params: Promise<{ orderI
         amount={b.amountTotal}
         orderName={`${brief.name} · ${dateLabel(b.useDate)}`}
         backHref={`/rent/${brief.slug}`}
-        summary={`${brief.name} · ${dateLabel(b.useDate)}${b.hours ? ` · ${b.hours}` : ""}`}
+        placeLabel={brief.name}
+        scheduleLabel={`${dateLabel(b.useDate)}${b.hours ? ` · ${b.hours}` : ""}`}
         amountLabel={won(b.amountTotal)}
         withMentor={b.amountMentor > 0}
       />

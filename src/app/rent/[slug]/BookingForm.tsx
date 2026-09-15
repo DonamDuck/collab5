@@ -36,6 +36,16 @@ import { MentorOptions } from "./MentorOption";
 
 const labelCls = "mb-2 block text-[16px] font-medium text-body";
 const hintCls = "mt-2 text-[15px] leading-relaxed break-keep text-faint";
+/** 확인 팝업의 항목 한 줄. 결제 화면의 같은 줄과 라벨 폭을 맞춰 둔다. */
+function ConfirmItem({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="flex gap-3 leading-relaxed break-keep">
+      <dt className="w-[72px] shrink-0 text-mute">{label}</dt>
+      <dd className="min-w-0 flex-1 text-body">{value}</dd>
+    </div>
+  );
+}
+
 /** 못 넘어간 칸 바로 아래에 붙는 한 줄. 힌트와 같은 자리에 같은 크기로 서고 색만 다르다. */
 const errCls = "mt-2 text-[15px] leading-relaxed break-keep text-danger";
 
@@ -284,14 +294,9 @@ export function BookingForm({
         </div>
       )}
 
-      {/* ── 금액 ── 낼 돈을 버튼 «위»에 적는다. 누른 뒤에 금액을 처음 보면 그건 함정이다.
-          표 대신 한 문장 — 항목이 둘뿐이라 표를 그리면 영수증이 된다. */}
-      <p className="border-t border-hairline pt-6 text-[17px] leading-relaxed break-keep text-body">
-        대여 비용 <span className="font-medium text-ink">{won(total)}</span>
-        {mentorAmount > 0 && <span className="text-mute"> (사장님 시간 포함)</span>} · 사장님이 거절하시면
-        전액 돌려드려요. 수락하시면 그때 주소와 연락처가 열려요.
-      </p>
-
+      {/* 🔻09-15 대표 — 「대여 비용 · 거절하면 전액 환불 · 수락하면 주소가 열려요」 줄 삭제.
+          금액은 화면 아래 고정 바가 늘 들고 있어서 같은 말이 두 번이었고, 환불 이야기는
+          상세의 «환불 규정» 절로 옮겼다(대표 [2]). 한 문장이 세 가지 일을 하려다 셋 다 흐렸다. */}
       {err && <p className="text-[15px] leading-relaxed break-keep text-danger">{err}</p>}
 
       {/* 🔻09-14 데스크톱 인라인 버튼 삭제 — 하단 고정 바가 이제 모든 폭에서 뜬다(대표 지시).
@@ -307,7 +312,7 @@ export function BookingForm({
 
       <ConfirmDialog
         open={confirming}
-        title="이대로 신청할까요"
+        title="신청 정보를 확인해주세요"
         confirmLabel="신청하기"
         busy={pending}
         onConfirm={submit}
@@ -318,11 +323,22 @@ export function BookingForm({
         {mentorMinutes > 0 && (
           <MentorOptions minutes={mentorMinutes} price={mentorPrice} value={withMentor} onChange={setWithMentor} />
         )}
-        <p>
-          {dateLabel(useDate)}에 <span className="font-medium text-ink">{spaceName}</span>을{" "}
-          <span className="font-medium text-ink">{won(total)}</span>에 신청할까요?
-        </p>
-        <p className="text-mute">사장님이 거절하시면 전액 돌려드려요.</p>
+        {/* 📋09-15 대표 — *「줄글로 하지 말고 결제 화면의 항목처럼」*. 결제 화면(`PayPanel`)과 같은 문법이다.
+            ⭐두 화면이 같은 모양이라 **방금 확인한 것을 다음 화면에서 다시 대조**할 수 있다.
+            🔻「사장님이 거절하시면 전액 돌려드려요」는 뺐다 — 상세의 환불 규정 절이 맡는다(대표 [6]). */}
+        <dl className="space-y-2 border-t border-hairline pt-3 text-[16px]">
+          <ConfirmItem label="장소" value={spaceName} />
+          <ConfirmItem label="신청 날짜" value={dateLabel(useDate)} />
+          <ConfirmItem
+            label="결제 금액"
+            value={
+              <>
+                <span className="font-medium text-ink">{won(total)}</span>
+                {mentorAmount > 0 && <span className="text-mute"> · 사장님 시간 포함</span>}
+              </>
+            }
+          />
+        </dl>
       </ConfirmDialog>
     </div>
   );

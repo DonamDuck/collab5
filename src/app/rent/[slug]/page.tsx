@@ -230,6 +230,37 @@ export default async function SpaceDetailPage({
         )}
       </Section>
 
+      {/* 💸09-15 대표 — *「환불 규정 섹션 하나 만들고 환불 규정 넣자. 일단 제너럴하게 우리가 정한 환불규정으로」*.
+          ⭐숫자는 `guestCancelRefundRate`(`lib/rent-payment.ts`)가 실제로 계산하는 값 그대로다.
+            🚨문장으로 옮겨 적은 표가 코드와 어긋나면, 손님은 화면을 믿고 우리는 코드대로 돌려준다.
+            그러니 여기 값을 고칠 일이 생기면 **그 함수부터 고치고 이 절을 맞춘다.**
+          📌공간마다 다르게 두지 않는다. 사장님이 각자 정하면 손님이 매번 다시 읽어야 하고,
+            분쟁이 났을 때 기준이 공간 수만큼 생긴다. */}
+      <Section title="환불 규정">
+        <p className="text-[17px] leading-relaxed break-keep text-body">
+          사장님이 거절하시면 <span className="font-medium text-ink">전액</span> 돌려드려요.
+        </p>
+        <p className="mt-3 text-[16px] leading-relaxed break-keep text-mute">
+          신청하신 분이 취소하실 때는 쓰기로 한 날까지 남은 기간으로 정해져요.
+        </p>
+        <dl className="mt-3 space-y-2 text-[16px]">
+          {[
+            ["7일 전까지", "전액 (100%)"],
+            ["3일 전까지", "70%"],
+            ["1일 전까지", "50%"],
+            ["당일", "환불 없음"],
+          ].map(([when, rate]) => (
+            <div key={when} className="flex gap-3 leading-relaxed break-keep">
+              <dt className="w-[104px] shrink-0 text-mute">{when}</dt>
+              <dd className="min-w-0 flex-1 text-body">{rate}</dd>
+            </div>
+          ))}
+        </dl>
+        <p className="mt-3 text-[15px] leading-relaxed break-keep text-faint">
+          돌려드리는 돈은 결제하신 수단으로 그대로 들어가요. 사장님이 수락하시면 그때 주소와 연락처가 열려요.
+        </p>
+      </Section>
+
       {/* ── 신청 ── */}
       <Section title="신청하기">
         {isOwner ? (
