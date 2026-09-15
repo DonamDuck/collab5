@@ -221,8 +221,14 @@ export async function signInAction(
     "collab5-2": [process.env.LOCAL_TEST_EMAIL_2, process.env.LOCAL_TEST_PASSWORD_2],
   };
   let id = email.trim(), pw = password;
-  const hit = testMap[id];
-  if (process.env.NODE_ENV === "development" && process.env.LOCAL_TEST_LOGIN === "1" && hit && password === id) {
+  // 📱**폰 키보드가 손대는 것을 되돌린다** (09-15 실측: 아이폰 사파리에서 `collab5-2`로 로그인이 안 됐다).
+  //   아이폰은 첫 글자를 대문자로 올리고(`Collab5-2`), 하이픈을 긴 줄표로 바꾸기도 한다(`collab5–2`).
+  //   서버에 도착한 값이 표의 키와 한 글자라도 다르면 실제 계정 로그인으로 흘러가 조용히 실패한다.
+  //   ⭐테스트 분기에서만 쓰는 정규화라 실제 이메일 비교에는 안 닿는다.
+  const norm = (v: string) => v.trim().toLowerCase().replace(/[\u2013\u2014\u2212]/g, "-");
+  const key = norm(id);
+  const hit = testMap[key];
+  if (process.env.NODE_ENV === "development" && process.env.LOCAL_TEST_LOGIN === "1" && hit && norm(password) === key) {
     if (!hit[0] || !hit[1]) return { error: "테스트 계정 env가 비어 있어요 (LOCAL_TEST_EMAIL_n)." };
     [id, pw] = [hit[0], hit[1]];
   }

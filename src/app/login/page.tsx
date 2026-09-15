@@ -76,6 +76,12 @@ function LoginForm() {
               type={process.env.NODE_ENV === "development" ? "text" : "email"}
               name="email"
               autoComplete="username"
+              // 📱아이폰 키보드가 첫 글자를 대문자로 올리고 철자를 고친다. 이메일 칸에서는 그게 전부 오타다.
+              //   운영의 `type="email"`은 이 셋을 알아서 끄지만 개발 빌드의 `text`는 안 꺼서 명시한다(09-15 실측).
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              inputMode="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="user@email.com"
