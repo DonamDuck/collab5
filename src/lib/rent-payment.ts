@@ -4,8 +4,10 @@
 //   들어올 때까지의 **자리 표시**다. 모듈이 오면 이 파일의 두 함수 본문만 갈아 끼운다(호출부는 안 바뀐다).
 //
 // ⚠️키가 없으면 **모의 모드**로 떨어진다(notify.ts와 같은 규율 — 미설정 환경에서 흐름 검증이 막히면 안 된다).
-//   모의 모드는 `TOSS_SECRET_KEY`가 비었을 때만 켜지고, 콘솔에 매번 그 사실을 찍는다.
-//   🚨운영에서 이 모드로 돌면 **돈을 안 받고 예약이 확정된다.** 배포 전 키 유무를 반드시 확인할 것.
+//   🔒단 **개발에서만이다**(2026-09-16). 전에는 키 유무만 봐서, 운영에 키를 안 넣으면
+//     «돈을 안 받고 예약이 확정»됐다. 그 경고를 이 머리말에 적어 두고 사람 손에 맡겼는데,
+//     ⭐배포 전에 사람이 확인해야 하는 것은 언젠가 한 번은 빠진다. 그래서 코드가 막는다.
+//   운영에서 키가 비어 있으면 결제는 **실패로 떨어진다** — 조용히 통과하는 것보다 낫다.
 
 const TOSS_BASE = "https://api.tosspayments.com/v1/payments";
 
@@ -15,6 +17,12 @@ function secret(): string {
 
 export function paymentsLive(): boolean {
   return secret().length > 0;
+}
+
+/** 모의 모드를 켜도 되는 자리인가. 🔒**운영에서는 절대 안 된다.**
+ *  키가 없는 운영은 «설정 사고»지 «검증 환경»이 아니다. */
+function mockAllowed(): boolean {
+  return process.env.NODE_ENV !== "production";
 }
 
 /** Basic {base64(secretKey + ":")} — 토스 규약. 비밀번호 자리를 비우고 콜론만 붙인다. */
@@ -35,6 +43,10 @@ export async function approvePayment(
   paymentKey: string, orderId: string, amount: number
 ): Promise<ApproveResult> {
   if (!paymentsLive()) {
+    if (!mockAllowed()) {
+      console.error(`[rent-payment] 🚨운영에 TOSS_SECRET_KEY가 없다 — 승인을 거절한다 (order=${orderId})`);
+      return { ok: false, paymentKey, message: "결제를 처리할 수 없어요. 잠시 뒤 다시 시도해 주세요." };
+    }
     console.warn(`[rent-payment] 모의 승인 — TOSS_SECRET_KEY 없음 (order=${orderId}, ${amount}원)`);
     return { ok: true, paymentKey: paymentKey || `mock_${orderId}`, message: "모의 승인" };
   }
@@ -59,6 +71,8 @@ export async function cancelPayment(
   paymentKey: string, reason: string, amount?: number
 ): Promise<boolean> {
   if (!paymentsLive()) {
+    // 🔁취소는 승인과 «반대로» 관대하게 둔다. 운영에 키가 없으면 애초에 승인이 안 되니
+    //   취소할 실제 결제도 없다. 여기서 막으면 환불 흐름만 붙잡혀 예약이 취소 불가로 남는다.
     console.warn(`[rent-payment] 모의 취소 — key=${paymentKey} (${reason})`);
     return true;
   }
