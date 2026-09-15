@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { getSpacePublic, listLiveBookingsIn } from "@/lib/spaces";
 import { getSessionUserId } from "@/lib/profiles";
 import { repo } from "@/lib/repo";
+import { accessHowLine } from "@/lib/rent-copy";
 import { PhotoSlider } from "@/components/PhotoSlider";
 import { BookingForm } from "./BookingForm";
 import { categoryLabel, Chip, dateLabel, primaryBtnCls, scopeLabel, won } from "../ui";
@@ -262,13 +263,8 @@ export default async function SpaceDetailPage({
             분쟁이 났을 때 기준이 공간 수만큼 생긴다. */}
       {/* 📨09-16 — 비밀번호 같은 건 우리가 안 가진다. 「어떻게 받게 되는지」만 미리 말해 준다. */}
       <Section title="이용 안내">
-        <p className="text-[17px] leading-relaxed break-keep text-body">
-          {sp.accessHow === "sms"
-            ? "예약이 확정되면 사장님이 문자로 이용 안내를 보내드려요."
-            : sp.accessHow === "onsite"
-              ? "이용하시는 날 현장에서 사장님이 직접 안내해 드려요."
-              : "예약이 확정되면 문자로 안내드리고, 당일 현장에서도 한 번 더 알려드려요."}
-        </p>
+        {/* 같은 문장이 확정 메일에도 나간다 — 정본은 `lib/rent-copy`다. */}
+        <p className="text-[17px] leading-relaxed break-keep text-body">{accessHowLine(sp.accessHow)}</p>
         <p className="mt-2 text-[15px] leading-relaxed break-keep text-mute">
           출입 비밀번호처럼 민감한 내용은 collab5에 저장하지 않아요. 사장님이 직접 전해 드립니다.
         </p>

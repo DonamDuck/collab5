@@ -11,6 +11,7 @@
 //   받는 사람이 여는 곳은 하나다.
 import { SITE_URL } from "./site";
 import { bookingWhen, dateLabel } from "./rent-time";
+import { accessHowLine, hostContactLine } from "./rent-copy";
 import type { Space, SpaceBooking } from "./types";
 import type { Profile } from "./profiles";
 
@@ -133,11 +134,14 @@ export async function notifyBookingConfirmed(
   const when = dateLabel(booking.useDate);
   const subject = `[collab5] 확정됐어요 · ${when} ${space.name}`;
   const link = `${SITE_URL}/rent/done/${booking.id}`;
-  const contact = [host?.phone, host?.email].filter(Boolean).join(" · ") || "연락처를 안 적으셨어요";
+  const contact = hostContactLine(space.contactPhone, host?.phone, host?.email);
   const rows: [string, string][] = [
     ["언제", bookingWhen(booking)],
     ["어디", space.name],
     ["주소", space.address],
+    // 📨09-16 「들어오는 법」(옛 `accessNote`)에서 «안내 방식»으로. 비밀번호 같은 건 우리가 안 가진다.
+    //   옛 공간은 그 글이 아직 남아 있어서 있으면 같이 보낸다.
+    ["이용 안내", accessHowLine(space.accessHow)],
     ["들어오는 법", space.accessNote],
     ["사장님", `${hostName} · ${contact}`],
     ["사장님 말씀", booking.hostMessage],
