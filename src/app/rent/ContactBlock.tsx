@@ -6,13 +6,19 @@
 //
 // 🎨16px 본문, 상단 15px faint 안내 한 줄. 상자 없이 — 확정 화면에 민트 상자를 두면 「성공」이 색으로 말해
 //   버려서 브랜드색 희소성 규율(ui.tsx)과 부딪힌다.
+//
+// 🔁09-15 대표 — *「가게 정보 타이틀 하나 섹션 만들고 하단에 전화번호: 이메일: 주소: 이런 식으로 깔끔하게」*.
+//   전엔 이름·전화·이메일·주소가 **각자 다른 모양의 줄**로 흘러서 무엇이 무엇인지 라벨이 없었다.
+//   이제 화면 셋(확정·신청 완료·내 하루 가게)이 쓰는 그 항목 문법(`InfoRow`)을 여기서도 쓴다.
 import type { Profile } from "@/lib/profiles";
+import { InfoList, InfoRow } from "./ui";
 
 export function ContactBlock({
   who,
   profile,
   address,
   accessNote,
+  title = "가게 정보",
 }: {
   /** 「사장님」 또는 「신청하신 분」 */
   who: string;
@@ -21,41 +27,46 @@ export function ContactBlock({
   address?: string;
   /** 「들어오는 법」 — 주소와 같은 급의 비밀. 손님 쪽에만. */
   accessNote?: string;
+  /** 절 제목. 손님이 보면 「가게 정보」, 사장님이 보면 「신청하신 분 정보」다. */
+  title?: string;
 }) {
   const name = profile?.brandName?.trim() || "이름을 안 적으셨어요";
   const phone = profile?.phone?.trim() ?? "";
   const email = profile?.email?.trim() ?? "";
-  const line = "text-[16px] leading-relaxed break-keep text-body";
   return (
-    <div className="mt-3">
-      <p className="text-[15px] text-faint">확정된 분끼리만 보여요</p>
-      <p className={`mt-1 ${line}`}>
-        <span className="text-mute">{who} · </span>
-        <span className="font-medium text-ink">{name}</span>
-      </p>
-      {phone ? (
-        <p className={line}>
-          <a href={`tel:${phone.replace(/[^0-9+]/g, "")}`} className="underline underline-offset-2">
-            {phone}
-          </a>
-        </p>
-      ) : (
-        <p className={`${line} text-mute`}>전화번호를 안 적으셨어요. 이메일로 연락해 주세요.</p>
-      )}
-      {email && (
-        <p className={line}>
-          <a href={`mailto:${email}`} className="underline underline-offset-2">
-            {email}
-          </a>
-        </p>
-      )}
-      {address && <p className={`mt-2 ${line}`}>{address}</p>}
-      {accessNote && (
-        <p className={`whitespace-pre-line ${line}`}>
-          <span className="text-mute">들어오는 법 · </span>
-          {accessNote}
-        </p>
-      )}
-    </div>
+    <section className="mt-8 border-t border-hairline pt-7">
+      <h2 className="text-[19px] font-bold leading-snug tracking-tight text-ink">{title}</h2>
+      <p className="mt-1 mb-4 text-[15px] text-faint">확정된 분끼리만 보여요</p>
+      <InfoList>
+        <InfoRow label={who} value={<span className="font-medium text-ink">{name}</span>} />
+        <InfoRow
+          label="전화번호"
+          value={
+            phone ? (
+              // 눌러서 바로 걸 수 있게. 확정된 뒤의 연락은 대개 「지금」 해야 하는 일이다.
+              <a href={`tel:${phone.replace(/[^0-9+]/g, "")}`} className="underline underline-offset-2">
+                {phone}
+              </a>
+            ) : (
+              <span className="text-mute">안 적으셨어요. 이메일로 연락해 주세요.</span>
+            )
+          }
+        />
+        {email && (
+          <InfoRow
+            label="이메일"
+            value={
+              <a href={`mailto:${email}`} className="break-all underline underline-offset-2">
+                {email}
+              </a>
+            }
+          />
+        )}
+        {address && <InfoRow label="주소" value={address} />}
+        {accessNote && (
+          <InfoRow label="들어오는 법" value={<span className="whitespace-pre-line">{accessNote}</span>} />
+        )}
+      </InfoList>
+    </section>
   );
 }

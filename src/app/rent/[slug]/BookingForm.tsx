@@ -29,23 +29,13 @@ import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { startBookingAction, confirmBookingAction } from "@/lib/rent-actions";
 import type { SpaceUseType } from "@/lib/types";
-import { dateLabel, primaryBtnCls, RentSelect, rentInputCls, rentTextareaCls, won } from "../ui";
+import { dateLabel, InfoList, InfoRow, primaryBtnCls, RentSelect, rentInputCls, rentTextareaCls, won } from "../ui";
 import { ConfirmDialog } from "../ConfirmDialog";
 import { PickDateCalendar } from "./PickDateCalendar";
 import { MentorOptions } from "./MentorOption";
 
 const labelCls = "mb-2 block text-[16px] font-medium text-body";
 const hintCls = "mt-2 text-[15px] leading-relaxed break-keep text-faint";
-/** 확인 팝업의 항목 한 줄. 결제 화면의 같은 줄과 라벨 폭을 맞춰 둔다. */
-function ConfirmItem({ label, value }: { label: string; value: React.ReactNode }) {
-  return (
-    <div className="flex gap-3 leading-relaxed break-keep">
-      <dt className="w-[72px] shrink-0 text-mute">{label}</dt>
-      <dd className="min-w-0 flex-1 text-body">{value}</dd>
-    </div>
-  );
-}
-
 /** 못 넘어간 칸 바로 아래에 붙는 한 줄. 힌트와 같은 자리에 같은 크기로 서고 색만 다르다. */
 const errCls = "mt-2 text-[15px] leading-relaxed break-keep text-danger";
 
@@ -326,10 +316,10 @@ export function BookingForm({
         {/* 📋09-15 대표 — *「줄글로 하지 말고 결제 화면의 항목처럼」*. 결제 화면(`PayPanel`)과 같은 문법이다.
             ⭐두 화면이 같은 모양이라 **방금 확인한 것을 다음 화면에서 다시 대조**할 수 있다.
             🔻「사장님이 거절하시면 전액 돌려드려요」는 뺐다 — 상세의 환불 규정 절이 맡는다(대표 [6]). */}
-        <dl className="space-y-2 border-t border-hairline pt-3 text-[16px]">
-          <ConfirmItem label="장소" value={spaceName} />
-          <ConfirmItem label="신청 날짜" value={dateLabel(useDate)} />
-          <ConfirmItem
+        <InfoList className="border-t border-hairline pt-3">
+          <InfoRow label="장소" value={spaceName} />
+          <InfoRow label="신청 날짜" value={dateLabel(useDate)} />
+          <InfoRow
             label="결제 금액"
             value={
               <>
@@ -338,7 +328,7 @@ export function BookingForm({
               </>
             }
           />
-        </dl>
+        </InfoList>
       </ConfirmDialog>
     </div>
   );

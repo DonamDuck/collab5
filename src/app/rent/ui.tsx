@@ -138,6 +138,36 @@ export const secondaryBtnCls =
   "inline-flex h-[44px] items-center justify-center rounded-md border border-border-strong bg-surface px-5 text-[16px] font-medium text-ink transition-colors hover:bg-surface-soft disabled:opacity-60";
 
 /** 목록 카드·상세 상단이 쓰는 흰 카드. ⛔점선 테두리 금지(대표 지시) — 실선 hairline 한 종류만 쓴다. */
+/** 📋 항목 줄 — 「장소 / 일정 / 금액」처럼 **라벨과 값이 짝인 것**을 세로로 세운다 (2026-09-15 대표).
+ *
+ *  대표: *「줄글로 하지 말고 결제 화면의 항목처럼」* · *「이쁘게 나오게 하자고! 이건 예약 완료 화면이니깐」*.
+ *  ⭐한 곳에 둔 이유 — 신청 확인 팝업 · 결제 · 신청 완료 · 확정 · 취소, **다섯 자리가 같은 것을 보여 준다.**
+ *    자리마다 따로 그리면 라벨 폭이 제각각이 되고, 방금 확인한 것을 다음 화면에서 대조하기 어려워진다.
+ *  ⚠️표 태그를 쓰지 않는다. 두 칸짜리 표는 좁은 화면에서 칸이 깨진다. 라벨 고정폭이면 충분하다.
+ *  📐라벨 88px = 「결제 금액」 네 글자가 안 접히는 폭(16px 기준 재서 잡았다). */
+export function InfoList({ children, className = "" }: { children: ReactNode; className?: string }) {
+  return <dl className={`space-y-2.5 ${className}`}>{children}</dl>;
+}
+
+export function InfoRow({ label, value }: { label: string; value: ReactNode }) {
+  return (
+    <div className="flex gap-3 text-[16px] leading-relaxed break-keep">
+      <dt className="w-[88px] shrink-0 text-mute">{label}</dt>
+      <dd className="min-w-0 flex-1 text-body">{value}</dd>
+    </div>
+  );
+}
+
+/** 항목을 감싸는 옅은 판. 「지금 대조할 것」이 한 덩어리로 보인다. */
+export function InfoPanel({ title, children }: { title?: string; children: ReactNode }) {
+  return (
+    <div className="rounded-lg border border-hairline bg-surface-soft p-4">
+      {title && <p className="mb-3 text-[15px] font-medium text-mute">{title}</p>}
+      <InfoList>{children}</InfoList>
+    </div>
+  );
+}
+
 export function CardBox({ children, className = "" }: { children: ReactNode; className?: string }) {
   return (
     <div className={`rounded-lg border border-hairline bg-surface p-5 ${className}`}>{children}</div>

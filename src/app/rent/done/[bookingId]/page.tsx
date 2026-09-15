@@ -4,7 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import { getBooking, getSpaceFull, isRevealed, listSpacesByIds } from "@/lib/spaces";
 import { getSessionUserId, getProfileById } from "@/lib/profiles";
 import { ContactBlock } from "../../ContactBlock";
-import { dateLabel, primaryBtnCls, secondaryBtnCls, won } from "../../ui";
+import { dateLabel, InfoPanel, InfoRow, primaryBtnCls, secondaryBtnCls, won } from "../../ui";
 
 // 하루 가게 — 신청 완료 화면 (2026-09-14)
 //
@@ -17,7 +17,8 @@ import { dateLabel, primaryBtnCls, secondaryBtnCls, won } from "../../ui";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "신청했어요 — collab5",
+  // 확정·완료 어느 쪽이든 열리는 화면이라 탭 제목은 중립으로 둔다(본문 제목이 상태를 말한다).
+  title: "예약 내역 — collab5",
   robots: { index: false },
 };
 
@@ -40,47 +41,91 @@ export default async function RentDonePage({ params }: { params: Promise<{ booki
   const space = open && brief ? await getSpaceFull(brief.slug) : null;
   const host = open && brief ? await getProfileById(brief.ownerUserId) : null;
 
-  const title = open ? "확정됐어요" : b.status === "paid" ? "신청했어요" : "이 신청은 끝났어요";
+  // 🔁09-15 대표 — *「예약을 완료했어요」*·*「예약이 확정됐어요!」*. 「신청했어요」는 우리가 받은 일을 말하고
+  //   「예약을 완료했어요」는 «그분이 해낸 일»을 말한다. 끝나는 화면에서 주어는 손님이어야 한다.
+  // 🎉이모지는 제목 «오른쪽»에(대표: *「타이틀 우측이나 좀 뭐 재밌게」*). 왼쪽에 두면 글머리표처럼 읽혀서
+  //   제목이 목록의 한 줄로 내려앉는다. 오른쪽은 문장이 끝난 뒤라 축하가 된다.
+  //   ⚠️`aria-hidden` — 화면 낭독기가 「파티 크래커」를 읽으면 제목이 길어지기만 한다.
+  const title = open ? "예약이 확정됐어요" : b.status === "paid" ? "예약을 완료했어요" : "이 신청은 끝났어요";
+  const emoji = open ? "🎉" : b.status === "paid" ? "✨" : "";
   const spaceName = brief?.name ?? "공간";
 
   return (
     <main className="mx-auto w-full max-w-[560px] px-4 py-14 sm:px-6">
-      <h1 className="text-[22px] font-bold leading-tight tracking-tight text-ink">{title}</h1>
-      <p className="mt-4 text-[17px] leading-relaxed break-keep text-body">
-        <span className="font-medium text-ink">{spaceName}</span> · {dateLabel(b.useDate)}
-        {b.hours ? ` · ${b.hours}` : ""}
-      </p>
-      <p className="mt-1 text-[17px] leading-relaxed break-keep text-body">
-        낸 돈 {won(b.amountTotal)}
-        {b.amountMentor > 0 && <span className="text-mute"> (사장님 시간 포함)</span>}
-      </p>
+      <h1 className="flex items-center gap-2 text-[22px] font-bold leading-tight tracking-tight text-ink">
+        {title}
+        {emoji && (
+          <span aria-hidden="true" className="text-[20px]">
+            {emoji}
+          </span>
+        )}
+      </h1>
+
+      {/* 📋신청 확인 팝업·결제 화면과 «같은» 항목 문법이다. 여기까지 세 화면에서 같은 것을 세 번 보게 되는데,
+          그게 번거로움이 아니라 확인이다 — 셋이 다르게 생기면 대조가 안 된다. */}
+      <div className="mt-6">
+        <InfoPanel>
+          <InfoRow label="장소" value={<span className="font-medium text-ink">{spaceName}</span>} />
+          <InfoRow label="일정" value={`${dateLabel(b.useDate)}${b.hours ? ` · ${b.hours}` : ""}`} />
+          <InfoRow
+            label="결제 금액"
+            value={
+              <>
+                <span className="font-medium text-ink">{won(b.amountTotal)}</span>
+                {b.amountMentor > 0 && <span className="text-mute"> · 사장님 시간 포함</span>}
+              </>
+            }
+          />
+        </InfoPanel>
+      </div>
 
       {open ? (
         <>
           {b.hostMessage && (
-            <p className="mt-4 text-[16px] leading-relaxed break-keep text-body">사장님 말씀 · {b.hostMessage}</p>
+            <p className="mt-6 text-[16px] leading-relaxed break-keep text-body">사장님 말씀 · {b.hostMessage}</p>
           )}
-          <ContactBlock who="사장님" profile={host} address={space?.address} accessNote={space?.accessNote} />
+          <ContactBlock
+            who="사장님"
+            title="가게 정보"
+            profile={host}
+            address={space?.address}
+            accessNote={space?.accessNote}
+          />
         </>
       ) : b.status === "paid" ? (
-        <>
-          <p className="mt-5 text-[15px] leading-relaxed break-keep text-mute">
-            사장님이 보통 하루 안에 답해요. 답이 오면 이메일로 알려드릴게요.
-          </p>
-          <p className="mt-1 text-[15px] leading-relaxed break-keep text-mute">거절되면 전액 돌려드려요.</p>
-        </>
+        // 📌09-15 대표가 문안까지 주셨다. 맞춤법만 손봤다 — 「~거에요」는 「~거예요」가 맞고,
+        //   「1~2일 내」·「3~5일 내」는 「~일 안에」로 풀었다(우리 말투는 한자 조사를 안 쓴다).
+        <section className="mt-8 border-t border-hairline pt-7">
+          <h2 className="text-[19px] font-bold leading-snug tracking-tight text-ink">예약 안내 사항</h2>
+          <ul className="mt-4 space-y-3">
+            {[
+              "사장님께서 신청을 확인하신 뒤 개인 연락처로 연락해 주실 거예요. 이틀 안에 연락이 없으면 사장님 전화번호를 신청 내역에서 확인하실 수 있어요.",
+              "신청이 거절되면 사흘에서 닷새 안에 환불이 끝나요.",
+            ].map((t) => (
+              <li key={t} className="flex gap-2 text-[16px] leading-relaxed break-keep text-body">
+                <span aria-hidden="true" className="text-mute">
+                  ·
+                </span>
+                <span className="min-w-0 flex-1">{t}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
       ) : (
-        <p className="mt-5 text-[15px] leading-relaxed break-keep text-mute">
+        <p className="mt-6 text-[15px] leading-relaxed break-keep text-mute">
           자세한 상태는 내 하루 가게에서 보실 수 있어요.
         </p>
       )}
 
-      <div className="mt-8 flex flex-wrap gap-2">
-        <Link href="/rent/my" className={`${primaryBtnCls} h-[48px]`}>
-          내 하루 가게 보기
+      {/* 🔻09-15 대표 — 버튼 둘을 나란히 두지 않는다. 「신청 내역 보기」가 지금 할 일이고
+          「다른 공간도 둘러보기」는 그 다음에 «혹시» 할 일이라 무게가 다르다.
+          ⏳「신청 내역 보기」는 아직 `/rent/my`로 간다. 전용 페이지는 백로그(B80). */}
+      <div className="mt-9">
+        <Link href="/rent/my" className={`${primaryBtnCls} h-[48px] w-full`}>
+          신청 내역 보기
         </Link>
-        <Link href="/rent" className={`${secondaryBtnCls} h-[48px]`}>
-          다른 공간 보기
+        <Link href="/rent" className={`${secondaryBtnCls} mt-2 h-[48px] w-full`}>
+          다른 공간도 둘러보기
         </Link>
       </div>
     </main>

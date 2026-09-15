@@ -18,21 +18,20 @@ import { won } from "../ui";
 export type MentorPick = boolean;
 
 /** 옵션 두 줄. 고르면 면이 켜지고 오른쪽에 값이 붙는다. */
-export function MentorOptions({
-  minutes,
-  price,
-  value,
-  onChange,
-  dense,
-}: {
-  minutes: number;
-  price: number;
-  value: MentorPick;
-  onChange: (v: MentorPick) => void;
-  /** 하단 바 안에 들어갈 때(데스크톱) — 세로를 아끼려고 설명 줄을 접는다. */
+type RowProps = {
+  on: boolean;
+  title: string;
+  desc?: string;
+  amount: string;
   dense?: boolean;
-}) {
-  const Row = ({ on, title, desc, amount }: { on: boolean; title: string; desc?: string; amount: string }) => (
+  onChange: (v: MentorPick) => void;
+};
+
+/** ⚠️**컴포넌트 안에서 만들지 않는다.** 렌더마다 새 함수가 나오면 React는 매번 «다른 컴포넌트»로 보고
+ *  통째로 다시 마운트한다(lint `react-hooks/static-components`). 고른 줄이 깜빡이는 원인이 여기서 난다. */
+function Row({ on, title, desc, amount, dense, onChange }: RowProps) {
+  return (
+
     <button
       type="button"
       role="radio"
@@ -57,15 +56,33 @@ export function MentorOptions({
       </span>
       <span className="shrink-0 text-[15px] font-medium text-body">{amount}</span>
     </button>
+  
   );
+}
 
+export function MentorOptions({
+  minutes,
+  price,
+  value,
+  onChange,
+  dense,
+}: {
+  minutes: number;
+  price: number;
+  value: MentorPick;
+  onChange: (v: MentorPick) => void;
+  /** 하단 바 안에 들어갈 때(데스크톱) — 세로를 아끼려고 설명 줄을 접는다. */
+  dense?: boolean;
+}) {
   return (
     <div role="radiogroup" aria-label="신청 옵션" className="space-y-2">
       {/* 🔻09-15 대표 — 설명 줄 「그날 공간만 쓰고 혼자 해볼게요」를 뺐다.
           제목이 이미 그 문장이라 두 줄이 같은 말을 두 번 했다. 값이 안 붙는 쪽은 설명할 것이 없다. */}
-      <Row on={!value} title="공간만 빌릴게요" amount="+0원" />
+      <Row on={!value} title="공간만 빌릴게요" amount="+0원" dense={dense} onChange={onChange} />
       <Row
         on={value}
+        dense={dense}
+        onChange={onChange}
         title="사장님께 잠깐 배워보기"
         // 🔁09-15 대표 — *「사장님과 협의한 날짜에, 미리 이 일을 잠깐 배워볼 수 있어요 등과 같이 쓰자」*.
         //   ⭐전엔 「문 열기 전 60분」이라 **그날 아침으로 못 박혀 있었다.** 실제로는 사장님과 날을 맞추는 일이라

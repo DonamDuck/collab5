@@ -8,17 +8,7 @@
 // ⚠️SDK를 파일 맨 위에서 import하지 않는다. 결제까지 안 오는 대부분의 방문자에게 그 무게를 지울 이유가 없다.
 import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
-import { primaryBtnCls, secondaryBtnCls } from "../../ui";
-
-/** 라벨 한 줄. 라벨 폭을 고정해 값의 왼쪽 끝이 세로로 맞는다 — 그게 「표처럼 보이는」 이유다. */
-function Item({ label, value }: { label: string; value: React.ReactNode }) {
-  return (
-    <div className="flex gap-3 text-[16px] leading-relaxed break-keep">
-      <dt className="w-[72px] shrink-0 text-mute">{label}</dt>
-      <dd className="min-w-0 flex-1 text-body">{value}</dd>
-    </div>
-  );
-}
+import { InfoPanel, InfoRow, primaryBtnCls, secondaryBtnCls } from "../../ui";
 
 export function PayPanel({
   orderId,
@@ -145,26 +135,22 @@ export function PayPanel({
       {/* 📋09-15 대표 — *「그럴싸한 결제 정보처럼 보여줘야 해 · subtitle 결제 정보 확인 · 장소/일정/금액」*.
           줄글은 「읽고 넘기는 글」로 보이고 항목은 「대조하는 표」로 보인다. 돈 내기 직전에 필요한 건 대조다.
           ⚠️표 태그를 쓰지 않는다 — 두 칸짜리 표는 좁은 화면에서 칸이 깨진다. 왼쪽 라벨 고정폭이면 충분하다. */}
-      <div className="rounded-lg border border-hairline bg-surface-soft p-4">
-        <p className="mb-3 text-[15px] font-medium text-mute">결제 정보 확인</p>
-        <dl className="space-y-2">
-          <Item label="장소" value={placeLabel} />
-          <Item label="일정" value={scheduleLabel} />
-          <Item
-            label="금액"
-            value={
-              <>
-                <span className="font-medium text-ink">{amountLabel}</span>
-                {withMentor && <span className="text-mute"> · 사장님 시간 포함</span>}
-              </>
-            }
-          />
-        </dl>
-      </div>
+      <InfoPanel title="결제 정보 확인">
+        <InfoRow label="장소" value={placeLabel} />
+        <InfoRow label="일정" value={scheduleLabel} />
+        <InfoRow
+          label="금액"
+          value={
+            <>
+              <span className="font-medium text-ink">{amountLabel}</span>
+              {withMentor && <span className="text-mute"> · 사장님 시간 포함</span>}
+            </>
+          }
+        />
+      </InfoPanel>
 
       {/* 토스가 이 두 칸을 채운다 — 결제수단과 약관. 우리는 자리만 둔다. */}
       <div id="rent-pay-methods" />
-      <div id="rent-pay-agreement" />
 
       {err && <p className="text-[15px] leading-relaxed break-keep text-danger">{err}</p>}
 
@@ -183,14 +169,21 @@ export function PayPanel({
         </div>
       )}
 
-      <button
-        type="button"
-        onClick={requestPay}
-        disabled={pending || !ready}
-        className={`${primaryBtnCls} h-[52px] w-full`}
-      >
-        {ready ? `${amountLabel} 결제하기` : "결제 화면 불러오는 중…"}
-      </button>
+      {/* 🤝09-15 대표 — *「약관이 버튼과 떨어져 있어서 «약관 + 결제»처럼 느껴지지가 않는다.
+          토스 약관이긴 하지만 우리 서비스 안에 넣은 거니까 우리가 만든 것처럼 어색하지 않게」*.
+          ⭐약관과 버튼 사이의 «여백»이 곧 둘의 관계다. 한 칸 띄우면 남의 안내문이 되고, 붙이면
+            「이걸 읽고 이 버튼을 누른다」가 된다. `space-y-6`에서 빼내 한 덩어리로 묶었다. */}
+      <div className="space-y-3">
+        <div id="rent-pay-agreement" />
+        <button
+          type="button"
+          onClick={requestPay}
+          disabled={pending || !ready}
+          className={`${primaryBtnCls} h-[52px] w-full`}
+        >
+          {ready ? `${amountLabel} 결제하기` : "결제 화면 불러오는 중…"}
+        </button>
+      </div>
 
       <p className="text-[15px] leading-relaxed break-keep text-faint">지금은 시험 결제예요.</p>
     </div>

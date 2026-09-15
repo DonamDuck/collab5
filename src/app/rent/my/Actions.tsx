@@ -19,7 +19,7 @@ import {
   quoteCancelAction,
   publishSpaceAction,
 } from "@/lib/rent-actions";
-import { primaryBtnCls, rentTextareaCls, secondaryBtnCls, won } from "../ui";
+import { InfoList, InfoRow, primaryBtnCls, rentTextareaCls, secondaryBtnCls, won } from "../ui";
 import { ConfirmDialog } from "../ConfirmDialog";
 
 /** 받은 신청 — 수락 · 거절. 거절은 전액 환불이라 되돌릴 수 없다(대표 09-13). */
@@ -143,22 +143,39 @@ export function GuestCancel({ bookingId }: { bookingId: number }) {
       {err && <p className="mt-2 text-[15px] leading-relaxed break-keep text-danger">{err}</p>}
       <ConfirmDialog
         open={quote !== null}
-        title="이 신청을 취소할까요"
+        title="신청을 취소할까요?"
         confirmLabel="취소하기"
         cancelLabel="그냥 둘게요"
         busy={pending}
         onConfirm={run}
         onCancel={() => setQuote(null)}
       >
+        {/* 💸09-15 대표 — *「결제한 금액 / 수수료: NN원(MM%) / 환불 금액, 이런 식으로 구성하고 이쁘게」*.
+            ⭐줄글일 땐 「80,000원 중 80,000원(100%)이 돌아와요」였는데, 그 문장은 **안 돌아오는 돈이 얼마인지를
+              말하지 않는다.** 항목으로 세우면 빠지는 돈이 자기 줄을 갖는다. 취소는 그걸 보고 정하는 일이다.
+            🔻「취소하면 되돌릴 수 없어요」 삭제(대표 [9]) — 확인 팝업 자체가 이미 그 말이다.
+            ⚠️수수료율은 화면에서 계산하지 않는다. 서버가 준 `rate`에서 거꾸로 낸다 — 두 곳에서 따로 계산하면
+              언젠가 두 값이 갈라지고, 그때 손님이 보는 쪽이 틀린다. */}
         {quote && (
-          <>
-            <p>
-              낸 돈 {won(quote.total)} 중{" "}
-              <span className="font-medium text-ink">{won(quote.refund)}</span>
-              {quote.refund > 0 ? `(${Math.round(quote.rate * 100)}%)이 돌아와요.` : "이 돌아와요. 당일 취소라 환불이 없어요."}
-            </p>
-            <p className="text-mute">취소하면 되돌릴 수 없어요.</p>
-          </>
+          <InfoList className="border-t border-hairline pt-3">
+            <InfoRow label="결제한 금액" value={won(quote.total)} />
+            <InfoRow
+              label="취소 수수료"
+              value={
+                <>
+                  {won(quote.total - quote.refund)}
+                  <span className="text-mute"> ({100 - Math.round(quote.rate * 100)}%)</span>
+                </>
+              }
+            />
+            <InfoRow
+              label="환불 금액"
+              value={<span className="font-medium text-ink">{won(quote.refund)}</span>}
+            />
+          </InfoList>
+        )}
+        {quote?.refund === 0 && (
+          <p className="text-[15px] leading-relaxed break-keep text-mute">당일 취소라 돌려드릴 수 없어요.</p>
         )}
       </ConfirmDialog>
     </div>
