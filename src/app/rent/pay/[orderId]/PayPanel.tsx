@@ -173,11 +173,6 @@ export function PayPanel({
 
       {err && <p className="text-[15px] leading-relaxed break-keep text-danger">{err}</p>}
 
-      {probe && (
-        <p className="rounded-md bg-surface-soft px-3 py-2 font-mono text-[12px] leading-relaxed break-all text-mute">
-          {probe}
-        </p>
-      )}
 
       {slow && !ready && !err && (
         <div>
@@ -228,6 +223,11 @@ export function PayPanel({
       </div>
 
       <p className="text-[15px] leading-relaxed break-keep text-faint">지금은 시험 결제예요.</p>
+      {probe && (
+        <p className="rounded-md bg-surface-soft px-3 py-2 font-mono text-[12px] leading-relaxed break-all text-mute">
+          {probe}
+        </p>
+      )}
     </div>
   );
 }
