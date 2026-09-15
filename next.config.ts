@@ -12,6 +12,14 @@ const nextConfig: NextConfig = {
   // ✅끄더라도 **컴파일·런타임 에러는 그대로 화면에 뜬다**(Next 16 문서 명시). 잃는 건 배지뿐이다.
   devIndicators: false,
 
+  // 📱**폰으로 로컬을 볼 때 필요하다** (2026-09-16 대표 QA에서 나옴)
+  // Next 16 개발 서버는 localhost가 아닌 주소에서 오는 스크립트·HMR 요청을 기본으로 막는다.
+  // 그러면 폰은 HTML만 받고 페이지 코드는 한 줄도 못 받아서, 화면은 그려지는데 아무것도 안 눌리고
+  // 로그인 버튼은 옛날식 GET 제출(`/login?email=…`)로 떨어진다. 서버 로그에 ⚠ Blocked cross-origin … 이 찍힌다.
+  // ⭐IP는 와이파이를 옮길 때마다 바뀌니 Bonjour 이름(`<맥 이름>.local`)도 같이 연다.
+  //   운영 빌드에는 영향이 없는 개발 전용 설정이다.
+  allowedDevOrigins: ["192.168.35.121", "song-yeongdeog-ui-MacBookAir-5.local", "*.local"],
+
   experimental: {
     // 브랜드 사진(리사이즈 data URL)을 서버 액션으로 저장 → 기본 1MB보다 여유 필요
     serverActions: { bodySizeLimit: "12mb" },
