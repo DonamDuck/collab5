@@ -103,3 +103,28 @@ export function bookingWhen(b: {
   if (b.startTime && b.endTime) return `${date} ${rangeLabel(b.startTime, b.endTime)}`;
   return b.hours ? `${date} · ${b.hours}` : date;
 }
+
+/** 오늘(KST) `YYYY-MM-DD`.
+ *  ⭐서버가 어느 시간대에 떠 있든 같은 답을 준다 — UTC에 9시간을 더해 «날짜만» 떼어낸다.
+ *    그래서 화면(브라우저)과 서버 액션이 같은 「오늘」을 본다. */
+export function todayKst(): string {
+  return new Date(Date.now() + 9 * 3_600_000).toISOString().slice(0, 10);
+}
+
+/** 지금(KST) `HH:MM`. 같은 날 이미 지나간 시각을 파는 걸 막는 데 쓴다. */
+export function nowHhmmKst(): string {
+  return new Date(Date.now() + 9 * 3_600_000).toISOString().slice(11, 16);
+}
+
+/** 아직 팔 수 있는 시간대만 남긴다 — 지난 날은 통째로 빼고, 오늘은 «이미 끝난» 칸을 뺀다.
+ *
+ *  🩸09-16까지 이걸 «아무도» 안 했다. 사장님이 열어 둔 날이 지나가도 달력에 그대로 남고,
+ *    서버도 지난 날짜를 그냥 받았다. 지난주 날짜로 결제가 되는 것이다.
+ *  ⭐화면과 서버가 같은 함수를 부른다. 한쪽만 걸러 두면 언젠가 그 틈으로 들어온다. */
+export function futureSlots(slots: OpenSlot[], today = todayKst(), now = nowHhmmKst()): OpenSlot[] {
+  return slots.filter((sl) => {
+    if (sl.date < today) return false;
+    if (sl.date > today) return true;
+    return toMinutes(sl.end) > toMinutes(now);
+  });
+}

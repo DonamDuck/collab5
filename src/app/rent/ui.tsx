@@ -53,12 +53,9 @@ export function scopeLabel(v: SpaceScope): string {
 
 /** 날짜·일정 서식은 `lib/rent-time`이 정본이다(09-16). 서버 액션·메일도 같은 함수를 쓴다.
  *  여기서 다시 내보내는 건 `/rent/**` 화면들이 이 파일 하나만 보게 하려는 것이다. */
-export { dateLabel, bookingWhen } from "@/lib/rent-time";
+export { dateLabel, bookingWhen, todayKst } from "@/lib/rent-time";
 
-/** 오늘(KST) `YYYY-MM-DD` — 날짜 입력칸의 `min`으로 쓴다. 지난 날짜를 고르는 실수를 미리 막는다. */
-export function todayKst(): string {
-  return new Date(Date.now() + 9 * 3_600_000).toISOString().slice(0, 10);
-}
+
 
 /** 읽고 지나가는 칩 — 설비·쓰임새·날짜. 소개서 상단 카드의 pill과 같은 얼굴.
  *  ⭐한 덩어리 안에서는 이 한 종류만 쓴다(디자인-시스템 §형태가 의미를 만든다).

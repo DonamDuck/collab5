@@ -5,6 +5,7 @@ import { getSpacePublic, listLiveBookingsIn } from "@/lib/spaces";
 import { getSessionUserId } from "@/lib/profiles";
 import { repo } from "@/lib/repo";
 import { accessHowLine } from "@/lib/rent-copy";
+import { futureSlots } from "@/lib/rent-time";
 import { PhotoSlider } from "@/components/PhotoSlider";
 import { BookingForm } from "./BookingForm";
 import { categoryLabel, Chip, dateLabel, primaryBtnCls, scopeLabel, won } from "../ui";
@@ -80,7 +81,9 @@ export default async function SpaceDetailPage({
       : [];
 
   // 🔁09-16 하루 단위 → 시간 단위. 날짜는 시간대 목록에서 뽑고, 그 날 이미 팔린 시간도 같이 읽는다.
-  const openSlots = [...sp.openSlots].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+  // ⏳지난 시간대는 여기서 걸러 낸다. 사장님이 열어 둔 날이 지나가도 목록에는 그대로 남아 있어서,
+  //   안 거르면 달력에 지난주가 「빌릴 수 있는 날」로 서 있고 결제까지 통과한다.
+  const openSlots = futureSlots(sp.openSlots).sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
   const openDates = Array.from(new Set(openSlots.map((sl) => sl.date))).sort();
   // ⚠️예약을 날짜마다 따로 부르면 열어 둔 날 수만큼 왕복이 는다. 한 번에 읽어 날짜별로 나눈다.
   const liveBookings = openDates.length > 0 ? await listLiveBookingsIn(sp.id, openDates) : [];

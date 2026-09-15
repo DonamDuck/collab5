@@ -29,7 +29,7 @@ import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { startBookingAction, confirmBookingAction } from "@/lib/rent-actions";
 import type { SpaceUseType, OpenSlot } from "@/lib/types";
-import { hourMarks, hoursBetween, overlaps, toHHMM, toMinutes, rangeLabel } from "@/lib/rent-time";
+import { hourMarks, hoursBetween, nowHhmmKst, overlaps, toHHMM, toMinutes, rangeLabel, todayKst } from "@/lib/rent-time";
 import { dateLabel, InfoList, InfoRow, primaryBtnCls, RentSelect, rentInputCls, rentTextareaCls, won } from "../ui";
 import { ConfirmDialog } from "../ConfirmDialog";
 import { PickDateCalendar } from "./PickDateCalendar";
@@ -145,11 +145,14 @@ export function BookingForm({
    *  ⚠️**한 날에 시간대가 둘 이상일 수 있다**(오전만 열고 오후에 또 여는 가게). 그래서 이어 붙인 뒤
    *    시각 순으로 세우고 겹치는 칸에서 나온 같은 시각은 하나로 줄인다. 저장된 순서를 그대로 쓰면
    *    오후를 먼저 적어 둔 가게에서 고르개가 「15:00, 16:00, 10:00, 11:00」로 선다. */
+  // ⏳오늘을 고른 경우엔 이미 지나간 시각도 뺀다. 서버도 같은 검사를 한다(`startBookingAction`).
+  const cutoff = useDate === todayKst() ? toMinutes(nowHhmmKst()) : -1;
   const startChoices = Array.from(
     new Set(
       daySlots.flatMap((sl) =>
         hourMarks(sl)
           .filter((t) => hoursBetween(t, sl.end) >= minHours)
+          .filter((t) => toMinutes(t) > cutoff)
           .filter((t) => !taken.some((b) => overlaps(t, toHHMM(toMinutes(t) + minHours * 60), b.start, b.end))),
       ),
     ),

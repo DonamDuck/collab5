@@ -14,7 +14,7 @@ import { geocode } from "./geocode";
 import {
   notifyBookingPaid, notifyBookingConfirmed, notifyBookingRejected, notifyBookingCancelled,
 } from "./rent-notify";
-import { hoursBetween, fitsOpenSlot, overlaps } from "./rent-time";
+import { hoursBetween, fitsOpenSlot, nowHhmmKst, overlaps, toMinutes, todayKst } from "./rent-time";
 import type { Space, SpaceBooking, SpaceUseType, SpaceCategory, SpaceScope, OpenSlot, AccessHow } from "./types";
 
 // 하루 가게 — 쓰기 서버 액션 (2026-09-13)
@@ -202,6 +202,14 @@ export async function startBookingAction(input: BookingFormInput): Promise<Start
   if (sp.ownerUserId === uid) return { ok: false, message: "내 공간은 내가 빌릴 수 없어요." };
   if (input.plan.trim().length < 10) return { ok: false, message: "그날 무엇을 하실지 열 글자 이상 적어 주세요." };
 
+  // ⏳지난 시간은 못 산다. 화면도 거르지만(`futureSlots`) 관문은 여기다 —
+  //   열어 둔 날이 지나가도 목록에는 남아 있어서, 주소를 그대로 들고 온 사람은 화면을 안 거친다.
+  const today = todayKst();
+  if (input.useDate < today) return { ok: false, message: "지난 날짜는 신청할 수 없어요." };
+  if (input.useDate === today && toMinutes(input.startTime) <= toMinutes(nowHhmmKst())) {
+    return { ok: false, message: "이미 지난 시간이에요. 다른 시간을 골라 주세요." };
+  }
+
   // ⏱시간 검사 — 화면에서도 막지만 관문은 여기다.
   const hours = hoursBetween(input.startTime, input.endTime);
   if (hours <= 0) return { ok: false, message: "끝나는 시각이 시작보다 늦어야 해요." };
@@ -283,7 +291,7 @@ export async function confirmBookingAction(
   if (!paid) {
     await cancelPayment(approved.paymentKey, "예약 확정 실패 — 자동 환불");
     await setBookingStatus(b.id, "cancelled");
-    return { ok: false, message: "그 사이 그날이 찼어요. 결제는 자동으로 취소했습니다." };
+    return { ok: false, message: "그 사이 그 시간이 찼어요. 결제는 자동으로 취소했습니다." };
   }
 
   // 🔻09-16 `setOpenDate` 삭제 — 하루를 통째로 파는 모델이 아니다. 시간대가 겹치는지는
