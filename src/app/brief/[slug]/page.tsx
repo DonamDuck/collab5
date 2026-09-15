@@ -71,12 +71,14 @@ export default async function BriefPage({ params }: { params: Promise<{ slug: st
         <p className="mt-2 text-[14px] text-faint">{brief.publishedAt.replace(/-/g, ". ")}</p>
         {/* 🔗소개서로 가는 길. 09-14 대표: *「연결된 소개서 link ui 좀만 더 명확히」* —
             날짜 옆에 같은 회색(#9a9a9a)으로 붙어 있어 «메타 정보»로 읽혔다. 누를 것처럼 보이게 카드로 뺀다.
-            모양은 매거진의 「이 이야기의 브랜드」 카드를 그대로 따랐다(테두리·bg-surface·hover primary-pale·화살표). */}
+            모양은 매거진의 「이 이야기의 브랜드」 카드를 그대로 따랐다(테두리·bg-surface·hover primary-pale·화살표).
+            🔁09-15 윗줄 문구 교체 — 「이 리포트가 함께 만든」은 리포트가 소개서를 만든 것처럼 읽혔다(주어가 뒤바뀐다).
+            설명 대신 권유로 바꿨다. 대표가 넷 중 이걸 골랐다. */}
         <Link
           href={`/m/${brief.slug}`}
           className="mt-4 flex items-center justify-between gap-3 rounded-lg border border-hairline bg-surface px-4 py-3 transition-colors hover:bg-primary-pale">
           <span className="min-w-0">
-            <span className="block text-[12px] text-faint">이 리포트가 함께 만든</span>
+            <span className="block text-[12px] text-faint">소개서도 함께 보세요</span>
             <span className="mt-0.5 block text-[15px] font-semibold text-ink">
               {brief.brandName} 소개서
             </span>
