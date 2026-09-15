@@ -37,8 +37,11 @@ export default async function RentPayPage({ params }: { params: Promise<{ orderI
   const brief = (await listSpacesByIds([b.spaceId])).get(b.spaceId);
   if (!brief) notFound();
 
+  // 📐09-15 위 여백을 줄였다(대표: 「결제 위에 마진이 너무 넓다」). 겸사겸사 **결제창이 화면에 들어올
+  //   자리를 번다** — 이 창은 카드를 고르면 700px 가까이 자라는데, 위가 무거우면 화면 밖으로 밀려나고
+  //   그 상태에서 창 «안»이 안 눌린다(09-15 실측). 아래 여백은 그대로 둔다.
   return (
-    <main className="mx-auto w-full max-w-[560px] px-4 py-14 sm:px-6">
+    <main className="mx-auto w-full max-w-[560px] px-4 pt-6 pb-14 sm:px-6">
       {/* 🛟**React 밖에 둔 구조선** (2026-09-15).
        *
        * 🩸이 화면은 «가끔» 통째로 안 살아난다. 서버가 보낸 HTML은 멀쩡히 그려지는데 브라우저에서

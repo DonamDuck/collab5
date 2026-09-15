@@ -162,24 +162,13 @@ export function PayPanel({
         <h1 className="text-[22px] font-bold leading-tight tracking-tight text-ink">결제하기</h1>
       </div>
 
-      {/* 📋09-15 대표 — *「그럴싸한 결제 정보처럼 보여줘야 해 · subtitle 결제 정보 확인 · 장소/일정/금액」*.
-          줄글은 「읽고 넘기는 글」로 보이고 항목은 「대조하는 표」로 보인다. 돈 내기 직전에 필요한 건 대조다.
-          ⚠️표 태그를 쓰지 않는다 — 두 칸짜리 표는 좁은 화면에서 칸이 깨진다. 왼쪽 라벨 고정폭이면 충분하다. */}
-      <InfoPanel title="결제 정보 확인">
-        <InfoRow label="장소" value={placeLabel} />
-        <InfoRow label="일정" value={scheduleLabel} />
-        <InfoRow
-          label="금액"
-          value={
-            <>
-              <span className="font-medium text-ink">{amountLabel}</span>
-              {withMentor && <span className="text-mute"> · 사장님 시간 포함</span>}
-            </>
-          }
-        />
-      </InfoPanel>
 
       {/* 토스가 이 두 칸을 채운다 — 결제수단과 약관. 우리는 자리만 둔다. */}
+      {/* 📐09-15 **결제수단을 맨 위로 올렸다.** 대표 실측: 이 창이 696px까지 자라는데 위에 다른 것이
+          368px 쌓여 있어서 902px 화면에 안 들어갔다. 그래서 스크롤을 내려야 했고, 그때 창 윗부분이
+          화면 밖으로 104px 잘려 나간 상태에서 **그 안의 어떤 것도 안 눌렸다.**
+          ⭐창이 화면 안에 통째로 들어오면 그 상태가 아예 안 만들어진다 — 지금 배치면 150 + 696 < 902다.
+          🔻「결제 정보 확인」은 버튼 «바로 위»로 내렸다. 대조는 누르기 직전에 하는 일이라 자리로도 맞다. */}
       <div id="rent-pay-methods" />
 
       {err && <p className="text-[15px] leading-relaxed break-keep text-danger">{err}</p>}
@@ -204,6 +193,23 @@ export function PayPanel({
           </button>
         </div>
       )}
+
+      {/* 📋09-15 대표 — *「그럴싸한 결제 정보처럼 보여줘야 해 · subtitle 결제 정보 확인 · 장소/일정/금액」*.
+          줄글은 「읽고 넘기는 글」로 보이고 항목은 「대조하는 표」로 보인다. 돈 내기 직전에 필요한 건 대조다.
+          ⚠️표 태그를 쓰지 않는다 — 두 칸짜리 표는 좁은 화면에서 칸이 깨진다. 왼쪽 라벨 고정폭이면 충분하다. */}
+      <InfoPanel title="결제 정보 확인">
+        <InfoRow label="장소" value={placeLabel} />
+        <InfoRow label="일정" value={scheduleLabel} />
+        <InfoRow
+          label="금액"
+          value={
+            <>
+              <span className="font-medium text-ink">{amountLabel}</span>
+              {withMentor && <span className="text-mute"> · 사장님 시간 포함</span>}
+            </>
+          }
+        />
+      </InfoPanel>
 
       {/* 🤝09-15 대표 — *「약관이 버튼과 떨어져 있어서 «약관 + 결제»처럼 느껴지지가 않는다.
           토스 약관이긴 하지만 우리 서비스 안에 넣은 거니까 우리가 만든 것처럼 어색하지 않게」*.
