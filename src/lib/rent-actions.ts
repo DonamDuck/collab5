@@ -100,7 +100,7 @@ export async function saveSpaceAction(input: SpaceFormInput): Promise<ActionResu
   // 열어 둔 시간대가 말이 되는지. 거꾸로거나 최소 시간보다 짧은 칸은 아무도 못 빌린다.
   for (const sl of input.openSlots) {
     const h = hoursBetween(sl.start, sl.end);
-    if (h <= 0) return { ok: false, message: `${sl.date}의 시간이 거꾸로예요. 끝나는 시각이 더 늦어야 해요.` };
+    if (h <= 0) return { ok: false, message: `${dateLabel(sl.date)}의 시간이 거꾸로예요. 끝나는 시각이 더 늦어야 해요.` };
     if (h < input.minHours) {
       return { ok: false, message: `${dateLabel(sl.date)}은 ${h}시간만 열려 있어서 최소 ${input.minHours}시간을 못 채워요.` };
     }
@@ -202,17 +202,19 @@ export async function startBookingAction(input: BookingFormInput): Promise<Start
   if (sp.ownerUserId === uid) return { ok: false, message: "내 공간은 내가 빌릴 수 없어요." };
   if (input.plan.trim().length < 10) return { ok: false, message: "그날 무엇을 하실지 열 글자 이상 적어 주세요." };
 
-  // ⏳지난 시간은 못 산다. 화면도 거르지만(`futureSlots`) 관문은 여기다 —
+  // ⏳지난 «날»은 여기서 자른다. 화면도 거르지만(`futureSlots`) 관문은 여기다 —
   //   열어 둔 날이 지나가도 목록에는 남아 있어서, 주소를 그대로 들고 온 사람은 화면을 안 거친다.
   const today = todayKst();
   if (input.useDate < today) return { ok: false, message: "지난 날짜는 신청할 수 없어요." };
-  if (input.useDate === today && toMinutes(input.startTime) <= toMinutes(nowHhmmKst())) {
-    return { ok: false, message: "이미 지난 시간이에요. 다른 시간을 골라 주세요." };
-  }
 
   // ⏱시간 검사 — 화면에서도 막지만 관문은 여기다.
   const hours = hoursBetween(input.startTime, input.endTime);
   if (hours <= 0) return { ok: false, message: "끝나는 시각이 시작보다 늦어야 해요." };
+  // ⚠️지난 «시각» 검사는 모양 검사 «뒤»다. 앞에 두면 못 읽은 시각(`-1`)이 「이미 지났다」로 잡혀
+  //   글자가 깨졌을 때 엉뚱한 지적이 나간다.
+  if (input.useDate === today && toMinutes(input.startTime) <= toMinutes(nowHhmmKst())) {
+    return { ok: false, message: "이미 지난 시간이에요. 다른 시간을 골라 주세요." };
+  }
   if (hours < sp.minHours) return { ok: false, message: `이 공간은 최소 ${sp.minHours}시간부터 빌릴 수 있어요.` };
   if (!fitsOpenSlot(sp.openSlots, input.useDate, input.startTime, input.endTime)) {
     return { ok: false, message: "사장님이 열어 두신 시간 안에서 골라 주세요." };
