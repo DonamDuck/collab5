@@ -46,13 +46,14 @@ const CATEGORIES: [SpaceCategory, string][] = [
 const SCOPES: [SpaceScope, string, string][] = [
   ["space_only", "공간만 빌려드려요", "장비는 안 쓰고 자리만 써요. 모임·촬영·라운지 대관 같은 것들이요."],
   ["with_gear", "공간과 장비까지", "커피 머신·화구·재봉틀을 쓰실 수 있어요. 내 식으로 하루를 돌려 보는 자리예요."],
-  ["whole_shop", "가게 그대로", "간판과 메뉴까지 이 가게로 영업하실 수 있어요. 진짜 하루 사장이 되는 자리예요."],
+  // 🔻09-16 대표 — 「가게 그대로」 제거. 간판·메뉴까지 넘기는 건 무신고 영업 문제가 정리돼야 열 수 있고,
+  //   지금 단계에서 고르게 두면 사장님이 무심코 골랐다가 법에 걸린다. `SpaceScope` 타입엔 남겨 둔다.
 ];
 
 /** 📨이용 안내 방식. 🚨내용(비밀번호 등)은 우리가 안 가진다 — 방식만 고른다(대표 09-16). */
 const ACCESS_OPTIONS: [AccessHow, string][] = [
   ["sms", "문자로 미리 보내드려요"],
-  ["onsite", "현장에서 직접 알려드려요"],
+  ["onsite", "일정 전에 미리 만나서 알려드릴게요"],
   ["both", "둘 다 해요"],
 ];
 
@@ -71,11 +72,6 @@ const RULE_EXAMPLES = [
   "쓰신 그릇은 설거지까지 부탁드려요",
 ];
 
-const USE_OPTIONS: { v: SpaceUseType; label: string; desc: string }[] = [
-  { v: "as_is", label: "원래 목적대로", desc: "제가 하던 그대로 써 주셨으면 해요." },
-  { v: "open", label: "대관", desc: "제 규칙 안에서 무엇을 하실지는 빌리는 분이 정하세요." },
-  { v: "both", label: "둘 다 좋아요", desc: "어느 쪽이든 이야기해 보고 정할게요." },
-];
 
 /** 🔻09-16 공통 이용 시간(`TIMES`)이 없어졌다 — 시간대는 이제 날짜마다 붙고 그 목록은 `OpenSlotsCalendar`가 쥔다.
  *  ⏱커피챗 길이. 30분 단위, 최대 8시간(=하루). 대표 09-14. */
@@ -144,7 +140,8 @@ export function SpaceForm({
   const [addrDetail, setAddrDetail] = useState(() => splitAddress(initial?.address ?? "")[1]);
   const [contactPhone, setContactPhone] = useState(initial?.contactPhone ?? defaultPhone);
   const [accessHow, setAccessHow] = useState<AccessHow>(initial?.accessHow ?? "sms");
-  const [useType, setUseType] = useState<SpaceUseType>(initial?.useType ?? "both");
+  // 🔻09-16 화면에서 안 묻는다(범위 축과 중복). 저장할 때 기존 값을 그대로 넘겨 옛 데이터를 지킨다.
+  const useType: SpaceUseType = initial?.useType ?? "both";
   const [facilities, setFacilities] = useState<string[]>(initial?.facilities ?? []);
   const [facilitiesNote, setFacilitiesNote] = useState(initial?.facilitiesNote ?? "");
   const [facilityInput, setFacilityInput] = useState("");
@@ -351,7 +348,6 @@ export function SpaceForm({
         <L
           label="공간 소개"
           htmlFor="sp-body"
-          optional
           hint="자세히 남겨 주실수록 신청하는 분이 예약을 더 적극적으로 고려하세요. 빈칸이면 저희가 같이 써 드릴게요."
         >
           <textarea
@@ -419,7 +415,7 @@ export function SpaceForm({
 
         {/* 🔻09-16 「들어오는 법」 칸 삭제. 대표: *「비밀번호 이런 건 문자나 현장에서 당일에 안내하는 걸로」*.
             ⭐**우리는 그 내용을 안 가진다.** 담을 칸이 없으면 샐 일도 없다 — 방식만 고른다. */}
-        <L label="이용 안내는 어떻게 해드릴까요" hint="도어락 번호처럼 민감한 건 우리 화면에 안 남겨요.">
+        <L label="이용 안내는 어떻게 해드릴까요" hint="임시 출입 비밀번호와 그 밖의 안내 사항을 전해 주세요.">
           <div className="flex flex-wrap gap-2">
             {ACCESS_OPTIONS.map(([v, t]) => (
               <button
@@ -441,27 +437,10 @@ export function SpaceForm({
       </Group>
 
       {/* ── 어떻게 쓰나 ── */}
-      <Group title="어떻게 쓰면 될까요">
-        <L label="쓰임새">
-          <div className="flex flex-wrap gap-2">
-            {USE_OPTIONS.map((o) => (
-              <button
-                key={o.v}
-                type="button"
-                aria-pressed={useType === o.v}
-                onClick={() => setUseType(o.v)}
-                className={pickCls(useType === o.v)}
-              >
-                {o.label}
-              </button>
-            ))}
-          </div>
-          <p className="mt-3 text-[15px] leading-relaxed break-keep text-mute">
-            {USE_OPTIONS.find((o) => o.v === useType)?.desc}
-          </p>
-        </L>
-
-        {/* 🏷태그 = **고르는 것**. 대표 09-14: *「태그는 사용 가능한 시설을 추가할 때 키워드로 추가되게」* */}
+      <Group title="공간 안내">
+        {/* 🔻09-16 대표 — 「쓰임새」(원래 목적대로 / 대관) 칸 삭제. *「위에 대관, 대관+시설이 있는 거 같아
+            이건 제거해도 될 듯, 중복처럼 보여」*. 맞다 — 09-16에 만든 «범위» 축이 같은 것을 더 정확히 말한다.
+            ⚠️`useType`은 DB와 타입에 남아 있고 저장할 때 기존 값을 그대로 넘긴다(옛 데이터가 안 깨지게). */}
         <L label="쓸 수 있는 시설" optional hint="빌리는 분이 이걸 보고 고르세요. 누르면 담겨요.">
           <div className="flex flex-wrap gap-2">
             {facilityPool.map((f) => {
@@ -629,13 +608,25 @@ export function SpaceForm({
         {/* 🔁09-16 하루 값 → **시간당 값**(대표). 사장님마다 열 수 있는 시간이 다르고, 빌리는 쪽도
             하루 통째보다 「오후 세 시간」이 현실적이다. 눈금은 1시간 — 30분은 가게가 그렇게 생각하지 않고
             달력·요금·겹침이 두 배로 복잡해진다. 그 대신 «최소 대여 시간»이 30분의 필요를 덮는다. */}
-        <L label="대여 비용" htmlFor="sp-price" hint="한 시간에 얼마를 받으실지 적어 주세요.">
+        <L
+          label="대여 비용"
+          htmlFor="sp-price"
+          hint="한 시간에 얼마를 받으실지 적어 주세요. 대여하시는 분은 1시간 단위로 선택할 수 있어요."
+        >
           <WonInput id="sp-price" value={priceHour} onChange={setPriceHour} placeholder="예) 15,000" />
           {/* ⭐정직하게 적는다. 「수수료 15%」만 적어 두면 사장님은 손에 쥐는 금액을 직접 계산해야 하고,
               그 계산을 화면이 안 해 주면 첫 정산 때 「듣던 것과 다르다」가 된다. */}
-          {priceHour > 0 && (
+          {/* 💰09-16 대표 — *「수수료는 여기에만 쓰면 잘 못 본 것 같기도 한데, 상단에 좀 더 써 주면 어떨까」*.
+              ⭐값을 적는 «그 순간»이 수수료를 알아야 하는 순간이다. 맨 아래 약관 줄에만 있으면
+                값을 다 정하고 나서야 본다. 금액을 안 적었을 때도 요율은 먼저 말해 둔다. */}
+          {priceHour > 0 ? (
             <p className="mt-2 text-[15px] text-mute">
-              한 시간에 사장님께 {won(payoutNum)}이 가요 · 수수료 {Math.round(feeRate * 100)}%
+              수수료 {Math.round(feeRate * 100)}%를 뺀{" "}
+              <span className="font-medium text-ink">{won(payoutNum)}</span>이 한 시간마다 사장님께 가요.
+            </p>
+          ) : (
+            <p className="mt-2 text-[15px] text-faint">
+              성사된 금액에서 수수료 {Math.round(feeRate * 100)}%를 뺀 나머지를 사장님께 드려요.
             </p>
           )}
         </L>
@@ -657,10 +648,11 @@ export function SpaceForm({
             🔻설비 사용법 같은 «필수» 안내는 여기 없다. 그건 상품이 아니라 인수인계라 위 「안내 방식」이 맡는다. */}
         <div>
           <p className="text-[16px] font-medium leading-[28px] text-body">
-            현업에 대해 커피챗을 제공할 수 있나요?
+            커피챗(유료)
           </p>
           <p className="mt-1 text-[15px] leading-relaxed break-keep text-mute">
-            레시피나 비법은 안 알려주셔도 돼요. 하루가 어떻게 돌아가는지 들려주시는 것만으로 충분합니다.
+            레시피나 비법이 아니라, 현업에서의 하루가 어떻게 돌아가는지를 들려주실 수 있나요? 현업 진출을 고민하시는
+            분들을 위해 제공하실 내용이 있다면 골라 주세요.
           </p>
 
           {/* 아니요가 먼저이자 기본 — 대부분의 사장님에게 「안 해도 된다」가 먼저 보여야 부담이 없다. */}
@@ -727,8 +719,8 @@ export function SpaceForm({
 
       {/* ── 여는 날·시간 ── 실사에서 이 데이터를 가진 곳이 23곳 중 0곳이었다(설계 §조사 ②). */}
       <Group
-        title="어느 날 몇 시에 빌려주실 수 있나요"
-        sub="날짜를 누르면 시간이 붙어요. 날마다 다르게 정하셔도 됩니다."
+        title="대여 가능한 날짜 선택"
+        sub="요일마다 여는 시간을 정하고 달력에서 날짜를 누르세요. 대여하시는 분에게 선택한 날짜가 노출됩니다."
       >
         <OpenSlotsCalendar value={openSlots} onChange={setOpenSlots} minHours={Number(minHours) || 1} />
       </Group>
@@ -798,10 +790,12 @@ export function SpaceForm({
               ? "사진을 올리는 중이에요…"
               : editing
                 ? "고친 내용 올리기"
-                : "올리기"}
+                : "등록하기"}
         </button>
         <p className="mt-3 text-center text-[15px] leading-relaxed break-keep text-faint">
-          {editing ? "고치면 한 번 더 읽어보고 다시 공개해 드려요." : "올려 주시면 한 번 읽어보고 공개해 드려요."}
+          {editing
+            ? "주소나 매장 이름을 고치신 경우에만 다시 한 번 읽어봐요. 나머지는 바로 반영됩니다."
+            : "등록 요청하시면 collab5 검토 후 승인이 완료되는 대로 하루 가게에 노출이 시작돼요."}
         </p>
       </div>
     </div>
