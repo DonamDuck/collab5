@@ -5,7 +5,7 @@ import { getSessionUserId, getProfileById } from "./profiles";
 import {
   saveSpace, getSpaceFull, getBooking, createPendingBooking, getBookingByOrderId,
   markBookingPaid, decideBooking,
-  setBookingStatus, setOpenDate, listSpacesByOwner, listSpacesByIds, payout, FEE_RATE,
+  setBookingStatus, listSpacesByOwner, listSpacesByIds, payout, FEE_RATE,
   type SpaceSaveInput,
   listLiveBookings,
 } from "./spaces";
@@ -286,7 +286,8 @@ export async function confirmBookingAction(
     return { ok: false, message: "그 사이 그날이 찼어요. 결제는 자동으로 취소했습니다." };
   }
 
-  await setOpenDate(b.spaceId, b.useDate, false);
+  // 🔻09-16 `setOpenDate` 삭제 — 하루를 통째로 파는 모델이 아니다. 시간대가 겹치는지는
+  //   DB의 배제 제약(`no_time_overlap`)이 판정하고, 호스트가 연 시간대는 그대로 둔다.
   revalidatePath("/rent");
   revalidatePath("/rent/my");
   await safeNotify(async () => {
@@ -316,7 +317,6 @@ export async function decideBookingAction(
   if (!accept) {
     const refunded = await cancelPayment(b.paymentKey, "사장님 거절 — 전액 환불");
     await setBookingStatus(bookingId, refunded ? "refunded" : "rejected");
-    await setOpenDate(sp.id, b.useDate, true);   // 그날을 다시 판다
     revalidatePath("/rent/my");
     await safeNotify(async () => {
       const p = await notifyParties(decided);
@@ -370,7 +370,6 @@ export async function cancelBookingAction(bookingId: number): Promise<ActionResu
   if (refund > 0) await cancelPayment(b.paymentKey, "게스트 취소", refund === b.amountTotal ? undefined : refund);
 
   await setBookingStatus(bookingId, "cancelled");
-  await setOpenDate(b.spaceId, b.useDate, true);
   revalidatePath("/rent/my");
   await safeNotify(async () => {
     const p = await notifyParties(b);

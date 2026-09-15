@@ -231,20 +231,10 @@ export async function saveSpace(input: SpaceSaveInput): Promise<Space | null> {
   return data ? toSpace(data as Row) : null;
 }
 
-/** 그 날짜를 비는 날 목록에서 뺀다 — 예약이 확정되면 다시 못 팔게.
- *  ⚠️거절·환불로 풀릴 땐 되돌려야 하므로 `add`도 같은 함수로 받는다.
- *  🔻**시간 단위로 바뀌면서 이 함수의 일이 사라진다**(09-16). 하루가 통째로 팔리는 게 아니라
- *    시간대가 겹치는지를 DB의 배제 제약이 판정한다. 호스트가 연 시간대(`openSlots`)는 건드리지 않는다 —
- *    「이 시간에 열어 둔다」는 호스트의 선언이고, 「그 안에 누가 들어왔다」는 예약 쪽 사실이다. 둘을 섞으면
- *    예약이 취소됐을 때 호스트의 선언을 복원할 방법이 없어진다. 옛 데이터용으로만 남겨 둔다. */
-export async function setOpenDate(spaceId: number, date: string, open: boolean): Promise<void> {
-  const c = db();
-  if (!c) return;
-  const { data } = await c.from("spaces").select("open_dates").eq("id", spaceId).maybeSingle();
-  const cur = Array.isArray(data?.open_dates) ? (data!.open_dates as string[]) : [];
-  const next = open ? Array.from(new Set([...cur, date])).sort() : cur.filter((d) => d !== date);
-  await c.from("spaces").update({ open_dates: next }).eq("id", spaceId);
-}
+// 🔻하루 단위로 「그날을 판매 목록에서 빼던」 함수는 09-16에 지웠다. 시간 단위로 바뀌면서 할 일이 사라졌다.
+//   겹침은 DB의 배제 제약(`no_time_overlap`)이 판정하고, 호스트가 연 시간대(`openSlots`)는 예약이
+//   들어와도 그대로 둔다 — 「이 시간에 열어 둔다」는 호스트의 선언이고 「그 안에 누가 들어왔다」는
+//   예약 쪽 사실이라, 둘을 한 칸에 섞으면 예약이 취소됐을 때 호스트의 선언을 복원할 방법이 없어진다.
 
 // ─── 예약 ───
 

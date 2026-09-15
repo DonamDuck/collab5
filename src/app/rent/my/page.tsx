@@ -160,8 +160,12 @@ export default async function MyRentPage() {
                     >
                       {sp.name}
                     </Link>
+                    {/* 🩸09-16까지 이 줄이 옛 칸(`priceDay`·`openDates`)을 읽고 있었다. 시간 단위로 바뀐 뒤
+                        저장한 공간은 그 칸이 비어서 **「0원 · 비는 날 0일」**로 보였다. 자기 공간을 보는
+                        화면에서 값이 0원이면 사장님은 안 올라간 줄 안다. */}
                     <p className="mt-1 text-[15px] text-mute">
-                      {sp.area || "동네 미정"} · {won(sp.priceDay)} · 비는 날 {sp.openDates.length}일
+                      {sp.area || "동네 미정"} · 시간당 {won(sp.priceHour)} · 열어 둔 날{" "}
+                      {new Set(sp.openSlots.map((sl) => sl.date)).size}일
                     </p>
                   </>
                 }
