@@ -27,9 +27,9 @@ export function usageLabel(t: SpaceUseType): string {
   return "원래 목적대로 · 대관";
 }
 
-/** 📂업종·범위 라벨 (2026-09-16). ⚠️화면에 쓰는 말은 여기 한 곳에만 둔다 —
- *  목록·상세·카드가 각자 적으면 언젠가 「카페」와 「카페·디저트」가 같이 돌아다닌다. */
-/** 업종 목록 — **등록 폼의 고르개와 목록의 거르개가 같은 줄을 본다.**
+/** 📂업종 목록 (2026-09-16). ⚠️화면에 쓰는 말은 여기 한 곳에만 둔다 —
+ *  목록·상세·카드가 각자 적으면 언젠가 「카페」와 「카페·디저트」가 같이 돌아다닌다.
+ *  ⭐**등록 폼의 고르개와 목록의 거르개가 같은 줄을 본다.**
  *  🩸09-16까지 이 목록이 두 벌이었다(여기 하나, `SpaceForm`에 하나). 두 벌이면 한쪽에 업종을 더한 날
  *    다른 쪽에서 그 업종이 조용히 안 걸린다 — 목록에 있는데 거르개엔 없는 상태가 된다.
  *  ⭐순서도 정보다. 흔한 것부터 두고 「그 밖에」가 맨 뒤다. */
@@ -54,8 +54,6 @@ export function scopeLabel(v: SpaceScope): string {
 /** 날짜·일정 서식은 `lib/rent-time`이 정본이다(09-16). 서버 액션·메일도 같은 함수를 쓴다.
  *  여기서 다시 내보내는 건 `/rent/**` 화면들이 이 파일 하나만 보게 하려는 것이다. */
 export { dateLabel, bookingWhen, todayKst } from "@/lib/rent-time";
-
-
 
 /** 읽고 지나가는 칩 — 설비·쓰임새·날짜. 소개서 상단 카드의 pill과 같은 얼굴.
  *  ⭐한 덩어리 안에서는 이 한 종류만 쓴다(디자인-시스템 §형태가 의미를 만든다).
@@ -106,16 +104,16 @@ export function SpaceBadge({ status }: { status: string }) {
 export const rentInputCls =
   "h-[48px] w-full rounded-md border border-border-strong bg-surface px-4 text-[16px] text-ink outline-none placeholder:text-faint focus:border-focus";
 
-/** 🔽고르는 칸. 대표 09-14: *「드롭다운 UI들 로컬에 구현한 거 싹 다 봐줘. 아래쪽 화살표가 너무 다
- *  우측에 붙어 있어」*.
- *  ⭐브라우저가 그려 주는 기본 화살표는 **칸 오른쪽 끝에 딱 붙는다.** 우리 입력칸은 좌우 패딩이 16px인데
- *  화살표만 0px에 서 있으니 그 칸만 여백이 깨져 보인다. `appearance-none`으로 기본 화살표를 끄고
- *  같은 16px 자리에 우리 것을 그린다. 🚨훅이 없어 서버·클라 양쪽에서 쓸 수 있다(이 파일의 규율). */
 /** 훑는 칸 — 폼 입력칸(`rentInputCls`, border-strong)보다 한 단 조용하다.
  *  여긴 채우는 곳이 아니라 훑는 곳이라, 테두리가 진하면 「써야 하는 칸」처럼 보인다. */
 export const rentQuietInputCls =
   "h-[44px] w-full rounded-md border border-hairline bg-surface px-4 text-[16px] text-ink outline-none placeholder:text-faint focus:border-focus";
 
+/** 🔽고르는 칸. 대표 09-14: *「드롭다운 UI들 로컬에 구현한 거 싹 다 봐줘. 아래쪽 화살표가 너무 다
+ *  우측에 붙어 있어」*.
+ *  ⭐브라우저가 그려 주는 기본 화살표는 **칸 오른쪽 끝에 딱 붙는다.** 우리 입력칸은 좌우 패딩이 16px인데
+ *  화살표만 0px에 서 있으니 그 칸만 여백이 깨져 보인다. `appearance-none`으로 기본 화살표를 끄고
+ *  같은 16px 자리에 우리 것을 그린다. 🚨훅이 없어 서버·클라 양쪽에서 쓸 수 있다(이 파일의 규율). */
 export function RentSelect({
   className = "",
   tone = "form",
@@ -133,8 +131,11 @@ export function RentSelect({
    *  🪤에러도 경고도 없다. 09-16에 등록 폼의 「한 줄 시간 칸」이 이것 때문에 314px로 서 있었다. */
   wrapClassName?: string;
 }) {
+  // 📐높이는 «얼굴»이 정한다 — 훑는 칸 44, 채우는 칸 48, 한 줄에 여럿 설 땐 40.
+  //   🩸09-16에 이걸 단 하나로 묶었다가 거르개의 입력칸(44)과 고르개(48)가 4px 어긋났다.
   const border = tone === "quiet" ? "border-hairline" : "border-border-strong";
-  const box = compact ? "h-[40px] pl-3 pr-8 text-[15px]" : "h-[48px] pl-4 pr-11 text-[16px]";
+  const h = compact ? "h-[40px]" : tone === "quiet" ? "h-[44px]" : "h-[48px]";
+  const box = compact ? `${h} pl-3 pr-8 text-[15px]` : `${h} pl-4 pr-11 text-[16px]`;
   return (
     <div className={`relative ${wrapClassName}`}>
       <select
