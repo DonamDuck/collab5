@@ -7,7 +7,7 @@
 //   같은 이유로 `profiles.ts`도 자기 클라이언트를 따로 들고 있다 — 그 패턴을 그대로 빌렸다.
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import type { Space, SpacePublic, SpaceBooking, SpaceStatus, BookingStatus } from "./types";
+import type { Space, SpacePublic, SpaceBooking, SpaceStatus, BookingStatus, OpenSlot } from "./types";
 
 function db(): SupabaseClient | null {
   const url = process.env.SUPABASE_URL;
@@ -32,6 +32,18 @@ type Row = Record<string, unknown>;
 const s = (v: unknown) => (typeof v === "string" ? v : "");
 const n = (v: unknown) => (typeof v === "number" ? v : 0);
 const arr = (v: unknown) => (Array.isArray(v) ? (v as string[]) : []);
+/** jsonb의 시간대 목록을 «모양을 확인하며» 읽는다. 한 칸이라도 깨져 있으면 그 칸만 버린다 —
+ *  DB에 손으로 넣은 값이 들어올 수 있고, 하나 때문에 공간 전체가 안 열리면 안 된다. */
+function slots(v: unknown): OpenSlot[] {
+  if (!Array.isArray(v)) return [];
+  return v.flatMap((x) => {
+    if (!x || typeof x !== "object") return [];
+    const o = x as Record<string, unknown>;
+    const date = s(o.date), start = s(o.start), end = s(o.end);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !/^\d{2}:\d{2}/.test(start) || !/^\d{2}:\d{2}/.test(end)) return [];
+    return [{ date, start: start.slice(0, 5), end: end.slice(0, 5) }];
+  });
+}
 
 function toSpace(r: Row): Space {
   return {
@@ -48,23 +60,35 @@ function toSpace(r: Row): Space {
     priceDay: n(r.price_day), mentorMinutes: n(r.mentor_minutes), mentorPrice: n(r.mentor_price),
     openDates: arr(r.open_dates),
     servesFood: r.serves_food === true, subleaseOk: r.sublease_ok === true,
+
+    category: (s(r.category) || "") as Space["category"],
+    scope: (s(r.scope) || "space_only") as Space["scope"],
+    priceHour: n(r.price_hour), minHours: n(r.min_hours) || 1,
+    openSlots: slots(r.open_slots),
+    coffeeChat: r.coffee_chat === true,
+    coffeeChatMinutes: n(r.coffee_chat_minutes), coffeeChatPrice: n(r.coffee_chat_price),
+    coffeeChatTopics: s(r.coffee_chat_topics),
+    accessHow: (s(r.access_how) || "sms") as Space["accessHow"],
+    contactPhone: s(r.contact_phone),
+    hostTermsAt: s(r.host_terms_at) || undefined,
     status: (s(r.status) || "draft") as SpaceStatus,
     createdAt: s(r.created_at), updatedAt: s(r.updated_at),
   };
 }
 
-/** 🚨확정 «전»에 화면으로 나가는 모양 — 주소와 좌표를 **떼어 낸다.**
+/** 확정 «전»에 화면으로 나가는 모양.
  *
- *  대표 09-13: *「사장님과 연결을 미리 해버리면 우리 결제 없이 그들끼리 거래로 해버릴 수도 있을 것 같아서」.*
- *  그래서 확정 전에는 그 가게를 특정할 수 없어야 한다. 목록·상세는 **반드시 이 함수를 거친 값**을 쓴다.
- *  ⚠️`Omit` 타입만 믿지 마라 — 타입은 컴파일 때만 있고 런타임 객체엔 주소가 그대로 실려 나간다. 여기서 실제로 지운다. */
+ *  🔁**09-16에 방향이 뒤집혔다.** 09-13엔 주소·좌표를 떼어 냈다(이탈 방지). 09-16에 대표가
+ *  *「이미 공간 이름이 있어서 무의미할 것 같아」*로 정리했고, 전자상거래법 제20조②는 오히려
+ *  호스트의 주소·전화번호를 **청약 전에 보여 주도록** 요구한다. 그래서 주소·좌표·매장 전화는 나간다.
+ *
+ *  🚨**지금도 떼어 내는 것** — 「들어오는 법」(옛 `accessNote`)과 호스트 약관 동의 시각.
+ *  ⚠️`Omit` 타입만 믿지 마라 — 타입은 컴파일 때만 있고 런타임 객체엔 그대로 실려 나간다. 여기서 실제로 지운다.
+ *  📌목록·상세는 여전히 **반드시 이 함수를 거친 값**을 쓴다. 나중에 또 감출 것이 생기면 그 자리가 여기다. */
 export function toPublic(sp: Space): SpacePublic {
-  const { address: _a, lat, lng, accessNote: _n, ...rest } = sp;
-  void _a; void _n;
-  // 🗺소수 셋째 자리에서 끊는다(≈110m). 줌 14 + 원형 표시와 합쳐지면 건물이 안 짚힌다.
-  //   ⚠️`toFixed`는 문자열을 주므로 다시 숫자로. 목적은 반올림이 아니라 «정밀도 낮추기»다.
-  const blur = (v: number | undefined) => (typeof v === "number" ? Number(v.toFixed(3)) : undefined);
-  return { ...rest, areaLat: blur(lat), areaLng: blur(lng) };
+  const { accessNote: _n, hostTermsAt: _t, ...rest } = sp;
+  void _n; void _t;
+  return rest;
 }
 
 function toBooking(r: Row): SpaceBooking {
@@ -72,6 +96,11 @@ function toBooking(r: Row): SpaceBooking {
     id: n(r.id), spaceId: n(r.space_id), guestUserId: n(r.guest_user_id),
     guestBrandSlug: s(r.guest_brand_slug),
     useDate: s(r.use_date), hours: s(r.hours), plan: s(r.plan),
+    // ⚠️Postgres의 `time`은 "10:00:00"으로 온다. 화면·계산은 전부 "HH:MM"이라 여기서 잘라 맞춘다 —
+    //   한 곳에서 안 자르면 "10:00:00"과 "10:00" 비교가 조용히 어긋난다.
+    startTime: s(r.start_time).slice(0, 5), endTime: s(r.end_time).slice(0, 5),
+    hoursCount: n(r.hours_count),
+    withChat: r.with_chat === true, amountChat: n(r.amount_chat),
     headcount: typeof r.headcount === "number" ? r.headcount : undefined,
     withMentor: r.with_mentor === true,
     amountSpace: n(r.amount_space), amountMentor: n(r.amount_mentor), amountTotal: n(r.amount_total),
@@ -184,6 +213,13 @@ export async function saveSpace(input: SpaceSaveInput): Promise<Space | null> {
     price_day: input.priceDay, mentor_minutes: input.mentorMinutes, mentor_price: input.mentorPrice,
     open_dates: input.openDates,
     serves_food: input.servesFood, sublease_ok: input.subleaseOk, status: input.status,
+
+    category: input.category, scope: input.scope,
+    price_hour: input.priceHour, min_hours: input.minHours, open_slots: input.openSlots,
+    coffee_chat: input.coffeeChat, coffee_chat_minutes: input.coffeeChatMinutes,
+    coffee_chat_price: input.coffeeChatPrice, coffee_chat_topics: input.coffeeChatTopics,
+    access_how: input.accessHow, contact_phone: input.contactPhone,
+    host_terms_at: input.hostTermsAt ?? null,
   };
   const { data, error } = await c.from("spaces").upsert(row, { onConflict: "slug" }).select().maybeSingle();
   if (error) { console.error(`[spaces] save failed slug=${input.slug}: ${error.message}`); return null; }
@@ -191,7 +227,11 @@ export async function saveSpace(input: SpaceSaveInput): Promise<Space | null> {
 }
 
 /** 그 날짜를 비는 날 목록에서 뺀다 — 예약이 확정되면 다시 못 팔게.
- *  ⚠️거절·환불로 풀릴 땐 되돌려야 하므로 `add`도 같은 함수로 받는다. */
+ *  ⚠️거절·환불로 풀릴 땐 되돌려야 하므로 `add`도 같은 함수로 받는다.
+ *  🔻**시간 단위로 바뀌면서 이 함수의 일이 사라진다**(09-16). 하루가 통째로 팔리는 게 아니라
+ *    시간대가 겹치는지를 DB의 배제 제약이 판정한다. 호스트가 연 시간대(`openSlots`)는 건드리지 않는다 —
+ *    「이 시간에 열어 둔다」는 호스트의 선언이고, 「그 안에 누가 들어왔다」는 예약 쪽 사실이다. 둘을 섞으면
+ *    예약이 취소됐을 때 호스트의 선언을 복원할 방법이 없어진다. 옛 데이터용으로만 남겨 둔다. */
 export async function setOpenDate(spaceId: number, date: string, open: boolean): Promise<void> {
   const c = db();
   if (!c) return;
@@ -221,6 +261,8 @@ export async function createPendingBooking(input: BookingCreateInput): Promise<S
   const row = {
     space_id: input.spaceId, guest_user_id: input.guestUserId, guest_brand_slug: input.guestBrandSlug,
     use_date: input.useDate, hours: input.hours, plan: input.plan, headcount: input.headcount ?? null,
+    start_time: input.startTime, end_time: input.endTime, hours_count: input.hoursCount,
+    with_chat: input.withChat, amount_chat: input.amountChat,
     with_mentor: input.withMentor,
     amount_space: input.amountSpace, amount_mentor: input.amountMentor, amount_total: input.amountTotal,
     fee_rate: FEE_RATE, amount_payout: payout(input.amountTotal),
@@ -229,6 +271,33 @@ export async function createPendingBooking(input: BookingCreateInput): Promise<S
   const { data, error } = await c.from("space_bookings").insert(row).select().maybeSingle();
   if (error) { console.error(`[spaces] pending insert failed order=${input.orderId}: ${error.message}`); return null; }
   return data ? toBooking(data as Row) : null;
+}
+
+/** 그 공간 그 날짜에 «살아 있는» 예약들. 시간 겹침을 보려고 시각만 얇게 읽는다.
+ *  ⭐`pending`은 뺀다 — 결제창만 열어 보고 닫은 사람이 남의 시간을 막으면 안 된다(설계 그대로). */
+export async function listLiveBookings(spaceId: number, date: string): Promise<SpaceBooking[]> {
+  const c = db();
+  if (!c) return [];
+  const { data } = await c
+    .from("space_bookings")
+    .select("*")
+    .eq("space_id", spaceId)
+    .eq("use_date", date)
+    .in("status", ["paid", "confirmed", "done"]);
+  return (data ?? []).map((r) => toBooking(r as Row));
+}
+
+/** 여러 날짜의 살아 있는 예약을 «한 번에». 상세 화면이 열린 날 수만큼 왕복하지 않게. */
+export async function listLiveBookingsIn(spaceId: number, dates: string[]): Promise<SpaceBooking[]> {
+  const c = db();
+  if (!c || dates.length === 0) return [];
+  const { data } = await c
+    .from("space_bookings")
+    .select("*")
+    .eq("space_id", spaceId)
+    .in("use_date", dates)
+    .in("status", ["paid", "confirmed", "done"]);
+  return (data ?? []).map((r) => toBooking(r as Row));
 }
 
 export async function getBookingByOrderId(orderId: string): Promise<SpaceBooking | null> {

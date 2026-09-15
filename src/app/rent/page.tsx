@@ -4,7 +4,7 @@ import { listOpenSpaces } from "@/lib/spaces";
 import type { SpacePublic, SpaceUseType } from "@/lib/types";
 import { EmptyState } from "@/components/EmptyState";
 import { RentFilters, type UseFilter } from "./RentFilters";
-import { CoverPlaceholder, primaryBtnCls, secondaryBtnCls, won } from "./ui";
+import { categoryLabel, CoverPlaceholder, primaryBtnCls, scopeLabel, secondaryBtnCls, won } from "./ui";
 
 // 하루 가게 — 목록 (2026-09-13)
 // 스펙 = docs/superpowers/specs/2026-09-13-daily-shop-design.md
@@ -52,10 +52,10 @@ function SpaceCard({ sp }: { sp: SpacePublic }) {
         ) : (
           <CoverPlaceholder />
         )}
-        {/* 사장님 시간은 이 서비스만 파는 물건이라 커버 위에 미리 알린다(설계 §노하우 = 옵션 상품). */}
-        {sp.mentorMinutes > 0 && (
+        {/* 커피챗은 이 서비스만 파는 물건이라 커버 위에 미리 알린다(설계 §노하우 = 옵션 상품). */}
+        {sp.coffeeChat && sp.coffeeChatMinutes > 0 && (
           <span className="absolute bottom-2.5 left-2.5 rounded-pill bg-surface/90 px-3 py-1 text-[13px] font-medium text-ink">
-            사장님이 {sp.mentorMinutes}분 알려줘요
+            사장님과 커피챗 {sp.coffeeChatMinutes}분
           </span>
         )}
       </div>
@@ -63,11 +63,13 @@ function SpaceCard({ sp }: { sp: SpacePublic }) {
       <div className="px-4 py-3.5">
         {/* min-w-0 + truncate 한 쌍 — 375px에서 긴 이름이 카드를 밀어 **가로 스크롤**을 만든다. */}
         <p className="min-w-0 truncate text-[15px] font-bold text-ink">{sp.name}</p>
-        {sp.tagline && (
-          <p className="mt-1 line-clamp-1 text-[15px] leading-relaxed text-body">{sp.tagline}</p>
-        )}
+        {/* 🔁09-16 한 줄 소개가 없어진 자리에 **업종 · 범위**가 들어간다. 한 줄 소개는 사장님이 쓰기 나름이라
+            카드마다 길이가 들쭉날쭉했는데, 이 둘은 늘 같은 자리에 같은 길이로 선다. */}
+        <p className="mt-1 line-clamp-1 text-[15px] leading-relaxed text-body">
+          {categoryLabel(sp.category)} · {scopeLabel(sp.scope)}
+        </p>
         <p className="mt-2 text-[13px] text-faint">
-          {sp.area || "동네 미정"} · 하루 {won(sp.priceDay)}
+          {sp.address.split(/\s+/).slice(0, 2).join(" ") || "위치 미정"} · 시간당 {won(sp.priceHour)}
         </p>
       </div>
     </Link>

@@ -7,13 +7,15 @@ import {
   markBookingPaid, decideBooking,
   setBookingStatus, setOpenDate, listSpacesByOwner, listSpacesByIds, payout, FEE_RATE,
   type SpaceSaveInput,
+  listLiveBookings,
 } from "./spaces";
 import { approvePayment, cancelPayment, guestCancelRefundRate } from "./rent-payment";
 import { geocode } from "./geocode";
 import {
   notifyBookingPaid, notifyBookingConfirmed, notifyBookingRejected, notifyBookingCancelled,
 } from "./rent-notify";
-import type { Space, SpaceBooking, SpaceUseType } from "./types";
+import { hoursBetween, fitsOpenSlot, overlaps } from "./rent-time";
+import type { Space, SpaceBooking, SpaceUseType, SpaceCategory, SpaceScope, OpenSlot, AccessHow } from "./types";
 
 // 하루 가게 — 쓰기 서버 액션 (2026-09-13)
 // 스펙 = docs/superpowers/specs/2026-09-13-daily-shop-design.md
@@ -53,13 +55,16 @@ function makeSlug(name: string): string {
 
 export interface SpaceFormInput {
   slug?: string;
-  name: string; tagline: string; body: string; photos: string[];
-  area: string; address: string; accessNote: string;
-  useType: SpaceUseType; facilities: string[]; facilitiesNote: string; capacity?: number; hours: string;
-  rules: string; priceDay: number;
-  mentorMinutes: number; mentorPrice: number;
-  openDates: string[];
-  servesFood: boolean; subleaseOk: boolean;
+  name: string; body: string; photos: string[];
+  address: string;
+  category: SpaceCategory; scope: SpaceScope;
+  useType: SpaceUseType; facilities: string[]; facilitiesNote: string; capacity?: number;
+  rules: string;
+  priceHour: number; minHours: number; openSlots: OpenSlot[];
+  coffeeChat: boolean; coffeeChatMinutes: number; coffeeChatPrice: number; coffeeChatTopics: string;
+  accessHow: AccessHow; contactPhone: string;
+  /** 📜호스트 약관 동의. 화면의 체크 하나지만 계약의 근거라 서버가 다시 본다. */
+  hostTermsOk: boolean;
   brandSlug: string;
 }
 
@@ -68,23 +73,38 @@ export async function saveSpaceAction(input: SpaceFormInput): Promise<ActionResu
   const uid = await getSessionUserId();
   if (!uid) return { ok: false, message: "로그인이 필요해요." };
 
-  // 🚨1단계는 음식·음료를 안 받는다. 남의 영업신고 시설에서 남이 팔면 무신고 영업이다
-  //   (식품위생법 제37조 ④ → 제97조, 3년 이하 또는 3천만 원). 09-13 법규 조사.
-  if (input.servesFood) {
-    return { ok: false, message: "음식이나 음료를 파는 공간은 아직 받지 못해요. 법이 정리되는 대로 열겠습니다." };
-  }
-  // 임대인 동의 없는 전대는 계약 해지 사유다. 본인 확인을 받고 넘어간다.
-  if (!input.subleaseOk) {
-    return { ok: false, message: "내 소유이거나 임대인 동의를 받았는지 확인해 주세요." };
-  }
-  // ⭐「우리 집 규칙」은 이 서비스에서 제일 중요한 칸이라 빈칸으로 못 넘어간다.
+  // 🔻09-16 대표 — 음식 여부·임대인 동의 «칸»을 없앴다.
+  //   전대 확인은 등록 화면의 체크박스가 아니라 **호스트 약관 한 줄**로 옮겼다(약관규제법 제3조③④).
+  //   음식 차단도 뺐다 — 무신고 영업 문제는 호스트 명의의 영업신고 범위 안에서 호스트 관리·감독으로
+  //   푸는 것이 맞고(식품위생법 제37조④), 그것도 약관이 맡는다.
+  // ⭐「사용 유의 사항」은 이 서비스에서 제일 중요한 칸이라 빈칸으로 못 넘어간다.
   if (input.rules.trim().length < 10) {
-    return { ok: false, message: "우리 집 규칙을 열 글자 이상 적어 주세요. 이 칸이 사장님을 지켜 줍니다." };
+    return { ok: false, message: "사용 시 유의 사항을 열 글자 이상 적어 주세요. 이 칸이 사장님을 지켜 줍니다." };
   }
   if (!input.name.trim()) return { ok: false, message: "공간 이름을 적어 주세요." };
-  if (input.openDates.length === 0) return { ok: false, message: "빌려줄 수 있는 날을 하루 이상 골라 주세요." };
+  if (!input.category) return { ok: false, message: "어떤 업종인지 골라 주세요." };
+  if (input.openSlots.length === 0) return { ok: false, message: "빌려줄 수 있는 날과 시간을 하나 이상 정해 주세요." };
   if (input.photos.length === 0) return { ok: false, message: "사진을 한 장 이상 올려 주세요. 사진 없는 공간은 아무도 안 빌려요." };
-  if (input.priceDay < 0) return { ok: false, message: "값이 이상해요." };
+  if (input.priceHour <= 0) return { ok: false, message: "시간당 대여 비용을 적어 주세요." };
+  if (input.minHours < 1) return { ok: false, message: "최소 대여 시간은 한 시간 이상이어야 해요." };
+  // ☎️🚨청약 «전»에 보여야 하는 값이라 빈칸으로 못 넘어간다.
+  //   전자상거래법 제20조②(시행 2026-07-21): 중개자는 사업자 호스트의 성명·주소·전화번호를 확인해
+  //   청약 전에 소비자에게 제공해야 하고, 안 하면 제20조의2②로 **우리가 연대 책임**을 진다.
+  if (!input.contactPhone.trim()) {
+    return { ok: false, message: "매장 전화번호를 적어 주세요. 법에 따라 신청 전에 손님께 보여드려야 해요." };
+  }
+  // 📜호스트 약관 동의. 없으면 수수료·정산·구상을 나중에 주장할 근거가 없다.
+  if (!input.hostTermsOk) {
+    return { ok: false, message: "공간 제공자 약관에 동의해 주세요." };
+  }
+  // 열어 둔 시간대가 말이 되는지. 거꾸로거나 최소 시간보다 짧은 칸은 아무도 못 빌린다.
+  for (const sl of input.openSlots) {
+    const h = hoursBetween(sl.start, sl.end);
+    if (h <= 0) return { ok: false, message: `${sl.date}의 시간이 거꾸로예요. 끝나는 시각이 더 늦어야 해요.` };
+    if (h < input.minHours) {
+      return { ok: false, message: `${sl.date}는 ${h}시간만 열려 있어서 최소 ${input.minHours}시간을 못 채워요.` };
+    }
+  }
 
   // 수정이면 주인 확인부터. ⚠️입력에 실린 slug를 믿지 않고 DB에서 소유자를 다시 읽는다.
   if (input.slug) {
@@ -104,16 +124,34 @@ export async function saveSpaceAction(input: SpaceFormInput): Promise<ActionResu
   }
 
   const slug = input.slug || makeSlug(input.name);
+  // 🔁09-16 대표 — **고쳐도 공개가 유지된다.** 전엔 글자 하나만 바꿔도 검토 대기로 내려가 목록에서 사라졌다.
+  //   다시 검토받는 건 «가게가 바뀌는» 둘뿐이다: 주소와 매장 이름. 나머지는 사장님이 알아서 고친다.
+  const renamed = !!prev && prev.name.trim() !== input.name.trim();
+  const moved = !!prev && prev.address.trim() !== input.address.trim();
+  const status: Space["status"] = !prev ? "pending" : renamed || moved ? "pending" : prev.status;
+
   const row: SpaceSaveInput = {
     slug, ownerUserId: uid, brandSlug: input.brandSlug,
-    name: input.name.trim(), tagline: input.tagline.trim(), body: input.body, photos: input.photos,
-    area: input.area.trim(), address: input.address.trim(), lat, lng, accessNote: input.accessNote.trim(),
+    name: input.name.trim(), tagline: "", body: input.body, photos: input.photos,
+    // 동네는 이제 안 묻는다(대표 09-16: 「주소면 충분」). 옛 칸은 주소에서 앞 두 조각만 넣어 둔다 —
+    // 목록의 동네 거르개가 아직 이 칸을 본다.
+    area: input.address.trim().split(/\s+/).slice(0, 2).join(" "),
+    address: input.address.trim(), lat, lng, accessNote: "",
     useType: input.useType, facilities: input.facilities,
     facilitiesNote: input.facilitiesNote.trim(), capacity: input.capacity,
-    hours: input.hours, rules: input.rules.trim(),
-    priceDay: input.priceDay, mentorMinutes: input.mentorMinutes, mentorPrice: input.mentorPrice,
-    openDates: input.openDates, servesFood: false, subleaseOk: true,
-    status: "pending",
+    hours: "", rules: input.rules.trim(),
+    priceDay: 0, mentorMinutes: 0, mentorPrice: 0,
+    openDates: [], servesFood: false, subleaseOk: true,
+
+    category: input.category, scope: input.scope,
+    priceHour: input.priceHour, minHours: input.minHours, openSlots: input.openSlots,
+    coffeeChat: input.coffeeChat,
+    coffeeChatMinutes: input.coffeeChat ? input.coffeeChatMinutes : 0,
+    coffeeChatPrice: input.coffeeChat ? input.coffeeChatPrice : 0,
+    coffeeChatTopics: input.coffeeChat ? input.coffeeChatTopics.trim() : "",
+    accessHow: input.accessHow, contactPhone: input.contactPhone.trim(),
+    hostTermsAt: prev?.hostTermsAt ?? new Date().toISOString(),
+    status,
   };
   const saved = await saveSpace(row);
   if (!saved) return { ok: false, message: "저장에 실패했어요. 잠시 뒤 다시 시도해 주세요." };
@@ -135,10 +173,12 @@ export async function publishSpaceAction(slug: string): Promise<ActionResult> {
 export interface BookingFormInput {
   spaceSlug: string;
   useDate: string;
-  hours: string;
   plan: string;
   headcount?: number;
-  withMentor: boolean;
+  /** ⏱`HH:MM`. 하루 통째가 아니라 「그날 몇 시부터 몇 시까지」를 받는다(09-16). */
+  startTime: string;
+  endTime: string;
+  withChat: boolean;
   guestBrandSlug: string;
 }
 
@@ -160,12 +200,25 @@ export async function startBookingAction(input: BookingFormInput): Promise<Start
   const sp = await getSpaceFull(input.spaceSlug);
   if (!sp || sp.status !== "open") return { ok: false, message: "지금은 신청할 수 없는 공간이에요." };
   if (sp.ownerUserId === uid) return { ok: false, message: "내 공간은 내가 빌릴 수 없어요." };
-  if (!sp.openDates.includes(input.useDate)) return { ok: false, message: "그날은 이미 찼어요. 다른 날을 골라 주세요." };
   if (input.plan.trim().length < 10) return { ok: false, message: "그날 무엇을 하실지 열 글자 이상 적어 주세요." };
 
-  const amountSpace = sp.priceDay;
-  const amountMentor = input.withMentor && sp.mentorMinutes > 0 ? sp.mentorPrice : 0;
-  const amountTotal = amountSpace + amountMentor;
+  // ⏱시간 검사 — 화면에서도 막지만 관문은 여기다.
+  const hours = hoursBetween(input.startTime, input.endTime);
+  if (hours <= 0) return { ok: false, message: "끝나는 시각이 시작보다 늦어야 해요." };
+  if (hours < sp.minHours) return { ok: false, message: `이 공간은 최소 ${sp.minHours}시간부터 빌릴 수 있어요.` };
+  if (!fitsOpenSlot(sp.openSlots, input.useDate, input.startTime, input.endTime)) {
+    return { ok: false, message: "사장님이 열어 두신 시간 안에서 골라 주세요." };
+  }
+  // 이미 팔린 시간과 겹치는지. ⚠️여기서 막아도 «관문은 DB»다 — 두 사람이 같은 순간에 들어오면
+  //   이 검사는 둘 다 통과시키고, 승인 때 배제 제약이 뒤에 온 쪽을 떨어뜨린다.
+  const taken = await listLiveBookings(sp.id, input.useDate);
+  if (taken.some((b) => overlaps(b.startTime, b.endTime, input.startTime, input.endTime))) {
+    return { ok: false, message: "그 시간은 이미 찼어요. 다른 시간을 골라 주세요." };
+  }
+
+  const amountSpace = Math.round(sp.priceHour * hours);
+  const amountChat = input.withChat && sp.coffeeChat ? sp.coffeeChatPrice : 0;
+  const amountTotal = amountSpace + amountChat;
   if (amountTotal <= 0) return { ok: false, message: "값이 정해지지 않은 공간이에요. 사장님께 확인이 필요합니다." };
 
   // 주문번호는 우리가 만든다. 토스에 그대로 실려 가고 돌아올 때 이 값으로 행을 찾는다.
@@ -173,16 +226,18 @@ export async function startBookingAction(input: BookingFormInput): Promise<Start
 
   const booking = await createPendingBooking({
     spaceId: sp.id, guestUserId: uid, guestBrandSlug: input.guestBrandSlug,
-    useDate: input.useDate, hours: input.hours || sp.hours, plan: input.plan.trim(),
-    headcount: input.headcount, withMentor: amountMentor > 0,
-    amountSpace, amountMentor, amountTotal,
+    useDate: input.useDate, hours: `${input.startTime}~${input.endTime}`, plan: input.plan.trim(),
+    startTime: input.startTime, endTime: input.endTime, hoursCount: hours,
+    headcount: input.headcount, withChat: amountChat > 0, amountChat,
+    withMentor: false, amountMentor: 0,
+    amountSpace, amountTotal,
     paymentKey: "", orderId,
   });
   if (!booking) return { ok: false, message: "신청을 시작하지 못했어요. 잠시 뒤 다시 시도해 주세요." };
 
   return {
     ok: true, message: "", orderId, amount: amountTotal,
-    orderName: `${sp.name} · ${input.useDate}`,
+    orderName: `${sp.name} · ${input.useDate} ${input.startTime}~${input.endTime}`,
     bookingId: booking.id,
   };
 }

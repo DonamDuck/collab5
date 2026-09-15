@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { getSessionUserId } from "@/lib/profiles";
+import { getSessionUserId, getProfileById } from "@/lib/profiles";
 import { repo } from "@/lib/repo";
 import { FEE_RATE } from "@/lib/spaces";
 import { SpaceForm } from "./SpaceForm";
@@ -45,6 +45,11 @@ export default async function NewSpacePage() {
   // 이 기능은 소개서와 독립이고, 소개서를 요구하면 공급이 등록 업체 열두 곳으로 줄어든다(설계 §대상).
   const myBrands = (await repo.listMakersByOwner(uid)).map((m) => ({ slug: m.slug, name: m.name }));
 
+  // 🆕09-16 대표 — **빈 칸에서 시작하지 않게 한다.** 가입할 때 적은 브랜드명으로 공간 이름을,
+  //   프로필 전화번호로 매장 전화를 미리 채우고, 소개서가 있으면 첫 번째를 기본으로 연결한다.
+  //   ⭐셋 다 폼에서 고칠 수 있다 — 채워 두는 것과 정해 버리는 것은 다르다.
+  const me = await getProfileById(uid);
+
   return (
     <main className="mx-auto w-full max-w-[560px] px-4 pt-4 pb-16 sm:px-6 sm:pt-6">
       <header>
@@ -61,7 +66,13 @@ export default async function NewSpacePage() {
 
       {/* 수수료율을 서버에서 내려보낸다 — 클라가 숫자를 따로 들고 있으면 요율이 바뀌는 날
           화면만 옛 값을 말한다(그리고 그 어긋남은 아무 에러도 안 낸다). */}
-      <SpaceForm myBrands={myBrands} feeRate={FEE_RATE} />
+      <SpaceForm
+        myBrands={myBrands}
+        feeRate={FEE_RATE}
+        defaultName={me?.brandName ?? ""}
+        defaultPhone={me?.phone ?? ""}
+        defaultBrandSlug={myBrands[0]?.slug ?? ""}
+      />
     </main>
   );
 }

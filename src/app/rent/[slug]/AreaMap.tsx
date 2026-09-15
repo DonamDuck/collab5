@@ -1,46 +1,44 @@
 import Image from "next/image";
 
-// 하루 가게 — 「이 근처예요」 지도 (2026-09-14)
+// 하루 가게 — 위치 지도 (2026-09-14 신설 · 2026-09-16 정확한 핀으로 전환)
 //
 // 대표: *「지도 UI 하나 있어야 할 거 같아. 사장님이 당연히 주소 입력해서 등록해야 하고」* (아워플레이스 참고)
 //
-// 🚨**핀을 안 찍는다.** 예약이 확정되기 전엔 정확한 주소를 주지 않는 게 이 서비스의 규칙이다
-//   (09-13 대표 — 미리 연결되면 우리 없이 직거래로 샌다). 핀은 건물을 짚어 버리므로,
-//   대신 **낮은 줌 + 원형 표시**로 「이 동네 어딘가」까지만 말한다. 아워플레이스도 같은 모양이다.
-//
-// ⭐**막는 층이 둘이다.** 화면(낮은 줌 + 원)만으로는 부족하다 — 주소창의 좌표를 그대로 읽으면
-//   건물이 나온다. 그래서 **서버가 내보내는 좌표 자체를 뭉갠다**(`toPublic`, 소수 셋째 자리 ≈ 110m).
-//   🔑정밀도를 낮추는 것과 위치를 «옮기는» 것은 다르다. 옮기면 확정 뒤에 「아까 지도랑 다른데요」가
-//     되지만, 뭉개는 건 처음부터 「이 정도까지만 말한다」는 뜻이라 나중에 어긋나지 않는다.
+// 🔁**09-16에 방향이 뒤집혔다.** 09-13엔 핀을 안 찍고 낮은 줌 + 원형으로 「이 동네 어딘가」까지만 말했다.
+//   확정 전에 가게가 특정되면 우리 없이 직거래로 샐까 봐였다. 09-16에 대표가 정확한 핀을 요청하며
+//   *「이미 공간 이름이 있어서 (감추는 게) 무의미할 것 같아」*로 정리했다. 맞는 말이다 — 이름과 사진이
+//   이미 그 가게를 특정한다. 거기에 좌표만 뭉개 봐야 손님만 불편하다.
+// ⚖️법도 같은 쪽으로 민다 — 전자상거래법 제20조②는 호스트의 주소·전화번호를 **청약 전에** 주도록 한다.
+// 📌이탈을 막는 건 이제 주소가 아니라 **결제가 먼저라는 순서**다. 그 설계는 그대로다.
 //
 // 🖼이미지는 `/api/staticmap` 프록시를 탄다(NCP Secret이 클라로 새지 않게).
 const W = 640;
 const H = 240;
-/** 줌 14 ≈ 동네 한 덩어리. 16(건물 식별)에서 두 단 내렸다. */
-const LEVEL = 14;
+/** 줌 16 ≈ 건물이 짚히는 눈금. 길 찾아갈 사람에게 필요한 배율이다. */
+const LEVEL = 16;
 
-export function AreaMap({ lat, lng, area }: { lat: number; lng: number; area: string }) {
+export function AreaMap({ lat, lng, address }: { lat: number; lng: number; address: string }) {
+  // 지도 앱으로 넘기는 링크. 안드로이드·PC는 구글 지도가 열리고 iOS는 애플 지도로 받는다.
+  const q = encodeURIComponent(address);
   return (
     <div>
-      <div className="relative overflow-hidden rounded-lg border border-hairline">
+      <a
+        href={`https://maps.google.com/?q=${q}`}
+        target="_blank"
+        rel="noreferrer"
+        className="block overflow-hidden rounded-lg border border-hairline"
+      >
         <Image
-          src={`/api/staticmap?lat=${lat}&lng=${lng}&w=${W}&h=${H}&pin=0&level=${LEVEL}`}
-          alt={`${area} 근처 지도`}
+          src={`/api/staticmap?lat=${lat}&lng=${lng}&w=${W}&h=${H}&level=${LEVEL}`}
+          alt={`${address} 지도`}
           width={W}
           height={H}
           unoptimized
           className="h-auto w-full"
         />
-        {/* 범위 원 — 지도 한가운데. `pointer-events-none`이라 지도를 가리기만 하고 클릭은 안 먹는다.
-            키위 계열로 칠하면 「선택됨」으로 읽히므로 중립 잉크를 옅게 쓴다. */}
-        <span
-          aria-hidden="true"
-          className="pointer-events-none absolute left-1/2 top-1/2 size-[112px] -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-ink/25 bg-ink/10"
-        />
-      </div>
-      <p className="mt-2 text-[15px] text-mute">
-        {area} 근처예요. <span className="text-faint">정확한 주소는 사장님이 수락하시면 열려요.</span>
-      </p>
+      </a>
+      <p className="mt-2 text-[15px] leading-relaxed break-keep text-body">{address}</p>
+      <p className="mt-0.5 text-[15px] text-faint">지도를 누르면 길찾기가 열려요.</p>
     </div>
   );
 }

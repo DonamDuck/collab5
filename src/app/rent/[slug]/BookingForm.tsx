@@ -28,7 +28,8 @@
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { startBookingAction, confirmBookingAction } from "@/lib/rent-actions";
-import type { SpaceUseType } from "@/lib/types";
+import type { SpaceUseType, OpenSlot } from "@/lib/types";
+import { hourMarks, hoursBetween, overlaps, toHHMM, toMinutes, rangeLabel } from "@/lib/rent-time";
 import { dateLabel, InfoList, InfoRow, primaryBtnCls, RentSelect, rentInputCls, rentTextareaCls, won } from "../ui";
 import { ConfirmDialog } from "../ConfirmDialog";
 import { PickDateCalendar } from "./PickDateCalendar";
@@ -83,12 +84,14 @@ function PayBar({
 export function BookingForm({
   spaceId,
   spaceSlug,
-  openDates,
-  priceDay,
-  mentorMinutes,
-  mentorPrice,
+  openSlots,
+  takenByDate,
+  priceHour,
+  minHours,
+  coffeeChat,
+  coffeeChatMinutes,
+  coffeeChatPrice,
   capacity,
-  hours,
   useType,
   myBrands,
   spaceName,
@@ -97,12 +100,17 @@ export function BookingForm({
   spaceSlug: string;
   /** 확인 팝업 문장(「{공간}을 신청할까요」)에 쓴다. */
   spaceName: string;
-  openDates: string[];
-  priceDay: number;
-  mentorMinutes: number;
-  mentorPrice: number;
+  /** 🔁09-16 하루 단위 → 시간 단위. 호스트가 «날짜별로» 연 시간대. */
+  openSlots: OpenSlot[];
+  /** 이미 팔린 시간 — 날짜별 목록. 고르는 자리에서 바로 회색으로 만든다.
+   *  ⚠️여기서 막아도 **관문은 서버·DB**다. 두 사람이 같은 순간에 들어오면 뒤에 온 쪽이 승인에서 떨어진다. */
+  takenByDate: Record<string, { start: string; end: string }[]>;
+  priceHour: number;
+  minHours: number;
+  coffeeChat: boolean;
+  coffeeChatMinutes: number;
+  coffeeChatPrice: number;
   capacity?: number;
-  hours: string;
   /** 「몇 분이나」는 대관(`open`·`both`)에서만 묻는다. 원래 목적대로(`as_is`) 쓰는 자리엔 인원이 정보가 아니다. */
   useType: SpaceUseType;
   myBrands: { slug: string; name: string }[];
@@ -111,10 +119,13 @@ export function BookingForm({
   const [pending, start] = useTransition();
   const [err, setErr] = useState("");
 
-  const [useDate, setUseDate] = useState(openDates[0] ?? "");
+  const [useDate, setUseDate] = useState(openSlots[0]?.date ?? "");
+  /** 고른 날의 시작 시각. 날을 바꾸면 그 날의 첫 자리로 되돌린다 — 어제 고른 시각이 오늘 안 열려 있을 수 있다. */
+  const [startTime, setStartTime] = useState("");
+  const [useHours, setUseHours] = useState(0);
   const [headcount, setHeadcount] = useState("");
   const [plan, setPlan] = useState("");
-  const [withMentor, setWithMentor] = useState(false);
+  const [withChat, setWithChat] = useState(false);
   const [brandSlug, setBrandSlug] = useState("");
   /** 결제 직전 확인 팝업(대표 09-14: 의사 확인은 팝업으로). 열린 채로 `submit`이 돌지 않게 닫고 시작한다. */
   const [confirming, setConfirming] = useState(false);
@@ -127,8 +138,33 @@ export function BookingForm({
   const dateRef = useRef<HTMLDivElement>(null);
   const planRef = useRef<HTMLTextAreaElement>(null);
 
-  const mentorAmount = withMentor && mentorMinutes > 0 ? mentorPrice : 0;
-  const total = priceDay + mentorAmount;
+  // ⏱고른 날의 시간대와 이미 팔린 칸에서 «지금 고를 수 있는 것»을 만든다.
+  const daySlots = openSlots.filter((sl) => sl.date === useDate);
+  const taken = takenByDate[useDate] ?? [];
+  /** 시작 가능 시각 — 열린 시간대를 정시로 쪼개고, 최소 시간을 못 채우는 꼬리와 이미 팔린 칸은 뺀다. */
+  const startChoices = daySlots.flatMap((sl) =>
+    hourMarks(sl)
+      .filter((t) => hoursBetween(t, sl.end) >= minHours)
+      .filter((t) => !taken.some((b) => overlaps(t, toHHMM(toMinutes(t) + minHours * 60), b.start, b.end))),
+  );
+  const activeStart = startTime || startChoices[0] || "";
+  /** 그 시작에서 «몇 시간까지» 가능한가. 문 닫는 시각과 다음 예약 중 먼저 오는 쪽이 한계다. */
+  const maxHours = (() => {
+    const sl = daySlots.find((x) => activeStart >= x.start && activeStart < x.end);
+    if (!sl) return 0;
+    let limit = toMinutes(sl.end);
+    for (const b of taken) {
+      const bs = toMinutes(b.start);
+      if (bs >= toMinutes(activeStart) && bs < limit) limit = bs;
+    }
+    return Math.floor((limit - toMinutes(activeStart)) / 60);
+  })();
+  const hourChoices = Array.from({ length: Math.max(0, maxHours - minHours + 1) }, (_, i) => minHours + i);
+  const activeHours = useHours && hourChoices.includes(useHours) ? useHours : hourChoices[0] ?? 0;
+  const endTime = activeStart && activeHours ? toHHMM(toMinutes(activeStart) + activeHours * 60) : "";
+
+  const chatAmount = withChat && coffeeChat ? coffeeChatPrice : 0;
+  const total = priceHour * activeHours + chatAmount;
   // ⚠️열 글자는 서버(`confirmBookingAction`)가 강제하는 값이다. 여기서 먼저 막는 건 왕복을 아끼려는 것이지
   //   이게 관문이라서가 아니다 — 관문은 늘 서버 쪽이다.
   const planShort = plan.trim().length < 10;
@@ -161,10 +197,11 @@ export function BookingForm({
       const r = await startBookingAction({
         spaceSlug,
         useDate,
-        hours: "",          // 빈 값이면 서버가 공간의 이용 시간을 그대로 쓴다
+        startTime: activeStart,
+        endTime,
         plan: plan.trim(),
         headcount: headcount ? Number(headcount) : undefined,
-        withMentor,
+        withChat,
         guestBrandSlug: brandSlug,
       });
       if (!r.ok || !r.orderId || !r.amount) { setErr(r.message || "신청을 시작하지 못했어요."); return; }
@@ -195,12 +232,61 @@ export function BookingForm({
         {/* 🔁09-14 `<select>` → 달력(대표). 못 고르는 날이 흐리게 «보이는» 것이 오히려 정보다 —
             「이 공간은 화요일만 열린다」가 격자에서 한눈에 읽힌다. 목록은 그 규칙을 안 보여준다. */}
         <PickDateCalendar
-          openDates={openDates}
+          openDates={openSlots.map((sl) => sl.date)}
           value={useDate}
-          onChange={(d) => { setUseDate(d); setBadField((f) => (f === "date" ? "" : f)); }}
+          onChange={(d) => {
+            setUseDate(d);
+            // 날을 바꾸면 시각을 비운다 — 어제 고른 시각이 오늘도 열려 있으리란 보장이 없다.
+            setStartTime("");
+            setUseHours(0);
+            setBadField((f) => (f === "date" ? "" : f));
+          }}
         />
         {badField === "date" && <p className={errCls}>어느 날 쓰실지 골라 주세요.</p>}
-        {hours && <p className={hintCls}>이용 시간은 {hours}예요.</p>}
+        {daySlots.length > 0 && (
+          <p className={hintCls}>
+            {daySlots.map((sl) => `${sl.start}~${sl.end}`).join(", ")} 열려 있어요 · 최소 {minHours}시간부터
+          </p>
+        )}
+      </div>
+
+      {/* ⏱09-16 신설 — 시간 단위로 바뀌면서 「몇 시부터 몇 시간」이 신청의 핵심이 됐다.
+          ⭐**시작을 먼저, 길이를 그다음.** 끝나는 시각을 직접 고르게 하면 열린 시간·최소 시간·이미 팔린 칸
+            셋을 손님이 머리로 맞춰야 한다. 시작을 고르면 가능한 길이만 남겨 주는 쪽이 고를 것이 적다. */}
+      <div>
+        <p className={labelCls}>몇 시부터 쓰실까요?</p>
+        {startChoices.length === 0 ? (
+          <p className={hintCls}>이 날은 빌릴 수 있는 시간이 남아 있지 않아요. 다른 날을 골라 주세요.</p>
+        ) : (
+          <div className="flex flex-wrap items-center gap-2">
+            <RentSelect
+              aria-label="시작 시각"
+              className="w-[128px]"
+              value={activeStart}
+              onChange={(e) => { setStartTime(e.target.value); setUseHours(0); }}
+            >
+              {startChoices.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </RentSelect>
+            <span className="text-[16px] text-mute">부터</span>
+            <RentSelect
+              aria-label="몇 시간"
+              className="w-[128px]"
+              value={String(activeHours)}
+              onChange={(e) => setUseHours(Number(e.target.value))}
+            >
+              {hourChoices.map((h) => (
+                <option key={h} value={String(h)}>
+                  {h}시간
+                </option>
+              ))}
+            </RentSelect>
+            {endTime && <span className="text-[16px] text-mute">→ {endTime}에 끝나요</span>}
+          </div>
+        )}
       </div>
 
       {useType !== "as_is" && (
@@ -310,8 +396,13 @@ export function BookingForm({
       >
         {/* 🔁09-15 `sm:hidden` 제거 — 어느 폭에서나 여기서 고른다(대표 「데스크탑도 동일 UX」).
             바에서 옵션을 뺐으니 고르개가 둘로 보일 걱정도 없다. */}
-        {mentorMinutes > 0 && (
-          <MentorOptions minutes={mentorMinutes} price={mentorPrice} value={withMentor} onChange={setWithMentor} />
+        {coffeeChat && coffeeChatPrice > 0 && (
+          <MentorOptions
+            minutes={coffeeChatMinutes}
+            price={coffeeChatPrice}
+            value={withChat}
+            onChange={setWithChat}
+          />
         )}
         {/* 📋09-15 대표 — *「줄글로 하지 말고 결제 화면의 항목처럼」*. 결제 화면(`PayPanel`)과 같은 문법이다.
             ⭐두 화면이 같은 모양이라 **방금 확인한 것을 다음 화면에서 다시 대조**할 수 있다.
@@ -319,12 +410,13 @@ export function BookingForm({
         <InfoList className="border-t border-hairline pt-3">
           <InfoRow label="장소" value={spaceName} />
           <InfoRow label="신청 날짜" value={dateLabel(useDate)} />
+          <InfoRow label="이용 시간" value={rangeLabel(activeStart, endTime)} />
           <InfoRow
             label="결제 금액"
             value={
               <>
                 <span className="font-medium text-ink">{won(total)}</span>
-                {mentorAmount > 0 && <span className="text-mute"> · 사장님 시간 포함</span>}
+                {chatAmount > 0 && <span className="text-mute"> · 커피챗 포함</span>}
               </>
             }
           />

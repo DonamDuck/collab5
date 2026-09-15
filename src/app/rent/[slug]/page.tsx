@@ -1,12 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getSpacePublic } from "@/lib/spaces";
+import { getSpacePublic, listLiveBookingsIn } from "@/lib/spaces";
 import { getSessionUserId } from "@/lib/profiles";
 import { repo } from "@/lib/repo";
 import { PhotoSlider } from "@/components/PhotoSlider";
 import { BookingForm } from "./BookingForm";
-import { Chip, dateLabel, primaryBtnCls, usageLabel, won } from "../ui";
+import { categoryLabel, Chip, dateLabel, primaryBtnCls, scopeLabel, won } from "../ui";
 import { AreaMap } from "./AreaMap";
 
 // 하루 가게 — 공간 한 곳 + 신청 (2026-09-13)
@@ -78,11 +78,19 @@ export default async function SpaceDetailPage({
       ? (await repo.listMakersByOwner(uid)).map((m) => ({ slug: m.slug, name: m.name }))
       : [];
 
-  const openDates = [...sp.openDates].sort();
+  // 🔁09-16 하루 단위 → 시간 단위. 날짜는 시간대 목록에서 뽑고, 그 날 이미 팔린 시간도 같이 읽는다.
+  const openSlots = [...sp.openSlots].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+  const openDates = Array.from(new Set(openSlots.map((sl) => sl.date))).sort();
+  // ⚠️예약을 날짜마다 따로 부르면 열어 둔 날 수만큼 왕복이 는다. 한 번에 읽어 날짜별로 나눈다.
+  const liveBookings = openDates.length > 0 ? await listLiveBookingsIn(sp.id, openDates) : [];
+  const takenByDate: Record<string, { start: string; end: string }[]> = {};
+  for (const b of liveBookings) {
+    (takenByDate[b.useDate] ??= []).push({ start: b.startTime, end: b.endTime });
+  }
   // 규칙은 한 줄에 하나씩 적게 했다(`/rent/new`). 그 줄을 그대로 살려 한 줄씩 세운다.
   const ruleLines = sp.rules.split(/\n+/).map((s) => s.trim()).filter(Boolean);
   // 상단 카드 메타 — 동네 · 인원 · 시간. 표에 있던 값이 여기로 왔다.
-  const meta = [sp.area || "동네 미정", sp.capacity ? `최대 ${sp.capacity}명` : "", sp.hours]
+  const meta = [categoryLabel(sp.category), sp.capacity ? `최대 ${sp.capacity}명` : "", `시간당 ${won(sp.priceHour)}`]
     .filter(Boolean)
     .join(" · ");
   // 신청 폼이 뜨는 조건 — 모바일 하단 고정 바가 본문을 가리지 않게 이때만 바닥 여백을 더 준다.
@@ -111,7 +119,7 @@ export default async function SpaceDetailPage({
             금액을 빼자」*, 아워플레이스 참고). 카드는 «무엇인지»를 말하고 값은 «비용» 절이 맡는다. */}
         {/* 칩 줄 — 쓰임새 하나 + 설비 몇 개, 전부 같은 pill. 설비 전체는 아래 섹션에서 본다. */}
         <div className="mt-4 flex flex-wrap gap-2">
-          <Chip>{usageLabel(sp.useType)}</Chip>
+          <Chip>{scopeLabel(sp.scope)}</Chip>
           {sp.facilities.slice(0, 4).map((f) => (
             <Chip key={f}>{f}</Chip>
           ))}
@@ -184,12 +192,15 @@ export default async function SpaceDetailPage({
       )}
 
       {/* 📍09-14 신설 — 대표 지시(아워플레이스 참고). 좌표는 사장님이 주소를 넣을 때 한 번 재서
-          `spaces.lat/lng`에 굳혀 둔다(`lib/geocode.ts`). 좌표가 없으면 이 절은 통째로 안 뜬다. */}
-      {sp.areaLat != null && sp.areaLng != null && (
-        <Section title="위치">
-          <AreaMap lat={sp.areaLat} lng={sp.areaLng} area={sp.area} />
-        </Section>
-      )}
+          `spaces.lat/lng`에 굳혀 둔다(`lib/geocode.ts`). 좌표가 없으면 주소만 적는다.
+          🔁09-16 — 정확한 핀·정확한 주소로(위 `AreaMap` 머리말). */}
+      <Section title="위치">
+        {sp.lat != null && sp.lng != null ? (
+          <AreaMap lat={sp.lat} lng={sp.lng} address={sp.address} />
+        ) : (
+          <p className="text-[17px] leading-relaxed break-keep text-body">{sp.address}</p>
+        )}
+      </Section>
 
       <Section title="빌릴 수 있는 날">
         {openDates.length === 0 ? (
@@ -198,8 +209,8 @@ export default async function SpaceDetailPage({
           </p>
         ) : (
           <div className="flex flex-wrap gap-2">
-            {openDates.map((d) => (
-              <Chip key={d}>{dateLabel(d)}</Chip>
+            {openSlots.map((sl) => (
+              <Chip key={`${sl.date}-${sl.start}`}>{`${dateLabel(sl.date)} ${sl.start}~${sl.end}`}</Chip>
             ))}
           </div>
         )}
@@ -208,24 +219,37 @@ export default async function SpaceDetailPage({
       {/* 📚09-14 신설 — 대표: *「이거 체크박스 빼고 여기 정보 영역으로 하고 (선택 사항)으로.
           「사장님께 잠깐 배워 볼 수 있어요」로 정규 타이틀로 섹션으로 다루자」*.
           ⭐설명하는 자리와 고르는 자리를 갈랐다. 고르는 일은 결제 단계의 옵션이 맡는다. */}
-      {sp.mentorMinutes > 0 && (
-        <Section title="사장님께 잠깐 배워 볼 수 있어요">
+      {sp.coffeeChat && sp.coffeeChatMinutes > 0 && (
+        <Section title="사장님과 커피챗">
+          {/* ☕09-16 대표 — 「사장님께 잠깐 배워보기」를 커피챗으로 다시 잡았다.
+              ⭐파는 것은 비법이 아니라 «현업 이야기»다. 사장님이 직접 적은 주제가 있으면 그걸 보여 주고,
+                없으면 무엇을 물을 수 있는지 우리가 예를 든다 — 손님이 무엇을 사는지 알아야 고른다. */}
           <p className="text-[17px] leading-relaxed break-keep text-body">
-            문 열기 전 {sp.mentorMinutes}분 동안 이 일을 어떻게 하는지 들을 수 있어요. 손님은 언제 오는지,
-            재료는 어디서 떼는지 같은 것들이요.
+            사장님과 협의한 날짜에 {sp.coffeeChatMinutes}분 동안 현업 이야기를 들을 수 있어요.
           </p>
+          {sp.coffeeChatTopics.trim() ? (
+            <p className="mt-2 whitespace-pre-line text-[16px] leading-relaxed break-keep text-mute">
+              {sp.coffeeChatTopics}
+            </p>
+          ) : (
+            <p className="mt-2 text-[16px] leading-relaxed break-keep text-mute">
+              손님은 언제 오는지, 재료는 어디서 떼는지, 처음에 무엇을 크게 틀렸는지 같은 것들이요.
+            </p>
+          )}
           <p className="mt-3 text-[15px] text-mute">
-            <span className="font-medium text-ink">+{won(sp.mentorPrice)}</span> · 신청하실 때 고르시면 돼요
+            <span className="font-medium text-ink">+{won(sp.coffeeChatPrice)}</span> · 신청하실 때 고르시면 돼요
             <span className="ml-1 text-faint">(선택 사항)</span>
           </p>
         </Section>
       )}
 
       <Section title="비용">
-        <p className="text-[17px] text-ink">하루 {won(sp.priceDay)}</p>
-        {sp.mentorMinutes > 0 && (
+        <p className="text-[17px] text-ink">
+          시간당 {won(sp.priceHour)} · 최소 {sp.minHours}시간부터
+        </p>
+        {sp.coffeeChat && sp.coffeeChatPrice > 0 && (
           <p className="mt-1.5 text-[16px] text-mute">
-            사장님이 {sp.mentorMinutes}분 알려주는 시간은 {won(sp.mentorPrice)}, 원하시면 같이 담으세요.
+            커피챗 {sp.coffeeChatMinutes}분은 {won(sp.coffeeChatPrice)}, 원하시면 같이 담으세요.
           </p>
         )}
       </Section>
@@ -236,6 +260,20 @@ export default async function SpaceDetailPage({
             그러니 여기 값을 고칠 일이 생기면 **그 함수부터 고치고 이 절을 맞춘다.**
           📌공간마다 다르게 두지 않는다. 사장님이 각자 정하면 손님이 매번 다시 읽어야 하고,
             분쟁이 났을 때 기준이 공간 수만큼 생긴다. */}
+      {/* 📨09-16 — 비밀번호 같은 건 우리가 안 가진다. 「어떻게 받게 되는지」만 미리 말해 준다. */}
+      <Section title="이용 안내">
+        <p className="text-[17px] leading-relaxed break-keep text-body">
+          {sp.accessHow === "sms"
+            ? "예약이 확정되면 사장님이 문자로 이용 안내를 보내드려요."
+            : sp.accessHow === "onsite"
+              ? "이용하시는 날 현장에서 사장님이 직접 안내해 드려요."
+              : "예약이 확정되면 문자로 안내드리고, 당일 현장에서도 한 번 더 알려드려요."}
+        </p>
+        <p className="mt-2 text-[15px] leading-relaxed break-keep text-mute">
+          출입 비밀번호처럼 민감한 내용은 collab5에 저장하지 않아요. 사장님이 직접 전해 드립니다.
+        </p>
+      </Section>
+
       <Section title="환불 규정">
         <p className="text-[17px] leading-relaxed break-keep text-body">
           사장님이 거절하시면 <span className="font-medium text-ink">전액</span> 돌려드려요.
@@ -294,12 +332,14 @@ export default async function SpaceDetailPage({
             spaceId={sp.id}
             spaceSlug={sp.slug}
             spaceName={sp.name}
-            openDates={openDates}
-            priceDay={sp.priceDay}
-            mentorMinutes={sp.mentorMinutes}
-            mentorPrice={sp.mentorPrice}
+            openSlots={openSlots}
+            takenByDate={takenByDate}
+            priceHour={sp.priceHour}
+            minHours={sp.minHours}
+            coffeeChat={sp.coffeeChat}
+            coffeeChatMinutes={sp.coffeeChatMinutes}
+            coffeeChatPrice={sp.coffeeChatPrice}
             capacity={sp.capacity}
-            hours={sp.hours}
             useType={sp.useType}
             myBrands={myBrands}
           />

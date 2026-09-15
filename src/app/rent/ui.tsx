@@ -12,7 +12,7 @@
 //   만들고 있었다. 소개서(`/m`) 사다리와 디자인-시스템 정본에 맞춰 통째로 갈았다.
 //   ⛔`rem` 유틸 금지(루트 17px라 6.25% 부푼다) — 전부 px로 박는다.
 import type { ReactNode } from "react";
-import type { SpaceUseType, BookingStatus } from "@/lib/types";
+import type { SpaceUseType, BookingStatus, SpaceCategory, SpaceScope } from "@/lib/types";
 
 /** 금액은 늘 「12,000원」 한 모양으로. 숫자만 던져두면 자릿수를 눈으로 세게 된다. */
 export function won(n: number): string {
@@ -30,6 +30,27 @@ export function usageLabel(t: SpaceUseType): string {
 /** 날짜를 「10월 5일 (월)」로. `YYYY-MM-DD` 외의 값이 오면 받은 그대로 돌려준다.
  *  ⚠️`new Date("2026-10-05")`는 UTC 자정으로 읽혀 KST에선 하루 전으로 밀린다.
  *    그래서 Date를 거치지 않고 글자를 쪼갠 뒤, 요일만 정오 기준으로 계산한다. */
+/** 📂업종·범위 라벨 (2026-09-16). ⚠️화면에 쓰는 말은 여기 한 곳에만 둔다 —
+ *  목록·상세·카드가 각자 적으면 언젠가 「카페」와 「카페·디저트」가 같이 돌아다닌다. */
+export function categoryLabel(c: SpaceCategory): string {
+  return (
+    {
+      "": "업종 미정",
+      cafe: "카페",
+      restaurant: "음식점",
+      workshop: "공방",
+      studio: "스튜디오",
+      shop: "소품샵·편집숍",
+      lounge: "사무실·라운지",
+      etc: "그 밖에",
+    }[c] ?? "업종 미정"
+  );
+}
+
+export function scopeLabel(v: SpaceScope): string {
+  return { space_only: "공간만", with_gear: "공간과 장비까지", whole_shop: "가게 그대로" }[v] ?? "공간만";
+}
+
 export function dateLabel(iso: string): string {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
   if (!m) return iso;
