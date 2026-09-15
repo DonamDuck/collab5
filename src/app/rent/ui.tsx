@@ -119,15 +119,28 @@ export const rentQuietInputCls =
 export function RentSelect({
   className = "",
   tone = "form",
+  compact = false,
+  wrapClassName = "w-full",
   children,
   ...rest
-}: React.SelectHTMLAttributes<HTMLSelectElement> & { tone?: "form" | "quiet" }) {
-  // ⚠️두 얼굴을 `className`으로 덮어쓰지 않고 «고른다». Tailwind는 나중에 적은 클래스가 이기는 게 아니라
-  //   스타일시트 안의 순서가 이겨서, 덮어쓰기는 되는 날도 있고 안 되는 날도 있다.
-  const base = tone === "quiet" ? rentQuietInputCls : rentInputCls;
+}: React.SelectHTMLAttributes<HTMLSelectElement> & {
+  tone?: "form" | "quiet";
+  /** 한 줄에 여럿이 서야 할 때. ⚠️`size`는 `select`가 이미 쓰는 속성이라 이름을 달리했다. */
+  compact?: boolean;
+  /** 🩸**폭·높이는 여기로 준다. `className`으로 주면 조용히 안 먹는다.**
+   *  안쪽 `select`가 `w-full h-[48px]`를 들고 있어서, 바깥에서 `w-[92px]`를 얹어도
+   *  Tailwind는 나중에 적은 클래스가 아니라 스타일시트 «순서»로 이긴다.
+   *  🪤에러도 경고도 없다. 09-16에 등록 폼의 「한 줄 시간 칸」이 이것 때문에 314px로 서 있었다. */
+  wrapClassName?: string;
+}) {
+  const border = tone === "quiet" ? "border-hairline" : "border-border-strong";
+  const box = compact ? "h-[40px] pl-3 pr-8 text-[15px]" : "h-[48px] pl-4 pr-11 text-[16px]";
   return (
-    <div className="relative w-full">
-      <select className={`${base} appearance-none pr-11 ${className}`} {...rest}>
+    <div className={`relative ${wrapClassName}`}>
+      <select
+        className={`w-full appearance-none rounded-md border ${border} ${box} bg-surface text-ink outline-none focus:border-focus ${className}`}
+        {...rest}
+      >
         {children}
       </select>
       {/* `pointer-events-none` — 화살표가 클릭을 먹으면 그 자리를 눌렀을 때 목록이 안 열린다. */}
@@ -139,7 +152,9 @@ export function RentSelect({
         strokeWidth="1.8"
         strokeLinecap="round"
         strokeLinejoin="round"
-        className="pointer-events-none absolute right-4 top-1/2 size-[18px] -translate-y-1/2 text-mute"
+        className={`pointer-events-none absolute top-1/2 -translate-y-1/2 text-mute ${
+          compact ? "right-2.5 size-[16px]" : "right-4 size-[18px]"
+        }`}
       >
         <path d="m5 7.5 5 5 5-5" />
       </svg>

@@ -271,7 +271,7 @@ export function BookingForm({
           <div className="flex flex-wrap items-center gap-2">
             <RentSelect
               aria-label="시작 시각"
-              className="w-[128px]"
+              wrapClassName="w-[128px] shrink-0"
               value={activeStart}
               onChange={(e) => { setStartTime(e.target.value); setUseHours(0); }}
             >
@@ -284,7 +284,7 @@ export function BookingForm({
             <span className="text-[16px] text-mute">부터</span>
             <RentSelect
               aria-label="몇 시간"
-              className="w-[128px]"
+              wrapClassName="w-[128px] shrink-0"
               value={String(activeHours)}
               onChange={(e) => setUseHours(Number(e.target.value))}
             >

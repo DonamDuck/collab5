@@ -90,9 +90,9 @@ export function RentFilters({
           aria-label="동네"
         />
         {/* 업종도 고르는 순간이 곧 확정이다. 고른 뒤 버튼을 또 누르게 하면 한 번 더 일을 시킨다. */}
-        <div className="w-[150px] shrink-0">
-          <RentSelect
+        <RentSelect
             tone="quiet"
+            wrapClassName="w-[150px] shrink-0"
             value={category}
             onChange={(e) => {
               const v = e.target.value as SpaceCategory;
@@ -108,7 +108,6 @@ export function RentFilters({
               </option>
             ))}
           </RentSelect>
-        </div>
       </form>
 
       {hasAny && (

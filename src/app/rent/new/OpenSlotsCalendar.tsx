@@ -139,7 +139,8 @@ export function OpenSlotsCalendar({
 
   const navCls =
     "inline-flex h-[44px] w-[44px] items-center justify-center rounded-md text-[18px] text-body transition-colors hover:bg-surface-soft disabled:opacity-30 disabled:hover:bg-transparent";
-  const timeSel = "h-[40px] w-[92px] shrink-0";
+  /** 한 줄에 서야 하는 시간 칸. ⚠️폭·높이는 `wrapClassName`/`size`로 준다 — `className`으로는 안 먹는다. */
+  const timeWrap = "w-[104px] shrink-0";
 
   return (
     <div className="space-y-4">
@@ -232,7 +233,8 @@ export function OpenSlotsCalendar({
                   </span>
                   <RentSelect
                     aria-label={`${DOW[d]}요일 여는 시각`}
-                    className={timeSel}
+                    compact
+                    wrapClassName={timeWrap}
                     value={t.start}
                     onChange={(e) => editDow(d, { start: e.target.value })}
                   >
@@ -245,7 +247,8 @@ export function OpenSlotsCalendar({
                   <span className="text-mute">~</span>
                   <RentSelect
                     aria-label={`${DOW[d]}요일 닫는 시각`}
-                    className={timeSel}
+                    compact
+                    wrapClassName={timeWrap}
                     value={t.end}
                     onChange={(e) => editDow(d, { end: e.target.value })}
                   >
@@ -353,7 +356,8 @@ function SlotRow({
         <p className="min-w-[92px] shrink-0 text-[15px] font-medium text-ink">{dateLabel(sl.date)}</p>
         <RentSelect
           aria-label={`${dateLabel(sl.date)} 여는 시각`}
-          className="h-[40px] w-[92px] shrink-0"
+          compact
+          wrapClassName="w-[104px] shrink-0"
           value={sl.start}
           onChange={(e) => onEdit({ start: e.target.value })}
         >
@@ -366,7 +370,8 @@ function SlotRow({
         <span className="text-mute">~</span>
         <RentSelect
           aria-label={`${dateLabel(sl.date)} 닫는 시각`}
-          className="h-[40px] w-[92px] shrink-0"
+          compact
+          wrapClassName="w-[104px] shrink-0"
           value={sl.end}
           onChange={(e) => onEdit({ end: e.target.value })}
         >
