@@ -278,8 +278,12 @@ export default async function SpaceDetailPage({
         <p className="text-[17px] leading-relaxed break-keep text-body">
           사장님이 거절하시면 <span className="font-medium text-ink">전액</span> 돌려드려요.
         </p>
+        <p className="mt-3 text-[16px] leading-relaxed break-keep text-body">
+          신청하고 <span className="font-medium text-ink">한 시간 안</span>에 취소하시면 남은 날과 상관없이 전액
+          돌려드려요.
+        </p>
         <p className="mt-3 text-[16px] leading-relaxed break-keep text-mute">
-          신청하신 분이 취소하실 때는 쓰기로 한 날까지 남은 기간으로 정해져요.
+          그 뒤에 취소하실 때는 쓰기로 한 날까지 남은 기간으로 정해져요.
         </p>
         <dl className="mt-3 space-y-2 text-[16px]">
           {[
@@ -295,7 +299,7 @@ export default async function SpaceDetailPage({
           ))}
         </dl>
         <p className="mt-3 text-[15px] leading-relaxed break-keep text-faint">
-          돌려드리는 돈은 결제하신 수단으로 그대로 들어가요. 사장님이 수락하시면 그때 주소와 연락처가 열려요.
+          돌려드리는 돈은 결제하신 수단으로 그대로 들어가요. 이 규정은 collab5 규정을 따릅니다.
         </p>
       </Section>
 

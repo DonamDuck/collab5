@@ -80,12 +80,21 @@ export async function cancelPayment(
   }
 }
 
+/** ⏳**막 눌렀다면 되돌릴 수 있다** — 신청 후 1시간 안의 취소는 언제나 전액 (대표 09-16).
+ *  스페이스클라우드가 「예약 직후 2시간 전액」을 두는 걸 보고 대표가 1시간으로 정했다.
+ *  ⭐손 미끄러짐과 마음 바꿈은 다르다. 이 창이 없으면 잘못 누른 사람이 당일 예약에서 전액을 잃는다. */
+export const GRACE_MINUTES = 60;
+
 /** 취소 수수료 — 🚨**호스트가 아니라 우리가 정한다.**
  *  소비자분쟁해결기준에 공간 대여 항목이 없어서 우리가 규정을 만들어야 하는데,
  *  호스트 자율로 두면 전자상거래법 제35조로 무효가 될 수 있다(09-13 법규 조사).
  *  값은 공정위 지침 Ⅲ.1 라가 허용하는 **숙박업 공제율을 상한으로** 잡았다.
- *  ⚠️이 표는 초안이다. 약관에 싣기 전 대표 확인을 받을 것. */
-export function guestCancelRefundRate(daysBefore: number): number {
+ *
+ *  @param daysBefore 쓰기로 한 날까지 남은 일수
+ *  @param minutesSinceBooked 신청한 지 지난 분. 넘기지 않으면 유예 창을 안 본다(옛 호출부 호환).
+ */
+export function guestCancelRefundRate(daysBefore: number, minutesSinceBooked?: number): number {
+  if (typeof minutesSinceBooked === "number" && minutesSinceBooked <= GRACE_MINUTES) return 1;
   if (daysBefore >= 7) return 1;      // 7일 전까지 전액
   if (daysBefore >= 3) return 0.7;
   if (daysBefore >= 1) return 0.5;

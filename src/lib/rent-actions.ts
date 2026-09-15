@@ -337,7 +337,9 @@ export async function decideBookingAction(
 /** 취소 환불액 — 견적과 실제 취소가 **같은 계산**을 써야 한다. 둘이 따로 계산하면 팝업엔 70%라 적고 50%만 돌려주는 날이 온다. */
 function cancelRefund(b: SpaceBooking): { rate: number; refund: number } {
   const days = Math.floor((new Date(b.useDate).getTime() - Date.now()) / 86_400_000);
-  const rate = guestCancelRefundRate(days);
+  // ⏳신청한 지 얼마나 됐나 — 1시간 안이면 남은 날과 무관하게 전액이다(대표 09-16).
+  const mins = Math.floor((Date.now() - new Date(b.createdAt).getTime()) / 60_000);
+  const rate = guestCancelRefundRate(days, mins);
   return { rate, refund: Math.floor(b.amountTotal * rate) };
 }
 

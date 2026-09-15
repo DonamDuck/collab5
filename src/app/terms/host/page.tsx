@@ -1,0 +1,212 @@
+import type { Metadata } from "next";
+import Link from "next/link";
+import { FEE_RATE } from "@/lib/spaces";
+
+export const metadata: Metadata = {
+  title: "공간 제공자 약관 — collab5",
+  description: "하루 가게에 공간을 올리는 분과 collab5 사이의 약관",
+  // ⚠️필수 — 루트 layout의 `canonical: "/"`가 자식 페이지에 그대로 상속된다(08-07 발견).
+  alternates: { canonical: "/terms/host" },
+};
+
+// 공간 제공자(호스트) 약관 — 2026-09-16
+//
+// 📜**왜 따로 두나** (09-16 조사, 출처는 전부 직접 열어 확인했다)
+//   기존 `/terms`는 「서비스는 무료 원칙」·「이용자 간 거래 결과 책임 없음」 두 줄이 전부라
+//   호스트 의무(권한·정산·취소·구상)가 **하나도 없다.** 약관규제법 제3조③④는 중요 내용을 설명하고
+//   동의받아야 계약 내용으로 주장할 수 있다고 한다 — 지금 상태로는 수수료도 구상도 주장할 근거가 없다.
+//   ⭐아워플레이스·에어비앤비 둘 다 한 문서 «안»에 호스트 편을 갈라 두었다. 우리는 페이지를 나눴다 —
+//     등록 화면에서 이 링크 하나만 보여 주면 되고, 동의 시각(`spaces.host_terms_at`)이 그때 찍힌다.
+//
+// ⚖️법정 의무는 §5(중개자 고지)·§6(신원정보 제공)에 모여 있다. 나머지는 「신중」이지만
+//   수수료·정산·구상은 약관규제법상 «중요한 내용»이라 등록 화면에서도 눈에 띄게 적는다.
+// 🚨회사 면책은 좁게 썼다 — 고의·중과실 면책이나 위험 전가 조항은 약관규제법 제7조 제1·2호로 무효다.
+//
+// ⚠️**법률 검토 전 초안이다.** 시행일을 넣기 전에 대표 확인을 받는다.
+export default function HostTermsPage() {
+  const fee = Math.round(FEE_RATE * 100);
+  return (
+    <main className="mx-auto max-w-[760px] px-5 py-12 sm:px-6 sm:py-16">
+      <h1 className="text-[24px] font-bold leading-[1.25] tracking-[-0.025em] text-ink sm:text-[26px]">
+        공간 제공자 약관
+      </h1>
+      <p className="mt-3 text-[15px] leading-relaxed text-mute">
+        본 약관은 collab5(이하 &lsquo;회사&rsquo;)가 운영하는 &lsquo;하루 가게&rsquo;에 공간을 등록하여 대여하는 분(이하
+        &lsquo;호스트&rsquo;)과 회사 사이의 권리·의무를 정합니다. 회사의{" "}
+        <Link href="/terms" className="underline underline-offset-4">
+          이용약관
+        </Link>
+        과 함께 적용되며, 서로 다르게 정한 내용은 본 약관이 우선합니다.
+      </p>
+      <p className="mt-2 text-[15px] leading-relaxed text-faint">
+        공간을 등록하실 때 이 약관에 동의하신 것으로 보고, 동의하신 시각을 기록합니다.
+      </p>
+
+      <div className="mt-10 space-y-9">
+        <Article title="제1조 (공간을 빌려줄 권한)">
+          <ul className="list-disc space-y-1 pl-5">
+            <li>
+              호스트는 등록한 공간의 소유자이거나, 임대차계약상 해당 공간을 시간 단위로 다른 사람에게 사용하게 할 수 있는
+              권한을 가지고 있음을 보증합니다.
+            </li>
+            <li>
+              임대차계약에 전대(轉貸) 제한이 있는 경우 임대인의 동의를 받아야 하며, 그 확인은 호스트의 책임입니다.
+            </li>
+            <li>회사는 필요한 경우 소유 또는 사용 권한을 확인할 수 있는 자료를 요청할 수 있습니다.</li>
+          </ul>
+        </Article>
+
+        <Article title="제2조 (등록 정보의 정확성)">
+          <ul className="list-disc space-y-1 pl-5">
+            <li>
+              호스트는 공간의 이름·주소·사진·시설·이용 가능한 시간과 비용을 사실대로 등록합니다.
+            </li>
+            <li>
+              등록한 내용과 실제가 달라 이용자에게 환불이나 보상이 발생한 경우, 회사는 그 금액을 호스트에게 청구할 수
+              있습니다.
+            </li>
+            <li>
+              공간의 이름이나 주소가 바뀌면 회사의 확인을 다시 거칩니다. 그 밖의 내용은 호스트가 언제든 고칠 수 있습니다.
+            </li>
+          </ul>
+        </Article>
+
+        <Article title="제3조 (시설과 안전)">
+          <ul className="list-disc space-y-1 pl-5">
+            <li>공간의 관리와 안전 조치는 호스트가 합니다.</li>
+            <li>
+              이용 중 발생한 시설 파손이나 분실은 호스트와 이용자가 직접 정산하며, 회사는 결제 내역 확인 등 필요한 자료를
+              제공하여 협조합니다.
+            </li>
+            <li>호스트는 공간의 성격에 맞는 보험 가입을 검토하실 것을 권합니다.</li>
+          </ul>
+        </Article>
+
+        <Article title="제4조 (이용 안내와 출입 정보)">
+          <ul className="list-disc space-y-1 pl-5">
+            <li>
+              호스트는 예약이 확정된 이용자에게 문자 또는 현장 안내 중 등록 시 선택한 방법으로 이용 안내를 제공합니다.
+            </li>
+            <li>
+              <strong className="font-medium text-ink">
+                출입 비밀번호 등 민감한 정보는 회사가 보관하지 않습니다.
+              </strong>{" "}
+              호스트가 이용자에게 직접 전달하며, 그 관리 책임은 호스트에게 있습니다.
+            </li>
+          </ul>
+        </Article>
+
+        <Article title="제5조 (회사의 지위)">
+          <ul className="list-disc space-y-1 pl-5">
+            <li>
+              회사는 통신판매중개자로서 공간 대여 계약의 당사자가 아닙니다. 계약은 호스트와 이용자 사이에 성립하며, 공간의
+              제공과 그 이행에 관한 책임은 호스트에게 있습니다.
+            </li>
+            <li>
+              다만 회사가 대금을 직접 수령하므로, 청약 과정의 조작 실수 방지와 전자적 대금지급의 신뢰 확보에 관한 의무는
+              회사가 이행합니다.
+            </li>
+          </ul>
+        </Article>
+
+        <Article title="제6조 (호스트 정보의 제공)">
+          <ul className="list-disc space-y-1 pl-5">
+            <li>
+              회사는 관계 법령에 따라 호스트의 상호·사업장 주소·전화번호를 확인하고, 이용자가 신청하기 전에 공간 상세
+              화면에 표시합니다. 호스트는 이에 동의합니다.
+            </li>
+            <li>
+              호스트의 개인 연락처는 예약이 확정된 이용자에게만 공개됩니다.
+            </li>
+            <li>호스트가 사업자가 아닌 경우, 회사는 관계 법령에 따라 신원 확인 절차를 요청할 수 있습니다.</li>
+          </ul>
+        </Article>
+
+        <Article title="제7조 (예약의 확정과 거절)">
+          <ul className="list-disc space-y-1 pl-5">
+            <li>
+              이용자의 결제가 완료되면 호스트에게 신청이 전달되며, 호스트는 이를 수락하거나 거절할 수 있습니다.
+            </li>
+            <li>호스트가 거절한 경우 이용자에게 전액 환불되며, 호스트에게 정산되는 금액은 없습니다.</li>
+            <li>
+              확정된 예약을 호스트의 사정으로 취소하는 일이 반복되면, 회사는 공간의 노출을 중단하거나 등록을 해지할 수
+              있습니다.
+            </li>
+          </ul>
+        </Article>
+
+        <Article title="제8조 (취소와 환불)">
+          <p>
+            이용자의 취소에 따른 환불 기준은 회사가 정하며, 호스트가 개별적으로 달리 정할 수 없습니다.
+          </p>
+          <ul className="mt-2 list-disc space-y-1 pl-5">
+            <li>신청 후 1시간 이내 취소: 전액 환불</li>
+            <li>이용일 7일 전까지: 전액 환불</li>
+            <li>이용일 3일 전까지: 70% 환불</li>
+            <li>이용일 1일 전까지: 50% 환불</li>
+            <li>이용 당일: 환불 없음</li>
+          </ul>
+          <p className="mt-2 text-mute">
+            환불된 예약은 호스트 정산에서 제외되며, 환불되지 않은 금액은 정산 시 함께 지급됩니다.
+          </p>
+        </Article>
+
+        <Article title={`제9조 (수수료와 정산)`}>
+          <ul className="list-disc space-y-1 pl-5">
+            <li>
+              회사는 성사된 거래 금액의{" "}
+              <strong className="font-medium text-ink">{fee}%</strong>를 중개 수수료로 받습니다. 수수료율은 거래마다
+              기록되며, 요율이 바뀌어도 이미 성사된 거래에는 그때의 요율이 적용됩니다.
+            </li>
+            <li>정산은 이용이 끝난 것을 확인한 뒤 호스트가 지정한 계좌로 지급합니다.</li>
+            <li>
+              분쟁이 진행 중이거나 제2조에 따른 청구가 있는 경우, 회사는 해당 건의 정산을 보류하거나 청구액을 상계할 수
+              있습니다.
+            </li>
+          </ul>
+        </Article>
+
+        <Article title="제10조 (세금)">
+          <p>
+            정산받은 금액은 호스트의 소득입니다. 부가가치세·소득세 등의 신고와 납부는 호스트의 책임이며, 회사는 지급
+            내역을 확인할 수 있는 자료를 제공합니다.
+          </p>
+        </Article>
+
+        <Article title="제11조 (법령 준수)">
+          <ul className="list-disc space-y-1 pl-5">
+            <li>
+              호스트는 공간의 운영에 필요한 인허가·영업신고를 갖추고 관계 법령을 지킵니다.
+            </li>
+            <li>
+              이용자가 공간에서 하는 활동은 호스트의 영업신고 범위 안에서 호스트의 관리·감독 아래 이루어져야 합니다.
+              특히 식품의 조리·판매가 포함되는 경우, 무신고 영업이 되지 않도록 호스트가 확인합니다.
+            </li>
+          </ul>
+        </Article>
+
+        <Article title="제12조 (책임의 범위)">
+          <p>
+            회사는 중개 과정에서 제공하는 서비스에 관하여 책임을 지며, 호스트와 이용자 사이의 계약 이행에 관하여는 책임을
+            지지 않습니다. 다만 회사의 고의 또는 중대한 과실로 발생한 손해는 그러하지 아니합니다.
+          </p>
+        </Article>
+
+        <Article title="부칙">
+          <p className="text-mute">
+            본 약관은 법률 검토 후 시행일을 정하여 적용합니다. 변경 시에는 적용일 7일 전부터 서비스 내에 알립니다.
+          </p>
+        </Article>
+      </div>
+    </main>
+  );
+}
+
+function Article({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section>
+      <h2 className="text-[17px] font-bold text-ink">{title}</h2>
+      <div className="mt-2 space-y-2 text-[15px] leading-relaxed text-body">{children}</div>
+    </section>
+  );
+}
