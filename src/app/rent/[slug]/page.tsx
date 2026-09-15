@@ -204,6 +204,24 @@ export default async function SpaceDetailPage({
         ) : (
           <p className="text-[17px] leading-relaxed break-keep text-body">{sp.address}</p>
         )}
+        {/* ☎️**신청 «전»에 보여야 하는 값이다** (2026-09-16).
+            전자상거래법 제20조②는 중개자가 호스트의 상호·주소·전화번호를 확인해 청약 전에 소비자에게
+            제공하라고 한다. 안 하면 제20조의2②로 호스트 과실 손해에 회사가 연대 책임을 진다.
+            우리 호스트 약관 제6조도 「신청하기 전에 공간 상세 화면에 표시한다」고 약속했고,
+            등록 폼도 사장님께 *「법에 따라 신청 전에 손님께 보여드려요」*라고 적어 두었다.
+            🩸그런데 09-16까지 이 화면 어디에도 그 번호가 없었다. 폼은 받고 있었는데 꺼내는 곳이 없었다.
+            ⭐**개인 휴대폰은 여전히 확정 뒤에만 열린다**(`ContactBlock`). 여기 나가는 건 가게 번호다. */}
+        {sp.contactPhone.trim() && (
+          <p className="mt-3 text-[15px] leading-relaxed break-keep text-mute">
+            가게 전화{" "}
+            <a
+              href={`tel:${sp.contactPhone.replace(/[^0-9+]/g, "")}`}
+              className="text-body underline underline-offset-2"
+            >
+              {sp.contactPhone}
+            </a>
+          </p>
+        )}
       </Section>
 
       <Section title="빌릴 수 있는 날">
