@@ -90,6 +90,8 @@ export default async function RentDonePage({ params }: { params: Promise<{ booki
             profile={host}
             address={space?.address}
             accessNote={space?.accessNote}
+            shopPhone={space?.contactPhone}
+            accessHow={space?.accessHow}
           />
         </>
       ) : b.status === "paid" ? (

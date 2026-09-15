@@ -96,14 +96,23 @@ export default async function MyRentPage() {
   const spaceById = new Map<number, Space>(mySpaces.map((sp) => [sp.id, sp]));
   // 내가 «빌린» 곳은 남의 공간이라 `listSpacesByOwner`에 없다. id로 따로 읽는다(`listSpacesByIds` 주석 참조).
   const bookedSpaces = await listSpacesByIds(guestBookings.map((b) => b.spaceId));
-  // 「들어오는 법」은 요약본에 없다(주소와 같은 급의 비밀). 확정된 예약의 공간만 원본을 한 번 더 읽는다.
-  const accessNotes = new Map<number, string>(
+  // 「들어오는 법」·가게 전화·이용 안내는 요약본에 없다(주소와 같은 급의 비밀).
+  //   확정된 예약의 공간만 원본을 한 번 더 읽는다.
+  type Reveal = { accessNote: string; contactPhone: string; accessHow: Space["accessHow"] };
+  const revealed = new Map<number, Reveal>(
     await Promise.all(
       guestBookings
         .filter((b) => isRevealed(b) && bookedSpaces.has(b.spaceId))
         .map(async (b) => {
           const full = await getSpaceFull(bookedSpaces.get(b.spaceId)!.slug);
-          return [b.spaceId, full?.accessNote ?? ""] as [number, string];
+          return [
+            b.spaceId,
+            {
+              accessNote: full?.accessNote ?? "",
+              contactPhone: full?.contactPhone ?? "",
+              accessHow: full?.accessHow ?? "sms",
+            },
+          ] as [number, Reveal];
         }),
     ),
   );
@@ -294,7 +303,9 @@ export default async function MyRentPage() {
                       who="사장님"
                       profile={contacts.get(sp?.ownerUserId ?? -1) ?? null}
                       address={sp?.address}
-                      accessNote={accessNotes.get(b.spaceId)}
+                      accessNote={revealed.get(b.spaceId)?.accessNote}
+                      shopPhone={revealed.get(b.spaceId)?.contactPhone}
+                      accessHow={revealed.get(b.spaceId)?.accessHow}
                     />
                   ) : (
                     <Locked text="사장님이 수락하면 주소와 연락처가 열려요." />

@@ -11,6 +11,8 @@
 //   전엔 이름·전화·이메일·주소가 **각자 다른 모양의 줄**로 흘러서 무엇이 무엇인지 라벨이 없었다.
 //   이제 화면 셋(확정·신청 완료·내 하루 가게)이 쓰는 그 항목 문법(`InfoRow`)을 여기서도 쓴다.
 import type { Profile } from "@/lib/profiles";
+import type { AccessHow } from "@/lib/types";
+import { accessHowLine } from "@/lib/rent-copy";
 import { InfoList, InfoRow } from "./ui";
 
 export function ContactBlock({
@@ -18,6 +20,8 @@ export function ContactBlock({
   profile,
   address,
   accessNote,
+  shopPhone,
+  accessHow,
   title = "가게 정보",
 }: {
   /** 「사장님」 또는 「신청하신 분」 */
@@ -25,8 +29,13 @@ export function ContactBlock({
   profile: Profile | null;
   /** 손님 쪽에만 — 사장님은 자기 주소를 안 봐도 된다. */
   address?: string;
-  /** 「들어오는 법」 — 주소와 같은 급의 비밀. 손님 쪽에만. */
+  /** 「들어오는 법」 — 주소와 같은 급의 비밀. 손님 쪽에만. ⚠️옛 칸이라 새 공간은 비어 있다. */
   accessNote?: string;
+  /** ☎️매장 전화. 개인 번호보다 이쪽을 먼저 보여 준다 — 호스트 약관 제6조가 여는 번호가 그것이고,
+   *  받는 사람도 가게 번호가 편하다. 손님 쪽에만 넘긴다. */
+  shopPhone?: string;
+  /** 📨이용 안내를 어떻게 받게 되는지. 「들어오는 법」 칸을 대신한다(09-16). */
+  accessHow?: AccessHow;
   /** 절 제목. 손님이 보면 「가게 정보」, 사장님이 보면 「신청하신 분 정보」다. */
   title?: string;
 }) {
@@ -39,6 +48,16 @@ export function ContactBlock({
       <p className="mt-1 mb-4 text-[15px] text-faint">확정된 분끼리만 보여요</p>
       <InfoList>
         <InfoRow label={who} value={<span className="font-medium text-ink">{name}</span>} />
+        {shopPhone?.trim() && (
+          <InfoRow
+            label="가게 전화"
+            value={
+              <a href={`tel:${shopPhone.replace(/[^0-9+]/g, "")}`} className="underline underline-offset-2">
+                {shopPhone}
+              </a>
+            }
+          />
+        )}
         <InfoRow
           label="전화번호"
           value={
@@ -66,6 +85,7 @@ export function ContactBlock({
         {accessNote && (
           <InfoRow label="들어오는 법" value={<span className="whitespace-pre-line">{accessNote}</span>} />
         )}
+        {accessHow && <InfoRow label="이용 안내" value={accessHowLine(accessHow)} />}
       </InfoList>
     </section>
   );
