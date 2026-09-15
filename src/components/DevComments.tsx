@@ -136,14 +136,33 @@ export function DevComments() {
    *  그게 대표 입력을 날린 원인이었다. 이제 내가 일을 끝내고 신호를 보낸 «그 순간»에만 나간다 —
    *  대표가 기다리는 시점이지 타이핑하는 시점이 아니다.
    *  그래도 손이 올라가 있으면 안 고치고 버튼만 띄운다(위 `hasUnsavedWork`). */
+  /** 🔌**안 보이는 탭에서는 줄을 놓는다** (09-15).
+   *  이 스트림은 한 탭당 «계속 열려 있는» 연결 하나를 차지한다. 브라우저는 한 주소에 동시에 여는 연결 수가
+   *  정해져 있어서, 로컬 탭을 여럿 띄워 두면 그 자리가 스트림들로 다 찬다.
+   *  🩸09-15에 결제 화면이 탭마다 제각각으로 안 살아나는 일을 오래 쫓았는데, **새 탭에서는 늘 되고
+   *    한 번 죽은 탭은 새로고침으로도 안 살아났다.** 원인을 못 박지는 못했지만, 우리가 쥔 유일한 손잡이가
+   *    이 연결이다. 보고 있지 않은 탭이 줄을 붙잡고 있을 이유는 없다.
+   *  ⭐다시 보면 즉시 붙는다. 그 사이에 온 새로고침 신호는 놓치지만, 안 보던 탭이다. */
   useEffect(() => {
-    const es = new EventSource("/api/dev-reload");
+    let es: EventSource | null = null;
     // 한 번이라도 붙은 적이 있나. 재시작 중의 끊김과 «애초에 없는 주소»를 가르는 유일한 단서다.
     let everOpened = false;
     let warned = false;
 
-    es.onopen = () => (everOpened = true);
-    es.onmessage = () => {
+    const open = () => {
+      if (es || document.hidden) return;
+      es = new EventSource("/api/dev-reload");
+      wire(es);
+    };
+    const close = () => {
+      es?.close();
+      es = null;
+    };
+    const onVisible = () => (document.hidden ? close() : open());
+
+    const wire = (src: EventSource) => {
+    src.onopen = () => (everOpened = true);
+    src.onmessage = () => {
       if (hasUnsavedWork()) setStale(true);
       else location.reload();
     };
@@ -153,7 +172,7 @@ export function DevComments() {
     //   그 상태로 「되고 있습니다」라고 말하게 된다.
     // ⭐**한 번도 안 붙었을 때만** 외친다. 서버 재시작 중의 끊김은 정상이고(곧 다시 붙는다),
     //   그걸 같이 외치면 경고가 소음이 돼서 진짜일 때 아무도 안 본다.
-    es.onerror = () => {
+    src.onerror = () => {
       if (everOpened || warned) return;
       warned = true;
       console.warn(
@@ -161,7 +180,14 @@ export function DevComments() {
           "위젯만 가져오고 `src/app/api/dev-reload/route.ts` 를 빠뜨렸는지 확인하세요."
       );
     };
-    return () => es.close();
+    };
+
+    open();
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      close();
+    };
   }, [hasUnsavedWork]);
 
   /** 내 UI 안을 고르려다 실수하는 걸 막는다 — 위젯이 자기를 가리키면 아무 쓸모가 없다. */
