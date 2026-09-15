@@ -39,6 +39,26 @@ export default async function RentPayPage({ params }: { params: Promise<{ orderI
 
   return (
     <main className="mx-auto w-full max-w-[560px] px-4 py-14 sm:px-6">
+      {/* 🛟**React 밖에 둔 구조선** (2026-09-15).
+       *
+       * 🩸이 화면은 «가끔» 통째로 안 살아난다. 서버가 보낸 HTML은 멀쩡히 그려지는데 브라우저에서
+       *   이 페이지의 코드가 한 줄도 안 돈다 — 결제 칸이 비고 버튼이 「불러오는 중」에서 안 풀린다.
+       *   에러도 없고 콘솔도 조용하다. 같은 코드가 어떤 판엔 되고 어떤 판엔 안 된다(09-15 실측,
+       *   커밋을 되돌려 가며 열 번 가까이 대봤지만 **코드로는 갈리지 않았다**).
+       * ⭐그래서 안전장치를 «React 안»에 두면 소용이 없다. 안 도는 게 바로 그 React다.
+       *   이건 HTML에 박혀 오는 스크립트라 무슨 일이 있어도 돈다.
+       * 🔁9초 뒤에 결제창이 안 떠 있으면 다시 연다. 최대 두 번까지만(고리를 막는다).
+       * 🚨**같은 주소로 새로고침하면 안 살아난다** — 죽은 탭은 새로고침을 해도 계속 죽어 있다(09-15 실측).
+       *   주소 뒤에 다른 값을 붙여 «다른 주소»로 열어야 살아난다. 그래서 `reload()`가 아니라
+       *   `replace(경로+'?r=시각')`이다. 우리 화면은 이 값을 안 읽으니 해가 없다.
+       *   그리고 `replace`라서 뒤로가기 기록에 이 시도가 안 쌓인다.
+       * ⚠️운영에서는 거의 안 돈다(붙는 게 정상이라). 돌더라도 손님은 한 번 깜빡이는 것만 본다 —
+       *   아무것도 못 하는 화면을 보고 있는 것보다 낫다. */}
+      <script
+        dangerouslySetInnerHTML={{
+          __html: `(function(){try{var k='rent-pay-retry:'+location.pathname;var n=+(sessionStorage.getItem(k)||0);if(n>=2)return;setTimeout(function(){if(document.querySelector('#rent-pay-methods iframe'))return;sessionStorage.setItem(k,String(n+1));location.replace(location.pathname+'?r='+Date.now());},9000);}catch(e){}})();`,
+        }}
+      />
       <PayPanel
         orderId={b.orderId}
         amount={b.amountTotal}
