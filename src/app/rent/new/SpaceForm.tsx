@@ -23,7 +23,7 @@ import { uploadPhoto } from "@/lib/upload";
 import { PhotoGrid } from "@/app/register/PhotoGrid";
 import type { Space, SpaceUseType, SpaceCategory, SpaceScope, OpenSlot, AccessHow } from "@/lib/types";
 import { hoursBetween } from "@/lib/rent-time";
-import { CATEGORY_OPTIONS, primaryBtnCls, RentSelect, rentInputCls, rentTextareaCls, secondaryBtnCls, won } from "../ui";
+import { CATEGORY_OPTIONS, dateLabel, primaryBtnCls, RentSelect, rentInputCls, rentTextareaCls, secondaryBtnCls, won } from "../ui";
 import { AddressField } from "./AddressField";
 import { OpenSlotsCalendar } from "./OpenSlotsCalendar";
 
@@ -237,7 +237,7 @@ export function SpaceForm({
     if (priceHour <= 0) return "시간당 대여 비용을 적어 주세요.";
     if (openSlots.length === 0) return "빌려줄 수 있는 날과 시간을 하나 이상 정해 주세요.";
     const badSlot = openSlots.find((sl) => hoursBetween(sl.start, sl.end) < Number(minHours));
-    if (badSlot) return `${badSlot.date}는 최소 ${minHours}시간을 못 채워요. 시간을 늘리거나 그날을 빼 주세요.`;
+    if (badSlot) return `${dateLabel(badSlot.date)}은 최소 ${minHours}시간을 못 채워요. 시간을 늘리거나 그날을 빼 주세요.`;
     if (chatOn && chatPrice <= 0) return "커피챗 비용을 적어 주세요.";
     if (!termsOk) return "공간 제공자 약관에 동의해 주세요.";
     return "";
@@ -348,7 +348,7 @@ export function SpaceForm({
         <L
           label="공간 소개"
           htmlFor="sp-body"
-          hint="자세히 남겨 주실수록 신청하는 분이 예약을 더 적극적으로 고려하세요. 빈칸이면 저희가 같이 써 드릴게요."
+          hint="자세히 남겨 주실수록 신청하는 분이 마음을 정하기 쉬워요. 빈칸이면 저희가 같이 써 드릴게요."
         >
           <textarea
             id="sp-body"
@@ -415,7 +415,7 @@ export function SpaceForm({
 
         {/* 🔻09-16 「들어오는 법」 칸 삭제. 대표: *「비밀번호 이런 건 문자나 현장에서 당일에 안내하는 걸로」*.
             ⭐**우리는 그 내용을 안 가진다.** 담을 칸이 없으면 샐 일도 없다 — 방식만 고른다. */}
-        <L label="이용 안내는 어떻게 해드릴까요" hint="임시 출입 비밀번호와 그 밖의 안내 사항을 전해 주세요.">
+        <L label="이용 안내는 어떻게 해드릴까요" hint="예약이 확정된 분께 사장님이 직접 전하시는 방법이에요. 출입 비밀번호 같은 건 collab5가 갖고 있지 않아요.">
           <div className="flex flex-wrap gap-2">
             {ACCESS_OPTIONS.map(([v, t]) => (
               <button

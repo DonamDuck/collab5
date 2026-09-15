@@ -14,7 +14,7 @@ import { geocode } from "./geocode";
 import {
   notifyBookingPaid, notifyBookingConfirmed, notifyBookingRejected, notifyBookingCancelled,
 } from "./rent-notify";
-import { hoursBetween, fitsOpenSlot, nowHhmmKst, overlaps, toMinutes, todayKst } from "./rent-time";
+import { dateLabel, hoursBetween, fitsOpenSlot, nowHhmmKst, overlaps, toMinutes, todayKst } from "./rent-time";
 import type { Space, SpaceBooking, SpaceUseType, SpaceCategory, SpaceScope, OpenSlot, AccessHow } from "./types";
 
 // 하루 가게 — 쓰기 서버 액션 (2026-09-13)
@@ -102,7 +102,7 @@ export async function saveSpaceAction(input: SpaceFormInput): Promise<ActionResu
     const h = hoursBetween(sl.start, sl.end);
     if (h <= 0) return { ok: false, message: `${sl.date}의 시간이 거꾸로예요. 끝나는 시각이 더 늦어야 해요.` };
     if (h < input.minHours) {
-      return { ok: false, message: `${sl.date}는 ${h}시간만 열려 있어서 최소 ${input.minHours}시간을 못 채워요.` };
+      return { ok: false, message: `${dateLabel(sl.date)}은 ${h}시간만 열려 있어서 최소 ${input.minHours}시간을 못 채워요.` };
     }
   }
 
