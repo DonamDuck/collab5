@@ -71,9 +71,17 @@ function LoginForm() {
           <Field label="이메일" htmlFor="login-email">
             <input
               id="login-email"
-              type="email"
+              // 🧪개발 빌드만 text — 로컬 테스트 로그인 아이디 `collab5`가 이메일 형식 검사에 걸리지 않게.
+              //   NODE_ENV는 빌드 때 상수로 박히므로 운영 번들엔 "email"만 남는다(auth-actions §로컬 테스트 로그인).
+              type={process.env.NODE_ENV === "development" ? "text" : "email"}
               name="email"
               autoComplete="username"
+              // 📱아이폰 키보드가 첫 글자를 대문자로 올리고 철자를 고친다. 이메일 칸에서는 그게 전부 오타다.
+              //   운영의 `type="email"`은 이 셋을 알아서 끄지만 개발 빌드의 `text`는 안 꺼서 명시한다(09-15 실측).
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              inputMode="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="user@email.com"

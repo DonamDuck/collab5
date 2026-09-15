@@ -20,6 +20,10 @@ export type StaticMapParams = {
   h: number;
   /** 줌 레벨 0~20. 동네 가게 정도면 16이 적당(건물 단위 식별) */
   level?: number;
+  /** 🚨핀을 찍을지. **`false`면 「이 근처」만 말한다.**
+   *  하루 가게는 예약이 확정되기 «전»엔 정확한 주소를 안 준다(직거래 이탈 방지, 09-13 대표).
+   *  핀은 건물을 정확히 짚어 버리므로, 그 화면에선 핀 없이 낮은 줌으로만 보여준다. */
+  pin?: boolean;
 };
 
 /** 좌표 → 정적 지도 이미지(핀 포함) 바이트. 키 없거나 실패하면 null(호출부가 폴백 처리). */
@@ -32,6 +36,7 @@ export async function fetchStaticMap(p: StaticMapParams): Promise<{ buf: Buffer;
   const center = `${p.lng.toFixed(6)},${p.lat.toFixed(6)}`;
   // 핀은 markers로 직접 찍는다 — center만 쓰면 지도 중심 표시일 뿐 마커가 없다.
   const markers = `type:d|size:mid|pos:${p.lng.toFixed(6)} ${p.lat.toFixed(6)}`;
+  const withPin = p.pin !== false;
   // ⭐ scale=2 — Retina용 고해상도. **w/h를 키우는 것과 전혀 다르다**(08-01 실측으로 배운 것):
   //    · w/h를 키우면 같은 줌에서 **더 넓은 지역**이 담긴다 → 축소된 것처럼 보인다(실제로 그랬다)
   //    · scale=2는 w/h(=지역 범위)는 그대로 두고 **픽셀 밀도만 2배**로 준다
@@ -39,7 +44,7 @@ export async function fetchStaticMap(p: StaticMapParams): Promise<{ buf: Buffer;
   //    NCP w/h 상한 1024는 요청값 기준이라 scale=2를 붙여도 여유가 있다.
   const url =
     `${ENDPOINT}?w=${p.w}&h=${p.h}&center=${center}&level=${level}&scale=2` +
-    `&markers=${encodeURIComponent(markers)}`;
+    (withPin ? `&markers=${encodeURIComponent(markers)}` : "");
 
   try {
     const res = await fetch(url, {

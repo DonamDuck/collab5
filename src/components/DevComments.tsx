@@ -71,6 +71,22 @@ export function DevComments() {
   const [prior, setPrior] = useState<string[]>([]);
   const rootRef = useRef<HTMLDivElement>(null);
   const [stale, setStale] = useState(false);
+  /** 📱**좁은 화면에서는 오른쪽 «위»로 비킨다** (대표 09-15 — 「팝업이 모바일에서만 안 뜬다」).
+   *  🩸증상은 제품 버그처럼 보였지만 원인은 이 위젯이었다. 폰 폭에선 버튼 석 장이 한 줄로 300px을 먹어
+   *    화면 아래 고정 바(결제·신청 같은 «그 화면의 주 버튼»)를 통째로 덮었다. `elementFromPoint`로 찍으니
+   *    결제 버튼 한가운데조차 위젯이 잡혔다 — 대표 탭이 전부 여기로 들어온 것이다.
+   *  ⭐폰에서 «아래»는 언제나 제품의 주 버튼 자리다. 도구는 거기에 살면 안 된다.
+   *    위쪽은 헤더가 쓰지만 헤더 높이(64) 아래로 내리면 비고, 그 자리엔 누를 것이 거의 없다.
+   *  🔒그리고 평소엔 «동그라미 하나»로 접어 둔다. 펴 놓으면 위쪽을 또 덮는다. */
+  const [narrow, setNarrow] = useState(false);
+  const [barOpen, setBarOpen] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 639px)");
+    const sync = () => setNarrow(mq.matches);
+    sync();
+    mq.addEventListener("change", sync);
+    return () => mq.removeEventListener("change", sync);
+  }, []);
 
   const refreshCount = useCallback(() => {
     fetch("/api/dev-comment").then((r) => r.json()).then((d) => setCount(d.count ?? 0)).catch(() => {});
@@ -120,14 +136,33 @@ export function DevComments() {
    *  그게 대표 입력을 날린 원인이었다. 이제 내가 일을 끝내고 신호를 보낸 «그 순간»에만 나간다 —
    *  대표가 기다리는 시점이지 타이핑하는 시점이 아니다.
    *  그래도 손이 올라가 있으면 안 고치고 버튼만 띄운다(위 `hasUnsavedWork`). */
+  /** 🔌**안 보이는 탭에서는 줄을 놓는다** (09-15).
+   *  이 스트림은 한 탭당 «계속 열려 있는» 연결 하나를 차지한다. 브라우저는 한 주소에 동시에 여는 연결 수가
+   *  정해져 있어서, 로컬 탭을 여럿 띄워 두면 그 자리가 스트림들로 다 찬다.
+   *  🩸09-15에 결제 화면이 탭마다 제각각으로 안 살아나는 일을 오래 쫓았는데, **새 탭에서는 늘 되고
+   *    한 번 죽은 탭은 새로고침으로도 안 살아났다.** 원인을 못 박지는 못했지만, 우리가 쥔 유일한 손잡이가
+   *    이 연결이다. 보고 있지 않은 탭이 줄을 붙잡고 있을 이유는 없다.
+   *  ⭐다시 보면 즉시 붙는다. 그 사이에 온 새로고침 신호는 놓치지만, 안 보던 탭이다. */
   useEffect(() => {
-    const es = new EventSource("/api/dev-reload");
+    let es: EventSource | null = null;
     // 한 번이라도 붙은 적이 있나. 재시작 중의 끊김과 «애초에 없는 주소»를 가르는 유일한 단서다.
     let everOpened = false;
     let warned = false;
 
-    es.onopen = () => (everOpened = true);
-    es.onmessage = () => {
+    const open = () => {
+      if (es || document.hidden) return;
+      es = new EventSource("/api/dev-reload");
+      wire(es);
+    };
+    const close = () => {
+      es?.close();
+      es = null;
+    };
+    const onVisible = () => (document.hidden ? close() : open());
+
+    const wire = (src: EventSource) => {
+    src.onopen = () => (everOpened = true);
+    src.onmessage = () => {
       if (hasUnsavedWork()) setStale(true);
       else location.reload();
     };
@@ -137,7 +172,7 @@ export function DevComments() {
     //   그 상태로 「되고 있습니다」라고 말하게 된다.
     // ⭐**한 번도 안 붙었을 때만** 외친다. 서버 재시작 중의 끊김은 정상이고(곧 다시 붙는다),
     //   그걸 같이 외치면 경고가 소음이 돼서 진짜일 때 아무도 안 본다.
-    es.onerror = () => {
+    src.onerror = () => {
       if (everOpened || warned) return;
       warned = true;
       console.warn(
@@ -145,7 +180,14 @@ export function DevComments() {
           "위젯만 가져오고 `src/app/api/dev-reload/route.ts` 를 빠뜨렸는지 확인하세요."
       );
     };
-    return () => es.close();
+    };
+
+    open();
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      close();
+    };
   }, [hasUnsavedWork]);
 
   /** 내 UI 안을 고르려다 실수하는 걸 막는다 — 위젯이 자기를 가리키면 아무 쓸모가 없다. */
@@ -250,8 +292,13 @@ export function DevComments() {
         }} />
       )}
 
-      {/* 바닥 패널 — 왼쪽 아래는 Next 개발 표시가 쓰고 있어 오른쪽에 붙인다 */}
-      <div style={{ position: "fixed", right: 16, bottom: 16, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8 }}>
+      {/* 패널 — 넓은 화면은 오른쪽 아래(왼쪽 아래는 Next 개발 표시가 쓴다),
+          좁은 화면은 오른쪽 «위»(아래는 제품의 고정 바 자리다). */}
+      <div style={{
+        position: "fixed", right: narrow ? 10 : 16,
+        ...(narrow ? { top: 76 } : { bottom: 16 }),
+        display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8,
+      }}>
         {stale && (
           <button
             style={{ ...btn("#f2d81e", "#5c4a00"), boxShadow: "0 2px 10px rgba(0,0,0,.16)" }}
@@ -301,7 +348,25 @@ export function DevComments() {
           </div>
         )}
 
-        <div style={{ display: "flex", gap: 8 }}>
+        {/* 📱폰에서는 평소 동그라미 하나로 접어 둔다. 남긴 건수는 점으로만 알린다. */}
+        {narrow && !barOpen && mode === "off" ? (
+          <button
+            aria-label="코멘트 도구 열기"
+            onClick={() => setBarOpen(true)}
+            style={{
+              width: 40, height: 40, borderRadius: 20, border: "none", cursor: "pointer",
+              background: count > 0 ? "#222" : "#98ff5c", color: count > 0 ? "#fff" : "#1f5c00",
+              fontSize: 13, fontWeight: 700, boxShadow: "0 2px 10px rgba(0,0,0,.16)",
+            }}
+          >
+            {count > 0 ? count : "🗒"}
+          </button>
+        ) : (
+        <div style={{ display: "flex", flexDirection: narrow ? "column" : "row", alignItems: "flex-end", gap: 8 }}>
+          {narrow && mode === "off" && (
+            <button style={{ ...btn("#f5f5f6", "#4a4a4a"), boxShadow: "0 2px 10px rgba(0,0,0,.16)" }}
+              onClick={() => setBarOpen(false)}>접기</button>
+          )}
           {mode === "off" && count > 0 && (
             <button style={{ ...btn("#222", "#fff"), boxShadow: "0 2px 10px rgba(0,0,0,.16)" }} onClick={go}>
               {count}건 보내고 작업 시작
@@ -319,6 +384,7 @@ export function DevComments() {
             {mode === "picking" ? "고를 곳 클릭 (ESC 취소)" : "코멘트"}
           </button>
         </div>
+        )}
       </div>
     </div>
   );

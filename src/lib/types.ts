@@ -399,3 +399,190 @@ export interface MagazineSaveInput {
   brandLinks: MagazineBrandLink[];
   body: MagazineDoc;
 }
+
+// ─────────────────────────────────────────────────────────────
+// 하루 가게 — 공간 대여 (2026-09-13)
+// 스펙 = docs/superpowers/specs/2026-09-13-daily-shop-design.md
+// DB   = supabase/migrations/2026-09-13-daily-shop.sql
+// ─────────────────────────────────────────────────────────────
+
+/** 공간을 어떻게 쓰게 할 것인가 — 대표가 09-13에 두 갈래로 나눴다.
+ *  `as_is`  원래 목적대로 (요가원을 요가로, 공방을 공방으로). 고르는 축 = **설비**
+ *  `open`   대관 (호스트 규칙 안에서 게스트가 용도를 정한다). 고르는 축 = **인원·시간**
+ *  `both`   둘 다 */
+export type SpaceUseType = "as_is" | "open" | "both";
+
+/** 📂업종 — 검색·목록 거르개가 보는 축 (대표 09-16). */
+export type SpaceCategory = "" | "cafe" | "restaurant" | "workshop" | "studio" | "shop" | "lounge" | "etc";
+
+/** 📂빌려드리는 범위 — 값의 근거가 되는 축 (대표 09-16).
+ *  ⭐업종과 «두 축»으로 가른 이유: 한 목록으로 만들면 조합이 폭발한다.
+ *    「카페 공간만」·「카페 + 머신」·「국밥집 화구까지」·「예쁜 식당을 라운지로」가 전부 다른 상품인데,
+ *    업종 × 범위로 두면 `카페 × 공간+장비`, `음식점 × 공간만`처럼 두 칸으로 표현된다.
+ *  ⚠️옛 `useType`(원래 목적대로 / 대관)은 이 축에 흡수됐다. */
+export type SpaceScope = "space_only" | "with_gear" | "whole_shop";
+
+/** 하루 중 «열어 두는 시간대». 날마다 다를 수 있어서 날짜와 한 벌이다. */
+export interface OpenSlot {
+  /** `YYYY-MM-DD` */
+  date: string;
+  /** `HH:MM` — 24시 눈금, 정시 단위 */
+  start: string;
+  end: string;
+}
+
+/** 📨이용 안내를 어떻게 할지. 🚨비밀번호 같은 «내용»은 우리가 안 가진다 — 방식만 고른다. */
+export type AccessHow = "sms" | "onsite" | "both";
+
+export type SpaceStatus = "draft" | "pending" | "open" | "paused";
+
+export interface Space {
+  id: number;
+  slug: string;
+  ownerUserId: number;
+  /** 연결된 소개서. ⚠️FK가 아니라 **문자열**이다 — 소개서가 지워지거나 개명돼도 거래 기록은 남아야 한다.
+   *  ⭐빈 문자열이 정상값이다. 이 기능은 소개서 «없는» 사람도 쓴다(대표 09-13). */
+  brandSlug: string;
+
+  name: string;
+  tagline: string;
+  body: string;
+  photos: string[];
+
+  /** 동네까지만. 확정 전 화면에 나가는 유일한 위치 정보다. */
+  area: string;
+  /** 🚨전체 주소 — **확정된 예약의 당사자에게만** 준다. 목록·상세의 공개 투영에는 넣지 말 것. */
+  address: string;
+  lat?: number;
+  lng?: number;
+  /** 🚨「들어오는 법」 — 도어락·열쇠·스위치. 주소와 같은 급의 비밀이라 **확정 뒤에만** 연다. */
+  accessNote: string;
+
+  useType: SpaceUseType;
+  facilities: string[];
+  /** 시설 «줄글» 안내. 태그(`facilities`)는 고르는 것이고 이건 읽는 것이다 — 「빔프로젝터 있음」은
+   *  태그로 되지만 「HDMI 케이블은 없어서 가져오셔야 해요」는 줄글이라야 한다(대표 09-14). */
+  facilitiesNote: string;
+  capacity?: number;
+  hours: string;
+
+  /** ⭐「우리 집 규칙」 — 이 기능에서 제일 중요한 칸이다. 열쇠를 넘기는 두려움이 여기서 풀린다. 빈칸 금지. */
+  rules: string;
+  priceDay: number;
+  /** 사장님이 알려주는 시간(분). 0이면 그 상품을 안 판다. */
+  mentorMinutes: number;
+  mentorPrice: number;
+  /** 비는 날 `YYYY-MM-DD`. ⭐실사에서 이 데이터를 가진 소개서가 23곳 중 0곳이었다. 폼의 필수 칸. */
+  openDates: string[];
+
+  /** 🚨1단계는 음식·음료를 안 받는다(무신고 영업 — 식품위생법 제37조 ④). true면 등록을 막는다. */
+  servesFood: boolean;
+  /** 임대인 동의를 받았거나 본인 소유인가. 등록 시 확인받는다. */
+  subleaseOk: boolean;
+
+  // ─── 09-16 개편: 시간 단위 · 커피챗 · 카테고리 두 축 ───
+  // ⚠️위쪽 옛 칸들(tagline·hours·priceDay·openDates·mentor*·useType·accessNote·servesFood·subleaseOk)은
+  //   **아직 안 지운다.** 화면이 다 옮겨간 뒤에 따로 내린다([[schema-rename-checklist]]: 축소는 맨 마지막).
+
+  category: SpaceCategory;
+  scope: SpaceScope;
+
+  /** ⏱시간당 값. 눈금은 1시간이다 — 30분은 가게가 그렇게 생각하지 않고 달력·요금·겹침이 두 배가 된다.
+   *  ⭐그 대신 `minHours`가 있어서 「두 시간부터」 같은 규칙이 30분의 필요를 덮는다. */
+  priceHour: number;
+  minHours: number;
+  /** 날짜별로 열어 두는 시간대. 비었으면 아무도 신청할 수 없다(폼에서 막는다). */
+  openSlots: OpenSlot[];
+
+  /** ☕커피챗 — 「선배에게 현업 이야기 듣기」(대표 09-16).
+   *  ⭐파는 것은 «비법»이 아니다. 레시피를 한 줄도 안 주고도 하루가 어떻게 돌아가는지는 들려줄 수 있고,
+   *    창업을 생각하는 사람에게 값어치가 있는 건 그쪽이다. */
+  coffeeChat: boolean;
+  coffeeChatMinutes: number;
+  coffeeChatPrice: number;
+  /** 들려줄 수 있는 내용(여러 줄). 호스트가 「비법을 팔라는 건가」 하고 겁내지 않게 범위를 스스로 적는다. */
+  coffeeChatTopics: string;
+
+  accessHow: AccessHow;
+
+  /** ☎️**매장** 전화. 🚨청약 «전»에 보여야 한다 — 전자상거래법 제20조②(시행 2026-07-21 개정).
+   *  통신판매중개자는 사업자 호스트의 성명·주소·전화번호를 확인해 청약 전 소비자에게 제공해야 하고,
+   *  안 하면 제20조의2②로 **우리가 연대 책임**을 진다.
+   *  ⭐호스트 «개인 휴대폰»은 여기가 아니다(프로필에 있고 확정 후에 열린다). */
+  contactPhone: string;
+  /** 📜호스트 약관에 동의한 시각. 약관규제법 제3조③④ — 중요 내용은 설명하고 동의받아야 계약 내용이 된다. */
+  hostTermsAt?: string;
+
+  status: SpaceStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** 확정 «전» 화면에 나가는 투영.
+ *
+ *  🔁**09-16에 방향이 뒤집혔다.** 09-13엔 주소·좌표를 감췄다 — 대표: *「사장님과 연결을 미리 해버리면
+ *  우리 결제 없이 그들끼리 거래로 해버릴 수도 있을 것 같아서」*. 그런데 09-16에 대표가 정확한 핀을 요청하며
+ *  *「이미 공간 이름이 있어서 (감추는 게) 무의미할 것 같아」*라고 정리했다. 맞는 말이다 —
+ *  가게 이름과 사진이 이미 그 가게를 특정한다.
+ *
+ *  ⚖️그리고 **법이 같은 방향으로 민다.** 전자상거래법 제20조②(시행 2026-07-21)는 통신판매중개자가
+ *  사업자 호스트의 성명·주소·전화번호를 확인해 **청약 «전»에** 소비자에게 제공하도록 한다.
+ *  감추는 쪽을 고집하면 제20조의2②로 우리가 연대 책임을 진다.
+ *
+ *  🚨**그래도 빠지는 것이 있다.** 「들어오는 법」(`accessNote`)은 안 나간다 —
+ *  도어락 번호 같은 건 애초에 담지 않기로 했고(09-16 `accessHow`), 남아 있는 옛 값도 내보내지 않는다.
+ *  호스트 «개인 휴대폰»은 여기 실리지 않는다(프로필에 있고 확정 후에만 열린다).
+ *  📌이탈을 막는 건 이제 주소가 아니라 **결제가 먼저라는 순서**다. 그 설계는 그대로다. */
+export type SpacePublic = Omit<Space, "accessNote" | "hostTermsAt">;
+
+/** ⭐`pending`만 돈이 오기 «전»이다. 나머지는 전부 결제가 끝난 뒤의 이야기다.
+ *  pending   결제창으로 보내기 직전에 잡아 둔 자리. 🚨**호스트에게는 안 보인다**
+ *  paid      결제 완료, 호스트 답 기다리는 중
+ *  confirmed 호스트 수락 → 주소·연락처·소개서 링크가 열린다
+ *  rejected  호스트 거절 (→ refunded로 이어진다)
+ *  refunded  환불 완료
+ *  cancelled 게스트 취소. ⚠️환불률은 **우리가** 정한다 — 호스트 자율은 전자상거래법 제35조로 무효가 될 수 있다
+ *  done      그날이 지났다 */
+export type BookingStatus =
+  | "pending" | "paid" | "confirmed" | "rejected" | "refunded" | "cancelled" | "done";
+
+export interface SpaceBooking {
+  id: number;
+  spaceId: number;
+  guestUserId: number;
+  guestBrandSlug: string;
+
+  useDate: string;
+  /** ⚠️옛 칸. 새 코드는 `startTime`/`endTime`을 쓴다. */
+  hours: string;
+  /** `HH:MM`. 시간 단위 전환(09-16)으로 생긴 칸 — 하루 통째가 아니라 「오후 세 시간」을 판다. */
+  startTime: string;
+  endTime: string;
+  /** 끝 − 시작(시간). ⭐**금액의 근거를 행에 박아 둔다** — 나중에 공간의 시간당 값이 바뀌어도
+   *  이 거래가 얼마짜리였는지는 이 숫자와 `amountSpace`로 되짚을 수 있다(`feeRate`를 박아 두는 것과 같은 이유). */
+  hoursCount: number;
+  /** ⭐게스트가 쓴 「그날 무엇을 할 건지」. 호스트가 수락을 결정하는 근거이자,
+   *  나중에 이 사람 소개서의 첫 활동 기록이 되는 문장이다. */
+  plan: string;
+  headcount?: number;
+
+  /** ⚠️옛 칸 둘. 새 코드는 `withChat`/`amountChat`을 쓴다. */
+  withMentor: boolean;
+  amountMentor: number;
+  /** ☕커피챗을 같이 샀는가 (09-16). */
+  withChat: boolean;
+  amountChat: number;
+  amountSpace: number;
+  amountTotal: number;
+  /** ⚠️행마다 박아 둔다 — 요율이 바뀌어도 옛 거래는 **그때 값**으로 정산해야 한다. */
+  feeRate: number;
+  amountPayout: number;
+
+  paymentKey: string;
+  orderId: string;
+  status: BookingStatus;
+  hostMessage: string;
+  decidedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}

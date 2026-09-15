@@ -211,7 +211,28 @@ export async function signInAction(
 ): Promise<{ error?: string }> {
   if (!authEnabled()) return { error: NO_AUTH_MSG };
   const supabase = await createAuthClient();
-  const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+  // 🧪로컬 테스트 로그인 (대표 지시 09-13) — 폼에 `collab5`/`collab5`를 치면 테스트 계정으로 들어간다.
+  //   🚨세 겹으로 잠근다: ①개발 빌드에서만 ②`LOCAL_TEST_LOGIN=1`이 켜져 있을 때만 ③그 계정의 진짜 비밀번호는
+  //     env에만 있다. 운영 빌드에선 이 분기가 dead code라 번들에서도 빠진다. `.env.local`은 git 밖이다.
+  //   ⭐가짜 세션을 만들지 않는다 — 실제 Supabase 계정으로 진짜 로그인한다. 그래야 쿠키·RLS·프로필 조회가
+  //     운영과 똑같이 돈다(우회 경로를 따로 두면 그 경로만 되는 버그가 생긴다).
+  const testMap: Record<string, [string | undefined, string | undefined]> = {
+    collab5: [process.env.LOCAL_TEST_EMAIL_1, process.env.LOCAL_TEST_PASSWORD_1],
+    "collab5-2": [process.env.LOCAL_TEST_EMAIL_2, process.env.LOCAL_TEST_PASSWORD_2],
+  };
+  let id = email.trim(), pw = password;
+  // 📱**폰 키보드가 손대는 것을 되돌린다** (09-15 실측: 아이폰 사파리에서 `collab5-2`로 로그인이 안 됐다).
+  //   아이폰은 첫 글자를 대문자로 올리고(`Collab5-2`), 하이픈을 긴 줄표로 바꾸기도 한다(`collab5–2`).
+  //   서버에 도착한 값이 표의 키와 한 글자라도 다르면 실제 계정 로그인으로 흘러가 조용히 실패한다.
+  //   ⭐테스트 분기에서만 쓰는 정규화라 실제 이메일 비교에는 안 닿는다.
+  const norm = (v: string) => v.trim().toLowerCase().replace(/[\u2013\u2014\u2212]/g, "-");
+  const key = norm(id);
+  const hit = testMap[key];
+  if (process.env.NODE_ENV === "development" && process.env.LOCAL_TEST_LOGIN === "1" && hit && norm(password) === key) {
+    if (!hit[0] || !hit[1]) return { error: "테스트 계정 env가 비어 있어요 (LOCAL_TEST_EMAIL_n)." };
+    [id, pw] = [hit[0], hit[1]];
+  }
+  const { error } = await supabase.auth.signInWithPassword({ email: id, password: pw });
   if (error) return { error: "이메일 또는 비밀번호를 확인해주세요." };
   return {};
 }

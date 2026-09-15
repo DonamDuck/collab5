@@ -4,6 +4,7 @@ import { getSessionUser, isDevSession } from "@/lib/supabase/server";
 import { getProfile } from "@/lib/profiles";
 import { repo } from "@/lib/repo";
 import { ConnectMaker } from "./ConnectMaker";
+import Link from "next/link";
 import { LogoutButton } from "./LogoutButton";
 import { ChangePasswordButton } from "./ChangePasswordButton";
 import { LinkedAccounts } from "./LinkedAccounts";
@@ -263,6 +264,22 @@ export default async function MyPage({ searchParams }: { searchParams: Promise<{
           </div>
         </section>
       )}
+
+      {/* 🏠 하루 가게 (09-13) — 내가 올린 공간·주고받은 신청은 `/rent/my`에 따로 산다.
+          대표 실측: *"내가 신청한 rent를 마이페이지에서 못 본다"* — 탭에 끼우면 탭이 다섯이 돼 폰에서 넘치고,
+          하루 가게는 소개서와 «독립»인 기능이라 같은 표에 섞이지 않는다. 줄 하나로 건너보낸다. */}
+      <section className="mt-10 border-t border-hairline pt-6">
+        <Link
+          href="/rent/my"
+          className="-mx-2 flex items-center gap-3 rounded-md px-2 py-3 transition-colors hover:bg-surface-soft"
+        >
+          <div className="min-w-0 flex-1">
+            <p className="text-[17px] font-medium text-ink">내 하루 가게</p>
+            <p className="mt-0.5 text-[15px] text-mute">올린 공간과 주고받은 신청을 봐요</p>
+          </div>
+          <span aria-hidden className="text-[17px] text-faint">→</span>
+        </Link>
+      </section>
 
       {/* 계정 설정 */}
       <section className="mt-10 border-t border-hairline pt-6">
