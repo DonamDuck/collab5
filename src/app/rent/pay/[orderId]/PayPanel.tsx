@@ -58,6 +58,41 @@ export function PayPanel({
     return () => window.removeEventListener("pageshow", onShow);
   }, []);
 
+  /** 🩸**결제창이 «커진 뒤»에 클릭이 죽는다** (대표 09-15, 좁은 화면에서만).
+   *  「신용·체크카드」를 고르면 카드사 격자가 펼쳐지고 토스가 iframe 높이를 늘린다.
+   *  그런데 그 순간부터 그 안의 어떤 것도 안 눌린다 — 카드사도, 다시 누르는 tosspay 탭도.
+   *  ⭐**창을 넓히면 되살아난다**는 대표 실측이 답을 가리킨다. 브라우저가 «다른 출처의 iframe»을 위해
+   *    따로 들고 있는 «어디를 누르면 그 프레임인가» 지도가 iframe이 커질 때 갱신되지 않고 남는 것이다.
+   *    창 크기를 바꾸면 그 지도를 다시 그려서 되살아난다.
+   *  👉그래서 **크기가 바뀔 때마다 우리가 대신 다시 그리게 만든다.** 1px 스크롤과 resize 이벤트가
+   *    그 일을 시킨다(둘 다 눈에 안 보이고 되돌린다).
+   *  ⚠️높이가 «실제로 바뀐 때»만 돈다. 매 프레임 돌리면 스크롤이 떨린다. */
+  useEffect(() => {
+    if (!ready) return;
+    const host = document.getElementById("rent-pay-methods");
+    const frame = host?.querySelector("iframe");
+    if (!host || !frame) return;
+    let last = Math.round(frame.getBoundingClientRect().height);
+    const nudge = () => {
+      const now = Math.round(frame.getBoundingClientRect().height);
+      if (now === last) return;
+      // 🔎개발 중엔 숫자를 남긴다. Next가 브라우저 콘솔을 dev 서버 로그로 넘겨 줘서,
+      //   대표가 화면에서 겪은 일을 내가 «로그로» 되짚을 수 있다(화면에 군더더기를 안 붙이고).
+      if (process.env.NODE_ENV === "development") {
+        console.log(`[rent] 결제창 높이 ${last} → ${now} · 화면 ${window.innerHeight}`);
+      }
+      last = now;
+      const y = window.scrollY;
+      window.scrollTo(window.scrollX, y + 1);
+      window.scrollTo(window.scrollX, y);
+      window.dispatchEvent(new Event("resize"));
+    };
+    const ro = new ResizeObserver(nudge);
+    ro.observe(frame);
+    ro.observe(host);
+    return () => ro.disconnect();
+  }, [ready]);
+
   useEffect(() => {
     if (ready || err) return;
     const t = setTimeout(() => setSlow(true), 12000);
