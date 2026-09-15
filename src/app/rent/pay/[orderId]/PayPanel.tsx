@@ -58,67 +58,34 @@ export function PayPanel({
     return () => window.removeEventListener("pageshow", onShow);
   }, []);
 
-  /** 🩸**토스 창 안은 «한 번 누를 때마다» 다음 자리가 죽는다** (대표 09-15, 좁은 화면에서만).
-   *  카드를 고르면 카드사가 펼쳐지는데 그 카드사가 안 눌리고, 억지로 고르면 이번엔 할부 칸이 안 눌린다.
-   *  대표: *「step by step으로 하나 해결하면 다음 클릭이 안 되고 하는 이슈가 계속 반복적」*.
+  /** 🔎**개발 빌드에서만 — 지금 이 화면의 «숫자»를 띄운다** (09-15).
    *
-   *  ⭐**창 크기를 바꾸면 되살아난다**는 실측이 답을 가리킨다. 브라우저는 «다른 출처의 iframe»을 위해
-   *    「화면의 어디를 누르면 그 프레임인가」 지도를 따로 들고 있는데, 그 안에서 내용이 바뀌어
-   *    iframe이 자라도 **그 지도가 옛날 크기 그대로 남는다.** 새로 생긴 자리는 지도에 없어서 눌러도 안 간다.
-   *
-   *  🩸**첫 처치가 약했다.** 1px 스크롤을 두 줄 연달아 쓰고 `resize` 이벤트를 쐈는데 —
-   *    같은 프레임 안의 스크롤 두 번은 브라우저가 «합쳐서 없던 일»로 만들고, 사람이 만든 `resize`
-   *    이벤트는 **진짜 크기 변화가 아니라서 그 지도를 다시 그리게 하지 못한다.**
-   *    자바스크립트 이벤트와 브라우저의 레이아웃은 다른 층이다.
-   *  ⭐**고침 = 레이아웃을 «진짜로» 한 번 흔든다.** 우리가 가진 바깥 칸의 안쪽 여백을 1px 줬다가 되돌린다.
-   *    iframe의 실제 폭이 바뀌니 브라우저가 그 지도를 다시 그린다. 눈에는 안 보인다.
-   *  📡크기가 안 변하는 변화(할부 목록이 열리는 것 같은)도 있어서 **토스가 보내는 메시지에도 같이 반응한다.**
-   *    내용은 못 읽지만(다른 출처다) **「무언가 바뀌었다」는 신호로는 충분하다.** */
+   *  🩸토스 창 안에서 한 단계 들어갈 때마다 그 다음 자리가 안 눌린다. 그런데 **약관 창은 눌린다**(대표 실측).
+   *    두 창이 같은 페이지에 나란히 있는데 하나만 죽는다면, 원인은 「창 전체」가 아니라 **그 창의 «모양»**이다.
+   *  ⭐앞서 두 번 처치를 넣었지만 둘 다 «내가 못 보는 상태»를 겨냥한 짐작이었다. 짐작을 더 얹지 않는다.
+   *    📐**막힌 그 순간의 크기를 먼저 본다** — 결제창이 화면보다 얼마나 큰지, 창이 몇 개인지.
+   *  🚨자동화로는 이 자리를 못 잰다. 토스 창 «안»을 누르는 건 대표 손에서만 일어난다.
+   *    그래서 화면에 띄운다 — 막혔을 때 그 줄을 찍어 주시면 그게 곧 측정값이다.
+   *  ⛔운영 빌드에선 통째로 빠진다(`NODE_ENV` 게이트). */
+  const [probe, setProbe] = useState("");
   useEffect(() => {
-    if (!ready) return;
-    const hosts = ["rent-pay-methods", "rent-pay-agreement"]
-      .map((id) => document.getElementById(id))
-      .filter((el): el is HTMLElement => !!el);
-    if (hosts.length === 0) return;
-
-    let raf1 = 0;
-    let on = false;
-    /** 🪄**보이지 않게 한 번 흔든다.** 0.01px 옮겼다 되돌리면 사람 눈엔 아무 일도 없지만
-     *  브라우저에는 「이 프레임이 움직였다」가 되어 누를 자리 지도를 다시 그린다. */
-    const nudge = () => {
-      cancelAnimationFrame(raf1);
-      raf1 = requestAnimationFrame(() => {
-        on = !on;
-        hosts.forEach((h) => (h.style.transform = on ? "translateY(0.01px)" : "translateY(0px)"));
-      });
+    if (process.env.NODE_ENV !== "development" || !ready) return;
+    const tick = () => {
+      const frames = document.querySelectorAll("iframe");
+      const m = document.querySelector("#rent-pay-methods iframe");
+      const a = document.querySelector("#rent-pay-agreement iframe");
+      const box = (el: Element | null) => {
+        if (!el) return "없음";
+        const r = el.getBoundingClientRect();
+        return `${Math.round(r.width)}×${Math.round(r.height)} @${Math.round(r.top)}`;
+      };
+      setProbe(
+        `창 ${frames.length}개 · 결제 ${box(m)} · 약관 ${box(a)} · 화면 ${window.innerWidth}×${window.innerHeight} · 스크롤 ${Math.round(window.scrollY)}`,
+      );
     };
-
-    const ro = new ResizeObserver(nudge);
-    hosts.forEach((h) => {
-      ro.observe(h);
-      const frame = h.querySelector("iframe");
-      if (frame) ro.observe(frame);
-    });
-    // ⚠️출처를 확인하고 받는다. 아무 메시지에나 반응하면 남의 창이 우리 화면을 흔들 수 있다.
-    const onMessage = (e: MessageEvent) => {
-      if (typeof e.origin === "string" && e.origin.includes("tosspayments.com")) nudge();
-    };
-    window.addEventListener("message", onMessage);
-
-    // ⏱**그리고 1초마다 한 번씩 그냥 흔든다.** 위 둘(크기 변화·메시지)이 모든 변화를 잡아 준다는 보장이 없고,
-    //   못 잡으면 그 자리는 «다음 탭이 죽는» 자리가 된다. 흔드는 값이 0.01px이라 비용도 자국도 없다.
-    //   ⚠️보이는 동안만 돈다 — 안 보이는 탭에서 계속 돌 이유가 없다.
-    const beat = setInterval(() => {
-      if (!document.hidden) nudge();
-    }, 1000);
-
-    return () => {
-      ro.disconnect();
-      window.removeEventListener("message", onMessage);
-      clearInterval(beat);
-      cancelAnimationFrame(raf1);
-      hosts.forEach((h) => (h.style.transform = ""));
-    };
+    tick();
+    const t = setInterval(tick, 500);
+    return () => clearInterval(t);
   }, [ready]);
 
   useEffect(() => {
@@ -216,6 +183,12 @@ export function PayPanel({
       <div id="rent-pay-methods" />
 
       {err && <p className="text-[15px] leading-relaxed break-keep text-danger">{err}</p>}
+
+      {probe && (
+        <p className="rounded-md bg-surface-soft px-3 py-2 font-mono text-[12px] leading-relaxed break-all text-mute">
+          {probe}
+        </p>
+      )}
 
       {slow && !ready && !err && (
         <div>
