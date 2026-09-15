@@ -32,7 +32,7 @@ export function MentorOptions({
   /** 하단 바 안에 들어갈 때(데스크톱) — 세로를 아끼려고 설명 줄을 접는다. */
   dense?: boolean;
 }) {
-  const Row = ({ on, title, desc, amount }: { on: boolean; title: string; desc: string; amount: string }) => (
+  const Row = ({ on, title, desc, amount }: { on: boolean; title: string; desc?: string; amount: string }) => (
     <button
       type="button"
       role="radio"
@@ -53,7 +53,7 @@ export function MentorOptions({
       </span>
       <span className="min-w-0 flex-1">
         <span className="block text-[16px] font-medium text-ink">{title}</span>
-        {!dense && <span className="mt-0.5 block text-[14px] leading-snug break-keep text-mute">{desc}</span>}
+        {!dense && desc && <span className="mt-0.5 block text-[14px] leading-snug break-keep text-mute">{desc}</span>}
       </span>
       <span className="shrink-0 text-[15px] font-medium text-body">{amount}</span>
     </button>
@@ -61,11 +61,17 @@ export function MentorOptions({
 
   return (
     <div role="radiogroup" aria-label="신청 옵션" className="space-y-2">
-      <Row on={!value} title="공간만 빌릴게요" desc="그날 공간만 쓰고 혼자 해볼게요." amount="+0원" />
+      {/* 🔻09-15 대표 — 설명 줄 「그날 공간만 쓰고 혼자 해볼게요」를 뺐다.
+          제목이 이미 그 문장이라 두 줄이 같은 말을 두 번 했다. 값이 안 붙는 쪽은 설명할 것이 없다. */}
+      <Row on={!value} title="공간만 빌릴게요" amount="+0원" />
       <Row
         on={value}
         title="사장님께 잠깐 배워보기"
-        desc={`문 열기 전 ${minutes}분, 이 일을 어떻게 하는지 들어요.`}
+        // 🔁09-15 대표 — *「사장님과 협의한 날짜에, 미리 이 일을 잠깐 배워볼 수 있어요 등과 같이 쓰자」*.
+        //   ⭐전엔 「문 열기 전 60분」이라 **그날 아침으로 못 박혀 있었다.** 실제로는 사장님과 날을 맞추는 일이라
+        //     이 줄이 그대로면 손님이 「그날 일찍 가면 되는구나」로 읽고 어긋난다.
+        //   분은 남긴다 — 값(+30,000원)이 붙는 이유가 그 숫자다.
+        desc={`사장님과 협의한 날짜에, ${minutes}분 동안 이 일을 미리 잠깐 배워볼 수 있어요.`}
         amount={`+${won(price)}`}
       />
     </div>

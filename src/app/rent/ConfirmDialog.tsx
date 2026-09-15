@@ -7,7 +7,11 @@
 // 어느 하나가 ESC를 빠뜨리는 날이 온다(07-29 QA에서 시트 19곳이 19가지였다).
 //
 // 🎨모양 — `rounded-lg bg-surface shadow-e3`(모달 급 엘리베이션) · 제목 18 medium · 본문 17 regular ·
-//   버튼 둘(확인 = 키위, 취소 = 보조 44px). 375px에선 바닥에 붙는 시트, 640px부터 가운데 카드.
+//   버튼 둘(확인 = 키위, 취소 = 보조 44px). **어느 폭에서나 화면 가운데 뜨는 카드다.**
+// 🔁09-15 대표 — *「팝업으로 띄워 봐줄래?」*. 전엔 640px 아래에서 바닥에 붙는 시트였다.
+//   바닥 시트는 「이 화면에 딸린 서랍」으로 읽혀서, 돈이 움직이기 직전에 멈춰 세우는 힘이 약하다.
+//   ⭐그리고 폰 바닥은 제품의 고정 바와 개발 표시가 이미 쓰는 자리다. 거기로 내려가면 남의 것과 겹친다.
+//   ⚠️주소 찾기(`AddressField`)는 여전히 바닥에서 올라온다 — 그건 대표가 그렇게 요청한 자리다.
 // ⚠️홈 얼럿(`HomeGateAlert`)과 달리 **딤 클릭으로 닫힌다**(overlayClose: true). 그쪽은 작성 중 내용을 지키려는
 //   정책이고, 여기엔 지킬 입력이 없다. 닫힘 = 「다시 볼게요」라 잃을 것이 없다.
 import type { ReactNode } from "react";
@@ -44,12 +48,12 @@ export function ConfirmDialog({
   return createPortal(
     // 딤은 홈 얼럿과 같은 값(`bg-ink/55` + 2px 블러, 08-16 대표 확정). z-[60] = 헤더·하단 고정 바(z-40) 위.
     <div
-      className="fixed inset-0 z-[60] flex items-end justify-center bg-ink/55 backdrop-blur-[2px] sm:items-center sm:p-4 print:hidden"
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-ink/55 p-4 backdrop-blur-[2px] print:hidden"
       {...dialog.overlayProps}
     >
       <div
         {...dialog.panelProps}
-        className="w-full max-w-[420px] rounded-t-lg bg-surface px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-6 shadow-e3 sm:rounded-lg sm:p-6"
+        className="max-h-[calc(100dvh-2rem)] w-full max-w-[420px] overflow-y-auto rounded-lg bg-surface p-5 shadow-e3 sm:p-6"
       >
         <h2 id="rent-confirm-title" className="text-[18px] font-medium leading-snug break-keep text-ink">
           {title}

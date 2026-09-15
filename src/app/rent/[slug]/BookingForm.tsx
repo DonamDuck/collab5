@@ -36,29 +36,28 @@ import { MentorOptions } from "./MentorOption";
 
 const labelCls = "mb-2 block text-[16px] font-medium text-body";
 const hintCls = "mt-2 text-[15px] leading-relaxed break-keep text-faint";
+/** 못 넘어간 칸 바로 아래에 붙는 한 줄. 힌트와 같은 자리에 같은 크기로 서고 색만 다르다. */
+const errCls = "mt-2 text-[15px] leading-relaxed break-keep text-danger";
 
-/** 모바일 하단 고정 바 — 금액 + 이 화면의 키위 버튼. 640px부터는 폼 안의 버튼이 대신한다.
+/** 화면 아래 고정 바 — 금액 + 이 화면의 키위 버튼. 어느 폭에서나 이 하나가 유일한 결제 버튼이다.
  *  하단 여백은 `max()`다(MakerActionBar 08-09 실측): 홈 인디케이터가 있는 기기는 안전영역만, 없는 기기는 12px. */
 function PayBar({
   amount,
   label,
   disabled,
   onClick,
-  options,
 }: {
   amount: number;
   label: string;
   disabled: boolean;
   onClick: () => void;
-  /** 데스크톱에서 바 «안»에 들어갈 옵션 줄. 폰에서는 시트가 대신 맡아서 안 받는다. */
-  options?: React.ReactNode;
 }) {
   return (
     <div className="fixed inset-x-0 bottom-0 z-40">
       <div className="mx-auto w-full max-w-[640px] rounded-t-2xl border border-b-0 border-hairline bg-surface px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 shadow-e2">
-        {/* 🖥데스크톱만 — 대표: *「데스크탑은 결제 버튼과 비슷한 위계에 옵션 선택 가능한 UI로」*.
-            폰에서 여기 두면 바가 화면 절반을 먹어서, 그쪽은 버튼을 누를 때 시트로 올라온다. */}
-        {options && <div className="mb-3 hidden sm:block">{options}</div>}
+        {/* 🔻09-15 대표 — *「(폰이) 이렇게 나오는 거 좋은데, 데스크탑도 동일 UX로 적용 필요해」*.
+            전엔 폰은 팝업 안에서, 데스크톱은 이 바 «안»에서 옵션을 골랐다. 두 화면이 서로 다른 물건이었다.
+            ⭐이제 **옵션을 고르는 자리는 확인 팝업 한 곳뿐이다.** 바는 어느 폭에서나 금액과 버튼만 든다. */}
         <div className="flex items-center gap-3">
           <div className="min-w-0 flex-1">
             {/* 🔁09-14 「지금 내실 돈」 → **「대여 비용」**(대표). 「지금 내실」은 재촉으로 읽히고
@@ -122,6 +121,14 @@ export function BookingForm({
   const [widgetReady, setWidgetReady] = useState(false);
   /** 결제 직전 확인 팝업(대표 09-14: 의사 확인은 팝업으로). 열린 채로 `submit`이 돌지 않게 닫고 시작한다. */
   const [confirming, setConfirming] = useState(false);
+  /** 🚨**못 넘어간 이유를 «그 칸 옆»에 둔다**(대표 09-15 [2][3]).
+   *  전엔 오류 한 줄이 폼 맨 아래 결제 버튼 위에만 떴다. 그런데 버튼은 화면 아래 고정 바에 있어서
+   *  **누른 자리에서 3,000px 떨어진 곳에 글자가 생겼다.** 화면에는 아무 변화도 없고 팝업도 안 열리니
+   *  「버튼이 죽었다」로 읽힌다. 실제로 대표가 그렇게 읽었다.
+   *  ⭐그래서 둘을 같이 한다 — 문구는 그 칸 아래에 놓고, 화면을 그 칸으로 끌어올린다. */
+  const [badField, setBadField] = useState<"date" | "plan" | "">("");
+  const dateRef = useRef<HTMLDivElement>(null);
+  const planRef = useRef<HTMLTextAreaElement>(null);
   // 위젯 인스턴스는 렌더와 무관하게 살아 있어야 해서 ref에 둔다(state에 두면 리렌더마다 다시 그린다).
   const widgetsRef = useRef<{ requestPayment: (p: Record<string, unknown>) => Promise<void> } | null>(null);
 
@@ -132,10 +139,21 @@ export function BookingForm({
   const planShort = plan.trim().length < 10;
 
   /** 버튼이 부르는 건 이것 — 싼 검사만 하고 팝업을 연다. 서버 왕복은 팝업에서 [신청하기]를 누른 뒤다. */
+  /** 위에서부터 첫 번째로 비어 있는 칸으로 데려간다. 두 칸이 다 비어도 «위엣것» 하나만 말한다 —
+   *  한 번에 둘을 고치라고 하면 어디부터 볼지 또 고민하게 된다. */
+  const stopAt = (f: "date" | "plan") => {
+    setBadField(f);
+    const el = f === "date" ? dateRef.current : planRef.current;
+    el?.scrollIntoView({ behavior: "smooth", block: "center" });
+    // 글 칸은 커서까지 넣어 준다. 날짜는 격자라 커서가 갈 곳이 없다.
+    if (f === "plan") planRef.current?.focus({ preventScroll: true });
+  };
+
   const askConfirm = () => {
     setErr("");
-    if (!useDate) { setErr("어느 날 쓰실지 골라 주세요."); return; }
-    if (planShort) { setErr("그날 무엇을 하실지 열 글자 이상 적어 주세요."); return; }
+    setBadField("");
+    if (!useDate) { stopAt("date"); return; }
+    if (planShort) { stopAt("plan"); return; }
     setConfirming(true);
   };
 
@@ -229,7 +247,9 @@ export function BookingForm({
         {/* 토스가 이 두 칸을 채운다 — 결제수단과 약관. 우리는 자리만 둔다. */}
         <div id="rent-pay-methods" />
         <div id="rent-pay-agreement" />
-        {err && <p className="text-[15px] leading-relaxed break-keep text-danger">{err}</p>}
+        {/* 여기 남는 건 **서버가 돌려준 말**뿐이다(자리가 찼다·결제가 안 됐다). 칸이 비어서 못 가는 경우는
+          이제 그 칸 아래에서 말한다 — 누른 자리에서 멀리 떨어진 글자는 아무도 못 본다. */}
+      {err && <p className="text-[15px] leading-relaxed break-keep text-danger">{err}</p>}
         <div className="hidden sm:block">
           <button
             type="button"
@@ -254,11 +274,16 @@ export function BookingForm({
 
   return (
     <div className="space-y-7">
-      <div>
+      <div ref={dateRef}>
         <p className={labelCls}>신청 날짜를 선택해주세요.</p>
         {/* 🔁09-14 `<select>` → 달력(대표). 못 고르는 날이 흐리게 «보이는» 것이 오히려 정보다 —
             「이 공간은 화요일만 열린다」가 격자에서 한눈에 읽힌다. 목록은 그 규칙을 안 보여준다. */}
-        <PickDateCalendar openDates={openDates} value={useDate} onChange={setUseDate} />
+        <PickDateCalendar
+          openDates={openDates}
+          value={useDate}
+          onChange={(d) => { setUseDate(d); setBadField((f) => (f === "date" ? "" : f)); }}
+        />
+        {badField === "date" && <p className={errCls}>어느 날 쓰실지 골라 주세요.</p>}
         {hours && <p className={hintCls}>이용 시간은 {hours}예요.</p>}
       </div>
 
@@ -305,12 +330,17 @@ export function BookingForm({
             그래서 placeholder에 **답의 모양**을 보여준다 — 무엇을·누구와·몇 시간. */}
         <textarea
           id="rent-plan"
+          ref={planRef}
           rows={4}
           className={`${rentTextareaCls} resize-y`}
           value={plan}
-          onChange={(e) => setPlan(e.target.value)}
+          onChange={(e) => {
+            setPlan(e.target.value);
+            if (e.target.value.trim().length >= 10) setBadField((f) => (f === "plan" ? "" : f));
+          }}
           placeholder="예) 직접 만든 도자기 그릇 20점으로 하루 팝업을 열려고 해요. 친구 한 명과 둘이 오고, 오후에 손님을 받을 계획이에요."
         />
+        {badField === "plan" && <p className={errCls}>그날 무엇을 하실지 열 글자 이상 적어 주세요.</p>}
         <p className={hintCls}>사장님이 이 글만 보고 정하세요. 열 글자면 충분해요.</p>
       </div>
 
@@ -357,11 +387,6 @@ export function BookingForm({
         label={pending ? "신청하는 중…" : "결제하고 신청하기"}
         disabled={pending}
         onClick={askConfirm}
-        options={
-          mentorMinutes > 0 ? (
-            <MentorOptions minutes={mentorMinutes} price={mentorPrice} value={withMentor} onChange={setWithMentor} dense />
-          ) : undefined
-        }
       />
 
       <ConfirmDialog
@@ -372,13 +397,10 @@ export function BookingForm({
         onConfirm={submit}
         onCancel={() => setConfirming(false)}
       >
-        {/* 📱**폰에서 「버튼 → 옵션 바텀」이 바로 이 자리다**(대표 [5]). 이 팝업은 375px에서 바닥 시트로
-            올라온다(`ConfirmDialog`). 데스크톱은 옵션이 이미 바 안에 보이므로 여기선 접는다 —
-            같은 고르개가 한 화면에 둘이면 어느 쪽이 진짜인지 고민하게 된다. */}
+        {/* 🔁09-15 `sm:hidden` 제거 — 어느 폭에서나 여기서 고른다(대표 「데스크탑도 동일 UX」).
+            바에서 옵션을 뺐으니 고르개가 둘로 보일 걱정도 없다. */}
         {mentorMinutes > 0 && (
-          <div className="sm:hidden">
-            <MentorOptions minutes={mentorMinutes} price={mentorPrice} value={withMentor} onChange={setWithMentor} />
-          </div>
+          <MentorOptions minutes={mentorMinutes} price={mentorPrice} value={withMentor} onChange={setWithMentor} />
         )}
         <p>
           {dateLabel(useDate)}에 <span className="font-medium text-ink">{spaceName}</span>을{" "}
