@@ -25,7 +25,7 @@
 //   입력 48px/16px · 도움말 15 faint). 금액 표는 **한 문장**으로. 버튼은 화면 유일 키위 52px이고,
 //   모바일에선 `MakerActionBar`처럼 **하단 고정 바**에 금액과 같이 앉는다(폼이 길어서 버튼이
 //   화면 밖에 있으면 「어디서 내지」가 된다).
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { startBookingAction, confirmBookingAction } from "@/lib/rent-actions";
 import type { SpaceUseType } from "@/lib/types";
@@ -116,9 +116,6 @@ export function BookingForm({
   const [plan, setPlan] = useState("");
   const [withMentor, setWithMentor] = useState(false);
   const [brandSlug, setBrandSlug] = useState("");
-  /** 2단계 — 서버가 자리를 잡아 준 뒤 토스 위젯을 그리는 단계. null이면 아직 1단계(신청 내용 쓰기). */
-  const [pay, setPay] = useState<{ orderId: string; amount: number; orderName: string } | null>(null);
-  const [widgetReady, setWidgetReady] = useState(false);
   /** 결제 직전 확인 팝업(대표 09-14: 의사 확인은 팝업으로). 열린 채로 `submit`이 돌지 않게 닫고 시작한다. */
   const [confirming, setConfirming] = useState(false);
   /** 🚨**못 넘어간 이유를 «그 칸 옆»에 둔다**(대표 09-15 [2][3]).
@@ -129,8 +126,6 @@ export function BookingForm({
   const [badField, setBadField] = useState<"date" | "plan" | "">("");
   const dateRef = useRef<HTMLDivElement>(null);
   const planRef = useRef<HTMLTextAreaElement>(null);
-  // 위젯 인스턴스는 렌더와 무관하게 살아 있어야 해서 ref에 둔다(state에 두면 리렌더마다 다시 그린다).
-  const widgetsRef = useRef<{ requestPayment: (p: Record<string, unknown>) => Promise<void> } | null>(null);
 
   const mentorAmount = withMentor && mentorMinutes > 0 ? mentorPrice : 0;
   const total = priceDay + mentorAmount;
@@ -183,94 +178,15 @@ export function BookingForm({
         router.refresh();
         return;
       }
-      // ③ 2단계로. 위젯은 아래 useEffect가 그린다(컨테이너 div가 먼저 DOM에 있어야 해서).
-      setPay({ orderId: r.orderId, amount: r.amount, orderName: r.orderName ?? "하루 가게" });
+      // ③ 결제 화면으로. 🔁09-15 대표 — 전엔 이 화면 안에서 폼을 위젯으로 갈아끼웠다.
+      //   주소가 그대로라 브라우저 뒤로가기가 「신청 내용 고치기」로 안 가고 목록으로 나가 버렸다.
+      //   이제 `/rent/pay/<주문번호>`로 «이동»한다 — 뒤로가기가 제자리로 돌아온다.
+      // 🚨**`router.push`가 아니라 문서를 새로 연다.** 토스 결제수단 위젯은 «한 문서에 하나»만 허용해서,
+      //   화면 안 이동으로 결제 화면에 두 번째로 들어가면 `PAYMENT_METHODS_WIDGET_ALREADY_RENDERED`로 죽는다.
+      //   🪤화면엔 에러가 안 뜬다 — 결제 칸이 통째로 비고 버튼이 「불러오는 중」에서 안 풀린다(09-15 실측).
+      //   고치러 돌아갔다 다시 오는 길이 바로 그 경우라, 대표가 요청한 바로 그 동선에서 터진다.
+      window.location.assign(`/rent/pay/${r.orderId}`);
     });
-
-  // 2단계 진입 시 토스 위젯을 그린다. ⚠️SDK를 파일 맨 위에서 import하지 않는다 —
-  //   결제까지 안 가는 대부분의 방문자에게 그 무게를 지울 이유가 없다.
-  useEffect(() => {
-    if (!pay) return;
-    let alive = true;
-    (async () => {
-      try {
-        const { loadTossPayments, ANONYMOUS } = await import("@tosspayments/tosspayments-sdk");
-        const toss = await loadTossPayments(process.env.NEXT_PUBLIC_TOSS_CLIENT_KEY!);
-        // 비회원 결제. 카드를 저장해 두고 다시 쓰는 흐름은 아직 없다.
-        const widgets = toss.widgets({ customerKey: ANONYMOUS });
-        // 🚨금액은 서버가 정해 돌려준 값이다. 화면의 `total`을 쓰지 않는다.
-        await widgets.setAmount({ currency: "KRW", value: pay.amount });
-        await Promise.all([
-          widgets.renderPaymentMethods({ selector: "#rent-pay-methods", variantKey: "DEFAULT" }),
-          widgets.renderAgreement({ selector: "#rent-pay-agreement", variantKey: "AGREEMENT" }),
-        ]);
-        if (!alive) return;
-        widgetsRef.current = widgets as unknown as typeof widgetsRef.current;
-        setWidgetReady(true);
-      } catch (e) {
-        console.error("[rent] widget render failed", (e as { code?: string })?.code, (e as Error)?.message);
-        if (alive) setErr("결제 화면을 불러오지 못했어요. 잠시 뒤 다시 시도해 주세요.");
-      }
-    })();
-    return () => { alive = false; };
-  }, [pay]);
-
-  const requestPay = () =>
-    start(async () => {
-      if (!pay || !widgetsRef.current) return;
-      setErr("");
-      try {
-        await widgetsRef.current.requestPayment({
-          orderId: pay.orderId,
-          orderName: pay.orderName,
-          // 🔑돌아올 주소. 토스가 여기에 paymentKey·orderId·amount를 붙여 보낸다.
-          successUrl: `${window.location.origin}/rent/pay/success`,
-          failUrl: `${window.location.origin}/rent/pay/fail`,
-        });
-        // 여기 아래로는 안 내려온다 — 인증 창이 페이지를 가져간다.
-      } catch (e) {
-        // 사용자가 창을 닫으면 SDK가 던진다. 그건 사고가 아니라 「안 하기로 함」이다.
-        const code = (e as { code?: string })?.code;
-        if (code === "USER_CANCEL") return;
-        console.error("[rent] requestPayment failed", code, (e as Error)?.message);
-        setErr("결제를 진행하지 못했어요. 잠시 뒤 다시 시도해 주세요.");
-      }
-    });
-
-  if (pay) {
-    const payLabel = widgetReady ? "결제하기" : "불러오는 중…";
-    return (
-      <div className="space-y-6">
-        <p className="text-[17px] leading-relaxed text-body">
-          <span className="font-medium text-ink">{pay.orderName}</span> · {won(pay.amount)}
-        </p>
-        {/* 토스가 이 두 칸을 채운다 — 결제수단과 약관. 우리는 자리만 둔다. */}
-        <div id="rent-pay-methods" />
-        <div id="rent-pay-agreement" />
-        {/* 여기 남는 건 **서버가 돌려준 말**뿐이다(자리가 찼다·결제가 안 됐다). 칸이 비어서 못 가는 경우는
-          이제 그 칸 아래에서 말한다 — 누른 자리에서 멀리 떨어진 글자는 아무도 못 본다. */}
-      {err && <p className="text-[15px] leading-relaxed break-keep text-danger">{err}</p>}
-        <div className="hidden sm:block">
-          <button
-            type="button"
-            onClick={requestPay}
-            disabled={pending || !widgetReady}
-            className={`${primaryBtnCls} h-[52px] w-full`}
-          >
-            {widgetReady ? `${won(pay.amount)} 결제하기` : "결제 화면 불러오는 중…"}
-          </button>
-        </div>
-        <button
-          type="button"
-          onClick={() => { setPay(null); setWidgetReady(false); }}
-          className="py-[12px] text-[15px] text-mute underline underline-offset-2"
-        >
-          ← 신청 내용 고치기
-        </button>
-        <PayBar amount={pay.amount} label={payLabel} disabled={pending || !widgetReady} onClick={requestPay} />
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-7">
