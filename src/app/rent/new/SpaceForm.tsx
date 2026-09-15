@@ -20,6 +20,7 @@ import { useCallback, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { saveSpaceAction } from "@/lib/rent-actions";
 import { uploadPhoto } from "@/lib/upload";
+import { PhotoGrid } from "@/app/register/PhotoGrid";
 import type { Space, SpaceUseType } from "@/lib/types";
 import { primaryBtnCls, RentSelect, rentInputCls, rentTextareaCls, secondaryBtnCls, won } from "../ui";
 import { AddressField } from "./AddressField";
@@ -201,6 +202,16 @@ export function SpaceForm({
     }
   };
 
+  /** 격자 안에서 자리 바꾸기(끌기 · ← →). 첫 장이 대표 사진이라 순서가 곧 정보다. */
+  const movePhoto = (from: number, to: number) =>
+    setPhotos((p) => {
+      if (to < 0 || to >= p.length || from === to) return p;
+      const next = [...p];
+      const [it] = next.splice(from, 1);
+      next.splice(to, 0, it);
+      return next;
+    });
+
   // 화면에서 먼저 막는 이유는 왕복을 아끼려는 것이지 이게 관문이라서가 아니다 — 관문은 늘 서버다.
   const blocker = (): string => {
     if (!name.trim()) return "공간 이름을 적어 주세요.";
@@ -289,49 +300,20 @@ export function SpaceForm({
             placeholder="어떤 사람들이 여기서 무엇을 했는지, 어떤 날에 제일 예쁜지 같은 이야기를 적어 주세요."
           />
         </L>
-        <L label="사진" hint="한 장 이상 올려 주세요. 첫 장이 표지가 돼요.">
-          {/* 파일 고르기 버튼은 보조 버튼 얼굴로. 브라우저 기본 회색 버튼은 이 사이트 어디에도 없다. */}
-          <input
-            type="file"
-            accept="image/*"
-            multiple
-            onChange={(e) => {
-              void pickPhotos(e.target.files);
-              e.target.value = "";
-            }}
-            className="block w-full text-[15px] text-mute file:mr-3 file:h-[44px] file:cursor-pointer file:rounded-md file:border file:border-solid file:border-border-strong file:bg-surface file:px-4 file:text-[15px] file:font-medium file:text-ink"
+        <L label="사진" hint="한 장 이상 올려 주세요. 첫 장이 대표 사진이 돼요.">
+          {/* 🔁09-16 소개서 사진 격자(`register/PhotoGrid`)를 그대로 쓴다 — 대표: *「전반적으로 AI가 빠르게 만든
+              티가 남, 특히 입력폼」*에서 마지막까지 남아 있던 칸이 여기였다(브라우저 기본 「파일 선택」 버튼).
+              ⭐한 사이트에서 사진을 올리는 자리는 한 얼굴이어야 한다. 점선 ＋ 타일(드롭존 어피던스는 점선 예외),
+                끌어서 순서 바꾸기, 폰용 ← → 버튼, 「대표」 배지, 올리는 중 ✕ — 소개서에서 이미 검증된 것들이다.
+              ⚠️`sources`는 안 넘긴다 — 공간 사진에 출처 표시는 없다. 안 넘기면 그 버튼은 아예 안 생긴다. */}
+          <PhotoGrid
+            items={photos}
+            max={10}
+            addLabel="사진(필수)"
+            onAdd={(files) => void pickPhotos(files)}
+            onRemove={(i) => setPhotos((prev) => prev.filter((_, j) => j !== i))}
+            onReorder={movePhoto}
           />
-          {photos.length > 0 && (
-            <div className="mt-3 grid grid-cols-3 gap-2">
-              {photos.map((p, i) => (
-                <div key={i} className="relative aspect-square overflow-hidden rounded-md bg-surface-soft">
-                  {p.uploading ? (
-                    <div className="flex h-full w-full items-center justify-center text-[13px] text-faint">
-                      올리는 중…
-                    </div>
-                  ) : (
-                    <>
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={p.url} alt="" className="h-full w-full object-cover" />
-                      {/* 흰 pill로 — 검정 면은 안 쓴다. 사진 위라 흰 면이 오히려 잘 보인다. */}
-                      {i === 0 && (
-                        <span className="absolute left-1.5 top-1.5 inline-flex h-[28px] items-center rounded-pill bg-surface/90 px-2.5 text-[13px] font-medium text-ink">
-                          표지
-                        </span>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => setPhotos((prev) => prev.filter((_, j) => j !== i))}
-                        className="absolute right-1.5 top-1.5 h-[32px] rounded-pill bg-surface/90 px-3 text-[13px] font-medium text-ink"
-                      >
-                        빼기
-                      </button>
-                    </>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
         </L>
       </Group>
 
