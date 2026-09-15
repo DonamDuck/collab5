@@ -58,39 +58,67 @@ export function PayPanel({
     return () => window.removeEventListener("pageshow", onShow);
   }, []);
 
-  /** 🩸**결제창이 «커진 뒤»에 클릭이 죽는다** (대표 09-15, 좁은 화면에서만).
-   *  「신용·체크카드」를 고르면 카드사 격자가 펼쳐지고 토스가 iframe 높이를 늘린다.
-   *  그런데 그 순간부터 그 안의 어떤 것도 안 눌린다 — 카드사도, 다시 누르는 tosspay 탭도.
-   *  ⭐**창을 넓히면 되살아난다**는 대표 실측이 답을 가리킨다. 브라우저가 «다른 출처의 iframe»을 위해
-   *    따로 들고 있는 «어디를 누르면 그 프레임인가» 지도가 iframe이 커질 때 갱신되지 않고 남는 것이다.
-   *    창 크기를 바꾸면 그 지도를 다시 그려서 되살아난다.
-   *  👉그래서 **크기가 바뀔 때마다 우리가 대신 다시 그리게 만든다.** 1px 스크롤과 resize 이벤트가
-   *    그 일을 시킨다(둘 다 눈에 안 보이고 되돌린다).
-   *  ⚠️높이가 «실제로 바뀐 때»만 돈다. 매 프레임 돌리면 스크롤이 떨린다. */
+  /** 🩸**토스 창 안은 «한 번 누를 때마다» 다음 자리가 죽는다** (대표 09-15, 좁은 화면에서만).
+   *  카드를 고르면 카드사가 펼쳐지는데 그 카드사가 안 눌리고, 억지로 고르면 이번엔 할부 칸이 안 눌린다.
+   *  대표: *「step by step으로 하나 해결하면 다음 클릭이 안 되고 하는 이슈가 계속 반복적」*.
+   *
+   *  ⭐**창 크기를 바꾸면 되살아난다**는 실측이 답을 가리킨다. 브라우저는 «다른 출처의 iframe»을 위해
+   *    「화면의 어디를 누르면 그 프레임인가」 지도를 따로 들고 있는데, 그 안에서 내용이 바뀌어
+   *    iframe이 자라도 **그 지도가 옛날 크기 그대로 남는다.** 새로 생긴 자리는 지도에 없어서 눌러도 안 간다.
+   *
+   *  🩸**첫 처치가 약했다.** 1px 스크롤을 두 줄 연달아 쓰고 `resize` 이벤트를 쐈는데 —
+   *    같은 프레임 안의 스크롤 두 번은 브라우저가 «합쳐서 없던 일»로 만들고, 사람이 만든 `resize`
+   *    이벤트는 **진짜 크기 변화가 아니라서 그 지도를 다시 그리게 하지 못한다.**
+   *    자바스크립트 이벤트와 브라우저의 레이아웃은 다른 층이다.
+   *  ⭐**고침 = 레이아웃을 «진짜로» 한 번 흔든다.** 우리가 가진 바깥 칸의 안쪽 여백을 1px 줬다가 되돌린다.
+   *    iframe의 실제 폭이 바뀌니 브라우저가 그 지도를 다시 그린다. 눈에는 안 보인다.
+   *  📡크기가 안 변하는 변화(할부 목록이 열리는 것 같은)도 있어서 **토스가 보내는 메시지에도 같이 반응한다.**
+   *    내용은 못 읽지만(다른 출처다) **「무언가 바뀌었다」는 신호로는 충분하다.** */
   useEffect(() => {
     if (!ready) return;
-    const host = document.getElementById("rent-pay-methods");
-    const frame = host?.querySelector("iframe");
-    if (!host || !frame) return;
-    let last = Math.round(frame.getBoundingClientRect().height);
+    const hosts = ["rent-pay-methods", "rent-pay-agreement"]
+      .map((id) => document.getElementById(id))
+      .filter((el): el is HTMLElement => !!el);
+    if (hosts.length === 0) return;
+
+    let raf1 = 0;
+    let on = false;
+    /** 🪄**보이지 않게 한 번 흔든다.** 0.01px 옮겼다 되돌리면 사람 눈엔 아무 일도 없지만
+     *  브라우저에는 「이 프레임이 움직였다」가 되어 누를 자리 지도를 다시 그린다. */
     const nudge = () => {
-      const now = Math.round(frame.getBoundingClientRect().height);
-      if (now === last) return;
-      // 🔎개발 중엔 숫자를 남긴다. Next가 브라우저 콘솔을 dev 서버 로그로 넘겨 줘서,
-      //   대표가 화면에서 겪은 일을 내가 «로그로» 되짚을 수 있다(화면에 군더더기를 안 붙이고).
-      if (process.env.NODE_ENV === "development") {
-        console.log(`[rent] 결제창 높이 ${last} → ${now} · 화면 ${window.innerHeight}`);
-      }
-      last = now;
-      const y = window.scrollY;
-      window.scrollTo(window.scrollX, y + 1);
-      window.scrollTo(window.scrollX, y);
-      window.dispatchEvent(new Event("resize"));
+      cancelAnimationFrame(raf1);
+      raf1 = requestAnimationFrame(() => {
+        on = !on;
+        hosts.forEach((h) => (h.style.transform = on ? "translateY(0.01px)" : "translateY(0px)"));
+      });
     };
+
     const ro = new ResizeObserver(nudge);
-    ro.observe(frame);
-    ro.observe(host);
-    return () => ro.disconnect();
+    hosts.forEach((h) => {
+      ro.observe(h);
+      const frame = h.querySelector("iframe");
+      if (frame) ro.observe(frame);
+    });
+    // ⚠️출처를 확인하고 받는다. 아무 메시지에나 반응하면 남의 창이 우리 화면을 흔들 수 있다.
+    const onMessage = (e: MessageEvent) => {
+      if (typeof e.origin === "string" && e.origin.includes("tosspayments.com")) nudge();
+    };
+    window.addEventListener("message", onMessage);
+
+    // ⏱**그리고 1초마다 한 번씩 그냥 흔든다.** 위 둘(크기 변화·메시지)이 모든 변화를 잡아 준다는 보장이 없고,
+    //   못 잡으면 그 자리는 «다음 탭이 죽는» 자리가 된다. 흔드는 값이 0.01px이라 비용도 자국도 없다.
+    //   ⚠️보이는 동안만 돈다 — 안 보이는 탭에서 계속 돌 이유가 없다.
+    const beat = setInterval(() => {
+      if (!document.hidden) nudge();
+    }, 1000);
+
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("message", onMessage);
+      clearInterval(beat);
+      cancelAnimationFrame(raf1);
+      hosts.forEach((h) => (h.style.transform = ""));
+    };
   }, [ready]);
 
   useEffect(() => {
