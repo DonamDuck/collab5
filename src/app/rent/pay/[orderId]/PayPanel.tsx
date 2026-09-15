@@ -58,35 +58,6 @@ export function PayPanel({
     return () => window.removeEventListener("pageshow", onShow);
   }, []);
 
-  /** 🔎**개발 빌드에서만 — 지금 이 화면의 «숫자»를 띄운다** (09-15).
-   *
-   *  🩸토스 창 안에서 한 단계 들어갈 때마다 그 다음 자리가 안 눌린다. 그런데 **약관 창은 눌린다**(대표 실측).
-   *    두 창이 같은 페이지에 나란히 있는데 하나만 죽는다면, 원인은 「창 전체」가 아니라 **그 창의 «모양»**이다.
-   *  ⭐앞서 두 번 처치를 넣었지만 둘 다 «내가 못 보는 상태»를 겨냥한 짐작이었다. 짐작을 더 얹지 않는다.
-   *    📐**막힌 그 순간의 크기를 먼저 본다** — 결제창이 화면보다 얼마나 큰지, 창이 몇 개인지.
-   *  🚨자동화로는 이 자리를 못 잰다. 토스 창 «안»을 누르는 건 대표 손에서만 일어난다.
-   *    그래서 화면에 띄운다 — 막혔을 때 그 줄을 찍어 주시면 그게 곧 측정값이다.
-   *  ⛔운영 빌드에선 통째로 빠진다(`NODE_ENV` 게이트). */
-  const [probe, setProbe] = useState("");
-  useEffect(() => {
-    if (process.env.NODE_ENV !== "development" || !ready) return;
-    const tick = () => {
-      const frames = document.querySelectorAll("iframe");
-      const m = document.querySelector("#rent-pay-methods iframe");
-      const a = document.querySelector("#rent-pay-agreement iframe");
-      const box = (el: Element | null) => {
-        if (!el) return "없음";
-        const r = el.getBoundingClientRect();
-        return `${Math.round(r.width)}×${Math.round(r.height)} @${Math.round(r.top)}`;
-      };
-      setProbe(
-        `창 ${frames.length}개 · 결제 ${box(m)} · 약관 ${box(a)} · 화면 ${window.innerWidth}×${window.innerHeight} · 스크롤 ${Math.round(window.scrollY)}`,
-      );
-    };
-    tick();
-    const t = setInterval(tick, 500);
-    return () => clearInterval(t);
-  }, [ready]);
 
   useEffect(() => {
     if (ready || err) return;
@@ -223,11 +194,6 @@ export function PayPanel({
       </div>
 
       <p className="text-[15px] leading-relaxed break-keep text-faint">지금은 시험 결제예요.</p>
-      {probe && (
-        <p className="rounded-md bg-surface-soft px-3 py-2 font-mono text-[12px] leading-relaxed break-all text-mute">
-          {probe}
-        </p>
-      )}
     </div>
   );
 }
