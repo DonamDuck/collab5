@@ -51,17 +51,9 @@ export function scopeLabel(v: SpaceScope): string {
   return { space_only: "공간만", with_gear: "공간과 장비까지", whole_shop: "가게 그대로" }[v] ?? "공간만";
 }
 
-/** 날짜를 「10월 5일 (월)」로. `YYYY-MM-DD` 외의 값이 오면 받은 그대로 돌려준다.
- *  ⚠️`new Date("2026-10-05")`는 UTC 자정으로 읽혀 KST에선 하루 전으로 밀린다.
- *    그래서 Date를 거치지 않고 글자를 쪼갠 뒤, 요일만 정오 기준으로 계산한다. */
-export function dateLabel(iso: string): string {
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
-  if (!m) return iso;
-  const [, y, mo, d] = m;
-  const dow = "일월화수목금토"[new Date(`${iso}T12:00:00+09:00`).getDay()];
-  void y;
-  return `${Number(mo)}월 ${Number(d)}일 (${dow})`;
-}
+/** 날짜·일정 서식은 `lib/rent-time`이 정본이다(09-16). 서버 액션·메일도 같은 함수를 쓴다.
+ *  여기서 다시 내보내는 건 `/rent/**` 화면들이 이 파일 하나만 보게 하려는 것이다. */
+export { dateLabel, bookingWhen } from "@/lib/rent-time";
 
 /** 오늘(KST) `YYYY-MM-DD` — 날짜 입력칸의 `min`으로 쓴다. 지난 날짜를 고르는 실수를 미리 막는다. */
 export function todayKst(): string {

@@ -10,6 +10,7 @@
 // 🔗링크 base는 `SITE_URL`이다. 로컬에서 찍히는 링크가 운영 주소인 건 의도한 것 — 메일은 어디서 보내든
 //   받는 사람이 여는 곳은 하나다.
 import { SITE_URL } from "./site";
+import { bookingWhen, dateLabel } from "./rent-time";
 import type { Space, SpaceBooking } from "./types";
 import type { Profile } from "./profiles";
 
@@ -24,14 +25,6 @@ function esc(s: string): string {
 
 function won(n: number): string {
   return `${n.toLocaleString("ko-KR")}원`;
-}
-
-/** `2026-10-05` → `10월 5일 (월)`. ui.tsx의 `dateLabel`과 같은 계산인데, 그 파일은 화면 조각이라 여기서 안 끌어온다. */
-function dateLabel(iso: string): string {
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
-  if (!m) return iso;
-  const dow = "일월화수목금토"[new Date(`${iso}T12:00:00+09:00`).getDay()];
-  return `${Number(m[2])}월 ${Number(m[3])}일 (${dow})`;
 }
 
 function displayName(p: Profile | null, fallback: string): string {
@@ -110,7 +103,7 @@ export async function notifyBookingPaid(
   const link = `${SITE_URL}/rent/my`;
   const rows: [string, string][] = [
     ["누가", guestName],
-    ["언제", `${when}${booking.hours ? ` · ${booking.hours}` : ""}`],
+    ["언제", bookingWhen(booking)],
     ["어디", space.name],
     ["무엇을", booking.plan],
     ["받으실 돈", `${won(booking.amountPayout)} (손님이 낸 돈 ${won(booking.amountTotal)})`],
@@ -142,7 +135,7 @@ export async function notifyBookingConfirmed(
   const link = `${SITE_URL}/rent/done/${booking.id}`;
   const contact = [host?.phone, host?.email].filter(Boolean).join(" · ") || "연락처를 안 적으셨어요";
   const rows: [string, string][] = [
-    ["언제", `${when}${booking.hours ? ` · ${booking.hours}` : ""}`],
+    ["언제", bookingWhen(booking)],
     ["어디", space.name],
     ["주소", space.address],
     ["들어오는 법", space.accessNote],
@@ -173,7 +166,7 @@ export async function notifyBookingRejected(
   const subject = `[collab5] 이번엔 어렵대요 · ${when} ${space.name} · ${won(booking.amountTotal)} 전액 환불`;
   const link = `${SITE_URL}/rent`;
   const rows: [string, string][] = [
-    ["언제", when],
+    ["언제", bookingWhen(booking)],
     ["어디", space.name],
     ["환불", `${won(booking.amountTotal)} 전액 (카드사에 따라 며칠 걸릴 수 있어요)`],
     ["사장님 말씀", booking.hostMessage],
@@ -200,7 +193,7 @@ export async function notifyBookingCancelled(
   const when = dateLabel(booking.useDate);
   const subject = `[collab5] ${guestName}이 ${when} ${space.name} 신청을 취소했어요`;
   const link = `${SITE_URL}/rent/my`;
-  const rows: [string, string][] = [["언제", when], ["어디", space.name]];
+  const rows: [string, string][] = [["언제", bookingWhen(booking)], ["어디", space.name]];
   const text = [
     `${guestName}이 ${when} ${space.name} 신청을 취소했어요. 그날은 다시 비는 날로 돌아갔어요.`,
     ``,

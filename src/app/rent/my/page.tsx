@@ -14,7 +14,7 @@ import type { Space, SpaceBooking } from "@/lib/types";
 import { isRentAdmin } from "@/lib/rent-actions";
 import { HostDecide, GuestCancel, PublishButton } from "./Actions";
 import { ContactBlock } from "../ContactBlock";
-import { BookingBadge, SpaceBadge, dateLabel, primaryBtnCls, won } from "../ui";
+import { BookingBadge, SpaceBadge, bookingWhen, primaryBtnCls, won } from "../ui";
 
 // 하루 가게 — 내 공간 · 받은 신청 · 보낸 신청 (2026-09-13)
 //
@@ -126,7 +126,10 @@ export default async function MyRentPage() {
     ),
   );
 
-  const money = (b: SpaceBooking) => `${won(b.amountTotal)}${b.amountMentor > 0 ? " · 사장님 시간 포함" : ""}`;
+  // ☕09-16 커피챗으로 이름이 바뀌면서 칸도 바뀌었다(`amountMentor` → `amountChat`).
+  //   옛 예약은 옛 칸에만 값이 있어서 둘 다 본다. 말은 확인 팝업·상세와 같은 「커피챗」으로 맞췄다.
+  const money = (b: SpaceBooking) =>
+    `${won(b.amountTotal)}${b.amountChat > 0 || b.amountMentor > 0 ? " · 커피챗 포함" : ""}`;
 
   return (
     <main className="mx-auto w-full max-w-[720px] px-4 pt-8 pb-16 sm:px-6 sm:pt-12">
@@ -207,9 +210,8 @@ export default async function MyRentPage() {
                     <>
                       <p className="truncate text-[17px] font-medium text-ink">{sp?.name ?? "내 공간"}</p>
                       <p className="mt-1 text-[15px] text-mute">
-                        {dateLabel(b.useDate)}
+                        {bookingWhen(b)}
                         {b.headcount ? ` · ${b.headcount}명` : ""}
-                        {b.hours ? ` · ${b.hours}` : ""}
                       </p>
                     </>
                   }
@@ -267,7 +269,7 @@ export default async function MyRentPage() {
                     <>
                       <p className="truncate text-[17px] font-medium text-ink">{sp?.name ?? "공간"}</p>
                       <p className="mt-1 text-[15px] text-mute">
-                        {dateLabel(b.useDate)}
+                        {bookingWhen(b)}
                         {b.headcount ? ` · ${b.headcount}명` : ""}
                         {/* 확정 전에는 동네까지만. 상세 화면과 같은 규칙이다. */}
                         {sp?.area ? ` · ${sp.area}` : ""}

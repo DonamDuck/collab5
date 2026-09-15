@@ -74,3 +74,32 @@ export function rangeLabel(start: string, end: string): string {
   const h = hoursBetween(start, end);
   return h > 0 ? `${start}~${end} (${h % 1 === 0 ? h : h.toFixed(1)}시간)` : `${start}~${end}`;
 }
+
+/** `2026-10-05` → `10월 5일 (월)`.
+ *  ⚠️`new Date("2026-10-05")`는 UTC 자정으로 읽혀 KST에선 하루 전으로 밀린다.
+ *    그래서 Date를 거치지 않고 글자를 쪼갠 뒤, 요일만 정오 기준으로 계산한다.
+ *  🩸09-16까지 같은 계산이 화면(`app/rent/ui.tsx`)과 메일(`lib/rent-notify.ts`)에 따로 있었다.
+ *    한 벌이면 어느 날 서식이 갈라질 자리가 없다. */
+export function dateLabel(iso: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+  if (!m) return iso;
+  const dow = "일월화수목금토"[new Date(`${iso}T12:00:00+09:00`).getDay()];
+  return `${Number(m[2])}월 ${Number(m[3])}일 (${dow})`;
+}
+
+/** 예약 한 건의 「언제」 한 줄 — `10월 6일 (화) 13:00~15:00 (2시간)`.
+ *
+ *  🩸**09-16까지 이 자리가 날짜만 말했다.** 시간 단위로 판매를 바꿔 놓고, 정작 사장님이 받는
+ *    신청 목록과 메일에는 몇 시에 오는지가 없었다. 옛 `hours` 칸(자유 글)을 보고 있었는데
+ *    새 예약은 그 칸을 안 채운다 — 빈 값이라 화면에서도 조용히 사라졌다.
+ *  ⭐옛 예약은 그 `hours` 글이 유일한 단서라 아직 읽어 준다. 옛 칸을 지우는 날 이 갈래도 같이 지운다. */
+export function bookingWhen(b: {
+  useDate: string;
+  startTime?: string;
+  endTime?: string;
+  hours?: string;
+}): string {
+  const date = dateLabel(b.useDate);
+  if (b.startTime && b.endTime) return `${date} ${rangeLabel(b.startTime, b.endTime)}`;
+  return b.hours ? `${date} · ${b.hours}` : date;
+}

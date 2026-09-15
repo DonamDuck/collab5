@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { getBookingByOrderId, listSpacesByIds } from "@/lib/spaces";
 import { getSessionUserId } from "@/lib/profiles";
-import { dateLabel, won } from "../../ui";
+import { bookingWhen, dateLabel, won } from "../../ui";
 import { PayPanel } from "./PayPanel";
 
 // 하루 가게 — 결제 화면 (2026-09-15)
@@ -62,15 +62,17 @@ export default async function RentPayPage({ params }: { params: Promise<{ orderI
           __html: `(function(){try{var k='rent-pay-retry:'+location.pathname;var n=+(sessionStorage.getItem(k)||0);if(n>=2)return;setTimeout(function(){if(document.querySelector('#rent-pay-methods iframe'))return;sessionStorage.setItem(k,String(n+1));location.replace(location.pathname+'?r='+Date.now());},9000);}catch(e){}})();`,
         }}
       />
+      {/* ☕`withMentor`는 이름만 옛것이다. 09-16에 칸이 `amountMentor` → `amountChat`으로 바뀌었고,
+          옛 예약은 옛 칸에만 값이 있어서 둘 다 본다. */}
       <PayPanel
         orderId={b.orderId}
         amount={b.amountTotal}
         orderName={`${brief.name} · ${dateLabel(b.useDate)}`}
         backHref={`/rent/${brief.slug}`}
         placeLabel={brief.name}
-        scheduleLabel={`${dateLabel(b.useDate)}${b.hours ? ` · ${b.hours}` : ""}`}
+        scheduleLabel={bookingWhen(b)}
         amountLabel={won(b.amountTotal)}
-        withMentor={b.amountMentor > 0}
+        withMentor={b.amountChat > 0 || b.amountMentor > 0}
       />
     </main>
   );

@@ -171,7 +171,7 @@ export function PayPanel({
           value={
             <>
               <span className="font-medium text-ink">{amountLabel}</span>
-              {withMentor && <span className="text-mute"> · 사장님 시간 포함</span>}
+              {withMentor && <span className="text-mute"> · 커피챗 포함</span>}
             </>
           }
         />

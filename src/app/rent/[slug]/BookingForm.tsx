@@ -141,12 +141,19 @@ export function BookingForm({
   // ⏱고른 날의 시간대와 이미 팔린 칸에서 «지금 고를 수 있는 것»을 만든다.
   const daySlots = openSlots.filter((sl) => sl.date === useDate);
   const taken = takenByDate[useDate] ?? [];
-  /** 시작 가능 시각 — 열린 시간대를 정시로 쪼개고, 최소 시간을 못 채우는 꼬리와 이미 팔린 칸은 뺀다. */
-  const startChoices = daySlots.flatMap((sl) =>
-    hourMarks(sl)
-      .filter((t) => hoursBetween(t, sl.end) >= minHours)
-      .filter((t) => !taken.some((b) => overlaps(t, toHHMM(toMinutes(t) + minHours * 60), b.start, b.end))),
-  );
+  /** 시작 가능 시각 — 열린 시간대를 정시로 쪼개고, 최소 시간을 못 채우는 꼬리와 이미 팔린 칸은 뺀다.
+   *  ⚠️**한 날에 시간대가 둘 이상일 수 있다**(오전만 열고 오후에 또 여는 가게). 그래서 이어 붙인 뒤
+   *    시각 순으로 세우고 겹치는 칸에서 나온 같은 시각은 하나로 줄인다. 저장된 순서를 그대로 쓰면
+   *    오후를 먼저 적어 둔 가게에서 고르개가 「15:00, 16:00, 10:00, 11:00」로 선다. */
+  const startChoices = Array.from(
+    new Set(
+      daySlots.flatMap((sl) =>
+        hourMarks(sl)
+          .filter((t) => hoursBetween(t, sl.end) >= minHours)
+          .filter((t) => !taken.some((b) => overlaps(t, toHHMM(toMinutes(t) + minHours * 60), b.start, b.end))),
+      ),
+    ),
+  ).sort();
   const activeStart = startTime || startChoices[0] || "";
   /** 그 시작에서 «몇 시간까지» 가능한가. 문 닫는 시각과 다음 예약 중 먼저 오는 쪽이 한계다. */
   const maxHours = (() => {

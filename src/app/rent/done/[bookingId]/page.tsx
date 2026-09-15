@@ -4,7 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import { getBooking, getSpaceFull, isRevealed, listSpacesByIds } from "@/lib/spaces";
 import { getSessionUserId, getProfileById } from "@/lib/profiles";
 import { ContactBlock } from "../../ContactBlock";
-import { dateLabel, InfoPanel, InfoRow, primaryBtnCls, secondaryBtnCls, won } from "../../ui";
+import { bookingWhen, InfoPanel, InfoRow, primaryBtnCls, secondaryBtnCls, won } from "../../ui";
 
 // 하루 가게 — 신청 완료 화면 (2026-09-14)
 //
@@ -66,13 +66,13 @@ export default async function RentDonePage({ params }: { params: Promise<{ booki
       <div className="mt-6">
         <InfoPanel>
           <InfoRow label="장소" value={<span className="font-medium text-ink">{spaceName}</span>} />
-          <InfoRow label="일정" value={`${dateLabel(b.useDate)}${b.hours ? ` · ${b.hours}` : ""}`} />
+          <InfoRow label="일정" value={bookingWhen(b)} />
           <InfoRow
             label="결제 금액"
             value={
               <>
                 <span className="font-medium text-ink">{won(b.amountTotal)}</span>
-                {b.amountMentor > 0 && <span className="text-mute"> · 사장님 시간 포함</span>}
+                {(b.amountChat > 0 || b.amountMentor > 0) && <span className="text-mute"> · 커피챗 포함</span>}
               </>
             }
           />
