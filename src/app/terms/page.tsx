@@ -107,7 +107,49 @@ export default function TermsPage() {
           </ul>
         </Article>
 
-        <Article title="제10조 (분쟁의 해결 및 준거법)">
+        {/* 🏠09-17 — 하루 가게 손님 조항. QA에서 «손님 약관에 환불 규정이 0건»이 나왔다(규정은 호스트 약관 제8조에만 있었다).
+            손님이 돈을 내는 흐름인데 손님이 동의한 우리 규정이 없으면 분쟁 때 근거가 약하다.
+            ⚠️환불표는 `src/lib/rent-payment.ts` `guestCancelRefundRate`와 호스트 약관 제8조와 «셋이 같아야» 한다. 하나를 고치면 셋 다.
+            `id="rent"` — 공간 상세·결제 화면이 `/terms#rent`로 바로 건다. */}
+        <Article id="rent" title="제10조 (하루 가게 이용)">
+          <ul className="list-disc space-y-1 pl-5">
+            <li>
+              하루 가게는 공간을 올린 호스트와 공간을 빌리는 이용자를 이어 주는 서비스입니다. 회사는 통신판매중개자로서
+              거래 당사자가 아니며, 공간과 그 이용에 대한 책임은 호스트에게 있습니다. 다만 회사는 결제·환불을 대행하고 분쟁
+              해결을 돕습니다.
+            </li>
+            <li>이용자가 결제를 마치면 예약이 완료되고, 호스트와 이용자에게 서로의 연락처가 공개됩니다.</li>
+            <li>
+              호스트는 이용 시작 전까지 예약을 거절할 수 있으며, 이 경우 결제 금액 전액이 환불됩니다. 호스트가 수락한 뒤
+              호스트 사정으로 이용이 어려워지면 회사가 양쪽에 사정을 확인한 뒤 전액 환불합니다.
+            </li>
+            <li>이용자는 이용 시작 전까지 예약을 취소할 수 있으며, 환불 금액은 아래 기준을 따릅니다.</li>
+          </ul>
+          <ul className="mt-2 list-disc space-y-1 pl-5">
+            <li>결제 후 1시간 이내 취소: 전액 환불</li>
+            <li>이용일 7일 전까지: 전액 환불</li>
+            <li>이용일 3일 전까지: 70% 환불</li>
+            <li>이용일 1일 전까지: 50% 환불</li>
+            <li>이용 당일: 환불 없음</li>
+          </ul>
+          <ul className="mt-2 list-disc space-y-1 pl-5">
+            <li>남은 날짜는 이용일을 기준으로 한국 시간 날짜로 셉니다.</li>
+            <li>환불은 결제한 수단으로 돌아가며, 결제 수단에 따라 3~5영업일이 걸릴 수 있습니다.</li>
+            <li>
+              출입 비밀번호 등 공간 이용 안내는 호스트가 이용자에게 직접 전달하며, 회사는 그 내용을 보관하지 않습니다.
+            </li>
+            <li>이용자는 호스트가 공간 상세에 적은 사용 유의 사항을 지켜야 하며, 이용 중 생긴 손해는 관련 법령에 따라 책임집니다.</li>
+          </ul>
+          <p className="mt-2 text-mute">
+            이 조항은 회사가 하루 가게의 결제를 여는 날부터 적용됩니다. 호스트에게는{" "}
+            <Link href="/terms/host" className="underline underline-offset-2">
+              공간 제공자 약관
+            </Link>
+            이 함께 적용됩니다.
+          </p>
+        </Article>
+
+        <Article title="제11조 (분쟁의 해결 및 준거법)">
           <p>
             본 약관은 대한민국 법령에 따라 해석되며, 서비스 이용과 관련하여 회사와 이용자 간 분쟁이 발생한 경우 성실히 협의하여
             해결하되, 협의가 이루어지지 않을 경우 관할 법원은 민사소송법에 따릅니다.
@@ -120,9 +162,10 @@ export default function TermsPage() {
   );
 }
 
-function Article({ title, children }: { title: string; children: React.ReactNode }) {
+function Article({ id, title, children }: { id?: string; title: string; children: React.ReactNode }) {
   return (
-    <section>
+    // scroll-mt — `/terms#rent`로 들어오면 제목이 고정 헤더 밑에 숨지 않게.
+    <section id={id} className="scroll-mt-24">
       <h2 className="text-[17px] font-bold text-ink">{title}</h2>
       <div className="mt-2 space-y-2 text-[15px] leading-relaxed text-body">{children}</div>
     </section>
