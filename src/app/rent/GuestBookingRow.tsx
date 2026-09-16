@@ -99,13 +99,21 @@ export function GuestBookingRow({ view }: { view: GuestBookingView }) {
       {/* 🩸09-16 — `pending`에도 「사장님이 수락하면…」이 붙어 있었다. 그 신청은 **사장님에게
           보이지도 않는다**(`listBookingsForHost`가 거른다). 기다릴 것이 없는데 기다리라고 말하고,
           이어서 낼 길도 없어서 목록에 쌓이기만 했다. 결제 화면은 주문번호로 되돌아갈 수 있다. */}
+      {/* ⏳날짜가 지난 미결제 신청엔 「이어서 결제하기」를 안 띄운다(09-16). 눌러도 서버가 지난 날짜를 막아서
+          (`startBookingAction`) 손님은 결제 화면에서 막다른 길을 만난다. 버튼을 거두고 사실만 말한다. */}
       {b.status === "pending" ? (
-        <p className="mt-3 text-[15px] leading-relaxed break-keep text-faint">
-          아직 결제가 끝나지 않아 사장님께 전달되지 않았어요.{" "}
-          <Link href={`/rent/pay/${b.orderId}`} className="text-body underline underline-offset-2">
-            이어서 결제하기
-          </Link>
-        </p>
+        bookingStarted(b) ? (
+          <p className="mt-3 text-[15px] leading-relaxed break-keep text-faint">
+            결제를 마치지 않은 채 날짜가 지났어요. 사장님께는 전달되지 않았어요.
+          </p>
+        ) : (
+          <p className="mt-3 text-[15px] leading-relaxed break-keep text-faint">
+            아직 결제가 끝나지 않아 사장님께 전달되지 않았어요.{" "}
+            <Link href={`/rent/pay/${b.orderId}`} className="text-body underline underline-offset-2">
+              이어서 결제하기
+            </Link>
+          </p>
+        )
       ) : open ? (
         <ContactBlock
           who="사장님"
@@ -115,9 +123,12 @@ export function GuestBookingRow({ view }: { view: GuestBookingView }) {
           shopPhone={reveal?.contactPhone}
           accessHow={reveal?.accessHow}
         />
-      ) : (
+      ) : b.status === "paid" ? (
+        // 🩸09-16 — 전엔 «열리지 않은 모든» 신청에 이 줄이 붙었다. 거절·환불·취소된 신청에도
+        //   「사장님이 수락하면…」이 떠서, 끝난 일을 기다리라고 말했다. 기다릴 게 있는 건 `paid`뿐이다.
+        //   끝난 신청은 오른쪽 상태 글자(거절됐어요·취소했어요)가 이미 말한다.
         <LockedLine text="사장님이 수락하면 주소와 연락처가 열려요." />
-      )}
+      ) : null}
 
       {b.hostMessage && (
         <p className="mt-2 text-[15px] leading-relaxed break-keep text-body">사장님 말씀 · {b.hostMessage}</p>

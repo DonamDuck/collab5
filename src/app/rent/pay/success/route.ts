@@ -24,5 +24,5 @@ export async function GET(req: NextRequest) {
 
   // 🔑완료 화면(`/rent/done/{id}`)으로 — 방금 한 그 한 건만 보여 준다. 목록(`/rent/my`)으로 떨어뜨리면
   //   「내가 방금 한 게 뭐지」가 안 잡힌다(09-14). id를 못 받은 경우(이론상 없음)만 목록으로.
-  return NextResponse.redirect(new URL(r.bookingId ? `/rent/done/${r.bookingId}` : "/rent/my", req.url));
+  return NextResponse.redirect(new URL(r.bookingId ? `/rent/done/${r.bookingId}` : "/rent/requests", req.url));
 }

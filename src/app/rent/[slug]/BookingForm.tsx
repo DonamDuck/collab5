@@ -222,7 +222,7 @@ export function BookingForm({
       if (!clientKey) {
         const done = await confirmBookingAction("", r.orderId);
         if (!done.ok) { setErr(done.message); return; }
-        router.push(done.bookingId ? `/rent/done/${done.bookingId}` : "/rent/my");
+        router.push(done.bookingId ? `/rent/done/${done.bookingId}` : "/rent/requests");
         router.refresh();
         return;
       }
