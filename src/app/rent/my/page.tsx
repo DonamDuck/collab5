@@ -211,8 +211,10 @@ export default async function MyRentPage() {
                   {b.status === "paid" && !bookingStarted(b) && (
                     <HostDecide bookingId={b.id} amountTotal={b.amountTotal} />
                   )}
-                  {/* 🙋관리자에게 환불 신청(대표 09-16) — 결제 완료·확정 예약에서. 신청이 들어가 있으면 버튼 대신 상태 한 줄. */}
-                  {(b.status === "paid" || b.status === "confirmed") &&
+                  {/* 🙋관리자에게 환불 신청(대표 09-16) — 수락해 확정한 예약에서만. 수락 전(결제 완료)엔 거절이 곧 전액 환불이라
+                      관리자를 거칠 일이 없다. 단 수락 안 한 채 이용 시간이 시작되면 거절이 막히니 그때는 신청으로 연다.
+                      신청이 들어가 있으면 버튼 대신 상태 한 줄. */}
+                  {(b.status === "confirmed" || (b.status === "paid" && bookingStarted(b))) &&
                     (b.refundRequestedAt ? (
                       <p className="mt-3 text-[15px] leading-relaxed break-keep text-lemon-on">
                         환불 신청을 받았어요. 사장님과 손님께 전화로 확인한 뒤 처리해 드릴게요.

@@ -12,6 +12,7 @@
 //   이제 화면 셋(확정·신청 완료·내 하루 가게)이 쓰는 그 항목 문법(`InfoRow`)을 여기서도 쓴다.
 import type { Profile } from "@/lib/profiles";
 import type { AccessHow } from "@/lib/types";
+import Link from "next/link";
 import { accessHowLine } from "@/lib/rent-copy";
 import { InfoList, InfoRow } from "./ui";
 
@@ -24,6 +25,7 @@ export function ContactBlock({
   accessHow,
   title = "가게 정보",
   masked = false,
+  brand,
 }: {
   /** 「사장님」 또는 「신청하신 분」 */
   who: string;
@@ -43,6 +45,8 @@ export function ContactBlock({
    *  다녀온 뒤까지 번호·메일이 열려 있을 이유가 없고, 옛 공간의 「들어오는 법」엔 출입 비밀번호가 남아 있을 수 있다.
    *  줄은 지우지 않고 「-」로 둔다 — 줄이 통째로 사라지면 «원래 없던 정보»로 읽힌다. */
   masked?: boolean;
+  /** 📎사장님이 「내 소개서 보여주기」를 켠 공간에만 넘긴다(대표 09-16). 소개서는 누구나 여는 공개 페이지라 가리지 않는다. */
+  brand?: { name: string; slug: string } | null;
 }) {
   const name = profile?.brandName?.trim() || "이름을 안 적으셨어요";
   const phone = masked ? "" : profile?.phone?.trim() ?? "";
@@ -55,6 +59,16 @@ export function ContactBlock({
       </p>
       <InfoList>
         <InfoRow label={who} value={<span className="font-medium text-ink">{name}</span>} />
+        {brand?.slug && (
+          <InfoRow
+            label="소개서"
+            value={
+              <Link href={`/m/${encodeURIComponent(brand.slug)}`} className="underline underline-offset-2">
+                {brand.name || "소개서 보기"}
+              </Link>
+            }
+          />
+        )}
         {masked ? (
           <InfoRow label="가게 전화" value={<span className="text-mute">-</span>} />
         ) : shopPhone?.trim() && (

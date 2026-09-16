@@ -11,13 +11,18 @@
 import Link from "next/link";
 import { getSpaceFull, guestSeesHost, listBookingsForGuest, listSpacesByIds, type SpaceBrief } from "@/lib/spaces";
 import { getProfileById, type Profile } from "@/lib/profiles";
+import { repo } from "@/lib/repo";
 import type { Space, SpaceBooking } from "@/lib/types";
 import { bookingFinished, bookingStarted } from "@/lib/rent-time";
 import { ContactBlock } from "./ContactBlock";
 import { GuestCancel } from "./my/Actions";
 import { BookingBadge, ListRow, bookingWhen, won } from "./ui";
 
-type Reveal = { accessNote: string; contactPhone: string; accessHow: Space["accessHow"] };
+type Reveal = {
+  accessNote: string; contactPhone: string; accessHow: Space["accessHow"];
+  /** 사장님이 「내 소개서 보여주기」를 켰을 때만 있다. */
+  brand: { name: string; slug: string } | null;
+};
 
 export type GuestBookingView = {
   booking: SpaceBooking;
@@ -47,10 +52,12 @@ export async function loadGuestBookings(uid: number): Promise<GuestBookingView[]
     Promise.all(
       Array.from(openSpaceIds).map(async (id) => {
         const full = await getSpaceFull(spaces.get(id)!.slug);
+        const maker = full?.brandSlug ? await repo.getMakerBySlug(full.brandSlug) : null;
         const r: Reveal = {
           accessNote: full?.accessNote ?? "",
           contactPhone: full?.contactPhone ?? "",
           accessHow: full?.accessHow ?? "sms",
+          brand: maker && full?.brandSlug ? { name: maker.name, slug: full.brandSlug } : null,
         };
         return [id, r] as [number, Reveal];
       }),
@@ -122,6 +129,7 @@ export function GuestBookingRow({ view }: { view: GuestBookingView }) {
           accessNote={reveal?.accessNote}
           shopPhone={reveal?.contactPhone}
           accessHow={reveal?.accessHow}
+          brand={reveal?.brand}
           // 🙈이용일이 지난 예약은 연락처를 가린다(대표 09-16)
           masked={b.status === "done" || bookingFinished(b)}
         />

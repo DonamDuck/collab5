@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { getBooking, getSpaceFull, guestSeesHost, listSpacesByIds } from "@/lib/spaces";
 import { getSessionUserId, getProfileById } from "@/lib/profiles";
+import { repo } from "@/lib/repo";
 import { ContactBlock } from "../../ContactBlock";
 import { KAKAO_CHAT_URL } from "@/lib/site";
 import { bookingFinished } from "@/lib/rent-time";
@@ -42,6 +43,9 @@ export default async function RentDonePage({ params }: { params: Promise<{ booki
   const open = guestSeesHost(b);
   const space = open && brief ? await getSpaceFull(brief.slug) : null;
   const host = open && brief ? await getProfileById(brief.ownerUserId) : null;
+  // 📎사장님이 「내 소개서 보여주기」를 켠 공간이면 소개서 링크도 같이 연다(대표 09-16).
+  const maker = space?.brandSlug ? await repo.getMakerBySlug(space.brandSlug) : null;
+  const hostBrand = maker && space ? { name: maker.name, slug: space.brandSlug } : null;
 
   // 🔁09-15 대표 — *「예약을 완료했어요」*·*「예약이 확정됐어요!」*. 「신청했어요」는 우리가 받은 일을 말하고
   //   「예약을 완료했어요」는 «그분이 해낸 일»을 말한다. 끝나는 화면에서 주어는 손님이어야 한다.
@@ -114,6 +118,7 @@ export default async function RentDonePage({ params }: { params: Promise<{ booki
             accessNote={space?.accessNote}
             shopPhone={space?.contactPhone}
             accessHow={space?.accessHow}
+            brand={hostBrand}
             // 🙈이용일이 지난 예약은 연락처를 가린다(대표 09-16)
             masked={b.status === "done" || bookingFinished(b)}
           />

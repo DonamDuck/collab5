@@ -111,7 +111,9 @@ export async function notifyBookingPaid(
 ): Promise<MailResult> {
   const guestName = displayName(guest, "손님");
   const when = dateLabel(booking.useDate);
-  const subject = `[collab5] ${withJosa(guestName, "이/가")} ${when} ${withJosa(space.name, "을/를")} 신청했어요 · ${won(booking.amountTotal)}`;
+  // 🔁09-16 대표 — 「신청했어요」 → 「예약이 들어왔어요」. phase 1에선 결제가 곧 예약 완료라 손님은 이미 «예약»을 봤다.
+  //   같은 일을 사장님만 «신청»으로 받으면 답을 안 해도 되는 일처럼 읽힌다. 손님 메일과 문장은 따로 쓴다.
+  const subject = `[collab5] ${when} ${space.name}에 예약이 들어왔어요 · ${won(booking.amountTotal)}`;
   const link = `${SITE_URL}/rent/my`;
   const brandLine = guestBrand?.slug
     ? `${guestBrand.name.trim() || guestName}\n${SITE_URL}/m/${encodeURIComponent(guestBrand.slug)}`
@@ -127,17 +129,17 @@ export async function notifyBookingPaid(
     ["받으실 돈", `${won(booking.amountPayout)} (손님이 낸 돈 ${won(booking.amountTotal)})`],
   ];
   const text = [
-    `${withJosa(guestName, "이/가")} ${when} ${withJosa(space.name, "을/를")} 신청했어요.`,
+    `${when} ${space.name}에 예약이 들어왔어요. 결제는 이미 끝났어요.`,
     ...rows.filter(([, v]) => v).map(([k, v]) => `${k}: ${v.replace(/\n/g, " ")}`),
     ``,
-    `답하러 가기: ${link}`,
-    `거절하시면 손님께 전액 돌아가요.`,
+    `예약 보러 가기: ${link}`,
+    `사정이 생기면 이용 시작 전까지 거절하실 수 있어요. 거절하시면 손님께 전액 돌아가요.`,
   ].join("\n");
   const html = layout(
-    `${withJosa(guestName, "이/가")} ${when} ${withJosa(space.name, "을/를")} 신청했어요. 결제는 이미 끝났어요.`,
+    `${when} ${space.name}에 예약이 들어왔어요. 결제는 이미 끝났어요.`,
     rows,
-    { href: link, label: "받은 신청 보기" },
-    "거절하시면 손님께 전액 돌아가요.",
+    { href: link, label: "들어온 예약 보기" },
+    "사정이 생기면 이용 시작 전까지 거절하실 수 있어요. 거절하시면 손님께 전액 돌아가요.",
   );
   return send(host?.email ?? "", subject, html, text);
 }

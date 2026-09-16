@@ -503,6 +503,10 @@ export async function requestRefundAction(bookingId: number, note: string): Prom
   const mine = await listSpacesByOwner(uid);
   if (!mine.some((x) => x.id === b.spaceId)) return { ok: false, message: "내 공간의 예약만 신청할 수 있어요." };
   if (b.status !== "paid" && b.status !== "confirmed") return { ok: false, message: "이미 끝난 예약이에요." };
+  // 수락 전(결제 완료)이고 아직 시작 전이면 거절이 곧 전액 환불이다. 관리자 승인은 확정 뒤에만 거친다(대표 09-16).
+  if (b.status === "paid" && !bookingStarted(b)) {
+    return { ok: false, message: "아직 수락 전이라 거절하시면 손님께 바로 전액 돌아가요." };
+  }
   if (b.refundRequestedAt) return { ok: true, message: "이미 신청하셨어요. 저희가 곧 연락드릴게요." };
   const saved = await requestRefund(bookingId, note.trim());
   if (!saved) return { ok: false, message: "신청을 받지 못했어요. 잠시 뒤 다시 시도해 주세요." };

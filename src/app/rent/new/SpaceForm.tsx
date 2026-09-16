@@ -156,7 +156,10 @@ export function SpaceForm({
   const [chatTopics, setChatTopics] = useState(initial?.coffeeChatTopics ?? "");
   const [openSlots, setOpenSlots] = useState<OpenSlot[]>(initial?.openSlots ?? []);
   const [termsOk, setTermsOk] = useState(!!initial?.hostTermsAt);
-  const [brandSlug, setBrandSlug] = useState(initial?.brandSlug ?? defaultBrandSlug);
+  // 📎소개서 보여주기 토글(대표 09-16). 끄면 저장값은 빈 문자열이지만 고른 소개서는 기억해 둬서, 다시 켜면 그대로 돌아온다.
+  const [brandOn, setBrandOn] = useState(initial ? !!initial.brandSlug : !!defaultBrandSlug);
+  const [brandPick, setBrandPick] = useState(initial?.brandSlug || defaultBrandSlug || myBrands[0]?.slug || "");
+  const brandSlug = brandOn ? brandPick : "";
 
   // ⚠️`payout()`을 import하지 않고 식을 옮겨 적었다 — 그 함수는 `lib/spaces.ts`에 있고, 그 파일은
   //   supabase 클라이언트를 끌고 온다. 클라이언트 번들에 데이터 계층 한 벌이 통째로 실린다.
@@ -753,21 +756,50 @@ export function SpaceForm({
           </p>
         </div>
 
+        {/* 📎09-16 대표 — 소개서가 있는 사장님은 손님에게 보여줄지 «고른다». 켜면 공간 화면엔 브랜드 이름만,
+            결제를 마친 손님의 예약 내역엔 소개서 링크까지 열린다(연락처가 같이 열리는 시점이라 새는 게 없다). */}
         {myBrands.length > 0 && (
-          <L label="소개서 붙이기" htmlFor="sp-brand" optional hint="이름만 보여드려요. 연락처는 안 나가요.">
-            <RentSelect
-              id="sp-brand"
-              value={brandSlug}
-              onChange={(e) => setBrandSlug(e.target.value)}
-            >
-              <option value="">안 붙일래요</option>
-              {myBrands.map((b) => (
-                <option key={b.slug} value={b.slug}>
-                  {b.name}
-                </option>
+          <div>
+            <p className="text-[16px] font-medium leading-[28px] text-body">내 소개서 보여주기</p>
+            <p className="mt-1 text-[15px] leading-relaxed break-keep text-mute">
+              공간 화면에는 브랜드 이름만 나가요. 소개서 링크는 결제를 마친 손님께만 보여요.
+            </p>
+            <div role="radiogroup" aria-label="소개서 보여주기" className="mt-3 flex gap-2">
+              {[
+                { v: false, label: "안 보여요" },
+                { v: true, label: "보여요" },
+              ].map((o) => (
+                <button
+                  key={String(o.v)}
+                  type="button"
+                  role="radio"
+                  aria-checked={brandOn === o.v}
+                  onClick={() => setBrandOn(o.v)}
+                  className={`inline-flex h-[44px] min-w-[88px] items-center justify-center rounded-pill px-5 text-[15px] font-medium transition-colors ${
+                    brandOn === o.v
+                      ? "bg-primary-tint text-primary-on"
+                      : "border-[0.5px] border-[#DFDFE3] bg-surface text-body hover:bg-surface-soft"
+                  }`}
+                >
+                  {o.label}
+                </button>
               ))}
-            </RentSelect>
-          </L>
+            </div>
+            {/* 소개서가 둘 이상일 때만 고르게 한다. 하나면 고를 것이 없다. */}
+            {brandOn && myBrands.length > 1 && (
+              <div className="mt-4">
+                <L label="어떤 소개서를 보여줄까요" htmlFor="sp-brand">
+                  <RentSelect id="sp-brand" value={brandPick} onChange={(e) => setBrandPick(e.target.value)}>
+                    {myBrands.map((b) => (
+                      <option key={b.slug} value={b.slug}>
+                        {b.name}
+                      </option>
+                    ))}
+                  </RentSelect>
+                </L>
+              </div>
+            )}
+          </div>
         )}
       </Group>
 
