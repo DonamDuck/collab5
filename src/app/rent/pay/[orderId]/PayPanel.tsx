@@ -110,8 +110,17 @@ export function PayPanel({
         // 사용자가 창을 닫으면 SDK가 던진다. 그건 사고가 아니라 「안 하기로 함」이다.
         const code = (e as { code?: string })?.code;
         if (code === "USER_CANCEL") return;
-        console.error("[rent] requestPayment failed", code, (e as Error)?.message);
-        setErr("결제를 진행하지 못했어요. 잠시 뒤 다시 시도해 주세요.");
+        const tossMsg = (e as Error)?.message?.trim();
+        console.error("[rent] requestPayment failed", code, tossMsg);
+        // 🩸09-16 대표 QA — 카드 세부(할부·카드사)를 안 고르고 누르면 토스가 「카드 결제 정보를 선택해주세요」를
+        //   돌려주는데, 우리는 「잠시 뒤 다시 시도해 주세요」로 뭉뚱그렸다. 기다릴 일이 아니라 «지금 고르면» 되는 상황이다.
+        //   토스 문장은 손님에게 바로 보여도 되는 말로 온다. `NEED_`로 시작하는 건 «손님이 채울 게 남았다»는 뜻이라 그대로 보여 준다.
+        //   그 밖의 실패는 무슨 일인지 모르니 지금처럼 다시 시도하라고 말한다.
+        setErr(
+          code?.startsWith("NEED_") && tossMsg
+            ? tossMsg
+            : "결제를 진행하지 못했어요. 잠시 뒤 다시 시도해 주세요.",
+        );
       }
     });
 
