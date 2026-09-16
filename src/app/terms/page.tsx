@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 
 export const metadata: Metadata = {
   title: "이용약관 — collab5",
@@ -17,6 +18,16 @@ export default function TermsPage() {
       <p className="mt-3 text-[15px] leading-relaxed text-mute">
         본 약관은 collab5(이하 &lsquo;회사&rsquo;)가 제공하는 브랜드 소개서 및 콜라보 연결 서비스(이하 &lsquo;서비스&rsquo;)의 이용과
         관련하여 회사와 이용자 간의 권리·의무 및 책임사항을 규정합니다.
+      </p>
+      {/* 🏠하루 가게에 공간을 올리는 분께는 약관이 하나 더 있다(2026-09-16).
+          호스트 약관 머리말이 「이용약관과 함께 적용된다」고 말하는데, 정작 이쪽에서 그리로 가는 길이 없었다.
+          한 문서가 다른 문서를 전제하면 양쪽에서 서로 찾아갈 수 있어야 한다. */}
+      <p className="mt-2 text-[15px] leading-relaxed text-mute">
+        하루 가게에 공간을 올리시는 분께는{" "}
+        <Link href="/terms/host" className="underline underline-offset-4">
+          공간 제공자 약관
+        </Link>
+        도 함께 적용돼요.
       </p>
 
       <div className="mt-10 space-y-9">
