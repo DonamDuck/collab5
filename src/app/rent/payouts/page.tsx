@@ -10,6 +10,8 @@ import { isRentAdmin } from "@/lib/rent-actions";
 import type { Payment, PayoutStatus, SpaceBooking } from "@/lib/types";
 import { bookingWhen, won } from "../ui";
 import { RefundDecision } from "./RefundDecision";
+import { listPayoutAccounts, type PayoutAccount } from "@/lib/payout-accounts";
+import { bankName, HOLDER_TYPE_LABEL } from "@/lib/banks";
 
 // 하루 가게 — 정산 (2026-09-16) · 대표만
 //
@@ -30,7 +32,7 @@ export const metadata: Metadata = {
 };
 
 type Row = { payment: Payment; booking: SpaceBooking | null };
-type SellerGroup = { sellerId: number; profile: Profile | null; rows: Row[] };
+type SellerGroup = { sellerId: number; profile: Profile | null; rows: Row[]; account?: PayoutAccount };
 
 /** 판매자별로 묶는다 — 지급은 사람 단위로 나간다. */
 async function groupBySeller(rows: Row[]): Promise<SellerGroup[]> {
@@ -43,6 +45,10 @@ async function groupBySeller(rows: Row[]): Promise<SellerGroup[]> {
   }
   const groups = Array.from(map.values());
   await Promise.all(groups.map(async (g) => { g.profile = g.sellerId > 0 ? await getProfileById(g.sellerId) : null; }));
+  // 🏦정산 받을 계좌(09-17). 🔒원문 계좌번호를 읽는 «유일한» 화면이다 — 이 페이지는 첫 줄에서 `isRentAdmin`으로 막힌다.
+  //   돈을 보내려면 번호 전체가 필요해서 여기서만 가리지 않는다.
+  const accounts = await listPayoutAccounts(groups.map((g) => g.sellerId));
+  for (const g of groups) g.account = accounts.get(g.sellerId);
   return groups;
 }
 
@@ -204,6 +210,18 @@ function SellerBlock({ group, spaces }: { group: SellerGroup; spaces: Map<number
         <div className="min-w-0">
           <p className="truncate text-[17px] font-medium text-ink">{p?.brandName?.trim() || "이름을 안 적으셨어요"}</p>
           <p className="mt-0.5 text-[15px] break-all text-mute">{contact || "연락처가 없어요"}</p>
+          <p className="mt-0.5 text-[15px] break-all text-mute">
+            {group.account ? (
+              <>
+                {bankName(group.account.bankCode) || group.account.bankCode}{" "}
+                <span className="tabular-nums text-body">{group.account.accountNumber}</span>
+                {" · "}예금주 {group.account.holderName} ({HOLDER_TYPE_LABEL[group.account.holderType]}
+                {group.account.businessNumber ? ` ${group.account.businessNumber}` : ""})
+              </>
+            ) : (
+              <span className="text-lemon-on">계좌 없음</span>
+            )}
+          </p>
         </div>
         <p className="shrink-0 text-[17px] font-medium tabular-nums text-ink">{won(sum(group.rows))}</p>
       </div>

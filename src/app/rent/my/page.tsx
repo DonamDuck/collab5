@@ -5,7 +5,9 @@ import { getSessionUserId, getProfileById, type Profile } from "@/lib/profiles";
 import { repo } from "@/lib/repo";
 import type { Space } from "@/lib/types";
 import { isRentAdmin } from "@/lib/rent-actions";
-import { HostDecide, PublishButton, RefundRequest } from "./Actions";
+import { HostDecide, PauseToggle, PublishButton, RefundRequest } from "./Actions";
+import { PayoutAccount } from "./PayoutAccount";
+import { getPayoutAccount, toMasked } from "@/lib/payout-accounts";
 import { ContactBlock } from "../ContactBlock";
 import { bookingFinished, bookingStarted } from "@/lib/rent-time";
 import type { SpaceBooking } from "@/lib/types";
@@ -105,6 +107,10 @@ export default async function MyRentPage({
   void me;
   const hostBookings = hostOrder(hostBookingsRaw);
   const admin = await isRentAdmin();
+  // 🏦정산 받을 계좌(09-17). 🔒원문은 여기서 바로 마스킹본으로 줄인다 — 화면 컴포넌트로 번호 원문이 안 넘어간다.
+  //   공간이 없는 분에겐 읽지도 않는다(절 자체가 안 뜬다).
+  const payoutRaw = mySpaces.length > 0 ? await getPayoutAccount(uid) : null;
+  const payoutAccount = payoutRaw ? toMasked(payoutRaw) : null;
 
   const spaceById = new Map<number, Space>(mySpaces.map((sp) => [sp.id, sp]));
   // 🔑연락처 조회는 **열린 예약 것만** 한다. 전부 미리 읽어 두고 화면에서 가리는 방식은,
@@ -224,11 +230,23 @@ export default async function MyRentPage({
               >
                 {/* 대표에게만 보이는 손잡이. 남의 등록을 세상에 내보내는 판정이라 화면에도 문을 둔다. */}
                 {admin && sp.status === "pending" && <PublishButton slug={sp.slug} />}
+                {/* ⏸잠시 쉬기 / 다시 열기(09-17). 검토 대기·작성 중엔 안 뜬다 — 서버도 open↔paused만 받는다. */}
+                {(sp.status === "open" || sp.status === "paused") && (
+                  <PauseToggle slug={sp.slug} paused={sp.status === "paused"} />
+                )}
               </Row>
             ))}
           </ul>
         )}
       </section>
+
+      {/* ── ①' 정산 받을 계좌 (09-17) ── 공간을 올린 분에게만. 🔗메일·확정 줄이 `#payout-account`로 곧장 내려온다. */}
+      {mySpaces.length > 0 && (
+        <section id="payout-account" className="mt-12 scroll-mt-20">
+          <h2 className={h2Cls}>정산 받을 계좌</h2>
+          <PayoutAccount initial={payoutAccount} />
+        </section>
+      )}
 
       {/* ── ② 들어온 요청 ── */}
       <section className="mt-12">
@@ -324,6 +342,15 @@ export default async function MyRentPage({
                     ) : (
                       <RefundRequest bookingId={b.id} />
                     ))}
+
+                  {/* 🏦수락한 예약인데 계좌가 없으면 한 줄(09-17). 이용일이 지나도 보낼 곳이 없다. 날짜 약속은 안 한다. */}
+                  {!payoutAccount && (b.status === "confirmed" || b.status === "done") && (
+                    <p className="mt-2 text-[15px] leading-relaxed break-keep text-lemon-on">
+                      <Link href="#payout-account" className="underline underline-offset-2">
+                        정산 받을 계좌를 등록해 주세요
+                      </Link>
+                    </p>
+                  )}
 
                   {didLine && (
                     <p role="status" className="mt-3 text-[15px] leading-relaxed break-keep text-mint-on">
