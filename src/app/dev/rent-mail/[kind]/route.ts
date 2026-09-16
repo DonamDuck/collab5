@@ -60,7 +60,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ kind
     : `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(mail.subject)}</title>
 <body style="margin:0;background:#f4f4f5;font-family:-apple-system,sans-serif">
 <div style="max-width:640px;margin:0 auto;padding:16px">
-  <p style="margin:0 0 4px;font-size:13px;color:#888"><a href="/dev/rent-map#mail" style="color:#888">← 지도로</a> · 받는 사람 ${esc(mail.to || "(없음)")} · 보내지 않은 미리보기</p>
+  <p style="margin:0 0 4px;font-size:13px;color:#888;word-break:break-all"><a href="/dev/rent-map#mail" style="color:#888">← 지도로</a> · 받는 사람 ${esc(mail.to || "(없음)")} · 보내지 않은 미리보기</p>
   <p style="margin:0 0 12px;font-size:16px;font-weight:600;color:#222">${esc(mail.subject)}</p>
   <div style="background:#fff;border-radius:12px;padding:20px">${mail.html}</div>
   <details style="margin-top:12px;font-size:13px;color:#555"><summary>글자만 받는 메일함에서 보이는 모양</summary><pre style="white-space:pre-wrap">${esc(mail.text)}</pre></details>
