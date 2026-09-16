@@ -13,7 +13,7 @@ import { KAKAO_CHAT_URL, SITE_URL } from "./site";
 import { bookingWhen, dateLabel } from "./rent-time";
 import {
   accessHowLine, hostContactLine, withJosa, CONTACT_RULE_GUEST, CONTACT_RULE_HOST,
-  BOOKING_HEADLINE, COFFEE_CHAT_WHEN_GUEST, COFFEE_CHAT_WHEN_HOST,
+  BOOKING_HEADLINE, COFFEE_CHAT_WHEN_GUEST, COFFEE_CHAT_WHEN_HOST, HOST_REQUEST_STEPS,
 } from "./rent-copy";
 import type { Space, SpaceBooking } from "./types";
 import type { Profile } from "./profiles";
@@ -111,6 +111,9 @@ const REFUND_TIMING_LINE = "결제한 수단으로 3~5일 안에 돌아가요.";
 function spaceLink(space: Space): string {
   return `${SITE_URL}/rent/${encodeURIComponent(space.slug)}`;
 }
+
+/** 🏦사장님이 정산 계좌를 등록하는 자리(09-17). `/rent/my`의 그 절로 곧장 내려간다. */
+const PAYOUT_ACCOUNT_LINK = `${SITE_URL}/rent/my#payout-account`;
 
 /** 취소·환불 규정 한 줄. 상세 페이지 «환불 규정» 절과 호스트 약관 제8조의 숫자 그대로다 — 바뀌면 셋 다. */
 const CANCEL_POLICY_LINE =
@@ -244,6 +247,8 @@ function hostTodoLine(how: Space["accessHow"]): string {
 /** ②' 수락 → 사장님 (09-16). 누른 것이 잘 들어갔다는 확인과, 그날 필요한 손님 연락처. */
 export async function notifyBookingConfirmedToHost(
   booking: SpaceBooking, space: Space, host: Profile | null, guest: Profile | null,
+  /** 🏦정산 받을 계좌가 있나(09-17). 모르면 undefined — 그땐 말하지 않는다(없는 줄 알고 조르지 않게). */
+  hasPayoutAccount?: boolean,
 ): Promise<MailResult> {
   const guestName = displayName(guest, "손님");
   const when = dateLabel(booking.useDate);
@@ -272,6 +277,8 @@ export async function notifyBookingConfirmedToHost(
     ["그날까지", `${hostTodoLine(space.accessHow)} ${CONTACT_RULE_HOST}`],
     ["커피챗", boughtChat(booking) ? `손님이 커피챗도 함께 골랐어요. ${COFFEE_CHAT_WHEN_HOST}` : ""],
     ["받으실 돈", won(booking.amountPayout)],
+    // 🏦09-17 — 계좌가 없으면 이용일 뒤에 보낼 곳이 없다. 정산 날짜는 말하지 않는다(토스 계약 뒤 대표가 정한다).
+    ["정산 계좌", hasPayoutAccount === false ? `정산 받을 계좌를 등록해 주세요. ${PAYOUT_ACCOUNT_LINK}` : ""],
   ];
   const text = [
     lead,
@@ -421,4 +428,98 @@ export async function notifyAdminRefund(
     send(guest?.email ?? "", gSubject, gHtml, gText),
     send(host?.email ?? "", hSubject, hHtml, hText),
   ]);
+}
+
+/** ⑥ 공간 공개 → 사장님 (09-17). 검토를 마치고 목록에 올렸다는 소식과, 요청이 오면 할 일.
+ *  ⚠️호출부가 «원래 공개가 아니었을 때만» 부른다. 이미 열린 공간을 또 누르면 메일이 또 가면 안 된다. */
+export async function notifySpacePublished(
+  space: Space, host: Profile | null, hasPayoutAccount?: boolean,
+): Promise<MailResult> {
+  const subject = `[collab5] ${space.name} · 하루 가게 목록에 올라갔어요`;
+  const link = spaceLink(space);
+  const lead = `${space.name} 공간을 하루 가게 목록에 열어 드렸어요. 이제 손님들이 보고 예약할 수 있어요.`;
+  // 네 단계는 순서가 곧 정보라 번호를 붙인다(`HOST_REQUEST_STEPS` 주석과 같은 이유).
+  const steps = HOST_REQUEST_STEPS.map((line, i) => `${i + 1}. ${line}`).join("\n");
+  const rows: [string, string][] = [
+    ["앞으로 할 일", steps],
+    ["정산 계좌", hasPayoutAccount === false ? `아직 등록 전이에요. 손님이 이용한 날이 지나면 받으실 돈을 보낼 곳이라 미리 적어 두세요. ${PAYOUT_ACCOUNT_LINK}` : ""],
+  ];
+  const tail = "가게 사정으로 한동안 쉬고 싶으면 내 하루 가게에서 「잠시 쉬기」를 눌러 두세요. 목록에서만 빠지고 이미 받은 예약은 그대로예요.";
+  const text = [
+    lead,
+    ...rows.filter(([, v]) => v).map(([k, v]) => `${k}: ${v}`),
+    ``,
+    `내 공간 보기: ${link}`,
+    tail,
+  ].join("\n");
+  const html = layout(lead, rows, { href: link, label: "내 공간 보기" }, tail);
+  return send(host?.email ?? "", subject, html, text);
+}
+
+/** ⑦ 이용 전날 → 손님 (09-17). 내일 몇 시 어디인지, 누구에게 연락하면 되는지.
+ *  우리는 사장님이 안내를 보냈는지 모른다(기록이 없다). 그래서 «못 받았으면» 갈 곳만 열어 둔다. */
+export async function notifyRemindGuest(
+  booking: SpaceBooking, space: Space, host: Profile | null, guest: Profile | null,
+): Promise<MailResult> {
+  const hostName = displayName(host, "사장님");
+  const start = booking.startTime || "";
+  const subject = `[collab5] 내일${start ? ` ${start}` : ""} ${space.name} 예약이 있어요`;
+  const link = `${SITE_URL}/rent/requests`;
+  const contact = hostContactLine(space.contactPhone, host?.phone, host?.email);
+  const lead = `내일은 ${space.name} 예약한 날이에요. 시간과 주소를 한 번 더 적어 둘게요.`;
+  const rows: [string, string][] = [
+    ["언제", bookingWhen(booking)],
+    ["공간", space.name],
+    ["주소", space.address],
+    ["사장님", `${hostName} · ${contact}`],
+    ["커피챗", boughtChat(booking) ? COFFEE_CHAT_WHEN_GUEST : ""],
+    ["공간 페이지", spaceLink(space)],
+  ];
+  const tail = `사장님께 이용 안내를 아직 못 받으셨나요? 카카오톡으로 알려 주시면 저희가 사장님께 먼저 연락해 볼게요. ${KAKAO_CHAT_URL}`;
+  const text = [
+    lead,
+    ...rows.filter(([, v]) => v).map(([k, v]) => `${k}: ${v}`),
+    ``,
+    `예약 내역: ${link}`,
+    tail,
+  ].join("\n");
+  const html = layout(lead, rows, { href: link, label: "예약 내역 보기" }, tail);
+  return send(guest?.email ?? "", subject, html, text);
+}
+
+/** ⑦' 이용 전날 → 사장님 (09-17). 내일 누가 몇 시에 오는지와 오늘 챙길 것.
+ *  🔒손님 번호는 «수락한 예약»에만 싣는다. 사장님 쪽 연락처 문은 `isRevealed`(수락 뒤) 하나다 —
+ *    리마인드가 그 문을 옆으로 열면 수락 버튼의 뜻이 사라진다. 수락 전이면 수락하러 갈 곳을 말한다. */
+export async function notifyRemindHost(
+  booking: SpaceBooking, space: Space, host: Profile | null, guest: Profile | null,
+): Promise<MailResult> {
+  const guestName = displayName(guest, "손님");
+  const start = booking.startTime || "";
+  const subject = `[collab5] 내일${start ? ` ${start}` : ""} ${space.name} · ${guestName}`;
+  const link = `${SITE_URL}/rent/my`;
+  const accepted = booking.status === "confirmed";
+  const gPhone = booking.guestPhone?.trim() || guest?.phone?.trim() || "";
+  const gEmail = guest?.email?.trim() ?? "";
+  const guestContact = accepted ? [gPhone, gEmail].filter(Boolean).join(" · ") || "연락처를 안 남기셨어요" : "";
+  const lead = accepted
+    ? `내일 ${space.name}에 손님이 와요. 손님 연락처와 오늘 챙기실 일을 적어 뒀어요.`
+    : `내일 ${space.name}에 손님이 와요. 아직 수락 전인 예약이라, 오늘 들어가서 수락해 주세요.`;
+  const rows: [string, string][] = [
+    ["언제", bookingWhen(booking)],
+    ["누가", guestName],
+    ["연락처", guestContact],
+    ["무엇을", booking.plan],
+    ["오늘 챙길 일", accepted
+      ? `${hostTodoLine(space.accessHow)} 아직 못 하셨다면 오늘 챙겨 두시면 내일이 편해요.`
+      : "결제는 끝났고 손님은 내일 오세요. 수락하시면 손님 연락처가 열리니, 그때 이용 안내를 보내 주세요."],
+    ["커피챗", boughtChat(booking) ? COFFEE_CHAT_WHEN_HOST : ""],
+  ];
+  const text = [
+    lead,
+    ...rows.filter(([, v]) => v).map(([k, v]) => `${k}: ${v}`),
+    ``,
+    `내 하루 가게: ${link}`,
+  ].join("\n");
+  const html = layout(lead, rows, { href: link, label: accepted ? "내 하루 가게 보기" : "수락하러 가기" });
+  return send(host?.email ?? "", subject, html, text);
 }

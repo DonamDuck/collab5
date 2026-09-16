@@ -8,14 +8,16 @@ import {
   setBookingStatus, listSpacesByOwner, listSpacesByIds, payout, FEE_RATE,
   createPayment, getPaymentByOrderId, rentSync,
   type SpaceSaveInput,
-  listLiveBookings,
+  listLiveBookings, setSpaceStatus,
 } from "./spaces";
+import { hasPayoutAccount, savePayoutAccount, toMasked, validatePayoutInput, type PayoutAccountInput, type PayoutAccountMasked } from "./payout-accounts";
 import { approvePayment, cancelPayment, guestCancelRefundRate, GRACE_MINUTES } from "./rent-payment";
 import { geocode } from "./geocode";
 import { repo } from "./repo";
 import {
   notifyBookingPaid, notifyBookingConfirmed, notifyBookingRejected, notifyBookingCancelled,
   notifyBookingPaidToGuest, notifyBookingConfirmedToHost, notifyBookingCancelledToGuest, notifyAdminRefund,
+  notifySpacePublished,
 } from "./rent-notify";
 import { bookingStarted, dateLabel, kstDaysUntil, hoursBetween, fitsOpenSlot, nowHhmmKst, overlaps, toMinutes, todayKst } from "./rent-time";
 import type { Space, SpaceBooking, SpaceUseType, SpaceCategory, SpaceScope, OpenSlot, AccessHow } from "./types";
@@ -172,7 +174,60 @@ export async function publishSpaceAction(slug: string): Promise<ActionResult> {
   if (!sp) return { ok: false, message: "그 공간을 찾지 못했어요." };
   const saved = await saveSpace({ ...sp, status: "open" });
   revalidatePath("/rent");
-  return saved ? { ok: true, message: "공개했어요.", slug } : { ok: false, message: "실패했어요." };
+  if (!saved) return { ok: false, message: "실패했어요." };
+  // 📨09-17 대표 — 공개되면 사장님께 한 통. 🪤버튼을 두 번 누르거나 이미 열린 공간에 다시 누르면
+  //   이 함수가 또 불린다. «원래 공개가 아니었을 때만» 보낸다. 메일이 실패해도 공개는 그대로 성공이다.
+  if (sp.status !== "open") {
+    await safeNotify(async () => {
+      const [host, hasAccount] = await Promise.all([getProfileById(sp.ownerUserId), hasPayoutAccount(sp.ownerUserId)]);
+      await notifySpacePublished(saved, host, hasAccount);
+    });
+  }
+  return { ok: true, message: "공개했어요.", slug };
+}
+
+/** ⏸공간 잠시 쉬기 / 다시 열기 — 주인만(09-17). `open` ↔ `paused` 둘만 오간다.
+ *  검토 대기(`pending`)·작성 중(`draft`)은 여기서 못 바꾼다. 쉬기로 검토를 건너뛰는 길이 생기면 안 된다. */
+export async function setSpacePausedAction(slug: string, paused: boolean): Promise<ActionResult> {
+  const uid = await getSessionUserId();
+  if (!uid) return { ok: false, message: "로그인이 필요해요." };
+  const sp = await getSpaceFull(slug);
+  if (!sp) return { ok: false, message: "그 공간을 찾지 못했어요." };
+  if (sp.ownerUserId !== uid) return { ok: false, message: "내 공간만 바꿀 수 있어요." };
+  const from = paused ? "open" : "paused";
+  if (sp.status === (paused ? "paused" : "open")) {
+    return { ok: true, message: paused ? "이미 쉬는 중이에요." : "이미 열려 있어요.", slug };
+  }
+  if (sp.status !== from) {
+    return { ok: false, message: "검토가 끝나 공개된 공간만 쉬거나 다시 열 수 있어요.", slug };
+  }
+  const changed = await setSpaceStatus(slug, from, paused ? "paused" : "open");
+  if (!changed) return { ok: false, message: "바꾸지 못했어요. 잠시 뒤 다시 눌러 주세요." };
+  revalidatePath("/rent");
+  revalidatePath(`/rent/${slug}`);
+  revalidatePath("/rent/my");
+  // ⭐쉬어도 이미 결제된 예약은 살아 있다. 사장님이 「쉬면 예약도 사라지나」를 걱정하지 않게 결과에서 말한다.
+  return paused
+    ? { ok: true, message: "잠시 쉬게 해 뒀어요. 목록에서만 빠지고, 이미 받은 예약은 그대로 살아 있어요.", slug }
+    : { ok: true, message: "다시 열었어요. 목록에 바로 보여요.", slug };
+}
+
+/** 🏦정산 받을 계좌 저장 — 로그인 + 공간을 하나 이상 올린 사람만(09-17).
+ *  🔒응답에 계좌번호 원문을 싣지 않는다. 화면이 받는 건 뒷자리만 남긴 모양(`PayoutAccountMasked`)이다. */
+export async function savePayoutAccountAction(
+  input: PayoutAccountInput,
+): Promise<ActionResult & { account?: PayoutAccountMasked }> {
+  const uid = await getSessionUserId();
+  if (!uid) return { ok: false, message: "로그인이 필요해요." };
+  const mine = await listSpacesByOwner(uid);
+  if (mine.length === 0) return { ok: false, message: "공간을 올리신 뒤에 계좌를 등록할 수 있어요." };
+  const v = validatePayoutInput(input);
+  if (!v.ok) return { ok: false, message: v.message };
+  const saved = await savePayoutAccount(uid, v.value);
+  if (!saved) return { ok: false, message: "저장하지 못했어요. 잠시 뒤 다시 시도해 주세요." };
+  revalidatePath("/rent/my");
+  revalidatePath("/rent/payouts");
+  return { ok: true, message: "계좌를 저장했어요.", account: toMasked(saved) };
 }
 
 export interface BookingFormInput {
@@ -417,7 +472,8 @@ export async function decideBookingAction(
     if (!p) return;
     // 📨대표 09-16 — 예약 확정 때 손님과 사장님 둘 다.
     await notifyBookingConfirmed(decided, p.space, p.host, p.guest);
-    await notifyBookingConfirmedToHost(decided, p.space, p.host, p.guest);
+    // 🏦계좌가 없으면 메일에 등록 한 줄이 붙는다(09-17).
+    await notifyBookingConfirmedToHost(decided, p.space, p.host, p.guest, await hasPayoutAccount(uid));
   });
   return { ok: true, message: "수락했어요. 아래에 손님 연락처가 열렸어요." };
 }

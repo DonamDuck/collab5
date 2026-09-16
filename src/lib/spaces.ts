@@ -116,6 +116,7 @@ function toBooking(r: Row): SpaceBooking {
     status: (s(r.status) || "paid") as BookingStatus,
     hostMessage: s(r.host_message),
     decidedAt: r.decided_at ? s(r.decided_at) : undefined,
+    remindedAt: r.reminded_at ? s(r.reminded_at) : undefined,
     createdAt: s(r.created_at), updatedAt: s(r.updated_at),
   };
 }
@@ -235,6 +236,18 @@ export async function saveSpace(input: SpaceSaveInput): Promise<Space | null> {
   const { data, error } = await c.from("spaces").upsert(row, { onConflict: "slug" }).select().maybeSingle();
   if (error) { console.error(`[spaces] save failed slug=${input.slug}: ${error.message}`); return null; }
   return data ? toSpace(data as Row) : null;
+}
+
+/** 상태 한 칸만 옮긴다 — «지금 `from`일 때만» `to`로(09-17 잠시 쉬기).
+ *  ⭐행 전체를 다시 쓰는 `saveSpace`를 안 쓴다. 사장님이 옆 탭에서 고치는 중이면 그 내용을 옛 값으로 덮는다.
+ *  참 = 이번에 바뀌었다. 거짓 = 이미 다른 상태였거나 실패. 권한은 호출부가 확인한다. */
+export async function setSpaceStatus(slug: string, from: SpaceStatus, to: SpaceStatus): Promise<boolean> {
+  const c = db();
+  if (!c) return false;
+  const { data, error } = await c.from("spaces").update({ status: to })
+    .eq("slug", slug).eq("status", from).select("id");
+  if (error) { console.error(`[spaces] setSpaceStatus failed slug=${slug}: ${error.message}`); return false; }
+  return (data ?? []).length === 1;
 }
 
 // 🔻하루 단위로 「그날을 판매 목록에서 빼던」 함수는 09-16에 지웠다. 시간 단위로 바뀌면서 할 일이 사라졌다.
@@ -363,6 +376,35 @@ export async function setBookingStatus(id: number, status: BookingStatus): Promi
   const c = db();
   if (!c) return;
   await c.from("space_bookings").update({ status }).eq("id", id);
+}
+
+// ─── 이용 전날 리마인드 (2026-09-17) ───
+
+/** 그날(대개 «내일») 이용하는 살아 있는 예약 중 아직 리마인드를 안 보낸 것.
+ *  ⚠️`paid`도 넣는다 — phase 1은 결제가 곧 예약이라 사장님이 수락을 안 눌렀어도 손님은 온다.
+ *  환불 신청이 걸린 예약도 뺀다. 우리가 전화로 확인하는 중이라 「내일 뵈어요」가 엇나갈 수 있다. */
+export async function listBookingsToRemind(useDate: string): Promise<SpaceBooking[]> {
+  const c = db();
+  if (!c) return [];
+  const { data, error } = await c.from("space_bookings").select("*")
+    .eq("use_date", useDate).in("status", ["paid", "confirmed"])
+    .is("reminded_at", null).is("refund_requested_at", null)
+    .order("start_time", { ascending: true });
+  if (error) { console.error(`[spaces] listBookingsToRemind failed date=${useDate}: ${error.message}`); return []; }
+  return (data ?? []).map((r) => toBooking(r as Row));
+}
+
+/** 보냈다고 적는다. ⭐`reminded_at is null`인 행만 — 작업이 겹쳐 두 번 돌아도 먼저 적은 쪽만 참을 받는다.
+ *  참 = 이번에 내가 적었다. 거짓 = 이미 적혀 있었거나 실패. */
+export async function markReminded(bookingId: number): Promise<boolean> {
+  const c = db();
+  if (!c) return false;
+  const { data, error } = await c.from("space_bookings")
+    .update({ reminded_at: new Date().toISOString() })
+    .eq("id", bookingId).is("reminded_at", null)
+    .select("id");
+  if (error) { console.error(`[spaces] markReminded failed id=${bookingId}: ${error.message}`); return false; }
+  return (data ?? []).length === 1;
 }
 
 // ─── 결제 (2026-09-16) ───

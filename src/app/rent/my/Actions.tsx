@@ -19,6 +19,7 @@ import {
   quoteCancelAction,
   publishSpaceAction,
   requestRefundAction,
+  setSpacePausedAction,
 } from "@/lib/rent-actions";
 import { InfoList, InfoRow, primaryBtnCls, rentTextareaCls, secondaryBtnCls, won } from "../ui";
 import { ConfirmDialog } from "../ConfirmDialog";
@@ -297,6 +298,54 @@ export function RefundRequest({ bookingId }: { bookingId: number }) {
           placeholder="어떤 사정인지 짧게 남겨 주시면 전화드릴 때 도움이 돼요 (선택)"
           aria-label="환불 신청 사유"
         />
+      </ConfirmDialog>
+    </div>
+  );
+}
+
+/** ⏸공간 잠시 쉬기 / 다시 열기 (09-17). 공개 중(`open`)·쉬는 중(`paused`)에만 뜬다 — 서버도 그 둘만 받는다.
+ *  쉬기는 한 번 묻는다. 목록에서 빠지는 일이라 실수로 누르면 그동안 손님이 못 찾는다.
+ *  다시 열기는 바로 한다. 잘못 눌러도 잃는 게 없다. */
+export function PauseToggle({ slug, paused }: { slug: string; paused: boolean }) {
+  const router = useRouter();
+  const [pending, start] = useTransition();
+  const [ask, setAsk] = useState(false);
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
+  const run = (next: boolean) =>
+    start(async () => {
+      setAsk(false);
+      setMsg(null);
+      const r = await setSpacePausedAction(slug, next);
+      setMsg({ ok: r.ok, text: r.message });
+      if (r.ok) router.refresh();
+    });
+
+  return (
+    <div className="mt-3">
+      <button
+        type="button"
+        onClick={() => (paused ? run(false) : setAsk(true))}
+        disabled={pending}
+        className={`${secondaryBtnCls} text-[15px]`}
+      >
+        {pending ? "바꾸는 중…" : paused ? "다시 열기" : "잠시 쉬기"}
+      </button>
+      {msg && (
+        <p role="status" className={`mt-2 text-[15px] leading-relaxed break-keep ${msg.ok ? "text-mint-on" : "text-danger"}`}>
+          {msg.text}
+        </p>
+      )}
+      <ConfirmDialog
+        open={ask}
+        title="잠시 쉴까요?"
+        confirmLabel="쉬기"
+        busy={pending}
+        onConfirm={() => run(true)}
+        onCancel={() => setAsk(false)}
+      >
+        <p>쉬는 동안엔 하루 가게 목록에서 이 공간이 빠져서 새 예약이 안 들어와요.</p>
+        <p className="text-mute">손님이 이미 결제한 예약은 그대로라 그날 손님은 오세요. 다시 열기를 누르면 바로 돌아와요.</p>
       </ConfirmDialog>
     </div>
   );

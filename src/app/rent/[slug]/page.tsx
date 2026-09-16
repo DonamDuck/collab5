@@ -147,8 +147,11 @@ export default async function SpaceDetailPage({
         )}
         {isOwner && sp.status !== "open" && (
           // 노란 안내 상자 대신 한 줄. 주인만 보는 말이라 조용해도 된다.
+          // ⏸09-17 잠시 쉬기 — 쉬는 공간에 「저희가 확인하고 열어 드릴게요」가 뜨면 검토에 걸린 줄 안다. 여는 건 사장님 손이다.
           <p className="mt-4 text-[15px] leading-relaxed break-keep text-mute">
-            아직 공개 전이라 사장님에게만 보이는 화면이에요. 저희가 확인하고 열어 드릴게요.
+            {sp.status === "paused"
+              ? "쉬는 중이라 손님에겐 안 보여요. 내 하루 가게에서 다시 열 수 있어요."
+              : "아직 공개 전이라 사장님에게만 보이는 화면이에요. 저희가 확인하고 열어 드릴게요."}
           </p>
         )}
       </header>

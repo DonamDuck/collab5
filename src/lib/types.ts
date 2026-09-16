@@ -592,6 +592,8 @@ export interface SpaceBooking {
   refundRequestNote: string;
   hostMessage: string;
   decidedAt?: string;
+  /** ⏰이용 전날 리마인드를 보낸 시각(09-17). 비어 있으면 아직 안 보냈다 — 하루 한 번 도는 작업이 두 번 안 보내게. */
+  remindedAt?: string;
   createdAt: string;
   updatedAt: string;
 }
