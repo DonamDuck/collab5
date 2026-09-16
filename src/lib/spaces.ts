@@ -152,14 +152,14 @@ export async function listOpenSpaces(f: SpaceFilter = {}): Promise<SpacePublic[]
   return out.map(toPublic);
 }
 
-/** 상세(공개) — 주소 없음. 확정된 예약의 당사자에겐 `getSpaceFull`을 따로 쓴다. */
+/** 상세(공개). 09-16부터 주소·좌표는 공개다(대표: 공간 이름이 이미 보여 감추는 게 무의미). 빠지는 건 옛 「들어오는 법」과 약관 동의 시각뿐. */
 export async function getSpacePublic(slug: string): Promise<SpacePublic | null> {
   const sp = await getSpaceFull(slug);
   return sp ? toPublic(sp) : null;
 }
 
-/** 🚨주소까지 든 원본 — **호출 전에 권한을 반드시 확인할 것.**
- *  쓸 수 있는 곳은 둘뿐이다. ①그 공간의 주인 ②`confirmed` 예약의 게스트. */
+/** 🚨원본 — 옛 「들어오는 법」(`accessNote`, 출입 비밀번호가 남아 있을 수 있다)까지 든다. **호출 전에 권한을 확인할 것.**
+ *  쓸 수 있는 곳: ①그 공간의 주인 ②결제를 마친 예약의 손님(`guestSeesHost`). 공개 화면은 `getSpacePublic`. */
 export async function getSpaceFull(slug: string): Promise<Space | null> {
   const c = db();
   if (!c) return null;

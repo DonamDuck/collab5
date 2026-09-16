@@ -423,15 +423,21 @@ export async function decideBookingAction(
 }
 
 /** 취소 환불액 — 견적과 실제 취소가 **같은 계산**을 써야 한다. 둘이 따로 계산하면 팝업엔 70%라 적고 50%만 돌려주는 날이 온다. */
-function cancelRefund(b: SpaceBooking): { rate: number; refund: number } {
+function cancelRefund(b: SpaceBooking, paidAt?: string): { rate: number; refund: number } {
   // 🩸09-16까지 `new Date(useDate)`를 썼다. 그건 **UTC 자정 = KST 오전 9시**라, 낮에 취소하면 남은 날이
   //   하루씩 모자랐다 — 전날 오전 10시 취소가 50% 대신 0%, 7일 전 오전 10시가 100% 대신 70%.
   //   규정의 「이용일 N일 전」은 한국 달력의 날짜 차이다. 시각을 빼고 날짜끼리 뺀다.
   const days = kstDaysUntil(b.useDate);
-  // ⏳신청한 지 얼마나 됐나 — 1시간 안이면 남은 날과 무관하게 전액이다(대표 09-16).
-  const mins = Math.floor((Date.now() - new Date(b.createdAt).getTime()) / 60_000);
+  // ⏳결제한 지 얼마나 됐나 — 1시간 안이면 남은 날과 무관하게 전액이다(대표 09-16).
+  //   🩸09-17 QA: 예약 행이 생긴 시각(결제창을 연 때)부터 셌다. 결제 화면에 오래 머문 손님은 결제 뒤 한 시간을 다 못 받았다.
+  //     화면은 「결제하고 1시간 안에」라고 말하니 승인 시각부터 센다. 승인 기록이 없는 옛 예약만 행 생성 시각으로.
+  const mins = minutesSincePaid(b, paidAt);
   const rate = guestCancelRefundRate(days, mins);
   return { rate, refund: Math.floor(b.amountTotal * rate) };
+}
+
+function minutesSincePaid(b: SpaceBooking, paidAt?: string): number {
+  return Math.floor((Date.now() - new Date(paidAt || b.createdAt).getTime()) / 60_000);
 }
 
 /** 취소 «전» 팝업에 보여줄 환불액. 환불표는 서버 전용 파일(`rent-payment.ts`)에만 있다 —
@@ -446,11 +452,12 @@ export async function quoteCancelAction(
   if (!b || b.guestUserId !== uid) return { ok: false, message: "내 신청만 볼 수 있어요.", ...none };
   if (b.status !== "paid" && b.status !== "confirmed") return { ok: false, message: "이미 끝난 신청이에요.", ...none };
   if (bookingStarted(b)) return { ok: false, message: "이미 시작한 예약은 취소할 수 없어요.", ...none };
-  const { rate, refund } = cancelRefund(b);
+  const pay = await getPaymentByOrderId(b.orderId);
+  const { rate, refund } = cancelRefund(b, pay?.approvedAt);
   // 💬09-17 QA — 팝업이 「왜 그 %인지」를 한 줄로 말하게 재료를 같이 준다. 비율은 위 계산 그대로고,
   //   이 둘은 설명에만 쓴다(`cancelRefund`와 같은 식으로 센다).
   const daysBefore = kstDaysUntil(b.useDate);
-  const grace = Math.floor((Date.now() - new Date(b.createdAt).getTime()) / 60_000) <= GRACE_MINUTES;
+  const grace = minutesSincePaid(b, pay?.approvedAt) <= GRACE_MINUTES;
   return { ok: true, message: "", total: b.amountTotal, refund, rate, daysBefore, grace };
 }
 
@@ -468,7 +475,7 @@ export async function cancelBookingAction(bookingId: number): Promise<ActionResu
   const pay = await getPaymentByOrderId(b.orderId);
   if (!pay) return { ok: false, message: "결제 기록을 찾지 못해 취소하지 않았어요. 문의해 주세요." };
 
-  const { refund } = cancelRefund(b);
+  const { refund } = cancelRefund(b, pay.approvedAt);
   if (refund > 0) {
     const r = await cancelPayment(
       pay.paymentKey || b.paymentKey, "게스트 취소",

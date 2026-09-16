@@ -148,7 +148,7 @@ export default async function RentDonePage({ params }: { params: Promise<{ booki
               <ul className="mt-4 space-y-3">
                 {[
                   "사장님 연락처를 아래에 적어 두었어요. 이용 전에 궁금한 게 있으면 편하게 연락해 보세요.",
-                  "사장님 사정으로 어려워지면 전액 돌려드려요. 환불은 사흘에서 닷새 안에 끝나요.",
+                  "사장님 사정으로 어려워지면 전액 돌려드려요. 결제한 수단으로 3~5일 안에 돌아가요.",
                   // ☕09-17 커피챗을 담았으면 «언제»를 여기서도 말한다. 문장은 한 벌(`rent-copy`)이다.
                   ...(withChat ? [COFFEE_CHAT_WHEN_GUEST] : []),
                 ].map((t) => (
