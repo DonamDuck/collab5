@@ -9,6 +9,7 @@ import Link from "next/link";
 const BIZ: { label: string; value: string }[] = [
   { label: "상호", value: "collab5" },
   { label: "대표", value: "송영덕" },
+  { label: "사업자등록번호", value: "323-16-02896" },
   { label: "주소", value: "서울 성북구 돈암동 413-111, 402호" },
   { label: "문의", value: "dudejrthd@gmail.com" },
   { label: "전화", value: "010-2060-1629" },
