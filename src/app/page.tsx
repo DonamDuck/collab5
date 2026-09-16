@@ -45,6 +45,7 @@ import { repo } from "@/lib/repo";
 import type { Maker } from "@/lib/types";
 import { SITE_URL } from "@/lib/site";
 import { HomeBody } from "./HomeBody";
+import { KakaoChatFloat } from "@/components/KakaoChatFloat";
 
 // 🔄~~n≤12 동안 전량 노출~~(07-31) → 08-16부터 캐러셀만 그린다(`BrandGrid`의 `CAROUSEL_LIMIT`, ~~6~~→**7** 08-20).
 //   ⚠️여기서 자르지 않는 이유 — 레일 끝 칸이 「**N곳** 모두 보기」로 **전체 수**를 말해야 하고,
@@ -192,6 +193,8 @@ export default async function Home() {
       //    잉크(#222222)보다 한 단 어두워 지면이 확실히 닫히고 커버 사진·흰 배지가 더 튄다.
       bannerBg="carbon"
     />
+    {/* 💬카카오톡 상담 — 홈 오른쪽 아래에 떠 있다(대표 09-16). */}
+    <KakaoChatFloat />
     </>
   );
 }

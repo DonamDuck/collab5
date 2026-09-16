@@ -1,5 +1,6 @@
 // 전 페이지 공용 풋터 — 서버 컴포넌트(세션 불필요). 인쇄 시 숨김.
 import Link from "next/link";
+import { SUPPORT_EMAIL, SUPPORT_PHONE } from "@/lib/site";
 
 // 사업자 정보 한 줄 항목 — 라벨 없이 값만, 가운뎃점으로 구분
 //
@@ -11,8 +12,8 @@ const BIZ: { label: string; value: string }[] = [
   { label: "대표", value: "송영덕" },
   { label: "사업자등록번호", value: "323-16-02896" },
   { label: "주소", value: "서울 성북구 돈암동 413-111, 402호" },
-  { label: "문의", value: "dudejrthd@gmail.com" },
-  { label: "전화", value: "010-2060-1629" },
+  { label: "문의", value: SUPPORT_EMAIL },
+  { label: "전화", value: SUPPORT_PHONE },
 ];
 
 export function SiteFooter() {
@@ -46,6 +47,10 @@ export function SiteFooter() {
                 풋터 내비는 `flex-wrap`이라 길어지면 줄만 늘어난다(잘리지 않는다). */}
             <Link href="/magazine" className="inline-flex items-center py-[12px] hover:text-ink">
               콜라보 매거진
+            </Link>
+            {/* 💬고객센터(09-16 대표) — 카카오톡 상담이 여기로 모인다. 약관 앞에 둔다: 찾는 사람이 더 많다. */}
+            <Link href="/help" className="inline-flex items-center py-[12px] hover:text-ink">
+              고객센터
             </Link>
             <Link href="/terms" className="inline-flex items-center py-[12px] hover:text-ink">
               이용약관
