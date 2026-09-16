@@ -7,7 +7,7 @@ import { repo } from "@/lib/repo";
 import { ContactBlock } from "../../ContactBlock";
 import { KAKAO_CHAT_URL } from "@/lib/site";
 import { bookingFinished, bookingStarted } from "@/lib/rent-time";
-import { BOOKING_HEADLINE, COFFEE_CHAT_WHEN_GUEST } from "@/lib/rent-copy";
+import { BOOKING_HEADLINE, COFFEE_CHAT_WHEN_GUEST, CONTACT_RULE_GUEST } from "@/lib/rent-copy";
 import type { BookingStatus } from "@/lib/types";
 import { GuestCancel } from "../../my/Actions";
 import { bookingWhen, InfoPanel, InfoRow, primaryBtnCls, secondaryBtnCls, won } from "../../ui";
@@ -148,6 +148,8 @@ export default async function RentDonePage({ params }: { params: Promise<{ booki
               <ul className="mt-4 space-y-3">
                 {[
                   "사장님 연락처를 아래에 적어 두었어요. 이용 전에 궁금한 게 있으면 편하게 연락해 보세요.",
+                  // ⏱09-17 대표 — 확정 뒤 2일 안 연락 규칙.
+                  CONTACT_RULE_GUEST,
                   "사장님 사정으로 어려워지면 전액 돌려드려요. 결제한 수단으로 3~5일 안에 돌아가요.",
                   // ☕09-17 커피챗을 담았으면 «언제»를 여기서도 말한다. 문장은 한 벌(`rent-copy`)이다.
                   ...(withChat ? [COFFEE_CHAT_WHEN_GUEST] : []),

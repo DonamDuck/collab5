@@ -12,7 +12,7 @@
 import { KAKAO_CHAT_URL, SITE_URL } from "./site";
 import { bookingWhen, dateLabel } from "./rent-time";
 import {
-  accessHowLine, hostContactLine, withJosa,
+  accessHowLine, hostContactLine, withJosa, CONTACT_RULE_GUEST, CONTACT_RULE_HOST,
   BOOKING_HEADLINE, COFFEE_CHAT_WHEN_GUEST, COFFEE_CHAT_WHEN_HOST,
 } from "./rent-copy";
 import type { Space, SpaceBooking } from "./types";
@@ -143,8 +143,9 @@ export async function notifyBookingPaid(
   ];
   // ❓«답해야 하나»를 첫 줄에서 말한다(09-17 QA). phase 1은 결제가 곧 예약이라 안 눌러도 예약은 산다.
   //   그 말이 없으면 사장님은 이 메일이 «답하라»는 건지 «알고만 있으라»는 건지 모른다.
-  const lead = `${BOOKING_HEADLINE.hostPaid}. 결제는 이미 끝났고, 따로 답하지 않으셔도 예약은 그대로예요. 수락하시면 손님 연락처가 열려요.`;
-  const tail = "사정이 생기면 이용 시작 전까지 거절하실 수 있어요. 거절하시면 손님께 전액 돌아가요.";
+  // 🧭09-17 대표 — 요청 확인 → 수락·거절 → 2일 안에 공간 안내. «답하지 않아도 된다»던 문장은 이 절차와 부딪혀 뺐다.
+  const lead = `${BOOKING_HEADLINE.hostPaid}. 결제는 이미 끝났어요. 날짜와 손님이 적은 계획을 읽어 보시고 수락하거나 거절해 주세요. 수락하시면 손님 연락처가 열려요.`;
+  const tail = `거절은 이용 시작 전까지 할 수 있고, 손님께 전액 돌아가요. ${CONTACT_RULE_HOST}`;
   const text = [
     lead,
     ...rows.filter(([, v]) => v).map(([k, v]) => `${k}: ${v.replace(/\n/g, " ")}`),
@@ -179,7 +180,7 @@ export async function notifyBookingPaidToGuest(
     // ☕🩸09-16까지 「그날 사장님과 이야기 나눌 시간이 있어요」 — 화면은 「협의한 날짜」였다. 이제 `rent-copy` 한 줄.
     ["커피챗", boughtChat(booking) ? `커피챗도 함께 예약하셨어요. ${COFFEE_CHAT_WHEN_GUEST}` : ""],
     ["사장님", `${hostName} · ${contact}`],
-    ["이용 안내", accessHowLine(space.accessHow)],
+    ["이용 안내", `${accessHowLine(space.accessHow)} ${CONTACT_RULE_GUEST}`],
     ["공간 페이지", spaceLink(space)],
     ["취소하시면", CANCEL_POLICY_LINE],
   ];
@@ -213,7 +214,7 @@ export async function notifyBookingConfirmed(
     ["공간", space.name],
     ["주소", space.address],
     // 📨09-16 「들어오는 법」(옛 `accessNote`)에서 «안내 방식»으로. 비밀번호 같은 건 우리가 안 가진다.
-    ["이용 안내", accessHowLine(space.accessHow)],
+    ["이용 안내", `${accessHowLine(space.accessHow)} ${CONTACT_RULE_GUEST}`],
     ["사장님", `${hostName} · ${contact}`],
     ["사장님 말씀", booking.hostMessage],
     ["공간 페이지", spaceLink(space)],
@@ -251,7 +252,8 @@ export async function notifyBookingConfirmedToHost(
   const subject = `[collab5] ${when} ${space.name} · 손님 연락처와 그날 챙기실 일`;
   const link = `${SITE_URL}/rent/my`;
   // ☎️번호가 없는 손님이면 «이메일로만 연락된다»고 분명히 쓴다. 문자 안내를 고른 사장님이 할 일을 알 수 있게.
-  const gPhone = guest?.phone?.trim() ?? "";
+  // ☎️신청 때 받은 번호가 먼저다(09-17). 옛 예약만 프로필 번호로.
+  const gPhone = booking.guestPhone?.trim() || guest?.phone?.trim() || "";
   const gEmail = guest?.email?.trim() ?? "";
   const guestContact = gPhone
     ? [gPhone, gEmail].filter(Boolean).join(" · ")
@@ -267,7 +269,7 @@ export async function notifyBookingConfirmedToHost(
     ["언제", bookingWhen(booking)],
     ["공간", space.name],
     ["무엇을", booking.plan],
-    ["그날까지", hostTodoLine(space.accessHow)],
+    ["그날까지", `${hostTodoLine(space.accessHow)} ${CONTACT_RULE_HOST}`],
     ["커피챗", boughtChat(booking) ? `손님이 커피챗도 함께 골랐어요. ${COFFEE_CHAT_WHEN_HOST}` : ""],
     ["받으실 돈", won(booking.amountPayout)],
   ];

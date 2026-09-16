@@ -74,7 +74,6 @@ export default function SignupPage() {
     if (pwErr) return pwErr;
     if (password !== password2) return "비밀번호가 서로 달라요.";
     if (!phone.trim()) return "휴대폰번호를 입력해주세요.";
-    if (!brandName.trim()) return "브랜드명을 입력해주세요.";
     // 중복은 버튼을 잠그는 대신 여기서 잡는다 — 각 칸 옆 안내는 스크롤을 내리면 안 보인다(QA #17).
     // 에러 문구는 제출 버튼 바로 위에 뜨므로 "왜 안 되는지"가 누른 자리에서 보인다.
     if (dup.email) return DUP_MSG.email;
@@ -172,7 +171,8 @@ export default function SignupPage() {
           />
           {dup.phone && <p className="mt-1.5 text-[14px] text-red-600">{DUP_MSG.phone}</p>}
         </Field>
-        <Field label="브랜드명" htmlFor="signup-brand">
+        {/* 🙋09-17 대표 — 하루 가게로 브랜드가 없는 사람도 회원이 된다. 브랜드명은 선택이고, 비워도 된다고 바로 밑에서 말한다. */}
+        <Field label="브랜드명" htmlFor="signup-brand" optional>
           <input
             id="signup-brand"
             name="organization"
@@ -182,6 +182,7 @@ export default function SignupPage() {
             placeholder="예: 캔버스가든"
             className={authInputCls}
           />
+          <p className="mt-1.5 text-[13px] text-faint">아직 브랜드가 없다면 비워 두셔도 돼요. 나중에 채울 수 있어요.</p>
           {dup.brandName && <p className="mt-1.5 text-[14px] text-red-600">{DUP_MSG.brandName}</p>}
         </Field>
         <Field label="로고 또는 브랜드 사진" optional>

@@ -117,7 +117,7 @@ export default async function RentPayoutsPage() {
                     <p className="mt-0.5 text-[14px] text-mute">{bookingWhen(b)}</p>
                     <dl className="mt-2 space-y-1 text-[14px] leading-relaxed">
                       <div className="flex gap-2"><dt className="w-[48px] shrink-0 text-mute">사장님</dt><dd className="min-w-0 break-all text-body">{line(host)}</dd></div>
-                      <div className="flex gap-2"><dt className="w-[48px] shrink-0 text-mute">손님</dt><dd className="min-w-0 break-all text-body">{line(guest)}</dd></div>
+                      <div className="flex gap-2"><dt className="w-[48px] shrink-0 text-mute">손님</dt><dd className="min-w-0 break-all text-body">{line(guest && b.guestPhone ? { ...guest, phone: b.guestPhone } : guest)}</dd></div>
                       {b.refundRequestNote && (
                         <div className="flex gap-2"><dt className="w-[48px] shrink-0 text-mute">사정</dt><dd className="min-w-0 whitespace-pre-line text-body">{b.refundRequestNote}</dd></div>
                       )}

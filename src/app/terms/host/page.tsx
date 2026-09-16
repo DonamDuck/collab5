@@ -94,6 +94,11 @@ export default function HostTermsPage() {
               안내를 제공합니다.
             </li>
             <li>
+              {/* 09-17 대표 — 수락 뒤 2일 안 연락 규칙. 화면·메일 문장 정본은 `rent-copy`의 `CONTACT_RULE_HOST`. */}
+              호스트는 예약을 수락한 날부터 2일 안에, 이용일이 그보다 가까우면 이용 전까지 이용자에게 문자나 전화로
+              이용 안내를 전달합니다.
+            </li>
+            <li>
               <strong className="font-medium text-ink">
                 출입 비밀번호 등 민감한 정보는 회사가 보관하지 않습니다.
               </strong>{" "}

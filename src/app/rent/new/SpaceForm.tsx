@@ -383,7 +383,7 @@ export function SpaceForm({
         <L
           label="공간 소개"
           htmlFor="sp-body"
-          hint="자세히 남겨 주실수록 신청하는 분이 마음을 정하기 쉬워요. 빈칸이면 저희가 같이 써 드릴게요."
+          hint="자세히 남겨 주실수록 손님이 마음을 정하기 쉬워요."
         >
           <textarea
             id="sp-body"

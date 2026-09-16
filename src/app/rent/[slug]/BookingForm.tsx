@@ -32,7 +32,7 @@ import type { SpaceUseType, OpenSlot } from "@/lib/types";
 import { hourMarks, hoursBetween, nowHhmmKst, overlaps, toHHMM, toMinutes, rangeLabel, todayKst } from "@/lib/rent-time";
 import { dateLabel, InfoList, InfoRow, primaryBtnCls, RentSelect, rentInputCls, rentTextareaCls, won } from "../ui";
 import Link from "next/link";
-import { isTestPayment } from "@/lib/rent-copy";
+import { CONTACT_RULE_GUEST, isTestPayment } from "@/lib/rent-copy";
 import { ConfirmDialog } from "../ConfirmDialog";
 import { PickDateCalendar } from "./PickDateCalendar";
 import { MentorOptions } from "./MentorOption";
@@ -533,7 +533,9 @@ export function BookingForm({
               그대로 두고 주변 줄들과 같은 해요체로 옮겼다. 「통신판매중개자」라는 법 용어는 남긴다 —
               고지의 핵심 낱말이라 빼면 고지가 아니게 된다.
             📏15px — 위 항목 줄(16px)보다 한 단 작다. 강조가 아니라 «알림»이라 흐리게 둔다. */}
-        <p className="mt-4 text-[15px] leading-relaxed break-keep text-mute">
+        {/* ⏱09-17 대표 — 결제 직전에 «그다음 누가 무엇을 하는지»를 한 줄로. */}
+        <p className="mt-4 text-[15px] leading-relaxed break-keep text-body">{CONTACT_RULE_GUEST}</p>
+        <p className="mt-2 text-[15px] leading-relaxed break-keep text-mute">
           공간은 사장님이 직접 빌려주세요. collab5는 신청과 결제를 이어 드리는 통신판매중개자라 거래의 당사자는
           아니에요.
         </p>

@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { getSpacePublic, listLiveBookingsIn } from "@/lib/spaces";
 import { getProfileById, getSessionUserId } from "@/lib/profiles";
 import { repo } from "@/lib/repo";
-import { accessHowLine, COFFEE_CHAT_WHEN_GUEST } from "@/lib/rent-copy";
+import { accessHowLine, COFFEE_CHAT_WHEN_GUEST, CONTACT_RULE_GUEST } from "@/lib/rent-copy";
 import { futureSlots } from "@/lib/rent-time";
 import { PhotoSlider } from "@/components/PhotoSlider";
 import { BookingForm } from "./BookingForm";
@@ -307,8 +307,11 @@ export default async function SpaceDetailPage({
         <p className="text-[17px] leading-relaxed break-keep text-body">{accessHowLine(sp.accessHow)}</p>
         {/* ✍️09-17 QA — 「저장하지 않아요 / 전해 드립니다」로 한 절 안에서 격이 갈렸고, 앞 문장은 우리 입장이었다.
             손님에게 달라지는 것(누가 알려 주나)을 앞에 둔다. */}
+        {/* ⏱09-17 대표 — 확정 뒤 2일 안에 사장님이 연락하는 규칙을 신청 전에 알린다. 문장 정본은 `rent-copy`. */}
+        <p className="mt-2 text-[16px] leading-relaxed break-keep text-body">{CONTACT_RULE_GUEST}</p>
         <p className="mt-2 text-[15px] leading-relaxed break-keep text-mute">
-          출입 비밀번호 같은 건 사장님이 직접 알려 드려요. collab5는 따로 갖고 있지 않아요.
+          출입 비밀번호 같은 건 사장님이 직접 알려 드려요. collab5는 따로 갖고 있지 않아요. 연락이 없으면 카카오톡으로
+          알려 주세요.
         </p>
       </Section>
 

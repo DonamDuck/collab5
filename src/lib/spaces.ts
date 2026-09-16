@@ -98,7 +98,7 @@ export function toPublic(sp: Space): SpacePublic {
 function toBooking(r: Row): SpaceBooking {
   return {
     id: n(r.id), spaceId: n(r.space_id), guestUserId: n(r.guest_user_id),
-    guestBrandSlug: s(r.guest_brand_slug),
+    guestBrandSlug: s(r.guest_brand_slug), guestPhone: s(r.guest_phone),
     useDate: s(r.use_date), hours: s(r.hours), plan: s(r.plan),
     // ⚠️Postgres의 `time`은 "10:00:00"으로 온다. 화면·계산은 전부 "HH:MM"이라 여기서 잘라 맞춘다 —
     //   한 곳에서 안 자르면 "10:00:00"과 "10:00" 비교가 조용히 어긋난다.
@@ -263,6 +263,7 @@ export async function createPendingBooking(input: BookingCreateInput): Promise<S
   if (!c) return null;
   const row = {
     space_id: input.spaceId, guest_user_id: input.guestUserId, guest_brand_slug: input.guestBrandSlug,
+    guest_phone: input.guestPhone,
     use_date: input.useDate, hours: input.hours, plan: input.plan, headcount: input.headcount ?? null,
     start_time: input.startTime, end_time: input.endTime, hours_count: input.hoursCount,
     with_chat: input.withChat, amount_chat: input.amountChat,

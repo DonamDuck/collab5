@@ -121,9 +121,10 @@ export default function WelcomePage() {
         emailRef.current?.focus();
         return;
       }
-      if (!b || !p) {
-        setErr(!b ? "브랜드명을 입력해주세요." : "휴대폰번호를 입력해주세요.");
-        (!b ? brandRef : phoneRef).current?.focus();
+      // 🙋09-17 대표 — 브랜드명은 선택. 휴대폰번호만 잡는다.
+      if (!p) {
+        setErr("휴대폰번호를 입력해주세요.");
+        phoneRef.current?.focus();
         return;
       }
       setErr("");
@@ -209,7 +210,7 @@ export default function WelcomePage() {
               </p>
             )}
           </Field>
-          <Field label="브랜드명" htmlFor="welcome-brand">
+          <Field label="브랜드명" htmlFor="welcome-brand" optional>
             <input
               id="welcome-brand"
               ref={brandRef}
@@ -221,7 +222,7 @@ export default function WelcomePage() {
               className={authInputCls}
             />
             <p className="mt-1.5 text-[13px] text-faint">
-              소개서와 콜라보 제안의 인사말에 이 이름이 그대로 나와요.
+              아직 브랜드가 없다면 비워 두셔도 돼요. 적어 두시면 소개서와 콜라보 제안의 인사말에 이 이름이 나와요.
             </p>
           </Field>
           <Field label="휴대폰번호" htmlFor="welcome-phone">

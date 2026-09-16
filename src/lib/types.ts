@@ -553,6 +553,9 @@ export interface SpaceBooking {
   spaceId: number;
   guestUserId: number;
   guestBrandSlug: string;
+  /** ☎️신청 때 받은 손님 번호(대표 09-17). 프로필 번호보다 이쪽이 먼저다 — 그 예약에 쓰라고 적은 번호라서.
+   *  빈 문자열이면 옛 예약이다. 그땐 프로필 번호로 물러선다. */
+  guestPhone: string;
 
   useDate: string;
   /** ⚠️옛 칸. 새 코드는 `startTime`/`endTime`을 쓴다. */

@@ -185,7 +185,7 @@ export interface BookingFormInput {
   endTime: string;
   withChat: boolean;
   guestBrandSlug: string;
-  /** ☎️손님 연락처 — 필수(대표 09-17). 프로필에 번호가 없을 때만 거기 적는다(`savePhoneIfEmpty`). */
+  /** ☎️손님 연락처 — 필수(대표 09-17). 예약 행(`guest_phone`)에 적고, 프로필이 비었으면 거기도 채운다. */
   guestPhone: string;
 }
 
@@ -248,7 +248,7 @@ export async function startBookingAction(input: BookingFormInput): Promise<Start
   const orderId = `rent-${sp.id}-${input.useDate.replace(/-/g, "")}-${Math.random().toString(36).slice(2, 10)}`;
 
   const booking = await createPendingBooking({
-    spaceId: sp.id, guestUserId: uid, guestBrandSlug: input.guestBrandSlug,
+    spaceId: sp.id, guestUserId: uid, guestBrandSlug: input.guestBrandSlug, guestPhone: input.guestPhone.trim(),
     useDate: input.useDate, hours: `${input.startTime}~${input.endTime}`, plan: input.plan.trim(),
     startTime: input.startTime, endTime: input.endTime, hoursCount: hours,
     headcount: input.headcount, withChat: amountChat > 0, amountChat,
@@ -258,7 +258,7 @@ export async function startBookingAction(input: BookingFormInput): Promise<Start
   });
   if (!booking) return { ok: false, message: "신청을 시작하지 못했어요. 잠시 뒤 다시 시도해 주세요." };
 
-  // ☎️프로필에 번호가 비어 있으면 채운다. 사장님이 예약을 받은 뒤 보는 손님 번호가 프로필 전화다.
+  // ☎️프로필에 번호가 비어 있으면 채운다. 사장님이 보는 번호는 예약 행의 `guestPhone`이 먼저다(09-17).
   //   실패해도 신청은 계속한다 — 이메일이라는 연락 길이 남아 있고, 번호 하나로 결제를 막을 일은 아니다.
   await savePhoneIfEmpty(uid, input.guestPhone);
 

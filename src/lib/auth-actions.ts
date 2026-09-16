@@ -78,14 +78,14 @@ export async function signUpAction(input: SignUpInput): Promise<{ error?: string
 }
 
 // ── 소셜 로그인 온보딩(/welcome) ─────────────────────────────────────────────
-// 구글은 이름·이메일만 준다. 우리 계정은 **브랜드명·휴대폰번호가 필수**이고, 특히 브랜드명은
+// 구글은 이름·이메일만 준다. 우리 계정은 **휴대폰번호가 필수**다(🔁09-17 브랜드명은 선택으로 — 하루 가게로 브랜드 없는 사람도 온다). 브랜드명은
 // 제안 시트의 인사말·발신자 표시에 그대로 쓰여서 비면 곧바로 화면에 티가 난다.
 // 그래서 "일단 통과시키고 나중에 채우기"가 아니라 들어오는 길목에서 한 번 받는다.
 
 export interface OnboardingState {
   /** 서버가 세션을 확인했나 (쿠키 미도달 시 false) */
   authed: boolean;
-  /** 브랜드명·휴대폰번호가 둘 다 있음 = 온보딩 불필요 → 곧장 홈으로 */
+  /** 휴대폰번호가 있음 = 온보딩 불필요 → 곧장 홈으로 (09-17부터 브랜드명은 선택) */
   done: boolean;
   email: string;
   brandName: string;
@@ -127,7 +127,8 @@ export async function getOnboardingStateAction(): Promise<OnboardingState> {
   return {
     authed: true,
     // ⭐ 둘 다 있어야 done — 다시 로그인할 때마다 온보딩이 뜨면 안 된다.
-    done: !!(brandName && phone),
+    // 🔁09-17 브랜드명은 선택 — 휴대폰번호만 있으면 온보딩 끝.
+    done: !!phone,
     email: profile?.email || user.email || "",
     brandName,
     phone,
@@ -154,7 +155,6 @@ export async function completeOnboardingAction(input: {
 
   const brandName = input.brandName.trim();
   const phone = input.phone.trim();
-  if (!brandName) return { error: "브랜드명을 입력해주세요." };
   if (!phone) return { error: "휴대폰번호를 입력해주세요." };
 
   // excludeUuid=본인 — 재시도로 다시 들어왔을 때 자기 값과 부딪히지 않게 한다.
@@ -166,8 +166,9 @@ export async function completeOnboardingAction(input: {
   const existing = await getProfile(user.id);
   // ⭐가입 알림은 **이번에 처음 온보딩을 마친 사람**에게만 보낸다.
   //   이 액션은 재시도·브랜드명 수정으로 여러 번 들어올 수 있어서(위 excludeUuid 주석 참고),
-  //   그냥 걸면 같은 사람으로 알림이 반복된다. brandName이 비어 있었다 = 아직 온보딩 전이었다.
-  const isNewSignup = !existing?.brandName;
+  //   그냥 걸면 같은 사람으로 알림이 반복된다. 휴대폰번호가 비어 있었다 = 아직 온보딩 전이었다.
+  //   🔁09-17 브랜드명이 선택이 되면서 기준을 휴대폰번호로 옮겼다(브랜드명 없이 온보딩을 마친 사람에게 알림이 반복되지 않게).
+  const isNewSignup = !existing?.phone;
   // 이메일 출처는 **기존 프로필 → 세션 → 화면 입력** 순. 앞의 둘이 있으면 화면 값은 쓰지 않는다
   // (읽기 전용으로 보여준 값이라 어차피 같아야 하고, 다르다면 그게 사고다).
   const known = existing?.email || user.email || "";
