@@ -17,7 +17,7 @@ export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "공간 올리기 — 하루 가게",
-  description: "안 쓰는 날의 공간을 하루 단위로 빌려주세요. 규칙은 사장님이 정하세요.",
+  description: "공간이 비는 시간만 골라 빌려주세요. 규칙은 사장님이 정하세요.",
   alternates: { canonical: "/rent/new" },
 };
 

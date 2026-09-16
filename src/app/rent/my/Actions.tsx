@@ -101,7 +101,7 @@ export function HostDecide({
         onConfirm={() => run(false)}
         onCancel={() => setConfirmReject(false)}
       >
-        <p>거절하면 {won(amountTotal)} 전액이 손님께 돌아가요. 그날은 다시 비는 날이 돼요.</p>
+        <p>거절하면 {won(amountTotal)} 전액이 손님께 돌아가요. 그 시간은 다시 열려요.</p>
         {message.trim() && <p className="text-mute">남기신 말도 같이 전해드려요.</p>}
       </ConfirmDialog>
     </div>

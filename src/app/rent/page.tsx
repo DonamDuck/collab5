@@ -21,7 +21,7 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: "하루 가게 — collab5",
   description:
-    "안 쓰는 날의 공간을 하루 단위로 빌려드려요. 가게를 열어보고 싶은 사람이 그날 하루 사장님이 됩니다.",
+    "안 쓰는 날의 공간을 시간 단위로 빌려드려요. 가게를 열어보고 싶은 사람이 그 시간만큼 사장님이 됩니다.",
   // ⚠️필수 — 루트 layout의 `canonical: "/"`가 자식에 상속돼, 안 덮으면 이 페이지가 홈의 사본이 된다.
   alternates: { canonical: "/rent" },
 };

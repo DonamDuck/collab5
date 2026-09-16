@@ -40,7 +40,8 @@ export async function generateMetadata({
     title: `${sp.name} — 하루 가게`,
     // ⚠️설명에도 동네까지만 적는다. 링크 미리보기 카드는 로그인도 결제도 없이 퍼진다 —
     //   화면에서 가린 주소를 og 설명으로 흘리면 가린 의미가 없다.
-    description: sp.tagline || `${sp.area}의 공간을 하루 빌려보세요.`,
+    // ⏱09-16 대표 — 시간 단위 대여. 「하루 빌려보세요」는 사실이 틀린 말이라 링크 카드에도 안 싣는다.
+    description: sp.tagline || `${sp.area}에서 필요한 시간만큼 빌릴 수 있는 공간이에요.`,
     alternates: { canonical: `/rent/${sp.slug}` },
   };
 }
@@ -237,7 +238,7 @@ export default async function SpaceDetailPage({
       <Section title="빌릴 수 있는 날">
         {openDates.length === 0 ? (
           <p className="text-[17px] leading-relaxed text-body">
-            지금은 비는 날이 없어요. 곧 새 날짜가 올라올 거예요.
+            지금은 열린 시간이 없어요. 곧 새 날짜가 올라올 거예요.
           </p>
         ) : (
           <div className="flex flex-wrap gap-2">
@@ -356,7 +357,7 @@ export default async function SpaceDetailPage({
           </div>
         ) : openDates.length === 0 ? (
           <p className="text-[17px] leading-relaxed break-keep text-body">
-            지금은 비는 날이 없어요. 사장님이 새 날짜를 올리면 신청하실 수 있어요.
+            사장님이 새 시간을 열어 두시면 여기서 신청하실 수 있어요.
           </p>
         ) : (
           <BookingForm

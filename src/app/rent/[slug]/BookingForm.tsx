@@ -351,7 +351,8 @@ export function BookingForm({
             setPlan(e.target.value);
             if (e.target.value.trim().length >= 10) setBadField((f) => (f === "plan" ? "" : f));
           }}
-          placeholder="예) 직접 만든 도자기 그릇 20점으로 하루 팝업을 열려고 해요. 친구 한 명과 둘이 오고, 오후에 손님을 받을 계획이에요."
+          // ⏱09-16 대표 — 시간 단위. 예시가 「하루 팝업」이면 바로 위에서 고른 몇 시간과 말이 어긋난다.
+          placeholder="예) 직접 만든 도자기 그릇 20점으로 네 시간짜리 팝업을 열려고 해요. 친구랑 둘이 와서 손님을 받을 거예요."
         />
         {badField === "plan" && <p className={errCls}>그날 무엇을 하실지 열 글자 이상 적어 주세요.</p>}
         <p className={hintCls}>사장님이 이 글만 보고 정하세요. 열 글자면 충분해요.</p>

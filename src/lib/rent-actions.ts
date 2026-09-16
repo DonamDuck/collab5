@@ -336,7 +336,7 @@ export async function confirmBookingAction(
     const p = await notifyParties(paid);
     if (p) await notifyBookingPaid(paid, p.space, p.host, p.guest);
   });
-  return { ok: true, message: "신청했어요. 사장님 답을 기다려 주세요.", bookingId: paid.id };
+  return { ok: true, message: "예약을 완료했어요.", bookingId: paid.id }; // 👀09-16 대표 phase 1 — 결제를 마치면 곧 예약 완료, 기다리게 하지 않는다
 }
 
 /** 호스트의 수락·거절. 거절이면 **전액 환불**한다(대표 09-13). */

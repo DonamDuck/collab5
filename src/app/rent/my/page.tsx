@@ -107,7 +107,7 @@ export default async function MyRentPage() {
           </Link>
         </div>
         {mySpaces.length === 0 ? (
-          <p className={emptyCls}>아직 올리신 공간이 없어요. 쉬는 날 하루만 내주셔도 돼요.</p>
+          <p className={emptyCls}>아직 올리신 공간이 없어요. 몇 시간만 비어도 괜찮아요.</p>
         ) : (
           <ul className="mt-5">
             {mySpaces.map((sp) => (
