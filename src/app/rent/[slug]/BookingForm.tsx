@@ -41,6 +41,10 @@ const labelCls = "mb-2 block text-[16px] font-medium text-body";
 const hintCls = "mt-2 text-[15px] leading-relaxed break-keep text-faint";
 /** 못 넘어간 칸 바로 아래에 붙는 한 줄. 힌트와 같은 자리에 같은 크기로 서고 색만 다르다. */
 const errCls = "mt-2 text-[15px] leading-relaxed break-keep text-danger";
+/** 시각·길이 칩. 44px = 손가락 하한. 폭은 격자가 4등분해 준다. */
+const chipCls = "h-[44px] rounded-md border text-[16px] tabular-nums transition-colors";
+const chipOnCls = "border-transparent bg-primary-tint font-medium text-primary-on";
+const chipOffCls = "border-hairline bg-surface text-ink hover:bg-primary-pale";
 
 /** 화면 아래 고정 바 — 금액 + 이 화면의 키위 버튼. 어느 폭에서나 이 하나가 유일한 결제 버튼이다.
  *  하단 여백은 `max()`다(MakerActionBar 08-09 실측): 홈 인디케이터가 있는 기기는 안전영역만, 없는 기기는 12px. */
@@ -58,7 +62,11 @@ function PayBar({
 }) {
   return (
     <div className="fixed inset-x-0 bottom-0 z-40">
-      <div className="mx-auto w-full max-w-[640px] rounded-t-2xl border border-b-0 border-hairline bg-surface px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 shadow-e2">
+      {/* 📐09-17 디자인팀 — lg부터 상세가 두 기둥이 되면서, 화면 가운데 640 바가 어느 기둥에도 안 맞았다.
+          lg에선 바를 **오른쪽 기둥(340) 아래**로 붙인다. 위의 요약 카드(얼마·언제)와 한 줄로 읽혀서
+          버튼이 무엇에 대한 것인지가 바로 보인다. 폭 값은 상세 `page.tsx`의 격자와 한 쌍이다. */}
+      <div className="lg:mx-auto lg:flex lg:max-w-[1120px] lg:justify-end lg:px-6">
+      <div className="mx-auto w-full max-w-[640px] rounded-t-2xl border border-b-0 border-hairline bg-surface px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 shadow-e2 lg:mx-0 lg:w-[340px] lg:px-5">
         {/* 🔻09-15 대표 — *「(폰이) 이렇게 나오는 거 좋은데, 데스크탑도 동일 UX로 적용 필요해」*.
             전엔 폰은 팝업 안에서, 데스크톱은 이 바 «안»에서 옵션을 골랐다. 두 화면이 서로 다른 물건이었다.
             ⭐이제 **옵션을 고르는 자리는 확인 팝업 한 곳뿐이다.** 바는 어느 폭에서나 금액과 버튼만 든다. */}
@@ -86,6 +94,7 @@ function PayBar({
             {label}
           </button>
         </div>
+      </div>
       </div>
     </div>
   );
@@ -270,7 +279,9 @@ export function BookingForm({
     });
 
   return (
-    <div className="space-y-7">
+    // 📐09-17 디자인팀 — sm부터 폭 520. 데스크톱 왼쪽 기둥(676)을 다 쓰면 달력 칸이 75px로 벌어져
+    //   날짜 줄이 한눈에 안 읽혔다. 폰(343)은 그대로 꽉 찬다.
+    <div className="space-y-7 sm:max-w-[520px]">
       <div ref={dateRef}>
         {/* ✍️09-17 「신청 날짜를 선택해주세요.」 → 말 걸듯(행정어 걷기). 아래 「몇 시부터 쓰실까요?」와 같은 말투다. */}
         <p className={labelCls}>어느 날 쓰실까요?</p>
@@ -305,41 +316,52 @@ export function BookingForm({
         ) : startChoices.length === 0 ? (
           <p className={hintCls}>이 날은 빌릴 수 있는 시간이 남아 있지 않아요. 다른 날을 골라 주세요.</p>
         ) : (
-          <div className="flex flex-wrap items-center gap-2">
-            <RentSelect
-              aria-label="시작 시각"
-              wrapClassName="w-[128px] shrink-0"
-              value={activeStart}
-              onChange={(e) => {
-                setStartTime(e.target.value);
-                setUseHours(0);
-                if (e.target.value) setBadField((f) => (f === "time" ? "" : f));
-              }}
-            >
-              {/* 빈 첫 줄 — 고르기 전 상태를 «보이게» 둔다. 첫 시각이 앉아 있으면 고른 것처럼 읽힌다. */}
-              <option value="">시작 시각</option>
+          // 🎨09-17 디자인팀 — 드롭다운 둘(시작 · 길이) → **칩 두 줄**.
+          //   드롭다운은 열기 전엔 무엇이 남았는지 안 보이고, 폰에선 휠을 두 번 돌려야 했다.
+          //   칩으로 깔면 「이 날은 오후만 남았구나」가 누르기 전에 읽힌다(아워플레이스 시간 고르기와 같은 문법).
+          //   선택 색은 달력의 고른 날과 같은 키위 tint다 — 한 폼 안에서 «고른 것»의 얼굴은 하나.
+          <div>
+            <div className="grid grid-cols-4 gap-2" role="group" aria-label="시작 시각">
               {startChoices.map((t) => (
-                <option key={t} value={t}>
+                <button
+                  key={t}
+                  type="button"
+                  data-start-chip
+                  aria-pressed={t === activeStart}
+                  onClick={() => {
+                    setStartTime(t);
+                    setUseHours(0);
+                    setBadField((f) => (f === "time" ? "" : f));
+                  }}
+                  className={`${chipCls} ${t === activeStart ? chipOnCls : chipOffCls}`}
+                >
                   {t}
-                </option>
+                </button>
               ))}
-            </RentSelect>
-            <span className="text-[16px] text-mute">부터</span>
+            </div>
             {activeStart && (
-              <RentSelect
-                aria-label="몇 시간"
-                wrapClassName="w-[128px] shrink-0"
-                value={String(activeHours)}
-                onChange={(e) => setUseHours(Number(e.target.value))}
-              >
-                {hourChoices.map((h) => (
-                  <option key={h} value={String(h)}>
-                    {h}시간
-                  </option>
-                ))}
-              </RentSelect>
+              <>
+                <p className="mb-2 mt-5 text-[15px] text-mute">몇 시간 쓰실까요?</p>
+                <div className="grid grid-cols-4 gap-2" role="group" aria-label="몇 시간">
+                  {hourChoices.map((h) => (
+                    <button
+                      key={h}
+                      type="button"
+                      aria-pressed={h === activeHours}
+                      onClick={() => setUseHours(h)}
+                      className={`${chipCls} ${h === activeHours ? chipOnCls : chipOffCls}`}
+                    >
+                      {h}시간
+                    </button>
+                  ))}
+                </div>
+                {endTime && (
+                  <p className="mt-3 text-[15px] text-body">
+                    <span className="font-medium text-ink">{rangeLabel(activeStart, endTime)}</span>
+                  </p>
+                )}
+              </>
             )}
-            {endTime && <span className="text-[16px] text-mute">→ {endTime}에 끝나요</span>}
           </div>
         )}
         {badField === "time" && <p className={errCls}>시작 시각이 비어 있어요.</p>}
