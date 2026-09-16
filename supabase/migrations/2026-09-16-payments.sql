@@ -122,10 +122,32 @@ language plpgsql
 as $$
 declare
   v_booking_id bigint;
+  v_current    text;
 begin
   select booking_id into v_booking_id from payments where order_id = p_order_id for update;
   if not found then
     raise exception 'rent_sync: payments에 order_id=% 가 없다', p_order_id;
+  end if;
+
+  -- 🚦**지금 상태를 보고 옮긴다** (09-16 공급자↔수요자 점검 v2).
+  --   전엔 확인 없이 덮어써서, 30분 지난 결제창을 만료시키는 정리 작업과 손님의 결제 승인이 같은 순간에 돌면
+  --   승인된 예약이 expired로 뒤집혔다 — 돈은 토스에 잡힌 채 환불도 지급도 안 걸린다.
+  --   ⭐결제 줄을 위에서 `for update`로 잡았으니, 같은 주문의 호출은 여기서 한 줄로 선다. 그 뒤에 읽는 상태는 최신이다.
+  if v_booking_id is not null and p_booking_status is not null then
+    select status into v_current from space_bookings where id = v_booking_id for update;
+    -- 만료는 «아직 결제 전»에서만. 그 사이 승인됐으면 조용히 아무것도 안 한다(정리 작업이 늦게 온 것뿐이다).
+    if p_booking_status = 'expired' and v_current <> 'pending' then
+      return;
+    end if;
+    -- 다녀옴은 확정(또는 phase 1의 결제 완료)에서만. 그 사이 취소됐으면 아무것도 안 한다.
+    if p_booking_status = 'done' and v_current not in ('confirmed', 'paid') then
+      return;
+    end if;
+    -- 결제 완료는 결제 전·만료에서만. 만료 뒤에 승인이 들어오면 돈이 들어온 것이니 살린다.
+    --   이미 취소·환불된 예약에 승인이 오는 건 있으면 안 되는 일이라 오류로 멈춘다(호출부가 환불로 잇는다).
+    if p_booking_status = 'paid' and v_current not in ('pending', 'expired') then
+      raise exception 'rent_sync: order=% 는 % 상태라 paid로 못 옮긴다', p_order_id, v_current;
+    end if;
   end if;
 
   if p_toss is not null then

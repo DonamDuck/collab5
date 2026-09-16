@@ -442,8 +442,12 @@ export async function cancelBookingAction(bookingId: number): Promise<ActionResu
     //   「환불됩니다」라고 말했다. 돈은 안 돌아갔는데 예약은 사라진다. 실패면 아무것도 바꾸지 않는다.
     if (!r.ok) return { ok: false, message: "환불을 처리하지 못해 취소하지 않았어요. 잠시 뒤 다시 시도해 주세요." };
     // 💸예약 cancelled + 결제 CANCELED/PARTIAL_CANCELED(남은 돈)를 같이. 약관 제8조의 «남은 돈»이 여기 적힌다.
-    const synced = await rentSync(b.orderId, { bookingStatus: "cancelled", toss: r.payment });
-    if (!synced.ok) console.error(`[rent-actions] 🚨환불은 됐는데 상태 기록 실패 order=${b.orderId}`);
+    // 🔁기록이 한 번 실패하면 한 번 더 한다(09-16 점검 v2). 환불은 이미 나갔는데 결제 줄이 DONE으로 남으면,
+    //   이용일이 지나 정리 작업이 돌 때 «돌려준 돈»까지 사장님 지급 대기에 올라갈 수 있다.
+    //   두 번 다 실패하면 크게 남긴다 — 정산 화면에서 사람이 봐야 하는 자리다.
+    let synced = await rentSync(b.orderId, { bookingStatus: "cancelled", toss: r.payment });
+    if (!synced.ok) synced = await rentSync(b.orderId, { bookingStatus: "cancelled", toss: r.payment });
+    if (!synced.ok) console.error(`[rent-actions] 🚨🚨환불은 됐는데 상태 기록이 두 번 실패 — 수동 확인 필요 order=${b.orderId}`);
   } else {
     // 당일 취소 — 돈은 그대로 남는다(결제 DONE). 이용일이 지나면 그 돈은 사장님 몫으로 지급 대기에 오른다.
     await rentSync(b.orderId, { bookingStatus: "cancelled" });
