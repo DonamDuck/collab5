@@ -11,7 +11,10 @@
 //   받는 사람이 여는 곳은 하나다.
 import { KAKAO_CHAT_URL, SITE_URL } from "./site";
 import { bookingWhen, dateLabel } from "./rent-time";
-import { accessHowLine, hostContactLine, withJosa } from "./rent-copy";
+import {
+  accessHowLine, hostContactLine, withJosa,
+  BOOKING_HEADLINE, COFFEE_CHAT_WHEN_GUEST, COFFEE_CHAT_WHEN_HOST,
+} from "./rent-copy";
 import type { Space, SpaceBooking } from "./types";
 import type { Profile } from "./profiles";
 
@@ -99,6 +102,16 @@ function boughtChat(b: SpaceBooking): boolean {
   return b.amountChat > 0 || b.amountMentor > 0;
 }
 
+/** 💳환불이 «언제» 들어오는지 — 메일 네 통이 이 한 줄만 쓴다(09-17 QA).
+ *  🩸09-16까지 「카드사에 따라 며칠 걸릴 수 있어요」와 완료 화면의 「사흘에서 닷새」가 달랐고,
+ *    계좌이체·간편결제는 카드사가 아닌데 카드사를 말했다. */
+const REFUND_TIMING_LINE = "결제한 수단으로 3~5일 안에 돌아가요.";
+
+/** 🔗공간 페이지 — 유의 사항·사진을 그날 아침 다시 보는 자리(09-17 QA: 결제 완료 메일에 링크가 없었다). */
+function spaceLink(space: Space): string {
+  return `${SITE_URL}/rent/${encodeURIComponent(space.slug)}`;
+}
+
 /** 취소·환불 규정 한 줄. 상세 페이지 «환불 규정» 절과 호스트 약관 제8조의 숫자 그대로다 — 바뀌면 셋 다. */
 const CANCEL_POLICY_LINE =
   "신청하고 한 시간 안에 취소하시면 전액 돌려드려요. 그 뒤로는 7일 전까지 전액, 3일 전까지 70%, 1일 전까지 50%이고 당일은 환불이 없어요.";
@@ -111,9 +124,9 @@ export async function notifyBookingPaid(
 ): Promise<MailResult> {
   const guestName = displayName(guest, "손님");
   const when = dateLabel(booking.useDate);
-  // 🔁09-16 대표 — 「신청했어요」 → 「예약이 들어왔어요」. phase 1에선 결제가 곧 예약 완료라 손님은 이미 «예약»을 봤다.
-  //   같은 일을 사장님만 «신청»으로 받으면 답을 안 해도 되는 일처럼 읽힌다. 손님 메일과 문장은 따로 쓴다.
-  const subject = `[collab5] ${when} ${space.name}에 예약이 들어왔어요 · ${won(booking.amountTotal)}`;
+  // 🔁09-16 대표 — 「신청했어요」 → 「예약이 들어왔어요」. 09-17 대표 결정 4로 한 번 더 — 사장님 쪽에 들어온 것은 «요청»,
+  //   수락한 뒤가 «예약»이다. 제목 문장은 `BOOKING_HEADLINE.hostPaid` 한 벌을 쓴다.
+  const subject = `[collab5] ${when} ${space.name} · ${BOOKING_HEADLINE.hostPaid} · ${won(booking.amountTotal)}`;
   const link = `${SITE_URL}/rent/my`;
   const brandLine = guestBrand?.slug
     ? `${guestBrand.name.trim() || guestName}\n${SITE_URL}/m/${encodeURIComponent(guestBrand.slug)}`
@@ -122,25 +135,24 @@ export async function notifyBookingPaid(
     ["누가", guestName],
     ["소개서", brandLine],
     ["언제", bookingWhen(booking)],
-    ["어디", space.name],
+    ["공간", space.name],
     ["무엇을", booking.plan],
-    // ☕사장님이 커피챗을 해 줘야 하는 신청인지 — 09-16까지 이 메일에 없었다.
-    ["커피챗", boughtChat(booking) ? "같이 신청했어요" : ""],
+    // ☕사장님이 커피챗을 해 줘야 하는 신청인지 — 09-16까지 이 메일에 없었다. 「언제」는 `rent-copy` 한 줄(대표 09-17).
+    ["커피챗", boughtChat(booking) ? `손님이 커피챗도 함께 골랐어요. ${COFFEE_CHAT_WHEN_HOST}` : ""],
     ["받으실 돈", `${won(booking.amountPayout)} (손님이 낸 돈 ${won(booking.amountTotal)})`],
   ];
+  // ❓«답해야 하나»를 첫 줄에서 말한다(09-17 QA). phase 1은 결제가 곧 예약이라 안 눌러도 예약은 산다.
+  //   그 말이 없으면 사장님은 이 메일이 «답하라»는 건지 «알고만 있으라»는 건지 모른다.
+  const lead = `${BOOKING_HEADLINE.hostPaid}. 결제는 이미 끝났고, 따로 답하지 않으셔도 예약은 그대로예요. 수락하시면 손님 연락처가 열려요.`;
+  const tail = "사정이 생기면 이용 시작 전까지 거절하실 수 있어요. 거절하시면 손님께 전액 돌아가요.";
   const text = [
-    `${when} ${space.name}에 예약이 들어왔어요. 결제는 이미 끝났어요.`,
+    lead,
     ...rows.filter(([, v]) => v).map(([k, v]) => `${k}: ${v.replace(/\n/g, " ")}`),
     ``,
-    `예약 보러 가기: ${link}`,
-    `사정이 생기면 이용 시작 전까지 거절하실 수 있어요. 거절하시면 손님께 전액 돌아가요.`,
+    `들어온 요청 보기: ${link}`,
+    tail,
   ].join("\n");
-  const html = layout(
-    `${when} ${space.name}에 예약이 들어왔어요. 결제는 이미 끝났어요.`,
-    rows,
-    { href: link, label: "들어온 예약 보기" },
-    "사정이 생기면 이용 시작 전까지 거절하실 수 있어요. 거절하시면 손님께 전액 돌아가요.",
-  );
+  const html = layout(lead, rows, { href: link, label: "들어온 요청 보기" }, tail);
   return send(host?.email ?? "", subject, html, text);
 }
 
@@ -152,29 +164,33 @@ export async function notifyBookingPaidToGuest(
 ): Promise<MailResult> {
   const hostName = displayName(host, "사장님");
   const when = dateLabel(booking.useDate);
-  const subject = `[collab5] ${when} ${space.name}, 예약이 잡혔어요`;
+  // 🔁09-17 대표 결정 4 — 제목·첫 줄은 `BOOKING_HEADLINE.guestPaid`. 첫 문장이 「~에 ~에서」로 길게 늘어지던 것(QA)도 같이 풀었다.
+  const subject = `[collab5] ${when} ${space.name} · ${BOOKING_HEADLINE.guestPaid}`;
   const link = `${SITE_URL}/rent/requests`;
   const contact = hostContactLine(space.contactPhone, host?.phone, host?.email);
-  const lead = `예약을 마쳤어요. ${when}에 ${space.name}에서 쓰실 수 있고, 사장님 연락처도 아래에 적어 뒀어요.`;
+  const lead = `${BOOKING_HEADLINE.guestPaid}. 사장님 연락처와 그날 안내는 아래에 적어 뒀어요.`;
   const tail = `사장님과 연락이 잘 닿지 않으면 카카오톡으로 말씀해 주세요. ${KAKAO_CHAT_URL}`;
   const rows: [string, string][] = [
     ["언제", bookingWhen(booking)],
-    ["어디", space.name],
+    // 🏷「어디」와 「주소」가 나란히 서서 같은 정보 둘로 읽혔다(09-17 QA). 이름 칸은 「공간」이다.
+    ["공간", space.name],
     ["주소", space.address],
     ["결제한 돈", won(booking.amountTotal)],
-    ["커피챗", boughtChat(booking) ? "같이 신청하셨어요. 그날 사장님과 이야기 나눌 시간이 있어요." : ""],
+    // ☕🩸09-16까지 「그날 사장님과 이야기 나눌 시간이 있어요」 — 화면은 「협의한 날짜」였다. 이제 `rent-copy` 한 줄.
+    ["커피챗", boughtChat(booking) ? `커피챗도 함께 예약하셨어요. ${COFFEE_CHAT_WHEN_GUEST}` : ""],
     ["사장님", `${hostName} · ${contact}`],
     ["이용 안내", accessHowLine(space.accessHow)],
+    ["공간 페이지", spaceLink(space)],
     ["취소하시면", CANCEL_POLICY_LINE],
   ];
   const text = [
     lead,
     ...rows.filter(([, v]) => v).map(([k, v]) => `${k}: ${v}`),
     ``,
-    `신청 내역: ${link}`,
+    `예약 내역: ${link}`,
     tail,
   ].join("\n");
-  const html = layout(lead, rows, { href: link, label: "신청 내역 보기" }, tail);
+  const html = layout(lead, rows, { href: link, label: "예약 내역 보기" }, tail);
   return send(guest?.email ?? "", subject, html, text);
 }
 
@@ -186,18 +202,21 @@ export async function notifyBookingConfirmed(
 ): Promise<MailResult> {
   const hostName = displayName(host, "사장님");
   const when = dateLabel(booking.useDate);
-  const subject = `[collab5] 사장님이 ${when} 예약을 확인하셨어요`;
+  // 🔁09-17 대표 결정 4 — 제목·첫 줄은 `BOOKING_HEADLINE.guestConfirmed`.
+  const subject = `[collab5] ${when} ${space.name} · ${BOOKING_HEADLINE.guestConfirmed}`;
   const link = `${SITE_URL}/rent/done/${booking.id}`;
   const contact = hostContactLine(space.contactPhone, host?.phone, host?.email);
-  const lead = `${withJosa(hostName, "이/가")} ${when} 예약을 확인했어요. 그날 오시기만 하면 돼요.`;
+  // 🩸09-16까지 「그날 오시기만 하면 돼요」 — 원상복구·판매 금지 같은 유의 사항이 있는 공간과 부딪혔다(09-17 QA).
+  const lead = `${BOOKING_HEADLINE.guestConfirmed}. 가시기 전에 공간 페이지의 유의 사항을 한 번 봐 주세요.`;
   const rows: [string, string][] = [
     ["언제", bookingWhen(booking)],
-    ["어디", space.name],
+    ["공간", space.name],
     ["주소", space.address],
     // 📨09-16 「들어오는 법」(옛 `accessNote`)에서 «안내 방식»으로. 비밀번호 같은 건 우리가 안 가진다.
     ["이용 안내", accessHowLine(space.accessHow)],
     ["사장님", `${hostName} · ${contact}`],
     ["사장님 말씀", booking.hostMessage],
+    ["공간 페이지", spaceLink(space)],
   ];
   const text = [
     lead,
@@ -227,20 +246,29 @@ export async function notifyBookingConfirmedToHost(
 ): Promise<MailResult> {
   const guestName = displayName(guest, "손님");
   const when = dateLabel(booking.useDate);
-  const subject = `[collab5] ${when} 예약 수락이 잘 들어갔어요`;
+  // 🔁09-17 QA — 제목이 「수락이 잘 들어갔어요」였다. 방금 자기 손으로 누른 일을 되풀이하는 시스템 말이라,
+  //   제목을 «그날 챙길 것»으로 바꿨다.
+  const subject = `[collab5] ${when} ${space.name} · 손님 연락처와 그날 챙기실 일`;
   const link = `${SITE_URL}/rent/my`;
-  const guestContact = [guest?.phone?.trim(), guest?.email?.trim()].filter(Boolean).join(" · ");
-  const lead = `${when} 예약을 수락하셨어요. 그날 오실 분 연락처는 아래에 있어요.`;
+  // ☎️번호가 없는 손님이면 «이메일로만 연락된다»고 분명히 쓴다. 문자 안내를 고른 사장님이 할 일을 알 수 있게.
+  const gPhone = guest?.phone?.trim() ?? "";
+  const gEmail = guest?.email?.trim() ?? "";
+  const guestContact = gPhone
+    ? [gPhone, gEmail].filter(Boolean).join(" · ")
+    : gEmail
+      ? `이메일로만 연락돼요 · ${gEmail}`
+      : "연락처를 안 남기셨어요";
+  const lead = `${when} 예약을 수락하셨어요. 그날 오실 손님 연락처는 아래에 있어요.`;
   const tail =
     "사정이 생겨 이 예약을 무르셔야 하면 내 하루 가게에서 관리자에게 환불을 신청해 주세요. 저희가 두 분께 전화로 여쭤보고 처리할게요.";
   const rows: [string, string][] = [
     ["누가", guestName],
-    ["연락처", guestContact || "연락처를 남기지 않으셨어요"],
+    ["연락처", guestContact],
     ["언제", bookingWhen(booking)],
-    ["어디", space.name],
+    ["공간", space.name],
     ["무엇을", booking.plan],
     ["그날까지", hostTodoLine(space.accessHow)],
-    ["커피챗", boughtChat(booking) ? "같이 신청했어요. 이야기 나눌 시간도 잡아 두세요." : ""],
+    ["커피챗", boughtChat(booking) ? `손님이 커피챗도 함께 골랐어요. ${COFFEE_CHAT_WHEN_HOST}` : ""],
     ["받으실 돈", won(booking.amountPayout)],
   ];
   const text = [
@@ -264,8 +292,8 @@ export async function notifyBookingRejected(
   const link = `${SITE_URL}/rent`;
   const rows: [string, string][] = [
     ["언제", bookingWhen(booking)],
-    ["어디", space.name],
-    ["환불", `${won(booking.amountTotal)} 전액 (카드사에 따라 며칠 걸릴 수 있어요)`],
+    ["공간", space.name],
+    ["환불", `${won(booking.amountTotal)} 전액. ${REFUND_TIMING_LINE}`],
     ["사장님 말씀", booking.hostMessage],
   ];
   const text = [
@@ -288,19 +316,17 @@ export async function notifyBookingCancelled(
 ): Promise<MailResult> {
   const guestName = displayName(guest, "손님");
   const when = dateLabel(booking.useDate);
-  const subject = `[collab5] ${withJosa(guestName, "이/가")} ${when} ${space.name} 신청을 취소했어요`;
+  // 🔁09-17 QA — 「신청을 취소」였는데 손님 화면은 결제 뒤 «예약»이다. 사장님이 받은 건 이미 결제된 예약이라 «예약»으로.
+  const subject = `[collab5] ${withJosa(guestName, "이/가")} ${when} ${space.name} 예약을 취소했어요`;
   const link = `${SITE_URL}/rent/my`;
-  const rows: [string, string][] = [["언제", bookingWhen(booking)], ["어디", space.name]];
+  const rows: [string, string][] = [["언제", bookingWhen(booking)], ["공간", space.name]];
+  const lead = `${withJosa(guestName, "이/가")} ${when} ${space.name} 예약을 취소했어요. 그 시간이 다시 비었어요.`;
   const text = [
-    `${withJosa(guestName, "이/가")} ${when} ${space.name} 신청을 취소했어요. 그 시간은 다시 신청을 받을 수 있어요.`,
+    lead,
     ``,
     `내 하루 가게: ${link}`,
   ].join("\n");
-  const html = layout(
-    `${withJosa(guestName, "이/가")} ${when} ${space.name} 신청을 취소했어요. 그 시간은 다시 신청을 받을 수 있어요.`,
-    rows,
-    { href: link, label: "내 하루 가게 보기" },
-  );
+  const html = layout(lead, rows, { href: link, label: "내 하루 가게 보기" });
   return send(host?.email ?? "", subject, html, text);
 }
 
@@ -315,28 +341,30 @@ export async function notifyBookingCancelledToGuest(
   const refund = Math.max(0, Math.floor(refundAmount || 0));
   const link = `${SITE_URL}/rent/requests`;
   const subject = refund > 0
-    ? `[collab5] ${when} ${space.name} 취소했어요 · ${won(refund)} 환불`
+    // 🔁09-17 QA — 환불 갈래만 「예약을」이 빠져 0원 갈래와 짝이 안 맞았다.
+    ? `[collab5] ${when} ${space.name} 예약을 취소했어요 · ${won(refund)} 환불`
     : `[collab5] ${when} ${space.name} 예약을 취소했어요`;
   const lead = refund > 0
     ? `${when} ${space.name} 예약을 취소했어요. ${won(refund)}은 결제하신 수단으로 돌려드려요.`
-    : `${when} ${space.name} 예약을 취소했어요. 이번 취소는 규정상 돌려드릴 금액이 없어요.`;
+    // 0원은 당일 취소뿐이다(`guestCancelRefundRate` — 1일 전까지는 50%라도 돌아간다). 「규정상·금액」 행정어를 뺐다.
+    : `${when} ${space.name} 예약을 취소했어요. 당일 취소라 돌려드릴 돈이 없어요.`;
   const tail = refund > 0
     ? undefined
     : `규정이 궁금하시거나 따로 사정이 있으시면 카카오톡으로 편하게 물어보셔도 돼요. ${KAKAO_CHAT_URL}`;
   const rows: [string, string][] = [
     ["언제", bookingWhen(booking)],
-    ["어디", space.name],
+    ["공간", space.name],
     ["결제한 돈", won(booking.amountTotal)],
-    ["돌려드리는 돈", refund > 0 ? `${won(refund)}\n카드사에 따라 들어오기까지 며칠 걸릴 수 있어요.` : "0원"],
+    ["돌려드리는 돈", refund > 0 ? `${won(refund)}\n${REFUND_TIMING_LINE}` : "0원"],
   ];
   const text = [
     lead,
     ...rows.filter(([, v]) => v).map(([k, v]) => `${k}: ${v.replace(/\n/g, " ")}`),
     ``,
-    `신청 내역: ${link}`,
+    `예약 내역: ${link}`,
     ...(tail ? [tail] : []),
   ].join("\n");
-  const html = layout(lead, rows, { href: link, label: "신청 내역 보기" }, tail);
+  const html = layout(lead, rows, { href: link, label: "예약 내역 보기" }, tail);
   return send(guest?.email ?? "", subject, html, text);
 }
 
@@ -359,8 +387,8 @@ export async function notifyAdminRefund(
   const gTail = "갑자기 일정이 바뀌어 번거로우셨죠. 다른 날 공간이 필요하시면 여기서 다시 찾아보세요.";
   const gRows: [string, string][] = [
     ["언제", bookingWhen(booking)],
-    ["어디", space.name],
-    ["돌려드린 돈", `${amount}\n카드사에 따라 들어오기까지 며칠 걸릴 수 있어요.`],
+    ["공간", space.name],
+    ["돌려드린 돈", `${amount}\n${REFUND_TIMING_LINE}`],
   ];
   const gText = [
     gLead,
@@ -379,9 +407,10 @@ export async function notifyAdminRefund(
   const hRows: [string, string][] = [
     ["누가", guestName],
     ["언제", bookingWhen(booking)],
-    ["어디", space.name],
+    ["공간", space.name],
     ["환불한 돈", amount],
-    ["정산", "이 예약은 정산에서 빠져요."],
+    // 표 칸 모양을 맞춘다 — 값 자리에 문장만 있으면 다른 줄과 어긋나 보였다(QA).
+    ["정산", "없음 (이 예약은 정산에서 빠져요)"],
   ];
   const hText = [hLead, ...hRows.map(([k, v]) => `${k}: ${v}`), ``, `내 하루 가게: ${hLink}`, hTail].join("\n");
   const hHtml = layout(hLead, hRows, { href: hLink, label: "내 하루 가게 보기" }, hTail);

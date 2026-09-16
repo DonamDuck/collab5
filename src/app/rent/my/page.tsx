@@ -7,11 +7,16 @@ import type { Space } from "@/lib/types";
 import { isRentAdmin } from "@/lib/rent-actions";
 import { HostDecide, PublishButton, RefundRequest } from "./Actions";
 import { ContactBlock } from "../ContactBlock";
-import { bookingStarted } from "@/lib/rent-time";
+import { bookingFinished, bookingStarted } from "@/lib/rent-time";
+import type { SpaceBooking } from "@/lib/types";
+import { ClearQuery } from "./ClearQuery";
 import { GuestBookingRow, loadGuestBookings } from "../GuestBookingRow";
-import { BookingBadge, ListRow as Row, LockedLine as Locked, SpaceBadge, bookingWhen, primaryBtnCls, won } from "../ui";
+import { BookingBadge, ListRow as Row, SpaceBadge, bookingWhen, primaryBtnCls, won } from "../ui";
 
-// 하루 가게 — 내 공간 · 받은 신청 · 보낸 신청 (2026-09-13)
+// 하루 가게 — 내 공간 · 들어온 요청 · 내가 빌린 공간 (2026-09-13)
+//
+// 🔁09-17 대표 결정 4 — 사장님 쪽에 들어온 것은 «요청», 수락한 뒤가 «예약»이다. 손님 쪽은 결제 전 «신청», 결제 뒤 «예약».
+//   09-16까지 절 제목 「받은 신청」·배지 「새 신청이에요」·메일 「예약이 들어왔어요」가 한 건을 세 이름으로 불렀다.
 //
 // 🚨**이 화면이 주소와 연락처가 열리는 «유일한» 자리다.** 목록·상세는 확정 전 화면이라 동네까지만
 //   보여준다(설계 §이탈). 여기서도 문은 하나뿐이다 — `isRevealed(booking)`.
@@ -27,7 +32,7 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: "내 하루 가게 — collab5",
   // 로그인해야 보이는 화면이라 검색 결과에 뜰 일이 없다. 설명은 짧게.
-  description: "내가 올린 공간과 주고받은 신청을 한곳에서 봐요.",
+  description: "내가 올린 공간과 들어온 요청, 내가 빌린 공간을 한곳에서 봐요.",
   alternates: { canonical: "/rent/my" },
 };
 
@@ -39,7 +44,38 @@ const h2Cls = "text-[21px] font-bold leading-snug tracking-tight text-ink";
 
 // 줄(`Row`)과 잠긴 안내(`Locked`)는 `../ui`로 올렸다(09-16). 보낸 신청 줄이 `/rent/requests`와 같이 쓴다.
 
-export default async function MyRentPage() {
+/** 📋들어온 요청의 순서 — **답할 것 → 다가오는 예약 → 나머지**(09-17 QA).
+ *  🩸09-16까지 `created_at` 최신순이라 답해야 할 새 요청이 취소 세 건 아래 네 번째에 있었다.
+ *  사장님이 이 절을 여는 첫 질문은 「답할 게 있나」, 두 번째는 「다음에 누가 오나」다.
+ *  ⚠️읽기(`listBookingsForHost`)는 그대로 두고 화면에서 가른다 — 시간 판정(`bookingStarted`·`bookingFinished`)이
+ *    «지금»에 달려 있어서 DB 정렬로는 못 한다. */
+function hostOrder(list: SpaceBooking[]): SpaceBooking[] {
+  const at = (b: SpaceBooking) => `${b.useDate} ${b.startTime || "00:00"}`;
+  const rank = (b: SpaceBooking) =>
+    b.status === "paid" && !bookingStarted(b) ? 0 : (b.status === "paid" || b.status === "confirmed") && !bookingFinished(b) ? 1 : 2;
+  return [...list].sort((a, b) => {
+    const r = rank(a) - rank(b);
+    if (r !== 0) return r;
+    // 답할 것·다가오는 것은 가까운 날부터, 지난 것은 최근 것부터.
+    return rank(a) === 2 ? (at(a) < at(b) ? 1 : at(a) > at(b) ? -1 : 0) : at(a) < at(b) ? -1 : at(a) > at(b) ? 1 : 0;
+  });
+}
+
+/** 💬저장 뒤 한 줄(`?saved=`) — `SpaceForm`이 상황을 골라 실어 보낸다(09-17 QA: 말없이 목록으로 떨어졌다). */
+const SAVED_LINE: Record<string, string> = {
+  new: "올리셨어요. 읽어 본 뒤 목록에 열어 드릴게요.",
+  review: "매장 이름이나 주소가 바뀌어서 한 번 더 읽어 볼게요. 그동안 목록에서 잠시 빠져요.",
+  pending: "고치신 것까지 같이 읽어 볼게요. 끝나면 목록에 열어 드려요.",
+  ok: "고친 내용이 공간 화면에 바로 보여요.",
+  kept: "저장해 뒀어요.",
+};
+
+export default async function MyRentPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ saved?: string; did?: string; b?: string }>;
+}) {
+  const { saved, did, b: didBooking } = await searchParams;
   const uid = await getSessionUserId();
   if (!uid) {
     return (
@@ -60,13 +96,14 @@ export default async function MyRentPage() {
   await sweepBookings();
 
   // 보낸 신청은 줄과 함께 `loadGuestBookings`가 읽는다 — `/rent/requests`와 같은 한 벌(09-16).
-  const [me, mySpaces, hostBookings, guestBookings] = await Promise.all([
+  const [me, mySpaces, hostBookingsRaw, guestBookings] = await Promise.all([
     getProfileById(uid),
     listSpacesByOwner(uid),
     listBookingsForHost(uid),
     loadGuestBookings(uid),
   ]);
   void me;
+  const hostBookings = hostOrder(hostBookingsRaw);
   const admin = await isRentAdmin();
 
   const spaceById = new Map<number, Space>(mySpaces.map((sp) => [sp.id, sp]));
@@ -93,8 +130,31 @@ export default async function MyRentPage() {
     ),
   );
 
+  // 👤수락 «전»에 보이는 손님 정보 — 이름과 「전화번호가 있나」 둘뿐(09-17 QA).
+  //   🩸09-16까지 수락 근거가 손님이 쓴 한 줄뿐이었다. 열쇠를 넘기는 사장님이 누군지 모르는 사람을 수락했다.
+  //   🔑연락처 규칙은 그대로다 — 번호·이메일 «값»은 여기 담지 않는다. 읽자마자 이름과 참/거짓으로 줄여서,
+  //     전체 프로필이 이 화면 변수에 머물지 않게 한다(위 `contacts`가 «열린 예약 것만» 읽는 것과 같은 규율).
+  //   ⚠️손님 전화 필수화(09-17 대표 결정 2)는 신청 폼 쪽 일이다. 그 전 예약엔 번호가 없을 수 있다.
+  const lockedGuestIds = new Set<number>();
+  for (const b of hostBookings) if (!isRevealed(b) && b.status === "paid") lockedGuestIds.add(b.guestUserId);
+  const guestBriefs = new Map<number, { name: string; hasPhone: boolean }>(
+    await Promise.all(
+      Array.from(lockedGuestIds).map(async (id) => {
+        const p = await getProfileById(id);
+        return [id, { name: p?.brandName?.trim() ?? "", hasPhone: !!p?.phone?.trim() }] as [
+          number,
+          { name: string; hasPhone: boolean },
+        ];
+      }),
+    ),
+  );
+  const savedLine = saved ? SAVED_LINE[saved] ?? "" : "";
+  const didId = Number(didBooking) || 0;
+
   return (
     <main className="mx-auto w-full max-w-[720px] px-4 pt-8 pb-16 sm:px-6 sm:pt-12">
+      {/* 한 번 뜬 알림 표시(`saved`·`did`)를 주소에서 지운다. key로 새로 달아야 같은 화면 안의 두 번째 알림에서도 돈다. */}
+      {(saved || did) && <ClearQuery key={`${saved ?? ""}-${did ?? ""}-${didBooking ?? ""}`} />}
       <header>
         <Link href="/rent" className="inline-block py-[12px] text-[15px] text-mute underline underline-offset-2">
           ← 하루 가게
@@ -107,6 +167,12 @@ export default async function MyRentPage() {
           </Link>
         )}
       </header>
+
+      {savedLine && (
+        <p role="status" className="mt-6 rounded-lg bg-surface-soft px-4 py-3 text-[15px] leading-relaxed break-keep text-body">
+          {savedLine}
+        </p>
+      )}
 
       {/* ── ① 내가 올린 공간 ── */}
       <section className="mt-12">
@@ -161,23 +227,36 @@ export default async function MyRentPage() {
         )}
       </section>
 
-      {/* ── ② 받은 신청 ── */}
+      {/* ── ② 들어온 요청 ── */}
       <section className="mt-12">
-        <h2 className={h2Cls}>받은 신청</h2>
+        <h2 className={h2Cls}>들어온 요청</h2>
         {hostBookings.length === 0 ? (
-          <p className={emptyCls}>아직 들어온 신청이 없어요.</p>
+          <p className={emptyCls}>아직 들어온 요청이 없어요.</p>
         ) : (
           <ul className="mt-5">
             {hostBookings.map((b) => {
               const sp = spaceById.get(b.spaceId);
               const open = isRevealed(b);
+              const brief = guestBriefs.get(b.guestUserId);
+              // 💬방금 누른 수락·거절의 결과 한 줄(`HostDecide`가 `?did=&b=`로 실어 온다). 거절은 환불 성패를 상태로 읽는다.
+              const didLine =
+                didId === b.id
+                  ? did === "accept" && open
+                    ? "수락했어요. 아래에 손님 연락처가 열렸어요."
+                    : did === "reject" && b.status === "refunded"
+                      ? "거절했어요. 손님께 전액 돌려드렸어요."
+                      : did === "reject" && b.status === "rejected"
+                        ? "거절했어요. 환불이 늦어지고 있어 저희가 확인하고 있어요."
+                        : ""
+                  : "";
               return (
                 <Row
                   key={b.id}
                   head={
                     <>
                       <p className="truncate text-[17px] font-medium text-ink">{sp?.name ?? "내 공간"}</p>
-                      <p className="mt-1 text-[15px] text-mute">
+                      {/* 375px에서 「커/피챗」처럼 낱말 중간이 꺾였다(09-17 QA) — break-keep. */}
+                      <p className="mt-1 text-[15px] break-keep text-mute">
                         {bookingWhen(b)}
                         {b.headcount ? ` · ${b.headcount}명` : ""}
                         {/* ☕🩸09-16까지 사장님 쪽엔 커피챗 표시가 없었다. 손님 화면 네 곳엔 「커피챗 포함」이 뜨는데
@@ -201,10 +280,30 @@ export default async function MyRentPage() {
                       </Link>
                     </p>
                   )}
-                  {/* 받는 금액을 적는다. 낸 금액만 보이면 정산 때 「이만큼 들어올 줄 알았는데」가 된다. */}
+                  {/* 👤수락 전 손님 정보 — 이름과 전화번호가 있는지만(09-17 QA). 번호 «값»은 수락 뒤 연락처 블록이 연다. */}
+                  {brief && !open && (
+                    <p className="mt-2 text-[15px] leading-relaxed break-keep text-mute">
+                      손님 <span className="text-body">{brief.name || "이름을 안 적으셨어요"}</span>
+                      {" · "}
+                      {brief.hasPhone ? "전화번호를 남기셨어요" : "전화번호가 없어 이메일로 연락하셔야 해요"}
+                    </p>
+                  )}
+                  {/* 받는 금액을 적는다. 낸 금액만 보이면 정산 때 「이만큼 들어올 줄 알았는데」가 된다.
+                      💸09-17 QA — 거절·환불·취소 줄에도 「받으실 돈」이 그대로 떠 있었다. 받을 돈이 아닌 줄은 무슨 돈인지 바꿔 적고 흐리게.
+                      ⚠️손님 취소는 날에 따라 일부가 남아 정산될 수 있어(약관 제8조) 금액을 단정하지 않는다. */}
                   <p className="mt-2 text-[15px] text-mute">
-                    받으실 돈 {won(b.amountPayout)}
-                    <span className="text-faint"> · 신청자가 낸 돈 {won(b.amountTotal)}</span>
+                    {b.status === "refunded" ? (
+                      <span className="text-faint">손님께 전액 돌려드렸어요 · {won(b.amountTotal)}</span>
+                    ) : b.status === "rejected" ? (
+                      <span className="text-faint">돌려드릴 돈 {won(b.amountTotal)} · 저희가 환불을 챙기고 있어요</span>
+                    ) : b.status === "cancelled" ? (
+                      <span className="text-faint">손님 취소 · 낸 돈 {won(b.amountTotal)}</span>
+                    ) : (
+                      <>
+                        받으실 돈 {won(b.amountPayout)}
+                        <span className="text-faint"> · 손님이 낸 돈 {won(b.amountTotal)}</span>
+                      </>
+                    )}
                   </p>
 
                   {/* ⏯이용 시간이 시작하면 수락·거절 버튼을 거둔다(서버도 막는다). 결제 완료는 phase 1에서 곧 예약 완료다. */}
@@ -223,16 +322,29 @@ export default async function MyRentPage() {
                       <RefundRequest bookingId={b.id} />
                     ))}
 
+                  {didLine && (
+                    <p role="status" className="mt-3 text-[15px] leading-relaxed break-keep text-mint-on">
+                      {didLine}
+                    </p>
+                  )}
+
                   {open ? (
-                    <ContactBlock
-                      who="신청하신 분"
-                      // 🩸09-16까지 제목을 안 넘겨서 기본값 「가게 정보」가 떴다. 사장님이 보는 건 손님 정보다.
-                      title="신청하신 분 정보"
-                      profile={contacts.get(b.guestUserId) ?? null}
-                    />
-                  ) : b.status === "paid" ? (
-                    <Locked text="수락하시면 신청하신 분의 연락처가 열려요." />
+                    // 🎨09-17 QA — 연락처 블록이 `section` + 위 구분선 + 19px 제목이라 **다음 절처럼** 떠 보였다.
+                    //   블록(`ContactBlock`)은 `/rent/done`과 같이 쓰는 파일이라 안 고치고, 이 줄 안에서만 옷을 줄인다:
+                    //   옅은 판 안으로 넣고 구분선·위 여백을 지우고 제목을 본문 크기로. 자식 선택자라 이 자리에만 먹는다.
+                    <div className="mt-4 rounded-lg bg-surface-soft px-4 py-3 [&>section]:mt-0 [&>section]:border-t-0 [&>section]:pt-0 [&_h2]:text-[16px] [&_h2]:font-medium">
+                      <ContactBlock
+                        who="손님"
+                        // 🩸09-16까지 제목을 안 넘겨서 기본값 「가게 정보」가 떴다. 사장님이 보는 건 손님 정보다.
+                        title="손님 연락처"
+                        profile={contacts.get(b.guestUserId) ?? null}
+                        // 🙈이용일이 지난 예약은 가린다 — 손님 쪽(`GuestBookingRow`)과 같은 규칙(09-17 QA 🔴).
+                        //   09-16까지 사장님 화면만 안 넘겨서, 다녀간 뒤에도 손님 번호·메일이 계속 열려 있었다.
+                        masked={b.status === "done" || bookingFinished(b)}
+                      />
+                    </div>
                   ) : null}
+                  {/* 🔻09-17 QA — 「수락하시면 신청하신 분의 연락처가 열려요」 줄 삭제. 바로 위 버튼 「수락하고 연락처 열기」가 같은 말이었다. */}
 
                   {b.hostMessage && (
                     <p className="mt-2 text-[15px] leading-relaxed break-keep text-faint">
@@ -246,33 +358,26 @@ export default async function MyRentPage() {
         )}
       </section>
 
-      {/* ── ③ 내가 보낸 신청 ── */}
+      {/* ── ③ 내가 빌린 공간 ── */}
       {/* 🔗09-16 손님 전용 화면(`/rent/requests`, B81)이 생겼다. 이 절은 남긴다 — 사장님이면서 남의 공간을
           빌리는 분도 있어서, 여기서 통째로 빼면 그분은 두 화면을 오가야 한다. 옆에 건너가는 글자 링크만 둔다. */}
-      <section className="mt-12">
-        <div className="flex items-baseline justify-between gap-3">
-          <h2 className={h2Cls}>내가 보낸 신청</h2>
-          {guestBookings.length > 0 && (
+      {/* 🔻09-17 QA — 빈 상태면 절을 통째로 접는다. 사장님 화면 맨 아래에 손님용 빈 절이 늘 붙어 있었다.
+          남의 공간을 빌린 적이 생기면 그때 나타난다. */}
+      {guestBookings.length > 0 && (
+        <section className="mt-12">
+          <div className="flex items-baseline justify-between gap-3">
+            <h2 className={h2Cls}>내가 빌린 공간</h2>
             <Link href="/rent/requests" className="shrink-0 py-[12px] text-[15px] text-mute underline underline-offset-2">
               따로 모아 보기
             </Link>
-          )}
-        </div>
-        {guestBookings.length === 0 ? (
-          <p className={emptyCls}>
-            아직 신청하신 곳이 없어요.{" "}
-            <Link href="/rent" className="underline underline-offset-2">
-              빌릴 곳 둘러보기
-            </Link>
-          </p>
-        ) : (
+          </div>
           <ul className="mt-5">
             {guestBookings.map((v) => (
               <GuestBookingRow key={v.booking.id} view={v} />
             ))}
           </ul>
-        )}
-      </section>
+        </section>
+      )}
     </main>
   );
 }

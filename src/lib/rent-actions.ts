@@ -82,19 +82,20 @@ export async function saveSpaceAction(input: SpaceFormInput): Promise<ActionResu
   //   푸는 것이 맞고(식품위생법 제37조④), 그것도 약관이 맡는다.
   // ⭐「사용 유의 사항」은 이 서비스에서 제일 중요한 칸이라 빈칸으로 못 넘어간다.
   if (input.rules.trim().length < 10) {
-    return { ok: false, message: "사용 시 유의 사항을 열 글자 이상 적어 주세요. 이 칸이 사장님을 지켜 줍니다." };
+    return { ok: false, message: "유의 사항을 열 글자 넘게 담아 주세요. 이 칸이 사장님을 지켜 줘요." };
   }
   if (!input.name.trim()) return { ok: false, message: "공간 이름을 적어 주세요." };
   if (!input.category) return { ok: false, message: "어떤 업종인지 골라 주세요." };
   if (input.openSlots.length === 0) return { ok: false, message: "빌려줄 수 있는 날과 시간을 하나 이상 정해 주세요." };
   if (input.photos.length === 0) return { ok: false, message: "사진을 한 장 이상 올려 주세요. 사진 없는 공간은 아무도 안 빌려요." };
-  if (input.priceHour <= 0) return { ok: false, message: "시간당 대여 비용을 적어 주세요." };
+  if (input.priceHour <= 0) return { ok: false, message: "한 시간에 얼마 받으실지 적어 주세요." };
   if (input.minHours < 1) return { ok: false, message: "최소 대여 시간은 한 시간 이상이어야 해요." };
   // ☎️🚨청약 «전»에 보여야 하는 값이라 빈칸으로 못 넘어간다.
   //   전자상거래법 제20조②(시행 2026-07-21): 중개자는 사업자 호스트의 성명·주소·전화번호를 확인해
   //   청약 전에 소비자에게 제공해야 하고, 안 하면 제20조의2②로 **우리가 연대 책임**을 진다.
   if (!input.contactPhone.trim()) {
-    return { ok: false, message: "매장 전화번호를 적어 주세요. 법에 따라 신청 전에 손님께 보여드려야 해요." };
+    // 🔁09-17 QA — 「법에 따라」가 위협조로 읽혔다. 근거는 위 주석에 두고 사장님께는 쓰임만 말한다.
+    return { ok: false, message: "매장 전화번호가 비어 있어요. 손님이 신청하기 전에 보는 번호예요." };
   }
   // 📜호스트 약관 동의. 없으면 수수료·정산·구상을 나중에 주장할 근거가 없다.
   if (!input.hostTermsOk) {
@@ -160,7 +161,8 @@ export async function saveSpaceAction(input: SpaceFormInput): Promise<ActionResu
   if (!saved) return { ok: false, message: "저장에 실패했어요. 잠시 뒤 다시 시도해 주세요." };
   revalidatePath("/rent");
   revalidatePath(`/rent/${slug}`);
-  return { ok: true, message: "올렸어요. 확인하고 공개해 드릴게요.", slug };
+  // 화면은 이 말을 안 띄운다 — 저장 뒤 `/rent/my?saved=…`가 상황별 한 줄을 띄운다(09-17).
+  return { ok: true, message: "올렸어요. 읽어 보고 목록에 열어 드릴게요.", slug };
 }
 
 /** 검토 통과 — 대표만. `pending` → `open`. */
@@ -366,11 +368,11 @@ export async function decideBookingAction(
   if (!uid) return { ok: false, message: "로그인이 필요해요." };
 
   const b = await getBooking(bookingId);
-  if (!b) return { ok: false, message: "그 신청을 찾지 못했어요." };
+  if (!b) return { ok: false, message: "그 요청을 찾지 못했어요." };
   // ⚠️권한은 "이 사람이 그 공간의 주인인가"다. booking에는 주인이 안 적혀 있어 공간을 거쳐 확인한다.
   const mine = await listSpacesByOwner(uid);
   const sp = mine.find((x) => x.id === b.spaceId);
-  if (!sp) return { ok: false, message: "내 공간의 신청만 결정할 수 있어요." };
+  if (!sp) return { ok: false, message: "내 공간에 들어온 요청만 답할 수 있어요." };
 
   // ⏯이용 시간이 이미 시작했으면 «수락»은 뜻이 없다. 거절(= 전액 환불)은 그대로 열어 둔다 —
   //   답을 못 한 채 날이 간 신청은 손님 돈이 붙잡혀 있는 것이라, 사장님이 돌려줄 길은 남아 있어야 한다.
@@ -387,7 +389,7 @@ export async function decideBookingAction(
   }
 
   const decided = await decideBooking(bookingId, accept, message.trim());
-  if (!decided) return { ok: false, message: "이미 처리된 신청이에요." };
+  if (!decided) return { ok: false, message: "이미 답하신 요청이에요." };
 
   if (!accept) {
     // 예약은 이미 rejected다(`decideBooking`). 환불이 «성공»하면 예약 refunded + 결제 CANCELED를 같이 옮긴다.
@@ -406,8 +408,8 @@ export async function decideBookingAction(
       if (p) await notifyBookingRejected(decided, p.space, p.host, p.guest);
     });
     return refunded
-      ? { ok: true, message: "거절하고 전액 환불했어요." }
-      : { ok: true, message: "거절했어요. 환불이 지연되고 있어 확인 중입니다." };
+      ? { ok: true, message: "거절했어요. 손님께 전액 돌려드렸어요." }
+      : { ok: true, message: "거절했어요. 환불이 늦어지고 있어 저희가 확인하고 있어요." };
   }
   revalidatePath("/rent/my");
   await safeNotify(async () => {
@@ -417,7 +419,7 @@ export async function decideBookingAction(
     await notifyBookingConfirmed(decided, p.space, p.host, p.guest);
     await notifyBookingConfirmedToHost(decided, p.space, p.host, p.guest);
   });
-  return { ok: true, message: "수락했어요. 이제 신청자 연락처가 보입니다." };
+  return { ok: true, message: "수락했어요. 아래에 손님 연락처가 열렸어요." };
 }
 
 /** 취소 환불액 — 견적과 실제 취소가 **같은 계산**을 써야 한다. 둘이 따로 계산하면 팝업엔 70%라 적고 50%만 돌려주는 날이 온다. */

@@ -23,6 +23,7 @@ import { uploadPhoto } from "@/lib/upload";
 import { PhotoGrid } from "@/app/register/PhotoGrid";
 import type { Space, SpaceUseType, SpaceCategory, SpaceScope, OpenSlot, AccessHow } from "@/lib/types";
 import { hoursBetween } from "@/lib/rent-time";
+import { COFFEE_CHAT_WHEN_HOST } from "@/lib/rent-copy";
 import { CATEGORY_OPTIONS, dateLabel, primaryBtnCls, RentSelect, rentInputCls, rentTextareaCls, secondaryBtnCls, won } from "../ui";
 import { AddressField } from "./AddressField";
 import { OpenSlotsCalendar } from "./OpenSlotsCalendar";
@@ -37,8 +38,9 @@ import { OpenSlotsCalendar } from "./OpenSlotsCalendar";
 /** 📂빌려드리는 범위 — 값의 근거가 되는 축. 대표가 말한 네 경우가 여기 다 들어간다
  *  (카페 공간만 / 카페 + 머신 / 국밥집 화구까지 / 예쁜 식당을 라운지로). */
 const SCOPES: [SpaceScope, string, string][] = [
-  ["space_only", "공간만 빌려드려요", "장비는 안 쓰고 자리만 써요. 모임·촬영·라운지 대관 같은 것들이요."],
-  ["with_gear", "공간과 장비까지", "커피 머신·화구·재봉틀을 쓰실 수 있어요. 빌린 시간 동안 내 식으로 가게를 돌려 보는 자리예요."],
+  // 🔁09-17 QA — 설명이 손님 시점(「내 식으로」)이었다. 이 칸은 사장님이 읽고 고르는 자리라 손님을 3인칭으로 둔다.
+  ["space_only", "공간만 빌려드려요", "손님은 장비 없이 자리만 써요. 모임·촬영·라운지 대관 같은 것들이요."],
+  ["with_gear", "공간과 장비까지", "커피 머신·화구·재봉틀까지 쓰게 해 드려요. 손님이 빌린 시간 동안 자기 식으로 가게를 돌려 봐요."],
   // 🔻09-16 대표 — 「가게 그대로」 제거. 간판·메뉴까지 넘기는 건 무신고 영업 문제가 정리돼야 열 수 있고,
   //   지금 단계에서 고르게 두면 사장님이 무심코 골랐다가 법에 걸린다. `SpaceScope` 타입엔 남겨 둔다.
 ];
@@ -67,8 +69,11 @@ const RULE_EXAMPLES = [
 
 
 /** 🔻09-16 공통 이용 시간(`TIMES`)이 없어졌다 — 시간대는 이제 날짜마다 붙고 그 목록은 `OpenSlotsCalendar`가 쥔다.
- *  ⏱커피챗 길이. 30분 단위, 최대 8시간(=하루). 대표 09-14. */
-const MENTOR_CHOICES = Array.from({ length: 16 }, (_, i) => (i + 1) * 30);
+ *  ⏱커피챗 길이. 30분 단위(대표 09-14 · 09-17 결정 1).
+ *  🔁09-17 QA — 30분~8시간 열여섯 개였다. 커피챗을 8시간 하는 사장님은 없고, 폰에선 목록이 길어 스크롤해야 했다.
+ *    두 시간까지로 줄였다. ⚠️그보다 길게 저장해 둔 옛 공간은 그 값을 목록에 덧붙여 보여 준다(`chatChoices`) —
+ *    목록에 없으면 select가 첫 값(30분)을 보여 줘서, 안 고쳤는데 고친 것처럼 저장된다. */
+const MENTOR_CHOICES = [30, 60, 90, 120];
 
 /** 90 → 「1시간 30분」. 분만 남으면 「30분」, 딱 떨어지면 「2시간」. */
 function minutesLabel(m: number): string {
@@ -230,29 +235,40 @@ export function SpaceForm({
     });
 
   // 화면에서 먼저 막는 이유는 왕복을 아끼려는 것이지 이게 관문이라서가 아니다 — 관문은 늘 서버다.
-  const blocker = (): string => {
-    if (!name.trim()) return "공간 이름을 적어 주세요.";
-    if (!category) return "어떤 업종인지 골라 주세요.";
-    if (readyPhotos.length === 0) return "사진을 한 장 이상 올려 주세요. 사진 없는 공간은 아무도 안 빌려요.";
-    if (!addrBase.trim()) return "주소를 찾아 주세요.";
-    if (!contactPhone.trim()) return "매장 전화번호를 적어 주세요.";
-    if (rules.trim().length < 10) return "사용 시 유의 사항을 열 글자 이상 적어 주세요.";
-    if (priceHour <= 0) return "시간당 대여 비용을 적어 주세요.";
-    if (openSlots.length === 0) return "빌려줄 수 있는 날과 시간을 하나 이상 정해 주세요.";
+  // 📍09-17 QA — 이유와 함께 **어느 칸인지**(`f-<칸>`)를 돌려준다. 위쪽 칸이 비어도 말은 맨 아래 버튼 위에만 떠서
+  //   스크롤을 올려 찾아야 했다. 누르면 그 칸으로 올라가고 칸 바로 밑에도 같은 말을 적는다.
+  const blocker = (): [string, string] | null => {
+    if (!name.trim()) return ["name", "공간 이름을 적어 주세요."];
+    if (!category) return ["category", "어떤 업종인지 골라 주세요."];
+    if (readyPhotos.length === 0) return ["photos", "사진을 한 장 이상 올려 주세요. 사진 없는 공간은 아무도 안 빌려요."];
+    if (!addrBase.trim()) return ["address", "주소를 찾아 주세요."];
+    if (!contactPhone.trim()) return ["phone", "매장 전화번호가 비어 있어요."];
+    if (rules.trim().length < 10) return ["rules", "유의 사항을 열 글자 넘게 담아 주셔야 올릴 수 있어요."];
+    if (priceHour <= 0) return ["price", "한 시간에 얼마 받으실지 적어 주세요."];
+    if (openSlots.length === 0) return ["slots", "빌려줄 날을 달력에서 하루 이상 골라 주세요."];
     const badSlot = openSlots.find((sl) => hoursBetween(sl.start, sl.end) < Number(minHours));
-    if (badSlot) return `${dateLabel(badSlot.date)}은 최소 ${minHours}시간을 못 채워요. 시간을 늘리거나 그날을 빼 주세요.`;
-    if (chatOn && chatPrice <= 0) return "커피챗 비용을 적어 주세요.";
-    if (!termsOk) return "공간 제공자 약관에 동의해 주세요.";
-    return "";
+    if (badSlot) return ["slots", `${dateLabel(badSlot.date)}은 최소 ${minHours}시간을 못 채워요. 시간을 늘리거나 그날을 빼 주세요.`];
+    if (chatOn && chatPrice <= 0) return ["chatPrice", "커피챗 값이 비어 있어요."];
+    if (!termsOk) return ["terms", "공간 제공자 약관에 동의해 주세요."];
+    return null;
   };
-  const blocked = blocker();
+  const blockedPair = blocker();
+  const blocked = blockedPair?.[1] ?? "";
+  /** 이 칸이 지금 막고 있는 칸이면 그 말을, 아니면 빈 문자열. 한 번 눌러 본 뒤에만 말한다(`tried`). */
+  const fieldErr = (key: string) => (tried && !err && blockedPair?.[0] === key ? blockedPair[1] : "");
+
+  /** 커피챗 길이 선택지 — 옛 저장값이 목록 밖이면 그 값도 끼워 준다(위 `MENTOR_CHOICES` 주석). */
+  const chatChoices = MENTOR_CHOICES.includes(Number(chatMin))
+    ? MENTOR_CHOICES
+    : [...MENTOR_CHOICES, Number(chatMin)].sort((a, b) => a - b);
 
   const submit = () =>
     start(async () => {
       setErr("");
       setTried(true);
-      if (blocked) {
-        setErr(blocked);
+      if (blockedPair) {
+        // 빨간 말은 칸 밑에만 둔다(`fieldErr`). 버튼 위엔 같은 말이 옅은 글씨로 남아, 아래에서 다시 봐도 이유가 보인다.
+        document.getElementById(`f-${blockedPair[0]}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
         return;
       }
       const address = [addrBase.trim(), addrDetail.trim()].filter(Boolean).join(", ");
@@ -286,7 +302,20 @@ export function SpaceForm({
         return;
       }
       // 검토 대기라 `/rent/{slug}`는 아직 남에게 안 보인다. 자기 것이 어디 있는지 보이는 화면으로 보낸다.
-      router.push("/rent/my");
+      // 💬09-17 QA — 말없이 목록으로 떨어져서 「된 건가?」 했다. `saved`로 무슨 일이 났는지 한 줄 띄운다.
+      //   ⚠️검토로 내려가는 조건은 `saveSpaceAction`과 같은 규칙이다(이름·주소가 바뀌면). 거기를 바꾸면 여기도.
+      const renamed = !!initial && initial.name.trim() !== name.trim();
+      const moved = !!initial && initial.address.trim() !== address;
+      const saved = !initial
+        ? "new"
+        : initial.status === "pending"
+          ? "pending"
+          : renamed || moved
+            ? "review"
+            : initial.status === "open"
+              ? "ok"
+              : "kept";
+      router.push(`/rent/my?saved=${saved}`);
       router.refresh();
     });
 
@@ -297,7 +326,7 @@ export function SpaceForm({
     <div className="mt-10 space-y-12">
       {/* ── 어떤 공간인가 ── */}
       <Group title="어떤 공간인가요">
-        <L label="공간 이름" htmlFor="sp-name">
+        <L label="공간 이름" htmlFor="sp-name" anchor="name" error={fieldErr("name")}>
           <input
             id="sp-name"
             className={rentInputCls}
@@ -309,9 +338,12 @@ export function SpaceForm({
         {/* 🔻09-16 「한 줄로 말하면」을 빼고 그 자리에 **업종**을 넣었다(대표) — 검색하고 거를 수 있어야 한다.
             ⭐**두 축**으로 가른 이유는 조합이 폭발해서다. 카페 공간만 / 카페 + 머신 / 국밥집 화구까지 /
               예쁜 식당을 라운지로… 를 한 목록으로 만들면 끝이 없는데, 업종 × 범위면 두 칸으로 끝난다. */}
-        <L label="업종" htmlFor="sp-category">
+        {/* 🔁09-17 QA — 빈 선택지가 「고르지 않음」이라 안 골라도 되는 칸처럼 보였다. 업종은 필수다(폼·서버 둘 다 막는다). */}
+        <L label="업종" htmlFor="sp-category" anchor="category" error={fieldErr("category")}>
           <RentSelect id="sp-category" value={category} onChange={(e) => setCategory(e.target.value as SpaceCategory)}>
-            <option value="">고르지 않음</option>
+            <option value="" disabled>
+              업종을 골라 주세요
+            </option>
             {CATEGORY_OPTIONS.map(([v, t]) => (
               <option key={v} value={v}>
                 {t}
@@ -319,7 +351,7 @@ export function SpaceForm({
             ))}
           </RentSelect>
         </L>
-        <L label="어디까지 빌려드릴까요" hint="값을 정하는 근거가 돼요. 신청하는 분도 이걸 보고 고릅니다.">
+        <L label="어디까지 빌려드릴까요" hint="값을 정하는 근거가 돼요. 손님도 이걸 보고 골라요.">
           <div role="radiogroup" aria-label="빌려드리는 범위" className="space-y-2">
             {SCOPES.map(([v, t, d]) => (
               <button
@@ -362,7 +394,13 @@ export function SpaceForm({
             placeholder="어떤 사람들이 여기서 무엇을 했는지, 어떤 날에 제일 예쁜지 같은 이야기를 적어 주세요."
           />
         </L>
-        <L label="사진" hint="한 장 이상 올려 주세요. 첫 장이 대표 사진이 돼요.">
+        {/* 📸09-17 QA — 몇 장·어떤 사진이 좋은지 힌트가 없어 사장님은 예쁜 창가만 올렸다. 손님이 정할 때 보는 건 자리와 화장실이다. */}
+        <L
+          label="사진"
+          anchor="photos"
+          error={fieldErr("photos")}
+          hint="전경, 작업할 자리, 화장실 순으로 올려 두시면 손님이 고르기 쉬워요. 첫 장이 대표 사진이 돼요."
+        >
           {/* 🔁09-16 소개서 사진 격자(`register/PhotoGrid`)를 그대로 쓴다 — 대표: *「전반적으로 AI가 빠르게 만든
               티가 남, 특히 입력폼」*에서 마지막까지 남아 있던 칸이 여기였다(브라우저 기본 「파일 선택」 버튼).
               ⭐한 사이트에서 사진을 올리는 자리는 한 얼굴이어야 한다. 점선 ＋ 타일(드롭존 어피던스는 점선 예외),
@@ -384,6 +422,8 @@ export function SpaceForm({
         <L
           label="전체 주소"
           htmlFor="sp-address"
+          anchor="address"
+          error={fieldErr("address")}
           hint="신청하는 분이 공간 화면에서 보고 찾아오실 수 있게 지도와 함께 보여드려요."
         >
           <AddressField
@@ -403,7 +443,10 @@ export function SpaceForm({
         <L
           label="매장 전화번호"
           htmlFor="sp-phone"
-          hint="법에 따라 신청 전에 손님께 보여드려요. 사장님 개인 번호는 결제를 마친 손님께만 보여요."
+          anchor="phone"
+          error={fieldErr("phone")}
+          // 🔁09-17 QA — 「법에 따라」가 처음 듣는 사장님께 위협조로 읽혔다. 근거는 위 주석에 남기고 화면엔 결과만.
+          hint="가게 번호는 신청 전에 손님께 보여요. 사장님 휴대폰 번호는 결제를 마친 손님께만 열려요."
         >
           <input
             id="sp-phone"
@@ -418,7 +461,11 @@ export function SpaceForm({
 
         {/* 🔻09-16 「들어오는 법」 칸 삭제. 대표: *「비밀번호 이런 건 문자나 현장에서 당일에 안내하는 걸로」*.
             ⭐**우리는 그 내용을 안 가진다.** 담을 칸이 없으면 샐 일도 없다 — 방식만 고른다. */}
-        <L label="이용 안내는 어떻게 해드릴까요" hint="예약한 분께 사장님이 직접 전하시는 방법이에요. 출입 비밀번호 같은 건 collab5가 갖고 있지 않아요.">
+        {/* 🔁09-17 QA — 라벨에 «무엇을» 안내하는지가 없어서 힌트까지 읽어야 알았다. */}
+        <L
+          label="열쇠·비밀번호·기계 쓰는 법은 어떻게 전하실래요"
+          hint="예약한 손님께 사장님이 직접 전해 주세요. 출입 비밀번호 같은 건 collab5가 갖고 있지 않아요."
+        >
           <div className="flex flex-wrap gap-2">
             {ACCESS_OPTIONS.map(([v, t]) => (
               <button
@@ -501,7 +548,8 @@ export function SpaceForm({
           />
         </L>
 
-        <L label="최대 몇 명까지 수용이 가능한가요?" htmlFor="sp-cap" optional>
+        {/* 🔁09-17 QA — 「수용이 가능한가요」「숫자를 입력해주세요」가 이 폼에서 드문 행정어였고, 자리글은 폰에서 잘렸다. */}
+        <L label="몇 명까지 들어올 수 있나요" htmlFor="sp-cap" optional>
           {/* 🔁09-14 대표 — *「숫자 input으로 바꾸고 input 옆에 「명」으로 default로 넣어주라」*.
               단위를 칸 «안»에 박는다. 밖에 두면 좁은 화면에서 줄이 바뀌어 떨어진다(신청 폼과 같은 처리). */}
           <div className="relative w-[200px]">
@@ -513,7 +561,7 @@ export function SpaceForm({
               className={`${rentInputCls} pr-11`}
               value={capacity}
               onChange={(e) => setCapacity(e.target.value)}
-              placeholder="숫자를 입력해주세요"
+              placeholder="예) 8"
             />
             <span
               aria-hidden="true"
@@ -531,8 +579,9 @@ export function SpaceForm({
 
       {/* ── 사용 유의 사항 ── ⭐이 서비스에서 제일 중요한 칸.
            🔁09-14 대표 — 제목 「우리 집 규칙」 → **「사용 유의 사항」**(중간에 「공간 사용 규칙」을 거쳐 확정),
-             설명은 「공간 사용시 유의 사항을 적어주세요.」로. */}
-      <Group title="사용 유의 사항" sub="공간 사용시 유의 사항을 적어주세요.">
+             설명은 「공간 사용시 유의 사항을 적어주세요.」로.
+           🔁09-17 QA — 설명이 제목을 그대로 되풀이했고 「사용시」 띄어쓰기도 틀렸다. 누구를 위한 칸인지를 말한다. */}
+      <Group title="사용 유의 사항" sub="손님이 지켜 줬으면 하는 것들이에요. 하나씩 담아 주세요." anchor="rules" error={fieldErr("rules")}>
         {/* 🔁09-14 여러 줄 textarea → **한 줄 입력 + 담기**(대표: *「한 줄에 하나씩 말고 하나 쓰고 우측에
             입력 버튼, 추가하면 하단에 +규칙 추가 이런 식으로」*).
             ⭐줄바꿈으로 나누라는 건 «규칙»이 아니라 «약속»이었다 — 지키는 사람이 없으면 한 덩어리로 저장되고
@@ -614,7 +663,9 @@ export function SpaceForm({
         <L
           label="대여 비용"
           htmlFor="sp-price"
-          hint="한 시간에 얼마를 받으실지 적어 주세요. 대여하시는 분은 1시간 단위로 선택할 수 있어요."
+          anchor="price"
+          error={fieldErr("price")}
+          hint="한 시간 값을 적어 주세요. 손님은 한 시간 단위로 골라요."
         >
           <WonInput id="sp-price" value={priceHour} onChange={setPriceHour} placeholder="예) 15,000" />
           {/* ⭐정직하게 적는다. 「수수료 15%」만 적어 두면 사장님은 손에 쥐는 금액을 직접 계산해야 하고,
@@ -653,9 +704,11 @@ export function SpaceForm({
           <p className="text-[16px] font-medium leading-[28px] text-body">
             커피챗(유료)
           </p>
+          {/* 🔁09-17 QA — 「현업에서의」「제공하실」 행정어, 고를 것은 예/아니요뿐인데 「골라 주세요」였다.
+              카페 사장님이 쓰는 말(「가게를 열려는 분」)로 풀었다. */}
           <p className="mt-1 text-[15px] leading-relaxed break-keep text-mute">
-            레시피나 비법이 아니라, 현업에서의 하루가 어떻게 돌아가는지를 들려주실 수 있나요? 현업 진출을 고민하시는
-            분들을 위해 제공하실 내용이 있다면 골라 주세요.
+            가게를 열어 보려는 분께 하루가 어떻게 돌아가는지 들려주실 수 있나요? 레시피는 안 알려 주셔도 돼요. 재료를
+            어디서 떼는지, 언제 몰리고 언제 비는지 같은 이야기면 충분해요.
           </p>
 
           {/* 아니요가 먼저이자 기본 — 대부분의 사장님에게 「안 해도 된다」가 먼저 보여야 부담이 없다. */}
@@ -683,6 +736,8 @@ export function SpaceForm({
 
           {chatOn && (
             <div className="mt-5 space-y-6">
+              {/* ☕「언제」는 `rent-copy` 한 줄만 쓴다(대표 09-17 결정 1). 손님 쪽 화면·메일이 같은 말을 한다. */}
+              <p className="text-[15px] leading-relaxed break-keep text-body">{COFFEE_CHAT_WHEN_HOST}</p>
               <L label="얼마나 이야기 나누실까요" htmlFor="sp-cm">
                 <RentSelect
                   id="sp-cm"
@@ -690,21 +745,21 @@ export function SpaceForm({
                   value={chatMin}
                   onChange={(e) => setChatMin(e.target.value)}
                 >
-                  {MENTOR_CHOICES.map((m) => (
+                  {chatChoices.map((m) => (
                     <option key={m} value={m}>
                       {minutesLabel(m)}
                     </option>
                   ))}
                 </RentSelect>
               </L>
-              <L label="커피챗 비용" htmlFor="sp-cp">
+              <L label="커피챗 비용" htmlFor="sp-cp" anchor="chatPrice" error={fieldErr("chatPrice")}>
                 <WonInput id="sp-cp" value={chatPrice} onChange={setChatPrice} placeholder="예) 20,000" />
               </L>
               <L
                 label="어떤 이야기를 들려주실 수 있나요"
                 htmlFor="sp-ct"
                 optional
-                hint="적어 두시면 신청하는 분이 무엇을 사는지 알고 고릅니다."
+                hint="적어 두시면 손님이 무슨 이야기를 듣게 될지 알고 골라요."
               >
                 <textarea
                   id="sp-ct"
@@ -723,7 +778,10 @@ export function SpaceForm({
       {/* ── 여는 날·시간 ── 실사에서 이 데이터를 가진 곳이 23곳 중 0곳이었다(설계 §조사 ②). */}
       <Group
         title="대여 가능한 날짜 선택"
-        sub="요일마다 여는 시간을 정하고 달력에서 날짜를 누르세요. 대여하시는 분에게 선택한 날짜가 노출됩니다."
+        // 🔁09-17 QA — 「노출됩니다」(피동·행정)가 아래 결과 줄의 「보입니다」와 같은 말 두 번이었다. 여기 한 번만.
+        sub="달력에서 날짜를 누르고, 요일마다 여는 시간을 정해 주세요. 고른 날이 손님에게 보여요."
+        anchor="slots"
+        error={fieldErr("slots")}
       >
         <OpenSlotsCalendar value={openSlots} onChange={setOpenSlots} minHours={Number(minHours) || 1} />
       </Group>
@@ -735,7 +793,13 @@ export function SpaceForm({
               약관은 동의 시각이 남아 계약의 근거가 된다(약관규제법 제3조③④).
             ⚖️조사(09-16)로 확인한 것 — 아워플레이스·에어비앤비 둘 다 호스트 편을 따로 두고,
               우리 기존 약관엔 호스트 의무가 한 줄도 없었다. 수수료·정산·구상을 주장할 근거가 없었다. */}
-        <div className="space-y-4">
+        {/* 🏠09-17 대표 결정 6 — 임대인 동의 «체크»는 다시 넣지 않는다. 대신 동의 바로 위에 한 줄로 먼저 생각하게 한다.
+            임차 가게 사장님은 여기서 처음 떠올린다(QA). */}
+        <p className="text-[15px] leading-relaxed break-keep text-body">
+          공간을 빌려주는 데 막히는 것이 없는지 미리 살펴봐 주세요. 임대차 계약이나 건물 관리 규약에 제한이 있을 수
+          있어요.
+        </p>
+        <div id="f-terms" className="space-y-4">
           <label className="flex cursor-pointer items-start gap-3">
             <input
               type="checkbox"
@@ -752,17 +816,29 @@ export function SpaceForm({
           </label>
           <p className="text-[15px] leading-relaxed break-keep text-mute">
             내 소유이거나 임대인 동의를 받았다는 것, 수수료 {Math.round(feeRate * 100)}%와 정산 방법,
-            환불 규정이 담겨 있어요. 신청하는 분께는 브랜드 이름·주소·매장 전화번호가 신청 전에 보입니다.
+            환불 규정이 담겨 있어요. 손님은 신청하기 전에 브랜드 이름·주소·매장 전화번호를 볼 수 있어요.
           </p>
+          {fieldErr("terms") && <p className="text-[15px] leading-relaxed break-keep text-danger">{fieldErr("terms")}</p>}
         </div>
 
         {/* 📎09-16 대표 — 소개서가 있는 사장님은 손님에게 보여줄지 «고른다». 켜면 공간 화면엔 브랜드 이름만,
             결제를 마친 손님의 예약 내역엔 소개서 링크까지 열린다(연락처가 같이 열리는 시점이라 새는 게 없다). */}
+        {/* 📝09-17 QA — 소개서 없는 사장님에겐 이 자리가 통째로 비어 있었다. 소개서 서비스인데 그 문이 닫혀 있던 셈이라
+            같은 자리에 만드는 길 한 줄을 둔다. 새 탭 — 여기까지 채운 폼 값이 날아가지 않게. */}
+        {myBrands.length === 0 && (
+          <p className="text-[15px] leading-relaxed break-keep text-mute">
+            소개서가 있으면 손님이 사장님 이야기를 미리 볼 수 있어요.{" "}
+            <a href="/register" target="_blank" rel="noreferrer" className="text-body underline underline-offset-2">
+              소개서 만들기
+            </a>
+          </p>
+        )}
         {myBrands.length > 0 && (
           <div>
             <p className="text-[16px] font-medium leading-[28px] text-body">내 소개서 보여주기</p>
+            {/* 🔁09-17 대표 결정 3 — 공간 화면에서 소개서 링크를 연다. 옛 설명(「이름만 나가요 · 결제한 손님께만 링크」)은 더 이상 맞지 않는다. */}
             <p className="mt-1 text-[15px] leading-relaxed break-keep text-mute">
-              공간 화면에는 브랜드 이름만 나가요. 소개서 링크는 결제를 마친 손님께만 보여요.
+              켜 두시면 공간 화면에 소개서 링크가 같이 보여요. 손님이 빌리기 전에 사장님 이야기를 읽어 볼 수 있어요.
             </p>
             <div role="radiogroup" aria-label="소개서 보여주기" className="mt-3 flex gap-2">
               {[
@@ -825,9 +901,13 @@ export function SpaceForm({
                 : "등록하기"}
         </button>
         <p className="mt-3 text-center text-[15px] leading-relaxed break-keep text-faint">
-          {editing
-            ? "주소나 매장 이름을 고치신 경우에만 다시 한 번 읽어봐요. 나머지는 바로 반영됩니다."
-            : "등록 요청하시면 collab5 검토 후 승인이 완료되는 대로 하루 가게에 노출이 시작돼요."}
+          {/* 🔁09-17 QA — 「승인이 완료되는 대로 노출이 시작돼요」 명사화 둘, 고치기 쪽은 머리글과 같은 말 + 「반영됩니다」 피동.
+              검토 기한은 아직 대표가 안 정해서 적지 않는다. */}
+          {!editing
+            ? "올리시면 저희가 읽어 보고 목록에 열어 드려요."
+            : initial?.status === "pending"
+              ? "고친 내용은 지금 하는 검토에 같이 담겨요."
+              : "매장 이름이나 주소를 바꾸시면 한 번 더 읽어 볼게요. 그동안 목록에서 잠시 빠져요."}
         </p>
       </div>
     </div>
@@ -866,14 +946,28 @@ function WonInput({
 
 /** 묶음 제목 + 칸들. 한 화면에 칸이 스무 개라 구역이 없으면 어디까지 적었는지 놓친다.
  *  제목 → 첫 입력 23px(register `GroupHeader` 규칙). 칸 사이 24px. */
-function Group({ title, sub, children }: { title: string; sub?: string; children: React.ReactNode }) {
+function Group({
+  title,
+  sub,
+  anchor,
+  error,
+  children,
+}: {
+  title: string;
+  sub?: string;
+  /** 막힌 칸으로 스크롤할 때 찾는 이름(`f-<anchor>`). */
+  anchor?: string;
+  error?: string;
+  children: React.ReactNode;
+}) {
   return (
-    <section>
+    <section id={anchor ? `f-${anchor}` : undefined}>
       <div className="mb-[23px]">
         <h2 className="text-[21px] font-bold leading-snug tracking-tight text-ink">{title}</h2>
         {sub && <p className="mt-2 text-[15px] leading-relaxed break-keep text-mute">{sub}</p>}
       </div>
       <div className="space-y-6">{children}</div>
+      {error && <p className="mt-3 text-[15px] leading-relaxed break-keep text-danger">{error}</p>}
     </section>
   );
 }
@@ -886,22 +980,29 @@ function L({
   htmlFor,
   optional,
   hint,
+  anchor,
+  error,
   children,
 }: {
   label: string;
   htmlFor?: string;
   optional?: boolean;
   hint?: string;
+  /** 막힌 칸으로 스크롤할 때 찾는 이름(`f-<anchor>`). */
+  anchor?: string;
+  /** 🙋칸 바로 밑에 뜨는 말 — 한 번 눌러 본 뒤, 이 칸이 막고 있을 때만(09-17). */
+  error?: string;
   children: React.ReactNode;
 }) {
   return (
-    <div>
+    <div id={anchor ? `f-${anchor}` : undefined}>
       <label htmlFor={htmlFor} className="mb-2 block text-[16px] font-medium text-body">
         {label}
         {optional && <span className="ml-1 text-[15px] font-normal text-faint">· 선택</span>}
       </label>
       {hint && <p className="-mt-0.5 mb-2 text-[15px] leading-relaxed break-keep text-faint">{hint}</p>}
       {children}
+      {error && <p className="mt-2 text-[15px] leading-relaxed break-keep text-danger">{error}</p>}
     </div>
   );
 }

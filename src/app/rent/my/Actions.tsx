@@ -23,7 +23,8 @@ import {
 import { InfoList, InfoRow, primaryBtnCls, rentTextareaCls, secondaryBtnCls, won } from "../ui";
 import { ConfirmDialog } from "../ConfirmDialog";
 
-/** 받은 신청 — 수락 · 거절. 거절은 전액 환불이라 되돌릴 수 없다(대표 09-13). */
+/** 들어온 요청 — 수락 · 거절. 거절은 전액 환불이라 되돌릴 수 없다(대표 09-13).
+ *  🔁09-17 대표 결정 4 — 사장님 쪽에 들어온 건 «요청»이라 부른다(손님 쪽은 결제 뒤 «예약»). */
 export function HostDecide({
   bookingId,
   amountTotal,
@@ -49,6 +50,10 @@ export function HostDecide({
         setErr(r.message);
         return;
       }
+      // 💬09-17 QA — 누르면 버튼이 사라지고 화면이 조용히 바뀌어서 됐는지 배지를 찾아봐야 했다.
+      //   이 버튼은 상태가 바뀌면 화면에서 빠지므로(부모가 `paid`일 때만 그린다) 결과 줄은 부모가 띄운다.
+      //   `did`와 예약 번호를 주소에 실어 보내면 그 줄 안에 한 번 뜬다. 거절 뒤 환불 성패는 부모가 상태로 읽는다.
+      router.replace(`/rent/my?did=${accept ? "accept" : "reject"}&b=${bookingId}`, { scroll: false });
       router.refresh();
     });
 
@@ -62,13 +67,13 @@ export function HostDecide({
         value={message}
         onChange={(e) => setMessage(e.target.value)}
         placeholder="한 줄 남기실 말 (예: 그날 오전엔 제가 있을게요)"
-        aria-label="신청하신 분께 남길 말"
+        aria-label="손님께 남길 말"
       />
       {err && <p className="text-[15px] leading-relaxed break-keep text-danger">{err}</p>}
       {/* ⏯이용 시간이 이미 지난 신청 — 답을 못 한 채 날이 갔다. 손님 돈이 붙잡혀 있으니 돌려줄 길만 남긴다. */}
       {started && (
         <p className="text-[15px] leading-relaxed break-keep text-mute">
-          이용 시간이 이미 지나 수락할 수 없어요. 거절하시면 신청하신 분께 전액 환불됩니다.
+          이용 시간이 이미 지나 수락할 수 없어요. 거절하시면 손님께 전액 돌아가요.
         </p>
       )}
       <div className="flex gap-2">
@@ -96,7 +101,7 @@ export function HostDecide({
       </div>
       <ConfirmDialog
         open={confirmReject}
-        title="이 신청을 거절할까요"
+        title="이 요청을 거절할까요"
         confirmLabel="거절하기"
         busy={pending}
         onConfirm={() => run(false)}

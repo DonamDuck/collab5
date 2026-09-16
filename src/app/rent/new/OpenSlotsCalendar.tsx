@@ -144,6 +144,10 @@ export function OpenSlotsCalendar({
 
   return (
     <div className="space-y-4">
+      {/* 👆🔁09-17 QA — 이 안내가 달력 «아래»에 있어서 다 누른 뒤에야 읽혔다. 머리글이 버튼이라는 걸 누르기 전에 안다. */}
+      <p className="text-[15px] leading-relaxed break-keep text-mute">
+        요일(일·월·화…)을 누르면 이 달의 그 요일이 한 번에 담겨요.
+      </p>
       {/* ── ① 달력 ── */}
       <div className="rounded-md border border-border-strong bg-surface p-3">
         <div className="flex items-center justify-between">
@@ -168,7 +172,8 @@ export function OpenSlotsCalendar({
               type="button"
               onClick={() => toggleDow(i)}
               aria-label={`${d}요일 전부 담기`}
-              className="rounded-md py-1.5 text-center text-[13px] font-medium text-faint transition-colors hover:bg-surface-soft hover:text-body"
+              // 누를 수 있는 얼굴 — 옅은 알약 면(09-17 QA: 회색 작은 글자라 표 머리로만 보였다).
+              className="mx-0.5 mb-1 rounded-pill bg-surface-soft py-1.5 text-center text-[14px] font-medium text-body transition-colors hover:bg-primary-pale"
             >
               {d}
             </button>
@@ -205,9 +210,6 @@ export function OpenSlotsCalendar({
             );
           })}
         </div>
-        <p className="mt-2 text-[14px] leading-relaxed break-keep text-faint">
-          요일(일·월·화…)을 누르면 이 달의 그 요일이 한 번에 담겨요.
-        </p>
       </div>
 
       {/* ── ② 고른 요일의 시간 ── 달력 «아래», 고른 요일만(대표 09-16). */}
@@ -219,7 +221,7 @@ export function OpenSlotsCalendar({
         <div className="rounded-md border border-border-strong bg-surface p-3">
           <p className="text-[16px] font-medium text-ink">몇 시에 여시나요</p>
           <p className="mt-1 text-[15px] leading-relaxed break-keep text-mute">
-            고르신 요일만 나와요. 여기서 바꾸면 그 요일로 고른 날이 같이 바뀝니다.
+            고르신 요일만 나와요. 여기서 바꾸면 그 요일로 고른 날이 같이 바뀌어요.
           </p>
           <div className="mt-3 space-y-2.5">
             {usedDows.map((d) => {
@@ -273,8 +275,8 @@ export function OpenSlotsCalendar({
       {sorted.length > 0 && (
         <div>
           <p className="text-[15px] leading-relaxed break-keep text-body">
-            <span className="font-medium text-ink">{sorted.length}일</span>을 여셨어요. 대여하시는 분에게 이 날짜가
-            보입니다.
+            {/* 🔻「대여하시는 분에게 이 날짜가 보입니다」 삭제 — 절 설명과 같은 말이 두 번이었다(09-17 QA). */}
+            <span className="font-medium text-ink">{sorted.length}일</span>을 여셨어요.
           </p>
 
           {odds.length > 0 && (
