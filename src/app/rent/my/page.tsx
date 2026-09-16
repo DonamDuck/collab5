@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { markFinishedBookings, listSpacesByOwner, listBookingsForHost, isRevealed } from "@/lib/spaces";
+import { sweepBookings, listSpacesByOwner, listBookingsForHost, isRevealed } from "@/lib/spaces";
 import { getSessionUserId, getProfileById, type Profile } from "@/lib/profiles";
 import type { Space } from "@/lib/types";
 import { isRentAdmin } from "@/lib/rent-actions";
@@ -56,7 +56,7 @@ export default async function MyRentPage() {
 
   // ⏹읽기 «전에» 끝난 확정 예약을 「다녀왔어요」로 넘긴다(09-16). 뒤에서 넘기면 이번 화면엔 옛 상태가 나간다.
   //   크론 대신 이 화면이 열릴 때 한다 — 끝난 예약은 누군가 볼 때 넘어가면 충분하고, 두 번 불려도 같은 결과다.
-  await markFinishedBookings();
+  await sweepBookings();
 
   // 보낸 신청은 줄과 함께 `loadGuestBookings`가 읽는다 — `/rent/requests`와 같은 한 벌(09-16).
   const [me, mySpaces, hostBookings, guestBookings] = await Promise.all([

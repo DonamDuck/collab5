@@ -9,6 +9,8 @@
 //     ⭐배포 전에 사람이 확인해야 하는 것은 언젠가 한 번은 빠진다. 그래서 코드가 막는다.
 //   운영에서 키가 비어 있으면 결제는 **실패로 떨어진다** — 조용히 통과하는 것보다 낫다.
 
+import type { TossPayment } from "./types";
+
 const TOSS_BASE = "https://api.tosspayments.com/v1/payments";
 
 function secret(): string {
@@ -43,23 +45,33 @@ function authHeader(): string {
 
 export interface ApproveResult {
   ok: boolean;
-  paymentKey: string;
+  /** 승인됐을 때 토스가 돌려준 Payment 객체 그대로. `rent_sync`에 그대로 넘긴다. */
+  payment?: TossPayment;
   /** 실패했을 때 사람이 읽을 이유. 화면에 그대로 보여도 되는 문장만 담는다. */
   message: string;
 }
 
 /** 결제 승인 — 결제창이 돌려준 `paymentKey`·`orderId`·`amount`를 서버에서 다시 확정한다.
- *  🚨**금액을 클라이언트가 준 값으로 믿지 마라.** 호출부가 공간 값에서 다시 계산한 금액을 넘겨야 한다. */
+ *  🚨**금액을 클라이언트가 준 값으로 믿지 마라.** 호출부가 결제 줄에 적힌 금액을 넘겨야 한다.
+ *  ⭐09-16부터 토스 응답(Payment)을 «그대로» 돌려준다. 돈의 상태는 우리가 계산하지 않고 토스 말을 옮긴다. */
 export async function approvePayment(
   paymentKey: string, orderId: string, amount: number
 ): Promise<ApproveResult> {
   if (!paymentsLive()) {
     if (!mockAllowed()) {
       console.error(`[rent-payment] 🚨운영에 TOSS_SECRET_KEY가 없다 — 승인을 거절한다 (order=${orderId})`);
-      return { ok: false, paymentKey, message: "결제를 처리할 수 없어요. 잠시 뒤 다시 시도해 주세요." };
+      return { ok: false, message: "결제를 처리할 수 없어요. 잠시 뒤 다시 시도해 주세요." };
     }
     console.warn(`[rent-payment] 모의 승인 — TOSS_SECRET_KEY 없음 (order=${orderId}, ${amount}원)`);
-    return { ok: true, paymentKey: paymentKey || `mock_${orderId}`, message: "모의 승인" };
+    // 모의 응답도 토스와 «같은 모양»으로 만든다. 모양이 다르면 모의 모드에서만 도는 길이 생긴다.
+    return {
+      ok: true,
+      message: "모의 승인",
+      payment: {
+        paymentKey: paymentKey || `mock_${orderId}`, orderId, status: "DONE",
+        totalAmount: amount, balanceAmount: amount, method: "모의", approvedAt: new Date().toISOString(), cancels: [],
+      },
+    };
   }
   // 🧪가맹 심사 기간에는 «운영»에 테스트 키가 달려 있다([[결제-모듈-토스]] 순서).
   //   그 상태에서 들어온 신청은 돈이 안 움직이는데 예약은 확정된다. 막지는 않는다(막으면 심사가 안 된다).
@@ -73,25 +85,40 @@ export async function approvePayment(
       headers: { Authorization: authHeader(), "Content-Type": "application/json" },
       body: JSON.stringify({ paymentKey, orderId, amount }),
     });
-    const body = (await res.json()) as { message?: string; paymentKey?: string };
-    if (!res.ok) return { ok: false, paymentKey, message: body.message || "결제 승인에 실패했어요." };
-    return { ok: true, paymentKey: body.paymentKey || paymentKey, message: "" };
+    const body = (await res.json()) as TossPayment & { message?: string };
+    if (!res.ok) return { ok: false, message: body.message || "결제 승인에 실패했어요." };
+    return { ok: true, message: "", payment: body };
   } catch (e) {
     console.error(`[rent-payment] approve threw order=${orderId}: ${String(e)}`);
-    return { ok: false, paymentKey, message: "결제 서버에 닿지 못했어요. 잠시 뒤 다시 시도해 주세요." };
+    return { ok: false, message: "결제 서버에 닿지 못했어요. 잠시 뒤 다시 시도해 주세요." };
   }
 }
 
+export interface CancelResult {
+  ok: boolean;
+  /** 환불이 됐을 때 토스가 돌려준 Payment 객체(남은 돈·환불 이력이 들어 있다). */
+  payment?: TossPayment;
+}
+
 /** 결제 취소 — 호스트 거절과 게스트 취소가 둘 다 이리로 온다.
- *  ⚠️`amount`를 주면 부분 취소, 안 주면 전액이다. **호스트 거절은 언제나 전액**이다(대표 09-13). */
+ *  ⚠️`amount`를 주면 부분 취소, 안 주면 전액이다. **호스트 거절은 언제나 전액**이다(대표 09-13).
+ *  `balanceBefore`는 모의 모드에서 토스와 같은 모양의 응답을 만들 때만 쓴다(지금 남은 돈). */
 export async function cancelPayment(
-  paymentKey: string, reason: string, amount?: number
-): Promise<boolean> {
+  paymentKey: string, reason: string, amount: number | undefined, balanceBefore: number,
+): Promise<CancelResult> {
   if (!paymentsLive()) {
     // 🔁취소는 승인과 «반대로» 관대하게 둔다. 운영에 키가 없으면 애초에 승인이 안 되니
     //   취소할 실제 결제도 없다. 여기서 막으면 환불 흐름만 붙잡혀 예약이 취소 불가로 남는다.
     console.warn(`[rent-payment] 모의 취소 — key=${paymentKey} (${reason})`);
-    return true;
+    const cancelAmount = amount ?? balanceBefore;
+    const balance = Math.max(0, balanceBefore - cancelAmount);
+    return {
+      ok: true,
+      payment: {
+        paymentKey, status: balance === 0 ? "CANCELED" : "PARTIAL_CANCELED", balanceAmount: balance,
+        cancels: [{ cancelAmount, cancelReason: reason, canceledAt: new Date().toISOString() }],
+      },
+    };
   }
   try {
     const res = await fetch(`${TOSS_BASE}/${encodeURIComponent(paymentKey)}/cancel`, {
@@ -99,15 +126,15 @@ export async function cancelPayment(
       headers: { Authorization: authHeader(), "Content-Type": "application/json" },
       body: JSON.stringify(amount ? { cancelReason: reason, cancelAmount: amount } : { cancelReason: reason }),
     });
+    const body = (await res.json().catch(() => ({}))) as TossPayment & { message?: string };
     if (!res.ok) {
-      const body = (await res.json().catch(() => ({}))) as { message?: string };
       console.error(`[rent-payment] cancel failed key=${paymentKey}: ${body.message ?? res.status}`);
-      return false;
+      return { ok: false };
     }
-    return true;
+    return { ok: true, payment: body };
   } catch (e) {
     console.error(`[rent-payment] cancel threw key=${paymentKey}: ${String(e)}`);
-    return false;
+    return { ok: false };
   }
 }
 

@@ -7,7 +7,10 @@
 //   같은 이유로 `profiles.ts`도 자기 클라이언트를 따로 들고 있다 — 그 패턴을 그대로 빌렸다.
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import type { Space, SpacePublic, SpaceBooking, SpaceStatus, BookingStatus, OpenSlot } from "./types";
+import type {
+  Space, SpacePublic, SpaceBooking, SpaceStatus, BookingStatus, OpenSlot,
+  Payment, PaymentStatus, PayoutStatus, TossPayment,
+} from "./types";
 import { bookingFinished, todayKst } from "./rent-time";
 
 function db(): SupabaseClient | null {
@@ -107,10 +110,6 @@ function toBooking(r: Row): SpaceBooking {
     amountSpace: n(r.amount_space), amountMentor: n(r.amount_mentor), amountTotal: n(r.amount_total),
     feeRate: typeof r.fee_rate === "number" ? r.fee_rate : Number(r.fee_rate ?? FEE_RATE),
     amountPayout: n(r.amount_payout),
-    // ⚠️두 칸은 09-16 마이그레이션(`2026-09-16-rent-payout.sql`)이 만든다. 돌리기 전엔 행에 없어서
-    //   0 / undefined로 읽힌다 — 읽기는 안 깨진다. 쓰기는 따로 떼어 두었다(`recordRefund`·`markPaidOut`).
-    amountRefunded: n(r.amount_refunded),
-    paidOutAt: r.paid_out_at ? s(r.paid_out_at) : undefined,
     paymentKey: s(r.payment_key), orderId: s(r.order_id),
     status: (s(r.status) || "paid") as BookingStatus,
     hostMessage: s(r.host_message),
@@ -246,7 +245,6 @@ export async function saveSpace(input: SpaceSaveInput): Promise<Space | null> {
 export type BookingCreateInput = Omit<
   SpaceBooking,
   "id" | "status" | "hostMessage" | "decidedAt" | "createdAt" | "updatedAt" | "amountPayout" | "feeRate"
-  | "amountRefunded" | "paidOutAt"
 >;
 
 /** 결제창으로 보내기 «직전»에 자리를 잡아 둔다.
@@ -309,19 +307,9 @@ export async function getBookingByOrderId(orderId: string): Promise<SpaceBooking
   return data ? toBooking(data as Row) : null;
 }
 
-/** 승인된 결제를 행에 못 박는다. `pending`일 때만 통과한다.
- *  🩸**여기서 유니크 인덱스에 걸릴 수 있다** — 같은 날짜를 누가 먼저 결제했다는 뜻이고,
- *    그때는 호출부가 **환불로 이어가야 한다.** 실패를 조용히 삼키면 돈만 받고 예약이 없는 상태가 된다. */
-export async function markBookingPaid(orderId: string, paymentKey: string): Promise<SpaceBooking | null> {
-  const c = db();
-  if (!c) return null;
-  const { data, error } = await c.from("space_bookings")
-    .update({ status: "paid", payment_key: paymentKey })
-    .eq("order_id", orderId).eq("status", "pending")
-    .select().maybeSingle();
-  if (error) { console.error(`[spaces] markPaid failed order=${orderId}: ${error.message}`); return null; }
-  return data ? toBooking(data as Row) : null;
-}
+// 🔻`markBookingPaid`는 09-16에 지웠다. 승인은 이제 `rentSync(orderId, "paid", 토스응답)` 한 번이다 —
+//   예약을 paid로 올리는 것과 결제를 DONE으로 적는 것이 한 트랜잭션이라, 시간이 겹쳐 예약이 막히면
+//   결제 기록도 같이 안 바뀐다(그때 호출부가 환불로 잇는다).
 
 export async function getBooking(id: number): Promise<SpaceBooking | null> {
   const c = db();
@@ -336,9 +324,10 @@ export async function listBookingsForHost(ownerUserId: number): Promise<SpaceBoo
   if (!c) return [];
   const mine = await listSpacesByOwner(ownerUserId);
   if (mine.length === 0) return [];
-  // 🚨`pending`을 뺀다. 결제 전 신청이 사장님께 보이면 거기서 바로 직거래로 샐 수 있다(대표 09-13).
+  // 🚨`pending`·`expired`를 뺀다. 결제 전 신청이 사장님께 보이면 거기서 바로 직거래로 샐 수 있다(대표 09-13).
+  //   `expired`(09-16)는 결제창만 열고 떠난 신청이라 pending과 같은 이유로 안 보인다 — 빠뜨리면 그 구멍이 다시 열린다.
   const { data } = await c.from("space_bookings").select("*")
-    .in("space_id", mine.map((sp) => sp.id)).neq("status", "pending")
+    .in("space_id", mine.map((sp) => sp.id)).not("status", "in", "(pending,expired)")
     .order("created_at", { ascending: false });
   return (data ?? []).map((r) => toBooking(r as Row));
 }
@@ -372,66 +361,130 @@ export async function setBookingStatus(id: number, status: BookingStatus): Promi
   await c.from("space_bookings").update({ status }).eq("id", id);
 }
 
-// ─── 끝난 예약 · 정산 (2026-09-16) ───
+// ─── 결제 (2026-09-16) ───
+// ⭐예약과 결제는 두 테이블이고, 두 상태를 바꾸는 문은 DB 함수 `rent_sync` 하나다(대표 09-16).
+//   앱이 두 번 나눠 쓰면 가운데서 끊기는 날 「예약은 취소, 결제는 완료」가 생긴다. 함수 안은 한 트랜잭션이다.
 
-/** ⏹끝난 확정 예약을 「다녀왔어요」(`done`)로 넘긴다. 몇 건 넘겼는지 돌려준다.
- *
- *  🩸09-16까지 **아무것도 `done`을 안 만들었다.** 확정 예약은 이용일이 지나도 영원히 `confirmed`였고,
- *    그래서 ①이미 쓴 예약에 취소 버튼이 떴고 ②약관 제9조 「이용이 끝난 것을 확인한 뒤 정산」이 판정할 상태가 없었다.
- *  ⭐**크론을 안 쓴다.** 이 화면들이 열릴 때 부른다(`/rent/my`·정산 화면). 끝난 예약을 누군가 보는 순간
- *    넘어가면 충분하고, 조건절이 `status = confirmed`라 두 번 불려도 같은 결과다(멱등).
- *  ⭐판정은 SQL이 아니라 `bookingFinished` 한 벌로 한다 — SQL과 TS가 각자 「끝났다」를 정의하면 언젠가 갈라진다. */
-export async function markFinishedBookings(): Promise<number> {
-  const c = db();
-  if (!c) return 0;
-  const { data, error } = await c
-    .from("space_bookings")
-    .select("id,use_date,end_time")
-    .eq("status", "confirmed")
-    .lte("use_date", todayKst());
-  if (error || !data) return 0;
-  const ids = data
-    .filter((r) => bookingFinished({ useDate: s(r.use_date), endTime: s(r.end_time).slice(0, 5) }))
-    .map((r) => n(r.id));
-  if (ids.length === 0) return 0;
-  // 🔒조건절을 «두 겹»으로 — id 목록 + 지금도 confirmed인 것. 그 사이 손님이 취소했으면 덮어쓰지 않는다.
-  const { error: upErr } = await c.from("space_bookings").update({ status: "done" }).in("id", ids).eq("status", "confirmed");
-  if (upErr) { console.error(`[spaces] markFinished failed: ${upErr.message}`); return 0; }
-  return ids.length;
+function toPayment(r: Row): Payment {
+  return {
+    id: n(r.id), orderId: s(r.order_id), paymentKey: s(r.payment_key),
+    purpose: "rent_booking",
+    bookingId: typeof r.booking_id === "number" ? r.booking_id : undefined,
+    buyingUserId: typeof r.buying_user_id === "number" ? r.buying_user_id : undefined,
+    sellingUserId: typeof r.selling_user_id === "number" ? r.selling_user_id : undefined,
+    amount: n(r.amount), balanceAmount: n(r.balance_amount), method: s(r.method),
+    status: (s(r.status) || "READY") as PaymentStatus,
+    approvedAt: r.approved_at ? s(r.approved_at) : undefined,
+    canceledAt: r.canceled_at ? s(r.canceled_at) : undefined,
+    feeRate: typeof r.fee_rate === "number" ? r.fee_rate : Number(r.fee_rate ?? FEE_RATE),
+    payoutAmount: n(r.payout_amount),
+    payoutStatus: (s(r.payout_status) || "NONE") as PayoutStatus,
+    payoutRequestedAt: r.payout_requested_at ? s(r.payout_requested_at) : undefined,
+    payoutDoneAt: r.payout_done_at ? s(r.payout_done_at) : undefined,
+    createdAt: s(r.created_at), updatedAt: s(r.updated_at),
+  };
 }
 
-/** 💸환불한 금액을 남긴다. ⚠️상태 변경과 «따로» 부른다 — 마이그레이션 전이면 이 칸이 없어 실패하는데,
- *  그게 취소 자체를 막으면 안 된다. 실패하면 콘솔에만 남는다. */
-export async function recordRefund(id: number, amount: number): Promise<void> {
+/** 결제창을 열기 «직전»에 결제 줄을 만든다(READY). 예약 pending 줄과 같은 주문번호다.
+ *  ⚠️판매자 칸은 하루 가게에선 반드시 채운다 — 지급대행이 돈을 보낼 상대가 이 사람이다. */
+export async function createPayment(input: {
+  orderId: string; bookingId: number; buyingUserId: number; sellingUserId: number; amount: number;
+}): Promise<Payment | null> {
+  const c = db();
+  if (!c) return null;
+  const { data, error } = await c.from("payments").insert({
+    order_id: input.orderId, purpose: "rent_booking", booking_id: input.bookingId,
+    buying_user_id: input.buyingUserId, selling_user_id: input.sellingUserId,
+    amount: input.amount, balance_amount: input.amount, status: "READY", fee_rate: FEE_RATE,
+  }).select().maybeSingle();
+  if (error) { console.error(`[spaces] payment insert failed order=${input.orderId}: ${error.message}`); return null; }
+  return data ? toPayment(data as Row) : null;
+}
+
+export async function getPaymentByOrderId(orderId: string): Promise<Payment | null> {
+  const c = db();
+  if (!c) return null;
+  const { data } = await c.from("payments").select("*").eq("order_id", orderId).maybeSingle();
+  return data ? toPayment(data as Row) : null;
+}
+
+/** 🔒예약·결제·지급 상태를 «같이» 옮기는 유일한 문. 셋 다 null이면 아무것도 안 바꾼다.
+ *  - `bookingStatus` 예약을 무엇으로
+ *  - `toss` 토스 Payment 응답(돈의 상태는 우리가 계산하지 않고 토스 말을 옮긴다)
+ *  - `payoutStatus` 지급 상태를 무엇으로
+ *  실패하면 둘 다 안 바뀐 것이다(DB 함수가 한 트랜잭션). 호출부가 그 뒤를 책임진다. */
+export async function rentSync(
+  orderId: string,
+  change: { bookingStatus?: BookingStatus; toss?: TossPayment; payoutStatus?: PayoutStatus },
+): Promise<{ ok: boolean; message: string }> {
+  const c = db();
+  if (!c) return { ok: false, message: "db 없음" };
+  const { error } = await c.rpc("rent_sync", {
+    p_order_id: orderId,
+    p_booking_status: change.bookingStatus ?? null,
+    // ⚠️토스 객체를 그대로 넘기면 안 된다 — 경계 너머로 보내기 전에 한 번 평범한 JSON으로 만든다
+    //   ([[foreign-object-at-the-boundary]]). 날짜·undefined가 섞이면 jsonb 변환에서 조용히 빠진다.
+    p_toss: change.toss ? JSON.parse(JSON.stringify(change.toss)) : null,
+    p_payout_status: change.payoutStatus ?? null,
+  });
+  if (error) {
+    console.error(`[spaces] rent_sync failed order=${orderId} ${JSON.stringify(change.bookingStatus ?? null)}: ${error.message}`);
+    return { ok: false, message: error.message };
+  }
+  return { ok: true, message: "" };
+}
+
+/** 🧹시간이 흘러서 바뀌어야 하는 것들을 한 번에 옮긴다. 크론 없이 `/rent/my`·신청 내역·정산 화면이 열릴 때 부른다.
+ *  셋 다 조건절이 «지금 상태»를 보므로 두 번 불려도 같은 결과다(멱등).
+ *  ① 결제창만 열고 30분 지난 신청 → 예약 expired · 결제 EXPIRED (토스 결제 유효 시간이 30분)
+ *  ② 끝난 확정 예약 → 예약 done · 지급 WAITING
+ *  ③ 이용일이 지난 «취소» 예약인데 환불하고 남은 돈이 있는 것 → 지급 WAITING
+ *     당일 취소(환불 0원)와 부분 환불이 여기 온다. 약관 제8조 「환불되지 않은 금액은 정산 시 지급」. */
+export async function sweepBookings(): Promise<void> {
   const c = db();
   if (!c) return;
-  const { error } = await c.from("space_bookings").update({ amount_refunded: amount }).eq("id", id);
-  if (error) console.error(`[spaces] recordRefund failed id=${id}: ${error.message} (2026-09-16-rent-payout.sql 돌렸나?)`);
+  const today = todayKst();
+
+  // ①
+  const cutoff = new Date(Date.now() - 30 * 60_000).toISOString();
+  const { data: stale } = await c.from("space_bookings").select("order_id")
+    .eq("status", "pending").lt("created_at", cutoff);
+  for (const r of stale ?? []) {
+    await rentSync(s(r.order_id), { bookingStatus: "expired", toss: { status: "EXPIRED" } });
+  }
+
+  // ②
+  const { data: conf } = await c.from("space_bookings").select("order_id,use_date,end_time")
+    .eq("status", "confirmed").lte("use_date", today);
+  for (const r of conf ?? []) {
+    if (!bookingFinished({ useDate: s(r.use_date), endTime: s(r.end_time).slice(0, 5) })) continue;
+    await rentSync(s(r.order_id), { bookingStatus: "done", payoutStatus: "WAITING" });
+  }
+
+  // ③
+  const { data: kept } = await c.from("payments")
+    .select("order_id,balance_amount,booking:space_bookings!inner(status,use_date)")
+    .eq("payout_status", "NONE").in("status", ["DONE", "PARTIAL_CANCELED"]).gt("balance_amount", 0);
+  for (const r of kept ?? []) {
+    const b = (r as Row).booking as Row | undefined;
+    if (!b || s(b.status) !== "cancelled" || s(b.use_date) >= today) continue;
+    await rentSync(s((r as Row).order_id), { payoutStatus: "WAITING" });
+  }
 }
 
-/** 🏦사장님 몫 — 손님이 «실제로 남긴» 돈에서 그 거래의 요율을 뺀다.
- *  끝난 예약은 전액이 남았고, 취소된 예약은 환불하고 남은 만큼이다(약관 제8조).
- *  ⭐요율은 행에 박힌 값이다 — 요율이 바뀌어도 옛 거래는 그때 값으로 준다. */
-export function hostShare(b: SpaceBooking): number {
-  const kept = Math.max(0, b.amountTotal - b.amountRefunded);
-  return payout(kept, b.feeRate);
-}
-
-/** 정산할 예약 — 이용일이 지났고 손님 돈이 조금이라도 남은 것.
- *  - `done` : 다녀온 예약
- *  - `cancelled` : 손님이 취소했지만 전액 환불은 아니었던 것(환불하고 남은 몫)
- *  ⚠️`rejected`는 넣지 않는다 — 거절은 전액 환불이어야 하는데 그게 «실패한» 자리라, 사장님이 아니라 손님께 돌려드릴 돈이다. */
-export async function listSettleable(): Promise<SpaceBooking[]> {
+/** 지급 목록 — 대기·요청·실패·완료. 정산 화면이 판매자별로 묶는다. 예약을 같이 읽어 온다. */
+export async function listPayouts(): Promise<{ payment: Payment; booking: SpaceBooking | null }[]> {
   const c = db();
   if (!c) return [];
-  const { data, error } = await c
-    .from("space_bookings")
-    .select("*")
-    .in("status", ["done", "cancelled"])
-    .lt("use_date", todayKst())
-    .order("use_date", { ascending: true });
-  if (error) { console.error(`[spaces] listSettleable failed: ${error.message}`); return []; }
-  return (data ?? []).map((r) => toBooking(r as Row)).filter((b) => hostShare(b) > 0);
+  const { data, error } = await c.from("payments")
+    .select("*, booking:space_bookings(*)")
+    .in("payout_status", ["WAITING", "REQUESTED", "FAILED", "DONE"])
+    .order("created_at", { ascending: true });
+  if (error) { console.error(`[spaces] listPayouts failed: ${error.message}`); return []; }
+  return (data ?? []).map((r) => {
+    const row = r as Row;
+    return { payment: toPayment(row), booking: row.booking ? toBooking(row.booking as Row) : null };
+  });
 }
 
 /** 🧾정산 화면이 따로 보여줄 «손이 필요한» 예약 둘.
@@ -448,20 +501,6 @@ export async function listStuckBookings(): Promise<{ unanswered: SpaceBooking[];
     unanswered: (a.data ?? []).map((r) => toBooking(r as Row)),
     refundFailed: (b.data ?? []).map((r) => toBooking(r as Row)),
   };
-}
-
-/** 🏦입금했다고 적는다. 🔒아직 안 적힌 행만 — 두 번 눌러도 처음 시각이 남는다. */
-export async function markPaidOut(ids: number[]): Promise<number> {
-  const c = db();
-  if (!c || ids.length === 0) return 0;
-  const { data, error } = await c
-    .from("space_bookings")
-    .update({ paid_out_at: new Date().toISOString() })
-    .in("id", ids)
-    .is("paid_out_at", null)
-    .select("id");
-  if (error) { console.error(`[spaces] markPaidOut failed: ${error.message}`); return -1; }
-  return (data ?? []).length;
 }
 
 /** ⭐확정된 예약에서만 참이다 — 주소·연락처를 열어도 되는가. */

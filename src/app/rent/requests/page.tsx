@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { markFinishedBookings } from "@/lib/spaces";
+import { sweepBookings } from "@/lib/spaces";
 import { getSessionUserId } from "@/lib/profiles";
 import { bookingFinished } from "@/lib/rent-time";
 import type { BookingStatus } from "@/lib/types";
@@ -25,7 +25,7 @@ export const metadata: Metadata = {
 const h2Cls = "text-[21px] font-bold leading-snug tracking-tight text-ink";
 
 /** 더 이상 움직이지 않는 상태. 날이 남았어도 거절·취소된 신청은 「지난 신청」으로 내린다. */
-const CLOSED: BookingStatus[] = ["rejected", "refunded", "cancelled", "done"];
+const CLOSED: BookingStatus[] = ["rejected", "refunded", "cancelled", "done", "expired"];
 
 /** 정렬 열쇠 — 날짜 + 시작 시각. 둘 다 고정폭 글자라 문자열 비교로 순서가 맞다. */
 const whenKey = (v: GuestBookingView) => `${v.booking.useDate} ${v.booking.startTime ?? ""}`;
@@ -50,7 +50,7 @@ export default async function RentRequestsPage() {
   }
 
   // ⏹읽기 «전에» 끝난 확정 예약을 「다녀왔어요」로 넘긴다. `/rent/my`와 같은 자리, 같은 이유다.
-  await markFinishedBookings();
+  await sweepBookings();
 
   const all = await loadGuestBookings(uid);
   // 다가오는 것은 가까운 날부터(다음에 챙길 것이 맨 위), 지난 것은 최근 것부터.

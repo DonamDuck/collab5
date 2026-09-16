@@ -80,6 +80,8 @@ const BOOKING_TONE: Record<BookingStatus, { label: string; cls: string }> = {
   refunded: { label: "환불됐어요", cls: "text-faint" },
   cancelled: { label: "취소했어요", cls: "text-faint" },
   done: { label: "다녀왔어요", cls: "text-faint" },
+  // ⏳09-16 — 결제창만 열고 30분이 지나 닫힌 신청. 실패가 아니라 시간이 지난 것이라 말투도 그렇게.
+  expired: { label: "결제 시간이 지났어요", cls: "text-faint" },
 };
 
 export function BookingBadge({ status }: { status: BookingStatus }) {

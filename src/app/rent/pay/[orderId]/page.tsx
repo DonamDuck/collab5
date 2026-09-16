@@ -32,6 +32,8 @@ export default async function RentPayPage({ params }: { params: Promise<{ orderI
   const b = await getBookingByOrderId(orderId);
   // 남의 주문이면 404. 「있는데 못 본다」보다 「없다」가 새는 정보가 적다(`/rent/done`과 같은 규칙).
   if (!b || b.guestUserId !== uid) notFound();
+  // ⏳결제 시간이 지난 신청은 결제 화면을 다시 열지 않는다 — 토스 결제가 이미 EXPIRED라 눌러도 막힌다.
+  if (b.status === "expired") redirect("/rent/requests");
   if (b.status !== "pending") redirect(`/rent/done/${b.id}`);
 
   const brief = (await listSpacesByIds([b.spaceId])).get(b.spaceId);

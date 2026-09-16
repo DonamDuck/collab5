@@ -544,7 +544,9 @@ export type SpacePublic = Omit<Space, "accessNote" | "hostTermsAt">;
  *  cancelled 게스트 취소. ⚠️환불률은 **우리가** 정한다 — 호스트 자율은 전자상거래법 제35조로 무효가 될 수 있다
  *  done      그날이 지났다 */
 export type BookingStatus =
-  | "pending" | "paid" | "confirmed" | "rejected" | "refunded" | "cancelled" | "done";
+  | "pending" | "paid" | "confirmed" | "rejected" | "refunded" | "cancelled" | "done"
+  // ⏳09-16 — 결제창만 열고 30분이 지난 신청. 토스 결제가 EXPIRED가 되는 것과 짝이다.
+  | "expired";
 
 export interface SpaceBooking {
   id: number;
@@ -577,11 +579,6 @@ export interface SpaceBooking {
   /** ⚠️행마다 박아 둔다 — 요율이 바뀌어도 옛 거래는 **그때 값**으로 정산해야 한다. */
   feeRate: number;
   amountPayout: number;
-  /** 💸손님께 «돌려준» 돈(09-16). 호스트 약관 제8조 — 돌려주지 않은 몫은 정산 때 사장님께 간다.
-   *  그 몫을 계산할 근거가 이 칸이다. 취소·거절이 환불에 «성공»했을 때만 적는다. */
-  amountRefunded: number;
-  /** 🏦사장님께 입금한 시각(09-16). 비어 있으면 아직 안 드린 것. 입금은 대표가 손으로 한다. */
-  paidOutAt?: string;
 
   paymentKey: string;
   orderId: string;
@@ -590,4 +587,56 @@ export interface SpaceBooking {
   decidedAt?: string;
   createdAt: string;
   updatedAt: string;
+}
+
+// ─── 결제 (2026-09-16) ───
+// ⭐예약(`SpaceBooking`)은 «무슨 일이 있었나», 결제(`Payment`)는 «돈이 어디 있나»다. 테이블도 둘이다.
+//   두 상태를 바꾸는 문은 DB 함수 `rent_sync` 하나다(`lib/spaces.ts`의 `rentSync`) — 한 트랜잭션에서 같이 움직인다.
+
+/** 토스 Payment.status 이름 그대로(토스 문서 대조, 09-16). 번역표를 두지 않는다. */
+export type PaymentStatus =
+  | "READY" | "IN_PROGRESS" | "WAITING_FOR_DEPOSIT" | "DONE"
+  | "CANCELED" | "PARTIAL_CANCELED" | "ABORTED" | "EXPIRED";
+
+/** 사장님께 보내는 돈(토스 지급대행)의 상태. 결제 줄 하나에 붙는다. */
+export type PayoutStatus = "NONE" | "WAITING" | "REQUESTED" | "DONE" | "FAILED";
+
+export interface Payment {
+  id: number;
+  orderId: string;
+  /** 승인 전엔 빈 문자열. 토스 환불 API는 이 키로만 부를 수 있다. */
+  paymentKey: string;
+  purpose: "rent_booking";
+  bookingId?: number;
+  buyingUserId?: number;
+  /** 돈을 받을 사람. 판매자가 «우리»인 결제(리포트 유료화)엔 비어 있다. */
+  sellingUserId?: number;
+  /** 처음 낸 돈(토스 totalAmount). 환불해도 안 바뀐다. */
+  amount: number;
+  /** 환불하고 «남은» 돈(토스 balanceAmount). 사장님 몫은 여기서 계산한다(호스트 약관 제8조). */
+  balanceAmount: number;
+  method: string;
+  status: PaymentStatus;
+  approvedAt?: string;
+  canceledAt?: string;
+  feeRate: number;
+  payoutAmount: number;
+  payoutStatus: PayoutStatus;
+  payoutRequestedAt?: string;
+  payoutDoneAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** 토스가 돌려주는 Payment 객체. 우리가 읽는 칸만 적고 나머지는 그대로 DB `toss_raw`에 담는다. */
+export interface TossPayment {
+  paymentKey?: string;
+  orderId?: string;
+  status: PaymentStatus;
+  totalAmount?: number;
+  balanceAmount?: number;
+  method?: string;
+  approvedAt?: string;
+  cancels?: { cancelAmount: number; cancelReason?: string; canceledAt: string }[];
+  [k: string]: unknown;
 }

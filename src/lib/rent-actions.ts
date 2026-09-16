@@ -4,9 +4,9 @@ import { revalidatePath } from "next/cache";
 import { getSessionUserId, getProfileById } from "./profiles";
 import {
   saveSpace, getSpaceFull, getBooking, createPendingBooking, getBookingByOrderId,
-  markBookingPaid, decideBooking,
+  decideBooking,
   setBookingStatus, listSpacesByOwner, listSpacesByIds, payout, FEE_RATE,
-  recordRefund, markPaidOut,
+  createPayment, getPaymentByOrderId, rentSync,
   type SpaceSaveInput,
   listLiveBookings,
 } from "./spaces";
@@ -246,6 +246,17 @@ export async function startBookingAction(input: BookingFormInput): Promise<Start
   });
   if (!booking) return { ok: false, message: "신청을 시작하지 못했어요. 잠시 뒤 다시 시도해 주세요." };
 
+  // 💳결제 줄도 여기서 만든다(READY). 승인·환불은 전부 이 줄을 기준으로 한다(09-16 결제 테이블).
+  //   판매자 = 공간 주인. 지급대행이 돈을 보낼 상대다.
+  const payment = await createPayment({
+    orderId, bookingId: booking.id, buyingUserId: uid, sellingUserId: sp.ownerUserId, amount: amountTotal,
+  });
+  if (!payment) {
+    // 결제 줄 없이 결제창을 열면 돌아왔을 때 승인할 근거가 없다. 신청을 닫고 멈춘다.
+    await setBookingStatus(booking.id, "expired");
+    return { ok: false, message: "신청을 시작하지 못했어요. 잠시 뒤 다시 시도해 주세요." };
+  }
+
   return {
     ok: true, message: "", orderId, amount: amountTotal,
     orderName: `${sp.name} · ${input.useDate} ${input.startTime}~${input.endTime}`,
@@ -287,15 +298,35 @@ export async function confirmBookingAction(
   // 새로고침·뒤로가기로 이 함수가 두 번 불릴 수 있다. 이미 끝난 건 조용히 성공으로 돌려준다.
   if (b.status !== "pending") return { ok: true, message: "이미 신청이 끝났어요.", bookingId: b.id };
 
-  const approved = await approvePayment(paymentKey, orderId, b.amountTotal);
-  if (!approved.ok) return { ok: false, message: approved.message };
+  // 🚨승인 금액은 «결제 줄»에 적힌 값이다. 주소창의 amount는 안 믿는다.
+  const pay = await getPaymentByOrderId(orderId);
+  if (!pay) return { ok: false, message: "결제 기록을 찾지 못했어요. 처음부터 다시 신청해 주세요." };
 
-  const paid = await markBookingPaid(orderId, approved.paymentKey);
-  if (!paid) {
-    await cancelPayment(approved.paymentKey, "예약 확정 실패 — 자동 환불");
-    await setBookingStatus(b.id, "cancelled");
-    return { ok: false, message: "그 사이 그 시간이 찼어요. 결제는 자동으로 취소했습니다." };
+  const approved = await approvePayment(paymentKey, orderId, pay.amount);
+  if (!approved.ok || !approved.payment) {
+    // 돈은 안 움직였다. 결제 줄만 ABORTED로 남기고 예약은 그대로 둔다(30분 안이면 다시 시도할 수 있다).
+    await rentSync(orderId, { toss: { status: "ABORTED" } });
+    return { ok: false, message: approved.message };
   }
+
+  // ⭐예약 paid + 결제 DONE을 «한 트랜잭션»으로. 시간이 겹쳐 예약이 막히면 결제 기록도 같이 안 바뀐다.
+  const synced = await rentSync(orderId, { bookingStatus: "paid", toss: approved.payment });
+  if (!synced.ok) {
+    // 🩸돈은 승인됐는데 예약을 못 올렸다(대개 그 사이 누가 같은 시간을 먼저 결제했다).
+    //   돈만 받고 예약이 없는 상태를 남기면 안 된다 — 들어온 돈을 먼저 적고, 바로 전액 환불한다.
+    await rentSync(orderId, { toss: approved.payment });
+    const key = approved.payment.paymentKey || paymentKey;
+    const refund = await cancelPayment(key, "예약 확정 실패 — 자동 환불", undefined, pay.amount);
+    if (refund.ok) {
+      await rentSync(orderId, { bookingStatus: "cancelled", toss: refund.payment });
+      return { ok: false, message: "그 사이 그 시간이 찼어요. 결제는 자동으로 취소했습니다." };
+    }
+    // 환불까지 실패하면 손님 돈이 붙잡혀 있다. 정산 화면 「손이 필요한 예약」에 뜨게 rejected로 둔다.
+    console.error(`[rent-actions] 🚨승인 뒤 예약 실패 + 자동 환불 실패 — 수동 환불 필요 order=${orderId}`);
+    await rentSync(orderId, { bookingStatus: "rejected" });
+    return { ok: false, message: "그 사이 그 시간이 찼어요. 환불을 처리하고 있으니 곧 연락드릴게요." };
+  }
+  const paid = (await getBookingByOrderId(orderId)) ?? { ...b, status: "paid" as const };
 
   // 🔻09-16 `setOpenDate` 삭제 — 하루를 통째로 파는 모델이 아니다. 시간대가 겹치는지는
   //   DB의 배제 제약(`no_time_overlap`)이 판정하고, 호스트가 연 시간대는 그대로 둔다.
@@ -332,10 +363,14 @@ export async function decideBookingAction(
   if (!decided) return { ok: false, message: "이미 처리된 신청이에요." };
 
   if (!accept) {
-    const refunded = await cancelPayment(b.paymentKey, "사장님 거절 — 전액 환불");
-    await setBookingStatus(bookingId, refunded ? "refunded" : "rejected");
-    // 💸돌려준 돈을 남긴다 — 환불이 «성공»했을 때만. 실패한 자리(`rejected`)는 아직 돌려준 게 아니다.
-    if (refunded) await recordRefund(bookingId, b.amountTotal);
+    // 예약은 이미 rejected다(`decideBooking`). 환불이 «성공»하면 예약 refunded + 결제 CANCELED를 같이 옮긴다.
+    //   실패하면 rejected로 남는다 — 정산 화면 「손이 필요한 예약」에 뜬다.
+    const pay = await getPaymentByOrderId(b.orderId);
+    const refund = pay
+      ? await cancelPayment(pay.paymentKey || b.paymentKey, "사장님 거절 — 전액 환불", undefined, pay.balanceAmount)
+      : { ok: false as const };
+    const refunded = refund.ok && !!(await rentSync(b.orderId, { bookingStatus: "refunded", toss: refund.payment })).ok;
+    if (!refunded) console.error(`[rent-actions] 거절 환불 실패 order=${b.orderId} (결제 줄 ${pay ? "있음" : "없음"})`);
     revalidatePath("/rent/my");
     await safeNotify(async () => {
       const p = await notifyParties(decided);
@@ -389,17 +424,25 @@ export async function cancelBookingAction(bookingId: number): Promise<ActionResu
   //   환불은 0원인데 사장님 정산에서 통째로 빠진다. 화면도 버튼을 숨기지만 관문은 여기다.
   if (bookingStarted(b)) return { ok: false, message: "이미 시작한 예약은 취소할 수 없어요." };
 
+  const pay = await getPaymentByOrderId(b.orderId);
+  if (!pay) return { ok: false, message: "결제 기록을 찾지 못해 취소하지 않았어요. 문의해 주세요." };
+
   const { refund } = cancelRefund(b);
   if (refund > 0) {
-    const ok = await cancelPayment(b.paymentKey, "게스트 취소", refund === b.amountTotal ? undefined : refund);
+    const r = await cancelPayment(
+      pay.paymentKey || b.paymentKey, "게스트 취소",
+      refund >= pay.balanceAmount ? undefined : refund, pay.balanceAmount,
+    );
     // 🩸09-16까지 이 결과를 안 봤다. 토스 환불이 실패해도 상태는 「취소」가 됐고 손님에겐
     //   「환불됩니다」라고 말했다. 돈은 안 돌아갔는데 예약은 사라진다. 실패면 아무것도 바꾸지 않는다.
-    if (!ok) return { ok: false, message: "환불을 처리하지 못해 취소하지 않았어요. 잠시 뒤 다시 시도해 주세요." };
+    if (!r.ok) return { ok: false, message: "환불을 처리하지 못해 취소하지 않았어요. 잠시 뒤 다시 시도해 주세요." };
+    // 💸예약 cancelled + 결제 CANCELED/PARTIAL_CANCELED(남은 돈)를 같이. 약관 제8조의 «남은 돈»이 여기 적힌다.
+    const synced = await rentSync(b.orderId, { bookingStatus: "cancelled", toss: r.payment });
+    if (!synced.ok) console.error(`[rent-actions] 🚨환불은 됐는데 상태 기록 실패 order=${b.orderId}`);
+  } else {
+    // 당일 취소 — 돈은 그대로 남는다(결제 DONE). 이용일이 지나면 그 돈은 사장님 몫으로 지급 대기에 오른다.
+    await rentSync(b.orderId, { bookingStatus: "cancelled" });
   }
-
-  await setBookingStatus(bookingId, "cancelled");
-  // 💸약관 제8조 — 돌려주지 않은 몫은 정산 때 사장님께 간다. 그 계산의 근거.
-  await recordRefund(bookingId, refund);
   revalidatePath("/rent/my");
   await safeNotify(async () => {
     const p = await notifyParties(b);
@@ -414,14 +457,5 @@ export async function quotePayout(total: number): Promise<{ fee: number; payout:
   return { fee: total - out, payout: out, rate: FEE_RATE };
 }
 
-/** 🏦정산 — 사장님께 입금했다고 적는다. **대표만.** 입금 자체는 대표가 은행에서 손으로 한다(1단계).
- *  ⚠️이 칸은 장부다 — 두 번 주거나 빠뜨리지 않게. 이미 적힌 행은 덮어쓰지 않는다(`markPaidOut`). */
-export async function markPaidOutAction(bookingIds: number[]): Promise<ActionResult> {
-  if (!(await isRentAdmin())) return { ok: false, message: "권한이 없어요." };
-  const ids = bookingIds.filter((x) => Number.isInteger(x) && x > 0);
-  if (ids.length === 0) return { ok: false, message: "고른 예약이 없어요." };
-  const n = await markPaidOut(ids);
-  if (n < 0) return { ok: false, message: "적지 못했어요. 정산 칸 SQL(2026-09-16-rent-payout.sql)을 돌렸는지 확인해 주세요." };
-  revalidatePath("/rent/payouts");
-  return { ok: true, message: n === ids.length ? `${n}건을 입금했다고 적었어요.` : `${n}건을 적었어요. 나머지는 이미 적혀 있었어요.` };
-}
+// 🔻`markPaidOutAction`(대표가 손으로 입금했다고 적는 버튼)은 09-16에 지웠다.
+//   정산은 토스 «지급대행»이다 — 돈이 우리 계좌를 거치지 않는다(볼트 [[결제-모듈-토스]], 대표 확정).
