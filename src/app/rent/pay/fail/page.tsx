@@ -39,7 +39,8 @@ export default async function RentPayFailPage({
         <Link href="/rent" className={secondaryBtnCls}>
           다른 공간 보기
         </Link>
-        <Link href="/rent/my" className={secondaryBtnCls}>
+        {/* 09-16 손님 전용 목록으로(B81). `/rent/my`는 사장님 화면이다. */}
+        <Link href="/rent/requests" className={secondaryBtnCls}>
           내 신청 보기
         </Link>
       </div>

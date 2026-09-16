@@ -1,22 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import {
-  markFinishedBookings,
-  listSpacesByOwner,
-  listBookingsForHost,
-  listBookingsForGuest,
-  isRevealed,
-  listSpacesByIds,
-  getSpaceFull,
-  type SpaceBrief,
-} from "@/lib/spaces";
+import { markFinishedBookings, listSpacesByOwner, listBookingsForHost, isRevealed } from "@/lib/spaces";
 import { getSessionUserId, getProfileById, type Profile } from "@/lib/profiles";
-import type { Space, SpaceBooking } from "@/lib/types";
+import type { Space } from "@/lib/types";
 import { isRentAdmin } from "@/lib/rent-actions";
-import { HostDecide, GuestCancel, PublishButton } from "./Actions";
+import { HostDecide, PublishButton } from "./Actions";
 import { ContactBlock } from "../ContactBlock";
 import { bookingStarted } from "@/lib/rent-time";
-import { BookingBadge, SpaceBadge, bookingWhen, primaryBtnCls, won } from "../ui";
+import { GuestBookingRow, loadGuestBookings } from "../GuestBookingRow";
+import { BookingBadge, ListRow as Row, LockedLine as Locked, SpaceBadge, bookingWhen, primaryBtnCls, won } from "../ui";
 
 // 하루 가게 — 내 공간 · 받은 신청 · 보낸 신청 (2026-09-13)
 //
@@ -44,31 +36,7 @@ const h2Cls = "text-[21px] font-bold leading-snug tracking-tight text-ink";
 // 연락처 블록은 `../ContactBlock`(09-14) — `/rent/done`과 같은 얼굴이어야 해서 밖으로 뺐다.
 //   ⚠️여기 오기 전에 호출부가 `isRevealed`로 거른다. 블록은 그 판정을 다시 하지 않는다.
 
-/** 아직 안 열린 연락처 — 회색 상자 대신 한 줄. */
-function Locked({ text }: { text: string }) {
-  return <p className="mt-3 text-[15px] leading-relaxed break-keep text-faint">{text}</p>;
-}
-
-/** 읽는 목록의 한 줄 — 위 구분선 + 왼쪽 글 + 오른쪽 상태. 마지막 줄은 아래 구분선도 갖는다. */
-function Row({
-  head,
-  status,
-  children,
-}: {
-  head: React.ReactNode;
-  status: React.ReactNode;
-  children?: React.ReactNode;
-}) {
-  return (
-    <li className="border-t border-hairline py-5 last:border-b">
-      <div className="flex items-start justify-between gap-4">
-        <div className="min-w-0 flex-1">{head}</div>
-        {status}
-      </div>
-      {children}
-    </li>
-  );
-}
+// 줄(`Row`)과 잠긴 안내(`Locked`)는 `../ui`로 올렸다(09-16). 보낸 신청 줄이 `/rent/requests`와 같이 쓴다.
 
 export default async function MyRentPage() {
   const uid = await getSessionUserId();
@@ -90,49 +58,23 @@ export default async function MyRentPage() {
   //   크론 대신 이 화면이 열릴 때 한다 — 끝난 예약은 누군가 볼 때 넘어가면 충분하고, 두 번 불려도 같은 결과다.
   await markFinishedBookings();
 
+  // 보낸 신청은 줄과 함께 `loadGuestBookings`가 읽는다 — `/rent/requests`와 같은 한 벌(09-16).
   const [me, mySpaces, hostBookings, guestBookings] = await Promise.all([
     getProfileById(uid),
     listSpacesByOwner(uid),
     listBookingsForHost(uid),
-    listBookingsForGuest(uid),
+    loadGuestBookings(uid),
   ]);
   void me;
   const admin = await isRentAdmin();
 
   const spaceById = new Map<number, Space>(mySpaces.map((sp) => [sp.id, sp]));
-  // 내가 «빌린» 곳은 남의 공간이라 `listSpacesByOwner`에 없다. id로 따로 읽는다(`listSpacesByIds` 주석 참조).
-  const bookedSpaces = await listSpacesByIds(guestBookings.map((b) => b.spaceId));
-  // 「들어오는 법」·가게 전화·이용 안내는 요약본에 없다(주소와 같은 급의 비밀).
-  //   확정된 예약의 공간만 원본을 한 번 더 읽는다.
-  type Reveal = { accessNote: string; contactPhone: string; accessHow: Space["accessHow"] };
-  const revealed = new Map<number, Reveal>(
-    await Promise.all(
-      guestBookings
-        .filter((b) => isRevealed(b) && bookedSpaces.has(b.spaceId))
-        .map(async (b) => {
-          const full = await getSpaceFull(bookedSpaces.get(b.spaceId)!.slug);
-          return [
-            b.spaceId,
-            {
-              accessNote: full?.accessNote ?? "",
-              contactPhone: full?.contactPhone ?? "",
-              accessHow: full?.accessHow ?? "sms",
-            },
-          ] as [number, Reveal];
-        }),
-    ),
-  );
-
   // 🔑연락처 조회는 **열린 예약 것만** 한다. 전부 미리 읽어 두고 화면에서 가리는 방식은,
   //   서버 컴포넌트라 HTML에 안 실리긴 하지만 「가리기」가 판정을 대신하게 만든다.
   //   그러다 한 번 쓰는 자리가 늘면 그때 새어 나간다.
   const contactIds = new Set<number>();
+  //   보낸 신청 쪽 사장님 연락처는 `loadGuestBookings`가 같은 규칙으로 따로 읽는다.
   for (const b of hostBookings) if (isRevealed(b)) contactIds.add(b.guestUserId);
-  for (const b of guestBookings) {
-    if (!isRevealed(b)) continue;
-    const sp = bookedSpaces.get(b.spaceId);
-    if (sp) contactIds.add(sp.ownerUserId);
-  }
   const contacts = new Map<number, Profile | null>(
     await Promise.all(
       Array.from(contactIds).map(
@@ -140,11 +82,6 @@ export default async function MyRentPage() {
       ),
     ),
   );
-
-  // ☕09-16 커피챗으로 이름이 바뀌면서 칸도 바뀌었다(`amountMentor` → `amountChat`).
-  //   옛 예약은 옛 칸에만 값이 있어서 둘 다 본다. 말은 확인 팝업·상세와 같은 「커피챗」으로 맞췄다.
-  const money = (b: SpaceBooking) =>
-    `${won(b.amountTotal)}${b.amountChat > 0 || b.amountMentor > 0 ? " · 커피챗 포함" : ""}`;
 
   return (
     <main className="mx-auto w-full max-w-[720px] px-4 pt-8 pb-16 sm:px-6 sm:pt-12">
@@ -271,8 +208,17 @@ export default async function MyRentPage() {
       </section>
 
       {/* ── ③ 내가 보낸 신청 ── */}
+      {/* 🔗09-16 손님 전용 화면(`/rent/requests`, B81)이 생겼다. 이 절은 남긴다 — 사장님이면서 남의 공간을
+          빌리는 분도 있어서, 여기서 통째로 빼면 그분은 두 화면을 오가야 한다. 옆에 건너가는 글자 링크만 둔다. */}
       <section className="mt-12">
-        <h2 className={h2Cls}>내가 보낸 신청</h2>
+        <div className="flex items-baseline justify-between gap-3">
+          <h2 className={h2Cls}>내가 보낸 신청</h2>
+          {guestBookings.length > 0 && (
+            <Link href="/rent/requests" className="shrink-0 py-[12px] text-[15px] text-mute underline underline-offset-2">
+              따로 모아 보기
+            </Link>
+          )}
+        </div>
         {guestBookings.length === 0 ? (
           <p className={emptyCls}>
             아직 신청하신 곳이 없어요.{" "}
@@ -282,63 +228,9 @@ export default async function MyRentPage() {
           </p>
         ) : (
           <ul className="mt-5">
-            {guestBookings.map((b) => {
-              const sp: SpaceBrief | undefined = bookedSpaces.get(b.spaceId);
-              const open = isRevealed(b);
-              return (
-                <Row
-                  key={b.id}
-                  head={
-                    <>
-                      <p className="truncate text-[17px] font-medium text-ink">{sp?.name ?? "공간"}</p>
-                      <p className="mt-1 text-[15px] text-mute">
-                        {bookingWhen(b)}
-                        {b.headcount ? ` · ${b.headcount}명` : ""}
-                        {/* 확정 전에는 동네까지만. 상세 화면과 같은 규칙이다. */}
-                        {sp?.area ? ` · ${sp.area}` : ""}
-                        {` · ${money(b)}`}
-                      </p>
-                    </>
-                  }
-                  status={<BookingBadge status={b.status} />}
-                >
-                  {/* 🩸09-16 — `pending`에도 「사장님이 수락하면…」이 붙어 있었다. 그 신청은 **사장님에게
-                      보이지도 않는다**(`listBookingsForHost`가 거른다). 기다릴 것이 없는데 기다리라고 말하고,
-                      이어서 낼 길도 없어서 목록에 쌓이기만 했다. 결제 화면은 주문번호로 되돌아갈 수 있다. */}
-                  {b.status === "pending" ? (
-                    <p className="mt-3 text-[15px] leading-relaxed break-keep text-faint">
-                      아직 결제가 끝나지 않아 사장님께 전달되지 않았어요.{" "}
-                      <Link href={`/rent/pay/${b.orderId}`} className="text-body underline underline-offset-2">
-                        이어서 결제하기
-                      </Link>
-                    </p>
-                  ) : open ? (
-                    <ContactBlock
-                      who="사장님"
-                      profile={contacts.get(sp?.ownerUserId ?? -1) ?? null}
-                      address={sp?.address}
-                      accessNote={revealed.get(b.spaceId)?.accessNote}
-                      shopPhone={revealed.get(b.spaceId)?.contactPhone}
-                      accessHow={revealed.get(b.spaceId)?.accessHow}
-                    />
-                  ) : (
-                    <Locked text="사장님이 수락하면 주소와 연락처가 열려요." />
-                  )}
-
-                  {b.hostMessage && (
-                    <p className="mt-2 text-[15px] leading-relaxed break-keep text-body">
-                      사장님 말씀 · {b.hostMessage}
-                    </p>
-                  )}
-
-                  {/* 🚨이미 시작한 예약엔 취소 버튼을 안 띄운다(09-16). 다 쓴 예약을 취소로 바꾸면
-                      환불은 0원인데 사장님 정산에서 통째로 빠졌다. 관문은 서버 액션이고 이건 화면 쪽 짝이다. */}
-                  {(b.status === "paid" || b.status === "confirmed") && !bookingStarted(b) && (
-                    <GuestCancel bookingId={b.id} />
-                  )}
-                </Row>
-              );
-            })}
+            {guestBookings.map((v) => (
+              <GuestBookingRow key={v.booking.id} view={v} />
+            ))}
           </ul>
         )}
       </section>

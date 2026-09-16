@@ -32,8 +32,8 @@ export default async function RentDonePage({ params }: { params: Promise<{ booki
 
   const b = await getBooking(id);
   if (!b || b.guestUserId !== uid) notFound();
-  // 결제창만 열고 안 낸 자리는 「완료」가 아니다. 목록으로 보내 상태를 그대로 보게 한다.
-  if (b.status === "pending") redirect("/rent/my");
+  // 결제창만 열고 안 낸 자리는 「완료」가 아니다. 보낸 신청 목록으로 보내 상태를 그대로 보게 한다.
+  if (b.status === "pending") redirect("/rent/requests");
 
   const brief = (await listSpacesByIds([b.spaceId])).get(b.spaceId);
   const open = isRevealed(b);
@@ -115,15 +115,16 @@ export default async function RentDonePage({ params }: { params: Promise<{ booki
         </section>
       ) : (
         <p className="mt-6 text-[15px] leading-relaxed break-keep text-mute">
-          자세한 상태는 내 하루 가게에서 보실 수 있어요.
+          자세한 상태는 신청 내역에서 보실 수 있어요.
         </p>
       )}
 
       {/* 🔻09-15 대표 — 버튼 둘을 나란히 두지 않는다. 「신청 내역 보기」가 지금 할 일이고
           「다른 공간도 둘러보기」는 그 다음에 «혹시» 할 일이라 무게가 다르다.
-          ⏳「신청 내역 보기」는 아직 `/rent/my`로 간다. 전용 페이지는 백로그(B80). */}
+          🔗09-16 「신청 내역 보기」는 손님 전용 `/rent/requests`로 간다(B81). 전엔 사장님 화면인 `/rent/my`로
+          가서, 손님이 자기 신청을 찾으려면 공간·받은 신청 두 덩이를 지나야 했다. */}
       <div className="mt-9">
-        <Link href="/rent/my" className={`${primaryBtnCls} h-[48px] w-full`}>
+        <Link href="/rent/requests" className={`${primaryBtnCls} h-[48px] w-full`}>
           신청 내역 보기
         </Link>
         <Link href="/rent" className={`${secondaryBtnCls} mt-2 h-[48px] w-full`}>
