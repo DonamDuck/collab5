@@ -6,6 +6,7 @@ import { bookingFinished } from "@/lib/rent-time";
 import type { BookingStatus } from "@/lib/types";
 import { GuestBookingRow, loadGuestBookings, type GuestBookingView } from "../GuestBookingRow";
 import { primaryBtnCls } from "../ui";
+import { KAKAO_CHAT_URL } from "@/lib/site";
 
 // 하루 가게 — 손님이 보낸 신청만 모아 보는 화면 (2026-09-16 · 백로그 B81)
 //
@@ -68,6 +69,14 @@ export default async function RentRequestsPage() {
           ← 하루 가게
         </Link>
         <h1 className="mt-3 text-[28px] font-bold leading-[1.25] tracking-[-0.02em] text-ink">내가 보낸 신청</h1>
+        {/* 💬09-16 phase 1 — 채팅이 없으니 막히면 갈 곳이 여기다. 사장님과 연락이 안 닿는 일도 우리가 받는다. */}
+        <p className="mt-2 text-[15px] leading-relaxed break-keep text-mute">
+          사장님과 연락이 닿지 않거나 예약에 문제가 생기면{" "}
+          <a href={KAKAO_CHAT_URL} target="_blank" rel="noreferrer" className="text-body underline underline-offset-2">
+            카카오톡으로 알려 주세요
+          </a>
+          .
+        </p>
       </header>
 
       {all.length === 0 ? (

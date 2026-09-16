@@ -4,6 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import { getBooking, getSpaceFull, guestSeesHost, listSpacesByIds } from "@/lib/spaces";
 import { getSessionUserId, getProfileById } from "@/lib/profiles";
 import { ContactBlock } from "../../ContactBlock";
+import { KAKAO_CHAT_URL } from "@/lib/site";
 import { bookingWhen, InfoPanel, InfoRow, primaryBtnCls, secondaryBtnCls, won } from "../../ui";
 
 // 하루 가게 — 신청 완료 화면 (2026-09-14)
@@ -131,6 +132,13 @@ export default async function RentDonePage({ params }: { params: Promise<{ booki
         <Link href="/rent" className={`${secondaryBtnCls} mt-2 h-[48px] w-full`}>
           다른 공간도 둘러보기
         </Link>
+        {/* 💬09-16 phase 1 — 버튼 무게를 늘리지 않으려고 글자 링크로 둔다. 할 일은 위 두 버튼이고 이건 «막혔을 때». */}
+        <p className="mt-5 text-center text-[15px] leading-relaxed break-keep text-mute">
+          궁금한 게 있으면{" "}
+          <a href={KAKAO_CHAT_URL} target="_blank" rel="noreferrer" className="text-body underline underline-offset-2">
+            카카오톡으로 물어봐 주세요
+          </a>
+        </p>
       </div>
     </main>
   );
