@@ -58,6 +58,8 @@ export default async function RentRequestsPage() {
   const past = all
     .filter((v) => CLOSED.includes(v.booking.status) || bookingFinished(v.booking))
     .sort((a, b) => whenKey(b).localeCompare(whenKey(a)));
+  const expired = past.filter((v) => v.booking.status === "expired");
+  const pastKept = past.filter((v) => v.booking.status !== "expired");
   const upcoming = all
     .filter((v) => !past.includes(v))
     .sort((a, b) => whenKey(a).localeCompare(whenKey(b)));
@@ -111,11 +113,27 @@ export default async function RentRequestsPage() {
           {past.length > 0 && (
             <section className="mt-12">
               <h2 className={h2Cls}>지난 신청</h2>
-              <ul className="mt-5">
-                {past.map((v) => (
-                  <GuestBookingRow key={v.booking.id} view={v} />
-                ))}
-              </ul>
+              {pastKept.length > 0 && (
+                <ul className="mt-5">
+                  {pastKept.map((v) => (
+                    <GuestBookingRow key={v.booking.id} view={v} />
+                  ))}
+                </ul>
+              )}
+              {/* 🗂09-17 QA — 결제창만 열었다 닫은 흔적(expired)이 16줄 쌓여 진짜 지난 예약이 묻혔다.
+                  기본은 접고 건수만 말한다. 다시 열 길이 없는 줄이라 펼쳐 볼 일은 드물다. */}
+              {expired.length > 0 && (
+                <details className="mt-5">
+                  <summary className="cursor-pointer py-[12px] text-[15px] text-mute underline underline-offset-2">
+                    결제 안 한 신청 {expired.length}건
+                  </summary>
+                  <ul className="mt-2">
+                    {expired.map((v) => (
+                      <GuestBookingRow key={v.booking.id} view={v} />
+                    ))}
+                  </ul>
+                </details>
+              )}
             </section>
           )}
         </>

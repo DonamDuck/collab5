@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
-import { getBookingByOrderId, listSpacesByIds } from "@/lib/spaces";
+import { getBookingByOrderId, getSpaceFull, listSpacesByIds } from "@/lib/spaces";
 import { getSessionUserId } from "@/lib/profiles";
+import { GRACE_MINUTES, guestCancelRefundRate } from "@/lib/rent-payment";
+import { kstDaysUntil } from "@/lib/rent-time";
 import { bookingWhen, dateLabel, won } from "../../ui";
 import { PayPanel } from "./PayPanel";
 
@@ -23,6 +25,36 @@ export const metadata: Metadata = {
   robots: { index: false },
 };
 
+/** `YYYY-MM-DD`에서 n일 뺀 날. UTC 자정끼리 계산해 시간대가 끼어들지 않는다(`kstDaysUntil`과 같은 방식). */
+function minusDays(iso: string, n: number): string {
+  const d = new Date(Date.UTC(+iso.slice(0, 4), +iso.slice(5, 7) - 1, +iso.slice(8, 10)) - n * 86_400_000);
+  return d.toISOString().slice(0, 10);
+}
+
+/** 💸**이 예약 기준** 취소 규정 한 줄 (09-17 QA).
+ *  결제 직전에 망설이게 하는 건 「취소하면 얼마 돌아오나」인데, 규정표를 읽고 날짜를 셈하는 건 손님 몫이었다.
+ *  ⭐비율은 `guestCancelRefundRate`에 날짜를 하나씩 넣어 «물어서» 얻는다. 구간표(7·3·1일)를 여기 다시 적지 않는다 —
+ *    표가 바뀌는 날 이 문장만 뒤처진다(상세 「환불 규정」 절 주석과 같은 규율).
+ *  지금 구간이 언제까지 이어지는지 찾고, 그 날짜와 다음 구간을 말한다. */
+function cancelRuleLine(useDate: string): string {
+  const pct = (r: number) => (r >= 1 ? "전액" : `${Math.round(r * 100)}%`);
+  const days = kstDaysUntil(useDate);
+  const now = guestCancelRefundRate(days);
+  let d = days;
+  while (d > 0 && guestCancelRefundRate(d - 1) === now) d -= 1;
+  const until = dateLabel(minusDays(useDate, d));
+  const next = d > 0 ? guestCancelRefundRate(d - 1) : null;
+  const graceHours = GRACE_MINUTES / 60;
+  if (now >= 1) {
+    return next === null || next === now
+      ? `${until}까지 취소하면 전액 돌려드려요.`
+      : `${until}까지 취소하면 전액 돌려드리고, 그 뒤엔 ${next > 0 ? `${pct(next)}로 줄어요` : "돌려드릴 수 없어요"}.`;
+  }
+  const grace = `결제하고 ${graceHours}시간 안에 취소하면 전액이에요.`;
+  if (now === 0) return `${grace} 그 뒤엔 오늘 쓰는 예약이라 돌려드릴 수 없어요.`;
+  return `${grace} 그 뒤엔 ${until}까지 ${pct(now)}를 돌려드려요.`;
+}
+
 export default async function RentPayPage({ params }: { params: Promise<{ orderId: string }> }) {
   const { orderId } = await params;
 
@@ -38,6 +70,16 @@ export default async function RentPayPage({ params }: { params: Promise<{ orderI
 
   const brief = (await listSpacesByIds([b.spaceId])).get(b.spaceId);
   if (!brief) notFound();
+
+  // 💸09-17 QA — 금액 내역. 합계만 있으면 「왜 이 값인가」를 손님이 셈한다. 커피챗 분은 공간의 지금 값이다
+  //   (예약 행엔 분이 안 남는다). ☕`amountMentor`는 옛 칸 — 둘 다 본다.
+  const chat = b.amountChat || b.amountMentor;
+  const chatMinutes = chat > 0 ? (await getSpaceFull(brief.slug))?.coffeeChatMinutes ?? 0 : 0;
+  const hours = b.hoursCount % 1 === 0 ? b.hoursCount : b.hoursCount.toFixed(1);
+  const breakdown = [
+    b.amountSpace > 0 ? `대여 ${b.hoursCount > 0 ? `${hours}시간 ` : ""}${won(b.amountSpace)}` : "",
+    chat > 0 ? `커피챗 ${chatMinutes > 0 ? `${chatMinutes}분 ` : ""}${won(chat)}` : "",
+  ].filter(Boolean).join(" + ");
 
   // 📐09-15 위 여백을 줄였다(대표: 「결제 위에 마진이 너무 넓다」). 겸사겸사 **결제창이 화면에 들어올
   //   자리를 번다** — 이 창은 카드를 고르면 700px 가까이 자라는데, 위가 무거우면 화면 밖으로 밀려나고
@@ -64,8 +106,6 @@ export default async function RentPayPage({ params }: { params: Promise<{ orderI
           __html: `(function(){try{var k='rent-pay-retry:'+location.pathname;var n=+(sessionStorage.getItem(k)||0);if(n>=2)return;setTimeout(function(){if(document.querySelector('#rent-pay-methods iframe'))return;sessionStorage.setItem(k,String(n+1));location.replace(location.pathname+'?r='+Date.now());},9000);}catch(e){}})();`,
         }}
       />
-      {/* ☕`withMentor`는 이름만 옛것이다. 09-16에 칸이 `amountMentor` → `amountChat`으로 바뀌었고,
-          옛 예약은 옛 칸에만 값이 있어서 둘 다 본다. */}
       <PayPanel
         orderId={b.orderId}
         amount={b.amountTotal}
@@ -74,7 +114,8 @@ export default async function RentPayPage({ params }: { params: Promise<{ orderI
         placeLabel={brief.name}
         scheduleLabel={bookingWhen(b)}
         amountLabel={won(b.amountTotal)}
-        withMentor={b.amountChat > 0 || b.amountMentor > 0}
+        breakdown={breakdown}
+        cancelLine={cancelRuleLine(b.useDate)}
       />
     </main>
   );

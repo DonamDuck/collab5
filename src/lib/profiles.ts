@@ -148,3 +148,30 @@ export async function getProfile(authUuid: string): Promise<Profile | null> {
     profileImage: data.profile_image ?? "",
   };
 }
+
+/** ☎️하루 가게 신청 때 받은 손님 번호를 프로필에 «비어 있을 때만» 적는다 (대표 09-17).
+ *  사장님이 예약을 받은 뒤 보는 손님 연락처가 프로필 전화라(`ContactBlock`), 소셜 가입처럼 번호 없이 들어온
+ *  손님은 사장님 화면에 번호가 비어 있었다. 신청 폼이 번호를 필수로 받고 여기서 채운다.
+ *  ⚠️이미 번호가 있으면 덮지 않는다. 가입 때 적은 번호를 신청 한 번으로 바꾸면 계정 정보가 모르는 사이에 바뀐다.
+ *  ⚠️다른 계정이 쓰는 번호면 적지 않는다. 가입 화면이 번호 중복을 막고 있어서(`findDuplicates`) 같은 규칙을 지킨다.
+ *  돌려주는 값 — 실제로 적었으면 true. 실패해도 던지지 않는다(신청을 막을 일이 아니다). */
+export async function savePhoneIfEmpty(userId: number, phone: string): Promise<boolean> {
+  const client = db();
+  const value = phone.trim();
+  if (!client || !value) return false;
+  try {
+    const p = await getProfileById(userId);
+    if (!p || p.phone.trim()) return false;
+    const dup = await findDuplicates({ phone: value, excludeUuid: p.uuid });
+    if (dup.phone) return false;
+    const { error } = await client.from("users").update({ phone: value }).eq("user_id", userId);
+    if (error) {
+      console.error(`[profiles] 번호 저장 실패 user=${userId}: ${error.message}`);
+      return false;
+    }
+    return true;
+  } catch (e) {
+    console.error(`[profiles] 번호 저장 실패 user=${userId}: ${String(e)}`);
+    return false;
+  }
+}

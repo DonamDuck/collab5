@@ -14,6 +14,7 @@
 //   · 데스크톱: 하단 고정 바 «안», 결제 버튼과 나란히
 //   ⭐그래서 이 파일은 «줄»만 그리고 어디에 놓일지는 모른다. 자리를 아는 건 부모다.
 import { won } from "../ui";
+import { COFFEE_CHAT_WHEN_GUEST } from "@/lib/rent-copy";
 
 export type MentorPick = boolean;
 
@@ -92,7 +93,8 @@ export function MentorOptions({
         //     이 줄이 그대로면 손님이 「그날 일찍 가면 되는구나」로 읽고 어긋난다.
         //   분은 남긴다 — 값(+30,000원)이 붙는 이유가 그 숫자다.
         // ☕09-16 대표 — 파는 것이 «배움»에서 «현업 이야기»로 바뀌었다. 09-15에 주신 앞머리(협의한 날짜에)는 그대로 두고 뒤만 갈았다.
-        desc={`사장님과 협의한 날짜에, ${minutes}분 동안 현업 이야기를 나눠요.`}
+        // ☕09-17 대표 — 「언제」는 `COFFEE_CHAT_WHEN_GUEST` 한 줄만 쓴다. 「협의한 날짜」는 상세·메일과 말이 갈렸다.
+        desc={`${minutes}분 동안 현업 이야기를 나눠요. ${COFFEE_CHAT_WHEN_GUEST}`}
         amount={`+${won(price)}`}
       />
     </div>

@@ -19,7 +19,8 @@ export function PayPanel({
   placeLabel,
   scheduleLabel,
   amountLabel,
-  withMentor,
+  breakdown,
+  cancelLine,
 }: {
   orderId: string;
   amount: number;
@@ -29,7 +30,10 @@ export function PayPanel({
   placeLabel: string;
   scheduleLabel: string;
   amountLabel: string;
-  withMentor: boolean;
+  /** 「대여 4시간 60,000원 + 커피챗 60분 40,000원」. 서버가 예약 행에서 만든다. 비면 합계만. */
+  breakdown: string;
+  /** 이 예약 날짜로 계산한 취소 규정 한 줄. 서버가 환불표에 물어 만든다(`page.tsx`). */
+  cancelLine: string;
 }) {
   const [ready, setReady] = useState(false);
   const [err, setErr] = useState("");
@@ -181,7 +185,7 @@ export function PayPanel({
           value={
             <>
               <span className="font-medium text-ink">{amountLabel}</span>
-              {withMentor && <span className="text-mute"> · 커피챗 포함</span>}
+              {breakdown && <span className="block text-[15px] text-mute">{breakdown}</span>}
             </>
           }
         />
@@ -192,6 +196,14 @@ export function PayPanel({
           ⭐약관과 버튼 사이의 «여백»이 곧 둘의 관계다. 한 칸 띄우면 남의 안내문이 되고, 붙이면
             「이걸 읽고 이 버튼을 누른다」가 된다. `space-y-6`에서 빼내 한 덩어리로 묶었다. */}
       <div className="space-y-3">
+        {/* 📜09-17 QA — 돈이 실제로 나가는 화면에 취소 규정도 약관 링크도 없었다. 이 예약 날짜로 계산한 한 줄과
+            하루 가게 조항(`/terms#rent`)으로 가는 길. 토스 약관 칸 «위»에 둬서 「읽고 → 동의하고 → 누른다」 순서가 된다. */}
+        <p className="text-[15px] leading-relaxed break-keep text-mute">
+          {cancelLine}{" "}
+          <Link href="/terms#rent" target="_blank" className="text-body underline underline-offset-2">
+            취소 규정 전체 보기
+          </Link>
+        </p>
         <div id="rent-pay-agreement" />
         <button
           type="button"

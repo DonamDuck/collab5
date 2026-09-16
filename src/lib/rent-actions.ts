@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { getSessionUserId, getProfileById } from "./profiles";
+import { getSessionUserId, getProfileById, savePhoneIfEmpty } from "./profiles";
 import {
   saveSpace, getSpaceFull, getBooking, createPendingBooking, getBookingByOrderId,
   decideBooking, requestRefund, clearRefundRequest,
@@ -10,7 +10,7 @@ import {
   type SpaceSaveInput,
   listLiveBookings,
 } from "./spaces";
-import { approvePayment, cancelPayment, guestCancelRefundRate } from "./rent-payment";
+import { approvePayment, cancelPayment, guestCancelRefundRate, GRACE_MINUTES } from "./rent-payment";
 import { geocode } from "./geocode";
 import { repo } from "./repo";
 import {
@@ -183,6 +183,8 @@ export interface BookingFormInput {
   endTime: string;
   withChat: boolean;
   guestBrandSlug: string;
+  /** ☎️손님 연락처 — 필수(대표 09-17). 프로필에 번호가 없을 때만 거기 적는다(`savePhoneIfEmpty`). */
+  guestPhone: string;
 }
 
 export interface StartBookingResult extends ActionResult {
@@ -204,6 +206,12 @@ export async function startBookingAction(input: BookingFormInput): Promise<Start
   if (!sp || sp.status !== "open") return { ok: false, message: "지금은 신청할 수 없는 공간이에요." };
   if (sp.ownerUserId === uid) return { ok: false, message: "내 공간은 내가 빌릴 수 없어요." };
   if (input.plan.trim().length < 10) return { ok: false, message: "그날 무엇을 하실지 열 글자 이상 적어 주세요." };
+  // ☎️09-17 대표 — 손님 번호는 필수. 화면도 막지만 관문은 여기다(액션은 화면 없이도 불린다).
+  //   숫자만 세서 0으로 시작하는 9~11자리면 받는다(지역번호 02 포함). 모양은 손님이 적은 그대로 둔다.
+  const phoneDigits = (input.guestPhone ?? "").replace(/\D/g, "");
+  if (!/^0\d{8,10}$/.test(phoneDigits)) {
+    return { ok: false, message: "연락받을 전화번호를 다시 봐 주세요. 숫자 9~11자리예요." };
+  }
 
   // ⏳지난 «날»은 여기서 자른다. 화면도 거르지만(`futureSlots`) 관문은 여기다 —
   //   열어 둔 날이 지나가도 목록에는 남아 있어서, 주소를 그대로 들고 온 사람은 화면을 안 거친다.
@@ -232,7 +240,7 @@ export async function startBookingAction(input: BookingFormInput): Promise<Start
   const amountSpace = Math.round(sp.priceHour * hours);
   const amountChat = input.withChat && sp.coffeeChat ? sp.coffeeChatPrice : 0;
   const amountTotal = amountSpace + amountChat;
-  if (amountTotal <= 0) return { ok: false, message: "값이 정해지지 않은 공간이에요. 사장님께 확인이 필요합니다." };
+  if (amountTotal <= 0) return { ok: false, message: "아직 값이 안 정해진 공간이라 신청할 수 없어요." };
 
   // 주문번호는 우리가 만든다. 토스에 그대로 실려 가고 돌아올 때 이 값으로 행을 찾는다.
   const orderId = `rent-${sp.id}-${input.useDate.replace(/-/g, "")}-${Math.random().toString(36).slice(2, 10)}`;
@@ -247,6 +255,10 @@ export async function startBookingAction(input: BookingFormInput): Promise<Start
     paymentKey: "", orderId,
   });
   if (!booking) return { ok: false, message: "신청을 시작하지 못했어요. 잠시 뒤 다시 시도해 주세요." };
+
+  // ☎️프로필에 번호가 비어 있으면 채운다. 사장님이 예약을 받은 뒤 보는 손님 번호가 프로필 전화다.
+  //   실패해도 신청은 계속한다 — 이메일이라는 연락 길이 남아 있고, 번호 하나로 결제를 막을 일은 아니다.
+  await savePhoneIfEmpty(uid, input.guestPhone);
 
   // 💳결제 줄도 여기서 만든다(READY). 승인·환불은 전부 이 줄을 기준으로 한다(09-16 결제 테이블).
   //   판매자 = 공간 주인. 지급대행이 돈을 보낼 상대다.
@@ -424,8 +436,8 @@ function cancelRefund(b: SpaceBooking): { rate: number; refund: number } {
  *  화면에 표를 다시 적으면 표가 바뀌는 날 화면만 뒤처진다. 그래서 화면은 늘 이걸 부른다. */
 export async function quoteCancelAction(
   bookingId: number,
-): Promise<{ ok: boolean; message: string; total: number; refund: number; rate: number }> {
-  const none = { total: 0, refund: 0, rate: 0 };
+): Promise<{ ok: boolean; message: string; total: number; refund: number; rate: number; daysBefore: number; grace: boolean }> {
+  const none = { total: 0, refund: 0, rate: 0, daysBefore: 0, grace: false };
   const uid = await getSessionUserId();
   if (!uid) return { ok: false, message: "로그인이 필요해요.", ...none };
   const b = await getBooking(bookingId);
@@ -433,7 +445,11 @@ export async function quoteCancelAction(
   if (b.status !== "paid" && b.status !== "confirmed") return { ok: false, message: "이미 끝난 신청이에요.", ...none };
   if (bookingStarted(b)) return { ok: false, message: "이미 시작한 예약은 취소할 수 없어요.", ...none };
   const { rate, refund } = cancelRefund(b);
-  return { ok: true, message: "", total: b.amountTotal, refund, rate };
+  // 💬09-17 QA — 팝업이 「왜 그 %인지」를 한 줄로 말하게 재료를 같이 준다. 비율은 위 계산 그대로고,
+  //   이 둘은 설명에만 쓴다(`cancelRefund`와 같은 식으로 센다).
+  const daysBefore = kstDaysUntil(b.useDate);
+  const grace = Math.floor((Date.now() - new Date(b.createdAt).getTime()) / 60_000) <= GRACE_MINUTES;
+  return { ok: true, message: "", total: b.amountTotal, refund, rate, daysBefore, grace };
 }
 
 /** 게스트 취소 — 환불률은 우리 규정표가 정한다(호스트 자율 금지). */
@@ -441,7 +457,7 @@ export async function cancelBookingAction(bookingId: number): Promise<ActionResu
   const uid = await getSessionUserId();
   if (!uid) return { ok: false, message: "로그인이 필요해요." };
   const b = await getBooking(bookingId);
-  if (!b || b.guestUserId !== uid) return { ok: false, message: "내 신청만 취소할 수 있어요." };
+  if (!b || b.guestUserId !== uid) return { ok: false, message: "내 예약만 취소할 수 있어요." };
   if (b.status !== "paid" && b.status !== "confirmed") return { ok: false, message: "이미 끝난 신청이에요." };
   // 🚨이미 시작한 예약은 취소할 수 없다(09-16). 막지 않으면 다 쓴 예약을 「취소」로 바꿔
   //   환불은 0원인데 사장님 정산에서 통째로 빠진다. 화면도 버튼을 숨기지만 관문은 여기다.
@@ -478,7 +494,8 @@ export async function cancelBookingAction(bookingId: number): Promise<ActionResu
     await notifyBookingCancelled({ ...b, status: "cancelled" }, p.space, p.host, p.guest);
     await notifyBookingCancelledToGuest({ ...b, status: "cancelled" }, p.space, p.host, p.guest, refund);
   });
-  return { ok: true, message: refund > 0 ? `취소했어요. ${refund.toLocaleString()}원이 환불됩니다.` : "취소했어요. 당일 취소라 환불은 없습니다." };
+  // ✍️09-17 — 「환불됩니다」·「없습니다」 피동·합니다체를 걷었다. 누가 돌려주는지 주어가 보이게.
+  return { ok: true, message: refund > 0 ? `취소했어요. ${refund.toLocaleString()}원을 돌려드릴게요.` : "취소했어요. 당일 취소라 돌려드릴 돈은 없어요." };
 }
 
 /** 화면에서 금액을 보여줄 때 쓰는 계산 — 호스트에게 얼마가 가는지 정직하게 적기 위한 것. */
