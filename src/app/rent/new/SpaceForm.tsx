@@ -16,13 +16,13 @@
 //
 //   같은 폼이 `/rent/new`와 `/rent/[slug]/edit`를 다 맡는다 — `initial`이 오면 고치기 모드.
 //   저장은 둘 다 `saveSpaceAction`이고, slug가 실리면 그 행을 덮어쓴다(다시 검토 대기로 들어간다).
-import { useCallback, useState, useTransition } from "react";
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { saveSpaceAction } from "@/lib/rent-actions";
 import { uploadPhoto } from "@/lib/upload";
 import { PhotoGrid } from "@/app/register/PhotoGrid";
-import type { Space, SpaceUseType, SpaceCategory, SpaceScope, OpenSlot, AccessHow } from "@/lib/types";
-import { hoursBetween } from "@/lib/rent-time";
+import type { Space, SpaceUseType, SpaceCategory, SpaceScope, OpenSlot, AccessHow, RepeatRule } from "@/lib/types";
+import { expandRepeat, hoursBetween, stripRepeat } from "@/lib/rent-time";
 import { COFFEE_CHAT_WHEN_HOST } from "@/lib/rent-copy";
 import { CATEGORY_OPTIONS, dateLabel, primaryBtnCls, RentSelect, rentInputCls, rentTextareaCls, secondaryBtnCls, won } from "../ui";
 import { AddressField } from "./AddressField";
@@ -94,6 +94,9 @@ function splitAddress(s: string): [string, string] {
   return i === -1 ? [s, ""] : [s.slice(0, i), s.slice(i + 2)];
 }
 
+/** 다 올라간 사진 주소만. 올라가는 중인 자리(빈 주소)는 초안에 안 담는다. */
+const readyPhotosOf = (ps: Photo[]) => ps.filter((p) => !p.uploading && p.url).map((p) => p.url);
+
 /** 고르는 pill — 고른 것은 키위 틴트, 아닌 것은 흰 면 + hairline. 44px 터치 타깃. */
 const pickCls = (on: boolean) =>
   `inline-flex h-[44px] items-center rounded-pill px-4 text-[15px] font-medium transition-colors ${
@@ -102,6 +105,25 @@ const pickCls = (on: boolean) =>
 
 type Photo = { url: string; uploading?: boolean };
 
+// 💾새로 올리기 임시 저장 (2026-09-17 대표 「오늘 다 구현」)
+//   칸이 스무 개 가까이라 한 번에 못 끝내는 사장님이 많다. 나갔다 오면 처음부터였다.
+//   ⭐새로 올리기에서만 한다. 고치기는 이미 DB에 있고, 낡은 초안을 얹으면 저장된 값을 되돌린다.
+//   🔑키에 사용자 id를 넣는다. 안 넣으면 같은 기기에서 다른 계정으로 들어온 사람에게 남의 초안이 뜬다.
+//   ✋약관 동의는 안 담는다. 다시 눌러야 동의다.
+const DRAFT_VERSION = 1;
+const DRAFT_DEBOUNCE_MS = 700;
+const draftKeyOf = (uid: number) => `collab5:rent-new-draft:u${uid}`;
+
+interface SpaceDraft {
+  name: string; category: SpaceCategory; scope: SpaceScope; body: string; photos: string[];
+  addrBase: string; addrDetail: string; contactPhone: string; accessHow: AccessHow;
+  facilities: string[]; facilitiesNote: string; capacity: string; rules: string;
+  priceHour: number; minHours: string;
+  chatOn: boolean; chatMin: string; chatPrice: number; chatTopics: string;
+  openSlots: OpenSlot[]; repeatWeekly: RepeatRule[];
+  brandOn: boolean; brandPick: string;
+}
+
 export function SpaceForm({
   myBrands,
   feeRate,
@@ -109,6 +131,7 @@ export function SpaceForm({
   defaultName = "",
   defaultPhone = "",
   defaultBrandSlug = "",
+  userId,
 }: {
   myBrands: { slug: string; name: string }[];
   feeRate: number;
@@ -120,6 +143,8 @@ export function SpaceForm({
   defaultPhone?: string;
   /** 소개서가 하나라도 있으면 그걸 기본으로 연결한다. 없으면 그 칸 자체가 안 뜬다. */
   defaultBrandSlug?: string;
+  /** 💾새로 올리기 임시 저장의 키. 고치기 모드에선 안 넘긴다(넘겨도 `initial`이 있으면 안 쓴다). */
+  userId?: number;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -159,12 +184,118 @@ export function SpaceForm({
   const [chatMin, setChatMin] = useState(String(initial?.coffeeChatMinutes || 60));
   const [chatPrice, setChatPrice] = useState<number>(initial?.coffeeChatPrice ?? 0);
   const [chatTopics, setChatTopics] = useState(initial?.coffeeChatTopics ?? "");
-  const [openSlots, setOpenSlots] = useState<OpenSlot[]>(initial?.openSlots ?? []);
+  // 🔁09-17 — `initial.openSlots`는 규칙을 펼친 값이다(`toSpace`). 폼은 «직접 연 날»만 들고 규칙은 따로 든다.
+  //   펼친 날을 직접 연 날로 받아 두면, 규칙을 꺼도 그 날들이 직접 연 날로 남아 저장된다.
+  const [openSlots, setOpenSlots] = useState<OpenSlot[]>(() =>
+    initial ? stripRepeat(initial.openSlots, initial.repeatWeekly ?? []) : [],
+  );
+  const [repeatWeekly, setRepeatWeekly] = useState<RepeatRule[]>(initial?.repeatWeekly ?? []);
   const [termsOk, setTermsOk] = useState(!!initial?.hostTermsAt);
   // 📎소개서 보여주기 토글(대표 09-16). 끄면 저장값은 빈 문자열이지만 고른 소개서는 기억해 둬서, 다시 켜면 그대로 돌아온다.
   const [brandOn, setBrandOn] = useState(initial ? !!initial.brandSlug : !!defaultBrandSlug);
   const [brandPick, setBrandPick] = useState(initial?.brandSlug || defaultBrandSlug || myBrands[0]?.slug || "");
   const brandSlug = brandOn ? brandPick : "";
+
+  // ─── 💾임시 저장 (새로 올리기만) ───
+  const draftKey = !initial && userId ? draftKeyOf(userId) : null;
+  /** 아무것도 안 쓴 첫 모습. 지금 폼이 이것과 같으면 초안을 안 남긴다(열어만 봤는데 「불러왔어요」가 뜨면 이상하다). */
+  const [blank] = useState<SpaceDraft>(() => ({
+    name: defaultName, category: "", scope: "space_only", body: "", photos: [],
+    addrBase: "", addrDetail: "", contactPhone: defaultPhone, accessHow: "sms",
+    facilities: [], facilitiesNote: "", capacity: "", rules: "",
+    priceHour: 0, minHours: "2",
+    chatOn: false, chatMin: "60", chatPrice: 0, chatTopics: "",
+    openSlots: [], repeatWeekly: [],
+    brandOn: !!defaultBrandSlug, brandPick: defaultBrandSlug || myBrands[0]?.slug || "",
+  }));
+  const [draftLoaded, setDraftLoaded] = useState(false);
+  const [restored, setRestored] = useState(false);
+  /** 저장이 끝난 뒤엔 초안을 다시 쓰지 않는다 — 떠나기 직전에 남은 타이머가 지운 초안을 되살린다. */
+  const draftDone = useRef(false);
+
+  const applyDraft = (d: SpaceDraft) => {
+    setName(d.name); setCategory(d.category); setScope(d.scope); setBody(d.body);
+    setPhotos(d.photos.map((url) => ({ url })));
+    setAddrBase(d.addrBase); setAddrDetail(d.addrDetail); setContactPhone(d.contactPhone); setAccessHow(d.accessHow);
+    setFacilities(d.facilities); setFacilitiesNote(d.facilitiesNote); setCapacity(d.capacity); setRules(d.rules);
+    setPriceHour(d.priceHour); setMinHours(d.minHours);
+    setChatOn(d.chatOn); setChatMin(d.chatMin); setChatPrice(d.chatPrice); setChatTopics(d.chatTopics);
+    setOpenSlots(d.openSlots); setRepeatWeekly(d.repeatWeekly);
+    setBrandOn(d.brandOn);
+    // 그새 소개서를 지웠으면 옛 slug를 붙들지 않는다.
+    setBrandPick(myBrands.some((b) => b.slug === d.brandPick) ? d.brandPick : blank.brandPick);
+  };
+
+  // 열 때 한 번 읽는다. ⚠️useState 초기값에서 읽으면 서버 렌더와 모양이 달라 하이드레이션이 깨진다.
+  //   그래서 effect 안에서 값을 얹는다 — 브라우저 저장소는 «바깥 시스템»이라 이 규칙의 예외 자리다(`register/page.tsx`와 같은 처리).
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    if (!draftKey) return;
+    try {
+      const raw = localStorage.getItem(draftKey);
+      const env = raw ? (JSON.parse(raw) as { v?: number; data?: Partial<SpaceDraft> }) : null;
+      if (env?.v === DRAFT_VERSION && env.data && typeof env.data === "object") {
+        // 모양이 어긋난 칸은 빈 모습으로 메운다. 초안 하나 때문에 폼이 안 뜨면 안 된다.
+        const d = { ...blank, ...env.data } as SpaceDraft;
+        if (!Array.isArray(d.photos)) d.photos = [];
+        d.photos = d.photos.filter((u) => typeof u === "string" && /^https?:\/\//.test(u));
+        if (!Array.isArray(d.facilities)) d.facilities = [];
+        if (!Array.isArray(d.openSlots)) d.openSlots = [];
+        if (!Array.isArray(d.repeatWeekly)) d.repeatWeekly = [];
+        applyDraft(d);
+        setRestored(true);
+      }
+    } catch {
+      /* 저장소를 못 쓰는 브라우저(시크릿·정책)거나 깨진 값 — 없는 것으로 친다 */
+    }
+    setDraftLoaded(true);
+    // 여는 순간 한 번만. 의존성을 채우면 입력마다 초안을 다시 얹는다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draftKey]);
+  /* eslint-enable react-hooks/set-state-in-effect */
+
+  const draftSnap: SpaceDraft = {
+    // 주소가 http(s)인 사진만. 저장소 없는 로컬에선 사진이 data URL로 와서 한 장이 저장소 한도를 넘긴다.
+    name, category, scope, body, photos: readyPhotosOf(photos).filter((u) => /^https?:\/\//.test(u)),
+    addrBase, addrDetail, contactPhone, accessHow,
+    facilities, facilitiesNote, capacity, rules,
+    priceHour, minHours,
+    chatOn, chatMin, chatPrice, chatTopics,
+    openSlots, repeatWeekly,
+    brandOn, brandPick,
+  };
+  const draftJson = JSON.stringify(draftSnap);
+  useEffect(() => {
+    if (!draftKey || !draftLoaded || draftDone.current) return;
+    const tm = setTimeout(() => {
+      if (draftDone.current) return;
+      try {
+        if (draftJson === JSON.stringify(blank)) localStorage.removeItem(draftKey);
+        else localStorage.setItem(draftKey, JSON.stringify({ v: DRAFT_VERSION, savedAt: new Date().toISOString(), data: JSON.parse(draftJson) }));
+      } catch {
+        /* 용량이 넘치거나 저장소가 막혔다 — 임시 저장은 못 해도 쓰는 건 막지 않는다 */
+      }
+    }, DRAFT_DEBOUNCE_MS);
+    return () => clearTimeout(tm);
+  }, [draftKey, draftLoaded, draftJson, blank]);
+
+  const clearDraft = () => {
+    if (!draftKey) return;
+    try {
+      localStorage.removeItem(draftKey);
+    } catch {
+      /* 지울 수 없으면 지울 것도 못 읽은 것이다 */
+    }
+  };
+  /** 「처음부터 쓰기」 — 초안을 지우고 폼을 첫 모습으로. */
+  const startOver = () => {
+    clearDraft();
+    applyDraft(blank);
+    setTermsOk(false);
+    setTried(false);
+    setErr("");
+    setRestored(false);
+  };
 
   // ⚠️`payout()`을 import하지 않고 식을 옮겨 적었다 — 그 함수는 `lib/spaces.ts`에 있고, 그 파일은
   //   supabase 클라이언트를 끌고 온다. 클라이언트 번들에 데이터 계층 한 벌이 통째로 실린다.
@@ -245,8 +376,9 @@ export function SpaceForm({
     if (!contactPhone.trim()) return ["phone", "매장 전화번호가 비어 있어요."];
     if (rules.trim().length < 10) return ["rules", "유의 사항을 열 글자 넘게 담아 주셔야 올릴 수 있어요."];
     if (priceHour <= 0) return ["price", "한 시간에 얼마 받으실지 적어 주세요."];
-    if (openSlots.length === 0) return ["slots", "빌려줄 날을 달력에서 하루 이상 골라 주세요."];
-    const badSlot = openSlots.find((sl) => hoursBetween(sl.start, sl.end) < Number(minHours));
+    // 🔁09-17 — 매주 계속 여는 요일이 있으면 그걸로 하루 이상이 찬다. 시간 검사도 규칙이 연 날까지 본다.
+    if (openSlots.length === 0 && repeatWeekly.length === 0) return ["slots", "빌려줄 날을 달력에서 하루 이상 골라 주세요."];
+    const badSlot = expandRepeat(openSlots, repeatWeekly).find((sl) => hoursBetween(sl.start, sl.end) < Number(minHours));
     if (badSlot) return ["slots", `${dateLabel(badSlot.date)}은 최소 ${minHours}시간을 못 채워요. 시간을 늘리거나 그날을 빼 주세요.`];
     if (chatOn && chatPrice <= 0) return ["chatPrice", "커피챗 값이 비어 있어요."];
     if (!termsOk) return ["terms", "공간 제공자 약관에 동의해 주세요."];
@@ -288,6 +420,7 @@ export function SpaceForm({
         priceHour,
         minHours: Number(minHours) || 1,
         openSlots,
+        repeatWeekly,
         coffeeChat: chatOn,
         coffeeChatMinutes: chatOn ? Number(chatMin) : 0,
         coffeeChatPrice: chatOn ? chatPrice : 0,
@@ -301,6 +434,9 @@ export function SpaceForm({
         setErr(r.message);
         return;
       }
+      // 💾올라갔으니 초안은 끝이다. 떠나기 전에 남은 타이머가 되살리지 않게 먼저 막는다.
+      draftDone.current = true;
+      clearDraft();
       // 검토 대기라 `/rent/{slug}`는 아직 남에게 안 보인다. 자기 것이 어디 있는지 보이는 화면으로 보낸다.
       // 💬09-17 QA — 말없이 목록으로 떨어져서 「된 건가?」 했다. `saved`로 무슨 일이 났는지 한 줄 띄운다.
       //   ⚠️검토로 내려가는 조건은 `saveSpaceAction`과 같은 규칙이다(이름·주소가 바뀌면). 거기를 바꾸면 여기도.
@@ -324,6 +460,19 @@ export function SpaceForm({
 
   return (
     <div className="mt-10 space-y-12">
+      {/* 💾09-17 — 불러온 걸 먼저 말한다. 모르고 이어 쓰다 옛 사진이 올라가면 안 된다. */}
+      {restored && (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-md bg-surface-soft px-4 py-2">
+          <p className="min-w-0 flex-1 text-[15px] leading-relaxed break-keep text-body">쓰시던 내용을 불러왔어요.</p>
+          <button
+            type="button"
+            onClick={startOver}
+            className="h-[44px] shrink-0 text-[15px] text-mute underline underline-offset-2"
+          >
+            처음부터 쓰기
+          </button>
+        </div>
+      )}
       {/* ── 어떤 공간인가 ── */}
       <Group title="어떤 공간인가요">
         <L label="공간 이름" htmlFor="sp-name" anchor="name" error={fieldErr("name")}>
@@ -783,7 +932,13 @@ export function SpaceForm({
         anchor="slots"
         error={fieldErr("slots")}
       >
-        <OpenSlotsCalendar value={openSlots} onChange={setOpenSlots} minHours={Number(minHours) || 1} />
+        <OpenSlotsCalendar
+          value={openSlots}
+          onChange={setOpenSlots}
+          repeat={repeatWeekly}
+          onRepeatChange={setRepeatWeekly}
+          minHours={Number(minHours) || 1}
+        />
       </Group>
 
       {/* ── 확인 ── */}

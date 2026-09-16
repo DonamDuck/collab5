@@ -64,6 +64,8 @@ export interface SpaceFormInput {
   useType: SpaceUseType; facilities: string[]; facilitiesNote: string; capacity?: number;
   rules: string;
   priceHour: number; minHours: number; openSlots: OpenSlot[];
+  /** 🔁매주 계속 여는 요일(09-17). `openSlots`에 펼친 날짜가 섞여 와도 된다 — 저장(`saveSpace`)이 도로 뺀다. */
+  repeatWeekly: Space["repeatWeekly"];
   coffeeChat: boolean; coffeeChatMinutes: number; coffeeChatPrice: number; coffeeChatTopics: string;
   accessHow: AccessHow; contactPhone: string;
   /** 📜호스트 약관 동의. 화면의 체크 하나지만 계약의 근거라 서버가 다시 본다. */
@@ -86,7 +88,11 @@ export async function saveSpaceAction(input: SpaceFormInput): Promise<ActionResu
   }
   if (!input.name.trim()) return { ok: false, message: "공간 이름을 적어 주세요." };
   if (!input.category) return { ok: false, message: "어떤 업종인지 골라 주세요." };
-  if (input.openSlots.length === 0) return { ok: false, message: "빌려줄 수 있는 날과 시간을 하나 이상 정해 주세요." };
+  // 🔁09-17 — 매주 계속 여는 요일이 있으면 그걸로 «하루 이상»이 찬다.
+  const repeat = Array.isArray(input.repeatWeekly) ? input.repeatWeekly : [];
+  if (input.openSlots.length === 0 && repeat.length === 0) {
+    return { ok: false, message: "빌려줄 수 있는 날과 시간을 하나 이상 정해 주세요." };
+  }
   if (input.photos.length === 0) return { ok: false, message: "사진을 한 장 이상 올려 주세요. 사진 없는 공간은 아무도 안 빌려요." };
   if (input.priceHour <= 0) return { ok: false, message: "한 시간에 얼마 받으실지 적어 주세요." };
   if (input.minHours < 1) return { ok: false, message: "최소 대여 시간은 한 시간 이상이어야 해요." };
@@ -107,6 +113,24 @@ export async function saveSpaceAction(input: SpaceFormInput): Promise<ActionResu
     if (h <= 0) return { ok: false, message: `${dateLabel(sl.date)}의 시간이 거꾸로예요. 끝나는 시각이 더 늦어야 해요.` };
     if (h < input.minHours) {
       return { ok: false, message: `${dateLabel(sl.date)}은 ${h}시간만 열려 있어서 최소 ${input.minHours}시간을 못 채워요.` };
+    }
+  }
+
+  // 🔁요일 규칙 검사(09-17). 화면이 막아도 여기서 다시 본다 — 깨진 규칙 하나가 12주치 날짜를 만든다.
+  const dows = new Set<number>();
+  for (const r of repeat) {
+    const dayName = `매주 ${"일월화수목금토"[r?.dow] ?? "?"}요일`;
+    if (!r || !Number.isInteger(r.dow) || r.dow < 0 || r.dow > 6) return { ok: false, message: "매주 여는 요일을 알아보지 못했어요. 요일 줄에서 한 번 껐다 켜 주세요." };
+    if (dows.has(r.dow)) return { ok: false, message: `${dayName}이 두 번 들어 있어요. 하나만 남겨 주세요.` };
+    dows.add(r.dow);
+    if (!/^\d{2}:\d{2}$/.test(r.start ?? "") || !/^\d{2}:\d{2}$/.test(r.end ?? "") || toMinutes(r.start) < 0 || toMinutes(r.end) < 0) {
+      return { ok: false, message: `${dayName} 여는 시각이 비어 있어요.` };
+    }
+    const h = hoursBetween(r.start, r.end);
+    if (h <= 0) return { ok: false, message: `${dayName}의 시간이 거꾸로예요. 끝나는 시각이 더 늦어야 해요.` };
+    if (h < input.minHours) return { ok: false, message: `${dayName}은 ${h}시간만 열려 있어서 최소 ${input.minHours}시간을 못 채워요.` };
+    if (r.skip !== undefined && (!Array.isArray(r.skip) || r.skip.length > 200 || r.skip.some((d) => !/^\d{4}-\d{2}-\d{2}$/.test(d)))) {
+      return { ok: false, message: `${dayName} 쉬는 날 목록이 깨져 있어요. 새로고침하고 한 번 더 올려 주세요.` };
     }
   }
 
@@ -149,6 +173,7 @@ export async function saveSpaceAction(input: SpaceFormInput): Promise<ActionResu
 
     category: input.category, scope: input.scope,
     priceHour: input.priceHour, minHours: input.minHours, openSlots: input.openSlots,
+    repeatWeekly: repeat.map((r) => ({ dow: r.dow, start: r.start, end: r.end, ...(r.skip?.length ? { skip: r.skip } : {}) })),
     coffeeChat: input.coffeeChat,
     coffeeChatMinutes: input.coffeeChat ? input.coffeeChatMinutes : 0,
     coffeeChatPrice: input.coffeeChat ? input.coffeeChatPrice : 0,

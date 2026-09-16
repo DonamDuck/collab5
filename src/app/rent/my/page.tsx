@@ -203,6 +203,9 @@ export default async function MyRentPage({
                     <p className="mt-1 text-[15px] text-mute">
                       {sp.area || "동네 미정"} · 시간당 {won(sp.priceHour)} · 열어 둔 날{" "}
                       {new Set(sp.openSlots.map((sl) => sl.date)).size}일
+                      {/* 🔁09-17 — `openSlots`는 매주 규칙을 펼친 12주치까지 센다. 규칙이 있으면 요일을 짧게 붙인다(월요일부터). */}
+                      {sp.repeatWeekly.length > 0 &&
+                        ` · 매주 ${[...sp.repeatWeekly].sort((a, b) => ((a.dow + 6) % 7) - ((b.dow + 6) % 7)).map((r) => "일월화수목금토"[r.dow]).join("·")} 계속 열림`}
                     </p>
                   </>
                 }

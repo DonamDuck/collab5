@@ -97,6 +97,8 @@ export default async function NewSpacePage({
         defaultName={me?.brandName ?? ""}
         defaultPhone={me?.phone ?? ""}
         defaultBrandSlug={myBrands[0]?.slug ?? ""}
+        // 💾임시 저장 키에 쓴다(09-17). 계정마다 초안이 따로 남는다.
+        userId={uid}
       />
     </main>
   );

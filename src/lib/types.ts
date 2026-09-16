@@ -431,6 +431,16 @@ export interface OpenSlot {
   end: string;
 }
 
+/** 🔁매주 계속 여는 요일 (2026-09-17). `spaces.repeat_weekly`에 저장하고 읽을 때 앞으로 12주를 펼친다
+ *  (`rent-time`의 `expandRepeat`). ⭐`openSlots`엔 펼친 날짜가 «이미 들어 있다» — 화면·서버는 이 칸을 안 봐도 된다.
+ *  `dow` 0=일 … 6=토. `skip`은 그 요일 중 하루만 쉬는 날(`YYYY-MM-DD`). 없으면 빈다. */
+export interface RepeatRule {
+  dow: number;
+  start: string;
+  end: string;
+  skip?: string[];
+}
+
 /** 📨이용 안내를 어떻게 할지. 🚨비밀번호 같은 «내용»은 우리가 안 가진다 — 방식만 고른다. */
 export type AccessHow = "sms" | "onsite" | "both";
 
@@ -493,6 +503,8 @@ export interface Space {
   minHours: number;
   /** 날짜별로 열어 두는 시간대. 비었으면 아무도 신청할 수 없다(폼에서 막는다). */
   openSlots: OpenSlot[];
+  /** 🔁매주 계속 여는 요일 규칙. ⚠️`openSlots`는 이미 이 규칙을 펼친 값이다(`toSpace`). 저장할 때 펼친 칸은 도로 뺀다. */
+  repeatWeekly: RepeatRule[];
 
   /** ☕커피챗 — 「선배에게 현업 이야기 듣기」(대표 09-16).
    *  ⭐파는 것은 «비법»이 아니다. 레시피를 한 줄도 안 주고도 하루가 어떻게 돌아가는지는 들려줄 수 있고,
