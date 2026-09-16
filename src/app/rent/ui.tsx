@@ -212,6 +212,34 @@ export function CardBox({ children, className = "" }: { children: ReactNode; cla
   );
 }
 
+/** 읽는 목록의 한 줄 — 위 구분선 + 왼쪽 글 + 오른쪽 상태. 마지막 줄은 아래 구분선도 갖는다.
+ *  🔁09-16 `/rent/my` 안에만 있던 것을 여기로 올렸다. 보낸 신청 줄(`GuestBookingRow`)이 `/rent/requests`와
+ *    같이 쓰면서, 줄 모양이 한 화면에만 있으면 두 화면의 구분선·간격이 따로 놀게 된다. */
+export function ListRow({
+  head,
+  status,
+  children,
+}: {
+  head: ReactNode;
+  status: ReactNode;
+  children?: ReactNode;
+}) {
+  return (
+    <li className="border-t border-hairline py-5 last:border-b">
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0 flex-1">{head}</div>
+        {status}
+      </div>
+      {children}
+    </li>
+  );
+}
+
+/** 아직 안 열린 연락처 — 회색 상자 대신 한 줄. */
+export function LockedLine({ text }: { text: string }) {
+  return <p className="mt-3 text-[15px] leading-relaxed break-keep text-faint">{text}</p>;
+}
+
 /** 사진이 없을 때 커버 자리 — 회색 면에 아톰 마크를 옅게. 「사진 준비 중」 글자보다 조용하다.
  *  🚨정사각 클래스 금지 — 마크 비율이 1.28이라 `w-*`를 높이와 같게 박으면 찌그러진다. */
 export function CoverPlaceholder() {
