@@ -24,6 +24,10 @@ create table if not exists payments (
   purpose             text not null check (purpose in ('rent_booking')),
   booking_id          bigint unique references space_bookings(id) on delete restrict,
   buying_user_id      bigint not null references users(user_id) on delete restrict,   -- 돈을 낸 사람(대표 09-16 이름)
+  selling_user_id     bigint references users(user_id) on delete restrict,            -- 돈을 받을 사람 = 공간 주인(대표 09-16)
+  -- ⚠️selling_user_id는 null일 수 있다. 리포트 유료화처럼 판매자가 «우리»인 결제엔 사람이 없다.
+  --   하루 가게 결제는 반드시 채운다(아래 채우기와 앱 코드). 지급대행이 돈을 보내는 상대가 이 사람이다.
+  --   토스 셀러 id(지급대행 등록 뒤 생김)는 결제가 아니라 «사람»에 붙는 값이라 여기 두지 않는다.
   -- ⚠️두 FK 모두 restrict다. 돈이 오간 기록은 예약·회원을 지워도 같이 사라지면 안 된다
   --   (전자상거래법 제6조 — 대금 결제 기록 보존). 시험 데이터를 지울 땐 결제 줄을 먼저 지운다.
 
@@ -149,7 +153,7 @@ grant  execute on function rent_sync(text, text, jsonb, text) to service_role;
 
 -- ─── 4. 옛 예약에서 결제 줄 채우기 ────────────────────────────────────────────
 -- ⚠️운영 DB엔 시험 예약만 있다(09-16 조회: 18줄 — pending 15 · paid 1 · confirmed 1 · cancelled 1).
-insert into payments (order_id, payment_key, purpose, booking_id, buying_user_id,
+insert into payments (order_id, payment_key, purpose, booking_id, buying_user_id, selling_user_id,
                       amount, balance_amount, status, fee_rate, payout_amount, payout_status, created_at)
 select
   b.order_id,
@@ -157,6 +161,7 @@ select
   'rent_booking',
   b.id,
   b.guest_user_id,
+  sp.owner_user_id,
   b.amount_total,
   case when b.status in ('refunded', 'cancelled') then 0 else b.amount_total end,
   case
@@ -171,6 +176,7 @@ select
   case when b.status = 'done' then 'WAITING' else 'NONE' end,
   b.created_at
 from space_bookings b
+join spaces sp on sp.id = b.space_id
 where b.amount_total > 0
   and not exists (select 1 from payments p where p.order_id = b.order_id);
 
