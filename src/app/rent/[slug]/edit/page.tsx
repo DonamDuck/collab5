@@ -44,9 +44,14 @@ export default async function EditSpacePage({ params }: { params: Promise<{ slug
             (`saveSpaceAction`: 이름·주소가 바뀔 때만 검토로 내려간다).
             🩸그래서 이 줄은 사장님께 «일어나지 않을 일»을 예고하고 있었다. 값 하나 고치려다
             목록에서 사라진다고 읽히면 아예 안 고친다. */}
+        {/* 🔁09-17 QA — 검토 대기 공간에도 「공간은 그대로 보여요」라고 했다. 아직 아무에게도 안 보이는데.
+            상태로 가른다. 이름·주소를 바꾸면 검토로 간다는 말은 버튼 아래 한 곳에만 둔다(위아래 같은 말이 두 번이었다). */}
         <p className="mt-3 text-[17px] leading-relaxed break-keep text-mute">
-          고치시는 동안에도 공간은 그대로 보여요. 매장 이름이나 주소를 바꾸시면 그때만 한 번 더 확인해
-          드릴게요.
+          {sp.status === "open"
+            ? "고치시는 동안에도 공간은 그대로 보여요."
+            : sp.status === "pending"
+              ? "아직 저희가 읽어 보는 중인 공간이에요. 고치셔도 검토는 이어서 해요."
+              : "고친 내용은 저장해 두고, 공간을 다시 열 때 그대로 보여요."}
         </p>
       </header>
 

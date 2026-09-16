@@ -162,8 +162,12 @@ export default async function RentPayoutsPage() {
           </p>
           {stuck.unanswered.length > 0 && (
             <StuckList
-              title="사장님이 답을 안 하신 채 날이 지났어요"
-              hint="거절하시면 손님께 전액 환불돼요. 사장님께 연락해서 여쭤봐 주세요."
+              // 🔁09-17 QA — 옛 문안은 「사장님이 답을 안 하신 채 날이 지났어요 / 거절하시면 전액 환불」이었다.
+              //   phase 1은 결제가 곧 예약이라 답이 없어도 다녀간 예약은 `sweepBookings`가 done으로 넘겨 정산에 올린다.
+              //   그래서 여기 남는 `paid`는 «환불 신청이 걸린 채 날이 지난 것»이거나 넘기기가 실패한 것뿐이고,
+              //   이용 시작 뒤엔 거절 자체가 막혀 있다(`decideBookingAction`). 목록 조건(`listStuckBookings`)은 그대로 두고 문안만 맞췄다.
+              title="결제 완료 상태로 이용일이 지난 예약"
+              hint="대개 위 환불 신청에 같이 걸려 있는 예약이에요. 신청 없이 여기 있으면 이용 완료로 넘어가지 못한 것이니, 사장님께 다녀가셨는지 여쭤봐 주세요."
               rows={stuck.unanswered}
               spaces={spaces}
             />

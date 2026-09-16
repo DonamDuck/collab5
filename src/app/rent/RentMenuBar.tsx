@@ -65,6 +65,24 @@ export function RentMenuBar() {
     return () => window.removeEventListener("resize", measure);
   }, [measure]);
 
+  /** 🙈목록에서 **내려가는 동안엔 숨고, 올라오면 다시 뜬다**(09-17 QA). 떠 있는 바가 카드 커버 위
+   *  「사장님과 커피챗」 필을 덮었다(폰에서 필 글자가 알약 뒤로 들어감). 올라온다는 건 위로 가고 싶다는 뜻이라 그때 보인다.
+   *  ⚠️맨 위 근처(80px 안)에선 늘 보인다 — 첫 화면에서 바가 사라져 있으면 이 구역의 두 갈래가 안 읽힌다. */
+  const [hidden, setHidden] = useState(false);
+  const isForm = current === "/rent/new";
+  useEffect(() => {
+    if (isForm) return;
+    let last = window.scrollY;
+    const onScroll = () => {
+      const y = window.scrollY;
+      if (y < 80) setHidden(false);
+      else if (Math.abs(y - last) > 6) setHidden(y > last);
+      last = y;
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, [isForm]);
+
   // 🚪두 탭 화면이 아니면 바를 안 보인다(상세·내 하루 가게·결제 복귀는 각자 돌아갈 길이 따로 있다).
   //   ⭐판정을 레이아웃이 아니라 **여기서** 한다 — 화면이 늘 때 고칠 자리가 하나여야 어긋나지 않는다.
   if (activeIndex < 0) return null;
@@ -73,12 +91,19 @@ export function RentMenuBar() {
     // 🚨`pointer-events-none` 필수 — 이 래퍼는 화면 폭을 다 차지하는 투명 띠다. 그냥 두면 알약 좌우의
     //   빈 곳이 뒤 콘텐츠의 클릭을 먹는다(보이지 않는 것이 막으니 원인을 못 찾는다). 알약만 되돌린다.
     // top-14 = 헤더 높이. ⚠️루트 폰트가 17px이라 실제 59.5px다(56 아님 — 눈대중 금지).
-    <div className="pointer-events-none sticky top-14 z-[6] flex justify-center px-2 py-2">
+    // 📝등록 폼(`/rent/new`)에선 **따라오지 않는다**(09-17 QA). 채우는 화면이라 떠 있는 바가 라벨·힌트를 가렸다.
+    //   떠나는 길은 맨 위에 한 번 있으면 된다.
+    <div
+      className={`pointer-events-none z-[6] flex justify-center px-2 py-2 transition-[transform,opacity] duration-200 motion-reduce:transition-none ${
+        isForm ? "relative" : "sticky top-14"
+      } ${hidden && !isForm ? "-translate-y-full opacity-0" : ""}`}
+    >
       <nav
         ref={navRef}
         aria-label="하루 가게 바로가기"
         // 🔒`border-[0.5px] border-[#DFDFE3]` + `shadow-e2` = 홈 메뉴바·브랜드 카드와 완전히 같은 값.
-        className="no-scrollbar pointer-events-auto relative inline-flex max-w-full items-center gap-1 overflow-x-auto rounded-pill border-[0.5px] border-[#DFDFE3] bg-surface p-1 shadow-e2"
+        // 숨었을 땐 클릭도 안 받는다 — 투명해진 바가 뒤 카드의 클릭을 먹지 않게.
+        className={`no-scrollbar ${hidden && !isForm ? "pointer-events-none" : "pointer-events-auto"} relative inline-flex max-w-full items-center gap-1 overflow-x-auto rounded-pill border-[0.5px] border-[#DFDFE3] bg-surface p-1 shadow-e2`}
       >
         {/* 🎚미끄러지는 초록. 첫 렌더엔 `pill`이 없어 아예 안 그린다 — 막 태어난 요소는 전환할 이전 값이
             없어서, 0에서 제자리로 날아오는 것처럼 보이는 걸 막는다.
@@ -106,7 +131,11 @@ export function RentMenuBar() {
               key={t.href}
               href={t.href}
               data-on={on ? "1" : "0"}
-              onClick={() => setClicked(t.href)}
+              // 탭을 누르면 숨김을 푼다 — 목록에서 숨은 채로 폼에 갔다 돌아오면 맨 위에서도 바가 안 보일 수 있다.
+              onClick={() => {
+                setClicked(t.href);
+                setHidden(false);
+              }}
               aria-current={on ? "page" : undefined}
               className={`${BASE} ${on ? "text-primary-on" : "text-mute hover:text-primary-on"}`}
             >

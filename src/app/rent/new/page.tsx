@@ -4,6 +4,7 @@ import { getSessionUserId, getProfileById } from "@/lib/profiles";
 import { repo } from "@/lib/repo";
 import { FEE_RATE } from "@/lib/spaces";
 import { SpaceForm } from "./SpaceForm";
+import { redirect } from "next/navigation";
 import { primaryBtnCls } from "../ui";
 
 // 하루 가게 — 공간 올리기 (2026-09-13)
@@ -21,7 +22,16 @@ export const metadata: Metadata = {
   alternates: { canonical: "/rent/new" },
 };
 
-export default async function NewSpacePage() {
+export default async function NewSpacePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ slug?: string }>;
+}) {
+  // 🔀09-17 QA — `/rent/new?slug=…`로 오면 slug를 무시하고 빈 새 폼이 떴다. 고치려던 사장님이
+  //   모르고 올리면 «두 번째 공간»이 생긴다. 고치기 화면으로 보낸다(주인 확인은 그쪽이 한다).
+  const { slug } = await searchParams;
+  if (slug?.trim()) redirect(`/rent/${encodeURIComponent(slug.trim())}/edit`);
+
   const uid = await getSessionUserId();
 
   if (!uid) {

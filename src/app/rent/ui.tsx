@@ -43,12 +43,17 @@ export const CATEGORY_OPTIONS: [Exclude<SpaceCategory, "">, string][] = [
   ["etc", "그 밖에"],
 ];
 
+/** ⚠️업종이 빈 공간은 빈 문자열을 돌려준다(09-17 QA). 호출부가 `filter(Boolean)`으로 빼고 그린다.
+ *  🩸09-16까지 「업종 미정」을 돌려줬는데, 업종 칸이 생기기 전에 올린 공간이 전부 그 글자로 손님에게 보였다.
+ *    손님 눈엔 사장님이 성의 없이 올린 것으로 읽힌다. 모르는 값은 말하지 않는 편이 낫다. */
 export function categoryLabel(c: SpaceCategory): string {
-  return CATEGORY_OPTIONS.find(([v]) => v === c)?.[1] ?? "업종 미정";
+  return CATEGORY_OPTIONS.find(([v]) => v === c)?.[1] ?? "";
 }
 
+/** 범위 라벨 — **손님 말로**(09-17 QA). 「공간만」은 사장님이 고를 때 쓰는 말이라, 목록을 훑는 손님에겐
+ *  「장비는 못 쓴다」는 뜻이 안 읽혔다. 등록 폼의 고르개는 사장님 말(`SpaceForm`의 `SCOPES`)을 따로 쓴다. */
 export function scopeLabel(v: SpaceScope): string {
-  return { space_only: "공간만", with_gear: "공간과 장비까지", whole_shop: "가게 그대로" }[v] ?? "공간만";
+  return { space_only: "자리만 빌려요", with_gear: "장비까지 써요", whole_shop: "가게 그대로" }[v] ?? "자리만 빌려요";
 }
 
 /** 날짜·일정 서식은 `lib/rent-time`이 정본이다(09-16). 서버 액션·메일도 같은 함수를 쓴다.
@@ -70,25 +75,35 @@ export function Chip({ children }: { children: ReactNode }) {
  *  기다리는 중은 레몬, 열린 것은 민트, 끝나거나 막힌 것은 회색.
  *  ⛔Kiwi(primary)는 안 쓴다. 브랜드색이 「성공」을 뜻하기 시작하면 희소성이 무너진다
  *    (globals.css의 `--success-pale` 주석과 같은 규율). */
+// 🔁09-17 대표 결정 4 — 이름을 «짧은 명사꼴»로 맞췄다. 제목·첫 줄의 긴 문장은 `rent-copy.ts`의 `BOOKING_HEADLINE`이고,
+//   배지는 그 문장의 짧은 꼴이다(예약 완료 / 예약 확정 / 새 요청). 나머지 상태도 같은 결로 한 번에 갈았다.
+//   ⭐용어 규칙: 손님은 결제 전 「신청」, 결제 뒤 「예약」. 사장님은 들어온 것이 「요청」, 수락 뒤 「예약」.
+//   🩸09-16까지 손님 쪽은 「예약을 완료했어요」, 사장님 쪽은 「새 신청이에요」라서 같은 건이 화면마다 다른 이름이었다.
+//   ⚠️「완료」를 셋(예약·환불·이용)에 붙이면 목록을 세로로 읽을 때 한 금형이 된다. 예약 완료 하나에만 쓴다.
 const BOOKING_TONE: Record<BookingStatus, { label: string; cls: string }> = {
   // ⭐`pending`은 결제창까지 갔다가 안 내고 돌아온 자리다. 게스트 화면에만 뜨고 호스트에겐 안 보인다.
   //   말투를 「실패」로 쓰지 않는 이유 — 대개는 실패가 아니라 마음이 바뀐 것이다.
-  pending: { label: "결제가 안 끝났어요", cls: "text-faint" },
-  paid: { label: "사장님 답 기다리는 중", cls: "text-lemon-on" },
-  confirmed: { label: "확정됐어요", cls: "text-mint-on" },
-  rejected: { label: "거절됐어요", cls: "text-faint" },
-  refunded: { label: "환불됐어요", cls: "text-faint" },
-  cancelled: { label: "취소했어요", cls: "text-faint" },
+  pending: { label: "결제 전", cls: "text-faint" },
+  paid: { label: "예약 완료", cls: "text-mint-on" },
+  confirmed: { label: "예약 확정", cls: "text-mint-on" },
+  rejected: { label: "사장님 거절", cls: "text-faint" },
+  refunded: { label: "전액 환불", cls: "text-faint" },
+  cancelled: { label: "예약 취소", cls: "text-faint" },
   done: { label: "다녀왔어요", cls: "text-faint" },
   // ⏳09-16 — 결제창만 열고 30분이 지나 닫힌 신청. 실패가 아니라 시간이 지난 것이라 말투도 그렇게.
-  expired: { label: "결제 시간이 지났어요", cls: "text-faint" },
+  expired: { label: "결제 시간 지남", cls: "text-faint" },
 };
 
 /** 👥보는 사람에 따라 같은 상태를 다르게 말하는 자리. 09-16 phase 1 — 손님에게 `paid`는 기다림이 아니라
- *  «예약 완료»다(사장님 답을 기다리게 세워 두지 않는다). 사장님에게 같은 상태는 «새로 들어온 신청»이다. */
+ *  «예약 완료»다(사장님 답을 기다리게 세워 두지 않는다). 사장님에게 같은 상태는 «새로 들어온 요청»이다(09-17 대표 결정 4). */
 const TONE_FOR: Record<"guest" | "host", Partial<Record<BookingStatus, { label: string; cls: string }>>> = {
-  guest: { paid: { label: "예약을 완료했어요", cls: "text-mint-on" } },
-  host: { paid: { label: "새 신청이에요", cls: "text-lemon-on" } },
+  guest: {},
+  host: {
+    paid: { label: "새 요청", cls: "text-lemon-on" },
+    rejected: { label: "거절한 요청", cls: "text-faint" },
+    cancelled: { label: "손님이 취소", cls: "text-faint" },
+    done: { label: "손님 다녀감", cls: "text-faint" },
+  },
 };
 
 export function BookingBadge({ status, viewer = "guest" }: { status: BookingStatus; viewer?: "guest" | "host" }) {
