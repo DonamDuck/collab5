@@ -65,7 +65,8 @@ export function RentFilters({
   const hasAny = !!area.trim() || !!category || !!use;
 
   return (
-    <div className="mt-10 space-y-3">
+    // 📐09-17 디자인팀 — 목록이 lg에서 1120으로 넓어지며 동네 칸이 1,030px로 늘었다. 두세 글자 동네 이름을 받는 칸이다.
+    <div className="mt-10 space-y-3 lg:max-w-[640px]">
       {/* 🔻09-14 쓰임새 칩(전체·원래 목적대로·대관) **삭제** — 대표: *「여기 카테고리는 일단 전체만
           남기고 제거, 나중에 한번 싹 업데이트 할게. 다만 등록 type DB는 등록할때 입력하도록 할거야」*.
           ⭐**칩을 「전체」 하나만 남기지 않고 줄을 통째로 뺐다.** 고를 게 하나뿐인 고르개는 고르개가 아니라

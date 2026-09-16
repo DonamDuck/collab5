@@ -69,8 +69,12 @@ function SpaceCard({ sp }: { sp: SpacePublic }) {
         <p className="mt-1 line-clamp-1 text-[15px] leading-relaxed text-body">
           {[categoryLabel(sp.category), scopeLabel(sp.scope)].filter(Boolean).join(" · ")}
         </p>
-        <p className="mt-2 text-[13px] text-faint">
-          {sp.address.split(/\s+/).slice(0, 2).join(" ") || "위치 미정"} · 시간당 {won(sp.priceHour)}
+        <p className="mt-1 text-[14px] text-faint">{sp.address.split(/\s+/).slice(0, 2).join(" ") || "위치 미정"}</p>
+        {/* 💸09-17 디자인팀 — 값을 흐린 13px 꼬리에서 **굵은 줄 하나**로 올렸다. 목록을 훑는 손님이 이름 다음으로
+            대 보는 것이 값인데, 동네 뒤에 붙은 faint 글자라 카드 둘을 나란히 두고 비교가 안 됐다(아워플레이스 카드). */}
+        <p className="mt-2.5 text-ink">
+          <span className="text-[16px] font-bold tabular-nums">{won(sp.priceHour)}</span>
+          <span className="ml-0.5 text-[14px] text-mute">/ 시간</span>
         </p>
       </div>
     </Link>
@@ -95,7 +99,7 @@ export default async function RentPage({
   const filtered = !!(area?.trim() || category || useFilter);
 
   return (
-    <main className="mx-auto w-full max-w-[880px] px-4 pb-10 pt-4 sm:px-6 sm:pb-14 sm:pt-6">
+    <main className="mx-auto w-full max-w-[880px] px-4 lg:max-w-[1120px] pb-10 pt-4 sm:px-6 sm:pb-14 sm:pt-6">
       {/* 히어로 — 큰 제목 한 문장 + 넉넉한 여백(리틀리에서 가져온 「덜어냄」).
           🔻09-14 오른쪽 「안 쓰는 날 올리기」 키위 버튼 삭제 — 위 `RentMenuBar`가 그 일을 한다(대표 지시). */}
       <header className="flex flex-col gap-6">
@@ -144,7 +148,9 @@ export default async function RentPage({
         <>
           <p className="mt-10 text-[15px] text-faint">{spaces.length}곳이 기다리고 있어요</p>
           {/* 모바일 1열 → 640px부터 2열. 카드 안쪽을 min-w-0으로 잠가 뒀으니 좁은 화면에서 밀리지 않는다. */}
-          <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+          {/* 📐09-17 디자인팀 — lg부터 1120에 세 칸. 1440에서 880 두 칸이면 카드 한 장이 420px라 사진만 크고
+              한 화면에 두 곳밖에 안 보였다. 고르는 화면은 한눈에 여럿이 보여야 비교가 된다. */}
+          <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 lg:gap-5">
             {spaces.map((sp) => (
               <SpaceCard key={sp.slug} sp={sp} />
             ))}
