@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { getSessionUserId, getProfileById } from "./profiles";
 import {
   saveSpace, getSpaceFull, getBooking, createPendingBooking, getBookingByOrderId,
-  decideBooking,
+  decideBooking, requestRefund, clearRefundRequest,
   setBookingStatus, listSpacesByOwner, listSpacesByIds, payout, FEE_RATE,
   createPayment, getPaymentByOrderId, rentSync,
   type SpaceSaveInput,
@@ -355,8 +355,16 @@ export async function decideBookingAction(
 
   // ⏯이용 시간이 이미 시작했으면 «수락»은 뜻이 없다. 거절(= 전액 환불)은 그대로 열어 둔다 —
   //   답을 못 한 채 날이 간 신청은 손님 돈이 붙잡혀 있는 것이라, 사장님이 돌려줄 길은 남아 있어야 한다.
-  if (accept && bookingStarted(b)) {
-    return { ok: false, message: "이용 시간이 이미 지나 수락할 수 없어요. 거절하시면 손님께 전액 환불됩니다." };
+  // ⏯이용 시간이 이미 시작했으면 수락도 거절도 안 받는다(phase 1, 대표 09-16).
+  //   손님은 결제 때 이미 「예약 완료」를 봤고 다녀갔을 수 있다. 그때 사장님이 거절을 누르면 다녀간 손님에게
+  //   전액이 돌아간다. 문제가 있으면 «관리자에게 환불 신청»으로 — 우리가 양쪽에 전화로 확인한다.
+  if (bookingStarted(b)) {
+    return {
+      ok: false,
+      message: accept
+        ? "이용 시간이 이미 지나 따로 수락하지 않으셔도 돼요."
+        : "이용 시간이 이미 지나 거절할 수 없어요. 문제가 있으면 관리자에게 환불을 신청해 주세요.",
+    };
   }
 
   const decided = await decideBooking(bookingId, accept, message.trim());
@@ -468,3 +476,53 @@ export async function quotePayout(total: number): Promise<{ fee: number; payout:
 
 // 🔻`markPaidOutAction`(대표가 손으로 입금했다고 적는 버튼)은 09-16에 지웠다.
 //   정산은 토스 «지급대행»이다 — 돈이 우리 계좌를 거치지 않는다(볼트 [[결제-모듈-토스]], 대표 확정).
+
+// ─── 사장님의 «관리자에게 환불 신청» (대표 09-16) ───
+// 확정된 예약을 사장님 사정으로 무를 땐 사장님이 바로 환불하지 않는다. 신청 → 우리가 사장님·손님께 전화로 확인
+// → 관리자 승인 → 전액 환불. 숙박업이 이렇게 한다(대표). 신청 중에도 예약은 원래 상태로 살아 있다.
+
+/** 사장님이 신청한다. 🔒권한 = 그 공간의 주인. */
+export async function requestRefundAction(bookingId: number, note: string): Promise<ActionResult> {
+  const uid = await getSessionUserId();
+  if (!uid) return { ok: false, message: "로그인이 필요해요." };
+  const b = await getBooking(bookingId);
+  if (!b) return { ok: false, message: "그 예약을 찾지 못했어요." };
+  const mine = await listSpacesByOwner(uid);
+  if (!mine.some((x) => x.id === b.spaceId)) return { ok: false, message: "내 공간의 예약만 신청할 수 있어요." };
+  if (b.status !== "paid" && b.status !== "confirmed") return { ok: false, message: "이미 끝난 예약이에요." };
+  if (b.refundRequestedAt) return { ok: true, message: "이미 신청하셨어요. 저희가 곧 연락드릴게요." };
+  const saved = await requestRefund(bookingId, note.trim());
+  if (!saved) return { ok: false, message: "신청을 받지 못했어요. 잠시 뒤 다시 시도해 주세요." };
+  revalidatePath("/rent/my");
+  revalidatePath("/rent/payouts");
+  return { ok: true, message: "환불 신청을 받았어요. 사장님과 손님께 전화로 확인한 뒤 처리해 드릴게요." };
+}
+
+/** 관리자가 승인한다 — 손님께 «남은 돈 전액»을 돌려주고 예약 refunded + 결제 CANCELED를 같이 옮긴다. 🔒대표만. */
+export async function approveRefundAction(bookingId: number): Promise<ActionResult> {
+  if (!(await isRentAdmin())) return { ok: false, message: "권한이 없어요." };
+  const b = await getBooking(bookingId);
+  if (!b || !b.refundRequestedAt) return { ok: false, message: "환불 신청이 없는 예약이에요." };
+  if (b.status !== "paid" && b.status !== "confirmed") return { ok: false, message: "이미 끝난 예약이에요." };
+  const pay = await getPaymentByOrderId(b.orderId);
+  if (!pay) return { ok: false, message: "결제 기록을 찾지 못했어요." };
+  const refundAmount = pay.balanceAmount;
+  const r = await cancelPayment(pay.paymentKey || b.paymentKey, "사장님 사정 — 관리자 승인 전액 환불", undefined, refundAmount);
+  if (!r.ok) return { ok: false, message: "토스 환불이 실패했어요. 토스 관리자 화면에서 확인해 주세요." };
+  let synced = await rentSync(b.orderId, { bookingStatus: "refunded", toss: r.payment });
+  if (!synced.ok) synced = await rentSync(b.orderId, { bookingStatus: "refunded", toss: r.payment });
+  if (!synced.ok) console.error(`[rent-actions] 🚨🚨관리자 환불은 됐는데 기록 실패 — 수동 확인 order=${b.orderId}`);
+  revalidatePath("/rent/payouts");
+  revalidatePath("/rent/my");
+  // 📨손님·사장님 메일 — 메일 일꾼 결과를 합친 뒤 여기 배선한다(notifyAdminRefund).
+  return { ok: true, message: `${refundAmount.toLocaleString()}원을 손님께 돌려드렸어요.` };
+}
+
+/** 관리자가 신청을 닫는다 — 확인해 보니 환불할 일이 아니었을 때. 예약은 그대로. 🔒대표만. */
+export async function dismissRefundAction(bookingId: number): Promise<ActionResult> {
+  if (!(await isRentAdmin())) return { ok: false, message: "권한이 없어요." };
+  const ok = await clearRefundRequest(bookingId);
+  revalidatePath("/rent/payouts");
+  revalidatePath("/rent/my");
+  return ok ? { ok: true, message: "신청을 닫았어요. 예약은 그대로예요." } : { ok: false, message: "닫지 못했어요." };
+}

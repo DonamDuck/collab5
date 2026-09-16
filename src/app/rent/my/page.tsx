@@ -4,7 +4,7 @@ import { sweepBookings, listSpacesByOwner, listBookingsForHost, isRevealed } fro
 import { getSessionUserId, getProfileById, type Profile } from "@/lib/profiles";
 import type { Space } from "@/lib/types";
 import { isRentAdmin } from "@/lib/rent-actions";
-import { HostDecide, PublishButton } from "./Actions";
+import { HostDecide, PublishButton, RefundRequest } from "./Actions";
 import { ContactBlock } from "../ContactBlock";
 import { bookingStarted } from "@/lib/rent-time";
 import { GuestBookingRow, loadGuestBookings } from "../GuestBookingRow";
@@ -188,9 +188,19 @@ export default async function MyRentPage() {
                     <span className="text-faint"> · 신청자가 낸 돈 {won(b.amountTotal)}</span>
                   </p>
 
-                  {b.status === "paid" && (
-                    <HostDecide bookingId={b.id} amountTotal={b.amountTotal} started={bookingStarted(b)} />
+                  {/* ⏯이용 시간이 시작하면 수락·거절 버튼을 거둔다(서버도 막는다). 결제 완료는 phase 1에서 곧 예약 완료다. */}
+                  {b.status === "paid" && !bookingStarted(b) && (
+                    <HostDecide bookingId={b.id} amountTotal={b.amountTotal} />
                   )}
+                  {/* 🙋관리자에게 환불 신청(대표 09-16) — 결제 완료·확정 예약에서. 신청이 들어가 있으면 버튼 대신 상태 한 줄. */}
+                  {(b.status === "paid" || b.status === "confirmed") &&
+                    (b.refundRequestedAt ? (
+                      <p className="mt-3 text-[15px] leading-relaxed break-keep text-lemon-on">
+                        환불 신청을 받았어요. 사장님과 손님께 전화로 확인한 뒤 처리해 드릴게요.
+                      </p>
+                    ) : (
+                      <RefundRequest bookingId={b.id} />
+                    ))}
 
                   {open ? (
                     <ContactBlock

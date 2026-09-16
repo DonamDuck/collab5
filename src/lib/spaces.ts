@@ -111,6 +111,8 @@ function toBooking(r: Row): SpaceBooking {
     feeRate: typeof r.fee_rate === "number" ? r.fee_rate : Number(r.fee_rate ?? FEE_RATE),
     amountPayout: n(r.amount_payout),
     paymentKey: s(r.payment_key), orderId: s(r.order_id),
+    refundRequestedAt: r.refund_requested_at ? s(r.refund_requested_at) : undefined,
+    refundRequestNote: s(r.refund_request_note),
     status: (s(r.status) || "paid") as BookingStatus,
     hostMessage: s(r.host_message),
     decidedAt: r.decided_at ? s(r.decided_at) : undefined,
@@ -245,6 +247,7 @@ export async function saveSpace(input: SpaceSaveInput): Promise<Space | null> {
 export type BookingCreateInput = Omit<
   SpaceBooking,
   "id" | "status" | "hostMessage" | "decidedAt" | "createdAt" | "updatedAt" | "amountPayout" | "feeRate"
+  | "refundRequestedAt" | "refundRequestNote"
 >;
 
 /** 결제창으로 보내기 «직전»에 자리를 잡아 둔다.
@@ -453,9 +456,12 @@ export async function sweepBookings(): Promise<void> {
     await rentSync(s(r.order_id), { bookingStatus: "expired", toss: { status: "EXPIRED" } });
   }
 
-  // ②
+  // ② 👀phase 1(대표 09-16) — 결제 완료(paid)도 확정처럼 본다. 손님은 결제하는 순간 「예약 완료」를 봤고
+  //   사장님이 수락을 안 눌렀을 수 있다. 안 넘기면 다녀간 예약이 정산에 영영 안 올라간다.
+  //   실제 지급은 아직 사람이 보고 보내므로(지급대행 계약 전) 잘못 나갈 일은 없다.
+  //   🙋사장님이 «관리자에게 환불 신청»한 예약은 건너뛴다 — 우리가 전화로 확인하는 중이다.
   const { data: conf } = await c.from("space_bookings").select("order_id,use_date,end_time")
-    .eq("status", "confirmed").lte("use_date", today);
+    .in("status", ["confirmed", "paid"]).is("refund_requested_at", null).lte("use_date", today);
   for (const r of conf ?? []) {
     if (!bookingFinished({ useDate: s(r.use_date), endTime: s(r.end_time).slice(0, 5) })) continue;
     await rentSync(s(r.order_id), { bookingStatus: "done", payoutStatus: "WAITING" });
@@ -485,6 +491,41 @@ export async function listPayouts(): Promise<{ payment: Payment; booking: SpaceB
     const row = r as Row;
     return { payment: toPayment(row), booking: row.booking ? toBooking(row.booking as Row) : null };
   });
+}
+
+// ─── 사장님의 «관리자에게 환불 신청» (대표 09-16) ───
+
+/** 신청을 적는다. 이미 신청돼 있으면 덮어쓰지 않는다(처음 시각이 남는다). 권한은 호출부가 확인한다. */
+export async function requestRefund(bookingId: number, note: string): Promise<boolean> {
+  const c = db();
+  if (!c) return false;
+  const { data, error } = await c.from("space_bookings")
+    .update({ refund_requested_at: new Date().toISOString(), refund_request_note: note.slice(0, 500) })
+    .eq("id", bookingId).is("refund_requested_at", null).in("status", ["paid", "confirmed"])
+    .select("id");
+  if (error) { console.error(`[spaces] requestRefund failed id=${bookingId}: ${error.message}`); return false; }
+  return (data ?? []).length === 1;
+}
+
+/** 관리자가 «신청을 닫는다» — 전화로 확인해 보니 환불할 일이 아니었을 때. 예약은 원래대로 살아 있다. */
+export async function clearRefundRequest(bookingId: number): Promise<boolean> {
+  const c = db();
+  if (!c) return false;
+  const { error } = await c.from("space_bookings")
+    .update({ refund_requested_at: null, refund_request_note: "" }).eq("id", bookingId);
+  if (error) { console.error(`[spaces] clearRefundRequest failed id=${bookingId}: ${error.message}`); return false; }
+  return true;
+}
+
+/** 관리자가 처리할 환불 신청 — 아직 결제 완료·확정 상태로 살아 있는 것만. */
+export async function listRefundRequests(): Promise<SpaceBooking[]> {
+  const c = db();
+  if (!c) return [];
+  const { data, error } = await c.from("space_bookings").select("*")
+    .not("refund_requested_at", "is", null).in("status", ["paid", "confirmed"])
+    .order("refund_requested_at", { ascending: true });
+  if (error) { console.error(`[spaces] listRefundRequests failed: ${error.message}`); return []; }
+  return (data ?? []).map((r) => toBooking(r as Row));
 }
 
 /** 🧾정산 화면이 따로 보여줄 «손이 필요한» 예약 둘.

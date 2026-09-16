@@ -583,6 +583,10 @@ export interface SpaceBooking {
   paymentKey: string;
   orderId: string;
   status: BookingStatus;
+  /** 🙋사장님이 «관리자에게 환불 신청»한 시각(대표 09-16). 비어 있으면 신청 없음.
+   *  신청 중에도 예약 상태는 그대로다 — 관리자가 전화로 확인하고 승인해야 환불(refunded)로 넘어간다. */
+  refundRequestedAt?: string;
+  refundRequestNote: string;
   hostMessage: string;
   decidedAt?: string;
   createdAt: string;

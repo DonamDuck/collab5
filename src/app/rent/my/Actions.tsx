@@ -18,6 +18,7 @@ import {
   cancelBookingAction,
   quoteCancelAction,
   publishSpaceAction,
+  requestRefundAction,
 } from "@/lib/rent-actions";
 import { InfoList, InfoRow, primaryBtnCls, rentTextareaCls, secondaryBtnCls, won } from "../ui";
 import { ConfirmDialog } from "../ConfirmDialog";
@@ -226,6 +227,60 @@ export function PublishButton({ slug }: { slug: string }) {
         {pending ? "여는 중…" : "공개하기"}
       </button>
       {err && <p className="mt-2 text-[15px] text-danger">{err}</p>}
+    </div>
+  );
+}
+
+/** 🙋사장님 사정으로 확정 예약을 무를 때 — 바로 환불하지 않고 관리자에게 신청한다(대표 09-16).
+ *  우리가 사장님과 손님께 전화로 확인하고, 관리자가 승인하면 손님께 전액 환불된다(숙박업 방식).
+ *  ⚠️누르기 전에 얼럿으로 그 절차를 먼저 말한다 — 누르는 순간 환불되는 줄 알면 안 된다. */
+export function RefundRequest({ bookingId }: { bookingId: number }) {
+  const router = useRouter();
+  const [pending, start] = useTransition();
+  const [open, setOpen] = useState(false);
+  const [note, setNote] = useState("");
+  const [msg, setMsg] = useState("");
+
+  const run = () =>
+    start(async () => {
+      setOpen(false);
+      const r = await requestRefundAction(bookingId, note);
+      setMsg(r.message);
+      if (r.ok) router.refresh();
+    });
+
+  return (
+    <div className="mt-3">
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        disabled={pending}
+        className="py-[12px] text-[15px] text-mute underline underline-offset-2"
+      >
+        관리자에게 환불 신청하기
+      </button>
+      {msg && <p className="text-[15px] leading-relaxed break-keep text-mute">{msg}</p>}
+      <ConfirmDialog
+        open={open}
+        title="관리자에게 환불을 신청할까요"
+        confirmLabel="신청하기"
+        busy={pending}
+        onConfirm={run}
+        onCancel={() => setOpen(false)}
+      >
+        <p>
+          바로 환불되지는 않아요. 저희가 사장님과 손님께 전화로 사정을 확인하고, 관리자가 승인하면 손님께 전액
+          환불돼요.
+        </p>
+        <textarea
+          rows={3}
+          className={`${rentTextareaCls} mt-4 resize-y`}
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          placeholder="어떤 사정인지 짧게 남겨 주시면 전화드릴 때 도움이 돼요 (선택)"
+          aria-label="환불 신청 사유"
+        />
+      </ConfirmDialog>
     </div>
   );
 }

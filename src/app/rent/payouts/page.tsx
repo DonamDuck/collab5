@@ -1,11 +1,15 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { listPayouts, listSpacesByIds, listStuckBookings, sweepBookings, type SpaceBrief } from "@/lib/spaces";
+import {
+  getPaymentByOrderId, listPayouts, listRefundRequests, listSpacesByIds, listStuckBookings, sweepBookings,
+  type SpaceBrief,
+} from "@/lib/spaces";
 import { getProfileById, type Profile } from "@/lib/profiles";
 import { isRentAdmin } from "@/lib/rent-actions";
 import type { Payment, PayoutStatus, SpaceBooking } from "@/lib/types";
 import { bookingWhen, won } from "../ui";
+import { RefundDecision } from "./RefundDecision";
 
 // 하루 가게 — 정산 (2026-09-16) · 대표만
 //
@@ -51,8 +55,16 @@ export default async function RentPayoutsPage() {
   // 시간이 흘러 바뀌어야 하는 것부터 옮긴다 — 안 하면 어제 다녀온 예약이 지급 대기에 안 올라온다.
   await sweepBookings();
 
-  const [all, stuck] = await Promise.all([listPayouts(), listStuckBookings()]);
+  const [all, stuck, refundReqs] = await Promise.all([listPayouts(), listStuckBookings(), listRefundRequests()]);
+  // 🙋환불 신청 — 전화로 확인할 사람 둘의 연락처와, 실제로 돌아갈 돈(결제 줄의 남은 돈)을 같이 읽는다.
+  const refundRows = await Promise.all(
+    refundReqs.map(async (b) => {
+      const [pay, guest] = await Promise.all([getPaymentByOrderId(b.orderId), getProfileById(b.guestUserId)]);
+      return { b, amount: pay?.balanceAmount ?? b.amountTotal, guest };
+    }),
+  );
   const spaceIds = [
+    ...refundReqs.map((b) => b.spaceId),
     ...all.map((r) => r.booking?.spaceId).filter((x): x is number => typeof x === "number"),
     ...stuck.unanswered.map((b) => b.spaceId),
     ...stuck.refundFailed.map((b) => b.spaceId),
@@ -81,6 +93,43 @@ export default async function RentPayoutsPage() {
           실제로 보내는 건 토스 지급대행으로 해요. 계약과 사장님 셀러 등록이 끝나면 여기서 바로 요청할 수 있게 붙일게요.
         </p>
       </header>
+
+      {/* 🙋사장님의 환불 신청(대표 09-16) — 맨 위에 둔다. 손님 돈이 걸려 있고 전화가 먼저라 가장 먼저 봐야 한다. */}
+      {refundRows.length > 0 && (
+        <section className="mt-10">
+          <h2 className="text-[21px] font-bold leading-snug tracking-tight text-ink">환불 신청</h2>
+          <p className="mt-2 text-[15px] leading-relaxed break-keep text-mute">
+            사장님이 사정이 생겨 신청하셨어요. 사장님과 손님께 전화로 확인하신 뒤 처리해 주세요.
+          </p>
+          <ul className="mt-4">
+            {await Promise.all(
+              refundRows.map(async ({ b, amount, guest }) => {
+                const sp = spaces.get(b.spaceId);
+                const host = sp ? await getProfileById(sp.ownerUserId) : null;
+                const line = (p: Profile | null) =>
+                  [p?.brandName?.trim(), p?.phone?.trim(), p?.email?.trim()].filter(Boolean).join(" · ") || "연락처가 없어요";
+                return (
+                  <li key={b.id} className="border-b border-hairline py-4">
+                    <div className="flex items-baseline justify-between gap-3">
+                      <p className="min-w-0 truncate text-[16px] font-medium text-ink">{sp?.name ?? "공간"}</p>
+                      <p className="shrink-0 text-[16px] tabular-nums text-ink">{won(amount)}</p>
+                    </div>
+                    <p className="mt-0.5 text-[14px] text-mute">{bookingWhen(b)}</p>
+                    <dl className="mt-2 space-y-1 text-[14px] leading-relaxed">
+                      <div className="flex gap-2"><dt className="w-[48px] shrink-0 text-mute">사장님</dt><dd className="min-w-0 break-all text-body">{line(host)}</dd></div>
+                      <div className="flex gap-2"><dt className="w-[48px] shrink-0 text-mute">손님</dt><dd className="min-w-0 break-all text-body">{line(guest)}</dd></div>
+                      {b.refundRequestNote && (
+                        <div className="flex gap-2"><dt className="w-[48px] shrink-0 text-mute">사정</dt><dd className="min-w-0 whitespace-pre-line text-body">{b.refundRequestNote}</dd></div>
+                      )}
+                    </dl>
+                    <RefundDecision bookingId={b.id} amount={amount} />
+                  </li>
+                );
+              }),
+            )}
+          </ul>
+        </section>
+      )}
 
       <section className="mt-10">
         <div className="flex items-baseline justify-between gap-3">
