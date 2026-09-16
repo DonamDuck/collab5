@@ -4,7 +4,7 @@
 --   ①정산은 토스 «지급대행»이다 — 돈이 우리 계좌를 거치지 않는다(볼트 [[결제-모듈-토스]]).
 --   ②테이블은 «둘»이다. `space_bookings`(무슨 일이 있었나) + `payments`(돈이 어디 있나).
 --     환불 이력·지급 기록을 따로 테이블로 떼지 않는다 — 대표: *「3개 테이블 각각 만드는 건 낭비」*.
---     환불 이력은 토스가 돌려주는 `cancels` 배열을 그대로 jsonb에 담고, 지급은 결제 한 줄에 칸으로 붙인다.
+--     환불 이력은 토스 응답 전체(`toss_raw`) 안에 있고, 지급은 결제 한 줄에 칸으로 붙인다.
 --   ③상태는 «같이» 움직인다. 예약이 취소되면 결제가 CANCELED가 되고 둘 다 updated_at이 갱신된다.
 --     두 줄을 따로 쓰면 한쪽만 바뀌는 날이 오므로, 옮기는 일은 아래 함수 `rent_sync` 한 곳에서 «한 트랜잭션»으로 한다.
 --   그리고 1팀(리포트 유료화)이 나중에 이 테이블을 같이 쓴다. 그래서 이름이 `rent_payments`가 아니라 `payments`다.
@@ -23,7 +23,7 @@ create table if not exists payments (
   -- 📦어디서 온 결제인가. 리포트 유료화가 붙는 날 값을 하나 더한다.
   purpose             text not null check (purpose in ('rent_booking')),
   booking_id          bigint unique references space_bookings(id) on delete restrict,
-  payer_user_id       bigint not null references users(user_id) on delete restrict,
+  buying_user_id      bigint not null references users(user_id) on delete restrict,   -- 돈을 낸 사람(대표 09-16 이름)
   -- ⚠️두 FK 모두 restrict다. 돈이 오간 기록은 예약·회원을 지워도 같이 사라지면 안 된다
   --   (전자상거래법 제6조 — 대금 결제 기록 보존). 시험 데이터를 지울 땐 결제 줄을 먼저 지운다.
 
@@ -39,7 +39,8 @@ create table if not exists payments (
                                         'CANCELED', 'PARTIAL_CANCELED', 'ABORTED', 'EXPIRED')),
   approved_at         timestamptz,
   canceled_at         timestamptz,                                   -- 마지막 취소 시각
-  cancels             jsonb not null default '[]'::jsonb,            -- 토스 cancels 배열 그대로 = 환불 이력
+  -- 🔻환불 이력 칸(`cancels`)은 두지 않는다(대표 09-16). 토스는 응답마다 지금까지의 환불을 «전부» 실어 보내므로
+  --   이력은 `toss_raw->'cancels'`에 이미 있다. 정산 계산에 필요한 건 남은 돈(balance_amount) 하나뿐이다.
 
   -- 🏦지급(토스 지급대행) — 결제 한 줄 = 사장님 한 분께 한 번. 리포트 결제는 NONE으로 남는다.
   fee_rate            numeric(5,4) not null default 0.15,            -- 행마다 박는다. 요율이 바뀌어도 옛 거래는 그때 값
@@ -119,7 +120,6 @@ begin
       balance_amount = coalesce((p_toss->>'balanceAmount')::integer, balance_amount),
       method         = coalesce(p_toss->>'method', method),
       approved_at    = coalesce((p_toss->>'approvedAt')::timestamptz, approved_at),
-      cancels        = coalesce(p_toss->'cancels', cancels),
       canceled_at    = coalesce(
                          (select max((c->>'canceledAt')::timestamptz) from jsonb_array_elements(coalesce(p_toss->'cancels', '[]'::jsonb)) c),
                          canceled_at),
@@ -149,7 +149,7 @@ grant  execute on function rent_sync(text, text, jsonb, text) to service_role;
 
 -- ─── 4. 옛 예약에서 결제 줄 채우기 ────────────────────────────────────────────
 -- ⚠️운영 DB엔 시험 예약만 있다(09-16 조회: 18줄 — pending 15 · paid 1 · confirmed 1 · cancelled 1).
-insert into payments (order_id, payment_key, purpose, booking_id, payer_user_id,
+insert into payments (order_id, payment_key, purpose, booking_id, buying_user_id,
                       amount, balance_amount, status, fee_rate, payout_amount, payout_status, created_at)
 select
   b.order_id,
