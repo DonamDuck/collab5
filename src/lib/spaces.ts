@@ -9,9 +9,9 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type {
   Space, SpacePublic, SpaceBooking, SpaceStatus, BookingStatus, OpenSlot,
-  Payment, PaymentStatus, PayoutStatus, TossPayment,
+  Payment, PaymentStatus, PayoutStatus, TossPayment, RepeatRule,
 } from "./types";
-import { bookingFinished, todayKst } from "./rent-time";
+import { bookingFinished, todayKst, expandRepeat, stripRepeat, pruneRepeat } from "./rent-time";
 
 function db(): SupabaseClient | null {
   const url = process.env.SUPABASE_URL;
@@ -49,7 +49,27 @@ function slots(v: unknown): OpenSlot[] {
   });
 }
 
+/** 🔁요일 규칙을 «모양을 확인하며» 읽는다(2026-09-17). ⚠️칸이 아직 없는 DB(SQL 전)에선 `undefined`라 빈 배열 —
+ *  읽기가 죽으면 공간 화면 전체가 안 열린다. 같은 요일이 둘이면 앞의 것만 쓴다. */
+function repeatRules(v: unknown): RepeatRule[] {
+  if (!Array.isArray(v)) return [];
+  const seen = new Set<number>();
+  return v.flatMap((x) => {
+    if (!x || typeof x !== "object") return [];
+    const o = x as Record<string, unknown>;
+    const dow = o.dow, start = s(o.start), end = s(o.end);
+    if (typeof dow !== "number" || !Number.isInteger(dow) || dow < 0 || dow > 6 || seen.has(dow)) return [];
+    if (!/^\d{2}:\d{2}/.test(start) || !/^\d{2}:\d{2}/.test(end)) return [];
+    seen.add(dow);
+    const skip = arr(o.skip).filter((d) => typeof d === "string" && /^\d{4}-\d{2}-\d{2}$/.test(d));
+    const rule: RepeatRule = { dow, start: start.slice(0, 5), end: end.slice(0, 5) };
+    return [skip.length ? { ...rule, skip } : rule];
+  });
+}
+
 function toSpace(r: Row): Space {
+  // ⭐«읽을 때 펼친다» — 여기 한 곳에서. 목록 날짜 거르기·상세 달력·결제 전 `fitsOpenSlot`이 전부 이 값을 본다.
+  const repeatWeekly = repeatRules(r.repeat_weekly);
   return {
     id: n(r.id), slug: s(r.slug), ownerUserId: n(r.owner_user_id), brandSlug: s(r.brand_slug),
     name: s(r.name), tagline: s(r.tagline), body: s(r.body), photos: arr(r.photos),
@@ -68,7 +88,8 @@ function toSpace(r: Row): Space {
     category: (s(r.category) || "") as Space["category"],
     scope: (s(r.scope) || "space_only") as Space["scope"],
     priceHour: n(r.price_hour), minHours: n(r.min_hours) || 1,
-    openSlots: slots(r.open_slots),
+    openSlots: expandRepeat(slots(r.open_slots), repeatWeekly),
+    repeatWeekly,
     coffeeChat: r.coffee_chat === true,
     coffeeChatMinutes: n(r.coffee_chat_minutes), coffeeChatPrice: n(r.coffee_chat_price),
     coffeeChatTopics: s(r.coffee_chat_topics),
@@ -214,6 +235,11 @@ export type SpaceSaveInput = Omit<Space, "id" | "createdAt" | "updatedAt">;
 export async function saveSpace(input: SpaceSaveInput): Promise<Space | null> {
   const c = db();
   if (!c) return null;
+  // 🔁펼친 날짜는 DB에 굳히지 않는다(2026-09-17). 규칙과 똑같은 칸은 빼고, 지난 쉬는 날도 턴다.
+  //   ⚠️`repeat_weekly` 칸이 없는 DB(SQL 전)에선 이 저장이 통째로 실패한다 — SQL이 먼저다.
+  const today = todayKst();
+  const repeatWeekly = pruneRepeat(input.repeatWeekly ?? [], today);
+  const openSlots = stripRepeat(input.openSlots, repeatWeekly, today);
   const row = {
     slug: input.slug, owner_user_id: input.ownerUserId, brand_slug: input.brandSlug,
     name: input.name, tagline: input.tagline, body: input.body, photos: input.photos,
@@ -226,13 +252,20 @@ export async function saveSpace(input: SpaceSaveInput): Promise<Space | null> {
     serves_food: input.servesFood, sublease_ok: input.subleaseOk, status: input.status,
 
     category: input.category, scope: input.scope,
-    price_hour: input.priceHour, min_hours: input.minHours, open_slots: input.openSlots,
+    price_hour: input.priceHour, min_hours: input.minHours, open_slots: openSlots, repeat_weekly: repeatWeekly,
     coffee_chat: input.coffeeChat, coffee_chat_minutes: input.coffeeChatMinutes,
     coffee_chat_price: input.coffeeChatPrice, coffee_chat_topics: input.coffeeChatTopics,
     access_how: input.accessHow, contact_phone: input.contactPhone,
     host_terms_at: input.hostTermsAt ?? null,
   };
-  const { data, error } = await c.from("spaces").upsert(row, { onConflict: "slug" }).select().maybeSingle();
+  let { data, error } = await c.from("spaces").upsert(row, { onConflict: "slug" }).select().maybeSingle();
+  // 🧯SQL을 돌리기 전에 코드가 먼저 나가도 «규칙 없는» 저장은 살린다. 규칙이 있는데 칸이 없으면 그대로 실패시킨다 —
+  //   조용히 빼고 저장하면 사장님은 켰다고 믿는데 아무 날도 안 열린다.
+  if (error && repeatWeekly.length === 0 && /repeat_weekly/.test(error.message)) {
+    const { repeat_weekly: _r, ...rest } = row;
+    void _r;
+    ({ data, error } = await c.from("spaces").upsert(rest, { onConflict: "slug" }).select().maybeSingle());
+  }
   if (error) { console.error(`[spaces] save failed slug=${input.slug}: ${error.message}`); return null; }
   return data ? toSpace(data as Row) : null;
 }

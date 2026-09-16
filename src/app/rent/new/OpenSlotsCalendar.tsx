@@ -13,14 +13,20 @@
 //   📌요일 머리글(일·월·화…)을 누르면 그 달의 그 요일이 통째로 담긴다. 대표가 말한 「일괄 적용」이 이 자리다.
 //   📌시간이 기본과 다른 날은 달력에 점이 찍히고, 그 날만 아래 「따로 정한 날」로 줄이 생긴다.
 //
-// 💾저장은 날짜마다 시각 한 벌(`openSlots`)이다. 규칙을 저장하지 않는 이유 —
-//   규칙을 고치는 순간 **이미 팔린 날의 시간까지 흔들린다.** 규칙은 이 화면 안에서만 산다.
+// 💾저장은 날짜마다 시각 한 벌(`openSlots`)이다.
+// 🔁09-17 대표 「오늘 다 구현」 — **요일 줄마다 「매주 계속 열기」가 붙었다.** 그 전엔 요일 규칙을 저장하지 않았고,
+//   「매주 월요일」을 열려면 달마다 다시 와서 요일 머리글을 눌러야 했다.
+//   켜면 규칙(`repeat`)이 생기고 앞으로 12주의 그 요일이 달력에 열린 것으로 보인다(`expandRepeat`).
+//   ⭐이 화면의 `value`는 **직접 연 날만** 든다. 규칙이 연 날은 그릴 때 합친다 — 그래야 끄면 규칙 날만 빠지고 직접 누른 날은 남는다.
+//   🧷규칙이 연 날을 달력에서 누르면 그날만 쉰다(`skip`). 다시 누르면 다시 열린다.
+//   ⚠️09-16엔 「규칙을 고치면 이미 팔린 날의 시간까지 흔들린다」는 이유로 규칙을 안 저장했다. 예약은 자기 시각을 행에 따로 들고 있어서
+//     규칙 시각을 바꿔도 이미 받은 예약은 안 바뀐다. 바뀌는 건 «앞으로 팔 수 있는 시간»뿐이다.
 //
 // ⚠️날짜 계산은 UTC 자정 기준 정수 연산이다. `new Date(y, m, d)`는 브라우저 시간대를 타서
 //   달의 첫 요일이 기기마다 어긋날 수 있다. 오늘만 KST로 받고 나머지는 글자 비교로 한다.
 import { useState } from "react";
-import type { OpenSlot } from "@/lib/types";
-import { hoursBetween } from "@/lib/rent-time";
+import type { OpenSlot, RepeatRule } from "@/lib/types";
+import { addDaysIso, expandRepeat, hoursBetween, REPEAT_WEEKS } from "@/lib/rent-time";
 import { dateLabel, todayKst, RentSelect } from "../ui";
 
 const DOW = ["일", "월", "화", "수", "목", "금", "토"];
@@ -38,13 +44,19 @@ function dowOf(iso: string): number {
 export function OpenSlotsCalendar({
   value,
   onChange,
+  repeat,
+  onRepeatChange,
   minHours,
 }: {
+  /** ⭐**직접 연 날만.** 규칙이 연 날은 여기 안 들어온다(위 머리말). */
   value: OpenSlot[];
   /** 🚨**갱신 함수를 받는다**(값만 받지 않는다). 달력은 연달아 눌리는 화면이라, 렌더 사이에 두 번 누르면
    *  두 번째가 «한 판 전의 목록»으로 덮어써서 첫 번째 선택이 사라진다(09-16 실측 — 두 날을 눌렀는데 하나만 담겼다).
    *  ⭐부모의 `setOpenSlots`를 그대로 넘기면 React가 최신 값을 물어다 준다. */
   onChange: (next: OpenSlot[] | ((cur: OpenSlot[]) => OpenSlot[])) => void;
+  /** 🔁매주 계속 여는 요일(09-17). 갱신 함수를 받는 이유는 `onChange`와 같다. */
+  repeat: RepeatRule[];
+  onRepeatChange: (next: RepeatRule[] | ((cur: RepeatRule[]) => RepeatRule[])) => void;
   /** 최소 대여 시간 — 이보다 짧게 연 날은 아무도 못 빌리므로 그 자리에서 알려 준다. */
   minHours: number;
 }) {
@@ -66,13 +78,21 @@ export function OpenSlotsCalendar({
   const prev = () => setView((v) => (v.m === 1 ? { y: v.y - 1, m: 12 } : { y: v.y, m: v.m - 1 }));
   const next = () => setView((v) => (v.m === 12 ? { y: v.y + 1, m: 1 } : { y: v.y, m: v.m + 1 }));
 
-  const picked = (iso: string) => value.find((sl) => sl.date === iso);
-  const sorted = [...value].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+  /** 달력에 보이는 전부 = 직접 연 날 + 규칙이 연 날(같은 날이면 직접 연 쪽). 날짜순. */
+  const all = expandRepeat(value, repeat, today);
+  const picked = (iso: string) => all.find((sl) => sl.date === iso);
+  const sorted = all;
+  const ruleOf = (d: number) => repeat.find((r) => r.dow === d);
+  const windowEnd = addDaysIso(today, REPEAT_WEEKS * 7);
+  /** 이 날짜가 규칙이 «맡는» 날인가 — 그 요일에 규칙이 있고 12주 창 안. 쉬는 날이어도 맡는 날이다. */
+  const ruleCovers = (iso: string) => !!ruleOf(dowOf(iso)) && iso >= today && iso < windowEnd;
 
-  /** 고른 날들이 쓰는 요일 목록 — 여기 있는 요일만 아래에 줄로 나온다. */
-  const usedDows = Array.from(new Set(value.map((sl) => dowOf(sl.date)))).sort();
-  /** 그 요일의 «대표 시간». 같은 요일에 여러 시간이 섞여 있으면 제일 많은 쪽을 기준으로 삼는다. */
+  /** 고른 날들이 쓰는 요일 목록 — 여기 있는 요일만 아래에 줄로 나온다. 규칙을 켠 요일은 날이 다 쉬어도 남긴다. */
+  const usedDows = Array.from(new Set([...all.map((sl) => dowOf(sl.date)), ...repeat.map((r) => r.dow)])).sort();
+  /** 그 요일의 «대표 시간». 규칙이 있으면 규칙 시각. 없으면 같은 요일에 섞인 시간 중 제일 많은 쪽. */
   const dowTime = (d: number) => {
+    const r = ruleOf(d);
+    if (r) return { start: r.start, end: r.end };
     const times = value.filter((sl) => dowOf(sl.date) === d).map((sl) => `${sl.start}~${sl.end}`);
     if (times.length === 0) return BASE;
     const top = times.sort(
@@ -88,17 +108,51 @@ export function OpenSlotsCalendar({
   };
   const odds = sorted.filter(isOdd);
 
-  const toggle = (iso: string) => {
-    if (picked(iso)) {
-      onChange((cur) => cur.filter((sl) => sl.date !== iso));
-      if (editing === iso) setEditing(null);
-      return;
+  /** 날짜들을 닫는다 — 직접 연 칸은 지우고, 규칙이 맡는 날이면 그날을 쉬는 날로 적는다. */
+  const closeDates = (isos: string[]) => {
+    const set = new Set(isos);
+    onChange((cur) => cur.filter((sl) => !set.has(sl.date)));
+    const skipIsos = isos.filter(ruleCovers);
+    if (skipIsos.length) {
+      onRepeatChange((cur) =>
+        cur.map((r) => {
+          const mine = skipIsos.filter((iso) => dowOf(iso) === r.dow);
+          if (!mine.length) return r;
+          return { ...r, skip: Array.from(new Set([...(r.skip ?? []), ...mine])).sort() };
+        }),
+      );
     }
-    // 새로 고르는 날은 그 요일의 기준 시간을 따라간다. 처음 고르는 요일이면 기본값.
-    const t = dowTime(dowOf(iso));
-    onChange((cur) =>
-      cur.some((sl) => sl.date === iso) ? cur : [...cur, { date: iso, start: t.start, end: t.end }],
-    );
+    if (editing && set.has(editing)) setEditing(null);
+  };
+
+  /** 날짜들을 연다 — 규칙이 맡는 날이면 쉬는 날에서 지우고, 아니면 그 요일 기준 시간으로 직접 연다. */
+  const openDates = (isos: string[]) => {
+    const byRule = new Set(isos.filter(ruleCovers));
+    if (byRule.size) {
+      onRepeatChange((cur) =>
+        cur.map((r) => (r.skip?.some((x) => byRule.has(x)) ? { ...r, skip: r.skip.filter((x) => !byRule.has(x)) } : r)),
+      );
+    }
+    const add = isos.filter((iso) => !byRule.has(iso));
+    if (add.length) {
+      // 새로 고르는 날은 그 요일의 기준 시간을 따라간다. 처음 고르는 요일이면 기본값.
+      onChange((cur) => {
+        const have = new Set(cur.map((sl) => sl.date));
+        return [
+          ...cur,
+          ...add.filter((iso) => !have.has(iso)).map((iso) => ({ date: iso, ...dowTime(dowOf(iso)) })),
+        ];
+      });
+    }
+  };
+
+  const toggle = (iso: string) => (picked(iso) ? closeDates([iso]) : openDates([iso]));
+
+  /** 「매주 계속 열기」 켜기·끄기. 켜면 지금 그 요일 줄의 시각으로 규칙이 생긴다.
+   *  ⭐끄면 규칙만 빠진다 — 직접 누른 날은 `value`에 그대로 있다. */
+  const setRepeat = (d: number, on: boolean) => {
+    const t = dowTime(d);
+    onRepeatChange((cur) => (on ? [...cur.filter((r) => r.dow !== d), { dow: d, start: t.start, end: t.end }] : cur.filter((r) => r.dow !== d)));
   };
 
   /** 요일 머리글 누르기 — 이 달의 그 요일을 통째로 담거나 뺀다(대표가 말한 「일괄 적용」). */
@@ -110,16 +164,8 @@ export function OpenSlotsCalendar({
     }
     if (inMonth.length === 0) return;
     const allPicked = inMonth.every((iso) => picked(iso));
-    if (allPicked) {
-      onChange((cur) => cur.filter((sl) => !inMonth.includes(sl.date)));
-      return;
-    }
-    const t = dowTime(d);
-    onChange((cur) => {
-      const have = new Set(cur.map((sl) => sl.date));
-      const add = inMonth.filter((iso) => !have.has(iso)).map((iso) => ({ date: iso, start: t.start, end: t.end }));
-      return [...cur, ...add];
-    });
+    if (allPicked) closeDates(inMonth);
+    else openDates(inMonth.filter((iso) => !picked(iso)));
   };
 
   /** 요일 줄의 시각을 고치면 그 요일의 «기준을 따르던» 날이 다 따라간다.
@@ -127,6 +173,7 @@ export function OpenSlotsCalendar({
   const editDow = (d: number, patch: { start?: string; end?: string }) => {
     const before = dowTime(d);
     const after = { ...before, ...patch };
+    if (ruleOf(d)) onRepeatChange((cur) => cur.map((r) => (r.dow === d ? { ...r, ...after } : r)));
     onChange((cur) =>
       cur.map((sl) =>
         dowOf(sl.date) === d && sl.start === before.start && sl.end === before.end ? { ...sl, ...after } : sl,
@@ -134,8 +181,17 @@ export function OpenSlotsCalendar({
     );
   };
 
-  const editDate = (iso: string, patch: Partial<OpenSlot>) =>
-    onChange((cur) => cur.map((sl) => (sl.date === iso ? { ...sl, ...patch } : sl)));
+  /** 한 날짜만 시각 바꾸기. 규칙이 연 날이면 그날을 «직접 연 날»로 떼어 낸다(같은 날이면 직접 연 쪽이 이긴다). */
+  const editDate = (iso: string, patch: Partial<OpenSlot>) => {
+    const base = picked(iso);
+    onChange((cur) =>
+      cur.some((sl) => sl.date === iso)
+        ? cur.map((sl) => (sl.date === iso ? { ...sl, ...patch } : sl))
+        : base
+          ? [...cur, { ...base, ...patch, date: iso }]
+          : cur,
+    );
+  };
 
   const navCls =
     "inline-flex h-[44px] w-[44px] items-center justify-center rounded-md text-[18px] text-body transition-colors hover:bg-surface-soft disabled:opacity-30 disabled:hover:bg-transparent";
@@ -227,7 +283,8 @@ export function OpenSlotsCalendar({
             {usedDows.map((d) => {
               const t = dowTime(d);
               const h = hoursBetween(t.start, t.end);
-              const n = value.filter((sl) => dowOf(sl.date) === d).length;
+              const n = all.filter((sl) => dowOf(sl.date) === d).length;
+              const on = !!ruleOf(d);
               return (
                 <div key={d} className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
                   <span className="inline-flex h-[40px] w-[44px] shrink-0 items-center justify-center rounded-md bg-primary-tint text-[15px] font-medium text-primary-on">
@@ -261,13 +318,30 @@ export function OpenSlotsCalendar({
                     ))}
                   </RentSelect>
                   <span className="text-[14px] text-faint">{n}일</span>
+                  {/* 🔁09-17 — 이 폼의 알약 모양(고르면 키위 틴트, 아니면 흰 면)을 그대로 쓴다. 한 개짜리라 눌림 상태로 말한다. */}
+                  <button
+                    type="button"
+                    aria-pressed={on}
+                    onClick={() => setRepeat(d, !on)}
+                    className={`ml-auto inline-flex h-[40px] shrink-0 items-center rounded-pill px-4 text-[15px] font-medium transition-colors ${
+                      on
+                        ? "bg-primary-tint text-primary-on"
+                        : "border-[0.5px] border-[#DFDFE3] bg-surface text-body hover:bg-surface-soft"
+                    }`}
+                  >
+                    {on ? "매주 여는 중" : "매주 계속 열기"}
+                  </button>
                   {h < minHours && (
-                    <span className="text-[14px] text-danger">최소 {minHours}시간을 못 채워요</span>
+                    <span className="basis-full text-[14px] text-danger">최소 {minHours}시간을 못 채워요</span>
                   )}
                 </div>
               );
             })}
           </div>
+          {/* 🔁09-17 — 켜기 전에 무엇이 일어나는지 먼저 읽히게 줄들 바로 밑에 둔다. 쉬는 날은 `skip`으로 실제로 빠진다. */}
+          <p className="mt-3 text-[15px] leading-relaxed break-keep text-mute">
+            매주 계속 열어 두시면 늘 앞으로 12주치 그 요일이 열려 있어요. 하루만 쉬고 싶은 날은 달력에서 그날을 눌러 빼면 돼요.
+          </p>
         </div>
       )}
 
