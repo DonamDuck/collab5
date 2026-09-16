@@ -65,13 +65,15 @@ export async function notifySignup(n: SignupNotice): Promise<boolean> {
   const originLabel = ORIGIN_LABEL[n.origin];
   const idText = n.userId === null ? "(조회 실패)" : `#${n.userId}`;
 
-  const subject = `[collab5] 새 가입 — ${n.brandName}`;
+  // 🙋09-17 브랜드명이 선택이 됐다. 비면 제목 끝이 「—」로 끊기니 이메일로 대신한다.
+  const who = n.brandName?.trim() || `(브랜드명 없음) ${n.email}`;
+  const subject = `[collab5] 새 가입 — ${who}`;
 
   const text = [
     `새로운 브랜드가 collab5에 가입했어요.`,
     ``,
     `ID: ${idText}`,
-    `업체명: ${n.brandName}`,
+    `업체명: ${n.brandName?.trim() || "(비워 둠)"}`,
     `이메일: ${n.email}`,
     `가입 경로: ${originLabel}`,
     `가입 시각: ${when} (KST)`,
@@ -81,7 +83,7 @@ export async function notifySignup(n: SignupNotice): Promise<boolean> {
   <p style="margin:0 0 16px">새로운 브랜드가 <strong>collab5</strong>에 가입했어요.</p>
   <table style="border-collapse:collapse;font-size:15px">
     <tr><td style="padding:4px 16px 4px 0;color:#666">ID</td><td style="padding:4px 0"><strong>${esc(idText)}</strong></td></tr>
-    <tr><td style="padding:4px 16px 4px 0;color:#666">업체명</td><td style="padding:4px 0"><strong>${esc(n.brandName)}</strong></td></tr>
+    <tr><td style="padding:4px 16px 4px 0;color:#666">업체명</td><td style="padding:4px 0"><strong>${esc(n.brandName?.trim() || "(비워 둠)")}</strong></td></tr>
     <tr><td style="padding:4px 16px 4px 0;color:#666">이메일</td><td style="padding:4px 0">${esc(n.email)}</td></tr>
     <tr><td style="padding:4px 16px 4px 0;color:#666">가입 경로</td><td style="padding:4px 0">${esc(originLabel)}</td></tr>
     <tr><td style="padding:4px 16px 4px 0;color:#666">가입 시각</td><td style="padding:4px 0">${esc(when)} <span style="color:#888">(KST)</span></td></tr>
