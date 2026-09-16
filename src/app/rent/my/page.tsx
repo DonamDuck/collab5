@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import {
+  markFinishedBookings,
   listSpacesByOwner,
   listBookingsForHost,
   listBookingsForGuest,
@@ -14,6 +15,7 @@ import type { Space, SpaceBooking } from "@/lib/types";
 import { isRentAdmin } from "@/lib/rent-actions";
 import { HostDecide, GuestCancel, PublishButton } from "./Actions";
 import { ContactBlock } from "../ContactBlock";
+import { bookingStarted } from "@/lib/rent-time";
 import { BookingBadge, SpaceBadge, bookingWhen, primaryBtnCls, won } from "../ui";
 
 // 하루 가게 — 내 공간 · 받은 신청 · 보낸 신청 (2026-09-13)
@@ -84,6 +86,10 @@ export default async function MyRentPage() {
     );
   }
 
+  // ⏹읽기 «전에» 끝난 확정 예약을 「다녀왔어요」로 넘긴다(09-16). 뒤에서 넘기면 이번 화면엔 옛 상태가 나간다.
+  //   크론 대신 이 화면이 열릴 때 한다 — 끝난 예약은 누군가 볼 때 넘어가면 충분하고, 두 번 불려도 같은 결과다.
+  await markFinishedBookings();
+
   const [me, mySpaces, hostBookings, guestBookings] = await Promise.all([
     getProfileById(uid),
     listSpacesByOwner(uid),
@@ -147,6 +153,12 @@ export default async function MyRentPage() {
           ← 하루 가게
         </Link>
         <h1 className="mt-3 text-[28px] font-bold leading-[1.25] tracking-[-0.02em] text-ink">내 하루 가게</h1>
+        {/* 🏦대표만 보인다. 판정은 `isRentAdmin` 한 벌이고, 정산 화면도 같은 판정으로 다시 막는다. */}
+        {admin && (
+          <Link href="/rent/payouts" className="mt-2 inline-block py-[12px] text-[15px] text-mute underline underline-offset-2">
+            정산하기
+          </Link>
+        )}
       </header>
 
       {/* ── ① 내가 올린 공간 ── */}
@@ -236,7 +248,9 @@ export default async function MyRentPage() {
                     <span className="text-faint"> · 신청자가 낸 돈 {won(b.amountTotal)}</span>
                   </p>
 
-                  {b.status === "paid" && <HostDecide bookingId={b.id} amountTotal={b.amountTotal} />}
+                  {b.status === "paid" && (
+                    <HostDecide bookingId={b.id} amountTotal={b.amountTotal} started={bookingStarted(b)} />
+                  )}
 
                   {open ? (
                     <ContactBlock who="신청하신 분" profile={contacts.get(b.guestUserId) ?? null} />
@@ -317,7 +331,11 @@ export default async function MyRentPage() {
                     </p>
                   )}
 
-                  {(b.status === "paid" || b.status === "confirmed") && <GuestCancel bookingId={b.id} />}
+                  {/* 🚨이미 시작한 예약엔 취소 버튼을 안 띄운다(09-16). 다 쓴 예약을 취소로 바꾸면
+                      환불은 0원인데 사장님 정산에서 통째로 빠졌다. 관문은 서버 액션이고 이건 화면 쪽 짝이다. */}
+                  {(b.status === "paid" || b.status === "confirmed") && !bookingStarted(b) && (
+                    <GuestCancel bookingId={b.id} />
+                  )}
                 </Row>
               );
             })}

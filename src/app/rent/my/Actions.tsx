@@ -23,7 +23,16 @@ import { InfoList, InfoRow, primaryBtnCls, rentTextareaCls, secondaryBtnCls, won
 import { ConfirmDialog } from "../ConfirmDialog";
 
 /** 받은 신청 — 수락 · 거절. 거절은 전액 환불이라 되돌릴 수 없다(대표 09-13). */
-export function HostDecide({ bookingId, amountTotal }: { bookingId: number; amountTotal: number }) {
+export function HostDecide({
+  bookingId,
+  amountTotal,
+  started = false,
+}: {
+  bookingId: number;
+  amountTotal: number;
+  /** ⏯이용 시간이 이미 시작했나. 그러면 «수락»은 뜻이 없고 거절(= 전액 환불)만 남긴다(09-16). */
+  started?: boolean;
+}) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [message, setMessage] = useState("");
@@ -55,18 +64,26 @@ export function HostDecide({ bookingId, amountTotal }: { bookingId: number; amou
         aria-label="신청하신 분께 남길 말"
       />
       {err && <p className="text-[15px] leading-relaxed break-keep text-danger">{err}</p>}
+      {/* ⏯이용 시간이 이미 지난 신청 — 답을 못 한 채 날이 갔다. 손님 돈이 붙잡혀 있으니 돌려줄 길만 남긴다. */}
+      {started && (
+        <p className="text-[15px] leading-relaxed break-keep text-mute">
+          이용 시간이 이미 지나 수락할 수 없어요. 거절하시면 신청하신 분께 전액 환불됩니다.
+        </p>
+      )}
       <div className="flex gap-2">
         {/* ⭐항목마다 키위가 하나씩 나올 수 있는 화면이라(받은 신청 여러 건) 예외로 허용하되 작게 —
             폭을 내용만큼만. 높이는 옆 보조 버튼과 같은 44px(한 줄에서 높이가 다르면 어긋나 보인다). */}
         {/* 수락은 팝업 없이 — 문구가 결과를 미리 말한다(누르면 연락처가 열린다는 것). */}
-        <button
-          type="button"
-          onClick={() => run(true)}
-          disabled={pending}
-          className={`${primaryBtnCls} h-[44px] px-5 text-[15px]`}
-        >
-          {pending ? "처리 중…" : "수락하고 연락처 열기"}
-        </button>
+        {!started && (
+          <button
+            type="button"
+            onClick={() => run(true)}
+            disabled={pending}
+            className={`${primaryBtnCls} h-[44px] px-5 text-[15px]`}
+          >
+            {pending ? "처리 중…" : "수락하고 연락처 열기"}
+          </button>
+        )}
         <button
           type="button"
           onClick={() => setConfirmReject(true)}

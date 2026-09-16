@@ -577,6 +577,11 @@ export interface SpaceBooking {
   /** ⚠️행마다 박아 둔다 — 요율이 바뀌어도 옛 거래는 **그때 값**으로 정산해야 한다. */
   feeRate: number;
   amountPayout: number;
+  /** 💸손님께 «돌려준» 돈(09-16). 호스트 약관 제8조 — 돌려주지 않은 몫은 정산 때 사장님께 간다.
+   *  그 몫을 계산할 근거가 이 칸이다. 취소·거절이 환불에 «성공»했을 때만 적는다. */
+  amountRefunded: number;
+  /** 🏦사장님께 입금한 시각(09-16). 비어 있으면 아직 안 드린 것. 입금은 대표가 손으로 한다. */
+  paidOutAt?: string;
 
   paymentKey: string;
   orderId: string;

@@ -128,3 +128,24 @@ export function futureSlots(slots: OpenSlot[], today = todayKst(), now = nowHhmm
     return toMinutes(sl.end) > toMinutes(now);
   });
 }
+
+/** ⏯이 예약이 «시작했나» — 시작 시각이 지났으면 참.
+ *  🚨**시작한 예약은 취소할 수 없다**(09-16). 09-16까지 확정된 예약은 이용일이 지나도 취소 버튼이 떠서,
+ *    이미 쓴 예약을 「취소」로 바꾸면 환불은 0원인데 **사장님 정산에서 통째로 빠졌다.**
+ *  ⚠️시각이 없는 옛 예약은 그날 0시를 시작으로 본다(그날이 되면 막힌다). */
+export function bookingStarted(b: { useDate: string; startTime?: string }, today = todayKst(), now = nowHhmmKst()): boolean {
+  if (b.useDate < today) return true;
+  if (b.useDate > today) return false;
+  const st = b.startTime ? toMinutes(b.startTime) : 0;
+  return st <= toMinutes(now);
+}
+
+/** ⏹이 예약이 «끝났나» — 끝나는 시각이 지났으면 참. 「다녀왔어요」로 넘기는 기준이다.
+ *  ⚠️시각이 없는 옛 예약은 그날이 다 지나야(다음 날) 끝난 것으로 본다. */
+export function bookingFinished(b: { useDate: string; endTime?: string }, today = todayKst(), now = nowHhmmKst()): boolean {
+  if (b.useDate < today) return true;
+  if (b.useDate > today) return false;
+  if (!b.endTime) return false;
+  return toMinutes(b.endTime) <= toMinutes(now);
+}
+

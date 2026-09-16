@@ -6,6 +6,7 @@ import {
   saveSpace, getSpaceFull, getBooking, createPendingBooking, getBookingByOrderId,
   markBookingPaid, decideBooking,
   setBookingStatus, listSpacesByOwner, listSpacesByIds, payout, FEE_RATE,
+  recordRefund, markPaidOut,
   type SpaceSaveInput,
   listLiveBookings,
 } from "./spaces";
@@ -14,7 +15,7 @@ import { geocode } from "./geocode";
 import {
   notifyBookingPaid, notifyBookingConfirmed, notifyBookingRejected, notifyBookingCancelled,
 } from "./rent-notify";
-import { dateLabel, hoursBetween, fitsOpenSlot, nowHhmmKst, overlaps, toMinutes, todayKst } from "./rent-time";
+import { bookingStarted, dateLabel, hoursBetween, fitsOpenSlot, nowHhmmKst, overlaps, toMinutes, todayKst } from "./rent-time";
 import type { Space, SpaceBooking, SpaceUseType, SpaceCategory, SpaceScope, OpenSlot, AccessHow } from "./types";
 
 // 하루 가게 — 쓰기 서버 액션 (2026-09-13)
@@ -321,12 +322,20 @@ export async function decideBookingAction(
   const sp = mine.find((x) => x.id === b.spaceId);
   if (!sp) return { ok: false, message: "내 공간의 신청만 결정할 수 있어요." };
 
+  // ⏯이용 시간이 이미 시작했으면 «수락»은 뜻이 없다. 거절(= 전액 환불)은 그대로 열어 둔다 —
+  //   답을 못 한 채 날이 간 신청은 손님 돈이 붙잡혀 있는 것이라, 사장님이 돌려줄 길은 남아 있어야 한다.
+  if (accept && bookingStarted(b)) {
+    return { ok: false, message: "이용 시간이 이미 지나 수락할 수 없어요. 거절하시면 손님께 전액 환불됩니다." };
+  }
+
   const decided = await decideBooking(bookingId, accept, message.trim());
   if (!decided) return { ok: false, message: "이미 처리된 신청이에요." };
 
   if (!accept) {
     const refunded = await cancelPayment(b.paymentKey, "사장님 거절 — 전액 환불");
     await setBookingStatus(bookingId, refunded ? "refunded" : "rejected");
+    // 💸돌려준 돈을 남긴다 — 환불이 «성공»했을 때만. 실패한 자리(`rejected`)는 아직 돌려준 게 아니다.
+    if (refunded) await recordRefund(bookingId, b.amountTotal);
     revalidatePath("/rent/my");
     await safeNotify(async () => {
       const p = await notifyParties(decided);
@@ -364,6 +373,7 @@ export async function quoteCancelAction(
   const b = await getBooking(bookingId);
   if (!b || b.guestUserId !== uid) return { ok: false, message: "내 신청만 볼 수 있어요.", ...none };
   if (b.status !== "paid" && b.status !== "confirmed") return { ok: false, message: "이미 끝난 신청이에요.", ...none };
+  if (bookingStarted(b)) return { ok: false, message: "이미 시작한 예약은 취소할 수 없어요.", ...none };
   const { rate, refund } = cancelRefund(b);
   return { ok: true, message: "", total: b.amountTotal, refund, rate };
 }
@@ -375,11 +385,21 @@ export async function cancelBookingAction(bookingId: number): Promise<ActionResu
   const b = await getBooking(bookingId);
   if (!b || b.guestUserId !== uid) return { ok: false, message: "내 신청만 취소할 수 있어요." };
   if (b.status !== "paid" && b.status !== "confirmed") return { ok: false, message: "이미 끝난 신청이에요." };
+  // 🚨이미 시작한 예약은 취소할 수 없다(09-16). 막지 않으면 다 쓴 예약을 「취소」로 바꿔
+  //   환불은 0원인데 사장님 정산에서 통째로 빠진다. 화면도 버튼을 숨기지만 관문은 여기다.
+  if (bookingStarted(b)) return { ok: false, message: "이미 시작한 예약은 취소할 수 없어요." };
 
   const { refund } = cancelRefund(b);
-  if (refund > 0) await cancelPayment(b.paymentKey, "게스트 취소", refund === b.amountTotal ? undefined : refund);
+  if (refund > 0) {
+    const ok = await cancelPayment(b.paymentKey, "게스트 취소", refund === b.amountTotal ? undefined : refund);
+    // 🩸09-16까지 이 결과를 안 봤다. 토스 환불이 실패해도 상태는 「취소」가 됐고 손님에겐
+    //   「환불됩니다」라고 말했다. 돈은 안 돌아갔는데 예약은 사라진다. 실패면 아무것도 바꾸지 않는다.
+    if (!ok) return { ok: false, message: "환불을 처리하지 못해 취소하지 않았어요. 잠시 뒤 다시 시도해 주세요." };
+  }
 
   await setBookingStatus(bookingId, "cancelled");
+  // 💸약관 제8조 — 돌려주지 않은 몫은 정산 때 사장님께 간다. 그 계산의 근거.
+  await recordRefund(bookingId, refund);
   revalidatePath("/rent/my");
   await safeNotify(async () => {
     const p = await notifyParties(b);
@@ -392,4 +412,16 @@ export async function cancelBookingAction(bookingId: number): Promise<ActionResu
 export async function quotePayout(total: number): Promise<{ fee: number; payout: number; rate: number }> {
   const out = payout(total);
   return { fee: total - out, payout: out, rate: FEE_RATE };
+}
+
+/** 🏦정산 — 사장님께 입금했다고 적는다. **대표만.** 입금 자체는 대표가 은행에서 손으로 한다(1단계).
+ *  ⚠️이 칸은 장부다 — 두 번 주거나 빠뜨리지 않게. 이미 적힌 행은 덮어쓰지 않는다(`markPaidOut`). */
+export async function markPaidOutAction(bookingIds: number[]): Promise<ActionResult> {
+  if (!(await isRentAdmin())) return { ok: false, message: "권한이 없어요." };
+  const ids = bookingIds.filter((x) => Number.isInteger(x) && x > 0);
+  if (ids.length === 0) return { ok: false, message: "고른 예약이 없어요." };
+  const n = await markPaidOut(ids);
+  if (n < 0) return { ok: false, message: "적지 못했어요. 정산 칸 SQL(2026-09-16-rent-payout.sql)을 돌렸는지 확인해 주세요." };
+  revalidatePath("/rent/payouts");
+  return { ok: true, message: n === ids.length ? `${n}건을 입금했다고 적었어요.` : `${n}건을 적었어요. 나머지는 이미 적혀 있었어요.` };
 }
