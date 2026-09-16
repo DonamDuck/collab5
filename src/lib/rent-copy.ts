@@ -29,3 +29,17 @@ export function isTestPayment(): boolean {
   const k = process.env.NEXT_PUBLIC_TOSS_CLIENT_KEY || "";
   return !k || k.startsWith("test_");
 }
+
+/** 🇰🇷이름 뒤에 붙는 조사를 받침에 맞춘다 — `withJosa("소소하우스", "이/가")` → 「소소하우스가」.
+ *
+ *  🩸09-16까지 메일이 이름 뒤에 「이·을·은」을 그냥 붙였다. 받침 없는 이름이면
+ *    「소소하우스이 신청했어요」가 사장님 메일함에 그대로 들어간다. 사람 이름이 틀리게 불리는 자리라 티가 크다.
+ *  ⚠️한글이 아닌 글자로 끝나면(영문·숫자) 받침을 알 수 없다. 그때는 「이(가)」처럼 둘 다 적는다 —
+ *    틀린 쪽 하나를 고르는 것보다 낫다. */
+export function withJosa(word: string, pair: "이/가" | "을/를" | "은/는"): string {
+  const [withBatchim, without] = pair.split("/");
+  const last = word.trim().slice(-1);
+  const code = last.charCodeAt(0) - 0xac00;
+  if (!last || code < 0 || code > 11171) return `${word}${withBatchim}(${without})`;
+  return `${word}${code % 28 === 0 ? without : withBatchim}`;
+}

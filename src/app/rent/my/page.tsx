@@ -190,7 +190,12 @@ export default async function MyRentPage() {
                   )}
 
                   {open ? (
-                    <ContactBlock who="신청하신 분" profile={contacts.get(b.guestUserId) ?? null} />
+                    <ContactBlock
+                      who="신청하신 분"
+                      // 🩸09-16까지 제목을 안 넘겨서 기본값 「가게 정보」가 떴다. 사장님이 보는 건 손님 정보다.
+                      title="신청하신 분 정보"
+                      profile={contacts.get(b.guestUserId) ?? null}
+                    />
                   ) : b.status === "paid" ? (
                     <Locked text="수락하시면 신청하신 분의 연락처가 열려요." />
                   ) : null}

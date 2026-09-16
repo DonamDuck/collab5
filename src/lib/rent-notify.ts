@@ -11,7 +11,7 @@
 //   받는 사람이 여는 곳은 하나다.
 import { SITE_URL } from "./site";
 import { bookingWhen, dateLabel } from "./rent-time";
-import { accessHowLine, hostContactLine } from "./rent-copy";
+import { accessHowLine, hostContactLine, withJosa } from "./rent-copy";
 import type { Space, SpaceBooking } from "./types";
 import type { Profile } from "./profiles";
 
@@ -100,7 +100,7 @@ export async function notifyBookingPaid(
 ): Promise<MailResult> {
   const guestName = displayName(guest, "손님");
   const when = dateLabel(booking.useDate);
-  const subject = `[collab5] ${guestName}이 ${when} ${space.name}을 신청했어요 · ${won(booking.amountTotal)}`;
+  const subject = `[collab5] ${withJosa(guestName, "이/가")} ${when} ${withJosa(space.name, "을/를")} 신청했어요 · ${won(booking.amountTotal)}`;
   const link = `${SITE_URL}/rent/my`;
   const rows: [string, string][] = [
     ["누가", guestName],
@@ -110,14 +110,14 @@ export async function notifyBookingPaid(
     ["받으실 돈", `${won(booking.amountPayout)} (손님이 낸 돈 ${won(booking.amountTotal)})`],
   ];
   const text = [
-    `${guestName}이 ${when} ${space.name}을 신청했어요.`,
+    `${withJosa(guestName, "이/가")} ${when} ${withJosa(space.name, "을/를")} 신청했어요.`,
     ...rows.map(([k, v]) => `${k}: ${v}`),
     ``,
     `답하러 가기: ${link}`,
     `거절하시면 손님께 전액 돌아가요.`,
   ].join("\n");
   const html = layout(
-    `${guestName}이 ${when} ${space.name}을 신청했어요. 결제는 이미 끝났어요.`,
+    `${withJosa(guestName, "이/가")} ${when} ${withJosa(space.name, "을/를")} 신청했어요. 결제는 이미 끝났어요.`,
     rows,
     { href: link, label: "받은 신청 보기" },
     "거절하시면 손님께 전액 돌아가요.",
@@ -147,13 +147,13 @@ export async function notifyBookingConfirmed(
     ["사장님 말씀", booking.hostMessage],
   ];
   const text = [
-    `${hostName}이 수락했어요. ${when} ${space.name}은 이제 확정이에요.`,
+    `${withJosa(hostName, "이/가")} 수락했어요. ${when} ${withJosa(space.name, "은/는")} 이제 확정이에요.`,
     ...rows.filter(([, v]) => v).map(([k, v]) => `${k}: ${v}`),
     ``,
     `자세히 보기: ${link}`,
   ].join("\n");
   const html = layout(
-    `${hostName}이 수락했어요. ${when} ${space.name}은 이제 확정이에요.`,
+    `${withJosa(hostName, "이/가")} 수락했어요. ${when} ${withJosa(space.name, "은/는")} 이제 확정이에요.`,
     rows,
     { href: link, label: "확정 내용 보기" },
     "가시기 전에 사장님께 한 번 연락해 두시면 그날이 편해요.",
@@ -195,16 +195,16 @@ export async function notifyBookingCancelled(
 ): Promise<MailResult> {
   const guestName = displayName(guest, "손님");
   const when = dateLabel(booking.useDate);
-  const subject = `[collab5] ${guestName}이 ${when} ${space.name} 신청을 취소했어요`;
+  const subject = `[collab5] ${withJosa(guestName, "이/가")} ${when} ${space.name} 신청을 취소했어요`;
   const link = `${SITE_URL}/rent/my`;
   const rows: [string, string][] = [["언제", bookingWhen(booking)], ["어디", space.name]];
   const text = [
-    `${guestName}이 ${when} ${space.name} 신청을 취소했어요. 그날은 다시 비는 날로 돌아갔어요.`,
+    `${withJosa(guestName, "이/가")} ${when} ${space.name} 신청을 취소했어요. 그 시간은 다시 신청을 받을 수 있어요.`,
     ``,
     `내 하루 가게: ${link}`,
   ].join("\n");
   const html = layout(
-    `${guestName}이 ${when} ${space.name} 신청을 취소했어요. 그날은 다시 비는 날로 돌아갔어요.`,
+    `${withJosa(guestName, "이/가")} ${when} ${space.name} 신청을 취소했어요. 그 시간은 다시 신청을 받을 수 있어요.`,
     rows,
     { href: link, label: "내 하루 가게 보기" },
   );
