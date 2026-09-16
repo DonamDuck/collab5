@@ -9,6 +9,7 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { InfoPanel, InfoRow, primaryBtnCls, secondaryBtnCls } from "../../ui";
+import { isTestPayment } from "@/lib/rent-copy";
 
 export function PayPanel({
   orderId,
@@ -193,7 +194,9 @@ export function PayPanel({
         </button>
       </div>
 
-      <p className="text-[15px] leading-relaxed break-keep text-faint">지금은 시험 결제예요.</p>
+      {isTestPayment() && (
+        <p className="text-[15px] leading-relaxed break-keep text-faint">지금은 시험 결제예요.</p>
+      )}
     </div>
   );
 }

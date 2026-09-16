@@ -21,3 +21,11 @@ export function hostContactLine(shopPhone: string, personalPhone?: string, email
   const parts = [shopPhone?.trim(), personalPhone?.trim(), email?.trim()].filter(Boolean);
   return parts.length > 0 ? Array.from(new Set(parts)).join(" · ") : "연락처를 안 적으셨어요";
 }
+
+/** 🧪화면이 「시험 결제」라고 말해야 하는가 — **클라이언트 쪽 판정.**
+ *  서버는 비밀 키로 보고(`paymentsTestMode`), 화면은 공개 키로 본다. 둘 다 앞글자가 `test_`/`live_`다.
+ *  ⚠️키가 아예 없으면 결제창을 건너뛰는 자리라 그것도 「시험」으로 본다. */
+export function isTestPayment(): boolean {
+  const k = process.env.NEXT_PUBLIC_TOSS_CLIENT_KEY || "";
+  return !k || k.startsWith("test_");
+}

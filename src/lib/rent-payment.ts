@@ -19,6 +19,17 @@ export function paymentsLive(): boolean {
   return secret().length > 0;
 }
 
+/** 🔑**키가 「진짜 돈」인가.** 토스 키는 앞글자로 갈린다 — `test_sk_…` / `live_sk_…`.
+ *
+ *  🩸09-16까지 화면에 「지금은 시험 결제예요」가 **그냥 박혀 있었다.** 아무것도 안 보는 글자라
+ *    라이브 키로 바꾼 뒤에도 그대로 남는다 — 진짜 돈을 낸 손님에게 시험이라고 말하게 된다.
+ *  ⭐그리고 반대쪽이 더 위험하다. 가맹 «심사»를 받으려면 테스트 키를 단 채로 배포해야 하는데
+ *    ([[결제-모듈-토스]] 순서), 그때 들어온 사람은 **공짜로 예약을 확정**할 수 있다.
+ *    막을 수는 없다(막으면 심사가 안 된다). 대신 화면이 그 사실을 «스스로» 말하게 한다. */
+export function paymentsTestMode(): boolean {
+  return secret().startsWith("test_");
+}
+
 /** 모의 모드를 켜도 되는 자리인가. 🔒**운영에서는 절대 안 된다.**
  *  키가 없는 운영은 «설정 사고»지 «검증 환경»이 아니다. */
 function mockAllowed(): boolean {
@@ -49,6 +60,12 @@ export async function approvePayment(
     }
     console.warn(`[rent-payment] 모의 승인 — TOSS_SECRET_KEY 없음 (order=${orderId}, ${amount}원)`);
     return { ok: true, paymentKey: paymentKey || `mock_${orderId}`, message: "모의 승인" };
+  }
+  // 🧪가맹 심사 기간에는 «운영»에 테스트 키가 달려 있다([[결제-모듈-토스]] 순서).
+  //   그 상태에서 들어온 신청은 돈이 안 움직이는데 예약은 확정된다. 막지는 않는다(막으면 심사가 안 된다).
+  //   대신 로그에 남겨 둔다 — 나중에 「이 예약은 진짜였나」를 되짚을 유일한 단서다.
+  if (paymentsTestMode() && process.env.NODE_ENV === "production") {
+    console.warn(`[rent-payment] 🧪운영인데 «테스트» 키다 — 돈은 안 움직인다 (order=${orderId}, ${amount}원)`);
   }
   try {
     const res = await fetch(`${TOSS_BASE}/confirm`, {

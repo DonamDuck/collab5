@@ -31,6 +31,7 @@ import { startBookingAction, confirmBookingAction } from "@/lib/rent-actions";
 import type { SpaceUseType, OpenSlot } from "@/lib/types";
 import { hourMarks, hoursBetween, nowHhmmKst, overlaps, toHHMM, toMinutes, rangeLabel, todayKst } from "@/lib/rent-time";
 import { dateLabel, InfoList, InfoRow, primaryBtnCls, RentSelect, rentInputCls, rentTextareaCls, won } from "../ui";
+import { isTestPayment } from "@/lib/rent-copy";
 import { ConfirmDialog } from "../ConfirmDialog";
 import { PickDateCalendar } from "./PickDateCalendar";
 import { MentorOptions } from "./MentorOption";
@@ -387,7 +388,7 @@ export function BookingForm({
 
       {/* 🔻09-14 데스크톱 인라인 버튼 삭제 — 하단 고정 바가 이제 모든 폭에서 뜬다(대표 지시).
           같은 버튼이 화면에 둘이면 어느 쪽이 진짜인지 고민하게 된다. */}
-      <p className="text-[14px] text-faint">지금은 시험 결제예요.</p>
+      {isTestPayment() && <p className="text-[14px] text-faint">지금은 시험 결제예요.</p>}
 
       <PayBar
         amount={total}
