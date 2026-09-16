@@ -135,8 +135,13 @@ begin
       balance_amount = coalesce((p_toss->>'balanceAmount')::integer, balance_amount),
       method         = coalesce(p_toss->>'method', method),
       approved_at    = coalesce((p_toss->>'approvedAt')::timestamptz, approved_at),
+      -- 🩸09-16 실결제에서 터졌다: 토스는 환불이 없으면 `"cancels": null`을 보낸다. JSON의 null은 SQL NULL이 아니라서
+      --   coalesce를 그냥 지나가고, jsonb_array_elements가 「cannot extract elements from a scalar」로 함수를 통째로 죽였다.
+      --   그래서 모든 승인이 「시간이 찼어요 → 자동 환불」로 빠졌다. «배열일 때만» 펼친다.
       canceled_at    = coalesce(
-                         (select max((c->>'canceledAt')::timestamptz) from jsonb_array_elements(coalesce(p_toss->'cancels', '[]'::jsonb)) c),
+                         case when jsonb_typeof(p_toss->'cancels') = 'array'
+                              then (select max((c->>'canceledAt')::timestamptz) from jsonb_array_elements(p_toss->'cancels') c)
+                         end,
                          canceled_at),
       toss_raw       = p_toss
     where order_id = p_order_id;
