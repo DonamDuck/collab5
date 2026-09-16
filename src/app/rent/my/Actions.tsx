@@ -112,11 +112,22 @@ export function HostDecide({
 /** 내가 보낸 신청 취소. 환불률은 우리 규정표가 정한다 — 그래서 **여기 숫자를 적지 않는다.**
  *  화면에 「전액 환불」이라고 박아 두면 당일 취소에도 그 말이 남아 거짓이 된다.
  *  실제 금액은 액션이 계산해서 메시지로 돌려준다. */
+/** 취소 팝업의 이유 한 줄. 전액이면 «왜 전액인지», 깎이면 «며칠 남아서인지», 0원이면 당일이라서. */
+function cancelReason(q: { refund: number; rate: number; daysBefore: number; grace: boolean }): string {
+  if (q.refund === 0) return "당일 취소라 돌려드릴 수 없어요.";
+  if (q.rate >= 1) {
+    return q.grace
+      ? "예약하고 한 시간이 안 지나서 전액 돌아와요."
+      : `이용일까지 ${q.daysBefore}일 남아 전액 돌아와요.`;
+  }
+  return `이용일이 ${q.daysBefore}일 남았을 때라 ${Math.round(q.rate * 100)}%만 돌아가요.`;
+}
+
 export function GuestCancel({ bookingId }: { bookingId: number }) {
   const router = useRouter();
   const [pending, start] = useTransition();
   /** 서버가 계산해 준 환불 견적. 있으면 팝업이 열려 있다는 뜻. */
-  const [quote, setQuote] = useState<{ total: number; refund: number; rate: number } | null>(null);
+  const [quote, setQuote] = useState<{ total: number; refund: number; rate: number; daysBefore: number; grace: boolean } | null>(null);
   const [err, setErr] = useState("");
   const [done, setDone] = useState("");
 
@@ -129,7 +140,7 @@ export function GuestCancel({ bookingId }: { bookingId: number }) {
         setErr(q.message);
         return;
       }
-      setQuote({ total: q.total, refund: q.refund, rate: q.rate });
+      setQuote({ total: q.total, refund: q.refund, rate: q.rate, daysBefore: q.daysBefore, grace: q.grace });
     });
 
   const run = () =>
@@ -156,12 +167,13 @@ export function GuestCancel({ bookingId }: { bookingId: number }) {
         // 배경 없는 글자 버튼은 세로 패딩으로 44px를 채운다(디자인-시스템 §터치 타깃).
         className="py-[12px] text-[15px] text-mute underline underline-offset-2 disabled:opacity-60"
       >
-        {pending && !quote ? "확인하는 중…" : "신청 취소하기"}
+        {/* 🔁09-17 「신청」 → 「예약」 — 이 버튼은 결제를 마친 건(paid·confirmed)에만 뜬다. 결제 뒤는 「예약」이다(대표). */}
+        {pending && !quote ? "확인하는 중…" : "예약 취소하기"}
       </button>
       {err && <p className="mt-2 text-[15px] leading-relaxed break-keep text-danger">{err}</p>}
       <ConfirmDialog
         open={quote !== null}
-        title="신청을 취소할까요?"
+        title="예약을 취소할까요?"
         confirmLabel="취소하기"
         cancelLabel="그냥 둘게요"
         busy={pending}
@@ -192,9 +204,9 @@ export function GuestCancel({ bookingId }: { bookingId: number }) {
             />
           </InfoList>
         )}
-        {quote?.refund === 0 && (
-          <p className="text-[15px] leading-relaxed break-keep text-mute">당일 취소라 돌려드릴 수 없어요.</p>
-        )}
+        {/* 💬09-17 QA — 「왜 그 %인지」 한 줄. 수수료 0%만 보면 서둘러야 하는지 알 수 없다.
+            ⚠️숫자는 서버가 준 `rate`·`daysBefore`·`grace`로만 말한다. 구간표를 화면에 다시 적지 않는다. */}
+        {quote && <p className="text-[15px] leading-relaxed break-keep text-mute">{cancelReason(quote)}</p>}
       </ConfirmDialog>
     </div>
   );

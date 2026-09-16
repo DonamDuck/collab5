@@ -18,12 +18,13 @@ const H = 240;
 const LEVEL = 16;
 
 export function AreaMap({ lat, lng, address }: { lat: number; lng: number; address: string }) {
-  // 지도 앱으로 넘기는 링크. 안드로이드·PC는 구글 지도가 열리고 iOS는 애플 지도로 받는다.
+  // 🔁09-17 QA — 누르면 구글 지도가 열렸다. 한국에선 구글 지도로 길찾기가 거의 안 되고, 위 이미지도 네이버 지도라
+  //   누른 뒤 딴 지도가 뜨는 셈이었다. 네이버 지도 검색으로 보낸다(폰에선 앱이 있으면 앱이 받는다).
   const q = encodeURIComponent(address);
   return (
     <div>
       <a
-        href={`https://maps.google.com/?q=${q}`}
+        href={`https://map.naver.com/p/search/${q}`}
         target="_blank"
         rel="noreferrer"
         className="block overflow-hidden rounded-lg border border-hairline"
@@ -38,7 +39,7 @@ export function AreaMap({ lat, lng, address }: { lat: number; lng: number; addre
         />
       </a>
       <p className="mt-2 text-[15px] leading-relaxed break-keep text-body">{address}</p>
-      <p className="mt-0.5 text-[15px] text-faint">지도를 누르면 길찾기가 열려요.</p>
+      <p className="mt-0.5 text-[15px] text-faint">지도를 누르면 네이버 지도에서 길을 찾을 수 있어요.</p>
     </div>
   );
 }

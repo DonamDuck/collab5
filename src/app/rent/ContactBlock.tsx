@@ -13,7 +13,7 @@
 import type { Profile } from "@/lib/profiles";
 import type { AccessHow } from "@/lib/types";
 import Link from "next/link";
-import { accessHowLine } from "@/lib/rent-copy";
+import { accessHowLine, withJosa } from "@/lib/rent-copy";
 import { InfoList, InfoRow } from "./ui";
 
 export function ContactBlock({
@@ -48,7 +48,8 @@ export function ContactBlock({
   /** 📎사장님이 「내 소개서 보여주기」를 켠 공간에만 넘긴다(대표 09-16). 소개서는 누구나 여는 공개 페이지라 가리지 않는다. */
   brand?: { name: string; slug: string } | null;
 }) {
-  const name = profile?.brandName?.trim() || "이름을 안 적으셨어요";
+  // ✍️09-17 QA — 「안 적으셨어요」에 주어가 없어 누가 안 적었는지 몰랐다(읽는 사람은 자기 얘기로 읽는다).
+  const name = profile?.brandName?.trim() || `${withJosa(who, "이/가")} 이름을 안 남기셨어요`;
   const phone = masked ? "" : profile?.phone?.trim() ?? "";
   const email = masked ? "" : profile?.email?.trim() ?? "";
   return (
@@ -92,7 +93,7 @@ export function ContactBlock({
                 {phone}
               </a>
             ) : (
-              <span className="text-mute">안 적으셨어요. 이메일로 연락해 주세요.</span>
+              <span className="text-mute">{withJosa(who, "이/가")} 번호를 안 남기셨어요. 이메일로 연락해 보세요.</span>
             )
           }
         />

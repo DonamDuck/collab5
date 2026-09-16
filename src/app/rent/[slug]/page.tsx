@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { getSpacePublic, listLiveBookingsIn } from "@/lib/spaces";
 import { getProfileById, getSessionUserId } from "@/lib/profiles";
 import { repo } from "@/lib/repo";
-import { accessHowLine } from "@/lib/rent-copy";
+import { accessHowLine, COFFEE_CHAT_WHEN_GUEST } from "@/lib/rent-copy";
 import { futureSlots } from "@/lib/rent-time";
 import { PhotoSlider } from "@/components/PhotoSlider";
 import { BookingForm } from "./BookingForm";
@@ -13,12 +13,13 @@ import { AreaMap } from "./AreaMap";
 
 // 하루 가게 — 공간 한 곳 + 신청 (2026-09-13)
 //
-// 🚨🚨**이 파일은 `getSpaceFull`을 부르지 않는다.** 부르면 주소가 서버 렌더 HTML에 실려 나가고,
-//   확정 전에 가게가 특정되면 플랫폼을 건너뛴 직거래가 일어난다(설계 §이탈 — 대표 09-13:
-//   *「사장님과 연결을 미리 해버리면 우리 결제 없이 그들끼리 거래로 해버릴 수도」*).
-//   `getSpacePublic`은 타입만 좁히는 게 아니라 **런타임 객체에서 주소·좌표를 실제로 지운다.**
-//   같은 이유로 연결된 소개서도 **이름만** 보여주고 `/m/{slug}` 링크는 걸지 않는다 —
-//   소개서에는 인스타·연락처가 적혀 있어서 링크 하나로 구멍이 그대로 다시 뚫린다.
+// 🔁**09-13엔 주소도 소개서 링크도 가렸다.** 확정 전에 가게가 특정되면 결제 없이 직거래로 샐까 봐였다
+//   (대표 09-13: *「사장님과 연결을 미리 해버리면 우리 결제 없이 그들끼리 거래로 해버릴 수도」*).
+//   ✅09-16 대표 — 정확한 주소·핀을 연다(이름과 사진이 이미 가게를 특정하고, 전자상거래법 제20조②도
+//     호스트 주소·전화를 청약 전에 보이라고 한다. `AreaMap` 머리말).
+//   ✅09-17 대표 — 사장님이 「내 소개서 보여주기」를 켠 공간이면 소개서 링크도 연다(`/m/{slug}?back=…`).
+//   📌이탈을 막는 건 이제 가리기가 아니라 **결제가 먼저라는 순서**다(`BookingForm` 머리말).
+// 🚨그래도 `getSpaceFull`은 부르지 않는다. `getSpacePublic`이 「들어오는 법」(옛 `accessNote`)을 런타임에서 지운다.
 //
 // 🎨09-13 재작업 — 소개서(`/m`)와 같은 옷. 위에 흰 카드 하나(이름 22 · 한 줄 17 · 동네 15 · 칩),
 //   그 아래는 카드 밖 지면에 21px 섹션 제목 + 17px 본문(`MakerArticle`의 Section과 같은 자리).
@@ -38,8 +39,7 @@ export async function generateMetadata({
   if (!sp) return { title: "공간을 찾을 수 없어요 — collab5" };
   return {
     title: `${sp.name} — 하루 가게`,
-    // ⚠️설명에도 동네까지만 적는다. 링크 미리보기 카드는 로그인도 결제도 없이 퍼진다 —
-    //   화면에서 가린 주소를 og 설명으로 흘리면 가린 의미가 없다.
+    // 링크 미리보기 설명은 한 줄 소개 또는 동네까지. 주소는 화면에서 열려 있지만(09-16) 카드엔 길 필요가 없다.
     // ⏱09-16 대표 — 시간 단위 대여. 「하루 빌려보세요」는 사실이 틀린 말이라 링크 카드에도 안 싣는다.
     description: sp.tagline || `${sp.area}에서 필요한 시간만큼 빌릴 수 있는 공간이에요.`,
     alternates: { canonical: `/rent/${sp.slug}` },
@@ -71,7 +71,7 @@ export default async function SpaceDetailPage({
   // 「있지만 못 본다」와 「없다」를 구분해 주면, 주소를 훑어 아직 안 열린 공간 목록을 만들 수 있다.
   if (sp.status !== "open" && !isOwner) notFound();
 
-  // 연결된 소개서는 **이름 글자만** 꺼내 온다. Maker 객체를 클라이언트로 넘기면 연락처가 같이 건너간다.
+  // 연결된 소개서는 **이름 글자만** 꺼내 온다. 링크는 slug로 건다 — Maker 객체를 통째로 넘길 이유가 없다.
   // 상호(운영하는 브랜드 이름). 사장님 실명(profiles에 따로 없다)은 안 읽는다.
   const operatorName = (await getProfileById(sp.ownerUserId))?.brandName?.trim() ?? "";
   const brandName = sp.brandSlug ? (await repo.getMakerBySlug(sp.brandSlug))?.name ?? "" : "";
@@ -82,6 +82,8 @@ export default async function SpaceDetailPage({
     uid && !isOwner
       ? (await repo.listMakersByOwner(uid)).map((m) => ({ slug: m.slug, name: m.name }))
       : [];
+  // ☎️09-17 — 신청 폼의 번호 칸을 프로필 번호로 미리 채운다. 로그인한 손님일 때만 읽는다.
+  const myPhone = uid && !isOwner ? ((await getProfileById(uid))?.phone?.trim() ?? "") : "";
 
   // 🔁09-16 하루 단위 → 시간 단위. 날짜는 시간대 목록에서 뽑고, 그 날 이미 팔린 시간도 같이 읽는다.
   // ⏳지난 시간대는 여기서 걸러 낸다. 사장님이 열어 둔 날이 지나가도 목록에는 그대로 남아 있어서,
@@ -120,7 +122,6 @@ export default async function SpaceDetailPage({
         {sp.tagline && (
           <p className="mt-3 text-[17px] leading-relaxed break-keep text-body">{sp.tagline}</p>
         )}
-        {/* 🚨동네까지만. 상세 주소는 예약이 확정된 뒤 `/rent/my`에서 열린다. */}
         <p className="mt-1.5 text-[15px] text-mute">{meta}</p>
         {/* 🔁09-14 여기 있던 금액 줄을 **아래 「비용」 절로 내렸다**(대표: *「이거 금액 별도 하단으로
             금액을 빼자」*, 아워플레이스 참고). 카드는 «무엇인지»를 말하고 값은 «비용» 절이 맡는다. */}
@@ -131,9 +132,18 @@ export default async function SpaceDetailPage({
             <Chip key={f}>{f}</Chip>
           ))}
         </div>
-        {brandName && (
-          // ⛔링크 금지(위 파일 머리말). 「이 사장님이 누구인지」의 신뢰만 주고 연락처는 안 준다.
-          <p className="mt-4 text-[15px] text-faint">소개서를 가진 브랜드예요 · {brandName}</p>
+        {brandName && sp.brandSlug && (
+          // 📎09-17 대표 — 소개서 링크를 연다. `back`을 달아 소개서 화면에서 이 공간으로 돌아올 수 있게 한다
+          //   (돌아가기 버튼은 `/m` 쪽이 그린다). 사장님이 누구인지 먼저 보는 게 이 서비스만의 물건이다.
+          <p className="mt-4 text-[15px] text-mute">
+            사장님 소개서 ·{" "}
+            <Link
+              href={`/m/${encodeURIComponent(sp.brandSlug)}?back=${encodeURIComponent(`/rent/${sp.slug}`)}`}
+              className="text-body underline underline-offset-2"
+            >
+              {brandName}
+            </Link>
+          </p>
         )}
         {isOwner && sp.status !== "open" && (
           // 노란 안내 상자 대신 한 줄. 주인만 보는 말이라 조용해도 된다.
@@ -254,24 +264,22 @@ export default async function SpaceDetailPage({
           ⭐설명하는 자리와 고르는 자리를 갈랐다. 고르는 일은 결제 단계의 옵션이 맡는다. */}
       {sp.coffeeChat && sp.coffeeChatMinutes > 0 && (
         <Section title="사장님과 커피챗">
-          {/* ☕09-16 대표 — 「사장님께 잠깐 배워보기」를 커피챗으로 다시 잡았다.
-              ⭐파는 것은 비법이 아니라 «현업 이야기»다. 사장님이 직접 적은 주제가 있으면 그걸 보여 주고,
-                없으면 무엇을 물을 수 있는지 우리가 예를 든다 — 손님이 무엇을 사는지 알아야 고른다. */}
+          {/* ☕09-16 대표 — 「사장님께 잠깐 배워보기」를 커피챗으로 다시 잡았다. 파는 것은 «현업 이야기»다.
+              🔁09-17 — 「언제」는 `COFFEE_CHAT_WHEN_GUEST` 한 줄만 쓴다(대표: 시간은 사장님이 정한다).
+                전엔 「사장님과 협의한 날짜에」라 메일의 「그날」과 말이 갈렸다.
+              🔻09-17 QA — 주제가 비었을 때 넣던 기본 예시(「재료는 어디서 떼는지…」)를 뺐다. 요가원·공방에도
+                같은 문장이 붙어 업종과 안 맞았고, 공간 셋을 이어 보면 같은 틀로 읽혔다. 비면 짧게 둔다. */}
           <p className="text-[17px] leading-relaxed break-keep text-body">
-            사장님과 협의한 날짜에 {sp.coffeeChatMinutes}분 동안 현업 이야기를 들을 수 있어요.
+            {sp.coffeeChatMinutes}분 동안 사장님께 현업 이야기를 들을 수 있어요. {COFFEE_CHAT_WHEN_GUEST}
           </p>
-          {sp.coffeeChatTopics.trim() ? (
+          {sp.coffeeChatTopics.trim() && (
             <p className="mt-2 whitespace-pre-line text-[16px] leading-relaxed break-keep text-mute">
               {sp.coffeeChatTopics}
             </p>
-          ) : (
-            <p className="mt-2 text-[16px] leading-relaxed break-keep text-mute">
-              손님은 언제 오는지, 재료는 어디서 떼는지, 처음에 무엇을 크게 틀렸는지 같은 것들이요.
-            </p>
           )}
+          {/* ✍️「고르시면 돼요」와 「(선택 사항)」이 같은 말 두 번이라 하나로. */}
           <p className="mt-3 text-[15px] text-mute">
-            <span className="font-medium text-ink">+{won(sp.coffeeChatPrice)}</span> · 신청하실 때 고르시면 돼요
-            <span className="ml-1 text-faint">(선택 사항)</span>
+            <span className="font-medium text-ink">+{won(sp.coffeeChatPrice)}</span> · 신청할 때 담을 수 있어요
           </p>
         </Section>
       )}
@@ -297,8 +305,10 @@ export default async function SpaceDetailPage({
       <Section title="이용 안내">
         {/* 같은 문장이 확정 메일에도 나간다 — 정본은 `lib/rent-copy`다. */}
         <p className="text-[17px] leading-relaxed break-keep text-body">{accessHowLine(sp.accessHow)}</p>
+        {/* ✍️09-17 QA — 「저장하지 않아요 / 전해 드립니다」로 한 절 안에서 격이 갈렸고, 앞 문장은 우리 입장이었다.
+            손님에게 달라지는 것(누가 알려 주나)을 앞에 둔다. */}
         <p className="mt-2 text-[15px] leading-relaxed break-keep text-mute">
-          출입 비밀번호처럼 민감한 내용은 collab5에 저장하지 않아요. 사장님이 직접 전해 드립니다.
+          출입 비밀번호 같은 건 사장님이 직접 알려 드려요. collab5는 따로 갖고 있지 않아요.
         </p>
       </Section>
 
@@ -310,8 +320,9 @@ export default async function SpaceDetailPage({
           신청하고 <span className="font-medium text-ink">한 시간 안</span>에 취소하시면 남은 날과 상관없이 전액
           돌려드려요.
         </p>
+        {/* ✍️09-17 QA — 「남은 기간으로 정해져요」 피동·행정어. 경계가 날짜 기준이라는 것도 같이 말한다(`kstDaysUntil`). */}
         <p className="mt-3 text-[16px] leading-relaxed break-keep text-mute">
-          그 뒤에 취소하실 때는 쓰기로 한 날까지 남은 기간으로 정해져요.
+          그 뒤엔 이용일까지 며칠 남았는지에 따라 달라져요. 몇 시에 취소하든 달력 날짜로 세요.
         </p>
         <dl className="mt-3 space-y-2 text-[16px]">
           {[
@@ -326,8 +337,14 @@ export default async function SpaceDetailPage({
             </div>
           ))}
         </dl>
+        {/* 📜09-17 QA — 「이 규정은 collab5 규정을 따릅니다」는 동어반복이었고 원문으로 가는 길이 없었다.
+            하루 가게 조항은 `/terms#rent`에 있다(본 세션이 넣는다). */}
         <p className="mt-3 text-[15px] leading-relaxed break-keep text-faint">
-          돌려드리는 돈은 결제하신 수단으로 그대로 들어가요. 이 규정은 collab5 규정을 따릅니다.
+          돌려드리는 돈은 결제하신 수단으로 들어가요. 자세한 내용은{" "}
+          <Link href="/terms#rent" className="underline underline-offset-2">
+            이용약관
+          </Link>
+          에 있어요.
         </p>
       </Section>
 
@@ -340,6 +357,12 @@ export default async function SpaceDetailPage({
               내 하루 가게
             </Link>
             에서 보실 수 있어요.
+          </p>
+        ) : openDates.length === 0 ? (
+          // 🔁09-17 QA — 열린 시간이 없는데 비로그인 손님에게 「로그인하고 신청하기」가 섰다. 로그인하고 오면
+          //   이 문장을 본다(헛걸음). 열린 시간 검사를 로그인 검사보다 먼저 한다.
+          <p className="text-[17px] leading-relaxed break-keep text-body">
+            사장님이 새 시간을 열어 두시면 여기서 신청할 수 있어요.
           </p>
         ) : !uid ? (
           <div>
@@ -355,10 +378,6 @@ export default async function SpaceDetailPage({
               로그인하고 신청하기
             </Link>
           </div>
-        ) : openDates.length === 0 ? (
-          <p className="text-[17px] leading-relaxed break-keep text-body">
-            사장님이 새 시간을 열어 두시면 여기서 신청하실 수 있어요.
-          </p>
         ) : (
           <BookingForm
             spaceId={sp.id}
@@ -374,6 +393,7 @@ export default async function SpaceDetailPage({
             capacity={sp.capacity}
             useType={sp.useType}
             myBrands={myBrands}
+            initialPhone={myPhone}
           />
         )}
       </Section>

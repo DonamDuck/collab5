@@ -31,6 +31,7 @@ import { startBookingAction, confirmBookingAction } from "@/lib/rent-actions";
 import type { SpaceUseType, OpenSlot } from "@/lib/types";
 import { hourMarks, hoursBetween, nowHhmmKst, overlaps, toHHMM, toMinutes, rangeLabel, todayKst } from "@/lib/rent-time";
 import { dateLabel, InfoList, InfoRow, primaryBtnCls, RentSelect, rentInputCls, rentTextareaCls, won } from "../ui";
+import Link from "next/link";
 import { isTestPayment } from "@/lib/rent-copy";
 import { ConfirmDialog } from "../ConfirmDialog";
 import { PickDateCalendar } from "./PickDateCalendar";
@@ -49,7 +50,8 @@ function PayBar({
   disabled,
   onClick,
 }: {
-  amount: number;
+  /** null = 아직 시간을 안 골랐다. 그땐 금액 대신 안내를 든다. */
+  amount: number | null;
   label: string;
   disabled: boolean;
   onClick: () => void;
@@ -64,8 +66,16 @@ function PayBar({
           <div className="min-w-0 flex-1">
             {/* 🔁09-14 「지금 내실 돈」 → **「대여 비용」**(대표). 「지금 내실」은 재촉으로 읽히고
                 무엇에 대한 돈인지는 말해 주지 않는다. */}
-            <p className="text-[13px] text-faint">대여 비용</p>
-            <p className="truncate text-[17px] font-medium text-ink">{won(amount)}</p>
+            {/* 🔁09-17 QA — 아무것도 안 골랐는데 「대여 비용 30,000원」이 서 있어 「이 공간은 3만원」으로 읽혔다
+                (기본값으로 채운 날짜·시각의 값이었다). 시간을 고르기 전엔 금액 자리에 할 일을 말한다. */}
+            {amount === null ? (
+              <p className="text-[15px] leading-snug break-keep text-mute">시간을 고르면 금액이 나와요</p>
+            ) : (
+              <>
+                <p className="text-[13px] text-faint">대여 비용</p>
+                <p className="truncate text-[17px] font-medium text-ink">{won(amount)}</p>
+              </>
+            )}
           </div>
           <button
             type="button"
@@ -82,6 +92,12 @@ function PayBar({
 }
 
 
+/** 확인 팝업에 싣는 「무엇을」 앞부분. 40자에서 자르고 줄바꿈은 한 칸으로 편다. */
+function planPreview(plan: string): string {
+  const flat = plan.trim().replace(/\s+/g, " ");
+  return flat.length > 40 ? `${flat.slice(0, 40)}…` : flat;
+}
+
 export function BookingForm({
   spaceId,
   spaceSlug,
@@ -96,6 +112,7 @@ export function BookingForm({
   useType,
   myBrands,
   spaceName,
+  initialPhone,
 }: {
   spaceId: number;
   spaceSlug: string;
@@ -115,19 +132,24 @@ export function BookingForm({
   /** 「몇 분이나」는 대관(`open`·`both`)에서만 묻는다. 원래 목적대로(`as_is`) 쓰는 자리엔 인원이 정보가 아니다. */
   useType: SpaceUseType;
   myBrands: { slug: string; name: string }[];
+  /** 프로필에 적힌 번호. 있으면 칸을 미리 채운다(대표 09-17). */
+  initialPhone: string;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [err, setErr] = useState("");
 
-  const [useDate, setUseDate] = useState(openSlots[0]?.date ?? "");
-  /** 고른 날의 시작 시각. 날을 바꾸면 그 날의 첫 자리로 되돌린다 — 어제 고른 시각이 오늘 안 열려 있을 수 있다. */
+  // 🔁09-17 QA — 전엔 첫 열린 날이 미리 골라져 있었다. 달력을 안 보고 시간만 고르면 «고른 적 없는 날»로
+  //   결제까지 갔다. 날짜도 시각도 손님이 직접 고른 값만 쓴다.
+  const [useDate, setUseDate] = useState("");
+  /** 고른 날의 시작 시각. 날을 바꾸면 비운다 — 어제 고른 시각이 오늘 안 열려 있을 수 있다. */
   const [startTime, setStartTime] = useState("");
   const [useHours, setUseHours] = useState(0);
   const [headcount, setHeadcount] = useState("");
   const [plan, setPlan] = useState("");
   const [withChat, setWithChat] = useState(false);
   const [brandSlug, setBrandSlug] = useState("");
+  const [phone, setPhone] = useState(initialPhone);
   /** 결제 직전 확인 팝업(대표 09-14: 의사 확인은 팝업으로). 열린 채로 `submit`이 돌지 않게 닫고 시작한다. */
   const [confirming, setConfirming] = useState(false);
   /** 🚨**못 넘어간 이유를 «그 칸 옆»에 둔다**(대표 09-15 [2][3]).
@@ -135,9 +157,11 @@ export function BookingForm({
    *  **누른 자리에서 3,000px 떨어진 곳에 글자가 생겼다.** 화면에는 아무 변화도 없고 팝업도 안 열리니
    *  「버튼이 죽었다」로 읽힌다. 실제로 대표가 그렇게 읽었다.
    *  ⭐그래서 둘을 같이 한다 — 문구는 그 칸 아래에 놓고, 화면을 그 칸으로 끌어올린다. */
-  const [badField, setBadField] = useState<"date" | "plan" | "">("");
+  const [badField, setBadField] = useState<"date" | "time" | "plan" | "phone" | "">("");
   const dateRef = useRef<HTMLDivElement>(null);
+  const timeRef = useRef<HTMLDivElement>(null);
   const planRef = useRef<HTMLTextAreaElement>(null);
+  const phoneRef = useRef<HTMLInputElement>(null);
 
   // ⏱고른 날의 시간대와 이미 팔린 칸에서 «지금 고를 수 있는 것»을 만든다.
   const daySlots = openSlots.filter((sl) => sl.date === useDate);
@@ -158,7 +182,8 @@ export function BookingForm({
       ),
     ),
   ).sort();
-  const activeStart = startTime || startChoices[0] || "";
+  // 🔁09-17 — 첫 시각을 대신 고르지 않는다(날짜와 같은 이유). 고른 시각이 목록에서 사라졌으면 빈 값으로 돌아간다.
+  const activeStart = startChoices.includes(startTime) ? startTime : "";
   /** 그 시작에서 «몇 시간까지» 가능한가. 문 닫는 시각과 다음 예약 중 먼저 오는 쪽이 한계다. */
   const maxHours = (() => {
     const sl = daySlots.find((x) => activeStart >= x.start && activeStart < x.end);
@@ -175,7 +200,11 @@ export function BookingForm({
   const endTime = activeStart && activeHours ? toHHMM(toMinutes(activeStart) + activeHours * 60) : "";
 
   const chatAmount = withChat && coffeeChat ? coffeeChatPrice : 0;
-  const total = priceHour * activeHours + chatAmount;
+  const spaceAmount = priceHour * activeHours;
+  const total = spaceAmount + chatAmount;
+  const timePicked = !!useDate && !!endTime;
+  // ☎️서버(`startBookingAction`)와 같은 규칙 — 숫자만 세서 0으로 시작하는 9~11자리.
+  const phoneOk = /^0\d{8,10}$/.test(phone.replace(/\D/g, ""));
   // ⚠️열 글자는 서버(`confirmBookingAction`)가 강제하는 값이다. 여기서 먼저 막는 건 왕복을 아끼려는 것이지
   //   이게 관문이라서가 아니다 — 관문은 늘 서버 쪽이다.
   const planShort = plan.trim().length < 10;
@@ -183,19 +212,22 @@ export function BookingForm({
   /** 버튼이 부르는 건 이것 — 싼 검사만 하고 팝업을 연다. 서버 왕복은 팝업에서 [신청하기]를 누른 뒤다. */
   /** 위에서부터 첫 번째로 비어 있는 칸으로 데려간다. 두 칸이 다 비어도 «위엣것» 하나만 말한다 —
    *  한 번에 둘을 고치라고 하면 어디부터 볼지 또 고민하게 된다. */
-  const stopAt = (f: "date" | "plan") => {
+  const stopAt = (f: "date" | "time" | "plan" | "phone") => {
     setBadField(f);
-    const el = f === "date" ? dateRef.current : planRef.current;
+    const el = { date: dateRef.current, time: timeRef.current, plan: planRef.current, phone: phoneRef.current }[f];
     el?.scrollIntoView({ behavior: "smooth", block: "center" });
     // 글 칸은 커서까지 넣어 준다. 날짜는 격자라 커서가 갈 곳이 없다.
     if (f === "plan") planRef.current?.focus({ preventScroll: true });
+    if (f === "phone") phoneRef.current?.focus({ preventScroll: true });
   };
 
   const askConfirm = () => {
     setErr("");
     setBadField("");
     if (!useDate) { stopAt("date"); return; }
+    if (!endTime) { stopAt("time"); return; }
     if (planShort) { stopAt("plan"); return; }
+    if (!phoneOk) { stopAt("phone"); return; }
     setConfirming(true);
   };
 
@@ -214,6 +246,7 @@ export function BookingForm({
         headcount: headcount ? Number(headcount) : undefined,
         withChat,
         guestBrandSlug: brandSlug,
+        guestPhone: phone.trim(),
       });
       if (!r.ok || !r.orderId || !r.amount) { setErr(r.message || "신청을 시작하지 못했어요."); return; }
 
@@ -239,7 +272,8 @@ export function BookingForm({
   return (
     <div className="space-y-7">
       <div ref={dateRef}>
-        <p className={labelCls}>신청 날짜를 선택해주세요.</p>
+        {/* ✍️09-17 「신청 날짜를 선택해주세요.」 → 말 걸듯(행정어 걷기). 아래 「몇 시부터 쓰실까요?」와 같은 말투다. */}
+        <p className={labelCls}>어느 날 쓰실까요?</p>
         {/* 🔁09-14 `<select>` → 달력(대표). 못 고르는 날이 흐리게 «보이는» 것이 오히려 정보다 —
             「이 공간은 화요일만 열린다」가 격자에서 한눈에 읽힌다. 목록은 그 규칙을 안 보여준다. */}
         <PickDateCalendar
@@ -253,7 +287,7 @@ export function BookingForm({
             setBadField((f) => (f === "date" ? "" : f));
           }}
         />
-        {badField === "date" && <p className={errCls}>어느 날 쓰실지 골라 주세요.</p>}
+        {badField === "date" && <p className={errCls}>날짜부터 골라 주세요.</p>}
         {daySlots.length > 0 && (
           <p className={hintCls}>
             {daySlots.map((sl) => `${sl.start}~${sl.end}`).join(", ")} 열려 있어요 · 최소 {minHours}시간부터
@@ -264,9 +298,11 @@ export function BookingForm({
       {/* ⏱09-16 신설 — 시간 단위로 바뀌면서 「몇 시부터 몇 시간」이 신청의 핵심이 됐다.
           ⭐**시작을 먼저, 길이를 그다음.** 끝나는 시각을 직접 고르게 하면 열린 시간·최소 시간·이미 팔린 칸
             셋을 손님이 머리로 맞춰야 한다. 시작을 고르면 가능한 길이만 남겨 주는 쪽이 고를 것이 적다. */}
-      <div>
+      <div ref={timeRef}>
         <p className={labelCls}>몇 시부터 쓰실까요?</p>
-        {startChoices.length === 0 ? (
+        {!useDate ? (
+          <p className={hintCls}>날짜를 고르면 열린 시각이 나와요.</p>
+        ) : startChoices.length === 0 ? (
           <p className={hintCls}>이 날은 빌릴 수 있는 시간이 남아 있지 않아요. 다른 날을 골라 주세요.</p>
         ) : (
           <div className="flex flex-wrap items-center gap-2">
@@ -274,8 +310,14 @@ export function BookingForm({
               aria-label="시작 시각"
               wrapClassName="w-[128px] shrink-0"
               value={activeStart}
-              onChange={(e) => { setStartTime(e.target.value); setUseHours(0); }}
+              onChange={(e) => {
+                setStartTime(e.target.value);
+                setUseHours(0);
+                if (e.target.value) setBadField((f) => (f === "time" ? "" : f));
+              }}
             >
+              {/* 빈 첫 줄 — 고르기 전 상태를 «보이게» 둔다. 첫 시각이 앉아 있으면 고른 것처럼 읽힌다. */}
+              <option value="">시작 시각</option>
               {startChoices.map((t) => (
                 <option key={t} value={t}>
                   {t}
@@ -283,27 +325,30 @@ export function BookingForm({
               ))}
             </RentSelect>
             <span className="text-[16px] text-mute">부터</span>
-            <RentSelect
-              aria-label="몇 시간"
-              wrapClassName="w-[128px] shrink-0"
-              value={String(activeHours)}
-              onChange={(e) => setUseHours(Number(e.target.value))}
-            >
-              {hourChoices.map((h) => (
-                <option key={h} value={String(h)}>
-                  {h}시간
-                </option>
-              ))}
-            </RentSelect>
+            {activeStart && (
+              <RentSelect
+                aria-label="몇 시간"
+                wrapClassName="w-[128px] shrink-0"
+                value={String(activeHours)}
+                onChange={(e) => setUseHours(Number(e.target.value))}
+              >
+                {hourChoices.map((h) => (
+                  <option key={h} value={String(h)}>
+                    {h}시간
+                  </option>
+                ))}
+              </RentSelect>
+            )}
             {endTime && <span className="text-[16px] text-mute">→ {endTime}에 끝나요</span>}
           </div>
         )}
+        {badField === "time" && <p className={errCls}>시작 시각이 비어 있어요.</p>}
       </div>
 
       {useType !== "as_is" && (
         <div>
           <label htmlFor="rent-head" className={labelCls}>
-            예상 참여 인원을 알려주세요. <span className="ml-1 text-[15px] font-normal text-faint">(선택)</span>
+            오시는 인원 <span className="ml-1 text-[15px] font-normal text-faint">(선택)</span>
           </label>
           {/* 🔁09-14 대표 — 「input이 이렇게 길지 않아도 될 거 같은데」. 숫자 두세 자리를 받는 칸이
               화면 폭을 다 쓰면 **긴 글을 기대하는 칸처럼** 보인다. 폭이 곧 기대 길이다.
@@ -322,7 +367,8 @@ export function BookingForm({
               className={`${rentInputCls} pr-11`}
               value={headcount}
               onChange={(e) => setHeadcount(e.target.value)}
-              placeholder="숫자를 입력해주세요"
+              // ✍️09-17 「숫자를 입력해주세요」 → 예시 숫자(행정어 걷기). 칸 안 「명」과 붙여 읽힌다.
+              placeholder="예) 3"
             />
             <span
               aria-hidden="true"
@@ -358,10 +404,37 @@ export function BookingForm({
         <p className={hintCls}>사장님이 이 글만 보고 정하세요. 열 글자면 충분해요.</p>
       </div>
 
+      {/* ☎️09-17 대표 — 손님 전화번호 필수. 사장님이 예약을 받은 뒤 보는 손님 연락처가 프로필 전화인데,
+          소셜로 가입한 손님은 그 칸이 비어 있어 사장님이 연락할 길이 이메일뿐이었다.
+          프로필에 번호가 있으면 미리 채우고, 없으면 여기서 받아 서버가 프로필에 적는다(`savePhoneIfEmpty`). */}
+      <div>
+        <label htmlFor="rent-phone" className={labelCls}>
+          연락받을 번호
+        </label>
+        <input
+          id="rent-phone"
+          ref={phoneRef}
+          type="tel"
+          inputMode="tel"
+          autoComplete="tel"
+          className={`${rentInputCls} max-w-[240px]`}
+          value={phone}
+          onChange={(e) => {
+            setPhone(e.target.value);
+            if (/^0\d{8,10}$/.test(e.target.value.replace(/\D/g, ""))) setBadField((f) => (f === "phone" ? "" : f));
+          }}
+          placeholder="010-1234-5678"
+        />
+        {badField === "phone" && (
+          <p className={errCls}>{phone.trim() ? "번호 자릿수가 맞지 않아요." : "사장님이 연락드릴 번호가 필요해요."}</p>
+        )}
+        <p className={hintCls}>사장님이 예약을 받으면 이 번호로 연락드릴 수 있어요.</p>
+      </div>
+
       {/* 🔻09-14 「사장님께 잠깐 배워보기」 체크박스 삭제 — 대표 [3][5].
           설명은 상세 본문의 «정보 절»로 올라갔고, 고르는 일은 결제 단계(아래 옵션)로 내려왔다.
           ⭐**설명하는 자리와 고르는 자리를 갈랐다.** 한 줄 체크박스는 둘 다 하려다 둘 다 못 했다. */}
-      {myBrands.length > 0 && (
+      {myBrands.length > 0 ? (
         <div>
           <label htmlFor="rent-brand" className={labelCls}>
             내 소개서도 같이 보여드릴까요 <span className="ml-1 text-[15px] font-normal text-faint">· 선택</span>
@@ -378,8 +451,17 @@ export function BookingForm({
               </option>
             ))}
           </RentSelect>
-          <p className={hintCls}>사장님이 어떤 분인지 알면 수락이 훨씬 빨라져요.</p>
+          <p className={hintCls}>어떤 분이 오시는지 알면 사장님도 마음 놓고 맡기세요.</p>
         </div>
+      ) : (
+        // 📎09-17 QA — 소개서가 없는 손님에겐 이 칸이 통째로 안 보였다. 소개서로 데려올 사람이 바로 이분들이라
+        //   같은 자리에 한 줄을 둔다. 새 탭으로 연다 — 이 탭에서 가면 적던 신청이 날아간다.
+        <p className="text-[15px] leading-relaxed break-keep text-mute">
+          소개서가 있으면 사장님이 어떤 브랜드가 오는지 미리 볼 수 있어요.{" "}
+          <Link href="/register" target="_blank" className="text-body underline underline-offset-2">
+            3분 만에 소개서 만들기
+          </Link>
+        </p>
       )}
 
       {/* 🔻09-15 대표 — 「대여 비용 · 거절하면 전액 환불 · 수락하면 주소가 열려요」 줄 삭제.
@@ -391,17 +473,20 @@ export function BookingForm({
           같은 버튼이 화면에 둘이면 어느 쪽이 진짜인지 고민하게 된다. */}
       {isTestPayment() && <p className="text-[14px] text-faint">지금은 시험 결제예요.</p>}
 
+      {/* 🔁09-17 QA — 같은 흐름이 버튼 셋에서 「결제하고 신청하기 / 신청하기 / N원 결제하기」로 불렸다.
+          바는 확인 팝업을 여는 버튼이라 「신청하기」, 팝업은 결제 화면으로 넘기니 「결제하러 가기」,
+          결제 화면은 돈을 내는 버튼이라 「N원 결제하기」. 버튼 이름이 그 버튼이 여는 다음 화면을 말한다. */}
       <PayBar
-        amount={total}
-        label={pending ? "신청하는 중…" : "결제하고 신청하기"}
+        amount={timePicked ? total : null}
+        label={pending ? "결제 화면으로 가는 중…" : "신청하기"}
         disabled={pending}
         onClick={askConfirm}
       />
 
       <ConfirmDialog
         open={confirming}
-        title="신청 정보를 확인해주세요"
-        confirmLabel="신청하기"
+        title="이대로 신청할까요?"
+        confirmLabel="결제하러 가기"
         busy={pending}
         onConfirm={submit}
         onCancel={() => setConfirming(false)}
@@ -423,12 +508,20 @@ export function BookingForm({
           <InfoRow label="장소" value={spaceName} />
           <InfoRow label="신청 날짜" value={dateLabel(useDate)} />
           <InfoRow label="이용 시간" value={rangeLabel(activeStart, endTime)} />
+          {/* 📋09-17 QA — 사장님이 「이 글만 보고 정한다」면서 손님은 결제 직전에 그 글을 다시 못 봤다.
+              인원과 앞부분만 싣는다. 팝업이 길어지면 버튼이 화면 밖으로 밀린다. */}
+          {headcount && <InfoRow label="인원" value={`${headcount}명`} />}
+          <InfoRow label="무엇을" value={planPreview(plan)} />
           <InfoRow
             label="결제 금액"
             value={
               <>
                 <span className="font-medium text-ink">{won(total)}</span>
-                {chatAmount > 0 && <span className="text-mute"> · 커피챗 포함</span>}
+                {/* 💸09-17 QA — 합계만 있으면 「왜 10만원인가」를 손님이 셈한다. 내역을 한 줄로. */}
+                <span className="block text-[15px] text-mute">
+                  대여 {activeHours}시간 {won(spaceAmount)}
+                  {chatAmount > 0 && ` + 커피챗 ${coffeeChatMinutes}분 ${won(chatAmount)}`}
+                </span>
               </>
             }
           />

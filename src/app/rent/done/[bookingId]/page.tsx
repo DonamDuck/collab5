@@ -1,12 +1,15 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { getBooking, getSpaceFull, guestSeesHost, listSpacesByIds } from "@/lib/spaces";
+import { getBooking, getPaymentByOrderId, getSpaceFull, guestSeesHost, listSpacesByIds } from "@/lib/spaces";
 import { getSessionUserId, getProfileById } from "@/lib/profiles";
 import { repo } from "@/lib/repo";
 import { ContactBlock } from "../../ContactBlock";
 import { KAKAO_CHAT_URL } from "@/lib/site";
-import { bookingFinished } from "@/lib/rent-time";
+import { bookingFinished, bookingStarted } from "@/lib/rent-time";
+import { BOOKING_HEADLINE, COFFEE_CHAT_WHEN_GUEST } from "@/lib/rent-copy";
+import type { BookingStatus } from "@/lib/types";
+import { GuestCancel } from "../../my/Actions";
 import { bookingWhen, InfoPanel, InfoRow, primaryBtnCls, secondaryBtnCls, won } from "../../ui";
 
 // 하루 가게 — 신청 완료 화면 (2026-09-14)
@@ -23,6 +26,20 @@ export const metadata: Metadata = {
   // 확정·완료 어느 쪽이든 열리는 화면이라 탭 제목은 중립으로 둔다(본문 제목이 상태를 말한다).
   title: "예약 내역 — collab5",
   robots: { index: false },
+};
+
+/** 📛제목 — 결제 완료·확정은 `BOOKING_HEADLINE`(대표 09-17). 나머지는 이 화면에서만 쓰는 상태 문장이다.
+ *  🩸09-16까지 만료·취소·거절이 전부 「이 신청은 끝났어요」 하나였다. 왜 끝났는지가 제목에 없었다.
+ *  ⭐결제 전에 끝난 건 「신청」, 결제 뒤는 「예약」(대표 09-17 낱말 규칙). */
+const TITLE: Record<BookingStatus, string> = {
+  pending: "결제가 안 끝난 신청이에요",
+  paid: BOOKING_HEADLINE.guestPaid,
+  confirmed: BOOKING_HEADLINE.guestConfirmed,
+  done: "다녀온 하루 가게예요",
+  rejected: "사장님이 이번엔 어렵대요",
+  refunded: "돈을 돌려드린 예약이에요",
+  cancelled: "취소한 예약이에요",
+  expired: "결제 시간이 지난 신청이에요",
 };
 
 export default async function RentDonePage({ params }: { params: Promise<{ bookingId: string }> }) {
@@ -52,9 +69,17 @@ export default async function RentDonePage({ params }: { params: Promise<{ booki
   // 🎉이모지는 제목 «오른쪽»에(대표: *「타이틀 우측이나 좀 뭐 재밌게」*). 왼쪽에 두면 글머리표처럼 읽혀서
   //   제목이 목록의 한 줄로 내려앉는다. 오른쪽은 문장이 끝난 뒤라 축하가 된다.
   //   ⚠️`aria-hidden` — 화면 낭독기가 「파티 크래커」를 읽으면 제목이 길어지기만 한다.
-  const title = b.status === "paid" ? "예약을 완료했어요" : open ? "예약이 확정됐어요" : "이 신청은 끝났어요";
-  const emoji = b.status === "paid" ? "✨" : open ? "🎉" : "";
+  // 🔁09-17 제목은 위 `TITLE`로(대표: 상태 이름에 하루 가게 맥락). 이모지 자리 규칙은 그대로다.
+  const title = TITLE[b.status];
+  const emoji = b.status === "paid" ? "✨" : b.status === "confirmed" ? "🎉" : "";
   const spaceName = brief?.name ?? "공간";
+  const withChat = b.amountChat > 0 || b.amountMentor > 0;
+  // 💸09-17 QA — 만료된 신청에도 「결제 금액 80,000원」이 서서 「내가 8만원을 냈나?」로 읽혔다.
+  //   돈 줄은 상태가 정한다: 안 냈으면 «낸 돈 없음», 돌려준 게 있으면 «돌려드린 돈». 돌려준 돈은 토스가 알려 준
+  //   남은 돈(`balanceAmount`)에서 거꾸로 낸다 — 우리가 비율로 다시 계산하지 않는다.
+  const moneyBack = b.status === "cancelled" || b.status === "refunded" || b.status === "rejected";
+  const pay = moneyBack ? await getPaymentByOrderId(b.orderId) : null;
+  const refunded = pay ? Math.max(0, pay.amount - pay.balanceAmount) : null;
 
   return (
     <main className="mx-auto w-full max-w-[560px] px-4 py-14 sm:px-6">
@@ -71,17 +96,45 @@ export default async function RentDonePage({ params }: { params: Promise<{ booki
           그게 번거로움이 아니라 확인이다 — 셋이 다르게 생기면 대조가 안 된다. */}
       <div className="mt-6">
         <InfoPanel>
-          <InfoRow label="장소" value={<span className="font-medium text-ink">{spaceName}</span>} />
-          <InfoRow label="일정" value={bookingWhen(b)} />
+          {/* 🔗09-17 QA — 장소 이름이 글자뿐이라 유의 사항·사진을 다시 보러 갈 수 없었다. */}
           <InfoRow
-            label="결제 금액"
+            label="장소"
             value={
-              <>
-                <span className="font-medium text-ink">{won(b.amountTotal)}</span>
-                {(b.amountChat > 0 || b.amountMentor > 0) && <span className="text-mute"> · 커피챗 포함</span>}
-              </>
+              brief ? (
+                <Link href={`/rent/${brief.slug}`} className="font-medium text-ink underline underline-offset-2">
+                  {spaceName}
+                </Link>
+              ) : (
+                <span className="font-medium text-ink">{spaceName}</span>
+              )
             }
           />
+          <InfoRow label="일정" value={bookingWhen(b)} />
+          {b.status === "expired" ? (
+            <InfoRow label="결제" value="결제하지 않아서 낸 돈은 없어요" />
+          ) : (
+            <InfoRow
+              label="결제 금액"
+              value={
+                <>
+                  <span className="font-medium text-ink">{won(b.amountTotal)}</span>
+                  {withChat && <span className="text-mute"> · 커피챗 포함</span>}
+                </>
+              }
+            />
+          )}
+          {moneyBack && (
+            <InfoRow
+              label="돌려드린 돈"
+              value={
+                refunded === null ? (
+                  <span className="text-mute">신청 내역에서 확인해 주세요</span>
+                ) : (
+                  <span className="font-medium text-ink">{won(refunded)}</span>
+                )
+              }
+            />
+          )}
         </InfoPanel>
       </div>
 
@@ -96,6 +149,8 @@ export default async function RentDonePage({ params }: { params: Promise<{ booki
                 {[
                   "사장님 연락처를 아래에 적어 두었어요. 이용 전에 궁금한 게 있으면 편하게 연락해 보세요.",
                   "사장님 사정으로 어려워지면 전액 돌려드려요. 환불은 사흘에서 닷새 안에 끝나요.",
+                  // ☕09-17 커피챗을 담았으면 «언제»를 여기서도 말한다. 문장은 한 벌(`rent-copy`)이다.
+                  ...(withChat ? [COFFEE_CHAT_WHEN_GUEST] : []),
                 ].map((t) => (
                   <li key={t} className="flex gap-2 text-[16px] leading-relaxed break-keep text-body">
                     <span aria-hidden="true" className="text-mute">
@@ -106,9 +161,6 @@ export default async function RentDonePage({ params }: { params: Promise<{ booki
                 ))}
               </ul>
             </section>
-          )}
-          {b.hostMessage && (
-            <p className="mt-6 text-[16px] leading-relaxed break-keep text-body">사장님 말씀 · {b.hostMessage}</p>
           )}
           <ContactBlock
             who="사장님"
@@ -124,9 +176,24 @@ export default async function RentDonePage({ params }: { params: Promise<{ booki
           />
         </>
       ) : (
-        <p className="mt-6 text-[15px] leading-relaxed break-keep text-mute">
-          자세한 상태는 신청 내역에서 보실 수 있어요.
-        </p>
+        b.status === "expired" && (
+          <p className="mt-6 text-[15px] leading-relaxed break-keep text-mute">
+            결제 시간이 지나 사장님께 전달되지 않았어요.
+          </p>
+        )
+      )}
+
+      {/* 사장님 말씀은 거절한 건에도 붙을 수 있어서(이번엔 어려운 이유) 열림 여부와 따로 둔다. */}
+      {b.hostMessage && (
+        <p className="mt-6 text-[16px] leading-relaxed break-keep text-body">사장님 말씀 · {b.hostMessage}</p>
+      )}
+
+      {/* ✉️09-17 QA — 확정 메일의 「예약 내용 보기」가 이 화면으로 오는데 취소 버튼이 없었다. 「그날 못 가는데」 싶은
+          손님이 목록을 찾아 헤맸다. 목록 줄과 같은 조건·같은 버튼(`GuestCancel`)을 쓴다 — 조건이 두 벌이면 갈라진다. */}
+      {(b.status === "paid" || b.status === "confirmed") && !bookingStarted(b) && (
+        <div className="mt-6">
+          <GuestCancel bookingId={b.id} />
+        </div>
       )}
 
       {/* 🔻09-15 대표 — 버튼 둘을 나란히 두지 않는다. 「신청 내역 보기」가 지금 할 일이고

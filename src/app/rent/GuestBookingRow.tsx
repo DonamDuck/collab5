@@ -13,7 +13,8 @@ import { getSpaceFull, guestSeesHost, listBookingsForGuest, listSpacesByIds, typ
 import { getProfileById, type Profile } from "@/lib/profiles";
 import { repo } from "@/lib/repo";
 import type { Space, SpaceBooking } from "@/lib/types";
-import { bookingFinished, bookingStarted } from "@/lib/rent-time";
+import { bookingFinished, bookingStarted, dateLabel, rangeLabel } from "@/lib/rent-time";
+import { BOOKING_HEADLINE } from "@/lib/rent-copy";
 import { ContactBlock } from "./ContactBlock";
 import { GuestCancel } from "./my/Actions";
 import { BookingBadge, ListRow, bookingWhen, won } from "./ui";
@@ -81,24 +82,50 @@ export async function loadGuestBookings(uid: number): Promise<GuestBookingView[]
 
 // ☕09-16 커피챗으로 이름이 바뀌면서 칸도 바뀌었다(`amountMentor` → `amountChat`).
 //   옛 예약은 옛 칸에만 값이 있어서 둘 다 본다. 말은 확인 팝업·상세와 같은 「커피챗」으로 맞췄다.
-const money = (b: SpaceBooking) =>
-  `${won(b.amountTotal)}${b.amountChat > 0 || b.amountMentor > 0 ? " · 커피챗 포함" : ""}`;
+/** 메타 줄의 토막들. 🩸09-17 QA(폰 375px) — 한 줄 글자열이라 「1 / 명」·「(4시 / 간)」처럼 낱말 중간에서 줄이 끊겼다.
+ *  토막마다 `whitespace-nowrap`으로 감싸고, 줄바꿈은 토막 사이 `·`에서만 일어나게 한다.
+ *  날짜와 시간도 따로 토막이다 — 둘을 한 덩어리로 묶으면 좁은 폭에서 한 토막이 줄보다 길어진다. */
+function metaParts(b: SpaceBooking, area?: string): string[] {
+  const when = b.startTime && b.endTime ? [dateLabel(b.useDate), rangeLabel(b.startTime, b.endTime)] : [bookingWhen(b)];
+  return [
+    ...when,
+    b.headcount ? `${b.headcount}명` : "",
+    area ?? "",
+    won(b.amountTotal),
+    b.amountChat > 0 || b.amountMentor > 0 ? "커피챗 포함" : "",
+  ].filter(Boolean);
+}
 
 export function GuestBookingRow({ view }: { view: GuestBookingView }) {
   const { booking: b, space: sp, reveal, host } = view;
   const open = guestSeesHost(b);
+  // 🔗09-17 QA — 줄 어디에도 링크가 없어서 완료 화면(`/rent/done`)은 결제 직후 한 번만 볼 수 있었다.
+  //   「자세히」는 결제를 마친 건에만 건다 — 결제 전·만료 건은 완료 화면이 보여 줄 게 없다.
+  const paidOnce = b.status !== "pending" && b.status !== "expired";
+  // 📛09-17 대표 — 결제 완료·확정 건은 첫 줄을 `BOOKING_HEADLINE`으로. 배지는 그 짧은 꼴이다.
+  const headline = b.status === "paid" ? BOOKING_HEADLINE.guestPaid : b.status === "confirmed" ? BOOKING_HEADLINE.guestConfirmed : "";
   return (
     <ListRow
       head={
         <>
-          <p className="truncate text-[17px] font-medium text-ink">{sp?.name ?? "공간"}</p>
-          <p className="mt-1 text-[15px] text-mute">
-            {bookingWhen(b)}
-            {b.headcount ? ` · ${b.headcount}명` : ""}
-            {/* 확정 전에는 동네까지만. 상세 화면과 같은 규칙이다. */}
-            {sp?.area ? ` · ${sp.area}` : ""}
-            {` · ${money(b)}`}
+          <p className="truncate text-[17px] font-medium text-ink">
+            {sp ? (
+              <Link href={`/rent/${sp.slug}`} className="underline-offset-2 hover:underline">
+                {sp.name}
+              </Link>
+            ) : (
+              "공간"
+            )}
           </p>
+          <p className="mt-1 text-[15px] text-mute">
+            {metaParts(b, sp?.area).map((t, i) => (
+              <span key={i}>
+                {i > 0 && " · "}
+                <span className="whitespace-nowrap">{t}</span>
+              </span>
+            ))}
+          </p>
+          {headline && <p className="mt-2 text-[15px] text-body">{headline}</p>}
         </>
       }
       status={<BookingBadge status={b.status} />}
@@ -142,7 +169,17 @@ export function GuestBookingRow({ view }: { view: GuestBookingView }) {
 
       {/* 🚨이미 시작한 예약엔 취소 버튼을 안 띄운다(09-16). 다 쓴 예약을 취소로 바꾸면
           환불은 0원인데 사장님 정산에서 통째로 빠졌다. 관문은 서버 액션이고 이건 화면 쪽 짝이다. */}
-      {(b.status === "paid" || b.status === "confirmed") && !bookingStarted(b) && <GuestCancel bookingId={b.id} />}
+      <div className="flex flex-wrap items-center gap-x-5">
+        {paidOnce && (
+          <Link
+            href={`/rent/done/${b.id}`}
+            className="mt-2 inline-block py-[12px] text-[15px] text-body underline underline-offset-2"
+          >
+            자세히
+          </Link>
+        )}
+        {(b.status === "paid" || b.status === "confirmed") && !bookingStarted(b) && <GuestCancel bookingId={b.id} />}
+      </div>
     </ListRow>
   );
 }
