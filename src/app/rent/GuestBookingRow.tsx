@@ -15,9 +15,8 @@ import { repo } from "@/lib/repo";
 import type { Space, SpaceBooking } from "@/lib/types";
 import { bookingFinished, bookingStarted, dateLabel, rangeLabel } from "@/lib/rent-time";
 import { BOOKING_HEADLINE } from "@/lib/rent-copy";
-import { ContactBlock } from "./ContactBlock";
 import { GuestCancel } from "./my/Actions";
-import { BookingBadge, ListRow, bookingWhen, won } from "./ui";
+import { BookingBadge, InfoList, InfoRow, ListRow, bookingWhen, won } from "./ui";
 
 type Reveal = {
   accessNote: string; contactPhone: string; accessHow: Space["accessHow"];
@@ -96,6 +95,39 @@ function metaParts(b: SpaceBooking, area?: string): string[] {
   ].filter(Boolean);
 }
 
+/** 목록 줄 안의 연락처 두 줄 — 전화(가게 번호가 있으면 그것, 없으면 사장님 번호, 둘 다 없으면 이메일)와 주소.
+ *  번호 순서는 `ContactBlock`과 같다(호스트 약관 제6조가 여는 번호가 가게 번호다). */
+function CompactContact({ host, shopPhone, address }: { host: Profile | null; shopPhone?: string; address?: string }) {
+  const phone = shopPhone?.trim() || host?.phone?.trim() || "";
+  const email = host?.email?.trim() || "";
+  return (
+    <div className="mt-3 rounded-lg bg-surface-soft px-4 py-3">
+      <InfoList>
+        {phone ? (
+          <InfoRow
+            label="연락"
+            value={
+              <a href={`tel:${phone.replace(/[^0-9+]/g, "")}`} className="underline underline-offset-2">
+                {phone}
+              </a>
+            }
+          />
+        ) : email ? (
+          <InfoRow
+            label="연락"
+            value={
+              <a href={`mailto:${email}`} className="break-all underline underline-offset-2">
+                {email}
+              </a>
+            }
+          />
+        ) : null}
+        {address && <InfoRow label="주소" value={address} />}
+      </InfoList>
+    </div>
+  );
+}
+
 export function GuestBookingRow({ view }: { view: GuestBookingView }) {
   const { booking: b, space: sp, reveal, host } = view;
   const open = guestSeesHost(b);
@@ -148,18 +180,13 @@ export function GuestBookingRow({ view }: { view: GuestBookingView }) {
             </Link>
           </p>
         )
-      ) : open ? (
-        <ContactBlock
-          who="사장님"
-          profile={host}
-          address={sp?.address}
-          accessNote={reveal?.accessNote}
-          shopPhone={reveal?.contactPhone}
-          accessHow={reveal?.accessHow}
-          brand={reveal?.brand}
-          // 🙈이용일이 지난 예약은 연락처를 가린다(대표 09-16)
-          masked={b.status === "done" || bookingFinished(b)}
-        />
+      ) : open && !(b.status === "done" || bookingFinished(b)) ? (
+        // 🎨09-17 디자인팀 — 목록에선 **바로 쓸 두 줄만**. 전엔 줄마다 7줄짜리 「가게 정보」 블록(제목·안내·사장님·소개서·
+        //   가게 전화·전화번호·이메일·주소·이용 안내)을 통째로 펼쳐서, 앞으로 갈 곳 셋이면 폰에서 이 화면이 6,300px였다.
+        //   목록에서 손님이 하는 일은 «연락하기»와 «찾아가기» 둘이다. 나머지는 「자세히」(`/rent/done`)가 전부 보여 준다.
+        //   ⚠️문은 그대로 `guestSeesHost` 하나다. 줄이는 건 보여 주는 칸 수지, 여는 조건이 아니다.
+        //   🙈이용일이 지난 줄엔 판을 안 그린다. 가려진 「-」 넷이 남는 것보다 조용하고, 완료 화면이 가림을 따로 말한다.
+        <CompactContact host={host} shopPhone={reveal?.contactPhone} address={sp?.address} />
       ) : null}
       {/* 🔻09-16 「사장님이 수락하면 주소와 연락처가 열려요」 삭제 — 결제를 마치면 바로 열린다(대표, phase 1). */}
 
