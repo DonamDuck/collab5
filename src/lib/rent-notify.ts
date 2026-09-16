@@ -54,6 +54,15 @@ function layout(lead: string, rows: [string, string][], link: { href: string; la
 </div>`;
 }
 
+/** 한 통의 내용 — 보내기 전 모양. 🧪09-17 `build*` 함수가 이걸 만들고, `notify*`가 `sendMail`로 보낸다.
+ *  둘로 가른 이유 = 개발용 메일 미리보기(`/dev/rent-mail/[kind]`)가 보내지 않고 HTML만 보려고. 동작은 전과 같다. */
+export interface Mail {
+  to: string;
+  subject: string;
+  html: string;
+  text: string;
+}
+
 export interface MailResult {
   /** 실제로 나갔는가. 키 없음·수신자 없음·전송 실패 전부 false — 호출부는 무시해도 된다. */
   sent: boolean;
@@ -97,6 +106,10 @@ async function send(to: string, subject: string, html: string, text: string): Pr
   }
 }
 
+function sendMail(m: Mail): Promise<MailResult> {
+  return send(m.to, m.subject, m.html, m.text);
+}
+
 /** 커피챗을 같이 샀는가. 새 칸(`amountChat`)과 옛 칸(`amountMentor`) 둘 중 하나라도 돈이 있으면 샀다. */
 function boughtChat(b: SpaceBooking): boolean {
   return b.amountChat > 0 || b.amountMentor > 0;
@@ -121,10 +134,10 @@ const CANCEL_POLICY_LINE =
 
 /** ① 결제 완료 → 사장님. 손님이 누구인지·언제·얼마인지와 답하러 갈 곳.
  *  📇09-16 `guestBrand` — 손님이 신청 때 고른 소개서. 있으면 사장님이 누가 오는지 미리 볼 수 있게 링크를 단다. */
-export async function notifyBookingPaid(
+export function buildBookingPaid(
   booking: SpaceBooking, space: Space, host: Profile | null, guest: Profile | null,
   guestBrand?: { name: string; slug: string },
-): Promise<MailResult> {
+): Mail {
   const guestName = displayName(guest, "손님");
   const when = dateLabel(booking.useDate);
   // 🔁09-16 대표 — 「신청했어요」 → 「예약이 들어왔어요」. 09-17 대표 결정 4로 한 번 더 — 사장님 쪽에 들어온 것은 «요청»,
@@ -157,15 +170,23 @@ export async function notifyBookingPaid(
     tail,
   ].join("\n");
   const html = layout(lead, rows, { href: link, label: "들어온 요청 보기" }, tail);
-  return send(host?.email ?? "", subject, html, text);
+  return { to: host?.email ?? "", subject, html, text };
+}
+
+/** 보내는 쪽 — 문장은 `buildBookingPaid`가 만든다(09-17 메일 미리보기 `/dev/rent-mail`이 같은 함수를 부른다). */
+export async function notifyBookingPaid(
+  booking: SpaceBooking, space: Space, host: Profile | null, guest: Profile | null,
+  guestBrand?: { name: string; slug: string },
+): Promise<MailResult> {
+  return sendMail(buildBookingPaid(booking, space, host, guest, guestBrand));
 }
 
 /** ①' 결제 완료 → 손님 (09-16 phase 1). 채팅이 없는 지금은 결제가 곧 예약 완료라, 손님이 알아야 할 것을 이 한 통에 다 담는다.
  *  사장님 연락처도 여기서 열린다 — 사장님 답을 기다리게 하지 않기로 했다(대표 09-16).
  *  🚨옛 「들어오는 법」(`space.accessNote`)은 넣지 않는다. 출입 비밀번호가 적혀 있을 수 있는 칸이다. */
-export async function notifyBookingPaidToGuest(
+export function buildBookingPaidToGuest(
   booking: SpaceBooking, space: Space, host: Profile | null, guest: Profile | null,
-): Promise<MailResult> {
+): Mail {
   const hostName = displayName(host, "사장님");
   const when = dateLabel(booking.useDate);
   // 🔁09-17 대표 결정 4 — 제목·첫 줄은 `BOOKING_HEADLINE.guestPaid`. 첫 문장이 「~에 ~에서」로 길게 늘어지던 것(QA)도 같이 풀었다.
@@ -195,15 +216,22 @@ export async function notifyBookingPaidToGuest(
     tail,
   ].join("\n");
   const html = layout(lead, rows, { href: link, label: "예약 내역 보기" }, tail);
-  return send(guest?.email ?? "", subject, html, text);
+  return { to: guest?.email ?? "", subject, html, text };
+}
+
+/** 보내는 쪽 — 문장은 `buildBookingPaidToGuest`가 만든다(09-17 메일 미리보기 `/dev/rent-mail`이 같은 함수를 부른다). */
+export async function notifyBookingPaidToGuest(
+  booking: SpaceBooking, space: Space, host: Profile | null, guest: Profile | null,
+): Promise<MailResult> {
+  return sendMail(buildBookingPaidToGuest(booking, space, host, guest));
 }
 
 /** ② 수락 → 손님. 손님은 결제 때 이미 「예약을 마쳤어요」를 받았다(①').
  *  그래서 「이제 확정이에요」라고 하면 상태가 한 번 더 바뀐 것처럼 읽힌다. 사장님이 «확인했다»는 소식으로 쓴다(09-16).
  *  🚨옛 「들어오는 법」(`space.accessNote`)은 09-16에 뺐다. 비밀번호는 사장님이 문자·현장에서 그때그때 전한다. */
-export async function notifyBookingConfirmed(
+export function buildBookingConfirmed(
   booking: SpaceBooking, space: Space, host: Profile | null, guest: Profile | null,
-): Promise<MailResult> {
+): Mail {
   const hostName = displayName(host, "사장님");
   const when = dateLabel(booking.useDate);
   // 🔁09-17 대표 결정 4 — 제목·첫 줄은 `BOOKING_HEADLINE.guestConfirmed`.
@@ -234,7 +262,14 @@ export async function notifyBookingConfirmed(
     { href: link, label: "예약 내용 보기" },
     "가시기 전에 사장님께 한 번 연락해 두시면 그날이 편해요.",
   );
-  return send(guest?.email ?? "", subject, html, text);
+  return { to: guest?.email ?? "", subject, html, text };
+}
+
+/** 보내는 쪽 — 문장은 `buildBookingConfirmed`가 만든다(09-17 메일 미리보기 `/dev/rent-mail`이 같은 함수를 부른다). */
+export async function notifyBookingConfirmed(
+  booking: SpaceBooking, space: Space, host: Profile | null, guest: Profile | null,
+): Promise<MailResult> {
+  return sendMail(buildBookingConfirmed(booking, space, host, guest));
 }
 
 /** 사장님이 그날까지 챙길 일. `accessHowLine`은 손님에게 하는 말이라 사장님 쪽으로 돌려 적는다. */
@@ -245,11 +280,11 @@ function hostTodoLine(how: Space["accessHow"]): string {
 }
 
 /** ②' 수락 → 사장님 (09-16). 누른 것이 잘 들어갔다는 확인과, 그날 필요한 손님 연락처. */
-export async function notifyBookingConfirmedToHost(
+export function buildBookingConfirmedToHost(
   booking: SpaceBooking, space: Space, host: Profile | null, guest: Profile | null,
   /** 🏦정산 받을 계좌가 있나(09-17). 모르면 undefined — 그땐 말하지 않는다(없는 줄 알고 조르지 않게). */
   hasPayoutAccount?: boolean,
-): Promise<MailResult> {
+): Mail {
   const guestName = displayName(guest, "손님");
   const when = dateLabel(booking.useDate);
   // 🔁09-17 QA — 제목이 「수락이 잘 들어갔어요」였다. 방금 자기 손으로 누른 일을 되풀이하는 시스템 말이라,
@@ -288,13 +323,22 @@ export async function notifyBookingConfirmedToHost(
     tail,
   ].join("\n");
   const html = layout(lead, rows, { href: link, label: "내 하루 가게 보기" }, tail);
-  return send(host?.email ?? "", subject, html, text);
+  return { to: host?.email ?? "", subject, html, text };
+}
+
+/** 보내는 쪽 — 문장은 `buildBookingConfirmedToHost`가 만든다(09-17 메일 미리보기 `/dev/rent-mail`이 같은 함수를 부른다). */
+export async function notifyBookingConfirmedToHost(
+  booking: SpaceBooking, space: Space, host: Profile | null, guest: Profile | null,
+  /** 🏦정산 받을 계좌가 있나(09-17). 모르면 undefined — 그땐 말하지 않는다(없는 줄 알고 조르지 않게). */
+  hasPayoutAccount?: boolean,
+): Promise<MailResult> {
+  return sendMail(buildBookingConfirmedToHost(booking, space, host, guest, hasPayoutAccount));
 }
 
 /** ③ 거절 → 손님. 전액 환불이라는 사실이 첫 문장에 있어야 한다. */
-export async function notifyBookingRejected(
+export function buildBookingRejected(
   booking: SpaceBooking, space: Space, host: Profile | null, guest: Profile | null,
-): Promise<MailResult> {
+): Mail {
   void host;
   const when = dateLabel(booking.useDate);
   const subject = `[collab5] 이번엔 어렵대요 · ${when} ${space.name} · ${won(booking.amountTotal)} 전액 환불`;
@@ -316,13 +360,20 @@ export async function notifyBookingRejected(
     rows,
     { href: link, label: "다른 공간 보기" },
   );
-  return send(guest?.email ?? "", subject, html, text);
+  return { to: guest?.email ?? "", subject, html, text };
+}
+
+/** 보내는 쪽 — 문장은 `buildBookingRejected`가 만든다(09-17 메일 미리보기 `/dev/rent-mail`이 같은 함수를 부른다). */
+export async function notifyBookingRejected(
+  booking: SpaceBooking, space: Space, host: Profile | null, guest: Profile | null,
+): Promise<MailResult> {
+  return sendMail(buildBookingRejected(booking, space, host, guest));
 }
 
 /** ④ 손님 취소 → 사장님. 한 줄이면 된다. 그날이 다시 비는 날이 됐다는 것만. */
-export async function notifyBookingCancelled(
+export function buildBookingCancelled(
   booking: SpaceBooking, space: Space, host: Profile | null, guest: Profile | null,
-): Promise<MailResult> {
+): Mail {
   const guestName = displayName(guest, "손님");
   const when = dateLabel(booking.useDate);
   // 🔁09-17 QA — 「신청을 취소」였는데 손님 화면은 결제 뒤 «예약»이다. 사장님이 받은 건 이미 결제된 예약이라 «예약»으로.
@@ -336,15 +387,22 @@ export async function notifyBookingCancelled(
     `내 하루 가게: ${link}`,
   ].join("\n");
   const html = layout(lead, rows, { href: link, label: "내 하루 가게 보기" });
-  return send(host?.email ?? "", subject, html, text);
+  return { to: host?.email ?? "", subject, html, text };
+}
+
+/** 보내는 쪽 — 문장은 `buildBookingCancelled`가 만든다(09-17 메일 미리보기 `/dev/rent-mail`이 같은 함수를 부른다). */
+export async function notifyBookingCancelled(
+  booking: SpaceBooking, space: Space, host: Profile | null, guest: Profile | null,
+): Promise<MailResult> {
+  return sendMail(buildBookingCancelled(booking, space, host, guest));
 }
 
 /** ④' 손님 취소 → 손님 (09-16). 취소가 됐다는 사실과 얼마가 돌아가는지.
  *  `refundAmount`는 호출부가 규정표로 계산해 실제로 돌려준 금액이다. 여기서 다시 계산하지 않는다.
  *  0원이면 규정상 환불이 없는 경우다. 사과도 설득도 없이 담담하게 말하고, 물어볼 곳만 열어 둔다. */
-export async function notifyBookingCancelledToGuest(
+export function buildBookingCancelledToGuest(
   booking: SpaceBooking, space: Space, host: Profile | null, guest: Profile | null, refundAmount: number,
-): Promise<MailResult> {
+): Mail {
   void host;
   const when = dateLabel(booking.useDate);
   const refund = Math.max(0, Math.floor(refundAmount || 0));
@@ -374,15 +432,22 @@ export async function notifyBookingCancelledToGuest(
     ...(tail ? [tail] : []),
   ].join("\n");
   const html = layout(lead, rows, { href: link, label: "예약 내역 보기" }, tail);
-  return send(guest?.email ?? "", subject, html, text);
+  return { to: guest?.email ?? "", subject, html, text };
+}
+
+/** 보내는 쪽 — 문장은 `buildBookingCancelledToGuest`가 만든다(09-17 메일 미리보기 `/dev/rent-mail`이 같은 함수를 부른다). */
+export async function notifyBookingCancelledToGuest(
+  booking: SpaceBooking, space: Space, host: Profile | null, guest: Profile | null, refundAmount: number,
+): Promise<MailResult> {
+  return sendMail(buildBookingCancelledToGuest(booking, space, host, guest, refundAmount));
 }
 
 /** ⑤ 관리자 승인 환불 → 손님·사장님 둘 다 (09-16).
  *  사장님 사정으로 확정 예약을 무를 때: 사장님이 「관리자에게 환불 신청」 → 우리가 양쪽에 전화로 확인 → 승인 → 환불.
  *  두 사람 다 전화로 이미 들은 이야기라, 메일은 «처리가 끝났다»는 확인이다. 한쪽이 실패해도 다른 쪽은 나간다. */
-export async function notifyAdminRefund(
+export function buildAdminRefund(
   booking: SpaceBooking, space: Space, host: Profile | null, guest: Profile | null, refundAmount: number,
-): Promise<MailResult[]> {
+): Mail[] {
   const guestName = displayName(guest, "손님");
   const when = dateLabel(booking.useDate);
   const refund = Math.max(0, Math.floor(refundAmount || 0));
@@ -424,17 +489,24 @@ export async function notifyAdminRefund(
   const hText = [hLead, ...hRows.map(([k, v]) => `${k}: ${v}`), ``, `내 하루 가게: ${hLink}`, hTail].join("\n");
   const hHtml = layout(hLead, hRows, { href: hLink, label: "내 하루 가게 보기" }, hTail);
 
-  return Promise.all([
-    send(guest?.email ?? "", gSubject, gHtml, gText),
-    send(host?.email ?? "", hSubject, hHtml, hText),
-  ]);
+  return [
+    { to: guest?.email ?? "", subject: gSubject, html: gHtml, text: gText },
+    { to: host?.email ?? "", subject: hSubject, html: hHtml, text: hText },
+  ];
+}
+
+/** 보내는 쪽 — 문장은 `buildAdminRefund`가 만든다(09-17 메일 미리보기 `/dev/rent-mail`이 같은 함수를 부른다). */
+export async function notifyAdminRefund(
+  booking: SpaceBooking, space: Space, host: Profile | null, guest: Profile | null, refundAmount: number,
+): Promise<MailResult[]> {
+  return Promise.all(buildAdminRefund(booking, space, host, guest, refundAmount).map(sendMail));
 }
 
 /** ⑥ 공간 공개 → 사장님 (09-17). 검토를 마치고 목록에 올렸다는 소식과, 요청이 오면 할 일.
  *  ⚠️호출부가 «원래 공개가 아니었을 때만» 부른다. 이미 열린 공간을 또 누르면 메일이 또 가면 안 된다. */
-export async function notifySpacePublished(
+export function buildSpacePublished(
   space: Space, host: Profile | null, hasPayoutAccount?: boolean,
-): Promise<MailResult> {
+): Mail {
   const subject = `[collab5] ${space.name} · 하루 가게 목록에 올라갔어요`;
   const link = spaceLink(space);
   const lead = `${space.name} 공간을 하루 가게 목록에 열어 드렸어요. 이제 손님들이 보고 예약할 수 있어요.`;
@@ -453,14 +525,21 @@ export async function notifySpacePublished(
     tail,
   ].join("\n");
   const html = layout(lead, rows, { href: link, label: "내 공간 보기" }, tail);
-  return send(host?.email ?? "", subject, html, text);
+  return { to: host?.email ?? "", subject, html, text };
+}
+
+/** 보내는 쪽 — 문장은 `buildSpacePublished`가 만든다(09-17 메일 미리보기 `/dev/rent-mail`이 같은 함수를 부른다). */
+export async function notifySpacePublished(
+  space: Space, host: Profile | null, hasPayoutAccount?: boolean,
+): Promise<MailResult> {
+  return sendMail(buildSpacePublished(space, host, hasPayoutAccount));
 }
 
 /** ⑦ 이용 전날 → 손님 (09-17). 내일 몇 시 어디인지, 누구에게 연락하면 되는지.
  *  우리는 사장님이 안내를 보냈는지 모른다(기록이 없다). 그래서 «못 받았으면» 갈 곳만 열어 둔다. */
-export async function notifyRemindGuest(
+export function buildRemindGuest(
   booking: SpaceBooking, space: Space, host: Profile | null, guest: Profile | null,
-): Promise<MailResult> {
+): Mail {
   const hostName = displayName(host, "사장님");
   const start = booking.startTime || "";
   const subject = `[collab5] 내일${start ? ` ${start}` : ""} ${space.name} 예약이 있어요`;
@@ -484,15 +563,22 @@ export async function notifyRemindGuest(
     tail,
   ].join("\n");
   const html = layout(lead, rows, { href: link, label: "예약 내역 보기" }, tail);
-  return send(guest?.email ?? "", subject, html, text);
+  return { to: guest?.email ?? "", subject, html, text };
+}
+
+/** 보내는 쪽 — 문장은 `buildRemindGuest`가 만든다(09-17 메일 미리보기 `/dev/rent-mail`이 같은 함수를 부른다). */
+export async function notifyRemindGuest(
+  booking: SpaceBooking, space: Space, host: Profile | null, guest: Profile | null,
+): Promise<MailResult> {
+  return sendMail(buildRemindGuest(booking, space, host, guest));
 }
 
 /** ⑦' 이용 전날 → 사장님 (09-17). 내일 누가 몇 시에 오는지와 오늘 챙길 것.
  *  🔒손님 번호는 «수락한 예약»에만 싣는다. 사장님 쪽 연락처 문은 `isRevealed`(수락 뒤) 하나다 —
  *    리마인드가 그 문을 옆으로 열면 수락 버튼의 뜻이 사라진다. 수락 전이면 수락하러 갈 곳을 말한다. */
-export async function notifyRemindHost(
+export function buildRemindHost(
   booking: SpaceBooking, space: Space, host: Profile | null, guest: Profile | null,
-): Promise<MailResult> {
+): Mail {
   const guestName = displayName(guest, "손님");
   const start = booking.startTime || "";
   const subject = `[collab5] 내일${start ? ` ${start}` : ""} ${space.name} · ${guestName}`;
@@ -521,5 +607,12 @@ export async function notifyRemindHost(
     `내 하루 가게: ${link}`,
   ].join("\n");
   const html = layout(lead, rows, { href: link, label: accepted ? "내 하루 가게 보기" : "수락하러 가기" });
-  return send(host?.email ?? "", subject, html, text);
+  return { to: host?.email ?? "", subject, html, text };
+}
+
+/** 보내는 쪽 — 문장은 `buildRemindHost`가 만든다(09-17 메일 미리보기 `/dev/rent-mail`이 같은 함수를 부른다). */
+export async function notifyRemindHost(
+  booking: SpaceBooking, space: Space, host: Profile | null, guest: Profile | null,
+): Promise<MailResult> {
+  return sendMail(buildRemindHost(booking, space, host, guest));
 }

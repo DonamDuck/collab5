@@ -12,6 +12,8 @@ import type {
   Payment, PaymentStatus, PayoutStatus, TossPayment, RepeatRule,
 } from "./types";
 import { bookingFinished, todayKst, expandRepeat, stripRepeat, pruneRepeat } from "./rent-time";
+// 🧪09-17 목 데이터 — 읽기 함수는 첫 줄에서 목 세계를 돌려주고, 쓰기 함수는 첫 줄에서 멈춘다. 개발 빌드 전용(`rent-mock.ts` 머리말).
+import { getRentMock, rentMockOn } from "./rent-mock";
 
 function db(): SupabaseClient | null {
   const url = process.env.SUPABASE_URL;
@@ -157,6 +159,17 @@ export interface SpaceFilter {
 
 /** 목록 — 공개된 것만. ⭐돌려주는 값에 주소가 없다(`toPublic`). */
 export async function listOpenSpaces(f: SpaceFilter = {}): Promise<SpacePublic[]> {
+  const m = await getRentMock();
+  if (m) {
+    // 아래 DB 질의와 같은 거르기를 코드로 한다. 목 화면의 「0건」도 실제 조건과 같은 이유로 나와야 한다.
+    const out = m.data.spaces
+      .filter((sp) => sp.status === "open")
+      .filter((sp) => !f.area || sp.area.includes(f.area))
+      .filter((sp) => !f.category || sp.category === f.category)
+      .filter((sp) => !f.useType || f.useType === "both" || sp.useType === f.useType || sp.useType === "both")
+      .filter((sp) => !f.date || sp.openSlots.some((sl) => sl.date === f.date));
+    return out.slice(0, f.limit ?? 60).map(toPublic);
+  }
   const c = db();
   if (!c) return [];
   let q = c.from("spaces").select("*").eq("status", "open").order("created_at", { ascending: false });
@@ -183,6 +196,8 @@ export async function getSpacePublic(slug: string): Promise<SpacePublic | null> 
 /** 🚨원본 — 옛 「들어오는 법」(`accessNote`, 출입 비밀번호가 남아 있을 수 있다)까지 든다. **호출 전에 권한을 확인할 것.**
  *  쓸 수 있는 곳: ①그 공간의 주인 ②결제를 마친 예약의 손님(`guestSeesHost`). 공개 화면은 `getSpacePublic`. */
 export async function getSpaceFull(slug: string): Promise<Space | null> {
+  const m = await getRentMock();
+  if (m) return m.data.spaces.find((sp) => sp.slug === slug) ?? null;
   const c = db();
   if (!c) return null;
   const { data, error } = await c.from("spaces").select("*").eq("slug", slug).maybeSingle();
@@ -202,6 +217,17 @@ export interface SpaceBrief {
 export async function listSpacesByIds(ids: number[]): Promise<Map<number, SpaceBrief>> {
   const out = new Map<number, SpaceBrief>();
   if (ids.length === 0) return out;
+  const m = await getRentMock();
+  if (m) {
+    for (const sp of m.data.spaces) {
+      if (!ids.includes(sp.id)) continue;
+      out.set(sp.id, {
+        id: sp.id, slug: sp.slug, name: sp.name, area: sp.area, hours: sp.hours,
+        ownerUserId: sp.ownerUserId, photo: sp.photos[0] ?? "", address: sp.address,
+      });
+    }
+    return out;
+  }
   const c = db();
   if (!c) return out;
   // 필요한 칸만 고른다 — `select("*")`이면 본문·설비·비는 날까지 끌고 오는데 이 쓰임엔 한 줄도 안 쓴다.
@@ -221,6 +247,8 @@ export async function listSpacesByIds(ids: number[]): Promise<Map<number, SpaceB
 }
 
 export async function listSpacesByOwner(ownerUserId: number): Promise<Space[]> {
+  const m = await getRentMock();
+  if (m) return m.data.spaces.filter((sp) => sp.ownerUserId === ownerUserId);
   const c = db();
   if (!c) return [];
   const { data } = await c.from("spaces").select("*")
@@ -234,6 +262,7 @@ export type SpaceSaveInput = Omit<Space, "id" | "createdAt" | "updatedAt">;
 
 /** slug 기준 upsert. ⚠️권한 검사는 호출부(서버 액션)의 책임이다. */
 export async function saveSpace(input: SpaceSaveInput): Promise<Space | null> {
+  if (await rentMockOn()) return null;
   const c = db();
   if (!c) return null;
   // 🔁펼친 날짜는 DB에 굳히지 않는다(2026-09-17). 규칙과 똑같은 칸은 빼고, 지난 쉬는 날도 턴다.
@@ -275,6 +304,7 @@ export async function saveSpace(input: SpaceSaveInput): Promise<Space | null> {
  *  ⭐행 전체를 다시 쓰는 `saveSpace`를 안 쓴다. 사장님이 옆 탭에서 고치는 중이면 그 내용을 옛 값으로 덮는다.
  *  참 = 이번에 바뀌었다. 거짓 = 이미 다른 상태였거나 실패. 권한은 호출부가 확인한다. */
 export async function setSpaceStatus(slug: string, from: SpaceStatus, to: SpaceStatus): Promise<boolean> {
+  if (await rentMockOn()) return false;
   const c = db();
   if (!c) return false;
   const { data, error } = await c.from("spaces").update({ status: to })
@@ -305,6 +335,7 @@ export type BookingCreateInput = Omit<
  *  ⚠️날짜도 «잠그지 않는다» — 결제창만 열어보고 닫은 사람이 남의 날짜를 막으면 안 된다.
  *    선점은 `markBookingPaid`에서 유니크 인덱스로 갈린다(먼저 결제한 사람이 이긴다). */
 export async function createPendingBooking(input: BookingCreateInput): Promise<SpaceBooking | null> {
+  if (await rentMockOn()) return null;
   const c = db();
   if (!c) return null;
   const row = {
@@ -326,6 +357,8 @@ export async function createPendingBooking(input: BookingCreateInput): Promise<S
 /** 그 공간 그 날짜에 «살아 있는» 예약들. 시간 겹침을 보려고 시각만 얇게 읽는다.
  *  ⭐`pending`은 뺀다 — 결제창만 열어 보고 닫은 사람이 남의 시간을 막으면 안 된다(설계 그대로). */
 export async function listLiveBookings(spaceId: number, date: string): Promise<SpaceBooking[]> {
+  const m = await getRentMock();
+  if (m) return m.data.bookings.filter((b) => b.spaceId === spaceId && b.useDate === date && ["paid", "confirmed", "done"].includes(b.status));
   const c = db();
   if (!c) return [];
   const { data } = await c
@@ -339,6 +372,8 @@ export async function listLiveBookings(spaceId: number, date: string): Promise<S
 
 /** 여러 날짜의 살아 있는 예약을 «한 번에». 상세 화면이 열린 날 수만큼 왕복하지 않게. */
 export async function listLiveBookingsIn(spaceId: number, dates: string[]): Promise<SpaceBooking[]> {
+  const m = await getRentMock();
+  if (m) return m.data.bookings.filter((b) => b.spaceId === spaceId && dates.includes(b.useDate) && ["paid", "confirmed", "done"].includes(b.status));
   const c = db();
   if (!c || dates.length === 0) return [];
   const { data } = await c
@@ -351,6 +386,8 @@ export async function listLiveBookingsIn(spaceId: number, dates: string[]): Prom
 }
 
 export async function getBookingByOrderId(orderId: string): Promise<SpaceBooking | null> {
+  const m = await getRentMock();
+  if (m) return m.data.bookings.find((b) => b.orderId === orderId) ?? null;
   const c = db();
   if (!c) return null;
   const { data } = await c.from("space_bookings").select("*").eq("order_id", orderId).maybeSingle();
@@ -362,6 +399,8 @@ export async function getBookingByOrderId(orderId: string): Promise<SpaceBooking
 //   결제 기록도 같이 안 바뀐다(그때 호출부가 환불로 잇는다).
 
 export async function getBooking(id: number): Promise<SpaceBooking | null> {
+  const m = await getRentMock();
+  if (m) return m.data.bookings.find((b) => b.id === id) ?? null;
   const c = db();
   if (!c) return null;
   const { data } = await c.from("space_bookings").select("*").eq("id", id).maybeSingle();
@@ -370,6 +409,13 @@ export async function getBooking(id: number): Promise<SpaceBooking | null> {
 
 /** 호스트가 받은 신청 — 자기 공간 것만. */
 export async function listBookingsForHost(ownerUserId: number): Promise<SpaceBooking[]> {
+  const m = await getRentMock();
+  if (m) {
+    const ids = m.data.spaces.filter((sp) => sp.ownerUserId === ownerUserId).map((sp) => sp.id);
+    return m.data.bookings
+      .filter((b) => ids.includes(b.spaceId) && b.status !== "pending" && b.status !== "expired")
+      .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+  }
   const c = db();
   if (!c) return [];
   const mine = await listSpacesByOwner(ownerUserId);
@@ -383,6 +429,8 @@ export async function listBookingsForHost(ownerUserId: number): Promise<SpaceBoo
 }
 
 export async function listBookingsForGuest(guestUserId: number): Promise<SpaceBooking[]> {
+  const m = await getRentMock();
+  if (m) return m.data.bookings.filter((b) => b.guestUserId === guestUserId).sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
   const c = db();
   if (!c) return [];
   const { data } = await c.from("space_bookings").select("*")
@@ -395,6 +443,7 @@ export async function listBookingsForGuest(guestUserId: number): Promise<SpaceBo
 export async function decideBooking(
   id: number, accept: boolean, message: string
 ): Promise<SpaceBooking | null> {
+  if (await rentMockOn()) return null;
   const c = db();
   if (!c) return null;
   const { data, error } = await c.from("space_bookings")
@@ -406,6 +455,7 @@ export async function decideBooking(
 }
 
 export async function setBookingStatus(id: number, status: BookingStatus): Promise<void> {
+  if (await rentMockOn()) return;
   const c = db();
   if (!c) return;
   await c.from("space_bookings").update({ status }).eq("id", id);
@@ -417,6 +467,8 @@ export async function setBookingStatus(id: number, status: BookingStatus): Promi
  *  ⚠️`paid`도 넣는다 — phase 1은 결제가 곧 예약이라 사장님이 수락을 안 눌렀어도 손님은 온다.
  *  환불 신청이 걸린 예약도 뺀다. 우리가 전화로 확인하는 중이라 「내일 뵈어요」가 엇나갈 수 있다. */
 export async function listBookingsToRemind(useDate: string): Promise<SpaceBooking[]> {
+  const m = await getRentMock();
+  if (m) return m.data.bookings.filter((b) => b.useDate === useDate && (b.status === "paid" || b.status === "confirmed") && !b.remindedAt && !b.refundRequestedAt);
   const c = db();
   if (!c) return [];
   const { data, error } = await c.from("space_bookings").select("*")
@@ -430,6 +482,7 @@ export async function listBookingsToRemind(useDate: string): Promise<SpaceBookin
 /** 보냈다고 적는다. ⭐`reminded_at is null`인 행만 — 작업이 겹쳐 두 번 돌아도 먼저 적은 쪽만 참을 받는다.
  *  참 = 이번에 내가 적었다. 거짓 = 이미 적혀 있었거나 실패. */
 export async function markReminded(bookingId: number): Promise<boolean> {
+  if (await rentMockOn()) return false;
   const c = db();
   if (!c) return false;
   const { data, error } = await c.from("space_bookings")
@@ -469,6 +522,7 @@ function toPayment(r: Row): Payment {
 export async function createPayment(input: {
   orderId: string; bookingId: number; buyingUserId: number; sellingUserId: number; amount: number;
 }): Promise<Payment | null> {
+  if (await rentMockOn()) return null;
   const c = db();
   if (!c) return null;
   const { data, error } = await c.from("payments").insert({
@@ -481,6 +535,8 @@ export async function createPayment(input: {
 }
 
 export async function getPaymentByOrderId(orderId: string): Promise<Payment | null> {
+  const m = await getRentMock();
+  if (m) return m.data.payments.find((p) => p.orderId === orderId) ?? null;
   const c = db();
   if (!c) return null;
   const { data } = await c.from("payments").select("*").eq("order_id", orderId).maybeSingle();
@@ -496,6 +552,7 @@ export async function rentSync(
   orderId: string,
   change: { bookingStatus?: BookingStatus; toss?: TossPayment; payoutStatus?: PayoutStatus },
 ): Promise<{ ok: boolean; message: string }> {
+  if (await rentMockOn()) return { ok: false, message: "목 데이터 보기 중" };
   const c = db();
   if (!c) return { ok: false, message: "db 없음" };
   const { error } = await c.rpc("rent_sync", {
@@ -520,6 +577,8 @@ export async function rentSync(
  *  ③ 이용일이 지난 «취소» 예약인데 환불하고 남은 돈이 있는 것 → 지급 WAITING
  *     당일 취소(환불 0원)와 부분 환불이 여기 온다. 약관 제8조 「환불되지 않은 금액은 정산 시 지급」. */
 export async function sweepBookings(): Promise<void> {
+  // 🧪목 모드에선 옮기지 않는다 — 이 함수는 «쓰기»다. 목 세계의 상태는 케이스가 정한 그대로 보여야 한다.
+  if (await rentMockOn()) return;
   const c = db();
   if (!c) return;
   const today = todayKst();
@@ -556,6 +615,13 @@ export async function sweepBookings(): Promise<void> {
 
 /** 지급 목록 — 대기·요청·실패·완료. 정산 화면이 판매자별로 묶는다. 예약을 같이 읽어 온다. */
 export async function listPayouts(): Promise<{ payment: Payment; booking: SpaceBooking | null }[]> {
+  const m = await getRentMock();
+  if (m) {
+    return m.data.payments
+      .filter((p) => ["WAITING", "REQUESTED", "FAILED", "DONE"].includes(p.payoutStatus))
+      .sort((a, b) => (a.createdAt < b.createdAt ? -1 : 1))
+      .map((p) => ({ payment: p, booking: m.data.bookings.find((b) => b.id === p.bookingId) ?? null }));
+  }
   const c = db();
   if (!c) return [];
   const { data, error } = await c.from("payments")
@@ -573,6 +639,7 @@ export async function listPayouts(): Promise<{ payment: Payment; booking: SpaceB
 
 /** 신청을 적는다. 이미 신청돼 있으면 덮어쓰지 않는다(처음 시각이 남는다). 권한은 호출부가 확인한다. */
 export async function requestRefund(bookingId: number, note: string): Promise<boolean> {
+  if (await rentMockOn()) return false;
   const c = db();
   if (!c) return false;
   const { data, error } = await c.from("space_bookings")
@@ -585,6 +652,7 @@ export async function requestRefund(bookingId: number, note: string): Promise<bo
 
 /** 관리자가 «신청을 닫는다» — 전화로 확인해 보니 환불할 일이 아니었을 때. 예약은 원래대로 살아 있다. */
 export async function clearRefundRequest(bookingId: number): Promise<boolean> {
+  if (await rentMockOn()) return false;
   const c = db();
   if (!c) return false;
   const { error } = await c.from("space_bookings")
@@ -595,6 +663,12 @@ export async function clearRefundRequest(bookingId: number): Promise<boolean> {
 
 /** 관리자가 처리할 환불 신청 — 아직 결제 완료·확정 상태로 살아 있는 것만. */
 export async function listRefundRequests(): Promise<SpaceBooking[]> {
+  const m = await getRentMock();
+  if (m) {
+    return m.data.bookings
+      .filter((b) => b.refundRequestedAt && (b.status === "paid" || b.status === "confirmed"))
+      .sort((a, b) => ((a.refundRequestedAt ?? "") < (b.refundRequestedAt ?? "") ? -1 : 1));
+  }
   const c = db();
   if (!c) return [];
   const { data, error } = await c.from("space_bookings").select("*")
@@ -608,6 +682,14 @@ export async function listRefundRequests(): Promise<SpaceBooking[]> {
  *  - `paid` 인데 이용일이 지남 — 사장님이 답을 안 한 채 날이 갔다. 손님 돈이 붙잡혀 있다
  *  - `rejected` — 거절했는데 환불이 실패했다. 손님께 돌려드려야 한다 */
 export async function listStuckBookings(): Promise<{ unanswered: SpaceBooking[]; refundFailed: SpaceBooking[] }> {
+  const m = await getRentMock();
+  if (m) {
+    const byDate = (a: SpaceBooking, b: SpaceBooking) => (a.useDate < b.useDate ? -1 : 1);
+    return {
+      unanswered: m.data.bookings.filter((b) => b.status === "paid" && b.useDate < todayKst()).sort(byDate),
+      refundFailed: m.data.bookings.filter((b) => b.status === "rejected").sort(byDate),
+    };
+  }
   const c = db();
   if (!c) return { unanswered: [], refundFailed: [] };
   const [a, b] = await Promise.all([

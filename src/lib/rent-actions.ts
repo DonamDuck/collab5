@@ -2,6 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { getSessionUserId, getProfileById, savePhoneIfEmpty } from "./profiles";
+// 🧪09-17 목 데이터 — 목 쿠키가 있으면 쓰기 액션은 첫 줄에서 멈춘다(DB·토스·메일 전부 안 건드린다). 개발 빌드 전용.
+import { getRentMock, rentMockOn, RENT_MOCK_BLOCKED } from "./rent-mock";
 import {
   saveSpace, getSpaceFull, getBooking, createPendingBooking, getBookingByOrderId,
   decideBooking, requestRefund, clearRefundRequest,
@@ -38,6 +40,9 @@ export interface ActionResult { ok: boolean; message: string; slug?: string; boo
  *  ⚠️`lib/staff.ts`를 안 쓴다. 그 파일 주석이 *「소유·권한 판정에는 쓰지 마라」*고 못 박았고,
  *    이건 남의 등록을 세상에 내보내는 판정이라 성격이 다르다(매거진이 같은 이유로 별도 파일을 뒀다). */
 export async function isRentAdmin(): Promise<boolean> {
+  // 🧪09-17 목 데이터(개발 빌드 전용) — 케이스가 관리자 보기인지로 정한다.
+  const mock = await getRentMock();
+  if (mock) return mock.viewer.admin;
   // ⭐export하는 이유 — 화면이 [공개하기] 버튼을 보일지 정할 때 같은 규칙을 «다시 적으면»
   //   환경변수 이름이 어긋나는 날 버튼은 보이는데 안 눌리는 상태가 된다. 판정은 한 벌만 둔다.
   const raw = process.env.RENT_ADMIN_EMAILS ?? process.env.MAGAZINE_EDITOR_EMAILS ?? "dudejrthd@gmail.com";
@@ -77,6 +82,7 @@ export interface SpaceFormInput {
 
 /** 공간 등록·수정. 저장하면 `pending`(검토 대기)로 들어간다. */
 export async function saveSpaceAction(input: SpaceFormInput): Promise<ActionResult> {
+  if (await rentMockOn()) return { ...RENT_MOCK_BLOCKED };
   const uid = await getSessionUserId();
   if (!uid) return { ok: false, message: "로그인이 필요해요." };
 
@@ -194,6 +200,7 @@ export async function saveSpaceAction(input: SpaceFormInput): Promise<ActionResu
 
 /** 검토 통과 — 대표만. `pending` → `open`. */
 export async function publishSpaceAction(slug: string): Promise<ActionResult> {
+  if (await rentMockOn()) return { ...RENT_MOCK_BLOCKED };
   if (!(await isRentAdmin())) return { ok: false, message: "권한이 없어요." };
   const sp = await getSpaceFull(slug);
   if (!sp) return { ok: false, message: "그 공간을 찾지 못했어요." };
@@ -214,6 +221,7 @@ export async function publishSpaceAction(slug: string): Promise<ActionResult> {
 /** ⏸공간 잠시 쉬기 / 다시 열기 — 주인만(09-17). `open` ↔ `paused` 둘만 오간다.
  *  검토 대기(`pending`)·작성 중(`draft`)은 여기서 못 바꾼다. 쉬기로 검토를 건너뛰는 길이 생기면 안 된다. */
 export async function setSpacePausedAction(slug: string, paused: boolean): Promise<ActionResult> {
+  if (await rentMockOn()) return { ...RENT_MOCK_BLOCKED };
   const uid = await getSessionUserId();
   if (!uid) return { ok: false, message: "로그인이 필요해요." };
   const sp = await getSpaceFull(slug);
@@ -242,6 +250,7 @@ export async function setSpacePausedAction(slug: string, paused: boolean): Promi
 export async function savePayoutAccountAction(
   input: PayoutAccountInput,
 ): Promise<ActionResult & { account?: PayoutAccountMasked }> {
+  if (await rentMockOn()) return { ...RENT_MOCK_BLOCKED };
   const uid = await getSessionUserId();
   if (!uid) return { ok: false, message: "로그인이 필요해요." };
   const mine = await listSpacesByOwner(uid);
@@ -281,6 +290,7 @@ export interface StartBookingResult extends ActionResult {
  *  `pending` 행에 적히고, 돌아왔을 때 그 값으로 승인을 건다. 화면을 조작해도 값이 안 바뀐다.
  *  🚨`pending` 행은 호스트에게 안 보인다(`listBookingsForHost`가 거른다). */
 export async function startBookingAction(input: BookingFormInput): Promise<StartBookingResult> {
+  if (await rentMockOn()) return { ...RENT_MOCK_BLOCKED };
   const uid = await getSessionUserId();
   if (!uid) return { ok: false, message: "로그인이 필요해요." };
 
@@ -385,6 +395,7 @@ async function safeNotify(run: () => Promise<unknown>): Promise<void> {
 export async function confirmBookingAction(
   paymentKey: string, orderId: string
 ): Promise<ActionResult> {
+  if (await rentMockOn()) return { ...RENT_MOCK_BLOCKED };
   const uid = await getSessionUserId();
   if (!uid) return { ok: false, message: "로그인이 필요해요." };
 
@@ -444,6 +455,7 @@ export async function confirmBookingAction(
 export async function decideBookingAction(
   bookingId: number, accept: boolean, message: string
 ): Promise<ActionResult> {
+  if (await rentMockOn()) return { ...RENT_MOCK_BLOCKED };
   const uid = await getSessionUserId();
   if (!uid) return { ok: false, message: "로그인이 필요해요." };
 
@@ -544,6 +556,7 @@ export async function quoteCancelAction(
 
 /** 게스트 취소 — 환불률은 우리 규정표가 정한다(호스트 자율 금지). */
 export async function cancelBookingAction(bookingId: number): Promise<ActionResult> {
+  if (await rentMockOn()) return { ...RENT_MOCK_BLOCKED };
   const uid = await getSessionUserId();
   if (!uid) return { ok: false, message: "로그인이 필요해요." };
   const b = await getBooking(bookingId);
@@ -603,6 +616,7 @@ export async function quotePayout(total: number): Promise<{ fee: number; payout:
 
 /** 사장님이 신청한다. 🔒권한 = 그 공간의 주인. */
 export async function requestRefundAction(bookingId: number, note: string): Promise<ActionResult> {
+  if (await rentMockOn()) return { ...RENT_MOCK_BLOCKED };
   const uid = await getSessionUserId();
   if (!uid) return { ok: false, message: "로그인이 필요해요." };
   const b = await getBooking(bookingId);
@@ -624,6 +638,7 @@ export async function requestRefundAction(bookingId: number, note: string): Prom
 
 /** 관리자가 승인한다 — 손님께 «남은 돈 전액»을 돌려주고 예약 refunded + 결제 CANCELED를 같이 옮긴다. 🔒대표만. */
 export async function approveRefundAction(bookingId: number): Promise<ActionResult> {
+  if (await rentMockOn()) return { ...RENT_MOCK_BLOCKED };
   if (!(await isRentAdmin())) return { ok: false, message: "권한이 없어요." };
   const b = await getBooking(bookingId);
   if (!b || !b.refundRequestedAt) return { ok: false, message: "환불 신청이 없는 예약이에요." };
@@ -648,6 +663,7 @@ export async function approveRefundAction(bookingId: number): Promise<ActionResu
 
 /** 관리자가 신청을 닫는다 — 확인해 보니 환불할 일이 아니었을 때. 예약은 그대로. 🔒대표만. */
 export async function dismissRefundAction(bookingId: number): Promise<ActionResult> {
+  if (await rentMockOn()) return { ...RENT_MOCK_BLOCKED };
   if (!(await isRentAdmin())) return { ok: false, message: "권한이 없어요." };
   const ok = await clearRefundRequest(bookingId);
   revalidatePath("/rent/payouts");

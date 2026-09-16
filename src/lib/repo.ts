@@ -8,6 +8,8 @@ import { kstIso } from "./time";
 import { orderedIdeaTitles } from "./report-cards";
 import { isDemoSlug } from "./demo";
 import { MAX_COLLABS } from "./limits";
+import { getRentMock } from "./rent-mock";
+import { MOCK_SLUG_PREFIX, MOCK_USER_MIN } from "./rent-mock-data";
 
 export interface Repo {
   // 업체
@@ -1451,7 +1453,39 @@ class SupabaseRepo implements Repo {
 // ⚠️ service_role 키는 서버 전용 — 절대 NEXT_PUBLIC_로 노출 금지.
 const SUPABASE_KEY =
   process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
-export const repo: Repo =
+const baseRepo: Repo =
   process.env.SUPABASE_URL && SUPABASE_KEY
     ? new SupabaseRepo(process.env.SUPABASE_URL, SUPABASE_KEY)
     : new InMemoryRepo();
+
+/** 🧪하루 가게 목 데이터(2026-09-17) — 하루 가게가 부르는 두 함수만 가로챈다. 나머지는 그대로 원래 구현으로.
+ *  ⭐목 소개서 주소(`mock-…`)와 목 사용자 번호(9000번대)일 때만 목 세계를 본다. 실제 주소·번호는 목 쿠키가 있어도 DB로 간다.
+ *  🚨운영 빌드에선 감싸지 않는다(`NODE_ENV`는 빌드 때 상수로 박혀 이 분기가 통째로 빠진다). 머리말 = `rent-mock.ts`. */
+function withRentMock(base: Repo): Repo {
+  return new Proxy(base, {
+    get(target, prop, receiver) {
+      if (prop === "getMakerBySlug") {
+        return async (slug: string) => {
+          if (slug.startsWith(MOCK_SLUG_PREFIX)) {
+            const m = await getRentMock();
+            if (m) return m.data.makers.find((x) => x.slug === slug) ?? null;
+          }
+          return target.getMakerBySlug(slug);
+        };
+      }
+      if (prop === "listMakersByOwner") {
+        return async (ownerUserId: number) => {
+          if (ownerUserId >= MOCK_USER_MIN) {
+            const m = await getRentMock();
+            if (m) return m.data.makers.filter((x) => x.ownerUserId === ownerUserId);
+          }
+          return target.listMakersByOwner(ownerUserId);
+        };
+      }
+      const v = Reflect.get(target, prop, receiver);
+      return typeof v === "function" ? v.bind(target) : v;
+    },
+  });
+}
+
+export const repo: Repo = process.env.NODE_ENV === "development" ? withRentMock(baseRepo) : baseRepo;

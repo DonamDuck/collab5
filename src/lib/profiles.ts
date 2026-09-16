@@ -4,6 +4,8 @@
 // 앱은 세션의 auth UUID(authUuid)로 조회한다.
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { getSessionUser } from "./supabase/server";
+import { getRentMock, rentMockOn } from "./rent-mock";
+import { MOCK_USER_MIN } from "./rent-mock-data";
 
 export interface Profile {
   id: number; // 정수 user_id (1,2,3)
@@ -104,6 +106,11 @@ export async function updateProfileImage(uuid: string, imageUrl: string): Promis
 /** 정수 user_id로 프로필 조회 — 소개서 소유자 표시(로고 등)용.
  *  세션 → 프로필은 `getProfile(authUuid)`, 소유자 id → 프로필은 이 함수. */
 export async function getProfileById(userId: number): Promise<Profile | null> {
+  // 🧪09-17 하루 가게 목 데이터(개발 빌드 전용). 목 사용자 번호(9000번대)만 가로채고 실제 번호는 DB로 보낸다.
+  if (userId >= MOCK_USER_MIN) {
+    const m = await getRentMock();
+    if (m) return m.data.profiles.find((p) => p.id === userId) ?? null;
+  }
   const client = db();
   if (!client) return null;
   const { data } = await client
@@ -125,6 +132,10 @@ export async function getProfileById(userId: number): Promise<Profile | null> {
 /** ⭐ 세션 → 정수 user_id 중앙 리졸버. 소유권·찜·제안 판정은 전부 이걸 거친다(07-25 uuid→user_id 전환).
  *  profiles 행이 없으면 null(= 소유권 없음)로 안전하게 떨어진다. */
 export async function getSessionUserId(): Promise<number | null> {
+  // 🧪09-17 하루 가게 목 데이터(개발 빌드 전용). ⚠️사이트 전체에 먹는다 — 목 쿠키가 있는 동안엔 어느 화면이든
+  //   케이스의 가상 사용자로 보인다. 그래서 루트 레이아웃이 모든 화면 위에 「목 데이터 보는 중」 띠를 붙인다.
+  const m = await getRentMock();
+  if (m) return m.viewer.userId;
   const user = await getSessionUser();
   if (!user) return null;
   return (await getProfile(user.id))?.id ?? null;
@@ -156,6 +167,7 @@ export async function getProfile(authUuid: string): Promise<Profile | null> {
  *  ⚠️다른 계정이 쓰는 번호면 적지 않는다. 가입 화면이 번호 중복을 막고 있어서(`findDuplicates`) 같은 규칙을 지킨다.
  *  돌려주는 값 — 실제로 적었으면 true. 실패해도 던지지 않는다(신청을 막을 일이 아니다). */
 export async function savePhoneIfEmpty(userId: number, phone: string): Promise<boolean> {
+  if (await rentMockOn()) return false;
   const client = db();
   const value = phone.trim();
   if (!client || !value) return false;

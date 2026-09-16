@@ -6,6 +6,8 @@
 // ⏳토스 지급대행 셀러 등록(셀러 id·상태 칸)은 계약 뒤에 붙인다. 지금은 계좌를 받아 두기만 한다.
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { bankName, isBankCode, type PayoutHolderType } from "./banks";
+// 🧪09-17 목 데이터 — 읽기는 목 세계에서, 쓰기는 멈춘다. 개발 빌드 전용(`rent-mock.ts` 머리말).
+import { getRentMock, rentMockOn } from "./rent-mock";
 
 function db(): SupabaseClient | null {
   const url = process.env.SUPABASE_URL;
@@ -111,6 +113,8 @@ function toAccount(r: Row): PayoutAccount {
 
 /** 🚨원문. 권한 확인은 호출부 책임(본인 또는 관리자). */
 export async function getPayoutAccount(userId: number): Promise<PayoutAccount | null> {
+  const m = await getRentMock();
+  if (m) return m.data.payoutAccounts.find((a) => a.userId === userId) ?? null;
   const c = db();
   if (!c || !userId) return null;
   const { data, error } = await c.from("host_payout_accounts").select("*").eq("user_id", userId).maybeSingle();
@@ -121,6 +125,8 @@ export async function getPayoutAccount(userId: number): Promise<PayoutAccount | 
 /** 계좌가 있나 — 메일에 「계좌를 등록해 주세요」를 붙일지 정할 때. 읽기에 실패하면 undefined(모른다)라서
  *  테이블이 아직 없거나 키가 없는 날에 있는 사람까지 조르지 않는다. */
 export async function hasPayoutAccount(userId: number): Promise<boolean | undefined> {
+  const m = await getRentMock();
+  if (m) return m.data.payoutAccounts.some((a) => a.userId === userId);
   const c = db();
   if (!c || !userId) return undefined;
   const { data, error } = await c.from("host_payout_accounts").select("user_id").eq("user_id", userId).maybeSingle();
@@ -132,6 +138,11 @@ export async function hasPayoutAccount(userId: number): Promise<boolean | undefi
 export async function listPayoutAccounts(userIds: number[]): Promise<Map<number, PayoutAccount>> {
   const out = new Map<number, PayoutAccount>();
   const ids = Array.from(new Set(userIds.filter((x) => x > 0)));
+  const m = await getRentMock();
+  if (m) {
+    for (const a of m.data.payoutAccounts) if (ids.includes(a.userId)) out.set(a.userId, a);
+    return out;
+  }
   const c = db();
   if (!c || ids.length === 0) return out;
   const { data, error } = await c.from("host_payout_accounts").select("*").in("user_id", ids);
@@ -146,6 +157,7 @@ export async function listPayoutAccounts(userIds: number[]): Promise<Map<number,
 /** 한 사람에 한 줄 upsert. ⚠️검증(`validatePayoutInput`)과 권한은 호출부가 먼저 한다.
  *  🔁계좌가 바뀌면 토스 셀러 등록도 다시 해야 한다 — 셀러 칸을 비워 «다시 등록할 것»으로 되돌린다. */
 export async function savePayoutAccount(userId: number, input: PayoutAccountInput): Promise<PayoutAccount | null> {
+  if (await rentMockOn()) return null;
   const c = db();
   if (!c) return null;
   const { data, error } = await c.from("host_payout_accounts").upsert({
