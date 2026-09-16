@@ -89,7 +89,9 @@ export default function HostTermsPage() {
         <Article title="제4조 (이용 안내와 출입 정보)">
           <ul className="list-disc space-y-1 pl-5">
             <li>
-              호스트는 예약이 확정된 이용자에게 문자 또는 현장 안내 중 등록 시 선택한 방법으로 이용 안내를 제공합니다.
+              {/* 09-16 phase 1(대표) — 결제를 마치면 곧 예약 완료다. 제6조②와 같은 말로 맞추고, 등록 폼의 «둘 다»를 넣었다. */}
+              호스트는 결제를 마쳐 예약이 완료된 이용자에게, 등록 시 선택한 방법(문자, 대면 또는 둘 다)으로 이용
+              안내를 제공합니다.
             </li>
             <li>
               <strong className="font-medium text-ink">
