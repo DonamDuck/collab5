@@ -381,7 +381,7 @@ export function SpaceForm({
         <L
           label="전체 주소"
           htmlFor="sp-address"
-          hint="예약이 확정된 분에게만 열려요. 그 전에는 아무에게도 안 보여요."
+          hint="신청하는 분이 공간 화면에서 보고 찾아오실 수 있게 지도와 함께 보여드려요."
         >
           <AddressField
             base={addrBase}

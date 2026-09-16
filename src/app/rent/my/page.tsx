@@ -170,6 +170,9 @@ export default async function MyRentPage() {
                       <p className="mt-1 text-[15px] text-mute">
                         {bookingWhen(b)}
                         {b.headcount ? ` · ${b.headcount}명` : ""}
+                        {/* ☕🩸09-16까지 사장님 쪽엔 커피챗 표시가 없었다. 손님 화면 네 곳엔 「커피챗 포함」이 뜨는데
+                            정작 커피챗을 해 줄 사람이 모르는 상태였다. 옛 예약은 옛 칸에만 값이 있어 둘 다 본다. */}
+                        {b.amountChat > 0 || b.amountMentor > 0 ? " · 커피챗 신청" : ""}
                       </p>
                     </>
                   }

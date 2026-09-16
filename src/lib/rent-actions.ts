@@ -15,7 +15,7 @@ import { geocode } from "./geocode";
 import {
   notifyBookingPaid, notifyBookingConfirmed, notifyBookingRejected, notifyBookingCancelled,
 } from "./rent-notify";
-import { bookingStarted, dateLabel, hoursBetween, fitsOpenSlot, nowHhmmKst, overlaps, toMinutes, todayKst } from "./rent-time";
+import { bookingStarted, dateLabel, kstDaysUntil, hoursBetween, fitsOpenSlot, nowHhmmKst, overlaps, toMinutes, todayKst } from "./rent-time";
 import type { Space, SpaceBooking, SpaceUseType, SpaceCategory, SpaceScope, OpenSlot, AccessHow } from "./types";
 
 // 하루 가게 — 쓰기 서버 액션 (2026-09-13)
@@ -372,7 +372,9 @@ export async function decideBookingAction(
     const refunded = refund.ok && !!(await rentSync(b.orderId, { bookingStatus: "refunded", toss: refund.payment })).ok;
     if (!refunded) console.error(`[rent-actions] 거절 환불 실패 order=${b.orderId} (결제 줄 ${pay ? "있음" : "없음"})`);
     revalidatePath("/rent/my");
-    await safeNotify(async () => {
+    // 🩸환불이 실패했는데 「전액 돌려드려요」 메일이 나가면 안 된다. 돈이 아직 안 돌아왔다.
+    //   그 예약은 rejected로 남아 정산 화면 「손이 필요한 예약」에 뜨고, 환불이 끝나면 그때 알린다.
+    if (refunded) await safeNotify(async () => {
       const p = await notifyParties(decided);
       if (p) await notifyBookingRejected(decided, p.space, p.host, p.guest);
     });
@@ -390,7 +392,10 @@ export async function decideBookingAction(
 
 /** 취소 환불액 — 견적과 실제 취소가 **같은 계산**을 써야 한다. 둘이 따로 계산하면 팝업엔 70%라 적고 50%만 돌려주는 날이 온다. */
 function cancelRefund(b: SpaceBooking): { rate: number; refund: number } {
-  const days = Math.floor((new Date(b.useDate).getTime() - Date.now()) / 86_400_000);
+  // 🩸09-16까지 `new Date(useDate)`를 썼다. 그건 **UTC 자정 = KST 오전 9시**라, 낮에 취소하면 남은 날이
+  //   하루씩 모자랐다 — 전날 오전 10시 취소가 50% 대신 0%, 7일 전 오전 10시가 100% 대신 70%.
+  //   규정의 「이용일 N일 전」은 한국 달력의 날짜 차이다. 시각을 빼고 날짜끼리 뺀다.
+  const days = kstDaysUntil(b.useDate);
   // ⏳신청한 지 얼마나 됐나 — 1시간 안이면 남은 날과 무관하게 전액이다(대표 09-16).
   const mins = Math.floor((Date.now() - new Date(b.createdAt).getTime()) / 60_000);
   const rate = guestCancelRefundRate(days, mins);

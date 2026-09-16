@@ -149,3 +149,11 @@ export function bookingFinished(b: { useDate: string; endTime?: string }, today 
   return toMinutes(b.endTime) <= toMinutes(now);
 }
 
+/** 📅오늘(KST)부터 그 날짜까지 «달력으로» 며칠 남았나. 오늘이면 0, 내일이면 1, 어제면 -1.
+ *  ⭐시각을 안 본다 — 환불 규정의 「이용일 7일 전까지」는 한국 달력 날짜의 차이다.
+ *  두 날짜를 둘 다 UTC 자정으로 읽어 빼므로 시간대 어긋남이 서로 지워진다. */
+export function kstDaysUntil(useDate: string, today = todayKst()): number {
+  const a = Date.UTC(+today.slice(0, 4), +today.slice(5, 7) - 1, +today.slice(8, 10));
+  const b = Date.UTC(+useDate.slice(0, 4), +useDate.slice(5, 7) - 1, +useDate.slice(8, 10));
+  return Math.round((b - a) / 86_400_000);
+}

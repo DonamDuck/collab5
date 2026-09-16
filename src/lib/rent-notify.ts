@@ -107,6 +107,8 @@ export async function notifyBookingPaid(
     ["언제", bookingWhen(booking)],
     ["어디", space.name],
     ["무엇을", booking.plan],
+    // ☕사장님이 커피챗을 해 줘야 하는 신청인지 — 09-16까지 이 메일에 없었다.
+    ["커피챗", booking.amountChat > 0 || booking.amountMentor > 0 ? "같이 신청했어요" : ""],
     ["받으실 돈", `${won(booking.amountPayout)} (손님이 낸 돈 ${won(booking.amountTotal)})`],
   ];
   const text = [
