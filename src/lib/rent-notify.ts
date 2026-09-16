@@ -35,22 +35,56 @@ function displayName(p: Profile | null, fallback: string): string {
   return p?.brandName?.trim() || fallback;
 }
 
-/** 본문 공통 틀 — 첫 문장 + 표 + 링크 버튼. 네 통이 같은 얼굴이어야 받는 사람이 「collab5 메일」로 알아본다. */
+/** 본문 공통 틀 — 첫 문장 + 표 + 링크 버튼. 네 통이 같은 얼굴이어야 받는 사람이 「collab5 메일」로 알아본다.
+ *
+ *  🎨09-17 디자인팀 — 틀만 고쳐 열여섯 통이 같이 바뀐다. 문장(`lead`·`rows`·`tail`)은 그대로다.
+ *   ① 머리에 「collab5 하루 가게」 글자. 받은편지함에서 연 뒤 «어디서 온 메일인지»가 첫 줄에 선다. 이미지는 안 쓴다(차단되면 빈칸).
+ *   ② `lead`의 **첫 문장을 굵은 제목**으로 가른다. 「예약이 완료됐어요」가 뒤따르는 안내와 같은 15px라 한 덩어리로 읽혔다.
+ *   ③ 항목 표를 옅은 판(사이트 `InfoPanel`과 같은 #F6F6F7 · 12px 모서리) 안에 넣고 라벨 폭을 88px로 고정한다.
+ *      화면의 확인 팝업·완료 화면과 같은 모양이라, 메일과 화면을 나란히 대조하기 쉽다.
+ *   ④ 값 안의 줄이 주소 하나뿐이면 누를 수 있는 링크로 바꾼다. 날것 주소가 좁은 폰에서 세 줄로 꺾였다.
+ *  ⚠️인라인 스타일만 쓴다. 메일 앱 대부분이 `<style>`을 버린다. */
+const MAIL = { ink: "#1a1a1a", body: "#333", mute: "#666", faint: "#999", soft: "#F6F6F7", kiwi: "#98FF5C" };
+
+function splitLead(lead: string): [string, string] {
+  // 「…요.」·「…요!」에서 한 번만 자른다. 못 자르면 전부 제목이 아니라 전부 본문이다(긴 제목이 더 나쁘다).
+  const m = lead.match(/^(.{4,60}?[요다][.!?])\s+([\s\S]+)$/);
+  // 제목 자리엔 마침표를 뗀다(느낌표·물음표는 말투라 둔다).
+  return m ? [m[1].replace(/\.$/, ""), m[2]] : ["", lead];
+}
+
+function cell(v: string): string {
+  return v
+    .split("\n")
+    .map((line) => {
+      const t = line.trim();
+      return /^https?:\/\/\S+$/.test(t)
+        ? `<a href="${esc(t)}" style="color:${MAIL.ink};text-decoration:underline">열어 보기</a>`
+        : esc(line);
+    })
+    .join("<br>");
+}
+
 function layout(lead: string, rows: [string, string][], link: { href: string; label: string }, tail?: string): string {
   const tr = rows
     .filter(([, v]) => v.trim().length > 0)
     .map(
       ([k, v]) =>
-        `<tr><td style="padding:4px 16px 4px 0;color:#666;vertical-align:top;white-space:nowrap">${esc(k)}</td><td style="padding:4px 0;white-space:pre-line">${esc(v)}</td></tr>`,
+        `<tr><td style="width:88px;padding:5px 12px 5px 0;color:${MAIL.mute};vertical-align:top;white-space:nowrap">${esc(k)}</td><td style="padding:5px 0;color:${MAIL.body};word-break:keep-all;overflow-wrap:anywhere">${cell(v)}</td></tr>`,
     )
-    .join("\n    ");
-  return `<div style="font-family:-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo',sans-serif;font-size:15px;line-height:1.7;color:#1a1a1a">
-  <p style="margin:0 0 16px">${esc(lead)}</p>
-  <table style="border-collapse:collapse;font-size:15px">
-    ${tr}
-  </table>
-  <p style="margin:20px 0 0"><a href="${esc(link.href)}" style="display:inline-block;padding:12px 20px;border-radius:12px;background:#98FF5C;color:#222;text-decoration:none;font-weight:500">${esc(link.label)}</a></p>
-  ${tail ? `<p style="margin:16px 0 0;color:#666">${esc(tail)}</p>` : ""}
+    .join("\n      ");
+  const [head, rest] = splitLead(lead);
+  return `<div style="font-family:-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo',sans-serif;font-size:15px;line-height:1.7;color:${MAIL.ink};max-width:560px">
+  <p style="margin:0 0 20px;font-size:13px;font-weight:600;color:${MAIL.faint};letter-spacing:0.01em">collab5 · 하루 가게</p>
+  ${head ? `<p style="margin:0 0 8px;font-size:20px;line-height:1.4;font-weight:700;color:${MAIL.ink};word-break:keep-all">${esc(head)}</p>` : ""}
+  <p style="margin:0 0 20px;color:${MAIL.body};word-break:keep-all">${esc(rest)}</p>
+  <div style="background:${MAIL.soft};border-radius:12px;padding:12px 16px">
+    <table style="border-collapse:collapse;font-size:15px;width:100%">
+      ${tr}
+    </table>
+  </div>
+  <p style="margin:24px 0 0"><a href="${esc(link.href)}" style="display:inline-block;padding:13px 22px;border-radius:12px;background:${MAIL.kiwi};color:#222;text-decoration:none;font-weight:600">${esc(link.label)}</a></p>
+  ${tail ? `<p style="margin:20px 0 0;color:${MAIL.mute};font-size:14px;word-break:keep-all">${esc(tail)}</p>` : ""}
 </div>`;
 }
 
