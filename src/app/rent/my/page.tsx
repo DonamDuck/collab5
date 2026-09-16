@@ -40,6 +40,8 @@ export const metadata: Metadata = {
 
 const emptyCls = "mt-5 text-[15px] leading-relaxed break-keep text-faint";
 const h2Cls = "text-[21px] font-bold leading-snug tracking-tight text-ink";
+/** 들어온 요청 안의 무리 이름. 절 제목(21)보다 두 단 아래, 목록 줄 이름(17)보다 조용하게. */
+const h3Cls = "mt-6 text-[15px] font-medium text-mute";
 
 // 연락처 블록은 `../ContactBlock`(09-14) — `/rent/done`과 같은 얼굴이어야 해서 밖으로 뺐다.
 //   ⚠️여기 오기 전에 호출부가 `isRevealed`로 거른다. 블록은 그 판정을 다시 하지 않는다.
@@ -157,6 +159,145 @@ export default async function MyRentPage({
   const savedLine = saved ? SAVED_LINE[saved] ?? "" : "";
   const didId = Number(didBooking) || 0;
 
+  // 🗂세 무리 — 판정은 `hostOrder`의 순위와 같은 식이다. 한쪽만 고치면 정렬과 무리가 어긋난다.
+  const toAnswer = hostBookings.filter((b) => b.status === "paid" && !bookingStarted(b));
+  const upcoming = hostBookings.filter(
+    (b) => !toAnswer.includes(b) && (b.status === "paid" || b.status === "confirmed") && !bookingFinished(b),
+  );
+  const past = hostBookings.filter((b) => !toAnswer.includes(b) && !upcoming.includes(b));
+  const openSpaces = mySpaces.filter((sp) => sp.status === "open").length;
+
+  const hostRow = (b: SpaceBooking) => {
+      const sp = spaceById.get(b.spaceId);
+      const open = isRevealed(b);
+      const brief = guestBriefs.get(b.guestUserId);
+      // 💬방금 누른 수락·거절의 결과 한 줄(`HostDecide`가 `?did=&b=`로 실어 온다). 거절은 환불 성패를 상태로 읽는다.
+      const didLine =
+        didId === b.id
+          ? did === "accept" && open
+            ? "수락했어요. 아래에 손님 연락처가 열렸어요."
+            : did === "reject" && b.status === "refunded"
+              ? "거절했어요. 손님께 전액 돌려드렸어요."
+              : did === "reject" && b.status === "rejected"
+                ? "거절했어요. 환불이 늦어지고 있어 저희가 확인하고 있어요."
+                : ""
+          : "";
+      return (
+        <Row
+          key={b.id}
+          head={
+            <>
+              <p className="truncate text-[17px] font-medium text-ink">{sp?.name ?? "내 공간"}</p>
+              {/* 375px에서 「커/피챗」처럼 낱말 중간이 꺾였다(09-17 QA) — break-keep. */}
+              <p className="mt-1 text-[15px] break-keep text-mute">
+                {bookingWhen(b)}
+                {b.headcount ? ` · ${b.headcount}명` : ""}
+                {/* ☕🩸09-16까지 사장님 쪽엔 커피챗 표시가 없었다. 손님 화면 네 곳엔 「커피챗 포함」이 뜨는데
+                    정작 커피챗을 해 줄 사람이 모르는 상태였다. 옛 예약은 옛 칸에만 값이 있어 둘 다 본다. */}
+                {b.amountChat > 0 || b.amountMentor > 0 ? " · 커피챗 신청" : ""}
+              </p>
+            </>
+          }
+          status={<BookingBadge status={b.status} viewer="host" />}
+        >
+          {/* ⭐신청자가 쓴 「그날 무엇을」 — 사장님이 수락을 정하는 근거라 이 줄에서 제일 크게 읽힌다. */}
+          <p className="mt-3 whitespace-pre-line text-[16px] leading-relaxed break-keep text-body">
+            {b.plan}
+          </p>
+          {/* 📎손님이 고른 소개서 — 어떤 브랜드가 오는지 사장님이 미리 볼 수 있게(대표 09-16). */}
+          {b.guestBrandSlug && guestBrands.get(b.guestBrandSlug) && (
+            <p className="mt-2 text-[15px] text-mute">
+              소개서{" "}
+              <Link href={`/m/${b.guestBrandSlug}`} className="text-body underline underline-offset-2">
+                {guestBrands.get(b.guestBrandSlug)}
+              </Link>
+            </p>
+          )}
+          {/* 👤수락 전 손님 정보 — 이름과 전화번호가 있는지만(09-17 QA). 번호 «값»은 수락 뒤 연락처 블록이 연다. */}
+          {brief && !open && (
+            <p className="mt-2 text-[15px] leading-relaxed break-keep text-mute">
+              손님 <span className="text-body">{brief.name || "이름을 안 적으셨어요"}</span>
+              {" · "}
+              {brief.hasPhone || b.guestPhone ? "전화번호를 남기셨어요" : "전화번호가 없어 이메일로 연락하셔야 해요"}
+            </p>
+          )}
+          {/* 받는 금액을 적는다. 낸 금액만 보이면 정산 때 「이만큼 들어올 줄 알았는데」가 된다.
+              💸09-17 QA — 거절·환불·취소 줄에도 「받으실 돈」이 그대로 떠 있었다. 받을 돈이 아닌 줄은 무슨 돈인지 바꿔 적고 흐리게.
+              ⚠️손님 취소는 날에 따라 일부가 남아 정산될 수 있어(약관 제8조) 금액을 단정하지 않는다. */}
+          <p className="mt-2 text-[15px] text-mute">
+            {b.status === "refunded" ? (
+              <span className="text-faint">손님께 전액 돌려드렸어요 · {won(b.amountTotal)}</span>
+            ) : b.status === "rejected" ? (
+              <span className="text-faint">돌려드릴 돈 {won(b.amountTotal)} · 저희가 환불을 챙기고 있어요</span>
+            ) : b.status === "cancelled" ? (
+              <span className="text-faint">손님 취소 · 낸 돈 {won(b.amountTotal)}</span>
+            ) : (
+              <>
+                받으실 돈 {won(b.amountPayout)}
+                <span className="text-faint"> · 손님이 낸 돈 {won(b.amountTotal)}</span>
+              </>
+            )}
+          </p>
+
+          {/* ⏯이용 시간이 시작하면 수락·거절 버튼을 거둔다(서버도 막는다). 결제 완료는 phase 1에서 곧 예약 완료다. */}
+          {b.status === "paid" && !bookingStarted(b) && (
+            <HostDecide bookingId={b.id} amountTotal={b.amountTotal} />
+          )}
+          {/* 🙋관리자에게 환불 신청(대표 09-16) — 수락해 확정한 예약에서만. 수락 전(결제 완료)엔 거절이 곧 전액 환불이라
+              관리자를 거칠 일이 없다. 단 수락 안 한 채 이용 시간이 시작되면 거절이 막히니 그때는 신청으로 연다.
+              신청이 들어가 있으면 버튼 대신 상태 한 줄. */}
+          {(b.status === "confirmed" || (b.status === "paid" && bookingStarted(b))) &&
+            (b.refundRequestedAt ? (
+              <p className="mt-3 text-[15px] leading-relaxed break-keep text-lemon-on">
+                환불 신청을 받았어요. 사장님과 손님께 전화로 확인한 뒤 처리해 드릴게요.
+              </p>
+            ) : (
+              <RefundRequest bookingId={b.id} />
+            ))}
+
+          {/* 🏦수락한 예약인데 계좌가 없으면 한 줄(09-17). 이용일이 지나도 보낼 곳이 없다. 날짜 약속은 안 한다. */}
+          {!payoutAccount && (b.status === "confirmed" || b.status === "done") && (
+            <p className="mt-2 text-[15px] leading-relaxed break-keep text-lemon-on">
+              <Link href="#payout-account" className="underline underline-offset-2">
+                정산 받을 계좌를 등록해 주세요
+              </Link>
+            </p>
+          )}
+
+          {didLine && (
+            <p role="status" className="mt-3 text-[15px] leading-relaxed break-keep text-mint-on">
+              {didLine}
+            </p>
+          )}
+
+          {open ? (
+            // 🎨09-17 QA — 연락처 블록이 `section` + 위 구분선 + 19px 제목이라 **다음 절처럼** 떠 보였다.
+            //   블록(`ContactBlock`)은 `/rent/done`과 같이 쓰는 파일이라 안 고치고, 이 줄 안에서만 옷을 줄인다:
+            //   옅은 판 안으로 넣고 구분선·위 여백을 지우고 제목을 본문 크기로. 자식 선택자라 이 자리에만 먹는다.
+            <div className="mt-4 rounded-lg bg-surface-soft px-4 py-3 [&>section]:mt-0 [&>section]:border-t-0 [&>section]:pt-0 [&_h2]:text-[16px] [&_h2]:font-medium">
+              <ContactBlock
+                who="손님"
+                // 🩸09-16까지 제목을 안 넘겨서 기본값 「가게 정보」가 떴다. 사장님이 보는 건 손님 정보다.
+                title="손님 연락처"
+                // ☎️신청 때 받은 번호가 프로필 번호보다 먼저다(09-17). 옛 예약은 프로필 번호로.
+                profile={withBookingPhone(contacts.get(b.guestUserId) ?? null, b.guestPhone)}
+                // 🙈이용일이 지난 예약은 가린다 — 손님 쪽(`GuestBookingRow`)과 같은 규칙(09-17 QA 🔴).
+                //   09-16까지 사장님 화면만 안 넘겨서, 다녀간 뒤에도 손님 번호·메일이 계속 열려 있었다.
+                masked={b.status === "done" || bookingFinished(b)}
+              />
+            </div>
+          ) : null}
+          {/* 🔻09-17 QA — 「수락하시면 신청하신 분의 연락처가 열려요」 줄 삭제. 바로 위 버튼 「수락하고 연락처 열기」가 같은 말이었다. */}
+
+          {b.hostMessage && (
+            <p className="mt-2 text-[15px] leading-relaxed break-keep text-faint">
+              남기신 말 · {b.hostMessage}
+            </p>
+          )}
+        </Row>
+      );
+    };
+
   return (
     <main className="mx-auto w-full max-w-[720px] px-4 pt-8 pb-16 sm:px-6 sm:pt-12">
       {/* 한 번 뜬 알림 표시(`saved`·`did`)를 주소에서 지운다. key로 새로 달아야 같은 화면 안의 두 번째 알림에서도 돈다. */}
@@ -180,8 +321,74 @@ export default async function MyRentPage({
         </p>
       )}
 
-      {/* ── ① 내가 올린 공간 ── */}
-      <section className="mt-12">
+      {/* 📊09-17 디자인팀 — 숫자 세 칸. 절까지 내려가기 전에 «오늘 할 일이 있나»를 첫 화면에서 답한다(원티드·리멤버 대시보드).
+          칸을 누르면 그 무리로 내려간다. 새 요청이 있을 때만 그 숫자에 레몬 글자색을 준다 — 기다리는 것의 색(`BookingBadge`)과 같다. */}
+      {(mySpaces.length > 0 || hostBookings.length > 0) && (
+        <nav aria-label="요약" className="mt-8 grid grid-cols-3 gap-2 sm:gap-3">
+          {[
+            { href: "#requests", n: toAnswer.length, label: "새 요청", hot: toAnswer.length > 0 },
+            { href: "#requests", n: upcoming.length, label: "다가오는 예약", hot: false },
+            { href: "#spaces", n: openSpaces, label: "공개 중인 공간", hot: false },
+          ].map((t) => (
+            <a
+              key={t.label}
+              href={t.href}
+              className="rounded-lg border border-hairline bg-surface px-3 py-3.5 transition-colors hover:bg-surface-soft sm:px-5 sm:py-4"
+            >
+              <span className={`block text-[24px] font-bold leading-none tabular-nums ${t.hot ? "text-lemon-on" : "text-ink"}`}>
+                {t.n}
+              </span>
+              <span className="mt-2 block text-[14px] leading-snug break-keep text-mute sm:text-[15px]">{t.label}</span>
+            </a>
+          ))}
+        </nav>
+      )}
+
+      {/* ── ① 들어온 요청 ── */}
+      {/* 🎨09-17 디자인팀 — 절 순서를 **요청 → 공간 → 계좌**로 뒤집었다. 이 화면을 여는 첫 질문은 「답할 게 있나」인데
+          (`hostOrder` 머리말), 그 답이 공간 네 줄과 계좌 아래 세 번째 절에 있어 폰에선 두 화면을 내려가야 나왔다.
+          그리고 한 목록을 **답할 것 / 다가오는 예약 / 지난 요청** 세 무리로 갈랐다. 순서만으로는 어디서 무리가 바뀌는지
+          안 보여서, 새 요청 아래 취소 줄이 같은 얼굴로 이어졌다. 지난 요청은 접어 둔다. */}
+      {/* 공간이 하나도 없는 분에겐 이 절을 안 그린다. 받을 수 없는 요청의 빈 상태가 「새로 올리기」보다 먼저 서게 된다. */}
+      {(mySpaces.length > 0 || hostBookings.length > 0) && (
+      <section id="requests" className="mt-10 scroll-mt-20">
+        <h2 className={h2Cls}>들어온 요청</h2>
+        {hostBookings.length === 0 ? (
+          <p className={emptyCls}>아직 들어온 요청이 없어요.</p>
+        ) : (
+          <>
+            {toAnswer.length > 0 && (
+              <>
+                <h3 className={h3Cls}>답을 기다려요 · {toAnswer.length}</h3>
+                <ul className="mt-2">{toAnswer.map(hostRow)}</ul>
+              </>
+            )}
+            {upcoming.length > 0 && (
+              <>
+                <h3 className={h3Cls}>다가오는 예약 · {upcoming.length}</h3>
+                <ul className="mt-2">{upcoming.map(hostRow)}</ul>
+              </>
+            )}
+            {past.length > 0 && (
+              // 지난 것은 접는다. 열 일은 드물고, 펼쳐 두면 폰에서 이 절이 여섯 화면이 된다.
+              //   방금 거절한 줄(`?did=reject`)이 여기 있으면 펼친 채로 연다 — 결과 한 줄을 봐야 한다.
+              <details className="group mt-8" open={past.some((b) => b.id === didId)}>
+                <summary className="flex cursor-pointer list-none items-center gap-1.5 py-[12px] text-[15px] font-medium text-mute [&::-webkit-details-marker]:hidden">
+                  지난 요청 · {past.length}
+                  <svg aria-hidden="true" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="size-[16px] transition-transform group-open:rotate-180">
+                    <path d="m5 7.5 5 5 5-5" />
+                  </svg>
+                </summary>
+                <ul className="mt-2">{past.map(hostRow)}</ul>
+              </details>
+            )}
+          </>
+        )}
+      </section>
+      )}
+
+      {/* ── ② 내가 올린 공간 ── */}
+      <section id="spaces" className="mt-12 scroll-mt-20">
         <div className="flex items-baseline justify-between gap-3">
           <h2 className={h2Cls}>내가 올린 공간</h2>
           <Link href="/rent/new" className="shrink-0 py-[12px] text-[15px] text-mute underline underline-offset-2">
@@ -247,147 +454,6 @@ export default async function MyRentPage({
           <PayoutAccount initial={payoutAccount} />
         </section>
       )}
-
-      {/* ── ② 들어온 요청 ── */}
-      <section className="mt-12">
-        <h2 className={h2Cls}>들어온 요청</h2>
-        {hostBookings.length === 0 ? (
-          <p className={emptyCls}>아직 들어온 요청이 없어요.</p>
-        ) : (
-          <ul className="mt-5">
-            {hostBookings.map((b) => {
-              const sp = spaceById.get(b.spaceId);
-              const open = isRevealed(b);
-              const brief = guestBriefs.get(b.guestUserId);
-              // 💬방금 누른 수락·거절의 결과 한 줄(`HostDecide`가 `?did=&b=`로 실어 온다). 거절은 환불 성패를 상태로 읽는다.
-              const didLine =
-                didId === b.id
-                  ? did === "accept" && open
-                    ? "수락했어요. 아래에 손님 연락처가 열렸어요."
-                    : did === "reject" && b.status === "refunded"
-                      ? "거절했어요. 손님께 전액 돌려드렸어요."
-                      : did === "reject" && b.status === "rejected"
-                        ? "거절했어요. 환불이 늦어지고 있어 저희가 확인하고 있어요."
-                        : ""
-                  : "";
-              return (
-                <Row
-                  key={b.id}
-                  head={
-                    <>
-                      <p className="truncate text-[17px] font-medium text-ink">{sp?.name ?? "내 공간"}</p>
-                      {/* 375px에서 「커/피챗」처럼 낱말 중간이 꺾였다(09-17 QA) — break-keep. */}
-                      <p className="mt-1 text-[15px] break-keep text-mute">
-                        {bookingWhen(b)}
-                        {b.headcount ? ` · ${b.headcount}명` : ""}
-                        {/* ☕🩸09-16까지 사장님 쪽엔 커피챗 표시가 없었다. 손님 화면 네 곳엔 「커피챗 포함」이 뜨는데
-                            정작 커피챗을 해 줄 사람이 모르는 상태였다. 옛 예약은 옛 칸에만 값이 있어 둘 다 본다. */}
-                        {b.amountChat > 0 || b.amountMentor > 0 ? " · 커피챗 신청" : ""}
-                      </p>
-                    </>
-                  }
-                  status={<BookingBadge status={b.status} viewer="host" />}
-                >
-                  {/* ⭐신청자가 쓴 「그날 무엇을」 — 사장님이 수락을 정하는 근거라 이 줄에서 제일 크게 읽힌다. */}
-                  <p className="mt-3 whitespace-pre-line text-[16px] leading-relaxed break-keep text-body">
-                    {b.plan}
-                  </p>
-                  {/* 📎손님이 고른 소개서 — 어떤 브랜드가 오는지 사장님이 미리 볼 수 있게(대표 09-16). */}
-                  {b.guestBrandSlug && guestBrands.get(b.guestBrandSlug) && (
-                    <p className="mt-2 text-[15px] text-mute">
-                      소개서{" "}
-                      <Link href={`/m/${b.guestBrandSlug}`} className="text-body underline underline-offset-2">
-                        {guestBrands.get(b.guestBrandSlug)}
-                      </Link>
-                    </p>
-                  )}
-                  {/* 👤수락 전 손님 정보 — 이름과 전화번호가 있는지만(09-17 QA). 번호 «값»은 수락 뒤 연락처 블록이 연다. */}
-                  {brief && !open && (
-                    <p className="mt-2 text-[15px] leading-relaxed break-keep text-mute">
-                      손님 <span className="text-body">{brief.name || "이름을 안 적으셨어요"}</span>
-                      {" · "}
-                      {brief.hasPhone || b.guestPhone ? "전화번호를 남기셨어요" : "전화번호가 없어 이메일로 연락하셔야 해요"}
-                    </p>
-                  )}
-                  {/* 받는 금액을 적는다. 낸 금액만 보이면 정산 때 「이만큼 들어올 줄 알았는데」가 된다.
-                      💸09-17 QA — 거절·환불·취소 줄에도 「받으실 돈」이 그대로 떠 있었다. 받을 돈이 아닌 줄은 무슨 돈인지 바꿔 적고 흐리게.
-                      ⚠️손님 취소는 날에 따라 일부가 남아 정산될 수 있어(약관 제8조) 금액을 단정하지 않는다. */}
-                  <p className="mt-2 text-[15px] text-mute">
-                    {b.status === "refunded" ? (
-                      <span className="text-faint">손님께 전액 돌려드렸어요 · {won(b.amountTotal)}</span>
-                    ) : b.status === "rejected" ? (
-                      <span className="text-faint">돌려드릴 돈 {won(b.amountTotal)} · 저희가 환불을 챙기고 있어요</span>
-                    ) : b.status === "cancelled" ? (
-                      <span className="text-faint">손님 취소 · 낸 돈 {won(b.amountTotal)}</span>
-                    ) : (
-                      <>
-                        받으실 돈 {won(b.amountPayout)}
-                        <span className="text-faint"> · 손님이 낸 돈 {won(b.amountTotal)}</span>
-                      </>
-                    )}
-                  </p>
-
-                  {/* ⏯이용 시간이 시작하면 수락·거절 버튼을 거둔다(서버도 막는다). 결제 완료는 phase 1에서 곧 예약 완료다. */}
-                  {b.status === "paid" && !bookingStarted(b) && (
-                    <HostDecide bookingId={b.id} amountTotal={b.amountTotal} />
-                  )}
-                  {/* 🙋관리자에게 환불 신청(대표 09-16) — 수락해 확정한 예약에서만. 수락 전(결제 완료)엔 거절이 곧 전액 환불이라
-                      관리자를 거칠 일이 없다. 단 수락 안 한 채 이용 시간이 시작되면 거절이 막히니 그때는 신청으로 연다.
-                      신청이 들어가 있으면 버튼 대신 상태 한 줄. */}
-                  {(b.status === "confirmed" || (b.status === "paid" && bookingStarted(b))) &&
-                    (b.refundRequestedAt ? (
-                      <p className="mt-3 text-[15px] leading-relaxed break-keep text-lemon-on">
-                        환불 신청을 받았어요. 사장님과 손님께 전화로 확인한 뒤 처리해 드릴게요.
-                      </p>
-                    ) : (
-                      <RefundRequest bookingId={b.id} />
-                    ))}
-
-                  {/* 🏦수락한 예약인데 계좌가 없으면 한 줄(09-17). 이용일이 지나도 보낼 곳이 없다. 날짜 약속은 안 한다. */}
-                  {!payoutAccount && (b.status === "confirmed" || b.status === "done") && (
-                    <p className="mt-2 text-[15px] leading-relaxed break-keep text-lemon-on">
-                      <Link href="#payout-account" className="underline underline-offset-2">
-                        정산 받을 계좌를 등록해 주세요
-                      </Link>
-                    </p>
-                  )}
-
-                  {didLine && (
-                    <p role="status" className="mt-3 text-[15px] leading-relaxed break-keep text-mint-on">
-                      {didLine}
-                    </p>
-                  )}
-
-                  {open ? (
-                    // 🎨09-17 QA — 연락처 블록이 `section` + 위 구분선 + 19px 제목이라 **다음 절처럼** 떠 보였다.
-                    //   블록(`ContactBlock`)은 `/rent/done`과 같이 쓰는 파일이라 안 고치고, 이 줄 안에서만 옷을 줄인다:
-                    //   옅은 판 안으로 넣고 구분선·위 여백을 지우고 제목을 본문 크기로. 자식 선택자라 이 자리에만 먹는다.
-                    <div className="mt-4 rounded-lg bg-surface-soft px-4 py-3 [&>section]:mt-0 [&>section]:border-t-0 [&>section]:pt-0 [&_h2]:text-[16px] [&_h2]:font-medium">
-                      <ContactBlock
-                        who="손님"
-                        // 🩸09-16까지 제목을 안 넘겨서 기본값 「가게 정보」가 떴다. 사장님이 보는 건 손님 정보다.
-                        title="손님 연락처"
-                        // ☎️신청 때 받은 번호가 프로필 번호보다 먼저다(09-17). 옛 예약은 프로필 번호로.
-                        profile={withBookingPhone(contacts.get(b.guestUserId) ?? null, b.guestPhone)}
-                        // 🙈이용일이 지난 예약은 가린다 — 손님 쪽(`GuestBookingRow`)과 같은 규칙(09-17 QA 🔴).
-                        //   09-16까지 사장님 화면만 안 넘겨서, 다녀간 뒤에도 손님 번호·메일이 계속 열려 있었다.
-                        masked={b.status === "done" || bookingFinished(b)}
-                      />
-                    </div>
-                  ) : null}
-                  {/* 🔻09-17 QA — 「수락하시면 신청하신 분의 연락처가 열려요」 줄 삭제. 바로 위 버튼 「수락하고 연락처 열기」가 같은 말이었다. */}
-
-                  {b.hostMessage && (
-                    <p className="mt-2 text-[15px] leading-relaxed break-keep text-faint">
-                      남기신 말 · {b.hostMessage}
-                    </p>
-                  )}
-                </Row>
-              );
-            })}
-          </ul>
-        )}
-      </section>
 
       {/* ── ③ 내가 빌린 공간 ── */}
       {/* 🔗09-16 손님 전용 화면(`/rent/requests`, B81)이 생겼다. 이 절은 남긴다 — 사장님이면서 남의 공간을
