@@ -341,7 +341,7 @@ export default async function SpaceDetailPage({
               사장님이 거절하시면 <span className="font-medium text-ink">전액</span> 돌려드려요.
             </p>
             <p className="mt-3 text-[16px] leading-relaxed break-keep text-body">
-              신청하고 <span className="font-medium text-ink">한 시간 안</span>에 취소하시면 남은 날과 상관없이 전액
+              결제하고 <span className="font-medium text-ink">한 시간 안</span>에 취소하시면 남은 날과 상관없이 전액
               돌려드려요.
             </p>
             {/* ✍️09-17 QA — 「남은 기간으로 정해져요」 피동·행정어. 경계가 날짜 기준이라는 것도 같이 말한다(`kstDaysUntil`). */}

@@ -123,7 +123,7 @@ function cancelReason(q: { refund: number; rate: number; daysBefore: number; gra
   if (q.refund === 0) return "당일 취소라 돌려드릴 수 없어요.";
   if (q.rate >= 1) {
     return q.grace
-      ? "예약하고 한 시간이 안 지나서 전액 돌아와요."
+      ? "결제하고 한 시간이 안 지나서 전액 돌아와요."
       : `이용일까지 ${q.daysBefore}일 남아 전액 돌아와요.`;
   }
   return `이용일이 ${q.daysBefore}일 남았을 때라 ${Math.round(q.rate * 100)}%만 돌아가요.`;

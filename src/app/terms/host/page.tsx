@@ -151,7 +151,7 @@ export default function HostTermsPage() {
             이용자의 취소에 따른 환불 기준은 회사가 정하며, 호스트가 개별적으로 달리 정할 수 없습니다.
           </p>
           <ul className="mt-2 list-disc space-y-1 pl-5">
-            <li>신청 후 1시간 이내 취소: 전액 환불</li>
+            <li>결제 후 1시간 이내 취소: 전액 환불</li>
             <li>이용일 7일 전까지: 전액 환불</li>
             <li>이용일 3일 전까지: 70% 환불</li>
             <li>이용일 1일 전까지: 50% 환불</li>
