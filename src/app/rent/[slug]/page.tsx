@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getSpacePublic, listLiveBookingsIn } from "@/lib/spaces";
-import { getSessionUserId } from "@/lib/profiles";
+import { getProfileById, getSessionUserId } from "@/lib/profiles";
 import { repo } from "@/lib/repo";
 import { accessHowLine } from "@/lib/rent-copy";
 import { futureSlots } from "@/lib/rent-time";
@@ -71,6 +71,8 @@ export default async function SpaceDetailPage({
   if (sp.status !== "open" && !isOwner) notFound();
 
   // 연결된 소개서는 **이름 글자만** 꺼내 온다. Maker 객체를 클라이언트로 넘기면 연락처가 같이 건너간다.
+  // 상호(운영하는 브랜드 이름). 사장님 실명(profiles에 따로 없다)은 안 읽는다.
+  const operatorName = (await getProfileById(sp.ownerUserId))?.brandName?.trim() ?? "";
   const brandName = sp.brandSlug ? (await repo.getMakerBySlug(sp.brandSlug))?.name ?? "" : "";
 
   // 신청자가 자기 소개서를 붙일 수 있게 목록을 준다(선택). 없어도 신청은 된다 —
@@ -211,8 +213,16 @@ export default async function SpaceDetailPage({
             등록 폼도 사장님께 *「법에 따라 신청 전에 손님께 보여드려요」*라고 적어 두었다.
             🩸그런데 09-16까지 이 화면 어디에도 그 번호가 없었다. 폼은 받고 있었는데 꺼내는 곳이 없었다.
             ⭐**개인 휴대폰은 여전히 확정 뒤에만 열린다**(`ContactBlock`). 여기 나가는 건 가게 번호다. */}
-        {sp.contactPhone.trim() && (
+        {/* 🏷상호 — 가입할 때 받는 «브랜드 이름»이다(08-15 「상호」 → 「브랜드 이름」). 09-16 대표: 상호는 보이고
+            사장님 실명은 안 보인다. 공간 이름은 사장님이 「을지로 2층 작업실」처럼 바꿀 수 있어서,
+            그것만으론 상호가 안 남는다 — 법이 청약 전에 보이라고 한 값이라 따로 한 줄 둔다. */}
+        {operatorName && (
           <p className="mt-3 text-[15px] leading-relaxed break-keep text-mute">
+            운영 <span className="text-body">{operatorName}</span>
+          </p>
+        )}
+        {sp.contactPhone.trim() && (
+          <p className="mt-1 text-[15px] leading-relaxed break-keep text-mute">
             가게 전화{" "}
             <a
               href={`tel:${sp.contactPhone.replace(/[^0-9+]/g, "")}`}

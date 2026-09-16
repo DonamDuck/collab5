@@ -400,7 +400,7 @@ export function SpaceForm({
         <L
           label="매장 전화번호"
           htmlFor="sp-phone"
-          hint="법에 따라 신청 전에 손님께 보여드려요. 사장님 개인 번호는 예약이 확정된 뒤에만 열립니다."
+          hint="법에 따라 신청 전에 손님께 보여드려요. 사장님 개인 번호는 결제를 마친 손님께만 보여요."
         >
           <input
             id="sp-phone"
@@ -415,7 +415,7 @@ export function SpaceForm({
 
         {/* 🔻09-16 「들어오는 법」 칸 삭제. 대표: *「비밀번호 이런 건 문자나 현장에서 당일에 안내하는 걸로」*.
             ⭐**우리는 그 내용을 안 가진다.** 담을 칸이 없으면 샐 일도 없다 — 방식만 고른다. */}
-        <L label="이용 안내는 어떻게 해드릴까요" hint="예약이 확정된 분께 사장님이 직접 전하시는 방법이에요. 출입 비밀번호 같은 건 collab5가 갖고 있지 않아요.">
+        <L label="이용 안내는 어떻게 해드릴까요" hint="예약한 분께 사장님이 직접 전하시는 방법이에요. 출입 비밀번호 같은 건 collab5가 갖고 있지 않아요.">
           <div className="flex flex-wrap gap-2">
             {ACCESS_OPTIONS.map(([v, t]) => (
               <button

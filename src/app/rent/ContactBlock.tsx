@@ -45,7 +45,7 @@ export function ContactBlock({
   return (
     <section className="mt-8 border-t border-hairline pt-7">
       <h2 className="text-[19px] font-bold leading-snug tracking-tight text-ink">{title}</h2>
-      <p className="mt-1 mb-4 text-[15px] text-faint">확정된 분끼리만 보여요</p>
+      <p className="mt-1 mb-4 text-[15px] text-faint">예약한 분끼리만 보여요</p>
       <InfoList>
         <InfoRow label={who} value={<span className="font-medium text-ink">{name}</span>} />
         {shopPhone?.trim() && (

@@ -176,7 +176,7 @@ export default async function MyRentPage() {
                       </p>
                     </>
                   }
-                  status={<BookingBadge status={b.status} />}
+                  status={<BookingBadge status={b.status} viewer="host" />}
                 >
                   {/* ⭐신청자가 쓴 「그날 무엇을」 — 사장님이 수락을 정하는 근거라 이 줄에서 제일 크게 읽힌다. */}
                   <p className="mt-3 whitespace-pre-line text-[16px] leading-relaxed break-keep text-body">

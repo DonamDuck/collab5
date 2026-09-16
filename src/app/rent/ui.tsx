@@ -84,8 +84,15 @@ const BOOKING_TONE: Record<BookingStatus, { label: string; cls: string }> = {
   expired: { label: "결제 시간이 지났어요", cls: "text-faint" },
 };
 
-export function BookingBadge({ status }: { status: BookingStatus }) {
-  const t = BOOKING_TONE[status] ?? BOOKING_TONE.paid;
+/** 👥보는 사람에 따라 같은 상태를 다르게 말하는 자리. 09-16 phase 1 — 손님에게 `paid`는 기다림이 아니라
+ *  «예약 완료»다(사장님 답을 기다리게 세워 두지 않는다). 사장님에게 같은 상태는 «새로 들어온 신청»이다. */
+const TONE_FOR: Record<"guest" | "host", Partial<Record<BookingStatus, { label: string; cls: string }>>> = {
+  guest: { paid: { label: "예약을 완료했어요", cls: "text-mint-on" } },
+  host: { paid: { label: "새 신청이에요", cls: "text-lemon-on" } },
+};
+
+export function BookingBadge({ status, viewer = "guest" }: { status: BookingStatus; viewer?: "guest" | "host" }) {
+  const t = TONE_FOR[viewer][status] ?? BOOKING_TONE[status] ?? BOOKING_TONE.paid;
   return <span className={`shrink-0 text-[15px] ${t.cls}`}>{t.label}</span>;
 }
 

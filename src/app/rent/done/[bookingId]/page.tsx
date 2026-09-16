@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { getBooking, getSpaceFull, isRevealed, listSpacesByIds } from "@/lib/spaces";
+import { getBooking, getSpaceFull, guestSeesHost, listSpacesByIds } from "@/lib/spaces";
 import { getSessionUserId, getProfileById } from "@/lib/profiles";
 import { ContactBlock } from "../../ContactBlock";
 import { bookingWhen, InfoPanel, InfoRow, primaryBtnCls, secondaryBtnCls, won } from "../../ui";
@@ -13,7 +13,7 @@ import { bookingWhen, InfoPanel, InfoRow, primaryBtnCls, secondaryBtnCls, won } 
 //
 // 🚨**로그인 + 그 예약의 손님 본인만.** 주소가 `/rent/done/4`라 숫자를 바꿔 남의 것을 볼 수 있는 구조다.
 //   남의 것이면 404 — 「있는데 못 본다」보다 「없다」가 새는 정보가 적다.
-// 🔑연락처·주소는 `isRevealed`가 참일 때만 읽는다. 화면에서 가리는 게 아니라 «읽지를 않는다».
+// 🔑연락처·주소는 `guestSeesHost`가 참일 때만 읽는다. 화면에서 가리는 게 아니라 «읽지를 않는다».
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
@@ -36,8 +36,8 @@ export default async function RentDonePage({ params }: { params: Promise<{ booki
   if (b.status === "pending") redirect("/rent/requests");
 
   const brief = (await listSpacesByIds([b.spaceId])).get(b.spaceId);
-  const open = isRevealed(b);
-  // 주소·들어오는 법이 든 원본은 확정된 뒤에만 읽는다.
+  // 👀09-16 phase 1 — 결제를 마치면 사장님 연락처가 바로 열린다(`guestSeesHost`). 원본(주소·안내)도 그때 읽는다.
+  const open = guestSeesHost(b);
   const space = open && brief ? await getSpaceFull(brief.slug) : null;
   const host = open && brief ? await getProfileById(brief.ownerUserId) : null;
 
@@ -46,8 +46,8 @@ export default async function RentDonePage({ params }: { params: Promise<{ booki
   // 🎉이모지는 제목 «오른쪽»에(대표: *「타이틀 우측이나 좀 뭐 재밌게」*). 왼쪽에 두면 글머리표처럼 읽혀서
   //   제목이 목록의 한 줄로 내려앉는다. 오른쪽은 문장이 끝난 뒤라 축하가 된다.
   //   ⚠️`aria-hidden` — 화면 낭독기가 「파티 크래커」를 읽으면 제목이 길어지기만 한다.
-  const title = open ? "예약이 확정됐어요" : b.status === "paid" ? "예약을 완료했어요" : "이 신청은 끝났어요";
-  const emoji = open ? "🎉" : b.status === "paid" ? "✨" : "";
+  const title = b.status === "paid" ? "예약을 완료했어요" : open ? "예약이 확정됐어요" : "이 신청은 끝났어요";
+  const emoji = b.status === "paid" ? "✨" : open ? "🎉" : "";
   const spaceName = brief?.name ?? "공간";
 
   return (
@@ -81,6 +81,26 @@ export default async function RentDonePage({ params }: { params: Promise<{ booki
 
       {open ? (
         <>
+          {b.status === "paid" && (
+            // 📌09-15 대표 문안을 바탕으로, 09-16 phase 1에 맞춰 첫 줄만 바꿨다.
+            //   전엔 「이틀 안에 연락이 없으면 전화번호를 신청 내역에서 확인」이었는데, 이제 번호가 바로 아래에 열린다.
+            <section className="mt-8 border-t border-hairline pt-7">
+              <h2 className="text-[19px] font-bold leading-snug tracking-tight text-ink">예약 안내 사항</h2>
+              <ul className="mt-4 space-y-3">
+                {[
+                  "사장님 연락처를 아래에 적어 두었어요. 이용 전에 궁금한 게 있으면 편하게 연락해 보세요.",
+                  "사장님 사정으로 어려워지면 전액 돌려드려요. 환불은 사흘에서 닷새 안에 끝나요.",
+                ].map((t) => (
+                  <li key={t} className="flex gap-2 text-[16px] leading-relaxed break-keep text-body">
+                    <span aria-hidden="true" className="text-mute">
+                      ·
+                    </span>
+                    <span className="min-w-0 flex-1">{t}</span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
           {b.hostMessage && (
             <p className="mt-6 text-[16px] leading-relaxed break-keep text-body">사장님 말씀 · {b.hostMessage}</p>
           )}
@@ -94,25 +114,6 @@ export default async function RentDonePage({ params }: { params: Promise<{ booki
             accessHow={space?.accessHow}
           />
         </>
-      ) : b.status === "paid" ? (
-        // 📌09-15 대표가 문안까지 주셨다. 맞춤법만 손봤다 — 「~거에요」는 「~거예요」가 맞고,
-        //   「1~2일 내」·「3~5일 내」는 「~일 안에」로 풀었다(우리 말투는 한자 조사를 안 쓴다).
-        <section className="mt-8 border-t border-hairline pt-7">
-          <h2 className="text-[19px] font-bold leading-snug tracking-tight text-ink">예약 안내 사항</h2>
-          <ul className="mt-4 space-y-3">
-            {[
-              "사장님께서 신청을 확인하신 뒤 개인 연락처로 연락해 주실 거예요. 이틀 안에 연락이 없으면 사장님 전화번호를 신청 내역에서 확인하실 수 있어요.",
-              "신청이 거절되면 사흘에서 닷새 안에 환불이 끝나요.",
-            ].map((t) => (
-              <li key={t} className="flex gap-2 text-[16px] leading-relaxed break-keep text-body">
-                <span aria-hidden="true" className="text-mute">
-                  ·
-                </span>
-                <span className="min-w-0 flex-1">{t}</span>
-              </li>
-            ))}
-          </ul>
-        </section>
       ) : (
         <p className="mt-6 text-[15px] leading-relaxed break-keep text-mute">
           자세한 상태는 신청 내역에서 보실 수 있어요.

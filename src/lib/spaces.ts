@@ -503,7 +503,17 @@ export async function listStuckBookings(): Promise<{ unanswered: SpaceBooking[];
   };
 }
 
-/** ⭐확정된 예약에서만 참이다 — 주소·연락처를 열어도 되는가. */
+/** 👀손님이 사장님 연락처를 볼 수 있는가 — **결제를 마친 순간부터**(대표 09-16, phase 1).
+ *
+ *  채팅이 없는 지금은 「사장님 답 기다리는 중」으로 손님을 세워 두지 않는다. 결제가 끝나면 곧 예약 완료고,
+ *  사장님 전화번호를 바로 보여 준다. 사장님이 답을 안 하는 일은 우리가 상담(카카오 채널)으로 받아 직접 처리한다.
+ *  ⏭나중에 채팅이 붙으면 「채팅으로 메시지를 보낸 이력이 있으면 규정 위반이 아니다」 같은 규정을 그 위에 얹는다.
+ *  ⚠️사장님 쪽에서 «손님» 연락처를 여는 문은 여전히 `isRevealed`(수락 뒤)다. 둘을 섞지 마라. */
+export function guestSeesHost(b: SpaceBooking): boolean {
+  return b.status === "paid" || b.status === "confirmed" || b.status === "done";
+}
+
+/** ⭐사장님이 손님 연락처를 볼 수 있는가 — 수락(확정)한 예약에서만 참이다. */
 export function isRevealed(b: SpaceBooking): boolean {
   return b.status === "confirmed" || b.status === "done";
 }

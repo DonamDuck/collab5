@@ -4,18 +4,18 @@
 //   전엔 `/rent/my` 안에만 있었다. 같은 줄을 두 화면에 따로 적으면 취소 버튼 조건이나 연락처 문이
 //   한쪽만 고쳐지는 날이 온다(이 프로젝트에서 여러 번 났다).
 //
-// 🚨연락처·주소의 문은 여전히 `isRevealed(booking)` 하나다. `loadGuestBookings`가 열린 예약의 원본과
+// 🚨사장님 연락처의 문은 `guestSeesHost(booking)` 하나다(09-16부터 결제를 마치면 열린다). `loadGuestBookings`가 열린 예약의 원본과
 //   사장님 프로필만 읽고, 줄은 받은 값을 그리기만 한다. 화면에서 가리는 게 아니라 «읽지를 않는다».
 //
 // 훅이 없는 서버 컴포넌트 파일이다(`"use client"` 없음). 취소 버튼(`GuestCancel`)만 클라이언트 조각이다.
 import Link from "next/link";
-import { getSpaceFull, isRevealed, listBookingsForGuest, listSpacesByIds, type SpaceBrief } from "@/lib/spaces";
+import { getSpaceFull, guestSeesHost, listBookingsForGuest, listSpacesByIds, type SpaceBrief } from "@/lib/spaces";
 import { getProfileById, type Profile } from "@/lib/profiles";
 import type { Space, SpaceBooking } from "@/lib/types";
 import { bookingStarted } from "@/lib/rent-time";
 import { ContactBlock } from "./ContactBlock";
 import { GuestCancel } from "./my/Actions";
-import { BookingBadge, ListRow, LockedLine, bookingWhen, won } from "./ui";
+import { BookingBadge, ListRow, bookingWhen, won } from "./ui";
 
 type Reveal = { accessNote: string; contactPhone: string; accessHow: Space["accessHow"] };
 
@@ -39,7 +39,7 @@ export async function loadGuestBookings(uid: number): Promise<GuestBookingView[]
   const hostIds = new Set<number>();
   for (const b of bookings) {
     const sp = spaces.get(b.spaceId);
-    if (!isRevealed(b) || !sp) continue;
+    if (!guestSeesHost(b) || !sp) continue;
     openSpaceIds.add(b.spaceId);
     hostIds.add(sp.ownerUserId);
   }
@@ -62,7 +62,7 @@ export async function loadGuestBookings(uid: number): Promise<GuestBookingView[]
 
   return bookings.map((b) => {
     const sp = spaces.get(b.spaceId);
-    const open = isRevealed(b) && !!sp;
+    const open = guestSeesHost(b) && !!sp;
     return {
       booking: b,
       space: sp,
@@ -79,7 +79,7 @@ const money = (b: SpaceBooking) =>
 
 export function GuestBookingRow({ view }: { view: GuestBookingView }) {
   const { booking: b, space: sp, reveal, host } = view;
-  const open = isRevealed(b);
+  const open = guestSeesHost(b);
   return (
     <ListRow
       head={
@@ -123,12 +123,8 @@ export function GuestBookingRow({ view }: { view: GuestBookingView }) {
           shopPhone={reveal?.contactPhone}
           accessHow={reveal?.accessHow}
         />
-      ) : b.status === "paid" ? (
-        // 🩸09-16 — 전엔 «열리지 않은 모든» 신청에 이 줄이 붙었다. 거절·환불·취소된 신청에도
-        //   「사장님이 수락하면…」이 떠서, 끝난 일을 기다리라고 말했다. 기다릴 게 있는 건 `paid`뿐이다.
-        //   끝난 신청은 오른쪽 상태 글자(거절됐어요·취소했어요)가 이미 말한다.
-        <LockedLine text="사장님이 수락하면 주소와 연락처가 열려요." />
       ) : null}
+      {/* 🔻09-16 「사장님이 수락하면 주소와 연락처가 열려요」 삭제 — 결제를 마치면 바로 열린다(대표, phase 1). */}
 
       {b.hostMessage && (
         <p className="mt-2 text-[15px] leading-relaxed break-keep text-body">사장님 말씀 · {b.hostMessage}</p>
