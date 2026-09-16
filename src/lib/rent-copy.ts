@@ -45,3 +45,17 @@ export function withJosa(word: string, pair: "이/가" | "을/를" | "은/는"):
   if (!last || code < 0 || code > 11171) return `${word}${withBatchim}(${without})`;
   return `${word}${code % 28 === 0 ? without : withBatchim}`;
 }
+
+/** ☕커피챗을 «언제» 하는지 — 화면·팝업·메일이 이 한 줄만 쓴다(대표 09-17).
+ *  🩸09-16 QA: 상세는 「협의한 날짜」, 손님 메일은 「그날」, 사장님 메일엔 말이 없었다. 4만원짜리 옵션의 이행일이 세 갈래였다.
+ *  ⭐대표 결정 — 시간은 사장님이 정한다(*「알려줄 지식이나 마음가짐이 있는 분들이라면 알아서 잘 하실 거」*).
+ *    그래서 우리가 날짜를 박지 않고, 누가 정하는지만 말한다. */
+export const COFFEE_CHAT_WHEN_GUEST = "커피챗 시간은 예약 뒤에 사장님이 정해서 연락드려요.";
+export const COFFEE_CHAT_WHEN_HOST = "커피챗 시간은 사장님이 정해서 손님께 알려 주세요.";
+
+/** 📛예약 상태를 부르는 이름 — 하루 가게 맥락을 넣은 긴 문장(대표 09-17). 배지는 짧게, 제목·첫 줄은 이것. */
+export const BOOKING_HEADLINE = {
+  guestPaid: "하루 가게 예약이 완료됐어요",
+  guestConfirmed: "예약 확정! 사장님 확인이 끝났어요",
+  hostPaid: "하루 가게 요청이 들어왔어요",
+} as const;
