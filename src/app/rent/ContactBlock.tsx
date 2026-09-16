@@ -23,6 +23,7 @@ export function ContactBlock({
   shopPhone,
   accessHow,
   title = "가게 정보",
+  masked = false,
 }: {
   /** 「사장님」 또는 「신청하신 분」 */
   who: string;
@@ -38,17 +39,25 @@ export function ContactBlock({
   accessHow?: AccessHow;
   /** 절 제목. 손님이 보면 「가게 정보」, 사장님이 보면 「신청하신 분 정보」다. */
   title?: string;
+  /** 🙈이용일이 지난 예약이면 연락처를 「-」로 가린다(대표 09-16).
+   *  다녀온 뒤까지 번호·메일이 열려 있을 이유가 없고, 옛 공간의 「들어오는 법」엔 출입 비밀번호가 남아 있을 수 있다.
+   *  줄은 지우지 않고 「-」로 둔다 — 줄이 통째로 사라지면 «원래 없던 정보»로 읽힌다. */
+  masked?: boolean;
 }) {
   const name = profile?.brandName?.trim() || "이름을 안 적으셨어요";
-  const phone = profile?.phone?.trim() ?? "";
-  const email = profile?.email?.trim() ?? "";
+  const phone = masked ? "" : profile?.phone?.trim() ?? "";
+  const email = masked ? "" : profile?.email?.trim() ?? "";
   return (
     <section className="mt-8 border-t border-hairline pt-7">
       <h2 className="text-[19px] font-bold leading-snug tracking-tight text-ink">{title}</h2>
-      <p className="mt-1 mb-4 text-[15px] text-faint">예약한 분끼리만 보여요</p>
+      <p className="mt-1 mb-4 text-[15px] text-faint">
+        {masked ? "이용일이 지나 연락처는 가려 두었어요" : "예약한 분끼리만 보여요"}
+      </p>
       <InfoList>
         <InfoRow label={who} value={<span className="font-medium text-ink">{name}</span>} />
-        {shopPhone?.trim() && (
+        {masked ? (
+          <InfoRow label="가게 전화" value={<span className="text-mute">-</span>} />
+        ) : shopPhone?.trim() && (
           <InfoRow
             label="가게 전화"
             value={
@@ -61,7 +70,9 @@ export function ContactBlock({
         <InfoRow
           label="전화번호"
           value={
-            phone ? (
+            masked ? (
+              <span className="text-mute">-</span>
+            ) : phone ? (
               // 눌러서 바로 걸 수 있게. 확정된 뒤의 연락은 대개 「지금」 해야 하는 일이다.
               <a href={`tel:${phone.replace(/[^0-9+]/g, "")}`} className="underline underline-offset-2">
                 {phone}
@@ -71,6 +82,7 @@ export function ContactBlock({
             )
           }
         />
+        {masked && <InfoRow label="이메일" value={<span className="text-mute">-</span>} />}
         {email && (
           <InfoRow
             label="이메일"
@@ -82,7 +94,7 @@ export function ContactBlock({
           />
         )}
         {address && <InfoRow label="주소" value={address} />}
-        {accessNote && (
+        {!masked && accessNote && (
           <InfoRow label="들어오는 법" value={<span className="whitespace-pre-line">{accessNote}</span>} />
         )}
         {accessHow && <InfoRow label="이용 안내" value={accessHowLine(accessHow)} />}

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { sweepBookings, listSpacesByOwner, listBookingsForHost, isRevealed } from "@/lib/spaces";
 import { getSessionUserId, getProfileById, type Profile } from "@/lib/profiles";
+import { repo } from "@/lib/repo";
 import type { Space } from "@/lib/types";
 import { isRentAdmin } from "@/lib/rent-actions";
 import { HostDecide, PublishButton, RefundRequest } from "./Actions";
@@ -72,6 +73,15 @@ export default async function MyRentPage() {
   // 🔑연락처 조회는 **열린 예약 것만** 한다. 전부 미리 읽어 두고 화면에서 가리는 방식은,
   //   서버 컴포넌트라 HTML에 안 실리긴 하지만 「가리기」가 판정을 대신하게 만든다.
   //   그러다 한 번 쓰는 자리가 늘면 그때 새어 나간다.
+  // 📎손님이 신청하며 고른 소개서(대표 09-16: 사장님이 볼 수 있게). 이름만 한 번에 읽어 둔다.
+  const guestBrands = new Map<string, string>();
+  await Promise.all(
+    Array.from(new Set(hostBookings.map((b) => b.guestBrandSlug).filter(Boolean))).map(async (slug) => {
+      const m = await repo.getMakerBySlug(slug);
+      if (m) guestBrands.set(slug, m.name);
+    }),
+  );
+
   const contactIds = new Set<number>();
   //   보낸 신청 쪽 사장님 연락처는 `loadGuestBookings`가 같은 규칙으로 따로 읽는다.
   for (const b of hostBookings) if (isRevealed(b)) contactIds.add(b.guestUserId);
@@ -182,6 +192,15 @@ export default async function MyRentPage() {
                   <p className="mt-3 whitespace-pre-line text-[16px] leading-relaxed break-keep text-body">
                     {b.plan}
                   </p>
+                  {/* 📎손님이 고른 소개서 — 어떤 브랜드가 오는지 사장님이 미리 볼 수 있게(대표 09-16). */}
+                  {b.guestBrandSlug && guestBrands.get(b.guestBrandSlug) && (
+                    <p className="mt-2 text-[15px] text-mute">
+                      소개서{" "}
+                      <Link href={`/m/${b.guestBrandSlug}`} className="text-body underline underline-offset-2">
+                        {guestBrands.get(b.guestBrandSlug)}
+                      </Link>
+                    </p>
+                  )}
                   {/* 받는 금액을 적는다. 낸 금액만 보이면 정산 때 「이만큼 들어올 줄 알았는데」가 된다. */}
                   <p className="mt-2 text-[15px] text-mute">
                     받으실 돈 {won(b.amountPayout)}

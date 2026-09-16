@@ -5,6 +5,7 @@ import { getBooking, getSpaceFull, guestSeesHost, listSpacesByIds } from "@/lib/
 import { getSessionUserId, getProfileById } from "@/lib/profiles";
 import { ContactBlock } from "../../ContactBlock";
 import { KAKAO_CHAT_URL } from "@/lib/site";
+import { bookingFinished } from "@/lib/rent-time";
 import { bookingWhen, InfoPanel, InfoRow, primaryBtnCls, secondaryBtnCls, won } from "../../ui";
 
 // 하루 가게 — 신청 완료 화면 (2026-09-14)
@@ -113,6 +114,8 @@ export default async function RentDonePage({ params }: { params: Promise<{ booki
             accessNote={space?.accessNote}
             shopPhone={space?.contactPhone}
             accessHow={space?.accessHow}
+            // 🙈이용일이 지난 예약은 연락처를 가린다(대표 09-16)
+            masked={b.status === "done" || bookingFinished(b)}
           />
         </>
       ) : (

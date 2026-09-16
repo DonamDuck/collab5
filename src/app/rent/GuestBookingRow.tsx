@@ -12,7 +12,7 @@ import Link from "next/link";
 import { getSpaceFull, guestSeesHost, listBookingsForGuest, listSpacesByIds, type SpaceBrief } from "@/lib/spaces";
 import { getProfileById, type Profile } from "@/lib/profiles";
 import type { Space, SpaceBooking } from "@/lib/types";
-import { bookingStarted } from "@/lib/rent-time";
+import { bookingFinished, bookingStarted } from "@/lib/rent-time";
 import { ContactBlock } from "./ContactBlock";
 import { GuestCancel } from "./my/Actions";
 import { BookingBadge, ListRow, bookingWhen, won } from "./ui";
@@ -122,6 +122,8 @@ export function GuestBookingRow({ view }: { view: GuestBookingView }) {
           accessNote={reveal?.accessNote}
           shopPhone={reveal?.contactPhone}
           accessHow={reveal?.accessHow}
+          // 🙈이용일이 지난 예약은 연락처를 가린다(대표 09-16)
+          masked={b.status === "done" || bookingFinished(b)}
         />
       ) : null}
       {/* 🔻09-16 「사장님이 수락하면 주소와 연락처가 열려요」 삭제 — 결제를 마치면 바로 열린다(대표, phase 1). */}

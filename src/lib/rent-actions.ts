@@ -12,8 +12,10 @@ import {
 } from "./spaces";
 import { approvePayment, cancelPayment, guestCancelRefundRate } from "./rent-payment";
 import { geocode } from "./geocode";
+import { repo } from "./repo";
 import {
   notifyBookingPaid, notifyBookingConfirmed, notifyBookingRejected, notifyBookingCancelled,
+  notifyBookingPaidToGuest, notifyBookingConfirmedToHost, notifyBookingCancelledToGuest, notifyAdminRefund,
 } from "./rent-notify";
 import { bookingStarted, dateLabel, kstDaysUntil, hoursBetween, fitsOpenSlot, nowHhmmKst, overlaps, toMinutes, todayKst } from "./rent-time";
 import type { Space, SpaceBooking, SpaceUseType, SpaceCategory, SpaceScope, OpenSlot, AccessHow } from "./types";
@@ -334,7 +336,12 @@ export async function confirmBookingAction(
   revalidatePath("/rent/my");
   await safeNotify(async () => {
     const p = await notifyParties(paid);
-    if (p) await notifyBookingPaid(paid, p.space, p.host, p.guest);
+    if (!p) return;
+    // 📨대표 09-16 — 예약 신청(결제 완료) 때 사장님과 손님 둘 다. 사장님 메일엔 손님이 고른 소개서를 붙인다.
+    const brand = paid.guestBrandSlug ? await repo.getMakerBySlug(paid.guestBrandSlug) : null;
+    const guestBrand = brand ? { name: brand.name, slug: brand.slug } : undefined;
+    await notifyBookingPaid(paid, p.space, p.host, p.guest, guestBrand);
+    await notifyBookingPaidToGuest(paid, p.space, p.host, p.guest);
   });
   return { ok: true, message: "예약을 완료했어요.", bookingId: paid.id }; // 👀09-16 대표 phase 1 — 결제를 마치면 곧 예약 완료, 기다리게 하지 않는다
 }
@@ -393,7 +400,10 @@ export async function decideBookingAction(
   revalidatePath("/rent/my");
   await safeNotify(async () => {
     const p = await notifyParties(decided);
-    if (p) await notifyBookingConfirmed(decided, p.space, p.host, p.guest);
+    if (!p) return;
+    // 📨대표 09-16 — 예약 확정 때 손님과 사장님 둘 다.
+    await notifyBookingConfirmed(decided, p.space, p.host, p.guest);
+    await notifyBookingConfirmedToHost(decided, p.space, p.host, p.guest);
   });
   return { ok: true, message: "수락했어요. 이제 신청자 연락처가 보입니다." };
 }
@@ -463,7 +473,10 @@ export async function cancelBookingAction(bookingId: number): Promise<ActionResu
   revalidatePath("/rent/my");
   await safeNotify(async () => {
     const p = await notifyParties(b);
-    if (p) await notifyBookingCancelled({ ...b, status: "cancelled" }, p.space, p.host, p.guest);
+    if (!p) return;
+    // 📨대표 09-16 — 취소 완료 때 사장님과 손님 둘 다. 손님 메일엔 실제로 돌려드린 금액을 넘긴다(다시 계산하지 않는다).
+    await notifyBookingCancelled({ ...b, status: "cancelled" }, p.space, p.host, p.guest);
+    await notifyBookingCancelledToGuest({ ...b, status: "cancelled" }, p.space, p.host, p.guest, refund);
   });
   return { ok: true, message: refund > 0 ? `취소했어요. ${refund.toLocaleString()}원이 환불됩니다.` : "취소했어요. 당일 취소라 환불은 없습니다." };
 }
@@ -514,7 +527,11 @@ export async function approveRefundAction(bookingId: number): Promise<ActionResu
   if (!synced.ok) console.error(`[rent-actions] 🚨🚨관리자 환불은 됐는데 기록 실패 — 수동 확인 order=${b.orderId}`);
   revalidatePath("/rent/payouts");
   revalidatePath("/rent/my");
-  // 📨손님·사장님 메일 — 메일 일꾼 결과를 합친 뒤 여기 배선한다(notifyAdminRefund).
+  // 📨대표 09-16 — 관리자 승인 환불도 «취소 완료»라 손님과 사장님 둘 다에게.
+  await safeNotify(async () => {
+    const p = await notifyParties(b);
+    if (p) await notifyAdminRefund({ ...b, status: "refunded" }, p.space, p.host, p.guest, refundAmount);
+  });
   return { ok: true, message: `${refundAmount.toLocaleString()}원을 손님께 돌려드렸어요.` };
 }
 
