@@ -22,11 +22,15 @@ create table if not exists payments (
 
   -- 📦어디서 온 결제인가. 리포트 유료화가 붙는 날 값을 하나 더한다.
   purpose             text not null check (purpose in ('rent_booking')),
-  booking_id          bigint unique references space_bookings(id) on delete restrict,
-  buying_user_id      bigint not null references users(user_id) on delete restrict,   -- 돈을 낸 사람(대표 09-16 이름)
-  selling_user_id     bigint references users(user_id) on delete restrict,            -- 돈을 받을 사람 = 공간 주인(대표 09-16)
-  -- ⚠️selling_user_id는 null일 수 있다. 리포트 유료화처럼 판매자가 «우리»인 결제엔 사람이 없다.
-  --   하루 가게 결제는 반드시 채운다(아래 채우기와 앱 코드). 지급대행이 돈을 보내는 상대가 이 사람이다.
+  -- 🔁한 예약에 결제 «시도»는 여럿일 수 있다(카드 인증 실패 → 다시 시도). unique를 안 건 이유.
+  --   지켜야 할 규칙은 「승인된 결제는 하나」이고, 그건 아래 부분 unique 인덱스가 건다.
+  booking_id          bigint references space_bookings(id) on delete restrict,
+  buying_user_id      bigint references users(user_id) on delete set null,   -- 돈을 낸 사람(대표 09-16 이름)
+  selling_user_id     bigint references users(user_id) on delete set null,   -- 돈을 받을 사람 = 공간 주인(대표 09-16)
+  -- ⚠️사람 칸 둘은 «set null»이다. 회원 탈퇴가 하드 삭제라(매거진 하트가 cascade인 것과 같은 구조),
+  --   restrict로 걸면 결제 기록이 있는 회원은 탈퇴를 못 한다. 기록은 남기고(전자상거래법 제6조) 사람 칸만 빈다 —
+  --   누가 냈는지는 `toss_raw`로 되짚는다. 예약(booking_id)은 restrict — 예약은 사람이 아니라 «거래»라 지우면 안 된다.
+  --   selling_user_id는 리포트 유료화처럼 판매자가 «우리»인 결제엔 처음부터 비어 있다.
   --   토스 셀러 id(지급대행 등록 뒤 생김)는 결제가 아니라 «사람»에 붙는 값이라 여기 두지 않는다.
   -- ⚠️두 FK 모두 restrict다. 돈이 오간 기록은 예약·회원을 지워도 같이 사라지면 안 된다
   --   (전자상거래법 제6조 — 대금 결제 기록 보존). 시험 데이터를 지울 땐 결제 줄을 먼저 지운다.
@@ -62,6 +66,13 @@ create table if not exists payments (
 
 create index if not exists idx_payments_status on payments(status, created_at desc);
 create index if not exists idx_payments_payout on payments(payout_status) where payout_status in ('WAITING', 'REQUESTED', 'FAILED');
+create index if not exists idx_payments_buyer  on payments(buying_user_id, created_at desc);   -- 손님의 결제 내역
+create index if not exists idx_payments_seller on payments(selling_user_id, created_at desc);  -- 정산은 판매자별로 모은다
+create index if not exists idx_payments_booking on payments(booking_id, created_at desc);      -- 예약의 «마지막» 시도를 찾는다
+-- 🔒한 예약에 «승인된» 결제는 하나. 실패·만료 줄은 여럿 쌓여도 된다.
+create unique index if not exists uq_payments_booking_approved
+  on payments(booking_id)
+  where booking_id is not null and status in ('DONE', 'PARTIAL_CANCELED', 'CANCELED');
 
 -- 🔒정책 없음 = 공개 키(anon)로는 한 줄도 못 읽고 못 쓴다. 서버가 service_role로만 닿는다(spaces·space_bookings와 같은 규율).
 --   이걸 빠뜨리면 Supabase가 새 테이블을 공개 API로 열어 두어서, 누구나 남의 결제 내역을 읽을 수 있다.
@@ -134,7 +145,11 @@ begin
   if p_payout_status is not null then
     update payments set
       payout_status       = p_payout_status,
-      payout_amount       = floor(balance_amount * (1 - fee_rate))::integer,
+      -- 💸금액은 «대기·요청» 단계에서만 계산한다. 요청한 뒤(완료·실패)엔 손대지 않는다 —
+      --   요청과 완료 사이에 환불이 나면 완료 시점에 금액이 줄어 «실제로 보낸 돈»과 장부가 어긋난다.
+      payout_amount       = case when p_payout_status in ('WAITING', 'REQUESTED')
+                                 then floor(balance_amount * (1 - fee_rate))::integer
+                                 else payout_amount end,
       payout_requested_at = case when p_payout_status = 'REQUESTED' then now() else payout_requested_at end,
       payout_done_at      = case when p_payout_status = 'DONE' then now() else payout_done_at end
     where order_id = p_order_id;
