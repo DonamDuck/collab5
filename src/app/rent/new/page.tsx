@@ -42,7 +42,7 @@ export default async function NewSpacePage({
           안 쓰는 날, 빌려주세요
         </h1>
         <p className="mt-3 text-[17px] leading-relaxed break-keep text-mute">
-          쉬는 날 하루만 내주셔도 돼요. 먼저 로그인해 주세요.
+          쉬는 날이나 비는 몇 시간만 내주셔도 돼요. 먼저 로그인해 주세요.
         </p>
         {/* ⚠️복귀 키는 `redirect`다 — 로그인 화면이 읽는 이름이 그것이라 `next`로 적으면 홈으로 떨어진다. */}
         <Link href={`/login?redirect=${encodeURIComponent("/rent/new")}`} className={`${primaryBtnCls} mt-8 h-[48px]`}>
@@ -71,7 +71,7 @@ export default async function NewSpacePage({
           안 쓰는 날, 빌려주세요
         </h1>
         <p className="mt-3 text-[17px] leading-relaxed break-keep text-mute">
-          쉬는 날 하루만 내주셔도 돼요. 어떻게 써야 하는지는 사장님이 정하세요.
+          쉬는 날이나 비는 몇 시간만 내주셔도 돼요. 어떻게 써야 하는지는 사장님이 정하세요.
         </p>
       </header>
 

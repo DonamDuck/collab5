@@ -460,6 +460,7 @@ export function SpaceForm({
 
   return (
     <div className="mt-10 space-y-12">
+      <StepNav />
       {/* 💾09-17 — 불러온 걸 먼저 말한다. 모르고 이어 쓰다 옛 사진이 올라가면 안 된다. */}
       {restored && (
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-md bg-surface-soft px-4 py-2">
@@ -835,7 +836,7 @@ export function SpaceForm({
         </L>
 
         <L label="최소 몇 시간부터 빌려드릴까요" htmlFor="sp-minh" hint="이보다 짧게는 신청이 안 들어와요.">
-          <RentSelect id="sp-minh" className="sm:max-w-[240px]" value={minHours} onChange={(e) => setMinHours(e.target.value)}>
+          <RentSelect id="sp-minh" wrapClassName="w-full sm:max-w-[240px]" value={minHours} onChange={(e) => setMinHours(e.target.value)}>
             {[1, 2, 3, 4, 5, 6, 8].map((h) => (
               <option key={h} value={String(h)}>
                 {h}시간부터
@@ -890,7 +891,7 @@ export function SpaceForm({
               <L label="얼마나 이야기 나누실까요" htmlFor="sp-cm">
                 <RentSelect
                   id="sp-cm"
-                  className="sm:max-w-[240px]"
+                  wrapClassName="w-full sm:max-w-[240px]"
                   value={chatMin}
                   onChange={(e) => setChatMin(e.target.value)}
                 >
@@ -926,7 +927,7 @@ export function SpaceForm({
 
       {/* ── 여는 날·시간 ── 실사에서 이 데이터를 가진 곳이 23곳 중 0곳이었다(설계 §조사 ②). */}
       <Group
-        title="대여 가능한 날짜 선택"
+        title="언제 빌려주실까요"
         // 🔁09-17 QA — 「노출됩니다」(피동·행정)가 아래 결과 줄의 「보입니다」와 같은 말 두 번이었다. 여기 한 번만.
         sub="달력에서 날짜를 누르고, 요일마다 여는 시간을 정해 주세요. 고른 날이 손님에게 보여요."
         anchor="slots"
@@ -1099,6 +1100,63 @@ function WonInput({
   );
 }
 
+/** 🧭09-17 디자인팀 — 폼의 단계. **`Group`의 `title`과 글자가 같아야 번호가 붙는다**(제목을 바꾸면 여기도).
+ *  폰에서 이 폼은 여덟 화면을 내려간다. 절 제목 위 「3 / 7」과 넓은 화면의 오른쪽 목차가 «지금 어디쯤인지»를 말한다. */
+const FORM_STEPS = [
+  "어떤 공간인가요",
+  "어디에 있나요",
+  "공간 안내",
+  "사용 유의 사항",
+  "얼마에 빌려주실까요",
+  "언제 빌려주실까요",
+  "마지막으로 확인할게요",
+];
+
+/** 넓은 화면(xl)에서만 폼 오른쪽에 붙는 목차. 누르면 그 절로 가고, 읽고 있는 절이 진하게 선다.
+ *  📐폼 폭 560의 오른쪽 끝(50%+280)에서 40 띄운 자리. `/rent/new`·`/rent/[slug]/edit` 두 화면의 폭과 한 쌍이다. */
+function StepNav() {
+  const [active, setActive] = useState(1);
+  useEffect(() => {
+    const marks = Array.from(document.querySelectorAll<HTMLElement>("[data-form-step]"));
+    if (marks.length === 0) return;
+    // 화면 위쪽 35% 선을 지난 마지막 표지가 «지금 읽는 절»이다.
+    const onScroll = () => {
+      const line = window.innerHeight * 0.35;
+      let cur = 1;
+      for (const m of marks) if (m.getBoundingClientRect().top <= line) cur = Number(m.dataset.formStep);
+      setActive(cur);
+    };
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+  return (
+    <nav
+      aria-label="등록 단계"
+      className="fixed top-[140px] left-[calc(50%+320px)] hidden w-[200px] xl:block"
+    >
+      <ol className="space-y-1 border-l border-hairline">
+        {FORM_STEPS.map((t, i) => {
+          const on = active === i + 1;
+          return (
+            <li key={t}>
+              <a
+                href={`#step-${i + 1}`}
+                aria-current={on ? "step" : undefined}
+                className={`-ml-px block border-l-2 py-1.5 pl-4 text-[15px] leading-snug break-keep transition-colors ${
+                  on ? "border-ink font-medium text-ink" : "border-transparent text-mute hover:text-body"
+                }`}
+              >
+                {t}
+              </a>
+            </li>
+          );
+        })}
+      </ol>
+    </nav>
+  );
+}
+
 /** 묶음 제목 + 칸들. 한 화면에 칸이 스무 개라 구역이 없으면 어디까지 적었는지 놓친다.
  *  제목 → 첫 입력 23px(register `GroupHeader` 규칙). 칸 사이 24px. */
 function Group({
@@ -1115,9 +1173,16 @@ function Group({
   error?: string;
   children: React.ReactNode;
 }) {
+  const step = FORM_STEPS.indexOf(title) + 1;
   return (
     <section id={anchor ? `f-${anchor}` : undefined}>
-      <div className="mb-[23px]">
+      {/* 🧭단계 표지. id는 `f-<anchor>`(막힌 칸 스크롤)와 겹치지 않게 제목 묶음에 따로 단다. */}
+      <div className="mb-[23px] scroll-mt-24" id={step ? `step-${step}` : undefined} data-form-step={step || undefined}>
+        {step > 0 && (
+          <p className="mb-1.5 text-[14px] font-medium tabular-nums text-faint">
+            {step} / {FORM_STEPS.length}
+          </p>
+        )}
         <h2 className="text-[21px] font-bold leading-snug tracking-tight text-ink">{title}</h2>
         {sub && <p className="mt-2 text-[15px] leading-relaxed break-keep text-mute">{sub}</p>}
       </div>
