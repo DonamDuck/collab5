@@ -59,7 +59,8 @@ export function HostDecide({
     });
 
   return (
-    <div className="mt-4 space-y-3">
+    // 🃏09-18 대표 코멘트 #63 — 요청 카드의 «발». 위 선 하나로 「읽는 곳」과 「답하는 곳」을 가른다.
+    <div className="mt-4 space-y-3 border-t border-hairline pt-4">
       {/* 한 줄 메시지 — 수락이든 거절이든 같은 칸을 쓴다. 거절에만 칸을 주면 「거절할 때만 말한다」가
           되고, 수락 뒤 첫 연락이 아무 말 없이 주소만 열리는 것으로 시작된다. */}
       <textarea
@@ -77,28 +78,30 @@ export function HostDecide({
           이용 시간이 이미 지나 수락할 수 없어요. 거절하시면 손님께 전액 돌아가요.
         </p>
       )}
-      <div className="flex gap-2">
+      {/* 🔁09-18 — 순서를 [거절][수락]으로. 확인 팝업(`ConfirmDialog`)과 같이 «앞으로 가는 쪽»이 오른쪽이다.
+          넓은 화면은 카드 오른쪽 끝에 모으고, 폰은 한 줄을 1:2로 나눠 엄지가 닿게 한다. */}
+      <div className="flex gap-2 sm:justify-end">
+        <button
+          type="button"
+          onClick={() => setConfirmReject(true)}
+          disabled={pending}
+          className={`${secondaryBtnCls} flex-1 text-[15px] sm:flex-none`}
+        >
+          거절
+        </button>
         {/* ⭐항목마다 키위가 하나씩 나올 수 있는 화면이라(받은 신청 여러 건) 예외로 허용하되 작게 —
-            폭을 내용만큼만. 높이는 옆 보조 버튼과 같은 44px(한 줄에서 높이가 다르면 어긋나 보인다). */}
+            넓은 화면에선 폭을 내용만큼만. 높이는 옆 보조 버튼과 같은 44px(한 줄에서 높이가 다르면 어긋나 보인다). */}
         {/* 수락은 팝업 없이 — 문구가 결과를 미리 말한다(누르면 연락처가 열린다는 것). */}
         {!started && (
           <button
             type="button"
             onClick={() => run(true)}
             disabled={pending}
-            className={`${primaryBtnCls} h-[44px] px-5 text-[15px]`}
+            className={`${primaryBtnCls} h-[44px] flex-[2] px-5 text-[15px] sm:flex-none`}
           >
             {pending ? "처리 중…" : "수락하고 연락처 열기"}
           </button>
         )}
-        <button
-          type="button"
-          onClick={() => setConfirmReject(true)}
-          disabled={pending}
-          className={`${secondaryBtnCls} text-[15px]`}
-        >
-          거절
-        </button>
       </div>
       <ConfirmDialog
         open={confirmReject}
