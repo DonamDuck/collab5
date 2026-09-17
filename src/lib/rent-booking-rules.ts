@@ -9,6 +9,7 @@
 import type { RentProduct, Space, SpaceBooking } from "./types";
 import { bookingStarted, fitsOpenSlot, hoursBetween, isHourMark, overlaps, toMinutes } from "./rent-time";
 import { isRentProduct, productPrice } from "./rent-products";
+import { CAPACITY_MAX } from "./rent-limits";
 
 /** ⏳토스 결제창이 살아 있는 시간. 정리 작업(`sweepBookings`)이 신청을 만료로 옮기는 기준과 같은 값이다. */
 export const PAY_WINDOW_MINUTES = 30;
@@ -98,6 +99,14 @@ export function validateBookingRequest(
   }
   if (!fitsOpenSlot(space.openSlots, req.useDate, req.startTime, req.endTime)) {
     return { ok: false, code: "outside-slot", message: "사장님이 열어 두신 시간 안에서 골라 주세요." };
+  }
+  // 🙋09-18 밤 QA(G-08) — 인원. 화면은 「최대 N명까지 들어가요」라고 약속하는데 서버는 음수도 500명도 받았다.
+  //   ⭐대표 판단은 «막기»다(화면이 이미 약속한 숫자라 안 지키면 그 약속이 거짓이 된다). 안 적은 경우(모르겠어요)는 그대로 둔다.
+  if (req.headcount !== undefined && req.headcount !== null) {
+    const cap = space.capacity && space.capacity > 0 ? Math.min(space.capacity, CAPACITY_MAX) : CAPACITY_MAX;
+    if (!Number.isInteger(req.headcount) || req.headcount < 1 || req.headcount > cap) {
+      return { ok: false, code: "headcount", message: `인원은 1명부터 최대 ${cap}명까지 적어 주세요.` };
+    }
   }
   // 이미 팔린 시간과 겹치는지. ⚠️여기서 막아도 «관문은 DB»다 — 같은 순간에 둘이 들어오면 배제 제약이 뒤에 온 쪽을 떨어뜨린다.
   if (taken.some((b) => overlaps(b.startTime, b.endTime, req.startTime, req.endTime))) {
