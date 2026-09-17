@@ -20,10 +20,12 @@ import { PublishButton } from "../my/Actions";
 // 🔒등록증 원본은 이 화면에 안 싣는다. [등록증 보기]가 `/rent/review/cert/[slug]`로 가서 그때 60초짜리 서명 URL을 받는다.
 export const dynamic = "force-dynamic";
 
-export const metadata: Metadata = {
-  title: "공간 검토 — 하루 가게",
-  robots: { index: false },
-};
+/** 🔒탭 제목도 관리자에게만(09-18 밤 QA SC-26). 화면은 없는 척(404)하는데 고정 `metadata`라 탭에 「공간 검토」가 남아
+ *  이 주소가 무엇을 하는 곳인지 알려 주고 있었다. 아니면 제목을 안 줘서 사이트 기본 제목이 선다. 판정은 `isRentAdmin` 한 벌. */
+export async function generateMetadata(): Promise<Metadata> {
+  if (!(await isRentAdmin())) return { robots: { index: false } };
+  return { title: "공간 검토 — 하루 가게", robots: { index: false } };
+}
 
 const h2Cls = "text-[21px] font-bold leading-snug tracking-tight text-ink";
 

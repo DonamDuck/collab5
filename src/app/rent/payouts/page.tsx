@@ -27,10 +27,12 @@ import { bankName, HOLDER_TYPE_LABEL } from "@/lib/banks";
 //   등록·인증돼야 돈을 보낼 수 있다. 그때까지 이 화면은 «누구에게 얼마를 보낼지»를 정확히 쌓아 두는 장부다.
 export const dynamic = "force-dynamic";
 
-export const metadata: Metadata = {
-  title: "정산 — 하루 가게",
-  robots: { index: false },
-};
+/** 🔒탭 제목도 관리자에게만(09-18 밤 QA SC-26). 화면은 없는 척(404)하는데 고정 `metadata`라 탭에 「정산」이 남았다.
+ *  아니면 제목을 안 줘서 사이트 기본 제목이 선다. 판정은 `isRentAdmin` 한 벌(공간 검토 화면과 같다). */
+export async function generateMetadata(): Promise<Metadata> {
+  if (!(await isRentAdmin())) return { robots: { index: false } };
+  return { title: "정산 — 하루 가게", robots: { index: false } };
+}
 
 type Row = { payment: Payment; booking: SpaceBooking | null };
 type SellerGroup = { sellerId: number; profile: Profile | null; rows: Row[]; account?: PayoutAccount };
