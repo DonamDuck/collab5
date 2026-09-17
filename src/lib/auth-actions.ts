@@ -214,7 +214,9 @@ export async function signInAction(
   email: string,
   password: string
 ): Promise<{ error?: string }> {
-  if (await rentMockOn()) return { error: MOCK_BLOCKED_MSG };
+  // 🗺09-18 대표 QA — 가짜 데이터가 켜진 채 로그인하면 「저장하지 않았어요」가 떠서 로그인이 고장 난 줄 알았다.
+  //   로그인은 저장이 아니다. 왜 막혔고 어떻게 풀면 되는지를 말한다.
+  if (await rentMockOn()) return { error: "지금은 화면 지도의 가짜 데이터로 보는 중이라 로그인이 안 돼요. 왼쪽 아래 까만 띠에서 「끄기」를 누르면 로그인할 수 있어요." };
   if (!authEnabled()) return { error: NO_AUTH_MSG };
   const supabase = await createAuthClient();
   // 🧪로컬 테스트 로그인 (대표 지시 09-13) — 폼에 `collab5`/`collab5`를 치면 테스트 계정으로 들어간다.
