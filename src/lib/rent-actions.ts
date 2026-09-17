@@ -21,7 +21,10 @@ import { checkBusiness } from "./nts-bizcheck";
 import { matchPlace } from "./naver-local";
 import { signCertUpload } from "./host-docs";
 import { hasPayoutAccount, savePayoutAccount, toMasked, validatePayoutInput, type PayoutAccountInput, type PayoutAccountMasked } from "./payout-accounts";
-import { approvePayment, cancelPayment, guestCancelRefundPercent, GRACE_MINUTES } from "./rent-payment";
+import {
+  approvePayment, cancelPayment, guestCancelRefundPercent, GRACE_MINUTES,
+  PAY_FAIL_SLOT_TAKEN_REFUNDED, PAY_FAIL_SLOT_TAKEN_REFUND_PENDING,
+} from "./rent-payment";
 import { refundAmount } from "./rent-money";
 import { geocode } from "./geocode";
 import { repo } from "./repo";
@@ -51,6 +54,9 @@ export interface ActionResult {
   field?: string;
   /** 🧾09-18 저장 뒤 국세청 조회 결과. `mismatch`면 폼이 고치기 화면으로 가서 그 칸에 말을 띄운다. */
   bizStatus?: BizCheckStatus;
+  /** 🔒09-18 밤 QA(SEC-06) 결제 승인 실패의 사유 코드. 승인 라우트가 실패 화면에 `message` 대신 이걸 넘긴다
+   *  (주소의 글을 화면에 쓰면 누구나 우리 화면에 문장을 띄울 수 있다). 토스 코드 또는 `PAY_FAIL_*`. */
+  code?: string;
 }
 
 /** 공간을 공개로 넘길 수 있는 사람 — 지금은 대표뿐이다.
@@ -640,7 +646,7 @@ export async function confirmBookingAction(
   if (!approved.ok || !approved.payment) {
     // 돈은 안 움직였다. 결제 줄만 ABORTED로 남기고 예약은 그대로 둔다(30분 안이면 다시 시도할 수 있다).
     await rentSync(orderId, { toss: { status: "ABORTED" } });
-    return { ok: false, message: approved.message };
+    return { ok: false, message: approved.message, code: approved.code };
   }
 
   // ⭐예약 paid + 결제 DONE을 «한 트랜잭션»으로. 시간이 겹쳐 예약이 막히면 결제 기록도 같이 안 바뀐다.
@@ -653,12 +659,12 @@ export async function confirmBookingAction(
     const refund = await cancelPayment(key, "예약 확정 실패 — 자동 환불", undefined, pay.amount);
     if (refund.ok) {
       await rentSync(orderId, { bookingStatus: "cancelled", toss: refund.payment });
-      return { ok: false, message: "그 사이 그 시간이 찼어요. 결제는 자동으로 취소했습니다." };
+      return { ok: false, message: "그 사이 그 시간이 찼어요. 결제는 자동으로 취소했습니다.", code: PAY_FAIL_SLOT_TAKEN_REFUNDED };
     }
     // 환불까지 실패하면 손님 돈이 붙잡혀 있다. 정산 화면 「손이 필요한 예약」에 뜨게 rejected로 둔다.
     console.error(`[rent-actions] 🚨승인 뒤 예약 실패 + 자동 환불 실패 — 수동 환불 필요 order=${orderId}`);
     await rentSync(orderId, { bookingStatus: "rejected" });
-    return { ok: false, message: "그 사이 그 시간이 찼어요. 환불을 처리하고 있으니 곧 연락드릴게요." };
+    return { ok: false, message: "그 사이 그 시간이 찼어요. 환불을 처리하고 있으니 곧 연락드릴게요.", code: PAY_FAIL_SLOT_TAKEN_REFUND_PENDING };
   }
   const paid = (await getBookingByOrderId(orderId)) ?? { ...b, status: "paid" as const };
 

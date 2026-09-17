@@ -60,7 +60,12 @@ export const RENT_GROUPS: Group[] = [
         rows: [
           { desc: "결제 전 신청 (대관만, 커피챗 담음, 취소 규정 한 줄)", c: "guest-full", to: `/rent/pay/mock-order-${B.pending}` },
           { desc: "긴 글 · 큰 금액", c: "stress-guest", to: `/rent/pay/mock-order-${B.stressPending}` },
-          { desc: "결제 실패 화면", c: "guest-full", to: "/rent/pay/fail?message=사용자가 결제를 취소했어요" },
+          // 🔒09-18 밤 — 실패 화면은 주소의 글(`message`)을 안 쓰고 코드로 우리 문장을 고른다. 갈래마다 한 줄.
+          { desc: "결제 실패 · 결제 창을 닫음 (다시 결제하기 버튼)", c: "guest-full", to: `/rent/pay/fail?code=PAY_PROCESS_CANCELED&orderId=mock-order-${B.pending}` },
+          { desc: "결제 실패 · 카드사 거절", c: "guest-full", to: `/rent/pay/fail?code=REJECT_CARD_COMPANY&orderId=mock-order-${B.pending}` },
+          { desc: "결제 실패 · 그 사이 시간이 차서 자동 취소 (다시 결제하기 없음)", c: "guest-full", to: `/rent/pay/fail?code=RENT_SLOT_TAKEN_REFUNDED&orderId=mock-order-${B.pending}` },
+          { desc: "결제 실패 · 자동 환불도 실패해서 연락드림", c: "guest-full", to: `/rent/pay/fail?code=RENT_SLOT_TAKEN_REFUND_PENDING&orderId=mock-order-${B.pending}` },
+          { desc: "결제 실패 · 모르는 코드나 주소에 글을 붙인 경우 (기본 문장)", c: "guest-full", to: "/rent/pay/fail?message=아무 글이나&code=SOMETHING_ELSE" },
         ],
       },
       {

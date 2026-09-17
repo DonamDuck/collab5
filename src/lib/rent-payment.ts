@@ -49,7 +49,14 @@ export interface ApproveResult {
   payment?: TossPayment;
   /** 실패했을 때 사람이 읽을 이유. 화면에 그대로 보여도 되는 문장만 담는다. */
   message: string;
+  /** 토스가 준 실패 코드(`REJECT_CARD_PAYMENT` 등). 결제 실패 화면이 이 코드로 우리 문장을 고른다(09-18 밤 QA SEC-06). */
+  code?: string;
 }
+
+/** 🧾결제 실패 화면(`/rent/pay/fail?code=`)이 알아듣는 «우리» 사유 코드. 토스 코드와 안 겹치게 `RENT_`로 시작한다.
+ *  승인은 됐는데 그 사이 시간이 차서 예약을 못 올렸을 때 — 자동 환불이 됐는지에 따라 둘로 나뉜다(`confirmBookingAction`). */
+export const PAY_FAIL_SLOT_TAKEN_REFUNDED = "RENT_SLOT_TAKEN_REFUNDED";
+export const PAY_FAIL_SLOT_TAKEN_REFUND_PENDING = "RENT_SLOT_TAKEN_REFUND_PENDING";
 
 /** 결제 승인 — 결제창이 돌려준 `paymentKey`·`orderId`·`amount`를 서버에서 다시 확정한다.
  *  🚨**금액을 클라이언트가 준 값으로 믿지 마라.** 호출부가 결제 줄에 적힌 금액을 넘겨야 한다.
@@ -85,8 +92,8 @@ export async function approvePayment(
       headers: { Authorization: authHeader(), "Content-Type": "application/json" },
       body: JSON.stringify({ paymentKey, orderId, amount }),
     });
-    const body = (await res.json()) as TossPayment & { message?: string };
-    if (!res.ok) return { ok: false, message: body.message || "결제 승인에 실패했어요." };
+    const body = (await res.json()) as TossPayment & { message?: string; code?: string };
+    if (!res.ok) return { ok: false, message: body.message || "결제 승인에 실패했어요.", code: body.code };
     return { ok: true, message: "", payment: body };
   } catch (e) {
     console.error(`[rent-payment] approve threw order=${orderId}: ${String(e)}`);
