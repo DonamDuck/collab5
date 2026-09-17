@@ -1,7 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { getSessionUserId, getProfileById, savePhoneIfEmpty } from "./profiles";
+import { getSessionUserId, getProfile, getProfileById, savePhoneIfEmpty } from "./profiles";
+import { getSessionUser } from "./supabase/server";
 // 🧪09-17 목 데이터 — 목 쿠키가 있으면 쓰기 액션은 첫 줄에서 멈춘다(DB·토스·메일 전부 안 건드린다). 개발 빌드 전용.
 import { getRentMock, rentMockOn, RENT_MOCK_BLOCKED } from "./rent-mock";
 import {
@@ -62,10 +63,17 @@ export async function isRentAdmin(): Promise<boolean> {
   //   환경변수 이름이 어긋나는 날 버튼은 보이는데 안 눌리는 상태가 된다. 판정은 한 벌만 둔다.
   const raw = process.env.RENT_ADMIN_EMAILS ?? process.env.MAGAZINE_EDITOR_EMAILS ?? "dudejrthd@gmail.com";
   const allow = raw.split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
-  const uid = await getSessionUserId();
-  if (!uid) return false;
-  const p = await getProfileById(uid);
-  return !!p?.email && allow.includes(p.email.toLowerCase());
+  const user = await getSessionUser();
+  if (!user) return false;
+  // 🔒09-18 밤 QA(SEC-01) — 판정은 «로그인 수단이 확인해 준 이메일»로 한다. 매거진 편집자 판정(`isMagazineEditor`)과 같은 방식이다.
+  //   `users.email`만 보던 때는 구멍이 있었다. 카카오가 이메일을 안 주면 /welcome에서 손님이 이메일을 «직접» 치는데,
+  //   그 값이 프로필에 그대로 들어가서 대표 이메일을 적으면 누구나 공개·환불 승인·정산 화면을 열 수 있었다.
+  const authEmail = user.email?.trim().toLowerCase();
+  if (!authEmail || !user.email_confirmed_at) return false;
+  if (!allow.includes(authEmail)) return false;
+  // 세션만 믿지 않고 DB(`users`)도 다시 읽는다. 프로필이 지워졌거나 계정이 바뀐 경우를 세션만으로는 알 수 없다.
+  const profile = await getProfile(user.id);
+  return profile?.email?.trim().toLowerCase() === authEmail;
 }
 
 /** 주소 후보를 슬러그로. 한글 이름이면 옮길 글자가 없어 난수로 떨어진다(매거진이 같은 함정을 겪었다). */
