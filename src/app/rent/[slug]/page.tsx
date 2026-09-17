@@ -9,6 +9,7 @@ import { accessHowLine, COFFEE_CHAT_WHEN_GUEST, CONTACT_RULE_GUEST, PRODUCT_HINT
 import { lowestPrice, productNote, productPrice, sellableProducts } from "@/lib/rent-products";
 import { futureSlots } from "@/lib/rent-time";
 import { bizVerified } from "@/lib/bizcheck";
+import { OG_IMAGE } from "@/lib/site";
 import { PhotoSlider } from "@/components/PhotoSlider";
 import { BookingForm } from "./BookingForm";
 import { categoryLabel, Chip, dateLabel, InfoList, InfoRow, primaryBtnCls, secondaryBtnCls, won } from "../ui";
@@ -58,14 +59,27 @@ export async function generateMetadata({
   //   주소를 훑어 아직 안 열린 공간 목록을 만들 수 있었다는 뜻이다. 이제 남에게는 없는 공간과 똑같은 메타가 간다.
   const listed = sp.status === "open";
   if (!listed && !(await maySeeUnlisted(sp.ownerUserId, await getSessionUserId()))) return NOT_FOUND_META;
-  return {
+  const url = `/rent/${sp.slug}`;
+  // 링크 미리보기 설명은 한 줄 소개 또는 동네까지. 주소는 화면에서 열려 있지만(09-16) 카드엔 길 필요가 없다.
+  // ⏱09-16 대표 — 시간 단위 대여. 「하루 빌려보세요」는 사실이 틀린 말이라 링크 카드에도 안 싣는다.
+  const description = sp.tagline || `${sp.area}에서 필요한 시간만큼 빌릴 수 있는 공간이에요.`;
+  const meta: Metadata = {
     title: `${sp.name} — 하루 가게`,
-    // 링크 미리보기 설명은 한 줄 소개 또는 동네까지. 주소는 화면에서 열려 있지만(09-16) 카드엔 길 필요가 없다.
-    // ⏱09-16 대표 — 시간 단위 대여. 「하루 빌려보세요」는 사실이 틀린 말이라 링크 카드에도 안 싣는다.
-    description: sp.tagline || `${sp.area}에서 필요한 시간만큼 빌릴 수 있는 공간이에요.`,
-    alternates: { canonical: `/rent/${sp.slug}` },
-    // 주인·관리자가 공개 전 공간을 볼 때도 검색엔진엔 안 올린다.
-    ...(listed ? {} : { robots: { index: false } }),
+    description,
+    alternates: { canonical: url },
+  };
+  // 주인·관리자가 공개 전 공간을 볼 때도 검색엔진엔 안 올리고 링크 카드도 안 만든다.
+  if (!listed) return { ...meta, robots: { index: false } };
+  // 🔗09-18 밤 QA(SC-06) — 공개 공간의 링크 카드. 전엔 `openGraph`가 없어 루트 것을 물려받았다.
+  //   카톡에 공간 링크를 붙이면 제목은 사이트 슬로건, 주소는 홈, 그림은 로고 카드로 떠서 «홈 링크»처럼 보였다.
+  //   ⚠️`openGraph`는 루트와 합쳐지지 않고 통째로 갈린다. 사이트 이름·언어도 여기 다시 적는다.
+  //   사진은 http 주소만 쓴다. 크롤러는 data URL을 못 읽는다(`/m` 소개서와 같은 규칙). 없으면 사이트 기본 썸네일.
+  const cardTitle = `${sp.name} · 하루 가게`;
+  const image = sp.photos.find((p) => /^https?:\/\//.test(p)) ?? OG_IMAGE;
+  return {
+    ...meta,
+    openGraph: { type: "website", siteName: "collab5", locale: "ko_KR", url, title: cardTitle, description, images: [{ url: image }] },
+    twitter: { card: "summary_large_image", title: cardTitle, description, images: [image] },
   };
 }
 
