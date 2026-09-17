@@ -31,7 +31,10 @@ import {
 // ⭐신청이 «지금도» 말이 되나 — 신청 시작·결제 승인·결제 화면이 같이 쓰는 순수 규칙(09-18 밤 QA G-01).
 import { pendingBookingProblem, validateBookingRequest } from "./rent-booking-rules";
 import { refundAmount } from "./rent-money";
-import { CONTACT_PHONE_MAX, HOST_MESSAGE_MAX, PLAN_MAX, storePhoneOk } from "./rent-limits";
+import {
+  CAPACITY_MAX, COFFEE_CHAT_MINUTES_MAX, COFFEE_CHAT_MINUTES_MIN, COFFEE_CHAT_MINUTES_STEP, COFFEE_CHAT_PRICE_MAX,
+  CONTACT_PHONE_MAX, HOST_MESSAGE_MAX, MIN_HOURS_MAX, PLAN_MAX, PRICE_HOUR_MAX, storePhoneOk,
+} from "./rent-limits";
 import { geocode } from "./geocode";
 import { repo } from "./repo";
 import {
@@ -167,11 +170,35 @@ export async function saveSpaceAction(input: SpaceFormInput): Promise<ActionResu
   ] as const) {
     if (!on) continue;
     if (!(price > 0)) return { ok: false, message: `${withJosa(label, "은/는")} 한 시간에 얼마인지 적어 주세요.` };
+    // 💰09-18 밤 QA(H-13) — 상한. 전엔 칸(`integer`)을 넘기는 값이 들어가 「저장에 실패했어요」로만 떨어졌다.
+    if (!Number.isFinite(price) || price > PRICE_HOUR_MAX) {
+      return { ok: false, message: `${label} 한 시간 값은 ${PRICE_HOUR_MAX.toLocaleString()}원까지 받을 수 있어요.` };
+    }
     if ((note ?? "").trim().length < 10) {
       return { ok: false, message: `${label} 설명이 짧아요. 손님이 무엇을 쓰고 할 수 있는지 열 글자 넘게 담아 주세요.` };
     }
   }
-  if (input.minHours < 1) return { ok: false, message: "최소 대여 시간은 한 시간 이상이어야 해요." };
+  // ⏱09-18 밤 QA(H-36) — 최소 대여 시간은 «하루 안»의 정수다. 전엔 소수·25시간·빈 값이 그대로 저장됐다.
+  if (!Number.isInteger(input.minHours) || input.minHours < 1 || input.minHours > MIN_HOURS_MAX) {
+    return { ok: false, message: `최소 대여 시간은 한 시간부터 ${MIN_HOURS_MAX}시간까지 고를 수 있어요.` };
+  }
+  // ☕09-18 밤 QA(H-36) — 켠 커피챗은 값과 길이가 있어야 한다. 값 0원짜리 커피챗이 상품으로 서 있었다.
+  if (input.coffeeChat) {
+    if (!(input.coffeeChatPrice > 0)) return { ok: false, message: "커피챗을 켜셨으면 얼마인지 적어 주세요." };
+    if (input.coffeeChatPrice > COFFEE_CHAT_PRICE_MAX) {
+      return { ok: false, message: `커피챗 값은 ${COFFEE_CHAT_PRICE_MAX.toLocaleString()}원까지 받을 수 있어요.` };
+    }
+    const cm = input.coffeeChatMinutes;
+    if (!Number.isInteger(cm) || cm < COFFEE_CHAT_MINUTES_MIN || cm > COFFEE_CHAT_MINUTES_MAX || cm % COFFEE_CHAT_MINUTES_STEP !== 0) {
+      return { ok: false, message: `커피챗 길이는 ${COFFEE_CHAT_MINUTES_MIN}분부터 ${COFFEE_CHAT_MINUTES_MAX / 60}시간까지 ${COFFEE_CHAT_MINUTES_STEP}분 단위로 골라 주세요.` };
+    }
+  }
+  // 🙋09-18 밤 QA(H-25) — 정원. 안 적어도 되지만 적으면 1명 이상 정수다(신청 인원 검사와 같은 상한).
+  if (input.capacity !== undefined && input.capacity !== null) {
+    if (!Number.isInteger(input.capacity) || input.capacity < 1 || input.capacity > CAPACITY_MAX) {
+      return { ok: false, message: `들어올 수 있는 인원은 1명부터 ${CAPACITY_MAX.toLocaleString()}명까지 적어 주세요.` };
+    }
+  }
   // ☎️🚨청약 «전»에 보여야 하는 값이라 빈칸으로 못 넘어간다.
   //   전자상거래법 제20조②(시행 2026-07-21): 중개자는 사업자 호스트의 성명·주소·전화번호를 확인해
   //   청약 전에 소비자에게 제공해야 하고, 안 하면 제20조의2②로 **우리가 연대 책임**을 진다.
