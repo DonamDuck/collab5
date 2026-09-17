@@ -222,7 +222,10 @@ export const SITE_GROUPS: Group[] = [
         path: "/my",
         note: "리포트 탭의 「원두 구독 × 오후 세 시 도자기」 카드는 리포트 뒤에 소개서를 고친 경우라, 열면 시트에 다시 분석하기가 떠요. 연결된 계정·비밀번호 변경 칸은 브라우저의 진짜 로그인을 읽어요.",
         rows: [
-          { desc: "내 소개서 탭 (소개서 셋, 하나는 숨김)", c: "member-full", to: "/my" },
+          { desc: "큰 칸 「하루 가게」 — 새 요청이 있어 처음부터 이 칸이 열림 (숫자 세 칸·빌려준/빌린 공간 입구)", c: "host-full", to: "/my" },
+          { desc: "큰 칸 「하루 가게」 — 공간 없이 빌리기만 한 회원 (내 공간 올리기 한 줄)", c: "guest-full", to: "/my?area=rent" },
+          { desc: "큰 칸 「하루 가게」 — 아무것도 없는 새 회원", c: "member-new", to: "/my?area=rent" },
+          { desc: "내 소개서 탭 (소개서 셋, 하나는 숨김)", c: "member-full", to: "/my?area=brand" },
           { desc: "찜한 브랜드 탭", c: "member-full", to: "/my?tab=saved" },
           { desc: "콜라보 리포트 탭", c: "member-full", to: "/my?tab=reports" },
           { desc: "성사 기록 탭", c: "member-full", to: "/my?tab=collabs" },

@@ -21,16 +21,18 @@ import type { CollabReportListItem } from "@/lib/types";
 import { BRIEFS } from "@/lib/brief-samples/registry";
 import { listBriefsByOwner } from "@/lib/briefs";
 import { DEV_OWNED_SLUGS } from "@/lib/dev-session";
+import { listBookingsForGuest, listBookingsForHost, listSpacesByOwner } from "@/lib/spaces";
+import { bookingFinished, bookingStarted } from "@/lib/rent-time";
 
 // 🚨 로그인 사용자별 화면이라 절대 프리렌더되면 안 된다.
 // 쿠키 접근으로 자동 dynamic이 되긴 하지만, 그 판정이 "빌드 시점에 auth env가 있느냐"에 달려 있어
 // env 없는 빌드에선 정적(○)으로 잡힌다(실측). 명시 선언으로 고정. (1팀 /search 사례와 동일 함정)
 export const dynamic = "force-dynamic";
 
-export default async function MyPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
+export default async function MyPage({ searchParams }: { searchParams: Promise<{ tab?: string; area?: string }> }) {
   const user = await getSessionUser();
   if (!user) redirect("/login?redirect=%2Fmy"); // 로그인 후 원래 가려던 /my로 복귀
-  const { tab } = await searchParams;
+  const { tab, area: areaParam } = await searchParams;
   const initialTab = tab === "saved" ? "saved" : tab === "reports" ? "reports" : tab === "collabs" ? "collabs" : "mine";
 
   // 프로필·내 소개서·찜 목록은 서로 독립 조회 — 병렬로 가져와 왕복 단축
@@ -46,6 +48,23 @@ export default async function MyPage({ searchParams }: { searchParams: Promise<{
   // 🆕 [다시 분석하기]를 띄울 쌍 — **내 소개서가 리포트 뒤에 바뀐 것만**(08-31 대표). 유료 콜 0(전부 읽기).
   const editedPairs = await findEditedPairs(reports);
   const displayName = profile?.brandName || user.email?.split("@")[0] || "내 브랜드";
+
+  // 🏠09-18 대표 코멘트 — 「하루 가게 영역이 너무 하단이라 서브 메뉴처럼 느껴진다. 소개서&콜라보 | 하루 가게를 같은 위계로」.
+  //   ⭐목록은 `/rent/my` 한 곳에만 그린다(두 곳에 그리면 한쪽만 고쳐지는 날이 온다). 여기는 숫자와 입구만.
+  const [rentSpaces, rentHostBookings, rentGuestBookings] = profile
+    ? await Promise.all([listSpacesByOwner(profile.id), listBookingsForHost(profile.id), listBookingsForGuest(profile.id)])
+    : [[], [], []];
+  const rentToAnswer = rentHostBookings.filter((b) => b.status === "paid" && !bookingStarted(b)).length;
+  const rentUpcoming = rentHostBookings.filter(
+    (b) => (b.status === "paid" || b.status === "confirmed") && !bookingFinished(b),
+  ).length;
+  const rentMyTrips = rentGuestBookings.filter(
+    (b) => (b.status === "paid" || b.status === "confirmed") && !bookingFinished(b),
+  ).length;
+  // 큰 칸의 기본: 답할 새 요청이 있으면 하루 가게, 아니면 소개서·콜라보. 주소(`?area=`)가 있으면 그게 이긴다.
+  //   소개서 안쪽 탭(`?tab=`)으로 들어온 주소는 소개서 칸을 연다.
+  const area: "brand" | "rent" =
+    areaParam === "rent" || areaParam === "brand" ? areaParam : tab ? "brand" : rentToAnswer > 0 ? "rent" : "brand";
 
   // 📄 내 요약 보고서 = **`brand_briefs`에서 나에게 «연결된» 것**(대표가 손으로 연결한다).
   //    ⚠️표가 없으면 빈 목록이다 — 연결이라는 개념이 표에만 있어서, 코드 안 목록으로 흉내 내면 거짓이 된다.
@@ -234,7 +253,33 @@ export default async function MyPage({ searchParams }: { searchParams: Promise<{
         <LogoutButton />
       </div>
 
-      <section className="mt-9 border-t border-hairline pt-8">
+      {/* 🗂09-18 큰 칸 두 개 — 「소개서·콜라보 | 하루 가게」. `/rent/my`의 「빌려준 공간 | 빌린 공간」과 같은 알약 모양이라
+          큰 칸 → 작은 칸의 두 단계로 읽힌다. 주소(`?area=`)로 나눠 새로고침·메일 링크에서도 같은 칸이 열린다. */}
+      <nav aria-label="내 페이지 나누기" className="mt-8 inline-flex rounded-pill bg-surface-soft p-1">
+        {([
+          { key: "brand", label: "소개서·콜라보" },
+          { key: "rent", label: "하루 가게" },
+        ] as const).map((it) => (
+          <Link
+            key={it.key}
+            href={`/my?area=${it.key}`}
+            aria-current={area === it.key ? "page" : undefined}
+            className={`flex h-[44px] items-center gap-1.5 rounded-pill px-5 text-[15px] font-medium transition-colors sm:px-6 ${
+              area === it.key ? "bg-surface text-ink shadow-[0_1px_3px_rgba(0,0,0,0.08)]" : "text-mute hover:text-body"
+            }`}
+          >
+            {it.label}
+            {/* 답할 새 요청이 있으면 칸 이름 옆에 작은 점 — 다른 칸을 보고 있어도 알 수 있게. */}
+            {it.key === "rent" && rentToAnswer > 0 && (
+              <span aria-label={`새 요청 ${rentToAnswer}건`} className="size-[7px] rounded-full bg-lemon-on" />
+            )}
+          </Link>
+        ))}
+      </nav>
+
+      {area === "brand" && (
+        <>
+      <section className="mt-6">
         <MyTabs
           initialTab={initialTab}
           mine={mine}
@@ -265,21 +310,71 @@ export default async function MyPage({ searchParams }: { searchParams: Promise<{
         </section>
       )}
 
-      {/* 🏠 하루 가게 (09-13) — 내가 올린 공간·주고받은 신청은 `/rent/my`에 따로 산다.
-          대표 실측: *"내가 신청한 rent를 마이페이지에서 못 본다"* — 탭에 끼우면 탭이 다섯이 돼 폰에서 넘치고,
-          하루 가게는 소개서와 «독립»인 기능이라 같은 표에 섞이지 않는다. 줄 하나로 건너보낸다. */}
-      <section className="mt-10 border-t border-hairline pt-6">
-        <Link
-          href="/rent/my"
-          className="-mx-2 flex items-center gap-3 rounded-md px-2 py-3 transition-colors hover:bg-surface-soft"
-        >
-          <div className="min-w-0 flex-1">
-            <p className="text-[17px] font-medium text-ink">내 하루 가게</p>
-            <p className="mt-0.5 text-[15px] text-mute">올린 공간과 주고받은 신청을 봐요</p>
+        </>
+      )}
+
+      {area === "rent" && (
+        <section className="mt-6">
+          {/* 숫자 세 칸 — `/rent/my` 첫 화면의 숫자와 같은 판정이다(새 요청 = 결제 완료·시작 전). */}
+          <div className="grid grid-cols-3 gap-2 sm:gap-3">
+            {[
+              { href: "/rent/my?tab=host", n: rentToAnswer, label: "새 요청", hot: rentToAnswer > 0 },
+              { href: "/rent/my?tab=host", n: rentUpcoming, label: "다가오는 예약", hot: false },
+              { href: "/rent/my?tab=guest", n: rentMyTrips, label: "빌린 예약", hot: false },
+            ].map((c) => (
+              <Link
+                key={c.label}
+                href={c.href}
+                className="rounded-lg border border-hairline bg-surface px-3 py-3.5 transition-colors hover:bg-surface-soft sm:px-5 sm:py-4"
+              >
+                <span className={`block text-[24px] font-bold leading-none tabular-nums ${c.hot ? "text-lemon-on" : "text-ink"}`}>
+                  {c.n}
+                </span>
+                <span className="mt-2 block text-[14px] leading-snug break-keep text-mute sm:text-[15px]">{c.label}</span>
+              </Link>
+            ))}
           </div>
-          <span aria-hidden className="text-[17px] text-faint">→</span>
-        </Link>
-      </section>
+
+          <div className="mt-4 space-y-2">
+            {[
+              {
+                href: "/rent/my?tab=host",
+                title: "빌려준 공간 보기",
+                desc:
+                  rentSpaces.length > 0
+                    ? `올린 공간 ${rentSpaces.length}곳과 들어온 요청을 봐요`
+                    : "아직 올린 공간이 없어요",
+              },
+              {
+                href: "/rent/my?tab=guest",
+                title: "빌린 공간 보기",
+                desc: rentGuestBookings.length > 0 ? `내가 신청한 예약 ${rentGuestBookings.length}건을 봐요` : "아직 빌린 공간이 없어요",
+              },
+            ].map((c) => (
+              <Link
+                key={c.href}
+                href={c.href}
+                className="flex items-center gap-3 rounded-lg border border-hairline bg-surface px-4 py-4 transition-colors hover:bg-surface-soft sm:px-5"
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="text-[17px] font-medium text-ink">{c.title}</p>
+                  <p className="mt-0.5 text-[15px] break-keep text-mute">{c.desc}</p>
+                </div>
+                <span aria-hidden className="text-[17px] text-faint">→</span>
+              </Link>
+            ))}
+          </div>
+
+          {rentSpaces.length === 0 && (
+            <p className="mt-5 text-[15px] leading-relaxed break-keep text-mute">
+              쉬는 날이나 비는 시간에 가게를 빌려주고 싶으신가요?{" "}
+              <Link href="/rent/new" className="text-body underline underline-offset-2">
+                내 공간 올리기
+              </Link>
+            </p>
+          )}
+        </section>
+      )}
 
       {/* 계정 설정 */}
       <section className="mt-10 border-t border-hairline pt-6">
