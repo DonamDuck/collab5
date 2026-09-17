@@ -8,7 +8,8 @@
 //
 // 자동 채움 규칙: `roadAddress`(없으면 `jibunAddress`) → 전체 주소, `sigungu + bname` → 동네.
 // 동네 칸은 채운 뒤에도 고칠 수 있게 남긴다 — 「을지로3가」보다 「을지로」로 불리는 동네가 있다.
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useDismissable } from "@/components/useDismissable";
 import { rentInputCls, secondaryBtnCls } from "../ui";
 
 const SCRIPT_SRC = "https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js";
@@ -73,6 +74,12 @@ export function AddressField({
   const [busy, setBusy] = useState(false);
   const [manual, setManual] = useState(false);
   const boxRef = useRef<HTMLDivElement>(null);
+  // 🪟09-18 밤 QA(H-27) — 이 레이어만 ESC로 안 닫히고, 열려 있는 동안 **뒤 화면이 그대로 스크롤**됐다.
+  //   폰에서 주소 목록을 넘기다 손가락이 레이어 밖으로 나가면 등록 폼이 뒤에서 움직여, 닫고 나면 딴 데 와 있다.
+  //   ⭐확인 팝업(`ConfirmDialog`)이 쓰는 훅을 그대로 쓴다. 자리마다 따로 붙이면 언젠가 또 하나가 빠진다(07-29 시트 19곳).
+  //   ⚠️`overlayClose`는 그대로 참 — 여기선 딤 클릭이 「안 고를래요」라 잃을 입력이 없다(전에도 그렇게 닫혔다).
+  const closeLayer = useCallback(() => setOpen(false), []);
+  const layer = useDismissable(open, { onClose: closeLayer, overlayClose: true });
 
   // 컨테이너가 DOM에 생긴 «뒤에» embed해야 한다. 열기 버튼 핸들러 안에서 하면 아직 div가 없다.
   useEffect(() => {
@@ -136,15 +143,13 @@ export function AddressField({
           📱`items-end sm:items-center` — 폰은 바닥에서 올라오고 데스크톱은 가운데. `ConfirmDialog`와 같은 문법이다. */}
       {open && (
         <div
-          role="dialog"
-          aria-modal="true"
-          aria-label="주소 찾기"
+          {...layer.overlayProps}
           className="fixed inset-0 z-[60] flex items-end justify-center bg-ink/55 backdrop-blur-[2px] sm:items-center sm:p-4"
-          onClick={() => setOpen(false)}
         >
           <div
-            // 🚨바깥 클릭으로만 닫는다 — 안쪽 클릭이 부모로 올라가면 주소를 고르는 순간 닫힌다.
-            onClick={(e) => e.stopPropagation()}
+            // 🚨훅이 안쪽 클릭을 멈춰 준다 — 부모로 올라가면 주소를 고르는 순간 닫힌다.
+            {...layer.panelProps}
+            aria-label="주소 찾기"
             className="w-full max-w-[480px] overflow-hidden rounded-t-lg bg-surface shadow-e3 sm:rounded-lg"
           >
             <div className="flex items-center justify-between border-b border-hairline px-4 py-3">

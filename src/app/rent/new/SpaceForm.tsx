@@ -17,6 +17,7 @@
 //   같은 폼이 `/rent/new`와 `/rent/[slug]/edit`를 다 맡는다 — `initial`이 오면 고치기 모드.
 //   저장은 둘 다 `saveSpaceAction`이고, slug가 실리면 그 행을 덮어쓴다(다시 검토 대기로 들어간다).
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { saveSpaceAction } from "@/lib/rent-actions";
 import { uploadBizCert, uploadPhoto } from "@/lib/upload";
@@ -30,7 +31,7 @@ import {
   hasAnyBiz, openDateProblem, toOpenDate,
 } from "@/lib/bizcheck";
 import {
-  COFFEE_CHAT_LABEL, COFFEE_CHAT_WHEN_HOST, PRODUCT_HINT_HOST, PRODUCT_LABEL, PRODUCT_NOTE_PLACEHOLDER,
+  COFFEE_CHAT_LABEL, COFFEE_CHAT_WHEN_HOST, PRODUCT_HINT_HOST, PRODUCT_LABEL, PRODUCT_NOTE_PLACEHOLDER, withJosa,
 } from "@/lib/rent-copy";
 import { CATEGORY_OPTIONS, dateLabel, primaryBtnCls, RentSelect, rentInputCls, rentTextareaCls, secondaryBtnCls, won } from "../ui";
 import { AddressField } from "./AddressField";
@@ -143,6 +144,8 @@ export function SpaceForm({
   defaultPhone = "",
   defaultBrandSlug = "",
   userId,
+  noEmail = false,
+  mySpaceCount = 0,
 }: {
   myBrands: { slug: string; name: string }[];
   feeRate: number;
@@ -156,6 +159,10 @@ export function SpaceForm({
   defaultBrandSlug?: string;
   /** 💾새로 올리기 임시 저장의 키. 고치기 모드에선 안 넘긴다(넘겨도 `initial`이 있으면 안 쓴다). */
   userId?: number;
+  /** 📮가입 이메일이 없는 계정인가(09-18 밤 QA H-11). 요청 알림이 이메일로만 나가서, 이대로 올리면 못 받는다. */
+  noEmail?: boolean;
+  /** 🏠이미 올린 공간 수(09-18 밤 QA H-16). 새로 올리기 폼에서만 쓴다. */
+  mySpaceCount?: number;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -237,6 +244,17 @@ export function SpaceForm({
   /** 저장 뒤 사업자 칸만 남았을 때의 한 줄(나머지는 저장됐다는 것). */
   const [savedNote, setSavedNote] = useState("");
 
+  // 🔁09-18 밤 QA(H-09) — 이름이나 주소를 바꾸면 이 공간이 «다시 검토»로 내려가 목록에서 빠진다(`saveSpaceAction`).
+  //   그런데 그 사실은 폼 맨 아래 버튼 밑에 «늘 같은 문장»으로 서 있었다. 늘 떠 있는 문장은 안 읽힌다.
+  //   ⭐값이 실제로 바뀐 그 칸 옆에서, 바뀐 순간에만 말한다. 버튼 이름도 그때만 바꿔서 누르기 전에 한 번 더 보이게.
+  //   ⚠️검토로 내려가는 조건은 `saveSpaceAction`이 정본이다. 여기 두 줄은 그 규칙을 화면에서 미리 비추는 것뿐이다.
+  const addressNow = [addrBase.trim(), addrDetail.trim()].filter(Boolean).join(", ");
+  const renamedNow = !!initial && initial.name.trim() !== name.trim();
+  const movedNow = !!initial && initial.address.trim() !== addressNow;
+  const reviewAgain = renamedNow || movedNow;
+  /** 지금 손님에게 보이는 공간인가 — 그럴 때만 「목록에서 잠시 빠져요」가 참이다. */
+  const listedNow = initial?.status === "open";
+
   // ─── 💾임시 저장 (새로 올리기만) ───
   const draftKey = !initial && userId ? draftKeyOf(userId) : null;
   /** 아무것도 안 쓴 첫 모습. 지금 폼이 이것과 같으면 초안을 안 남긴다(열어만 봤는데 「불러왔어요」가 뜨면 이상하다). */
@@ -290,9 +308,10 @@ export function SpaceForm({
         if (!Array.isArray(d.openSlots)) d.openSlots = [];
         if (!Array.isArray(d.repeatWeekly)) d.repeatWeekly = [];
         // 🧾사업자 칸 — 모양이 틀리면 비운다. 등록증 경로는 «이 계정 폴더»일 때만 되살린다(같은 기기의 다른 계정 초안이 섞이지 않게).
-        d.bizNumber = typeof d.bizNumber === "string" ? bizDigits(d.bizNumber).slice(0, 10) : "";
-        d.bizOwnerName = typeof d.bizOwnerName === "string" ? d.bizOwnerName : "";
-        d.bizOpenDate = typeof d.bizOpenDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(d.bizOpenDate) ? d.bizOpenDate : "";
+        // 🔒09-18 밤 QA(H-34) — 이제 안 담는 칸이다. 09-18 전에 남은 초안이 있으면 여기서 버린다.
+        d.bizNumber = "";
+        d.bizOwnerName = "";
+        d.bizOpenDate = "";
         d.bizCertPath = typeof d.bizCertPath === "string" && userId && bizCertPathOk(d.bizCertPath, userId) ? d.bizCertPath : "";
         applyDraft(d);
         setRestored(true);
@@ -316,7 +335,11 @@ export function SpaceForm({
     chatOn, chatMin, chatPrice, chatTopics,
     openSlots, repeatWeekly,
     brandOn, brandPick,
-    bizNumber, bizOwnerName, bizOpenDate, bizCertPath,
+    // 🔒09-18 밤 QA(H-34) — 사업자등록번호·대표자 이름·개업일을 브라우저 저장소에 남기지 않는다.
+    //   가게 컴퓨터는 대개 공용이고, 이 셋이 모이면 국세청 조회가 그대로 되는 신원 한 벌이다.
+    //   ⭐임시 저장은 «다시 쓰기 귀찮은 것»을 위한 것이지 신원을 맡아 두는 곳이 아니다. 세 칸은 매번 새로 적는다.
+    //   ⚠️등록증 «경로»는 남긴다 — 파일 자체가 아니고, 읽을 때 이 계정 폴더인지 다시 본다(`bizCertPathOk`).
+    bizNumber: "", bizOwnerName: "", bizOpenDate: "", bizCertPath,
   };
   const draftJson = JSON.stringify(draftSnap);
   useEffect(() => {
@@ -445,26 +468,35 @@ export function SpaceForm({
   // 화면에서 먼저 막는 이유는 왕복을 아끼려는 것이지 이게 관문이라서가 아니다 — 관문은 늘 서버다.
   // 📍09-17 QA — 이유와 함께 **어느 칸인지**(`f-<칸>`)를 돌려준다. 위쪽 칸이 비어도 말은 맨 아래 버튼 위에만 떠서
   //   스크롤을 올려 찾아야 했다. 누르면 그 칸으로 올라가고 칸 바로 밑에도 같은 말을 적는다.
-  const blocker = (): [string, string] | null => {
+  // 📝09-18 밤 QA(H-14) — 막힘 검사도 «보낼 값»으로 한다. 칸에 적어만 두고 [담기]를 안 누른 유의 사항은
+  //   제출 직전에 합쳐지는데(아래 `submit`), 검사가 합치기 «전» 값을 보면 다 적은 사장님에게 「열 글자 넘게 담아 주세요」가 뜬다.
+  const blocker = (rulesV: string = rules): [string, string] | null => {
     if (!name.trim()) return ["name", "공간 이름을 적어 주세요."];
     if (!category) return ["category", "어떤 업종인지 골라 주세요."];
     if (readyPhotos.length === 0) return ["photos", "사진을 한 장 이상 올려 주세요. 사진 없는 공간은 아무도 안 빌려요."];
     if (!addrBase.trim()) return ["address", "주소를 찾아 주세요."];
-    if (!contactPhone.trim()) return ["phone", "매장 전화번호가 비어 있어요."];
+    if (!contactPhone.trim()) return ["phone", "가게 전화번호가 비어 있어요."];
     // ✂️09-18 밤 QA(SEC-07) — 서버(`saveSpaceAction`)와 같은 함수. 숫자만 세어 전화번호 모양인지 본다.
-    if (!storePhoneOk(contactPhone)) return ["phone", "매장 전화번호를 다시 봐 주세요. 예) 02-1234-5678"];
-    if (rules.trim().length < 10) return ["rules", "유의 사항을 열 글자 넘게 담아 주셔야 올릴 수 있어요."];
+    if (!storePhoneOk(contactPhone)) return ["phone", "가게 전화번호를 다시 봐 주세요. 예) 02-1234-5678"];
+    if (rulesV.trim().length < 10) return ["rules", "유의 사항을 열 글자 넘게 담아 주셔야 올릴 수 있어요."];
     // 🛍09-18 — 공간 상품 하나 이상, 켠 상품은 값과 설명. 서버(`saveSpaceAction`)가 같은 규칙으로 다시 본다.
     if (!spaceOn && !fullOn) return ["products", "파실 상품을 하나는 켜 주세요. 대관만이나 공간 전체 중에서요."];
     if (spaceOn && spacePrice <= 0) return ["spacePrice", "한 시간 값이 비어 있어요."];
     if (spaceOn && spaceNote.trim().length < 10) return ["spaceNote", "손님이 무엇을 쓰고 할 수 있는지 열 글자는 넘게 담아 주세요."];
     if (fullOn && fullPrice <= 0) return ["fullPrice", "한 시간 값이 비어 있어요."];
     if (fullOn && fullNote.trim().length < 10) return ["fullNote", "어떤 시설까지 쓰는지 조금 더 적어 주세요. 열 글자면 돼요."];
+    // 🔁09-18 밤 QA(H-21) — 커피챗 값 검사가 달력 «뒤»에 있었다. 화면에선 커피챗이 「무엇을 파실까요」 절 안이고
+    //   달력은 그다음 절이라, 둘 다 비면 화면을 지나쳐 내려갔다가 다시 올라오게 된다. 막는 순서는 화면 순서여야 한다.
+    if (chatOn && chatPrice <= 0) return ["chatPrice", "커피챗 값이 비어 있어요."];
     // 🔁09-17 — 매주 계속 여는 요일이 있으면 그걸로 하루 이상이 찬다. 시간 검사도 규칙이 연 날까지 본다.
     if (openSlots.length === 0 && repeatWeekly.length === 0) return ["slots", "빌려줄 날을 달력에서 하루 이상 골라 주세요."];
-    const badSlot = expandRepeat(openSlots, repeatWeekly).find((sl) => hoursBetween(sl.start, sl.end) < Number(minHours));
+    const expanded = expandRepeat(openSlots, repeatWeekly);
+    // 🩸09-18 밤 QA(H-20) — 닫는 시각을 여는 시각보다 앞에 두면 「최소 2시간을 못 채워요」가 떴다. 시간을 늘리라는 말인데
+    //   늘릴 데가 없다(거꾸로라 길이가 음수다). 서버(`saveSpaceAction`)는 이미 「거꾸로예요」라고 말한다 — 화면도 같은 말로.
+    const reversed = expanded.find((sl) => hoursBetween(sl.start, sl.end) <= 0);
+    if (reversed) return ["slots", `${dateLabel(reversed.date)}은 끝나는 시각이 여는 시각보다 앞이에요. 두 시각을 바꿔 주세요.`];
+    const badSlot = expanded.find((sl) => hoursBetween(sl.start, sl.end) < Number(minHours));
     if (badSlot) return ["slots", `${dateLabel(badSlot.date)}은 최소 ${minHours}시간을 못 채워요. 시간을 늘리거나 그날을 빼 주세요.`];
-    if (chatOn && chatPrice <= 0) return ["chatPrice", "커피챗 값이 비어 있어요."];
     // 🧾09-18 사업자 정보 — 폼 순서대로(번호 → 대표자 → 개업일 → 등록증). 서버(`saveSpaceAction`)가 같은 함수로 다시 본다.
     if (bizNeeded) {
       const numberProblem = bizNumberProblem(bizNumber);
@@ -492,9 +524,26 @@ export function SpaceForm({
       setErr("");
       setSavedNote("");
       setTried(true);
-      if (blockedPair) {
+
+      // 📝09-18 밤 QA(H-14) — 유의 사항·설비 칸에 적어 두고 [담기]를 «안 누른» 글이 제출 때 말없이 사라졌다.
+      //   사장님 눈엔 적어 둔 줄이 칸에 그대로 보이니 담긴 줄 안다. 저장하고 목록에 돌아와서야 빠진 걸 안다.
+      //   ⭐[담기]는 «여러 줄을 나누는 방법»이지 관문이 아니다. 보내기 직전에 남은 한 줄을 같이 담는다.
+      const leftoverRule = ruleInput.trim();
+      const ruleListFinal = leftoverRule && !ruleList.includes(leftoverRule) ? [...ruleList, leftoverRule] : ruleList;
+      const rulesFinal = ruleListFinal.join("\n");
+      const leftoverFacility = facilityInput.trim();
+      const facilitiesFinal =
+        leftoverFacility && !facilities.includes(leftoverFacility) ? [...facilities, leftoverFacility] : facilities;
+      // 화면도 같이 바꿔 둔다 — 저장에만 담기고 칸에 남아 있으면 「또 담아야 하나」가 된다.
+      if (rulesFinal !== rules) setRules(rulesFinal);
+      if (leftoverRule) setRuleInput("");
+      if (facilitiesFinal !== facilities) setFacilities(facilitiesFinal);
+      if (leftoverFacility) setFacilityInput("");
+
+      const bad = blocker(rulesFinal);
+      if (bad) {
         // 빨간 말은 칸 밑에만 둔다(`fieldErr`). 버튼 위엔 같은 말이 옅은 글씨로 남아, 아래에서 다시 봐도 이유가 보인다.
-        document.getElementById(`f-${blockedPair[0]}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+        document.getElementById(`f-${bad[0]}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
         return;
       }
       const address = [addrBase.trim(), addrDetail.trim()].filter(Boolean).join(", ");
@@ -506,10 +555,10 @@ export function SpaceForm({
         address,
         category,
         useType,
-        facilities,
+        facilities: facilitiesFinal,
         facilitiesNote,
         capacity: capacity ? Number(capacity) : undefined,
-        rules,
+        rules: rulesFinal,
         rentSpaceOn: spaceOn,
         rentSpacePrice: spaceOn ? spacePrice : 0,
         rentSpaceNote: spaceOn ? spaceNote : "",
@@ -583,6 +632,23 @@ export function SpaceForm({
   return (
     <div className="mt-10 space-y-12">
       <StepNav />
+      {/* 📮09-18 밤 QA(H-11) — 요청 알림은 이메일로만 나간다. 소셜로 가입해 이메일이 없는 계정은 손님이 신청해도 모른다.
+          ⚠️저장은 막지 않는다(대표 추천안) — 공급을 막을 만한 일이 아니고, 요청은 이 화면에서도 볼 수 있다. */}
+      {noEmail && (
+        <p className="rounded-md bg-lemon-pale px-4 py-3 text-[15px] leading-relaxed break-keep text-lemon-on">
+          이 계정엔 이메일이 없어서 요청이 들어와도 알려 드릴 곳이 없어요. 올리신 뒤에는 내 하루 가게에서 직접 확인해 주세요.
+        </p>
+      )}
+      {/* 🏠09-18 밤 QA(H-16) — 공간 넷을 올린 사장님에게도 「내 공간 등록」이 빈 폼으로 열렸다. 고치러 온 분이
+          모르고 올리면 같은 가게가 둘이 된다. 이미 올리신 것이 있으면 그리로 가는 길을 폼 머리에 둔다. */}
+      {!editing && mySpaceCount > 0 && (
+        <p className="text-[15px] leading-relaxed break-keep text-mute">
+          이미 올리신 공간이 {mySpaceCount}곳 있어요.{" "}
+          <Link href="/rent/my?tab=host" className="text-body underline underline-offset-2">
+            내 하루 가게에서 보기
+          </Link>
+        </p>
+      )}
       {/* 💾09-17 — 불러온 걸 먼저 말한다. 모르고 이어 쓰다 옛 사진이 올라가면 안 된다. */}
       {restored && (
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-md bg-surface-soft px-4 py-2">
@@ -606,6 +672,7 @@ export function SpaceForm({
             onChange={(e) => setName(e.target.value)}
             placeholder="예) 을지로 2층 작업실"
           />
+          {renamedNow && <ReviewAgainNote what="이름" listed={listedNow} />}
         </L>
         {/* 🔻09-16 「한 줄로 말하면」을 빼고 그 자리에 **업종**을 넣었다(대표) — 검색하고 거를 수 있어야 한다.
             ⭐**두 축**으로 가른 이유는 조합이 폭발해서다. 카페 공간만 / 카페 + 머신 / 국밥집 화구까지 /
@@ -668,7 +735,7 @@ export function SpaceForm({
           htmlFor="sp-address"
           anchor="address"
           error={fieldErr("address")}
-          hint="신청하는 분이 공간 화면에서 보고 찾아오실 수 있게 지도와 함께 보여드려요."
+          hint="손님이 공간 화면에서 보고 찾아오실 수 있게 지도와 함께 보여드려요."
         >
           <AddressField
             base={addrBase}
@@ -677,6 +744,7 @@ export function SpaceForm({
             onBase={setAddrBase}
             onDetail={setAddrDetail}
           />
+          {movedNow && <ReviewAgainNote what="주소" listed={listedNow} />}
         </L>
         {/* 🔻09-14 「동네」 칸 삭제 — 대표: *「주소를 필수로 하고, 동네 섹션 삭제해도 될 거 같아」*.
             ⭐주소를 받으면 동네는 «거기서 나온다». 같은 것을 두 번 묻는 칸이었고, 둘이 어긋나면
@@ -685,12 +753,12 @@ export function SpaceForm({
             중개자가 사업자 호스트의 성명·주소·전화번호를 확인해 **신청 «전»에** 손님에게 보여 주도록 한다.
             안 하면 제20조의2②로 우리가 연대 책임을 진다. 프로필 번호를 미리 채우고 여기서 고칠 수 있다. */}
         <L
-          label="매장 전화번호"
+          label="가게 전화번호"
           htmlFor="sp-phone"
           anchor="phone"
           error={fieldErr("phone")}
           // 🔁09-17 QA — 「법에 따라」가 처음 듣는 사장님께 위협조로 읽혔다. 근거는 위 주석에 남기고 화면엔 결과만.
-          hint="가게 번호는 신청 전에 손님께 보여요. 사장님 휴대폰 번호는 결제를 마친 손님께만 열려요."
+          hint="가게 전화번호는 신청 전에 손님께 보여요. 사장님 휴대폰 번호는 결제를 마친 손님께만 열려요."
         >
           <input
             id="sp-phone"
@@ -710,7 +778,9 @@ export function SpaceForm({
         <L
           // 🔁09-18 대표 코멘트 — 라벨·힌트 대표 문안(맞춤법만: 「전해주시겠나요」→「전해 주시겠어요」).
           label="출입문 비밀번호, 공간 사용법, 안내 사항 등은 어떻게 전해 주시겠어요?"
-          hint="예약을 확정하면 아래에서 고른 방식으로 빌리는 분께 연락해 주세요. (예약 확정 후 2일 안에)"
+          // ✍️09-18 밤 QA(H-30) — 사장님 화면에서 손님을 부르는 말이 셋(손님·빌리는 분·신청하는 분)이었고,
+          //   같은 일을 「예약을 확정하면」과 「수락」 두 이름으로 불렀다. 사장님 쪽은 «수락»·«손님» 한 벌로 모은다.
+          hint="수락하신 뒤 여기서 고르신 방식으로 손님께 연락해 주세요. (수락하고 2일 안에)"
         >
           <div className="flex flex-wrap gap-2">
             {ACCESS_OPTIONS.map(([v, t]) => (
@@ -737,7 +807,7 @@ export function SpaceForm({
         {/* 🔻09-16 대표 — 「쓰임새」(원래 목적대로 / 대관) 칸 삭제. *「위에 대관, 대관+시설이 있는 거 같아
             이건 제거해도 될 듯, 중복처럼 보여」*. 맞다 — 09-16에 만든 «범위» 축이 같은 것을 더 정확히 말한다.
             ⚠️`useType`은 DB와 타입에 남아 있고 저장할 때 기존 값을 그대로 넘긴다(옛 데이터가 안 깨지게). */}
-        <L label="쓸 수 있는 시설" optional hint="빌리는 분이 이걸 보고 고르세요. 누르면 담겨요.">
+        <L label="쓸 수 있는 시설" optional hint="손님이 이걸 보고 고르세요. 누르면 담겨요.">
           <div className="flex flex-wrap gap-2">
             {facilityPool.map((f) => {
               const on = facilities.includes(f);
@@ -1105,7 +1175,10 @@ export function SpaceForm({
         <L
           label="사업자등록증"
           anchor="bizCert"
-          error={fieldErr("bizCert") || certErr}
+          // 🩸09-18 밤 QA(H-04) — 한 번 제출한 뒤엔 `fieldErr`가 늘 「사업자등록증 파일을 올려 주세요」를 들고 있어서,
+          //   10MB 초과·형식 불일치·올리기 실패 같은 **진짜 이유**(`certErr`)가 그 일반 문구에 가려졌다.
+          //   사장님은 파일을 골랐는데 「올려 주세요」만 반복해서 보게 된다. 방금 일어난 일이 먼저다.
+          error={certErr || fieldErr("bizCert")}
           hint="사진이나 PDF로 올려 주세요. 10MB까지 돼요."
         >
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
@@ -1167,8 +1240,9 @@ export function SpaceForm({
               (계약 이행에 필요한 제공이라 따로 동의 체크는 두지 않고, 개인정보처리방침 «거래 상대방 제공»에 적어 두었다 · 09-17). */}
           <ul className="space-y-1.5">
             {[
-              `약관에는 내 소유이거나 임대인 동의를 받았다는 것, 수수료 ${Math.round(feeRate * 100)}%와 정산 방법, 환불 규정이 담겨 있어요.`,
-              "손님은 신청하기 전에 브랜드 이름·주소·매장 전화번호를 볼 수 있어요.",
+              // ✍️09-18 밤 QA(H-30) — 이 줄만 1인칭(「내 소유」)이라 옆 줄들과 화자가 달랐다. 사장님께 말하는 결로 맞춘다.
+              `약관에는 사장님 소유이거나 임대인 동의를 받으셨다는 것, 수수료 ${Math.round(feeRate * 100)}%와 정산 방법, 환불 규정이 담겨 있어요.`,
+              "손님은 신청하기 전에 브랜드 이름·주소·가게 전화번호를 볼 수 있어요.",
               "예약이 잡히면 예약한 손님께 사장님 연락처가 전달되고, 사장님도 손님 연락처를 받아요.",
             ].map((line) => (
               <li key={line} className="flex gap-2 text-[15px] leading-relaxed break-keep text-mute">
@@ -1258,20 +1332,36 @@ export function SpaceForm({
             : uploading
               ? certUploading ? "파일을 올리는 중이에요…" : "사진을 올리는 중이에요…"
               : editing
-                ? "고친 내용 올리기"
+                ? reviewAgain
+                  ? "고친 내용 올리고 다시 검토 받기"
+                  : "고친 내용 올리기"
                 : "등록하기"}
         </button>
         <p className="mt-3 text-center text-[15px] leading-relaxed break-keep text-faint">
           {/* 🔁09-17 QA — 「승인이 완료되는 대로 노출이 시작돼요」 명사화 둘, 고치기 쪽은 머리글과 같은 말 + 「반영됩니다」 피동.
               검토 기한은 아직 대표가 안 정해서 적지 않는다. */}
+          {/* 🔁09-18 밤 QA(H-09) — 이름·주소를 «이미 바꾼» 사장님에겐 위 칸 옆 안내가 말했으니 여기선 되풀이하지 않는다. */}
           {!editing
             ? "올리시면 저희가 읽어 보고 목록에 열어 드려요."
             : initial?.status === "pending"
               ? "고친 내용은 지금 하는 검토에 같이 담겨요."
-              : "매장 이름이나 주소를 바꾸시면 한 번 더 읽어 볼게요. 그동안 목록에서 잠시 빠져요."}
+              : reviewAgain
+                ? "고친 내용을 읽어 보고 다시 열어 드릴게요."
+                : "가게 이름이나 주소를 바꾸시면 한 번 더 읽어 볼게요. 그동안 목록에서 잠시 빠져요."}
         </p>
       </div>
     </div>
+  );
+}
+
+/** 🔁이름·주소를 바꿨을 때 그 칸 밑에 서는 한 줄(09-18 밤 QA H-09).
+ *  ⚠️레몬(기다리는 것의 색)이다 — 빨강은 「못 넘어간다」는 뜻이라 여기 쓰면 고치기를 멈추게 한다. 이건 막는 말이 아니다. */
+function ReviewAgainNote({ what, listed }: { what: string; listed: boolean }) {
+  return (
+    <p className="mt-2 text-[15px] leading-relaxed break-keep text-lemon-on">
+      {withJosa(what, "을/를")} 바꾸셨네요. 올리시면 저희가 한 번 더 읽어 봐요.
+      {listed ? " 그동안 이 공간은 목록에서 잠시 빠져요." : ""}
+    </p>
   );
 }
 
@@ -1404,7 +1494,8 @@ function ProductFields({
           </p>
         ) : (
           <p className="mt-2 text-[15px] text-faint">
-            성사된 금액에서 수수료 {Math.round(feeRate * 100)}%를 뺀 나머지를 사장님께 드려요.
+            {/* ✍️09-18 밤 QA(H-30) — 「성사된 금액」은 행정어다. 사장님이 쓰는 말로. */}
+            빌려주고 받으신 금액에서 수수료 {Math.round(feeRate * 100)}%를 뺀 나머지를 사장님께 드려요.
           </p>
         )}
       </L>
@@ -1533,7 +1624,9 @@ function Group({
 }) {
   const step = FORM_STEPS.indexOf(title) + 1;
   return (
-    <section id={anchor ? `f-${anchor}` : undefined}>
+    // 📐09-18 밤 QA(H-18) — `#f-biz`로 들어오면 「사업자 정보」 제목이 고정 헤더(3.5rem) 밑에 깔렸다.
+    //   저장 뒤 국세청 불일치로 여기까지 데려오는 길이라, 도착한 사장님이 무슨 절인지부터 못 봤다.
+    <section id={anchor ? `f-${anchor}` : undefined} className="scroll-mt-24">
       {/* 🧭단계 표지. id는 `f-<anchor>`(막힌 칸 스크롤)와 겹치지 않게 제목 묶음에 따로 단다. */}
       <div className="mb-[23px] scroll-mt-24" id={step ? `step-${step}` : undefined} data-form-step={step || undefined}>
         {step > 0 && (
@@ -1573,7 +1666,8 @@ function L({
   children: React.ReactNode;
 }) {
   return (
-    <div id={anchor ? `f-${anchor}` : undefined}>
+    // 📐09-18 밤 QA(H-18) — 막힌 칸으로 데려갈 때도 라벨이 헤더 밑에 깔린다. 절과 같은 값으로 비켜 둔다.
+    <div id={anchor ? `f-${anchor}` : undefined} className="scroll-mt-24">
       <label htmlFor={htmlFor} className="mb-2 block text-[16px] font-medium text-body">
         {label}
         {optional && <span className="ml-1 text-[15px] font-normal text-faint">· 선택</span>}

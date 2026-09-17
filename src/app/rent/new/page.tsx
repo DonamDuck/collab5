@@ -3,7 +3,7 @@ import Link from "next/link";
 import { HOST_REQUEST_STEPS } from "@/lib/rent-copy";
 import { getSessionUserId, getProfileById } from "@/lib/profiles";
 import { repo } from "@/lib/repo";
-import { FEE_RATE } from "@/lib/spaces";
+import { FEE_RATE, listSpacesByOwner } from "@/lib/spaces";
 import { SpaceForm } from "./SpaceForm";
 import { redirect } from "next/navigation";
 import { primaryBtnCls } from "../ui";
@@ -76,6 +76,9 @@ export default async function NewSpacePage({
   //   프로필 전화번호로 매장 전화를 미리 채우고, 소개서가 있으면 첫 번째를 기본으로 연결한다.
   //   ⭐셋 다 폼에서 고칠 수 있다 — 채워 두는 것과 정해 버리는 것은 다르다.
   const me = await getProfileById(uid);
+  // 🏠09-18 밤 QA(H-16) — 이미 올린 공간이 있으면 폼 머리에서 알려 준다(모르고 같은 가게를 또 올리는 일을 막는다).
+  //   📮H-11 — 이메일이 없는 계정은 요청 알림을 못 받는다. 저장은 막지 않고 한 줄로 알린다.
+  const mySpaceCount = (await listSpacesByOwner(uid)).length;
 
   return (
     <main className="mx-auto w-full max-w-[560px] px-4 pt-4 pb-16 sm:px-6 sm:pt-6">
@@ -116,6 +119,8 @@ export default async function NewSpacePage({
         defaultBrandSlug={myBrands[0]?.slug ?? ""}
         // 💾임시 저장 키에 쓴다(09-17). 계정마다 초안이 따로 남는다.
         userId={uid}
+        noEmail={!me?.email?.trim()}
+        mySpaceCount={mySpaceCount}
       />
     </main>
   );

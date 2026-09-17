@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { getSessionUserId } from "@/lib/profiles";
+import { getProfileById, getSessionUserId } from "@/lib/profiles";
 import { repo } from "@/lib/repo";
 import { FEE_RATE, getSpaceFull } from "@/lib/spaces";
 import { SpaceForm } from "../../new/SpaceForm";
@@ -29,6 +29,8 @@ export default async function EditSpacePage({ params }: { params: Promise<{ slug
   if (!sp || sp.ownerUserId !== uid) redirect(`/rent/${slug}`);
 
   const myBrands = (await repo.listMakersByOwner(uid)).map((m) => ({ slug: m.slug, name: m.name }));
+  // 📮09-18 밤 QA(H-11) — 이메일이 없는 계정은 요청 알림을 못 받는다. 고치기 화면에서도 같은 한 줄을 띄운다.
+  const me = await getProfileById(uid);
 
   return (
     <main className="mx-auto w-full max-w-[560px] px-4 pt-8 pb-16 sm:px-6 sm:pt-12">
@@ -55,7 +57,7 @@ export default async function EditSpacePage({ params }: { params: Promise<{ slug
         </p>
       </header>
 
-      <SpaceForm myBrands={myBrands} feeRate={FEE_RATE} initial={sp} />
+      <SpaceForm myBrands={myBrands} feeRate={FEE_RATE} initial={sp} noEmail={!me?.email?.trim()} />
     </main>
   );
 }
