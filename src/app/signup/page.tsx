@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { Suspense, useEffect, useState, useTransition } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import { safeRedirect } from "@/lib/safe-redirect";
 import { signUpAction, checkSignupDuplicatesAction } from "@/lib/auth-actions";
 import { uploadPhoto } from "@/lib/upload";
 import { Avatar } from "@/components/Avatar";
@@ -14,8 +15,29 @@ import { KakaoButton } from "@/components/KakaoButton";
 import { SocialDivider } from "@/components/SocialDivider";
 import { validatePassword, formatPhone } from "@/lib/validation";
 
+/** 부제 — 어디서 넘어왔는지에 맞춰 할 일을 말한다(09-18 밤 QA SC-05).
+ *  하루 가게에서 온 사람에게 「소개서를 관리해보세요」는 남의 이야기다. 공간 올리기·고치기에서 왔으면 사장님, 나머지 하루 가게는 손님. */
+function subtitleFor(back: string): string {
+  if (/^\/rent\/(?:new|[^/?#]+\/edit)(?:[/?#]|$)/.test(back)) return "가입하면 바로 공간을 올릴 수 있어요.";
+  if (/^\/rent(?:[/?#]|$)/.test(back)) return "가입하면 바로 공간을 신청할 수 있어요.";
+  return "브랜드 계정을 만들고 소개서를 관리해보세요.";
+}
+
+// `useSearchParams`는 Suspense 안에서 읽는다(로그인 화면과 같은 틀). 정적으로 그려지는 날에도 빌드가 안 깨진다.
 export default function SignupPage() {
+  return (
+    <Suspense fallback={<main className="mx-auto w-full max-w-[400px] px-4 py-14 sm:px-6" />}>
+      <SignupForm />
+    </Suspense>
+  );
+}
+
+function SignupForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  // 🔙가입을 마치면 로그인 화면으로 가는데, 거기서 로그인한 뒤 돌아갈 곳을 들고 간다(09-18 밤 QA SC-05).
+  //   전엔 `/login?welcome=1`로만 보내서 하루 가게 공간에서 온 손님도 로그인 뒤 홈에 떨어졌다.
+  const back = safeRedirect(searchParams.get("redirect"));
   const [pending, start] = useTransition();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -103,13 +125,13 @@ export default function SignupPage() {
         return;
       }
       // 완료 얼럿은 로그인 페이지에서 표시(가입 페이지 모달은 서버액션 리렌더에 취약)
-      router.replace("/login?welcome=1");
+      router.replace(back === "/" ? "/login?welcome=1" : `/login?welcome=1&redirect=${encodeURIComponent(back)}`);
     });
 
   return (
     <main className="mx-auto w-full max-w-[400px] px-4 py-14 sm:px-6">
       <h1 className="text-[24px] font-bold leading-[1.25] tracking-[-0.025em] text-ink">회원가입</h1>
-      <p className="mt-2 text-[15px] text-mute">브랜드 계정을 만들고 소개서를 관리해보세요.</p>
+      <p className="mt-2 text-[15px] text-mute">{subtitleFor(back)}</p>
 
       {/* ⭐<form> — Enter 제출 + 비밀번호 매니저가 '가입 폼'으로 인식(new-password면 '강력한 비번 제안'이 뜬다).
           ⚠️form 안 <button>은 기본 submit이라 '지우기'·'보기' 같은 건 type="button"이어야 한다(확인 완료). */}
@@ -246,7 +268,10 @@ export default function SignupPage() {
       {/* 이메일 가입에 딸린 보조 동선이라 가입 버튼 바로 아래에 둔다(/login과 같은 배치) */}
       <p className="mt-4 text-center text-[14px] text-mute">
         이미 계정이 있나요?{" "}
-        <Link href="/login" className="font-medium text-primary-on underline-offset-2 hover:underline">
+        <Link
+          href={back === "/" ? "/login" : `/login?redirect=${encodeURIComponent(back)}`}
+          className="font-medium text-primary-on underline-offset-2 hover:underline"
+        >
           로그인
         </Link>
       </p>

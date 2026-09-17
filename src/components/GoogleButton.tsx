@@ -30,10 +30,12 @@
 //    "가입"이라 쓰면 기존 유저에게, "로그인"이라 쓰면 신규 유저에게 거짓말이 된다.
 //
 // ⚠️ 구글은 이름·이메일만 준다. 우리 계정은 브랜드명·휴대폰번호가 필수라서 성공 후
-//    `/welcome`(온보딩 분기점)으로 보낸다. 이미 채워진 사람은 /welcome이 알아서 홈으로 넘긴다.
+//    `/welcome`(온보딩 분기점)으로 보낸다. 이미 채워진 사람은 /welcome이 알아서 보던 화면(없으면 홈)으로 넘긴다.
+//    🔙보던 화면(`?redirect=`)은 옮기기 직전 sessionStorage에 맡긴다(09-18 밤 QA SC-05, `lib/safe-redirect`).
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { authEnvReady, createBrowserAuthClient } from "@/lib/supabase/client";
+import { stashSocialRedirect } from "@/lib/safe-redirect";
 import { ButtonBusyVeil } from "./ButtonBusyVeil";
 
 const GOOGLE_ON = process.env.NEXT_PUBLIC_GOOGLE_ENABLED === "1";
@@ -215,7 +217,8 @@ function GoogleIdButton({ className }: { className: string }) {
         //    헤더(SiteHeader=서버 컴포넌트)가 **비로그인 상태로 그려진다.**
         //    (이메일 로그인은 signInAction=서버액션이라 Next가 알아서 캐시를 무를 뿐, 우린 그 길이 없다.)
         //    로그인은 세션 경계라 문서를 새로 받는 게 맞다 — 옛 리디렉션 방식도 전체 이동이었다.
-        window.location.replace("/welcome"); // 온보딩 분기점 — 이미 채워졌으면 거기서 홈으로 넘긴다
+        stashSocialRedirect(); // 지금 화면의 `?redirect=`를 같은 탭에 맡긴다. `/welcome`이 끝날 때 꺼내 간다.
+        window.location.replace("/welcome"); // 온보딩 분기점 — 이미 채워졌으면 거기서 보던 화면(없으면 홈)으로 넘긴다
       } catch {
         setErr("구글 로그인에 실패했어요. 잠시 후 다시 시도해주세요.");
         setPhase("ready");
