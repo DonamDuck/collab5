@@ -229,6 +229,17 @@ export async function saveSpaceAction(input: SpaceFormInput): Promise<ActionResu
   //   실패해도 저장은 그대로 간다 — 지도는 있으면 좋은 것이지 올리기를 막을 것이 아니다.
   const prev = input.slug ? await getSpaceFull(input.slug) : null;
 
+  // 🪪09-18 밤 QA(G-04·H-01) — 붙이는 소개서가 «내 것»인지 서버가 본다. 전엔 남의 소개서 주소를 그대로 붙일 수 있었고,
+  //   공개된 공간이 남의 브랜드를 달고 목록에 서도 검토를 거치지 않았다.
+  //   ⭐이미 붙어 있던 값을 그대로 다시 보내는 건 막지 않는다 — 소개서 소유권이 옮겨 간 날 공간 저장까지 막히면 안 된다.
+  const brandSlug = (input.brandSlug ?? "").trim();
+  if (brandSlug && brandSlug !== (prev?.brandSlug ?? "")) {
+    const maker = await repo.getMakerBySlug(brandSlug);
+    if (maker?.ownerUserId !== uid && !(await isRentAdmin())) {
+      return { ok: false, message: "내 소개서만 붙일 수 있어요.", field: "brand" };
+    }
+  }
+
   // ⏱09-18 밤 QA(SEC-08) — 여는 시각은 정시만(눈금 1시간, 대표 09-16). 고르개는 정시만 주지만 액션을 직접 부르면
   //   10:30 시작·24:30 끝 같은 칸이 저장됐다.
   //   ⚠️09-16 전에 30분으로 열어 둔 칸이 운영에 남아 있다(09-18 읽기: 공간 한 곳, 10:30 시작 두 날). 그 칸을 «그대로» 다시 보내면 받는다.
@@ -329,7 +340,7 @@ export async function saveSpaceAction(input: SpaceFormInput): Promise<ActionResu
   }
 
   const row: SpaceSaveInput = {
-    slug, ownerUserId: uid, brandSlug: input.brandSlug,
+    slug, ownerUserId: uid, brandSlug,
     name: input.name.trim(), tagline: "", body: input.body, photos: input.photos,
     // 동네는 이제 안 묻는다(대표 09-16: 「주소면 충분」). 옛 칸은 주소에서 앞 두 조각만 넣어 둔다 —
     // 목록의 동네 거르개가 아직 이 칸을 본다.
@@ -569,6 +580,11 @@ export async function startBookingAction(input: BookingFormInput): Promise<Start
   if (guestName.length < 2) return { ok: false, message: "이용하실 분 성함을 두 글자 이상 적어 주세요." };
   if (guestName.length > 50) return { ok: false, message: "성함이 너무 길어요. 50자 안으로 적어 주세요." };
 
+  // 🪪09-18 밤 QA(G-04) — 손님이 붙이는 소개서도 «내 것»만 받는다. 신청은 막지 않고 남의 것이면 빈 값으로 저장한다 —
+  //   이 값은 사장님 메일과 요청 카드에 그대로 붙어서, 남의 브랜드를 달면 그 브랜드가 신청한 것처럼 읽힌다.
+  const wantBrand = (input.guestBrandSlug ?? "").trim();
+  const guestBrandSlug = wantBrand && (await repo.getMakerBySlug(wantBrand))?.ownerUserId === uid ? wantBrand : "";
+
   // ⭐09-18 밤 QA(G-01·SC-11) — 날짜·시각·상품·열린 시간·겹침·인원은 «순수 함수 한 벌»이 본다.
   //   결제 승인(`confirmBookingAction`)과 결제 화면이 같은 함수로 다시 보므로, 규칙이 여기에만 있으면 안 된다.
   const taken = await listLiveBookings(sp.id, input.useDate);
@@ -585,7 +601,7 @@ export async function startBookingAction(input: BookingFormInput): Promise<Start
   const orderId = `rent-${sp.id}-${input.useDate.replace(/-/g, "")}-${Math.random().toString(36).slice(2, 10)}`;
 
   const booking = await createPendingBooking({
-    spaceId: sp.id, guestUserId: uid, guestBrandSlug: input.guestBrandSlug, guestPhone: input.guestPhone.trim(), guestName,
+    spaceId: sp.id, guestUserId: uid, guestBrandSlug, guestPhone: input.guestPhone.trim(), guestName,
     useDate: input.useDate, hours: `${input.startTime}~${input.endTime}`, plan: input.plan.trim(),
     startTime: input.startTime, endTime: input.endTime, hoursCount: hours, product: input.product,
     headcount: input.headcount, withChat: amountChat > 0, amountChat,
