@@ -14,6 +14,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { authEnvReady, createBrowserAuthClient } from "@/lib/supabase/client";
 import { completeOnboardingAction, getOnboardingStateAction } from "@/lib/auth-actions";
+import { takeSocialRedirect } from "@/lib/safe-redirect";
 import { uploadPhoto } from "@/lib/upload";
 import { Avatar } from "@/components/Avatar";
 import { Field, authInputCls } from "@/components/Field";
@@ -42,7 +43,9 @@ export default function WelcomePage() {
   const brandRef = useRef<HTMLInputElement>(null);
   const phoneRef = useRef<HTMLInputElement>(null);
 
-  // 진입 판정 ①세션 없음 → /login ②이미 채워짐 → / ③비었음 → 폼
+  // 진입 판정 ①세션 없음 → /login ②이미 채워짐 → 보던 화면(없으면 /) ③비었음 → 폼
+  // 🔙«보던 화면» = 소셜 버튼이 떠나기 직전 sessionStorage에 맡긴 경로(`lib/safe-redirect`, 09-18 밤 QA SC-05).
+  //   전엔 ②와 폼 제출 뒤가 늘 홈이라, 하루 가게 공간에서 「로그인하고 신청하기」로 온 손님이 그 공간을 잃었다.
   useEffect(() => {
     let alive = true;
     (async () => {
@@ -80,7 +83,7 @@ export default function WelcomePage() {
         //    한 번 더 로그인하면 문서를 새로 받아 되는 것도 이 때문이다).
         //    ⭐GoogleButton이 `window.location.replace`를 쓰는 이유와 **같은 버그**다(07-31 기록).
         //      로그인은 세션 경계라 문서를 새로 받는 게 맞다.
-        window.location.replace("/");
+        window.location.replace(takeSocialRedirect());
         return;
       }
       setEmail(st.email);
@@ -121,9 +124,10 @@ export default function WelcomePage() {
         emailRef.current?.focus();
         return;
       }
-      if (!b || !p) {
-        setErr(!b ? "브랜드명을 입력해주세요." : "휴대폰번호를 입력해주세요.");
-        (!b ? brandRef : phoneRef).current?.focus();
+      // 🙋09-17 대표 — 브랜드명은 선택. 휴대폰번호만 잡는다.
+      if (!p) {
+        setErr("휴대폰번호를 입력해주세요.");
+        phoneRef.current?.focus();
         return;
       }
       setErr("");
@@ -144,7 +148,7 @@ export default function WelcomePage() {
       // 위 `st.done` 분기와 같은 이유로 **하드 내비게이션**. 여기는 서버액션(completeOnboardingAction)을
       // 거쳐서 Next가 캐시를 무를 여지가 있지만, 이 경로도 결국 **소셜 로그인 직후**라 라우터 캐시에
       // 로그인 전 홈이 남아 있을 수 있다. 방금 프로필까지 새로 채웠으니 문서를 새로 받는 게 확실하다.
-      window.location.replace("/");
+      window.location.replace(takeSocialRedirect());
     });
 
   if (phase === "checking") {
@@ -209,7 +213,7 @@ export default function WelcomePage() {
               </p>
             )}
           </Field>
-          <Field label="브랜드명" htmlFor="welcome-brand">
+          <Field label="브랜드명" htmlFor="welcome-brand" optional>
             <input
               id="welcome-brand"
               ref={brandRef}
@@ -221,7 +225,7 @@ export default function WelcomePage() {
               className={authInputCls}
             />
             <p className="mt-1.5 text-[13px] text-faint">
-              소개서와 콜라보 제안의 인사말에 이 이름이 그대로 나와요.
+              아직 브랜드가 없다면 비워 두셔도 돼요. 적어 두시면 소개서와 콜라보 제안의 인사말에 이 이름이 나와요.
             </p>
           </Field>
           <Field label="휴대폰번호" htmlFor="welcome-phone">

@@ -8,6 +8,8 @@ import { kstIso } from "./time";
 import { orderedIdeaTitles } from "./report-cards";
 import { isDemoSlug } from "./demo";
 import { MAX_COLLABS } from "./limits";
+import { getRentMock } from "./rent-mock";
+import { MockRepo } from "./site-mock-repo";
 
 export interface Repo {
   // 업체
@@ -1451,7 +1453,31 @@ class SupabaseRepo implements Repo {
 // ⚠️ service_role 키는 서버 전용 — 절대 NEXT_PUBLIC_로 노출 금지.
 const SUPABASE_KEY =
   process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
-export const repo: Repo =
+const baseRepo: Repo =
   process.env.SUPABASE_URL && SUPABASE_KEY
     ? new SupabaseRepo(process.env.SUPABASE_URL, SUPABASE_KEY)
     : new InMemoryRepo();
+
+/** 🧪목 데이터(하루 가게 09-17 → 사이트 전체 09-18) — 목 쿠키가 켜져 있으면 **모든** repo 함수가 목 세계(`MockRepo`)로 간다.
+ *  ⭐09-17엔 하루 가게가 부르는 두 함수만, `mock-` 주소·9000번대 번호일 때만 가로챘다. 사이트 전체 지도에선
+ *    소개서·찜·리포트·매거진이 전부 목 세계여야 해서 통째로 돌린다. 목 모드에서 이 객체는 DB를 한 번도 안 부른다.
+ *  🚨쓰기 함수는 `MockRepo`에서 던진다(두 번째 울타리). 첫 울타리는 서버 액션 첫 줄이다.
+ *  🚨운영 빌드에선 감싸지 않는다(`NODE_ENV`는 빌드 때 상수로 박혀 이 분기가 통째로 빠진다). 머리말 = `rent-mock.ts`. */
+function withSiteMock(base: Repo): Repo {
+  return new Proxy(base, {
+    get(target, prop, receiver) {
+      const v = Reflect.get(target, prop, receiver);
+      if (typeof v !== "function") return v;
+      return async (...args: unknown[]) => {
+        const m = await getRentMock();
+        if (m) {
+          const mock = new MockRepo(m) as unknown as Record<PropertyKey, (...a: unknown[]) => unknown>;
+          return mock[prop](...args);
+        }
+        return (v as (...a: unknown[]) => unknown).apply(target, args);
+      };
+    },
+  });
+}
+
+export const repo: Repo = process.env.NODE_ENV === "development" ? withSiteMock(baseRepo) : baseRepo;

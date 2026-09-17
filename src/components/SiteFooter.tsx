@@ -1,13 +1,19 @@
 // 전 페이지 공용 풋터 — 서버 컴포넌트(세션 불필요). 인쇄 시 숨김.
 import Link from "next/link";
+import { SUPPORT_EMAIL, SUPPORT_PHONE } from "@/lib/site";
 
 // 사업자 정보 한 줄 항목 — 라벨 없이 값만, 가운뎃점으로 구분
+//
+// ⚖️**전자상거래법 제10조①이 정한 표시 항목**이다(상호·대표자·주소·전화·이메일·사업자등록번호·약관).
+//   ⛔**없는 번호는 적지 않는다.** 통신판매업 신고번호는 구매안전서비스 확인증을 받아야 신고할 수 있고,
+//     그 확인증은 토스 가맹 심사를 통과해야 나온다(볼트 [[결제-모듈-토스]] 순서). 받는 날 여기 한 줄 는다.
 const BIZ: { label: string; value: string }[] = [
   { label: "상호", value: "collab5" },
   { label: "대표", value: "송영덕" },
+  { label: "사업자등록번호", value: "323-16-02896" },
   { label: "주소", value: "서울 성북구 돈암동 413-111, 402호" },
-  { label: "문의", value: "dudejrthd@gmail.com" },
-  { label: "전화", value: "010-2060-1629" },
+  { label: "문의", value: SUPPORT_EMAIL },
+  { label: "전화", value: SUPPORT_PHONE },
 ];
 
 export function SiteFooter() {
@@ -42,6 +48,10 @@ export function SiteFooter() {
             <Link href="/magazine" className="inline-flex items-center py-[12px] hover:text-ink">
               콜라보 매거진
             </Link>
+            {/* 💬고객센터(09-16 대표) — 카카오톡 상담이 여기로 모인다. 약관 앞에 둔다: 찾는 사람이 더 많다. */}
+            <Link href="/help" className="inline-flex items-center py-[12px] hover:text-ink">
+              고객센터
+            </Link>
             <Link href="/terms" className="inline-flex items-center py-[12px] hover:text-ink">
               이용약관
             </Link>
@@ -62,6 +72,19 @@ export function SiteFooter() {
             </span>
           ))}
         </div>
+
+        {/* ⚖️**통신판매중개자 고지** — 전자상거래법 제20조①.
+            *「통신판매중개자는 자신이 통신판매의 당사자가 아니라는 사실을 소비자가 쉽게 알 수 있도록
+              미리 고지하여야 한다」*. 시행규칙 제11조의2는 **초기 화면**에 두라고 한다.
+            🚨안 하면 제20조의2①로 **호스트의 과실로 생긴 손해에 우리가 연대 책임**을 진다.
+            ⭐이 줄은 「하루 가게」가 열리는 날부터 의무지만, 미리 걸어 둬도 틀린 말이 아니다 —
+              소개서·매거진도 우리가 파는 물건이 아니다. 그래서 전 페이지 공용 풋터에 둔다.
+            📏저작권 줄과 같은 13px이다. 시행규칙이 요구하는 건 「당사자 고지와 같거나 큰 글씨」인데
+              이 사이트엔 당사자 고지 자체가 없다(우리가 파는 게 없으니). 그래서 비교 대상이 없다. */}
+        <p className="text-[13px] leading-relaxed break-keep text-faint">
+          collab5는 통신판매중개자이며 통신판매의 당사자가 아닙니다. 상품·서비스의 거래에 관한 책임은
+          판매자에게 있습니다.
+        </p>
 
         {/* 저작권 */}
         <p className="text-[13px] text-faint">© 2026 collab5. All rights reserved.</p>

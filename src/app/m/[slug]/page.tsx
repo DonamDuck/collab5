@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { headers } from "next/headers";
@@ -157,7 +158,7 @@ export default async function MakerPage({
   searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ banner?: string; film?: string }>;
+  searchParams: Promise<{ banner?: string; film?: string; back?: string }>;
 }) {
   const { slug } = await params;
   const sp = await searchParams;
@@ -168,6 +169,9 @@ export default async function MakerPage({
   //   ⭐본문 렌더는 손대지 않는다 — 화면에 찍히는 소개서가 실제와 한 픽셀도 달라지면 안 되므로.
   //   데이터·권한은 그대로다(숨기는 건 화면뿐). 열람 자체가 공개라 이 파라미터로 새로 열리는 정보는 없다.
   const film = sp?.film === "1";
+  // ?back=/rent/{공간} — 하루 가게 공간 상세에서 사장님 소개서로 넘어온 경우 돌아가는 길(대표 09-17).
+  //   🔒아무 주소나 받으면 남의 사이트로 튕기는 링크가 된다. 하루 가게 공간 주소 모양만 받는다.
+  const back = typeof sp?.back === "string" && /^\/rent\/[A-Za-z0-9-]+$/.test(sp.back) ? sp.back : "";
   const maker = await repo.getMakerBySlug(slug);
   if (!maker) notFound();
 
@@ -223,6 +227,18 @@ export default async function MakerPage({
           variant={(bannerParam as BannerVariant) || "a"}
           preview={bannerPreview}
         />
+      )}
+
+      {back && !film && (
+        <Link
+          href={back}
+          className="mb-4 inline-flex items-center gap-1 py-[10px] text-[15px] text-mute hover:text-body print:hidden"
+        >
+          <svg aria-hidden="true" viewBox="0 0 24 24" className="size-[18px]" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M15 18l-6-6 6-6" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          하루 가게로 돌아가기
+        </Link>
       )}
 
       {/* 소개서 본문 — /preview와 공유하는 단일 렌더 */}

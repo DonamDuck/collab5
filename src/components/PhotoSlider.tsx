@@ -11,12 +11,16 @@ export function PhotoSlider({
   photos,
   sources,
   rounded = "rounded-lg",
+  altPrefix = "브랜드 사진",
 }: {
   photos: string[];
   /** 사진 주소 → 출처 글자. 소개서 전체가 표 하나를 공유하므로 **슬라이더마다 그대로 넘기면 된다.**
    *  대부분의 사진엔 출처가 없다 — 있는 장에서만 캡션이 뜬다(대표 확정 08-20). */
   sources?: Record<string, string>;
   rounded?: string;
+  /** 대체 글자 앞말 — 화면 낭독기가 「브랜드 사진 1」처럼 읽는다. 하루 가게 공간 상세는 「공간 사진」을 넘긴다(09-18 밤 QA SC-24).
+   *  기본값은 소개서·콜라보 카드가 쓰던 말 그대로. */
+  altPrefix?: string;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const [idx, setIdx] = useState(0);
@@ -124,7 +128,7 @@ export function PhotoSlider({
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={src}
-                alt={`브랜드 사진 ${i + 1}`}
+                alt={`${altPrefix} ${i + 1}`}
                 draggable={false}
                 className="absolute inset-0 h-full w-full object-cover"
               />
@@ -146,7 +150,9 @@ export function PhotoSlider({
           type="button"
           onClick={() => setZoom(idx)}
           aria-label="사진 원본 보기"
-          className="absolute bottom-2 right-2 flex h-7 w-7 items-center justify-center rounded-pill bg-ink/55 text-white hover:bg-ink/75 print:hidden"
+          // 👆09-18 밤 QA(G-22) — 28px이라 손끝 하한(44)의 2/3였다. **보이는 동그라미는 그대로 두고** 누르는 자리만 넓힌다
+          //   (인디케이터 점이 쓰는 것과 같은 수법). 8px씩 = 44px. 사진 위라 옆 것과 겹칠 일이 없다.
+          className="absolute bottom-2 right-2 flex h-7 w-7 items-center justify-center rounded-pill bg-ink/55 text-white before:absolute before:-inset-[8px] before:content-[''] hover:bg-ink/75 print:hidden"
         >
           <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8">
             <circle cx="8.5" cy="8.5" r="5.5" />
@@ -199,8 +205,8 @@ export function PhotoSlider({
               aria-label={`${i + 1}번째 사진`}
               // 점 자체는 6.4px이라 44px 규칙의 1/7이었다 — 원하는 사진으로 넘어가질 못한다(QA #21).
               // ⚠️ 점을 키우면 디자인이 무너지니 **시각 픽셀은 그대로 두고 히트영역만** pseudo로 넓힌다.
-              //    -inset-y-4(≈40px 세로) + 좌우 3px → 인접 점과 겹치지 않는 선에서 최대치.
-              className={`relative h-1.5 rounded-pill transition-all after:absolute after:-inset-x-[3px] after:-inset-y-4 after:content-[''] ${
+              // 🔁09-18 밤 QA(G-22) — 세로를 40 → **44**로 채웠다. 가로는 점 사이 간격(6px)이 상한이라 여기까지가 최대치다.
+              className={`relative h-1.5 rounded-pill transition-all after:absolute after:-inset-x-[3px] after:-inset-y-[19px] after:content-[''] ${
                 i === idx ? "w-4 bg-primary" : "w-1.5 bg-border-strong"
               }`}
             />

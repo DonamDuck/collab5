@@ -9,6 +9,8 @@ import { updateProfileImage } from "./profiles";
 import { sha256 } from "./hash";
 import { mapLinkLabel, parseLatLngFromMapUrl } from "./links";
 import { lookupPlaceByName } from "./naver-local";
+// 🧪09-18 목 데이터 보기 중(개발 빌드 전용)엔 쓰기 액션이 첫 줄에서 멈춘다(첫 번째 울타리). 두 번째는 `site-mock-repo.ts`.
+import { MOCK_BLOCKED_MSG, rentMockOn } from "./rent-mock";
 import type { Block, CollabType, Maker, Enrichment } from "./types";
 
 // 사진(리사이즈 data URL)은 개당 수십만~100만 자에 달해, 배열에 문자열로 담아
@@ -113,6 +115,7 @@ function slugify(name: string): string {
 export async function createMakerAction(
   input: RegisterInput
 ): Promise<{ slug: string }> {
+  if (await rentMockOn()) throw new Error(MOCK_BLOCKED_MSG);
   const user = await getSessionUser();
   // 소유권은 정수 profiles.user_id 기준(07-25 전환). profiles 없으면 미소유로 떨어진다.
   const ownerUserId = (await getSessionUserId()) ?? undefined;
@@ -184,6 +187,7 @@ export interface CardInput {
 export async function createCardAction(
   input: CardInput
 ): Promise<{ slug: string }> {
+  if (await rentMockOn()) throw new Error(MOCK_BLOCKED_MSG);
   const slug = `${input.fromSlug}-${Math.random().toString(36).slice(2, 7)}`;
   const card = await repo.createCard({
     slug,
@@ -200,6 +204,7 @@ export async function createCardAction(
 
 /** North Star: 카드 view 기록 (무계정 열람 시 client에서 1회 호출) */
 export async function recordViewAction(cardId: number): Promise<void> {
+  if (await rentMockOn()) return;
   await repo.recordView(cardId, "share-link");
 }
 
@@ -208,6 +213,7 @@ export async function recordReactionAction(
   cardId: number,
   type: "관심" | "패스"
 ): Promise<void> {
+  if (await rentMockOn()) return;
   await repo.recordReaction(cardId, type);
 }
 
@@ -264,6 +270,7 @@ export async function setMakerPasswordAction(
   slug: string,
   password: string
 ): Promise<{ error?: string }> {
+  if (await rentMockOn()) return { error: MOCK_BLOCKED_MSG };
   const pw = password.trim();
   if (!pw) return { error: "비밀번호를 입력해주세요." };
   const maker = await repo.getMakerBySlug(slug);
@@ -294,6 +301,7 @@ export async function claimMakerAction(
   slug: string,
   password: string
 ): Promise<{ error?: string }> {
+  if (await rentMockOn()) return { error: MOCK_BLOCKED_MSG };
   const sessionUserId = await getSessionUserId();
   if (!sessionUserId) return { error: "로그인이 필요해요." };
   const maker = await repo.getMakerBySlug(slug);
@@ -313,6 +321,7 @@ export async function claimBySlugAction(
   slugOrUrl: string,
   password: string
 ): Promise<{ error?: string; slug?: string }> {
+  if (await rentMockOn()) return { error: MOCK_BLOCKED_MSG };
   const m = slugOrUrl.trim().match(/([a-z0-9-]+)\/?$/i);
   const slug = m?.[1] ?? "";
   if (!slug) return { error: "소개서 링크를 확인해주세요." };
@@ -327,6 +336,7 @@ export async function updateMakerAction(
   input: RegisterInput,
   password?: string
 ): Promise<{ error?: string; slug?: string }> {
+  if (await rentMockOn()) return { error: MOCK_BLOCKED_MSG };
   const maker = await repo.getMakerBySlug(slug);
   if (!maker) return { error: "소개서를 찾을 수 없어요." };
   const sessionUserId = await getSessionUserId();
@@ -384,6 +394,7 @@ export async function updateMakerAction(
 
 /** /my 프로필 사진 변경 — 로그인 사용자 본인 프로필만. */
 export async function updateProfileImageAction(imageUrl: string): Promise<{ error?: string }> {
+  if (await rentMockOn()) return { error: MOCK_BLOCKED_MSG };
   const user = await getSessionUser();
   if (!user) return { error: "로그인이 필요해요." };
   try {
@@ -399,6 +410,7 @@ export async function updateMakerFlagsAction(
   slug: string,
   flags: { searchVisible?: boolean; collabPaused?: boolean }
 ): Promise<{ error?: string }> {
+  if (await rentMockOn()) return { error: MOCK_BLOCKED_MSG };
   const sessionUserId = await getSessionUserId();
   if (!sessionUserId) return { error: "로그인이 필요해요." };
   const maker = await repo.getMakerBySlug(slug);
@@ -426,6 +438,7 @@ export async function setMakerSavedAction(
   makerId: number,
   saved: boolean
 ): Promise<{ error?: string }> {
+  if (await rentMockOn()) return { error: MOCK_BLOCKED_MSG };
   const sessionUserId = await getSessionUserId();
   if (!sessionUserId) return { error: "찜하려면 로그인이 필요해요." };
   // 내 소개서를 내가 찜하는 건 신호가 아니라 잡음이다 — 찜은 "누가 누굴 눈여겨보나"의 방향성 지표라서.
@@ -445,6 +458,7 @@ export async function recordCollabRequestAction(
   channel: string,
   fromBrandId?: number // 어떤 소개서로 제안했나(제안자가 여럿일 때 선택값)
 ): Promise<{ error?: string }> {
+  if (await rentMockOn()) return { error: MOCK_BLOCKED_MSG };
   // ⚠️ 로그인은 계측의 조건이 아니다(2026-07-29 수정). 전엔 비로그인이면 여기서 조기 반환해
   //    **연락 시도가 통째로 유실**됐다 — 호출부는 에러를 무시하고 복사·채널 오픈은 그대로 되므로
   //    사용자는 멀쩡히 연락했는데 북극성 퍼널엔 안 잡혔다. 무계정 열람이 제품 컨셉이라 더 컸다.
@@ -481,6 +495,7 @@ export async function recordCollabAction(input: {
   link?: string;
   alsoAddToProfile?: boolean; // 소개서 "함께한 콜라보"에도 남길지(기본 켬)
 }): Promise<{ error?: string }> {
+  if (await rentMockOn()) return { error: MOCK_BLOCKED_MSG };
   const sessionUserId = await getSessionUserId();
   if (!sessionUserId) return { error: "로그인이 필요해요." };
   if (input.brandAId === input.brandBId) return { error: "서로 다른 두 브랜드를 골라주세요." };
@@ -529,6 +544,7 @@ export async function recordCollabAction(input: {
 
 /** 소개서 삭제 — 로그인 소유자만. /my에서 사용. 카드·지표는 FK CASCADE로 함께 삭제. */
 export async function deleteMakerAction(slug: string): Promise<{ error?: string }> {
+  if (await rentMockOn()) return { error: MOCK_BLOCKED_MSG };
   const maker = await repo.getMakerBySlug(slug);
   if (!maker) return { error: "소개서를 찾을 수 없어요." };
   const sessionUserId = await getSessionUserId();
@@ -540,6 +556,7 @@ export async function deleteMakerAction(slug: string): Promise<{ error?: string 
 /** 특장점(ownerNote) 지우기 — 소유자 세션만. '다시 받기'의 보이지 않는 재주입 방지(B35 스펙 4-4).
  *  enrichment 자체는 updateMakerAction이 의도적으로 보존하는 필드라, 지우기만 이 전용 액션으로 연다. */
 export async function clearOwnerNoteAction(slug: string): Promise<{ ok: boolean }> {
+  if (await rentMockOn()) return { ok: false };
   const maker = await repo.getMakerBySlug(slug);
   if (!maker?.enrichment?.ownerNote) return { ok: true }; // 지울 게 없으면 성공으로
   const sessionUserId = await getSessionUserId();
@@ -579,6 +596,8 @@ export async function createUploadUrlAction(
 ): Promise<
   { path: string; token: string; publicUrl: string } | { error: string }
 > {
+  // 목 모드면 저장소에 안 올린다. `storage-disabled`를 받은 화면은 사진을 브라우저 안 data URL로 쓴다(`lib/upload.ts`).
+  if (await rentMockOn()) return { error: "storage-disabled" };
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) return { error: "storage-disabled" };

@@ -90,3 +90,10 @@ INDEX 확인 후:
 - **mention** ("~팀에 멘션/요청") → 대상 노트 `⚠️ 미읽 멘션`에 체크박스 추가 + INDEX 업데이트
 
 Vault 경로: `/Users/youngduck/Desktop/collab5-Obsidian/`
+
+## 🗺 화면 지도 `/dev/map` (09-18 대표 결정)
+화면 지도를 띄워 달라고 하면 개발 서버의 `/dev/map` 한 장. 모든 화면 × 모든 상태를 가짜 데이터로 연다(운영에선 404).
+화면을 새로 만들거나 상태를 늘리면 **`/dev/map`에 케이스도 같이 더한다.** 안 더하면 지도에서 조용히 빠지고 디자인팀 검수에서도 빠진다.
+줄은 `src/app/dev/map/site-rows.ts`·`rent-rows.ts`에, 가짜 데이터는 `src/lib/site-mock-data.ts`·`rent-mock-data.ts`에 둔다.
+목 데이터에서 쓰기는 두 겹으로 막는다. 새 쓰기 서버 액션은 첫 줄에 `if (await rentMockOn())` 울타리를, 새 쓰기 함수는 `throwIfMock`을 넣는다.
+목 모드에서 외부 AI(Gemini·Claude)와 메일은 절대 부르지 않는다. 유료다.

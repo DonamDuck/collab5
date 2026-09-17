@@ -4,6 +4,7 @@ import { getSessionUser, isDevSession } from "@/lib/supabase/server";
 import { getProfile } from "@/lib/profiles";
 import { repo } from "@/lib/repo";
 import { ConnectMaker } from "./ConnectMaker";
+import Link from "next/link";
 import { LogoutButton } from "./LogoutButton";
 import { ChangePasswordButton } from "./ChangePasswordButton";
 import { LinkedAccounts } from "./LinkedAccounts";
@@ -12,6 +13,7 @@ import { SavedMakerRow } from "./SavedMakerRow";
 import { ReportArchiveCard } from "./ReportArchiveCard";
 import { BriefCard } from "./BriefCard";
 import { MyTabs } from "./MyTabs";
+import { StickyTabs } from "@/components/StickyTabs";
 import { ProfileAvatarEditor } from "./ProfileAvatarEditor";
 import { CollabRecorder } from "./CollabRecorder";
 import { EmptyState } from "@/components/EmptyState";
@@ -20,16 +22,18 @@ import type { CollabReportListItem } from "@/lib/types";
 import { BRIEFS } from "@/lib/brief-samples/registry";
 import { listBriefsByOwner } from "@/lib/briefs";
 import { DEV_OWNED_SLUGS } from "@/lib/dev-session";
+import { listBookingsForGuest, listBookingsForHost, listSpacesByOwner } from "@/lib/spaces";
+import { groupGuestBookings, groupHostBookings } from "@/lib/rent-groups";
 
 // 🚨 로그인 사용자별 화면이라 절대 프리렌더되면 안 된다.
 // 쿠키 접근으로 자동 dynamic이 되긴 하지만, 그 판정이 "빌드 시점에 auth env가 있느냐"에 달려 있어
 // env 없는 빌드에선 정적(○)으로 잡힌다(실측). 명시 선언으로 고정. (1팀 /search 사례와 동일 함정)
 export const dynamic = "force-dynamic";
 
-export default async function MyPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
+export default async function MyPage({ searchParams }: { searchParams: Promise<{ tab?: string; area?: string }> }) {
   const user = await getSessionUser();
   if (!user) redirect("/login?redirect=%2Fmy"); // 로그인 후 원래 가려던 /my로 복귀
-  const { tab } = await searchParams;
+  const { tab, area: areaParam } = await searchParams;
   const initialTab = tab === "saved" ? "saved" : tab === "reports" ? "reports" : tab === "collabs" ? "collabs" : "mine";
 
   // 프로필·내 소개서·찜 목록은 서로 독립 조회 — 병렬로 가져와 왕복 단축
@@ -45,6 +49,24 @@ export default async function MyPage({ searchParams }: { searchParams: Promise<{
   // 🆕 [다시 분석하기]를 띄울 쌍 — **내 소개서가 리포트 뒤에 바뀐 것만**(08-31 대표). 유료 콜 0(전부 읽기).
   const editedPairs = await findEditedPairs(reports);
   const displayName = profile?.brandName || user.email?.split("@")[0] || "내 브랜드";
+
+  // 🏠09-18 대표 코멘트 — 「하루 가게 영역이 너무 하단이라 서브 메뉴처럼 느껴진다. 소개서&콜라보 | 하루 가게를 같은 위계로」.
+  //   ⭐목록은 `/rent/my` 한 곳에만 그린다(두 곳에 그리면 한쪽만 고쳐지는 날이 온다). 여기는 숫자와 입구만.
+  const [rentSpaces, rentHostBookings, rentGuestBookings] = profile
+    ? await Promise.all([listSpacesByOwner(profile.id), listBookingsForHost(profile.id), listBookingsForGuest(profile.id)])
+    : [[], [], []];
+  // 🔢숫자는 `/rent/my`와 같은 판정 한 벌(`lib/rent-groups`)로 센다(09-18 밤 QA SC-14).
+  //   🩸전엔 여기서 따로 적어서 「다가오는 예약」에 답할 새 요청까지 들어갔고(목 host-full 3 vs 2),
+  //   「빌린 예약」은 이어서 결제할 수 있는 신청을 빼서 `/rent/my`의 «예약 완료» 칸과 달랐다(guest-full 3 vs 4).
+  const rentHost = groupHostBookings(rentHostBookings);
+  const rentToAnswer = rentHost.toAnswer.length;
+  const rentUpcoming = rentHost.upcoming.length;
+  // 「빌린 예약」 = `/rent/my?tab=guest`가 처음 여는 «예약 완료» 칸의 수.
+  const rentMyTrips = groupGuestBookings(rentGuestBookings, (b) => b).upcoming.length;
+  // 큰 칸의 기본: 답할 새 요청이 있으면 하루 가게, 아니면 소개서·콜라보. 주소(`?area=`)가 있으면 그게 이긴다.
+  //   소개서 안쪽 탭(`?tab=`)으로 들어온 주소는 소개서 칸을 연다.
+  const area: "brand" | "rent" =
+    areaParam === "rent" || areaParam === "brand" ? areaParam : tab ? "brand" : rentToAnswer > 0 ? "rent" : "brand";
 
   // 📄 내 요약 보고서 = **`brand_briefs`에서 나에게 «연결된» 것**(대표가 손으로 연결한다).
   //    ⚠️표가 없으면 빈 목록이다 — 연결이라는 개념이 표에만 있어서, 코드 안 목록으로 흉내 내면 거짓이 된다.
@@ -233,7 +255,22 @@ export default async function MyPage({ searchParams }: { searchParams: Promise<{
         <LogoutButton />
       </div>
 
-      <section className="mt-9 border-t border-hairline pt-8">
+      {/* 🗂09-18 큰 칸 두 개 — 「소개서·콜라보 | 하루 가게」. `/rent/my`의 「빌려준 공간 | 빌린 공간」과 같은 알약 모양이라
+          큰 칸 → 작은 칸의 두 단계로 읽힌다. 주소(`?area=`)로 나눠 새로고침·메일 링크에서도 같은 칸이 열린다. */}
+      {/* 🔁09-18 대표 코멘트 — 「플로팅 처럼 보이긴 하는데… 중앙 플로팅이면 어떨까?」 → 떠 있는 알약은 「안 이쁘다」로 한 번 더 바뀌어 폭을 채운 밑줄 탭(`StickyTabs`). */}
+      <StickyTabs
+        className="mt-6"
+        label="내 페이지 나누기"
+        active={area}
+        items={[
+          { key: "brand", label: "소개서·콜라보", href: "/my?area=brand" },
+          { key: "rent", label: "하루 가게", href: "/my?area=rent", dot: rentToAnswer > 0 },
+        ]}
+      />
+
+      {area === "brand" && (
+        <>
+      <section className="mt-6">
         <MyTabs
           initialTab={initialTab}
           mine={mine}
@@ -261,6 +298,80 @@ export default async function MyPage({ searchParams }: { searchParams: Promise<{
               <BriefCard key={b.slug} brief={b} />
             ))}
           </div>
+        </section>
+      )}
+
+        </>
+      )}
+
+      {area === "rent" && (
+        <section className="mt-6">
+          {/* 숫자 세 칸 — `/rent/my`의 숫자와 같은 판정 한 벌(`lib/rent-groups`)이다. 새 요청·다가오는 예약은 빌려준 공간 칸, 빌린 예약은 빌린 공간 칸의 «예약 완료». */}
+          <div className="grid grid-cols-3 gap-2 sm:gap-3">
+            {[
+              { href: "/rent/my?tab=host", n: rentToAnswer, label: "새 요청", hot: rentToAnswer > 0 },
+              { href: "/rent/my?tab=host", n: rentUpcoming, label: "다가오는 예약", hot: false },
+              { href: "/rent/my?tab=guest", n: rentMyTrips, label: "빌린 예약", hot: false },
+            ].map((c) => (
+              <Link
+                key={c.label}
+                href={c.href}
+                className="rounded-lg border border-hairline bg-surface px-3 py-3.5 transition-colors hover:bg-surface-soft sm:px-5 sm:py-4"
+              >
+                <span className={`block text-[24px] font-bold leading-none tabular-nums ${c.hot ? "text-lemon-on" : "text-ink"}`}>
+                  {c.n}
+                </span>
+                <span className="mt-2 block text-[14px] leading-snug break-keep text-mute sm:text-[15px]">{c.label}</span>
+              </Link>
+            ))}
+          </div>
+
+          <div className="mt-4 space-y-2">
+            {[
+              {
+                href: "/rent/my?tab=host",
+                title: "빌려준 공간 보기",
+                desc:
+                  rentSpaces.length > 0
+                    ? `올린 공간 ${rentSpaces.length}곳과 들어온 요청을 봐요`
+                    : "아직 올린 공간이 없어요",
+              },
+              {
+                href: "/rent/my?tab=guest",
+                title: "빌린 공간 보기",
+                // 🔢09-18 밤 QA(G-28) — 바로 위 칸이 「빌린 예약 3」인데 이 줄은 「신청한 예약 16건」이었다.
+                //   한 화면에 같은 것을 세는 숫자 둘이 다르면 어느 쪽이 내 예약인지 알 수 없다.
+                //   ⭐숫자는 «예약 완료» 한 판정(`rentMyTrips`)만 쓰고, 나머지는 세지 말고 무엇이 있는지만 말한다.
+                desc:
+                  rentMyTrips > 0
+                    ? `빌린 예약 ${rentMyTrips}건을 봐요`
+                    : rentGuestBookings.length > 0
+                      ? "지난 예약과 취소한 예약을 봐요"
+                      : "아직 빌린 공간이 없어요",
+              },
+            ].map((c) => (
+              <Link
+                key={c.href}
+                href={c.href}
+                className="flex items-center gap-3 rounded-lg border border-hairline bg-surface px-4 py-4 transition-colors hover:bg-surface-soft sm:px-5"
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="text-[17px] font-medium text-ink">{c.title}</p>
+                  <p className="mt-0.5 text-[15px] break-keep text-mute">{c.desc}</p>
+                </div>
+                <span aria-hidden className="text-[17px] text-faint">→</span>
+              </Link>
+            ))}
+          </div>
+
+          {rentSpaces.length === 0 && (
+            <p className="mt-5 text-[15px] leading-relaxed break-keep text-mute">
+              쉬는 날이나 비는 시간에 가게를 빌려주고 싶으신가요?{" "}
+              <Link href="/rent/new" className="text-body underline underline-offset-2">
+                내 공간 올리기
+              </Link>
+            </p>
+          )}
         </section>
       )}
 

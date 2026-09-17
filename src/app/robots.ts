@@ -11,6 +11,11 @@
 // ⭕반대로 `/m/`(소개서)은 **열어둔다** — 이번 작업의 목적이 그거다(대표 확정 08-07).
 //   ⚠️소개서는 **예외 없이 전부** 웹 검색에 연다(08-07 2차). [콜라보 찾기에 보이기] 토글은
 //   사이트 안 목록(홈·`/search`)만 정하지, 구글·네이버 노출과는 무관하다.
+// 🏠하루 가게(09-18 밤 QA SC-18) — 목록(`/rent`)과 공개 공간(`/rent/{slug}`)은 연다. 막는 건 로그인해야 보이는 화면과
+//   결제·완료·관리자 화면이다. `/rent/new`(공간 올리기)는 검색에 열지 대표 판단으로 남겨 두어 여기 적지 않는다.
+//   🪤robots 규칙은 «앞부분 일치»라 `/rent/my`라고만 적으면 `/rent/my-room-ab12` 같은 공간 주소까지 막힌다
+//     (공간 주소는 이름을 영문으로 옮겨 만든다 — `My Room` → `my-room-…`). 그래서 끝(`$`)과 `?`를 나눠 적는다.
+//     `$`를 모르는 검색엔진이면 그 줄은 아무것도 안 막을 뿐이고, 그 화면들은 페이지에 noindex가 따로 있다.
 import type { MetadataRoute } from "next";
 import { SITE_URL } from "@/lib/site";
 
@@ -29,6 +34,18 @@ export default function robots(): MetadataRoute.Robots {
         "/welcome",
         "/preview",
         "/c/", // 개인에게 보낸 콜라보 제안 카드 — 링크를 아는 사람만
+        // 하루 가게 — 내 화면·결제·완료·관리자(위 머리말의 `$` 이유 참고)
+        "/rent/my$",
+        "/rent/my?",
+        "/rent/requests$",
+        "/rent/requests?",
+        "/rent/pay/",
+        "/rent/done/",
+        "/rent/payouts$",
+        "/rent/payouts?",
+        "/rent/review$",
+        "/rent/review?",
+        "/rent/review/",
       ],
     },
     sitemap: `${SITE_URL}/sitemap.xml`,

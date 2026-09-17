@@ -13,6 +13,8 @@
 // 폼에서 가볍게 1콜만 쓰려고 여기 별도로 뺐다. 키(NAVER_CLIENT_ID/SECRET)는 공유.
 
 import { deriveRegion } from "./region";
+import { pickPlace, roadKey, type PlaceCandidate } from "./place-match";
+import { rentMockOn } from "./rent-mock";
 
 export type NaverPlace = {
   name: string;
@@ -137,6 +139,62 @@ export async function lookupPlaceByName(
     lat: ll?.lat,
     lng: ll?.lng,
   };
+}
+
+/** 🏪하루 가게 상호 매칭(2026-09-18 대표) — 사장님이 적은 공간 이름·주소와 «같은 가게»가 네이버 지역검색에 있는가.
+ *
+ *  판정은 `place-match.ts`의 `pickPlace`(이름 일치 AND 같은 건물, 확실한 하나만)가 한다. 여기는 검색만.
+ *  🔎검색은 두 번까지 — ①이름 그대로 ②시군구를 앞에 붙여서. 체인점처럼 같은 이름이 전국에 있으면
+ *    ①의 다섯 건에 우리 가게가 안 들 수 있다. ①에서 찾으면 ②는 안 부른다.
+ *  돌려주는 값
+ *   · `matched` 확실한 하나를 찾음
+ *   · `nomatch` 검색은 됐는데 같은 가게가 없음(또는 애매함) → 호출부가 옛 매칭을 지운다
+ *   · `unavailable` 키가 없거나 네이버가 안 받음 → 호출부가 판단을 미룬다(주소가 바뀌었으면 옛 매칭은 지운다)
+ *  🧪목 모드에선 절대 부르지 않는다. 호출부(서버 액션)가 첫 줄에서 막고, 여기서 한 번 더 막는다. */
+export type PlaceMatchResult =
+  | { status: "matched"; place: { name: string; address: string; lat?: number; lng?: number } }
+  | { status: "nomatch" }
+  | { status: "unavailable" };
+
+export async function matchPlace(
+  ours: { name: string; address: string; lat?: number; lng?: number },
+): Promise<PlaceMatchResult> {
+  if (await rentMockOn()) return { status: "unavailable" };
+  const id = process.env.NAVER_CLIENT_ID;
+  const secret = process.env.NAVER_CLIENT_SECRET;
+  const name = ours.name.trim();
+  if (!id || !secret || name.length < 2 || !ours.address.trim()) return { status: "unavailable" };
+
+  const gu = roadKey(ours.address)?.gu ?? "";
+  const queries = Array.from(new Set([name, gu ? `${gu} ${name}` : ""].filter(Boolean)));
+  let searched = false;
+  for (const q of queries) {
+    let items: NaverItem[];
+    try {
+      const url = `https://openapi.naver.com/v1/search/local.json?query=${encodeURIComponent(q)}&display=5`;
+      const res = await fetch(url, {
+        headers: { "X-Naver-Client-Id": id, "X-Naver-Client-Secret": secret },
+        signal: AbortSignal.timeout(6000),
+        cache: "no-store",
+      });
+      if (!res.ok) {
+        console.warn(`[naver-local] matchPlace ${res.status}`);
+        continue;
+      }
+      items = ((await res.json()) as { items?: NaverItem[] }).items ?? [];
+    } catch (e) {
+      console.warn("[naver-local] matchPlace error", e instanceof Error ? e.name : e);
+      continue;
+    }
+    searched = true;
+    const candidates: PlaceCandidate[] = items.map((it) => {
+      const ll = toLatLng(it.mapx, it.mapy);
+      return { name: clean(it.title), address: clean(it.roadAddress) || clean(it.address), lat: ll?.lat, lng: ll?.lng };
+    });
+    const hit = pickPlace(ours, candidates);
+    if (hit) return { status: "matched", place: hit };
+  }
+  return searched ? { status: "nomatch" } : { status: "unavailable" };
 }
 
 // ⚠️ `parseLatLngFromMapUrl`은 **`lib/links.ts`로 이사했다**(08-02).

@@ -5,6 +5,8 @@ import { authEnabled, createAuthClient, getSessionUser } from "./supabase/server
 import { upsertProfile, findDuplicates, getProfile, type DuplicateFlags } from "./profiles";
 import { validatePassword } from "./validation";
 import { notifySignup, type SignupOrigin } from "./notify";
+// 🧪09-18 목 데이터 보기 중(개발 빌드 전용)엔 쓰기 액션이 첫 줄에서 멈춘다(첫 번째 울타리).
+import { MOCK_BLOCKED_MSG, rentMockOn } from "./rent-mock";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://collab5.vercel.app";
 const NO_AUTH_MSG = "로그인 설정이 아직 준비되지 않았어요. (환경변수 미설정)";
@@ -35,6 +37,7 @@ const DUP_MSG = {
 } as const;
 
 export async function signUpAction(input: SignUpInput): Promise<{ error?: string }> {
+  if (await rentMockOn()) return { error: MOCK_BLOCKED_MSG };
   if (!authEnabled()) return { error: NO_AUTH_MSG };
   const pwErr = validatePassword(input.password);
   if (pwErr) return { error: pwErr };
@@ -78,14 +81,14 @@ export async function signUpAction(input: SignUpInput): Promise<{ error?: string
 }
 
 // ── 소셜 로그인 온보딩(/welcome) ─────────────────────────────────────────────
-// 구글은 이름·이메일만 준다. 우리 계정은 **브랜드명·휴대폰번호가 필수**이고, 특히 브랜드명은
+// 구글은 이름·이메일만 준다. 우리 계정은 **휴대폰번호가 필수**다(🔁09-17 브랜드명은 선택으로 — 하루 가게로 브랜드 없는 사람도 온다). 브랜드명은
 // 제안 시트의 인사말·발신자 표시에 그대로 쓰여서 비면 곧바로 화면에 티가 난다.
 // 그래서 "일단 통과시키고 나중에 채우기"가 아니라 들어오는 길목에서 한 번 받는다.
 
 export interface OnboardingState {
   /** 서버가 세션을 확인했나 (쿠키 미도달 시 false) */
   authed: boolean;
-  /** 브랜드명·휴대폰번호가 둘 다 있음 = 온보딩 불필요 → 곧장 홈으로 */
+  /** 휴대폰번호가 있음 = 온보딩 불필요 → 곧장 홈으로 (09-17부터 브랜드명은 선택) */
   done: boolean;
   email: string;
   brandName: string;
@@ -105,6 +108,7 @@ const LINK_HINT =
 const ONBOARD_DUP = {
   phone: "이미 이 번호로 가입한 계정이 있어요." + LINK_HINT,
   brandName: "이미 같은 이름으로 가입한 계정이 있어요." + LINK_HINT,
+  email: "이미 이 이메일로 가입한 계정이 있어요." + LINK_HINT,
 } as const;
 const ONBOARD_EXPIRED = "로그인 정보를 확인하지 못했어요. 다시 로그인해주세요.";
 
@@ -127,7 +131,8 @@ export async function getOnboardingStateAction(): Promise<OnboardingState> {
   return {
     authed: true,
     // ⭐ 둘 다 있어야 done — 다시 로그인할 때마다 온보딩이 뜨면 안 된다.
-    done: !!(brandName && phone),
+    // 🔁09-17 브랜드명은 선택 — 휴대폰번호만 있으면 온보딩 끝.
+    done: !!phone,
     email: profile?.email || user.email || "",
     brandName,
     phone,
@@ -148,13 +153,13 @@ export async function completeOnboardingAction(input: {
    */
   email?: string;
 }): Promise<{ error?: string }> {
+  if (await rentMockOn()) return { error: MOCK_BLOCKED_MSG };
   if (!authEnabled()) return { error: NO_AUTH_MSG };
   const user = await getSessionUser();
   if (!user) return { error: ONBOARD_EXPIRED };
 
   const brandName = input.brandName.trim();
   const phone = input.phone.trim();
-  if (!brandName) return { error: "브랜드명을 입력해주세요." };
   if (!phone) return { error: "휴대폰번호를 입력해주세요." };
 
   // excludeUuid=본인 — 재시도로 다시 들어왔을 때 자기 값과 부딪히지 않게 한다.
@@ -166,8 +171,9 @@ export async function completeOnboardingAction(input: {
   const existing = await getProfile(user.id);
   // ⭐가입 알림은 **이번에 처음 온보딩을 마친 사람**에게만 보낸다.
   //   이 액션은 재시도·브랜드명 수정으로 여러 번 들어올 수 있어서(위 excludeUuid 주석 참고),
-  //   그냥 걸면 같은 사람으로 알림이 반복된다. brandName이 비어 있었다 = 아직 온보딩 전이었다.
-  const isNewSignup = !existing?.brandName;
+  //   그냥 걸면 같은 사람으로 알림이 반복된다. 휴대폰번호가 비어 있었다 = 아직 온보딩 전이었다.
+  //   🔁09-17 브랜드명이 선택이 되면서 기준을 휴대폰번호로 옮겼다(브랜드명 없이 온보딩을 마친 사람에게 알림이 반복되지 않게).
+  const isNewSignup = !existing?.phone;
   // 이메일 출처는 **기존 프로필 → 세션 → 화면 입력** 순. 앞의 둘이 있으면 화면 값은 쓰지 않는다
   // (읽기 전용으로 보여준 값이라 어차피 같아야 하고, 다르다면 그게 사고다).
   const known = existing?.email || user.email || "";
@@ -178,6 +184,12 @@ export async function completeOnboardingAction(input: {
   if (!email) return { error: "이메일을 입력해주세요." };
   if (!known && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return { error: "이메일 형식을 확인해주세요." };
+  }
+  // 🔒09-18 밤 — 화면에서 «직접 친» 이메일도 중복을 본다. 이 검사가 빠져 있어서 남의 이메일(대표 이메일 포함)을
+  //   프로필에 굳힐 수 있었고, 이메일로 권한을 가르는 곳(매거진 편집)이 그 값을 믿었다.
+  if (!known) {
+    const dupEmail = await findDuplicates({ email, excludeUuid: user.id });
+    if (dupEmail.email) return { error: ONBOARD_DUP.email };
   }
   let userId: number | null = null;
   try {
@@ -209,14 +221,40 @@ export async function signInAction(
   email: string,
   password: string
 ): Promise<{ error?: string }> {
+  // 🗺09-18 대표 QA — 가짜 데이터가 켜진 채 로그인하면 「저장하지 않았어요」가 떠서 로그인이 고장 난 줄 알았다.
+  //   로그인은 저장이 아니다. 왜 막혔고 어떻게 풀면 되는지를 말한다.
+  if (await rentMockOn()) return { error: "지금은 화면 지도의 가짜 데이터로 보는 중이라 로그인이 안 돼요. 왼쪽 아래 까만 띠에서 「끄기」를 누르면 로그인할 수 있어요." };
   if (!authEnabled()) return { error: NO_AUTH_MSG };
   const supabase = await createAuthClient();
-  const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+  // 🧪로컬 테스트 로그인 (대표 지시 09-13) — 폼에 `collab5`/`collab5`를 치면 테스트 계정으로 들어간다.
+  //   🚨세 겹으로 잠근다: ①개발 빌드에서만 ②`LOCAL_TEST_LOGIN=1`이 켜져 있을 때만 ③그 계정의 진짜 비밀번호는
+  //     env에만 있다. 운영 빌드에선 이 분기가 dead code라 번들에서도 빠진다. `.env.local`은 git 밖이다.
+  //   ⭐가짜 세션을 만들지 않는다 — 실제 Supabase 계정으로 진짜 로그인한다. 그래야 쿠키·RLS·프로필 조회가
+  //     운영과 똑같이 돈다(우회 경로를 따로 두면 그 경로만 되는 버그가 생긴다).
+  const testMap: Record<string, [string | undefined, string | undefined]> = {
+    collab5: [process.env.LOCAL_TEST_EMAIL_1, process.env.LOCAL_TEST_PASSWORD_1],
+    "collab5-2": [process.env.LOCAL_TEST_EMAIL_2, process.env.LOCAL_TEST_PASSWORD_2],
+  };
+  let id = email.trim(), pw = password;
+  // 📱**폰 키보드가 손대는 것을 되돌린다** (09-15 실측: 아이폰 사파리에서 `collab5-2`로 로그인이 안 됐다).
+  //   아이폰은 첫 글자를 대문자로 올리고(`Collab5-2`), 하이픈을 긴 줄표로 바꾸기도 한다(`collab5–2`).
+  //   서버에 도착한 값이 표의 키와 한 글자라도 다르면 실제 계정 로그인으로 흘러가 조용히 실패한다.
+  //   ⭐테스트 분기에서만 쓰는 정규화라 실제 이메일 비교에는 안 닿는다.
+  const norm = (v: string) => v.trim().toLowerCase().replace(/[\u2013\u2014\u2212]/g, "-");
+  const key = norm(id);
+  const hit = testMap[key];
+  if (process.env.NODE_ENV === "development" && process.env.LOCAL_TEST_LOGIN === "1" && hit && norm(password) === key) {
+    if (!hit[0] || !hit[1]) return { error: "테스트 계정 env가 비어 있어요 (LOCAL_TEST_EMAIL_n)." };
+    [id, pw] = [hit[0], hit[1]];
+  }
+  const { error } = await supabase.auth.signInWithPassword({ email: id, password: pw });
   if (error) return { error: "이메일 또는 비밀번호를 확인해주세요." };
   return {};
 }
 
 export async function signOutAction(): Promise<void> {
+  // 🧪09-18 목 데이터 보기 중엔 브라우저의 진짜 로그인을 건드리지 않는다. 목 케이스를 끄려면 띠의 「끄기」.
+  if (await rentMockOn()) redirect("/");
   if (authEnabled()) {
     const supabase = await createAuthClient();
     await supabase.auth.signOut();
@@ -225,6 +263,7 @@ export async function signOutAction(): Promise<void> {
 }
 
 export async function requestPasswordResetAction(email: string): Promise<{ error?: string }> {
+  if (await rentMockOn()) return { error: MOCK_BLOCKED_MSG };
   if (!authEnabled()) return { error: NO_AUTH_MSG };
   const supabase = await createAuthClient();
   const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {

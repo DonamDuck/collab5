@@ -11,12 +11,18 @@ export const revalidate = 3600;
 
 import type { MetadataRoute } from "next";
 import { repo } from "@/lib/repo";
+import { listOpenSpaces } from "@/lib/spaces";
 import { SITE_URL } from "@/lib/site";
 
+/** 사이트맵에 싣는 하루 가게 공간 수의 상한. 목록 화면의 기본값(60)을 그대로 쓰면 61번째 공간부터 조용히 빠진다.
+ *  사이트맵 한 장의 한도(주소 5만 개)보다 한참 아래라 넉넉히 잡았다. */
+const RENT_SITEMAP_LIMIT = 1000;
+
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const [brands, articles] = await Promise.all([
+  const [brands, articles, spaces] = await Promise.all([
     repo.listSitemapBrands(),
     repo.listPublishedArticles(200),
+    listOpenSpaces({ limit: RENT_SITEMAP_LIMIT }),
   ]);
 
   // 고정 페이지 — 약관·개인정보는 넣되 우선순위를 낮게(있어야 하지만 찾아올 글은 아니다).
@@ -24,6 +30,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: SITE_URL, lastModified: new Date(), changeFrequency: "daily", priority: 1 },
     { url: `${SITE_URL}/search`, changeFrequency: "daily", priority: 0.7 },
     { url: `${SITE_URL}/magazine`, changeFrequency: "weekly", priority: 0.7 },
+    // 하루 가게 목록 — 빈 시간이 예약될 때마다 바뀌는 화면이라 daily(09-18 밤 QA SC-18).
+    { url: `${SITE_URL}/rent`, changeFrequency: "daily", priority: 0.7 },
     { url: `${SITE_URL}/terms`, changeFrequency: "yearly", priority: 0.2 },
     { url: `${SITE_URL}/privacy`, changeFrequency: "yearly", priority: 0.2 },
   ];
@@ -50,5 +58,15 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.8,
   }));
 
-  return [...staticPages, ...articlePages, ...makerPages];
+  // 하루 가게 공간 — **공개 중인 것만**(09-18 밤 QA SC-18). 검토 대기·쉬는 중·초안은 남에게 404라 넣으면 죽은 주소가 된다.
+  //   `listOpenSpaces`가 공개 목록과 같은 조건(`status = open`)으로 읽는다. 고치면 lastModified가 따라 올라간다.
+  // ⚠️`/rent/new`는 싣지 않는다. 검색에 열지는 대표 판단으로 남겨 두어서, 지금 상태(사이트맵에도 robots에도 없음) 그대로다.
+  const rentPages: MetadataRoute.Sitemap = spaces.map((sp) => ({
+    url: `${SITE_URL}/rent/${sp.slug}`,
+    lastModified: new Date(sp.updatedAt),
+    changeFrequency: "weekly",
+    priority: 0.7,
+  }));
+
+  return [...staticPages, ...articlePages, ...makerPages, ...rentPages];
 }

@@ -20,6 +20,7 @@ import {
 } from "@/lib/enrich";
 import { fetchHomepageDigest, fetchArticleExcerpts } from "@/lib/homepage";
 import { fetchInstagramDigest } from "@/lib/instagram";
+import { rentMockOn } from "@/lib/rent-mock";
 
 // 홈페이지 딥리드(예산 8초) + Gemini 생성 여유 — Vercel 기본값(짧음) 대신 명시
 export const maxDuration = 60;
@@ -82,6 +83,10 @@ async function digestsOf(
 }
 
 export async function POST(req: Request) {
+  // 🧪09-18 목 데이터 보기 중(개발 빌드 전용)엔 외부 AI·홈페이지·인스타를 한 번도 안 부른다. 두 번째 울타리는 `lib/enrich.ts`의 `live()`.
+  if (await rentMockOn()) {
+    return NextResponse.json({ error: "목 데이터 보기 중이라 AI를 부르지 않았어요." }, { status: 503 });
+  }
   let body: {
     mode?: unknown;
     query?: unknown;

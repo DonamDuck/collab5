@@ -11,6 +11,8 @@ import { PasswordInput } from "@/components/PasswordInput";
 import { GoogleButton } from "@/components/GoogleButton";
 import { KakaoButton } from "@/components/KakaoButton";
 import { SocialDivider } from "@/components/SocialDivider";
+// 🔒돌아갈 주소 검사는 가입·소셜 온보딩과 한 벌이다(09-18 밤 QA SC-05). 검사 규칙과 그 이유는 그 파일 머리말에.
+import { safeRedirect } from "@/lib/safe-redirect";
 
 export default function LoginPage() {
   return (
@@ -28,6 +30,9 @@ function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [err, setErr] = useState("");
+  // 🔙가입으로 건너가도 돌아갈 곳을 들고 간다(09-18 밤 QA SC-05). 전엔 가입 링크가 `/signup`뿐이라
+  //   하루 가게 공간에서 「로그인하고 신청하기」를 누른 손님이 가입을 거치면 그 공간을 잃고 홈에 떨어졌다.
+  const back = safeRedirect(searchParams.get("redirect"));
 
   const submit = () =>
     start(async () => {
@@ -41,9 +46,9 @@ function LoginForm() {
         setErr(r.error);
         return;
       }
-      // 로그인 후 복귀 경로 — 내부 절대경로(/…)만 허용(오픈 리다이렉트 방지). 없으면 홈.
-      const redirect = searchParams.get("redirect");
-      const dest = redirect && redirect.startsWith("/") && !redirect.startsWith("//") ? redirect : "/";
+      // 로그인 후 복귀 경로 — 우리 사이트 안 주소만 허용(오픈 리다이렉트 방지). 없으면 홈.
+      //   이동 직전이라 실제 origin으로 한 번 더 본다.
+      const dest = safeRedirect(searchParams.get("redirect"), window.location.origin);
       router.replace(dest); // push+refresh 중복 제거 — 서버 렌더가 새 세션 헤더 반영
     });
 
@@ -71,9 +76,17 @@ function LoginForm() {
           <Field label="이메일" htmlFor="login-email">
             <input
               id="login-email"
-              type="email"
+              // 🧪개발 빌드만 text — 로컬 테스트 로그인 아이디 `collab5`가 이메일 형식 검사에 걸리지 않게.
+              //   NODE_ENV는 빌드 때 상수로 박히므로 운영 번들엔 "email"만 남는다(auth-actions §로컬 테스트 로그인).
+              type={process.env.NODE_ENV === "development" ? "text" : "email"}
               name="email"
               autoComplete="username"
+              // 📱아이폰 키보드가 첫 글자를 대문자로 올리고 철자를 고친다. 이메일 칸에서는 그게 전부 오타다.
+              //   운영의 `type="email"`은 이 셋을 알아서 끄지만 개발 빌드의 `text`는 안 꺼서 명시한다(09-15 실측).
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              inputMode="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="user@email.com"
@@ -105,7 +118,10 @@ function LoginForm() {
           이메일 로그인에 딸린 보조 동선이라 그 옆에 붙어야 읽히고, 소셜 버튼과 섞이면
           "로그인 수단"이 넷처럼 보인다. */}
       <div className="mt-4 flex items-center justify-center gap-3 text-[14px]">
-        <Link href="/signup" className="font-medium text-primary-on underline-offset-2 hover:underline">
+        <Link
+          href={back === "/" ? "/signup" : `/signup?redirect=${encodeURIComponent(back)}`}
+          className="font-medium text-primary-on underline-offset-2 hover:underline"
+        >
           회원가입
         </Link>
         <span className="text-faint">·</span>

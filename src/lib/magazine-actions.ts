@@ -7,6 +7,8 @@ import { sanitizeHttpUrl } from "./enrich";
 import { normalizeSlug, slugError, SLUG_MIN } from "./magazine-slug";
 import type { MagazineDoc, MagazineSaveInput, MagazineStatus } from "./types";
 import { COMMENT_MAX } from "./limits";
+// 🧪09-18 목 데이터 보기 중(개발 빌드 전용)엔 쓰기 액션이 첫 줄에서 멈춘다(첫 번째 울타리).
+import { MOCK_BLOCKED_MSG, rentMockOn } from "./rent-mock";
 
 // 매거진 쓰기 서버 액션 (2026-08-10) — 스펙 = [[매거진-기능-개발지시]] §5
 //
@@ -75,6 +77,7 @@ export async function saveArticleAction(input: {
   brandLinks?: { slug: string; name: string; tagline: string }[];
   body: MagazineDoc;
 }): Promise<SaveResult> {
+  if (await rentMockOn()) return { ok: false, error: MOCK_BLOCKED_MSG };
   if (!(await isMagazineEditor())) return { ok: false, error: "권한이 없어요." };
 
   const title = input.title?.trim();
@@ -161,6 +164,7 @@ export async function setArticleLikedAction(
   articleId: number,
   liked: boolean
 ): Promise<{ error?: string; count?: number; liked?: boolean }> {
+  if (await rentMockOn()) return { error: MOCK_BLOCKED_MSG };
   const { getSessionUserId } = await import("./profiles");
   const userId = await getSessionUserId();
   if (!userId) return { error: "로그인이 필요해요." };
@@ -197,6 +201,7 @@ export async function addArticleCommentAction(
   articleId: number,
   body: string
 ): Promise<{ error?: string }> {
+  if (await rentMockOn()) return { error: MOCK_BLOCKED_MSG };
   const { getSessionUserId, getProfileById } = await import("./profiles");
   const userId = await getSessionUserId();
   if (!userId) return { error: "로그인이 필요해요." };
@@ -237,6 +242,7 @@ export async function addArticleCommentAction(
 export async function deleteArticleCommentAction(
   commentId: number
 ): Promise<{ error?: string }> {
+  if (await rentMockOn()) return { error: MOCK_BLOCKED_MSG };
   const { getSessionUserId } = await import("./profiles");
   const userId = await getSessionUserId();
   if (!userId) return { error: "로그인이 필요해요." };

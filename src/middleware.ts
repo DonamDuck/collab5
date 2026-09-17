@@ -4,6 +4,11 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 export async function middleware(request: NextRequest) {
+  // 🔒09-17 개발용 화면(`/dev/*` — 하루 가게 목 데이터 지도·메일 미리보기)은 운영에서 진짜 404로.
+  //   페이지 안의 `notFound()`는 스트리밍이 먼저 시작돼 상태 코드가 200으로 나가고 탭 제목도 샌다(운영 빌드 실측).
+  if (process.env.NODE_ENV !== "development" && request.nextUrl.pathname.startsWith("/dev/")) {
+    return new NextResponse("Not Found", { status: 404 });
+  }
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!url || !key) return NextResponse.next();

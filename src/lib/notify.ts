@@ -11,6 +11,7 @@
 // 발송은 Resend REST API를 fetch로 직접 친다. `resend` 패키지를 안 쓰는 이유:
 // 요청이 POST 한 방이라 의존성을 늘릴 이유가 없고, 번들도 안 커진다.
 import { kstIso } from "./time";
+import { rentMockOn } from "./rent-mock";
 
 const RESEND_ENDPOINT = "https://api.resend.com/emails";
 
@@ -22,9 +23,9 @@ const FROM = process.env.NOTIFY_FROM || "collab5 <onboarding@resend.dev>";
 export type SignupOrigin = "email" | "google" | "kakao";
 
 const ORIGIN_LABEL: Record<SignupOrigin, string> = {
-  email: "이메일 가입",
-  google: "구글 로그인",
-  kakao: "카카오 로그인",
+  email: "이메일로 가입",
+  google: "구글 계정으로 가입",
+  kakao: "카카오 계정으로 가입",
 };
 
 export interface SignupNotice {
@@ -49,44 +50,58 @@ function kstReadable(): string {
   return kstIso().slice(0, 16).replace("T", " ");
 }
 
+/** 가입 알림 한 통의 제목·본문. 보내는 함수와 개발용 미리보기(`/dev/rent-mail/signup-*`)가 같이 쓴다(09-18).
+ *  ⭐미리보기가 따로 글을 만들면 보이는 글과 가는 글이 갈라진다. 그래서 글 만들기를 여기 하나로 뺐다. */
+export function buildSignupMail(n: SignupNotice): { subject: string; text: string; html: string } {
+  const when = `${kstReadable()} (한국 시간)`;
+  const originLabel = ORIGIN_LABEL[n.origin];
+  const idText = n.userId === null ? "번호를 못 읽어 왔어요" : `#${n.userId}`;
+  const brand = n.brandName?.trim() ?? "";
+
+  // 🔁09-18 메일 전수 — 대표 결정 「메일 제목과 라벨은 사람 말로」를 가입 알림에도 옮겼다.
+  //   제목 「새 가입 — 느린오후」는 대시로 잇는 꼴이었고, 표 칸(ID·업체명·가입 시각)은 행정 낱말이었다.
+  // 🙋09-17 브랜드명이 선택이 됐다. 비면 이메일로 대신 부른다(그래야 받은편지함에서 누구인지 보인다).
+  const subject = `[collab5] ${brand || n.email} 님이 새로 가입했어요`;
+  const lead = "새로운 브랜드가 collab5에 가입했어요.";
+  // 세 번째 값 = 굵게 쓸까. 번호와 브랜드 이름이 알아볼 열쇠라 굵게 두고, 빈 값을 대신하는 말은 굵게 두지 않는다.
+  const rows: [string, string, boolean][] = [
+    ["회원 번호", idText, n.userId !== null],
+    ["브랜드 이름", brand || "비워 두셨어요", !!brand],
+    ["이메일", n.email, false],
+    ["가입한 방법", originLabel, false],
+    ["가입한 때", when, false],
+  ];
+
+  const text = [lead, ``, ...rows.map(([k, v]) => `${k}: ${v}`)].join("\n");
+
+  const tr = rows
+    .map(([k, v, bold]) =>
+      `<tr><td style="padding:4px 16px 4px 0;color:#666;white-space:nowrap;vertical-align:top">${esc(k)}</td><td style="padding:4px 0;word-break:keep-all;overflow-wrap:anywhere">${bold ? `<strong>${esc(v)}</strong>` : esc(v)}</td></tr>`,
+    )
+    .join("\n    ");
+  const html = `<div style="font-family:-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo',sans-serif;font-size:15px;line-height:1.7;color:#1a1a1a">
+  <p style="margin:0 0 16px">새로운 브랜드가 <strong>collab5</strong>에 가입했어요.</p>
+  <table style="border-collapse:collapse;font-size:15px">
+    ${tr}
+  </table>
+</div>`;
+  return { subject, text, html };
+}
+
 /**
- * 새 가입 알림을 대표에게 보낸다.
+ * 새 가입 알림을 대표에게 보낸다. 글은 `buildSignupMail`이 만든다.
  *
  * 성공/실패 여부를 boolean으로 돌려주지만 **호출부가 무시해도 된다** — 로깅용이다.
  * RESEND_API_KEY나 ADMIN_EMAIL이 없으면 아무것도 안 하고 false를 준다(정상 상황).
  */
 export async function notifySignup(n: SignupNotice): Promise<boolean> {
+  // 🧪09-18 목 데이터 보기 중(개발 빌드 전용)엔 보내지 않는다. 첫 울타리는 가입 액션 첫 줄.
+  if (await rentMockOn()) return false;
   const apiKey = process.env.RESEND_API_KEY;
   const to = process.env.ADMIN_EMAIL;
   // 키 미설정 = 아직 안 켰다는 뜻. 에러로 취급하지 않는다.
   if (!apiKey || !to) return false;
-
-  const when = kstReadable();
-  const originLabel = ORIGIN_LABEL[n.origin];
-  const idText = n.userId === null ? "(조회 실패)" : `#${n.userId}`;
-
-  const subject = `[collab5] 새 가입 — ${n.brandName}`;
-
-  const text = [
-    `새로운 브랜드가 collab5에 가입했어요.`,
-    ``,
-    `ID: ${idText}`,
-    `업체명: ${n.brandName}`,
-    `이메일: ${n.email}`,
-    `가입 경로: ${originLabel}`,
-    `가입 시각: ${when} (KST)`,
-  ].join("\n");
-
-  const html = `<div style="font-family:-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo',sans-serif;font-size:15px;line-height:1.7;color:#1a1a1a">
-  <p style="margin:0 0 16px">새로운 브랜드가 <strong>collab5</strong>에 가입했어요.</p>
-  <table style="border-collapse:collapse;font-size:15px">
-    <tr><td style="padding:4px 16px 4px 0;color:#666">ID</td><td style="padding:4px 0"><strong>${esc(idText)}</strong></td></tr>
-    <tr><td style="padding:4px 16px 4px 0;color:#666">업체명</td><td style="padding:4px 0"><strong>${esc(n.brandName)}</strong></td></tr>
-    <tr><td style="padding:4px 16px 4px 0;color:#666">이메일</td><td style="padding:4px 0">${esc(n.email)}</td></tr>
-    <tr><td style="padding:4px 16px 4px 0;color:#666">가입 경로</td><td style="padding:4px 0">${esc(originLabel)}</td></tr>
-    <tr><td style="padding:4px 16px 4px 0;color:#666">가입 시각</td><td style="padding:4px 0">${esc(when)} <span style="color:#888">(KST)</span></td></tr>
-  </table>
-</div>`;
+  const { subject, text, html } = buildSignupMail(n);
 
   try {
     const res = await fetch(RESEND_ENDPOINT, {

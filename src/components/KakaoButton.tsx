@@ -16,6 +16,8 @@
 //    코드 교환(detectSessionInUrl)을 기다린다. 이미 프로필이 채워진 사람은 거기서 홈으로 넘어간다.
 //    🚨 홈(`/`)으로 돌려보내면 안 된다 — 홈엔 그 교환을 기다리는 클라 코드가 없고,
 //       온보딩을 건너뛰어 **브랜드명·휴대폰이 빈 계정**이 생긴다.
+//    🔙보던 화면(`?redirect=`)은 `redirectTo`에 붙이지 않고 떠나기 직전 sessionStorage에 맡긴다(09-18 밤 QA SC-05).
+//       붙이면 Supabase Redirect URL 허용 목록을 고쳐야 한다. `/welcome`이 끝날 때 꺼내 간다(`lib/safe-redirect`).
 //
 // ⚠️ 라벨은 **"카카오로 시작하기"** — 대표가 스크린샷으로 지정(08-15).
 //    2팀이 구글 버튼의 `continue_with`("Google로 계속하기")와 맞추려고 "계속하기"로 바꿨었는데
@@ -26,6 +28,7 @@
 //    51px이라 둘이 나란히 서면 정확히 맞는다. 눈대중으로 48을 넣으면 어긋난다.
 import { useState } from "react";
 import { authEnvReady, createBrowserAuthClient } from "@/lib/supabase/client";
+import { stashSocialRedirect } from "@/lib/safe-redirect";
 import { ButtonBusyVeil } from "./ButtonBusyVeil";
 
 const KAKAO_ON = process.env.NEXT_PUBLIC_KAKAO_ENABLED === "1";
@@ -47,6 +50,8 @@ export function KakaoButton({ className = "" }: { className?: string }) {
     setErr("");
     setPending(true);
     try {
+      // 카카오를 다녀오는 동안 보던 화면을 같은 탭에 맡긴다. `/welcome`이 끝날 때 그리로 보낸다.
+      stashSocialRedirect();
       const supabase = createBrowserAuthClient();
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "kakao",

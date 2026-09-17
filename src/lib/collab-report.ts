@@ -22,6 +22,8 @@ import type { Block, BrandDna, CollabReportData, DnaItem, DnaSignature, Maker, N
 import { kstIso } from "./time";
 import { meter, logMeter, type CallMeter } from "./ai-cost";
 import { DNA_ITEM_LIMIT } from "./limits";
+// 🧪09-18 목 데이터 보기 중(개발 빌드 전용)엔 Gemini를 절대 안 부른다. 유료다. 첫 울타리는 `/api/collab-report` 라우트.
+import { throwIfMock } from "./rent-mock";
 
 // 리포트 모델: 대표 블라인드 A/B(07-26)에서 3.6-flash가 2.5-flash·3.1-pro를 모두 이김.
 // 리포트 호출에는 샘플링 파라미터를 넘기지 않는다(3.x 계열 temperature 지원 중단 공지 대응).
@@ -298,6 +300,7 @@ function mockDna(m: Maker): BrandDna {
 /** Brand DNA 생성(flash 고정·중립 — 비교 상대 무관 재사용 자산).
  *  prev = 갱신 재생성 시 기존 DNA — created_at을 보존한다(최초 생성 시각). */
 export async function generateDna(m: Maker, prev?: BrandDna, meters?: CallMeter[]): Promise<BrandDna> {
+  await throwIfMock("generateDna");
   const digest = brandDigest(m);
   if (!hasKey()) {
     const mock = mockDna(m);
@@ -548,6 +551,7 @@ export async function generateReport(
   modelOverride?: string, // A/B 실험 — 라우트가 화이트리스트 검증 후 전달
   meters?: CallMeter[] // 원가·토큰 실측 누적기(선택)
 ): Promise<{ report: CollabReportData | null; candidates: ReportCandidate[] }> {
+  await throwIfMock("generateReport");
   if (!hasKey()) return { report: MOCK_REPORT, candidates: [] };
 
   const contents = buildReportContents(a, aDna, b, bDna);

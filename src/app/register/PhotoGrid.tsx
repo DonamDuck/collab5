@@ -64,8 +64,16 @@ export function PhotoGrid({
                   : "border-hairline"
             }`}
           >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={it.url} alt="" className="pointer-events-none h-full w-full object-cover" />
+            {/* 🩸09-18 밤 QA(H-22) — 사진을 «고르는 순간» 콘솔에 `An empty string was passed to the src attribute`가 났다.
+                올라가는 중인 자리는 주소가 아직 없는데(`{ url: "", uploading: true }`) 그대로 `src`에 넣었다.
+                브라우저는 빈 `src`를 «이 페이지 주소»로 읽어 문서를 한 번 더 받아 온다. 화면은 멀쩡해서 아무도 못 알아챈다.
+                ⭐주소가 생긴 뒤에만 그린다. 그전까지는 아래 스피너가 덮는 회색 면이다. */}
+            {it.url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={it.url} alt="" className="pointer-events-none h-full w-full object-cover" />
+            ) : (
+              <span className="block h-full w-full bg-surface-soft" />
+            )}
             {/* 실패 타일 — 자리를 지키고 '다시 올리기'를 준다. 여러 장을 올렸을 때
                 **어느 사진이 실패했는지**가 보이는 게 핵심(전엔 타일이 사라져 알 수 없었다). */}
             {it.failed && (
@@ -92,7 +100,12 @@ export function PhotoGrid({
               type="button"
               onClick={() => onRemove(i)}
               aria-label={it.uploading ? "업로드 취소" : "사진 삭제"}
-              className="absolute right-1 top-1 z-10 flex h-5 w-5 items-center justify-center rounded-pill bg-ink/60 text-[11px] text-white"
+              // 👆09-18 밤 QA(H-28) — 20px이라 손끝 하한(44)의 절반도 안 됐다. 폰에서 지우려다 사진을 끌어 순서만 바뀐다.
+              //   보이는 동그라미는 그대로 두고 누르는 자리만 넓힌다.
+              //   ⚠️타일이 `overflow-hidden`이라 밖으로 나간 부분은 «눌리지도» 않는다. 그래서 16px을 줘도 실제로 커지는 건
+              //     타일 «안»쪽 40×40까지다. 44를 채우려면 20px이 필요한데, 그러면 80px 타일의 절반이 지우기 자리가 된다.
+              //     되돌릴 수 없는 버튼이라 거기까지는 안 간다(20 → 40이면 손끝이 닿는다).
+              className="absolute right-1 top-1 z-10 flex h-5 w-5 items-center justify-center rounded-pill bg-ink/60 text-[11px] text-white before:absolute before:-inset-4 before:content-['']"
             >
               ✕
             </button>
