@@ -12,6 +12,7 @@ import type {
   Payment, PaymentStatus, PayoutStatus, TossPayment, RepeatRule,
 } from "./types";
 import { bookingFinished, todayKst, expandRepeat, stripRepeat, pruneRepeat } from "./rent-time";
+import { productsFromLegacy } from "./rent-products";
 // 🧪09-17 목 데이터 — 읽기 함수는 첫 줄에서 목 세계를 돌려주고, 쓰기 함수는 첫 줄에서 멈춘다. 개발 빌드 전용(`rent-mock.ts` 머리말).
 import { getRentMock, rentMockOn } from "./rent-mock";
 
@@ -72,6 +73,15 @@ function repeatRules(v: unknown): RepeatRule[] {
 function toSpace(r: Row): Space {
   // ⭐«읽을 때 펼친다» — 여기 한 곳에서. 목록 날짜 거르기·상세 달력·결제 전 `fitsOpenSlot`이 전부 이 값을 본다.
   const repeatWeekly = repeatRules(r.repeat_weekly);
+  const scope = (s(r.scope) || "space_only") as Space["scope"];
+  // 🛍상품 셋(09-18). ⚠️SQL 전 DB엔 칸이 «없다»(undefined). 그땐 옛 범위·시간당 값에서 만든다 —
+  //   빈 상품으로 읽으면 모든 공간이 「팔 것 없음」이 되어 신청이 통째로 막힌다.
+  const products = r.rent_space_on === undefined && r.rent_full_on === undefined
+    ? productsFromLegacy(scope, n(r.price_hour))
+    : {
+      rentSpaceOn: r.rent_space_on === true, rentSpacePrice: n(r.rent_space_price), rentSpaceNote: s(r.rent_space_note),
+      rentFullOn: r.rent_full_on === true, rentFullPrice: n(r.rent_full_price), rentFullNote: s(r.rent_full_note),
+    };
   return {
     id: n(r.id), slug: s(r.slug), ownerUserId: n(r.owner_user_id), brandSlug: s(r.brand_slug),
     name: s(r.name), tagline: s(r.tagline), body: s(r.body), photos: arr(r.photos),
@@ -88,8 +98,9 @@ function toSpace(r: Row): Space {
     servesFood: r.serves_food === true, subleaseOk: r.sublease_ok === true,
 
     category: (s(r.category) || "") as Space["category"],
-    scope: (s(r.scope) || "space_only") as Space["scope"],
+    scope,
     priceHour: n(r.price_hour), minHours: n(r.min_hours) || 1,
+    ...products,
     openSlots: expandRepeat(slots(r.open_slots), repeatWeekly),
     repeatWeekly,
     coffeeChat: r.coffee_chat === true,
@@ -127,6 +138,8 @@ function toBooking(r: Row): SpaceBooking {
     //   한 곳에서 안 자르면 "10:00:00"과 "10:00" 비교가 조용히 어긋난다.
     startTime: s(r.start_time).slice(0, 5), endTime: s(r.end_time).slice(0, 5),
     hoursCount: n(r.hours_count),
+    // 🛍09-18. SQL 전엔 칸이 없어 «대관만»으로 읽힌다(SQL이 옛 예약을 공간의 옛 범위로 채운다).
+    product: s(r.product) === "full" ? "full" : "space",
     withChat: r.with_chat === true, amountChat: n(r.amount_chat),
     headcount: typeof r.headcount === "number" ? r.headcount : undefined,
     withMentor: r.with_mentor === true,
@@ -302,6 +315,10 @@ export async function saveSpace(input: SpaceSaveInput): Promise<Space | null> {
 
     category: input.category, scope: input.scope,
     price_hour: input.priceHour, min_hours: input.minHours, open_slots: openSlots, repeat_weekly: repeatWeekly,
+    // 🛍09-18 상품 셋. ⚠️이 칸들이 없는 DB(SQL 전)에선 저장이 통째로 실패한다 — `2026-09-18-rent-products.sql`이 먼저다.
+    //   조용히 빼고 저장하는 길은 두지 않았다. 사장님이 적은 상품 설명이 말없이 사라진다.
+    rent_space_on: input.rentSpaceOn, rent_space_price: input.rentSpacePrice, rent_space_note: input.rentSpaceNote,
+    rent_full_on: input.rentFullOn, rent_full_price: input.rentFullPrice, rent_full_note: input.rentFullNote,
     coffee_chat: input.coffeeChat, coffee_chat_minutes: input.coffeeChatMinutes,
     coffee_chat_price: input.coffeeChatPrice, coffee_chat_topics: input.coffeeChatTopics,
     access_how: input.accessHow, contact_phone: input.contactPhone,
@@ -362,6 +379,8 @@ export async function createPendingBooking(input: BookingCreateInput): Promise<S
     guest_phone: input.guestPhone,
     use_date: input.useDate, hours: input.hours, plan: input.plan, headcount: input.headcount ?? null,
     start_time: input.startTime, end_time: input.endTime, hours_count: input.hoursCount,
+    // 🛍09-18. ⚠️칸이 없는 DB(SQL 전)에선 이 insert가 실패해 신청이 막힌다 — SQL이 먼저다.
+    product: input.product,
     with_chat: input.withChat, amount_chat: input.amountChat,
     with_mentor: input.withMentor,
     amount_space: input.amountSpace, amount_mentor: input.amountMentor, amount_total: input.amountTotal,

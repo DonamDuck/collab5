@@ -28,11 +28,12 @@
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { startBookingAction, confirmBookingAction } from "@/lib/rent-actions";
-import type { SpaceUseType, OpenSlot } from "@/lib/types";
+import type { SpaceUseType, OpenSlot, RentProduct, Space } from "@/lib/types";
+import { bookingAmount, productNote, productPrice, sellableProducts } from "@/lib/rent-products";
 import { hourMarks, hoursBetween, nowHhmmKst, overlaps, toHHMM, toMinutes, rangeLabel, todayKst } from "@/lib/rent-time";
 import { dateLabel, InfoList, InfoRow, primaryBtnCls, RentSelect, rentInputCls, rentTextareaCls, won } from "../ui";
 import Link from "next/link";
-import { CONTACT_RULE_GUEST, isTestPayment } from "@/lib/rent-copy";
+import { COFFEE_CHAT_LABEL, CONTACT_RULE_GUEST, isTestPayment, PRODUCT_HINT_GUEST, PRODUCT_LABEL } from "@/lib/rent-copy";
 import { ConfirmDialog } from "../ConfirmDialog";
 import { PickDateCalendar } from "./PickDateCalendar";
 import { MentorOptions } from "./MentorOption";
@@ -50,12 +51,15 @@ const chipOffCls = "border-hairline bg-surface text-ink hover:bg-primary-pale";
  *  하단 여백은 `max()`다(MakerActionBar 08-09 실측): 홈 인디케이터가 있는 기기는 안전영역만, 없는 기기는 12px. */
 function PayBar({
   amount,
+  emptyText,
   label,
   disabled,
   onClick,
 }: {
   /** null = 아직 시간을 안 골랐다. 그땐 금액 대신 안내를 든다. */
   amount: number | null;
+  /** 금액 자리에 대신 서는 말. 무엇을 골라야 금액이 나오는지(09-18: 상품 → 시간 순). */
+  emptyText: string;
   label: string;
   disabled: boolean;
   onClick: () => void;
@@ -77,7 +81,7 @@ function PayBar({
             {/* 🔁09-17 QA — 아무것도 안 골랐는데 「대여 비용 30,000원」이 서 있어 「이 공간은 3만원」으로 읽혔다
                 (기본값으로 채운 날짜·시각의 값이었다). 시간을 고르기 전엔 금액 자리에 할 일을 말한다. */}
             {amount === null ? (
-              <p className="text-[15px] leading-snug break-keep text-mute">시간을 고르면 금액이 나와요</p>
+              <p className="text-[15px] leading-snug break-keep text-mute">{emptyText}</p>
             ) : (
               <>
                 <p className="text-[13px] text-faint">대여 비용</p>
@@ -112,7 +116,7 @@ export function BookingForm({
   spaceSlug,
   openSlots,
   takenByDate,
-  priceHour,
+  products,
   minHours,
   coffeeChat,
   coffeeChatMinutes,
@@ -132,7 +136,8 @@ export function BookingForm({
   /** 이미 팔린 시간 — 날짜별 목록. 고르는 자리에서 바로 회색으로 만든다.
    *  ⚠️여기서 막아도 **관문은 서버·DB**다. 두 사람이 같은 순간에 들어오면 뒤에 온 쪽이 승인에서 떨어진다. */
   takenByDate: Record<string, { start: string; end: string }[]>;
-  priceHour: number;
+  /** 🛍09-18 사장님이 켠 공간 상품(대관만·공간 전체)의 값·설명. 금액 계산은 서버와 같은 `bookingAmount`로 한다. */
+  products: Pick<Space, "rentSpaceOn" | "rentSpacePrice" | "rentSpaceNote" | "rentFullOn" | "rentFullPrice" | "rentFullNote">;
   minHours: number;
   coffeeChat: boolean;
   coffeeChatMinutes: number;
@@ -157,6 +162,11 @@ export function BookingForm({
   const [headcount, setHeadcount] = useState("");
   const [plan, setPlan] = useState("");
   const [withChat, setWithChat] = useState(false);
+  // 🛍09-18 대표 — 「고객은 신청할 때 이걸 선택할 수 있게」. 켜진 게 하나면 그것으로 정해 두고 고르기를 안 보인다.
+  //   둘이면 비워 둔다 — 날짜·시각과 같은 규칙(09-17 QA: 손님이 직접 고른 값만 쓴다).
+  const sellable = sellableProducts(products);
+  const [pickedProduct, setPickedProduct] = useState<RentProduct | "">(sellable.length === 1 ? sellable[0] : "");
+  const product: RentProduct | "" = sellable.length === 1 ? sellable[0] : pickedProduct;
   // 📎09-18 대표 코멘트 — 소개서 전달은 토글(예/아니요), **기본은 «예»**. 고르는 소개서는 첫 번째가 기본.
   const [brandOn, setBrandOn] = useState(true);
   const [brandPick, setBrandPick] = useState(myBrands[0]?.slug ?? "");
@@ -171,7 +181,8 @@ export function BookingForm({
    *  **누른 자리에서 3,000px 떨어진 곳에 글자가 생겼다.** 화면에는 아무 변화도 없고 팝업도 안 열리니
    *  「버튼이 죽었다」로 읽힌다. 실제로 대표가 그렇게 읽었다.
    *  ⭐그래서 둘을 같이 한다 — 문구는 그 칸 아래에 놓고, 화면을 그 칸으로 끌어올린다. */
-  const [badField, setBadField] = useState<"date" | "time" | "plan" | "phone" | "">("");
+  const [badField, setBadField] = useState<"product" | "date" | "time" | "plan" | "phone" | "">("");
+  const productRef = useRef<HTMLDivElement>(null);
   const dateRef = useRef<HTMLDivElement>(null);
   const timeRef = useRef<HTMLDivElement>(null);
   const planRef = useRef<HTMLTextAreaElement>(null);
@@ -213,9 +224,13 @@ export function BookingForm({
   const activeHours = useHours && hourChoices.includes(useHours) ? useHours : hourChoices[0] ?? 0;
   const endTime = activeStart && activeHours ? toHHMM(toMinutes(activeStart) + activeHours * 60) : "";
 
-  const chatAmount = withChat && coffeeChat ? coffeeChatPrice : 0;
-  const spaceAmount = priceHour * activeHours;
-  const total = spaceAmount + chatAmount;
+  // 💸금액 = 고른 상품 값 × 시간 (+ 커피챗). 서버(`startBookingAction`)가 같은 함수로 다시 계산한다 — 여기는 보여주기용.
+  const amount = product && activeHours > 0
+    ? bookingAmount({ ...products, coffeeChat, coffeeChatPrice }, product, activeHours, withChat)
+    : null;
+  const chatAmount = amount?.chat ?? 0;
+  const spaceAmount = amount?.space ?? 0;
+  const total = amount?.total ?? 0;
   const timePicked = !!useDate && !!endTime;
   // ☎️서버(`startBookingAction`)와 같은 규칙 — 숫자만 세서 0으로 시작하는 9~11자리.
   const phoneOk = /^0\d{8,10}$/.test(phone.replace(/\D/g, ""));
@@ -226,9 +241,9 @@ export function BookingForm({
   /** 버튼이 부르는 건 이것 — 싼 검사만 하고 팝업을 연다. 서버 왕복은 팝업에서 [신청하기]를 누른 뒤다. */
   /** 위에서부터 첫 번째로 비어 있는 칸으로 데려간다. 두 칸이 다 비어도 «위엣것» 하나만 말한다 —
    *  한 번에 둘을 고치라고 하면 어디부터 볼지 또 고민하게 된다. */
-  const stopAt = (f: "date" | "time" | "plan" | "phone") => {
+  const stopAt = (f: "product" | "date" | "time" | "plan" | "phone") => {
     setBadField(f);
-    const el = { date: dateRef.current, time: timeRef.current, plan: planRef.current, phone: phoneRef.current }[f];
+    const el = { product: productRef.current, date: dateRef.current, time: timeRef.current, plan: planRef.current, phone: phoneRef.current }[f];
     el?.scrollIntoView({ behavior: "smooth", block: "center" });
     // 글 칸은 커서까지 넣어 준다. 날짜는 격자라 커서가 갈 곳이 없다.
     if (f === "plan") planRef.current?.focus({ preventScroll: true });
@@ -238,6 +253,7 @@ export function BookingForm({
   const askConfirm = () => {
     setErr("");
     setBadField("");
+    if (!product) { stopAt("product"); return; }
     if (!useDate) { stopAt("date"); return; }
     if (!endTime) { stopAt("time"); return; }
     if (planShort) { stopAt("plan"); return; }
@@ -259,6 +275,7 @@ export function BookingForm({
         plan: plan.trim(),
         headcount: headcount ? Number(headcount) : undefined,
         withChat,
+        product: product as RentProduct,
         guestBrandSlug: brandSlug,
         guestPhone: phone.trim(),
       });
@@ -287,6 +304,72 @@ export function BookingForm({
     // 📐09-17 디자인팀 — sm부터 폭 520. 데스크톱 왼쪽 기둥(676)을 다 쓰면 달력 칸이 75px로 벌어져
     //   날짜 줄이 한눈에 안 읽혔다. 폰(343)은 그대로 꽉 찬다.
     <div className="space-y-7 sm:max-w-[520px]">
+      {/* 🛍09-18 대표 — 날짜·시각 «위»에서 상품부터 고른다. 값이 상품마다 달라서 시간을 고르기 전에 무엇을 빌리는지 정해야
+          하단 금액이 처음부터 맞게 선다. 둘이면 카드 라디오, 하나면 고르기 없이 한 줄. 설명은 상세 「빌릴 수 있는 것」과 같은 글이다. */}
+      {sellable.length > 0 && (
+        <div ref={productRef}>
+          <p className={labelCls}>어떻게 빌리실까요?</p>
+          {sellable.length === 1 ? (
+            <div className="rounded-lg bg-surface-soft px-4 py-3">
+              <p className="text-[16px] text-ink">
+                <span className="font-medium">{PRODUCT_LABEL[sellable[0]]}</span>
+                <span className="text-mute"> · 한 시간 {won(productPrice(products, sellable[0]))}</span>
+              </p>
+              <p className="mt-0.5 text-[15px] leading-snug break-keep text-mute">
+                {PRODUCT_HINT_GUEST[sellable[0]]}. 이 공간은 이 방식으로만 빌려드려요.
+              </p>
+            </div>
+          ) : (
+            <div role="radiogroup" aria-label="빌리는 방식" className="space-y-2">
+              {sellable.map((p) => {
+                const on = product === p;
+                const note = productNote(products, p);
+                return (
+                  <button
+                    key={p}
+                    type="button"
+                    role="radio"
+                    aria-checked={on}
+                    onClick={() => {
+                      setPickedProduct(p);
+                      setBadField((f) => (f === "product" ? "" : f));
+                    }}
+                    className={`flex w-full items-start gap-3 rounded-lg border px-4 py-3.5 text-left transition-colors ${
+                      on ? "border-primary-tint bg-primary-pale" : "border-hairline bg-surface hover:bg-surface-soft"
+                    }`}
+                  >
+                    <span
+                      aria-hidden="true"
+                      className={`mt-[3px] grid size-[18px] shrink-0 place-items-center rounded-full border-2 ${
+                        on ? "border-primary-on" : "border-border-strong"
+                      }`}
+                    >
+                      {on && <span className="size-[8px] rounded-full bg-primary-on" />}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="flex flex-wrap items-baseline justify-between gap-x-3">
+                        <span className="text-[16px] font-medium text-ink">{PRODUCT_LABEL[p]}</span>
+                        <span className="text-[15px] font-medium tabular-nums text-body">
+                          {won(productPrice(products, p))}
+                          <span className="font-normal text-mute"> / 시간</span>
+                        </span>
+                      </span>
+                      <span className="mt-0.5 block text-[14px] leading-snug break-keep text-mute">{PRODUCT_HINT_GUEST[p]}</span>
+                      {note && (
+                        <span className="mt-2 line-clamp-3 block whitespace-pre-line text-[15px] leading-relaxed break-keep text-body">
+                          {note}
+                        </span>
+                      )}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+          {badField === "product" && <p className={errCls}>어느 쪽으로 빌릴지 먼저 골라 주세요.</p>}
+        </div>
+      )}
+
       <div ref={dateRef}>
         {/* ✍️09-17 「신청 날짜를 선택해주세요.」 → 말 걸듯(행정어 걷기). 아래 「몇 시부터 쓰실까요?」와 같은 말투다. */}
         {/* 🔁09-18 대표 코멘트 — 제목은 「날짜를 선택해 주세요」, 그 아래에 날짜를 고르면 무엇이 보이는지 한 줄. */}
@@ -549,7 +632,8 @@ export function BookingForm({
           바는 확인 팝업을 여는 버튼이라 「신청하기」, 팝업은 결제 화면으로 넘기니 「결제하러 가기」,
           결제 화면은 돈을 내는 버튼이라 「N원 결제하기」. 버튼 이름이 그 버튼이 여는 다음 화면을 말한다. */}
       <PayBar
-        amount={timePicked ? total : null}
+        amount={timePicked && product ? total : null}
+        emptyText={!product ? "방식을 고르면 금액이 나와요" : "시간을 고르면 금액이 나와요"}
         label={pending ? "결제 화면으로 가는 중…" : "신청하기"}
         disabled={pending}
         onClick={askConfirm}
@@ -580,6 +664,8 @@ export function BookingForm({
         <p className="mt-6 text-[15px] font-bold text-ink">예약 정보 확인</p>
         <InfoList className="mt-2 border-t border-hairline pt-3">
           <InfoRow label="장소" value={spaceName} />
+          {/* 🛍09-18 — 무엇을 샀는지. 결제 화면·완료·메일이 같은 이름(`PRODUCT_LABEL`)을 쓴다. */}
+          {product && <InfoRow label="상품" value={PRODUCT_LABEL[product]} />}
           <InfoRow label="신청 날짜" value={dateLabel(useDate)} />
           <InfoRow label="이용 시간" value={rangeLabel(activeStart, endTime)} />
           {/* 📋09-17 QA — 사장님이 「이 글만 보고 정한다」면서 손님은 결제 직전에 그 글을 다시 못 봤다.
@@ -593,8 +679,8 @@ export function BookingForm({
                 <span className="font-medium text-ink">{won(total)}</span>
                 {/* 💸09-17 QA — 합계만 있으면 「왜 10만원인가」를 손님이 셈한다. 내역을 한 줄로. */}
                 <span className="block text-[15px] text-mute">
-                  대여 {activeHours}시간 {won(spaceAmount)}
-                  {chatAmount > 0 && ` + 커피챗 ${coffeeChatMinutes}분 ${won(chatAmount)}`}
+                  {product ? PRODUCT_LABEL[product] : "대여"} {activeHours}시간 {won(spaceAmount)}
+                  {chatAmount > 0 && ` + ${COFFEE_CHAT_LABEL} ${coffeeChatMinutes}분 ${won(chatAmount)}`}
                 </span>
               </>
             }

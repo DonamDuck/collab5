@@ -14,6 +14,8 @@ import type { SpaceBooking } from "@/lib/types";
 import { ClearQuery } from "./ClearQuery";
 import { GuestBookingRow, loadGuestBookings } from "../GuestBookingRow";
 import { BookingBadge, ListRow as Row, SpaceBadge, bookingWhen, primaryBtnCls, won } from "../ui";
+import { PRODUCT_LABEL } from "@/lib/rent-copy";
+import { productPrice, sellableProducts } from "@/lib/rent-products";
 
 // 하루 가게 — 내 공간 · 들어온 요청 · 내가 빌린 공간 (2026-09-13)
 //
@@ -190,6 +192,9 @@ export default async function MyRentPage({
               <p className="truncate text-[17px] font-medium text-ink">{sp?.name ?? "내 공간"}</p>
               {/* 375px에서 「커/피챗」처럼 낱말 중간이 꺾였다(09-17 QA) — break-keep. */}
               <p className="mt-1 text-[15px] break-keep text-mute">
+                {/* 🛍09-18 손님이 고른 상품 — 공간 전체면 사장님이 시설까지 준비해야 해서 요청 줄 첫머리에 둔다. */}
+                <span className="font-medium text-body">{PRODUCT_LABEL[b.product]}</span>
+                {" · "}
                 {bookingWhen(b)}
                 {b.headcount ? ` · ${b.headcount}명` : ""}
                 {/* ☕🩸09-16까지 사장님 쪽엔 커피챗 표시가 없었다. 손님 화면 네 곳엔 「커피챗 포함」이 뜨는데
@@ -414,7 +419,11 @@ export default async function MyRentPage({
                         저장한 공간은 그 칸이 비어서 **「0원 · 비는 날 0일」**로 보였다. 자기 공간을 보는
                         화면에서 값이 0원이면 사장님은 안 올라간 줄 안다. */}
                     <p className="mt-1 text-[15px] text-mute">
-                      {sp.area || "동네 미정"} · 시간당 {won(sp.priceHour)} · 열어 둔 날{" "}
+                      {/* 🛍09-18 시간당 값 하나 → 켠 상품마다 이름과 값. */}
+                      {sp.area || "동네 미정"} ·{" "}
+                      {sellableProducts(sp).map((p) => `${PRODUCT_LABEL[p]} ${won(productPrice(sp, p))}`).join(" · ") ||
+                        `시간당 ${won(sp.priceHour)}`}{" "}
+                      · 열어 둔 날{" "}
                       {new Set(sp.openSlots.map((sl) => sl.date)).size}일
                       {/* 🔁09-17 — `openSlots`는 매주 규칙을 펼친 12주치까지 센다. 규칙이 있으면 요일을 짧게 붙인다(월요일부터). */}
                       {sp.repeatWeekly.length > 0 &&

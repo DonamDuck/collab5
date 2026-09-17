@@ -7,7 +7,7 @@ import { repo } from "@/lib/repo";
 import { ContactBlock } from "../../ContactBlock";
 import { KAKAO_CHAT_URL } from "@/lib/site";
 import { bookingFinished, bookingStarted } from "@/lib/rent-time";
-import { BOOKING_HEADLINE, COFFEE_CHAT_WHEN_GUEST, CONTACT_RULE_GUEST } from "@/lib/rent-copy";
+import { BOOKING_HEADLINE, COFFEE_CHAT_WHEN_GUEST, CONTACT_RULE_GUEST, PRODUCT_LABEL } from "@/lib/rent-copy";
 import type { BookingStatus } from "@/lib/types";
 import { GuestCancel } from "../../my/Actions";
 import { bookingWhen, InfoPanel, InfoRow, primaryBtnCls, secondaryBtnCls, won } from "../../ui";
@@ -109,6 +109,8 @@ export default async function RentDonePage({ params }: { params: Promise<{ booki
               )
             }
           />
+          {/* 🛍09-18 고른 상품. 확인 팝업·결제 화면과 같은 줄 순서(장소 → 상품 → 일정). */}
+          <InfoRow label="상품" value={PRODUCT_LABEL[b.product]} />
           <InfoRow label="일정" value={bookingWhen(b)} />
           {b.status === "expired" ? (
             <InfoRow label="결제" value="결제하지 않아서 낸 돈은 없어요" />

@@ -29,12 +29,12 @@ export const RENT_GROUPS: Group[] = [
       {
         title: "공간 상세와 신청 폼",
         path: "/rent/[slug]",
-        note: "신청 폼은 상세 맨 아래에 있어요. 날짜를 고르면 시간이, 시간을 고르면 아래 바에 금액이 떠요. 전화번호를 지우고 「신청하기」를 누르면 번호 오류 줄을 볼 수 있어요.",
+        note: "신청 폼은 상세 맨 아래에 있어요. 상품을 두 개 파는 공간은 맨 위에서 「대관만·공간 전체」 중 하나를 골라야 금액이 떠요. 고른 뒤 시간을 정하고 상품을 바꾸면 아래 바 금액이 같이 바뀌어요. 상품을 안 고르고 「신청하기」를 누르면 오류 줄이, 전화번호를 지우고 누르면 번호 오류 줄이 떠요.",
         rows: [
-          { desc: "모든 칸이 찬 공간 · 신청 폼 · 커피챗 · 소개서 카드 · 내리면 뜨는 알약 줄", c: "guest-full", to: `/rent/${S.full}` },
+          { desc: "모든 칸이 찬 공간 · 상품 둘(대관만·공간 전체, 값과 설명이 다름) · 신청 폼 상품 고르기 · 커피챗 · 소개서 카드 · 내리면 뜨는 알약 줄", c: "guest-full", to: `/rent/${S.full}` },
           { desc: "같은 공간을 로그인 안 하고 볼 때", c: "anon", to: `/rent/${S.full}` },
-          { desc: "열린 시간이 없는 공간", c: "guest-full", to: `/rent/${S.noSlots}` },
-          { desc: "커피챗·소개서 없는 공간", c: "guest-full", to: `/rent/${S.other}` },
+          { desc: "열린 시간이 없는 공간 · 공간 전체 하나만 팜", c: "guest-full", to: `/rent/${S.noSlots}` },
+          { desc: "커피챗·소개서 없는 공간 · 대관만 하나만 팜 (신청 폼에 고르기 없이 한 줄)", c: "guest-full", to: `/rent/${S.other}` },
           { desc: "긴 글 (사진 12장, 유의 사항 12줄, 주제 8줄)", c: "stress-guest", to: `/rent/${S.stress}` },
           { desc: "최소 입력 (사진·소개·설비·전화 없음), 번호 없는 손님", c: "minimal-guest", to: `/rent/${S.minimal}` },
           { desc: "검토 대기 공간을 남이 열면 404", c: "guest-full", to: `/rent/${S.pending}` },
@@ -45,7 +45,7 @@ export const RENT_GROUPS: Group[] = [
         path: "/rent/pay/[orderId]",
         note: "결제창은 이 컴퓨터에 넣어 둔 토스 키로 떠요. 끝까지 눌러도 돈을 확정하는 단계(승인)를 막아 두어서 실패 화면으로 가요.",
         rows: [
-          { desc: "결제 전 신청 (커피챗 담음, 취소 규정 한 줄)", c: "guest-full", to: `/rent/pay/mock-order-${B.pending}` },
+          { desc: "결제 전 신청 (대관만, 커피챗 담음, 취소 규정 한 줄)", c: "guest-full", to: `/rent/pay/mock-order-${B.pending}` },
           { desc: "긴 글 · 큰 금액", c: "stress-guest", to: `/rent/pay/mock-order-${B.stressPending}` },
           { desc: "결제 실패 화면", c: "guest-full", to: "/rent/pay/fail?message=사용자가 결제를 취소했어요" },
         ],
@@ -54,7 +54,7 @@ export const RENT_GROUPS: Group[] = [
         title: "예약 한 건",
         path: "/rent/done/[bookingId]",
         rows: [
-          { desc: "결제 완료, 이용일 전, 커피챗 담음, 사장님 연락처 열림", c: "guest-full", to: `/rent/done/${B.paid}` },
+          { desc: "결제 완료, 공간 전체, 이용일 전, 커피챗 담음, 사장님 연락처 열림", c: "guest-full", to: `/rent/done/${B.paid}` },
           { desc: "확정된 예약, 이용일 전, 사장님 말씀 있음", c: "guest-full", to: `/rent/done/${B.confirmed}` },
           { desc: "확정된 예약, 커피챗·소개서 없는 공간", c: "guest-full", to: `/rent/done/${B.confirmedOther}` },
           { desc: "다녀온 예약 (연락처 가림)", c: "guest-full", to: `/rent/done/${B.done}` },
@@ -92,7 +92,7 @@ export const RENT_GROUPS: Group[] = [
         path: "/rent/my",
         note: "공간 넷은 공개 중·검토 대기·쉬는 중·초안이에요. 들어온 요청은 새 요청(수락 전 손님 정보), 이용 시간이 시작된 결제 완료, 확정(연락처 열림), 환불 신청 중, 다녀감(가림), 거절, 환불, 손님 취소 둘이에요. 맨 아래 「내가 빌린 공간」도 한 건 있어요. 「알림」 줄은 맨 위에 한 번 뜨고 주소에서 지워져요. 다시 보려면 링크를 한 번 더 누르면 돼요.",
         rows: [
-          { desc: "모든 상태, 정산 계좌 있음", c: "host-full", to: "/rent/my" },
+          { desc: "모든 상태, 정산 계좌 있음 (요청 줄 첫머리에 대관만·공간 전체)", c: "host-full", to: "/rent/my" },
           { desc: "같은 화면, 정산 계좌 없음 (확정 줄마다 계좌 등록 한 줄)", c: "host-noaccount", to: "/rent/my" },
           { desc: "관리자이기도 한 사장님 (정산하기 링크, 검토 대기 공간에 공개하기 버튼)", c: "host-admin", to: "/rent/my" },
           { desc: "올린 공간이 없을 때", c: "host-empty", to: "/rent/my" },
@@ -121,7 +121,7 @@ export const RENT_GROUPS: Group[] = [
       {
         title: "공간 올리기",
         path: "/rent/new",
-        note: "임시 저장 복원은 링크로 못 열어요. 폼에 몇 칸 적고 새로고침하면 복원 안내가 떠요. 저장은 계정마다 따로 브라우저에 남아요.",
+        note: "임시 저장 복원은 링크로 못 열어요. 폼에 몇 칸 적고 새로고침하면 복원 안내가 떠요. 저장은 계정마다 따로 브라우저에 남아요. 「무엇을 파실까요」에서 상품을 하나도 안 켜고 「등록하기」를 누르면 상품 오류가, 켜고 값·설명을 비우면 그 칸 오류가 떠요.",
         rows: [
           { desc: "빈 폼 (가입 때 적은 이름·번호, 첫 소개서가 미리 채워짐)", c: "host-full", to: "/rent/new" },
           { desc: "이름·번호·소개서가 없는 사장님의 빈 폼", c: "minimal-host", to: "/rent/new" },
@@ -132,9 +132,9 @@ export const RENT_GROUPS: Group[] = [
         title: "공간 고치기",
         path: "/rent/[slug]/edit",
         rows: [
-          { desc: "공개 중인 공간", c: "host-full", to: `/rent/${S.full}/edit` },
-          { desc: "검토 중인 공간", c: "host-full", to: `/rent/${S.pending}/edit` },
-          { desc: "쉬는 중인 공간", c: "host-full", to: `/rent/${S.paused}/edit` },
+          { desc: "공개 중인 공간 · 상품 셋 다 켬", c: "host-full", to: `/rent/${S.full}/edit` },
+          { desc: "검토 중인 공간 · 공간 전체만 켬", c: "host-full", to: `/rent/${S.pending}/edit` },
+          { desc: "쉬는 중인 공간 · 대관만 켬", c: "host-full", to: `/rent/${S.paused}/edit` },
           { desc: "초안", c: "host-full", to: `/rent/${S.draft}/edit` },
           { desc: "긴 글", c: "stress-host", to: `/rent/${S.stress}/edit` },
           { desc: "최소 입력", c: "minimal-host", to: `/rent/${S.minimal}/edit` },
@@ -182,7 +182,7 @@ export const RENT_GROUPS: Group[] = [
 ];
 
 export const RENT_POPUPS: Popup[] = [
-  { where: { desc: "공간 상세", c: "guest-full", to: `/rent/${S.full}` }, button: "날짜·시간을 고르고 「신청하기」", title: "이대로 신청할까요?" },
+  { where: { desc: "공간 상세", c: "guest-full", to: `/rent/${S.full}` }, button: "상품·날짜·시간을 고르고 「신청하기」", title: "이대로 신청할까요?" },
   { where: { desc: "예약 한 건", c: "guest-full", to: `/rent/done/${B.confirmed}` }, button: "「예약 취소하기」", title: "예약을 취소할까요?" },
   { where: { desc: "내 하루 가게", c: "host-full", to: "/rent/my" }, button: "새 요청 줄의 「거절」", title: "이 요청을 거절할까요" },
   { where: { desc: "내 하루 가게", c: "host-full", to: "/rent/my" }, button: "이용 시간이 시작된 줄의 「관리자에게 환불 신청하기」", title: "관리자에게 환불을 신청할까요" },

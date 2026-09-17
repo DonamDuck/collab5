@@ -20,6 +20,8 @@ export type MentorPick = boolean;
 /** 옵션 두 줄. 고르면 면이 켜지고 오른쪽에 값이 붙는다. */
 type RowProps = {
   on: boolean;
+  /** 이 줄을 누르면 넘기는 값. 🔁09-18 전엔 제목 글자(「공간만 빌릴게요」)로 갈랐다 — 제목을 바꾸면 조용히 뒤집혔다. */
+  pick: MentorPick;
   title: string;
   desc?: string;
   amount: string;
@@ -29,14 +31,14 @@ type RowProps = {
 
 /** ⚠️**컴포넌트 안에서 만들지 않는다.** 렌더마다 새 함수가 나오면 React는 매번 «다른 컴포넌트»로 보고
  *  통째로 다시 마운트한다(lint `react-hooks/static-components`). 고른 줄이 깜빡이는 원인이 여기서 난다. */
-function Row({ on, title, desc, amount, dense, onChange }: RowProps) {
+function Row({ on, pick, title, desc, amount, dense, onChange }: RowProps) {
   return (
 
     <button
       type="button"
       role="radio"
       aria-checked={on}
-      onClick={() => onChange(title !== "공간만 빌릴게요")}
+      onClick={() => onChange(pick)}
       className={`flex w-full items-center gap-3 rounded-lg border px-4 text-left transition-colors ${
         dense ? "py-2.5" : "py-3.5"
       } ${on ? "border-primary-tint bg-primary-pale" : "border-hairline bg-surface hover:bg-surface-soft"}`}
@@ -78,15 +80,18 @@ export function MentorOptions({
     <div role="radiogroup" aria-label="신청 옵션" className="space-y-2">
       {/* 🔻09-15 대표 — 설명 줄 「그날 공간만 쓰고 혼자 해볼게요」를 뺐다.
           제목이 이미 그 문장이라 두 줄이 같은 말을 두 번 했다. 값이 안 붙는 쪽은 설명할 것이 없다. */}
-      <Row on={!value} title="공간만 빌릴게요" amount="+0원" dense={dense} onChange={onChange} />
+      {/* 🛍09-18 「공간만 빌릴게요」 → 「커피챗 없이 할게요」. 상품 이름 「대관만」과 「공간만」이 한 팝업에 같이 서면
+          손님이 공간 상품을 또 고르는 줄로 읽는다. 이 줄이 가르는 건 커피챗 하나다. */}
+      <Row on={!value} pick={false} title="커피챗 없이 할게요" amount="+0원" dense={dense} onChange={onChange} />
       <Row
         on={value}
+        pick={true}
         dense={dense}
         onChange={onChange}
         // ☕09-16 대표 — 「사장님께 잠깐 배워보기」 → 커피챗. 상세 절 제목(「사장님과 커피챗」)과 같은 이름이어야
-        //   방금 읽은 그 상품을 고르는 줄로 읽힌다. ⚠️위 `Row`는 «공간만 빌릴게요» 글자로 값을 가르니 그 줄 제목은 두고,
-        //   이 줄 제목만 바꾼다(이 글자는 판정에 안 쓰인다).
+        //   방금 읽은 그 상품을 고르는 줄로 읽힌다. (09-18부터 판정은 `pick`이 한다.)
         title="사장님과 커피챗"
+        // 🔁09-18 제목 글자로 값을 가르던 판정을 `pick`으로 옮겼다. 이제 제목은 자유롭게 바꿔도 된다.
         // 🔁09-15 대표 — *「사장님과 협의한 날짜에, 미리 이 일을 잠깐 배워볼 수 있어요 등과 같이 쓰자」*.
         //   ⭐전엔 「문 열기 전 60분」이라 **그날 아침으로 못 박혀 있었다.** 실제로는 사장님과 날을 맞추는 일이라
         //     이 줄이 그대로면 손님이 「그날 일찍 가면 되는구나」로 읽고 어긋난다.

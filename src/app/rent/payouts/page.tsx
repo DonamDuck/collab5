@@ -9,6 +9,7 @@ import { getProfileById, type Profile } from "@/lib/profiles";
 import { isRentAdmin } from "@/lib/rent-actions";
 import type { Payment, PayoutStatus, SpaceBooking } from "@/lib/types";
 import { bookingWhen, won } from "../ui";
+import { PRODUCT_LABEL } from "@/lib/rent-copy";
 import { RefundDecision } from "./RefundDecision";
 import { listPayoutAccounts, type PayoutAccount } from "@/lib/payout-accounts";
 import { bankName, HOLDER_TYPE_LABEL } from "@/lib/banks";
@@ -120,7 +121,8 @@ export default async function RentPayoutsPage() {
                       <p className="min-w-0 truncate text-[16px] font-medium text-ink">{sp?.name ?? "공간"}</p>
                       <p className="shrink-0 text-[16px] tabular-nums text-ink">{won(amount)}</p>
                     </div>
-                    <p className="mt-0.5 text-[14px] text-mute">{bookingWhen(b)}</p>
+                    {/* 🛍09-18 상품 이름 — 환불 금액이 어느 상품 값에서 나왔는지 전화로 대조할 때 쓴다. */}
+                    <p className="mt-0.5 text-[14px] text-mute">{PRODUCT_LABEL[b.product]} · {bookingWhen(b)}</p>
                     <dl className="mt-2 space-y-1 text-[14px] leading-relaxed">
                       <div className="flex gap-2"><dt className="w-[48px] shrink-0 text-mute">사장님</dt><dd className="min-w-0 break-all text-body">{line(host)}</dd></div>
                       <div className="flex gap-2"><dt className="w-[48px] shrink-0 text-mute">손님</dt><dd className="min-w-0 break-all text-body">{line(guest && b.guestPhone ? { ...guest, phone: b.guestPhone } : guest)}</dd></div>
@@ -233,7 +235,7 @@ function SellerBlock({ group, spaces }: { group: SellerGroup; spaces: Map<number
                 {booking ? spaces.get(booking.spaceId)?.name ?? "공간" : "공간"}
               </p>
               <p className="mt-0.5 text-[14px] text-mute">
-                {booking ? bookingWhen(booking) : payment.orderId}
+                {booking ? `${PRODUCT_LABEL[booking.product]} · ${bookingWhen(booking)}` : payment.orderId}
                 {booking?.status === "cancelled" && ` · 취소하고 남은 ${won(payment.balanceAmount)}`}
               </p>
             </div>
@@ -276,7 +278,7 @@ function StuckList({
           <li key={b.id} className="flex items-baseline justify-between gap-3 border-b border-hairline py-3">
             <div className="min-w-0">
               <p className="truncate text-[15px] text-body">{spaces.get(b.spaceId)?.name ?? "공간"}</p>
-              <p className="mt-0.5 text-[14px] text-mute">{bookingWhen(b)}</p>
+              <p className="mt-0.5 text-[14px] text-mute">{PRODUCT_LABEL[b.product]} · {bookingWhen(b)}</p>
             </div>
             <p className="shrink-0 text-[15px] tabular-nums text-ink">{won(b.amountTotal)}</p>
           </li>

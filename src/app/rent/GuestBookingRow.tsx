@@ -14,7 +14,7 @@ import { getProfileById, type Profile } from "@/lib/profiles";
 import { repo } from "@/lib/repo";
 import type { Space, SpaceBooking } from "@/lib/types";
 import { bookingFinished, bookingStarted, dateLabel, rangeLabel } from "@/lib/rent-time";
-import { BOOKING_HEADLINE } from "@/lib/rent-copy";
+import { BOOKING_HEADLINE, PRODUCT_LABEL } from "@/lib/rent-copy";
 import { GuestCancel } from "./my/Actions";
 import { BookingBadge, InfoList, InfoRow, ListRow, bookingWhen, won } from "./ui";
 
@@ -87,6 +87,8 @@ export async function loadGuestBookings(uid: number): Promise<GuestBookingView[]
 function metaParts(b: SpaceBooking, area?: string): string[] {
   const when = b.startTime && b.endTime ? [dateLabel(b.useDate), rangeLabel(b.startTime, b.endTime)] : [bookingWhen(b)];
   return [
+    // 🛍09-18 고른 상품이 맨 앞 — 같은 공간을 두 방식으로 빌린 줄이 나란히 서면 이 토막으로만 갈린다.
+    PRODUCT_LABEL[b.product],
     ...when,
     b.headcount ? `${b.headcount}명` : "",
     area ?? "",

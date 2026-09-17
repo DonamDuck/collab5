@@ -4,11 +4,12 @@ import { notFound } from "next/navigation";
 import { getSpacePublic, listLiveBookingsIn } from "@/lib/spaces";
 import { getProfileById, getSessionUserId } from "@/lib/profiles";
 import { repo } from "@/lib/repo";
-import { accessHowLine, COFFEE_CHAT_WHEN_GUEST, CONTACT_RULE_GUEST } from "@/lib/rent-copy";
+import { accessHowLine, COFFEE_CHAT_WHEN_GUEST, CONTACT_RULE_GUEST, PRODUCT_HINT_GUEST, PRODUCT_LABEL } from "@/lib/rent-copy";
+import { lowestPrice, productNote, productPrice, sellableProducts } from "@/lib/rent-products";
 import { futureSlots } from "@/lib/rent-time";
 import { PhotoSlider } from "@/components/PhotoSlider";
 import { BookingForm } from "./BookingForm";
-import { categoryLabel, Chip, dateLabel, InfoList, InfoRow, primaryBtnCls, scopeLabel, secondaryBtnCls, won } from "../ui";
+import { categoryLabel, Chip, dateLabel, InfoList, InfoRow, primaryBtnCls, secondaryBtnCls, won } from "../ui";
 import { AreaMap } from "./AreaMap";
 import { HostBrandCard } from "./HostBrandCard";
 import { SectionNav } from "./SectionNav";
@@ -53,13 +54,14 @@ export async function generateMetadata({
 
 /** 💸값 한 줄 — 굵은 시간당 값 + 「최소 N시간」·「최대 N명」 태그. 폰 헤더와 데스크톱 요약 카드가 같은 얼굴이다(09-18 대표).
  *  태그는 읽고 지나가는 것이라 설비 칩(`Chip`)보다 한 단 작은 회색 pill로 둔다. 값 옆에 같은 크기 칩이 서면 값이 묻힌다. */
-function PriceLine({ priceHour, minHours, capacity }: { priceHour: number; minHours: number; capacity?: number }) {
+/*  🛍09-18 상품 셋 — 값이 둘이면 낮은 값에 「부터」를 붙인다(대표 결정의 「가격도 각각」). 하나면 그 값 그대로. */
+function PriceLine({ priceHour, from, minHours, capacity }: { priceHour: number; from?: boolean; minHours: number; capacity?: number }) {
   const tags = [`최소 ${minHours}시간`, capacity ? `최대 ${capacity}명` : ""].filter(Boolean);
   return (
     <div className="flex flex-wrap items-center gap-x-2 gap-y-2">
       <p className="text-ink">
         <span className="text-[24px] font-bold leading-none tracking-tight tabular-nums">{won(priceHour)}</span>
-        <span className="ml-1 text-[15px] text-mute">/ 시간</span>
+        <span className="ml-1 text-[15px] text-mute">{from ? "부터 / 시간" : "/ 시간"}</span>
       </p>
       <span className="flex gap-1.5">
         {tags.map((t) => (
@@ -137,6 +139,10 @@ export default async function SpaceDetailPage({
   // 🧭09-17 디자인팀 — 데스크톱 오른쪽 기둥에 싣는 «가장 가까운 열린 시간».
   const nextSlot = openSlots[0];
   const eyebrow = [categoryLabel(sp.category), sp.area].filter(Boolean).join(" · ");
+  // 🛍09-18 켜진 공간 상품. 값 줄은 낮은 값, 값이 서로 다르면 「부터」.
+  const products = sellableProducts(sp);
+  const fromPrice = lowestPrice(sp) || sp.priceHour;
+  const priceVaries = new Set(products.map((p) => productPrice(sp, p))).size > 1;
 
   return (
     <main
@@ -175,11 +181,14 @@ export default async function SpaceDetailPage({
                 그땐 흐린 메타 줄 끝의 글자였다. 이제 제목 아래 굵은 값 + 최소 시간·인원 태그로 세운다(아워플레이스 상세).
                 lg에선 오른쪽 요약 카드가 같은 줄을 들어서 여기선 숨긴다. 세부(커피챗 값 등)는 아래 「비용」 절이 맡는다. */}
             <div className="mt-4 lg:hidden">
-              <PriceLine priceHour={sp.priceHour} minHours={sp.minHours} capacity={sp.capacity} />
+              <PriceLine priceHour={fromPrice} from={priceVaries} minHours={sp.minHours} capacity={sp.capacity} />
             </div>
             {/* 칩 줄 — 쓰임새 하나 + 설비 몇 개, 전부 같은 pill. 설비 전체는 아래 섹션에서 본다. */}
             <div className="mt-4 flex flex-wrap gap-2">
-              <Chip>{scopeLabel(sp.scope)}</Chip>
+              {/* 🛍09-18 옛 범위 칩(`scopeLabel`) → 켜진 상품 이름. 둘 다 파는 공간에 「공간만」이 서면 틀린 말이다. */}
+              {products.map((p) => (
+                <Chip key={p}>{PRODUCT_LABEL[p]}</Chip>
+              ))}
               {sp.facilities.slice(0, 4).map((f) => (
                 <Chip key={f}>{f}</Chip>
               ))}
@@ -335,13 +344,36 @@ export default async function SpaceDetailPage({
             </Section>
           )}
 
-          <Section title="비용">
-            <p className="text-[17px] text-ink">
-              시간당 {won(sp.priceHour)} · 최소 {sp.minHours}시간부터
+          {/* 🛍09-18 「비용」 → 「빌릴 수 있는 것」(대표: 「대관만, 공간 전체, 커피챗 … 고객은 신청할 때 이걸 선택」).
+              앞선 코멘트 — 「일일카페로 하고 싶은 사람도, 예뻐서 대관만 하고 싶은 사람도 딱 보고 알 수 있게」.
+              ⭐그래서 값만 적지 않고 사장님이 적은 «무엇을 쓰고 할 수 있는지»를 상품마다 같이 싣는다.
+              상품 이름 밑 한 줄(`PRODUCT_HINT_GUEST`)은 우리 말, 그 아래 글은 사장님 말이다. */}
+          <Section title="빌릴 수 있는 것" nav="상품">
+            <div className="space-y-3">
+              {products.map((p) => (
+                <div key={p} className="rounded-lg border border-hairline bg-surface px-4 py-4">
+                  <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                    <p className="text-[17px] font-bold text-ink">{PRODUCT_LABEL[p]}</p>
+                    <p className="text-[16px] text-ink">
+                      <span className="font-medium tabular-nums">{won(productPrice(sp, p))}</span>
+                      <span className="ml-1 text-[15px] text-mute">/ 시간</span>
+                    </p>
+                  </div>
+                  <p className="mt-0.5 text-[15px] text-mute">{PRODUCT_HINT_GUEST[p]}</p>
+                  {productNote(sp, p) && (
+                    <p className="mt-3 whitespace-pre-line text-[16px] leading-relaxed break-keep text-body">
+                      {productNote(sp, p)}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+            <p className="mt-3 text-[15px] text-mute">
+              {products.length > 1 ? "신청할 때 둘 중 하나를 골라요. " : ""}최소 {sp.minHours}시간부터 빌릴 수 있어요.
             </p>
             {sp.coffeeChat && sp.coffeeChatPrice > 0 && (
-              <p className="mt-1.5 text-[16px] text-mute">
-                커피챗 {sp.coffeeChatMinutes}분은 {won(sp.coffeeChatPrice)}, 원하시면 같이 담으세요.
+              <p className="mt-1.5 text-[15px] text-mute">
+                커피챗 {sp.coffeeChatMinutes}분({won(sp.coffeeChatPrice)})은 어느 쪽에든 더할 수 있어요.
               </p>
             )}
           </Section>
@@ -461,7 +493,10 @@ export default async function SpaceDetailPage({
                 spaceName={sp.name}
                 openSlots={openSlots}
                 takenByDate={takenByDate}
-                priceHour={sp.priceHour}
+                products={{
+                  rentSpaceOn: sp.rentSpaceOn, rentSpacePrice: sp.rentSpacePrice, rentSpaceNote: sp.rentSpaceNote,
+                  rentFullOn: sp.rentFullOn, rentFullPrice: sp.rentFullPrice, rentFullNote: sp.rentFullNote,
+                }}
                 minHours={sp.minHours}
                 coffeeChat={sp.coffeeChat}
                 coffeeChatMinutes={sp.coffeeChatMinutes}
@@ -481,8 +516,24 @@ export default async function SpaceDetailPage({
         <aside className="hidden lg:sticky lg:top-24 lg:block">
           {/* 메타 줄·소개서 줄은 lg에서 위 헤더에서 숨기고 여기로 모인다. 같은 값이 한 화면에 두 번 서지 않게. */}
           <div className="rounded-lg border border-hairline bg-surface p-6 shadow-e1">
-            <PriceLine priceHour={sp.priceHour} minHours={sp.minHours} capacity={sp.capacity} />
+            <PriceLine priceHour={fromPrice} from={priceVaries} minHours={sp.minHours} capacity={sp.capacity} />
             <InfoList className="mt-5 border-t border-hairline pt-5">
+              {/* 🛍09-18 켜진 상품 이름 — 「부터」가 무엇 중 낮은 값인지 요약 카드에서도 읽히게. */}
+              {products.length > 0 && (
+                <InfoRow
+                  label="상품"
+                  value={
+                    // 한 줄에 둘을 이으면 340 카드에서 「공간 전체 / 30,000원」이 꺾였다(09-18 실측). 상품마다 한 줄.
+                    <>
+                      {products.map((p) => (
+                        <span key={p} className="block">
+                          {PRODUCT_LABEL[p]} <span className="tabular-nums">{won(productPrice(sp, p))}</span>
+                        </span>
+                      ))}
+                    </>
+                  }
+                />
+              )}
               <InfoRow
                 label="가까운 날"
                 value={

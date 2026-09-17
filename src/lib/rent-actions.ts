@@ -22,7 +22,9 @@ import {
   notifySpacePublished,
 } from "./rent-notify";
 import { bookingStarted, dateLabel, kstDaysUntil, hoursBetween, fitsOpenSlot, nowHhmmKst, overlaps, toMinutes, todayKst } from "./rent-time";
-import type { Space, SpaceBooking, SpaceUseType, SpaceCategory, SpaceScope, OpenSlot, AccessHow } from "./types";
+import type { Space, SpaceBooking, SpaceUseType, SpaceCategory, OpenSlot, AccessHow, RentProduct } from "./types";
+import { bookingAmount, compatScopePrice, isRentProduct, productOn } from "./rent-products";
+import { PRODUCT_LABEL, withJosa } from "./rent-copy";
 
 // 하루 가게 — 쓰기 서버 액션 (2026-09-13)
 // 스펙 = docs/superpowers/specs/2026-09-13-daily-shop-design.md
@@ -67,10 +69,13 @@ export interface SpaceFormInput {
   slug?: string;
   name: string; body: string; photos: string[];
   address: string;
-  category: SpaceCategory; scope: SpaceScope;
+  category: SpaceCategory;
   useType: SpaceUseType; facilities: string[]; facilitiesNote: string; capacity?: number;
   rules: string;
-  priceHour: number; minHours: number; openSlots: OpenSlot[];
+  /** 🛍상품 셋(09-18). 옛 `scope`·`priceHour`는 화면이 안 보낸다 — 서버가 이 값에서 호환 값을 만든다. */
+  rentSpaceOn: boolean; rentSpacePrice: number; rentSpaceNote: string;
+  rentFullOn: boolean; rentFullPrice: number; rentFullNote: string;
+  minHours: number; openSlots: OpenSlot[];
   /** 🔁매주 계속 여는 요일(09-17). `openSlots`에 펼친 날짜가 섞여 와도 된다 — 저장(`saveSpace`)이 도로 뺀다. */
   repeatWeekly: Space["repeatWeekly"];
   coffeeChat: boolean; coffeeChatMinutes: number; coffeeChatPrice: number; coffeeChatTopics: string;
@@ -102,7 +107,20 @@ export async function saveSpaceAction(input: SpaceFormInput): Promise<ActionResu
     return { ok: false, message: "빌려줄 수 있는 날과 시간을 하나 이상 정해 주세요." };
   }
   if (input.photos.length === 0) return { ok: false, message: "사진을 한 장 이상 올려 주세요. 사진 없는 공간은 아무도 안 빌려요." };
-  if (input.priceHour <= 0) return { ok: false, message: "한 시간에 얼마 받으실지 적어 주세요." };
+  // 🛍09-18 상품 셋 — 공간 상품은 하나 이상, 켠 상품은 값과 설명이 있어야 한다. 화면도 막지만 관문은 여기다.
+  if (!input.rentSpaceOn && !input.rentFullOn) {
+    return { ok: false, message: `파실 상품을 하나는 켜 주세요. ${PRODUCT_LABEL.space}, ${PRODUCT_LABEL.full} 중에서요.` };
+  }
+  for (const [on, price, note, label] of [
+    [input.rentSpaceOn, input.rentSpacePrice, input.rentSpaceNote, PRODUCT_LABEL.space],
+    [input.rentFullOn, input.rentFullPrice, input.rentFullNote, PRODUCT_LABEL.full],
+  ] as const) {
+    if (!on) continue;
+    if (!(price > 0)) return { ok: false, message: `${withJosa(label, "은/는")} 한 시간에 얼마인지 적어 주세요.` };
+    if ((note ?? "").trim().length < 10) {
+      return { ok: false, message: `${label} 설명이 짧아요. 손님이 무엇을 쓰고 할 수 있는지 열 글자 넘게 담아 주세요.` };
+    }
+  }
   if (input.minHours < 1) return { ok: false, message: "최소 대여 시간은 한 시간 이상이어야 해요." };
   // ☎️🚨청약 «전»에 보여야 하는 값이라 빈칸으로 못 넘어간다.
   //   전자상거래법 제20조②(시행 2026-07-21): 중개자는 사업자 호스트의 성명·주소·전화번호를 확인해
@@ -179,8 +197,20 @@ export async function saveSpaceAction(input: SpaceFormInput): Promise<ActionResu
     priceDay: 0, mentorMinutes: 0, mentorPrice: 0,
     openDates: [], servesFood: false, subleaseOk: true,
 
-    category: input.category, scope: input.scope,
-    priceHour: input.priceHour, minHours: input.minHours, openSlots: input.openSlots,
+    category: input.category,
+    // 🛍켠 상품만 값·설명을 남긴다. 꺼진 상품의 값이 남아 있으면 「N원부터」가 안 파는 값을 집는다.
+    rentSpaceOn: input.rentSpaceOn,
+    rentSpacePrice: input.rentSpaceOn ? Math.round(input.rentSpacePrice) : 0,
+    rentSpaceNote: input.rentSpaceOn ? input.rentSpaceNote.trim() : "",
+    rentFullOn: input.rentFullOn,
+    rentFullPrice: input.rentFullOn ? Math.round(input.rentFullPrice) : 0,
+    rentFullNote: input.rentFullOn ? input.rentFullNote.trim() : "",
+    // ⚠️옛 칸 둘은 호환 값으로 같이 쓴다(읽는 곳이 남아 있다). 계산은 `compatScopePrice` 한 곳.
+    ...compatScopePrice({
+      rentSpaceOn: input.rentSpaceOn, rentSpacePrice: input.rentSpaceOn ? input.rentSpacePrice : 0, rentSpaceNote: "",
+      rentFullOn: input.rentFullOn, rentFullPrice: input.rentFullOn ? input.rentFullPrice : 0, rentFullNote: "",
+    }),
+    minHours: input.minHours, openSlots: input.openSlots,
     repeatWeekly: repeat.map((r) => ({ dow: r.dow, start: r.start, end: r.end, ...(r.skip?.length ? { skip: r.skip } : {}) })),
     coffeeChat: input.coffeeChat,
     coffeeChatMinutes: input.coffeeChat ? input.coffeeChatMinutes : 0,
@@ -273,6 +303,8 @@ export interface BookingFormInput {
   startTime: string;
   endTime: string;
   withChat: boolean;
+  /** 🛍고른 공간 상품(09-18). 서버가 «켜진 상품인가»를 다시 본다. */
+  product: RentProduct;
   guestBrandSlug: string;
   /** ☎️손님 연락처 — 필수(대표 09-17). 예약 행(`guest_phone`)에 적고, 프로필이 비었으면 거기도 채운다. */
   guestPhone: string;
@@ -298,6 +330,10 @@ export async function startBookingAction(input: BookingFormInput): Promise<Start
   if (!sp || sp.status !== "open") return { ok: false, message: "지금은 신청할 수 없는 공간이에요." };
   if (sp.ownerUserId === uid) return { ok: false, message: "내 공간은 내가 빌릴 수 없어요." };
   if (input.plan.trim().length < 10) return { ok: false, message: "그날 무엇을 하실지 열 글자 이상 적어 주세요." };
+  // 🛍09-18 — 사장님이 켜 둔 상품인지. 화면을 거치지 않은 호출이면 꺼진 상품 이름이 올 수 있다.
+  if (!isRentProduct(input.product) || !productOn(sp, input.product)) {
+    return { ok: false, message: "이 공간에서 팔지 않는 상품이에요. 새로고침하고 다시 골라 주세요." };
+  }
   // ☎️09-17 대표 — 손님 번호는 필수. 화면도 막지만 관문은 여기다(액션은 화면 없이도 불린다).
   //   숫자만 세서 0으로 시작하는 9~11자리면 받는다(지역번호 02 포함). 모양은 손님이 적은 그대로 둔다.
   const phoneDigits = (input.guestPhone ?? "").replace(/\D/g, "");
@@ -329,10 +365,10 @@ export async function startBookingAction(input: BookingFormInput): Promise<Start
     return { ok: false, message: "그 시간은 이미 찼어요. 다른 시간을 골라 주세요." };
   }
 
-  const amountSpace = Math.round(sp.priceHour * hours);
-  const amountChat = input.withChat && sp.coffeeChat ? sp.coffeeChatPrice : 0;
-  const amountTotal = amountSpace + amountChat;
-  if (amountTotal <= 0) return { ok: false, message: "아직 값이 안 정해진 공간이라 신청할 수 없어요." };
+  // ⭐금액은 공간 행의 «고른 상품 값»으로 다시 계산한다(09-18). 화면이 본 값과 같은 함수(`bookingAmount`)다.
+  const amt = bookingAmount(sp, input.product, hours, input.withChat);
+  if (!amt || amt.total <= 0) return { ok: false, message: "아직 값이 안 정해진 공간이라 신청할 수 없어요." };
+  const { space: amountSpace, chat: amountChat, total: amountTotal } = amt;
 
   // 주문번호는 우리가 만든다. 토스에 그대로 실려 가고 돌아올 때 이 값으로 행을 찾는다.
   const orderId = `rent-${sp.id}-${input.useDate.replace(/-/g, "")}-${Math.random().toString(36).slice(2, 10)}`;
@@ -340,7 +376,7 @@ export async function startBookingAction(input: BookingFormInput): Promise<Start
   const booking = await createPendingBooking({
     spaceId: sp.id, guestUserId: uid, guestBrandSlug: input.guestBrandSlug, guestPhone: input.guestPhone.trim(),
     useDate: input.useDate, hours: `${input.startTime}~${input.endTime}`, plan: input.plan.trim(),
-    startTime: input.startTime, endTime: input.endTime, hoursCount: hours,
+    startTime: input.startTime, endTime: input.endTime, hoursCount: hours, product: input.product,
     headcount: input.headcount, withChat: amountChat > 0, amountChat,
     withMentor: false, amountMentor: 0,
     amountSpace, amountTotal,
@@ -365,7 +401,7 @@ export async function startBookingAction(input: BookingFormInput): Promise<Start
 
   return {
     ok: true, message: "", orderId, amount: amountTotal,
-    orderName: `${sp.name} · ${input.useDate} ${input.startTime}~${input.endTime}`,
+    orderName: `${sp.name} ${PRODUCT_LABEL[input.product]} · ${input.useDate} ${input.startTime}~${input.endTime}`,
     bookingId: booking.id,
   };
 }
