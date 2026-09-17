@@ -1,3 +1,4 @@
+import "server-only"; // 🔒클라이언트 컴포넌트가 import하면 빌드가 멈춘다. 서비스 롤 키로 DB를 읽는 파일이다(09-18 밤 QA SEC-09).
 // 계정 프로필 — 서버 전용(service_role). RLS 잠금이라 anon으로 접근 불가.
 // DB 테이블 = public.users (07-25 profiles→users 개명). auth.users(인증)와는 다른 테이블.
 // profiles.user_id = 정수 PK(1,2,3), profiles.uuid = auth.users(id) 링크.

@@ -1,3 +1,4 @@
+import "server-only"; // 🔒클라이언트 컴포넌트가 import하면 빌드가 멈춘다. 서비스 롤 키로 DB를 읽는 파일이다(09-18 밤 QA SEC-09).
 // 하루 가게 — 공간 대여 데이터 계층 (2026-09-13)
 // 스펙 = docs/superpowers/specs/2026-09-13-daily-shop-design.md
 //
