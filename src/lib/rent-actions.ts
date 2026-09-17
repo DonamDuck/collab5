@@ -627,6 +627,20 @@ async function notifyParties(b: SpaceBooking): Promise<{ space: Space; host: Awa
   return { space, host, guest };
 }
 
+/** 🔁토스가 「이 결제는 지금 처리 중」이라고 돌려주는 코드 둘(09-18 문서 확인). 겹쳐 들어온 우리 요청이 곧 결과를 쓴다. */
+const PAY_IN_FLIGHT_CODES = ["IDEMPOTENT_REQUEST_PROCESSING", "ALREADY_PROCESSING_REQUEST"];
+
+/** 이 주문이 «이미 끝나 있나» — 겹쳐 온 다른 요청이 먼저 올렸을 수 있다(09-18 밤 QA SC-02).
+ *  예약이 결제 완료 이상이거나 결제 줄이 DONE이면 성공으로 돌려준다. 알림은 먼저 끝낸 쪽이 이미 보냈다.
+ *  @param samePaymentKey 주면 «그 결제로» 올라간 것만 성공으로 본다(다른 결제가 올린 거면 우리 돈은 돌려줘야 한다). */
+async function settledBooking(orderId: string, bookingId: number, samePaymentKey?: string): Promise<ActionResult | null> {
+  const [again, payNow] = await Promise.all([getBookingByOrderId(orderId), getPaymentByOrderId(orderId)]);
+  const alive = !!again && ["paid", "confirmed", "done"].includes(again.status);
+  if (!alive && payNow?.status !== "DONE") return null;
+  if (samePaymentKey && payNow?.paymentKey && payNow.paymentKey !== samePaymentKey) return null;
+  return { ok: true, message: "예약을 완료했어요.", bookingId: again?.id ?? bookingId };
+}
+
 /** 알림 한 통 — 🚨**결과에 영향을 주면 안 된다.** `rent-notify.ts`가 스스로 삼키지만, 조회 단계(`notifyParties`)가
  *  던질 수도 있어 한 겹 더 감싼다. 결제는 끝났는데 메일 때문에 「실패」가 뜨는 일은 없어야 한다. */
 async function safeNotify(run: () => Promise<unknown>): Promise<void> {
@@ -682,6 +696,20 @@ export async function confirmBookingAction(
 
   const approved = await approvePayment(paymentKey, orderId, pay.amount);
   if (!approved.ok || !approved.payment) {
+    // 🔁09-18 밤 QA(SC-02) — 복귀 주소가 두 번 열리면 두 번째 승인은 「이미 처리된 결제」로 실패한다.
+    //   그때 ABORTED를 쓰면 **먼저 끝난 승인의 DONE을 덮는다.** 쓰기 «전»에 예약·결제를 다시 읽는다.
+    const settled = await settledBooking(orderId, b.id);
+    if (settled) return settled;
+    // 다른 요청이 «아직 처리 중»이면 ABORTED를 쓰지 않는다 — 그 요청이 곧 DONE을 쓴다. 잠깐 기다렸다 한 번 더 본다.
+    if (approved.code && PAY_IN_FLIGHT_CODES.includes(approved.code)) {
+      await new Promise((r) => setTimeout(r, 700));
+      const late = await settledBooking(orderId, b.id);
+      if (late) return late;
+      return {
+        ok: false, code: approved.code, bookingId: b.id,
+        message: "결제를 확인하고 있어요. 잠시 뒤 신청 내역에서 한 번 더 봐 주세요.",
+      };
+    }
     // 돈은 안 움직였다. 결제 줄만 ABORTED로 남기고 예약은 그대로 둔다(30분 안이면 다시 시도할 수 있다).
     await rentSync(orderId, { toss: { status: "ABORTED" } });
     return { ok: false, message: approved.message, code: approved.code };
@@ -690,6 +718,10 @@ export async function confirmBookingAction(
   // ⭐예약 paid + 결제 DONE을 «한 트랜잭션»으로. 시간이 겹쳐 예약이 막히면 결제 기록도 같이 안 바뀐다.
   const synced = await rentSync(orderId, { bookingStatus: "paid", toss: approved.payment });
   if (!synced.ok) {
+    // 🔁09-18 밤 QA(SC-02) — 겹쳐 온 요청이 «같은 결제»로 이미 올렸을 수 있다(멱등키 덕에 둘 다 같은 승인 응답을 받는다).
+    //   그 경우 예약은 멀쩡히 살아 있으니 환불하면 안 된다. 손님 돈을 되돌리기 «전»에 그것부터 확인한다.
+    const twin = await settledBooking(orderId, b.id, approved.payment.paymentKey || paymentKey);
+    if (twin) return twin;
     // 🩸돈은 승인됐는데 예약을 못 올렸다(대개 그 사이 누가 같은 시간을 먼저 결제했다).
     //   돈만 받고 예약이 없는 상태를 남기면 안 된다 — 들어온 돈을 먼저 적고, 바로 전액 환불한다.
     await rentSync(orderId, { toss: approved.payment });

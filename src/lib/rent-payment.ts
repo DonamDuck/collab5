@@ -9,9 +9,24 @@
 //     ⭐배포 전에 사람이 확인해야 하는 것은 언젠가 한 번은 빠진다. 그래서 코드가 막는다.
 //   운영에서 키가 비어 있으면 결제는 **실패로 떨어진다** — 조용히 통과하는 것보다 낫다.
 
+import { createHash } from "node:crypto";
 import type { TossPayment } from "./types";
 
 const TOSS_BASE = "https://api.tosspayments.com/v1/payments";
+
+/** 🔁**멱등키** — 같은 요청이 두 번 가도 돈이 두 번 움직이지 않게 (2026-09-18 밤 QA SC-01·SC-02).
+ *
+ *  토스 문서(09-18 확인): 헤더 이름은 `Idempotency-Key`, 최대 300자, 첫 요청 날부터 15일 유효.
+ *  토스는 «멱등키 + API 키 + API 주소 + HTTP 메서드»가 같은 요청이 있으면 **다시 처리하지 않고 첫 응답을 그대로** 준다.
+ *  앞선 요청이 아직 처리 중이면 409 `IDEMPOTENT_REQUEST_PROCESSING`이다.
+ *  ⚠️본문은 비교하지 않는다. 그래서 키에는 «무엇을 바꾸는 요청인지»를 통째로 넣는다 —
+ *    다른 요청이 같은 키를 쓰면 엉뚱한 첫 응답을 받는다.
+ *  ⭐문서는 UUID 같은 «무작위» 값을 권하지만 우리는 **주문에서 뽑은 값**을 쓴다. 무작위로 만들면
+ *    겹쳐 들어온 두 요청의 키가 서로 달라져서 막으려던 중복이 그대로 지나간다.
+ *  길이는 sha-256 16진수라 늘 70자 안쪽(상한 300 안). */
+function idemKey(kind: string, ...parts: (string | number)[]): string {
+  return `${kind}-${createHash("sha256").update(parts.join("|")).digest("hex")}`;
+}
 
 function secret(): string {
   return process.env.TOSS_SECRET_KEY || "";
@@ -100,7 +115,14 @@ export async function approvePayment(
   try {
     const res = await fetch(`${TOSS_BASE}/confirm`, {
       method: "POST",
-      headers: { Authorization: authHeader(), "Content-Type": "application/json" },
+      headers: {
+        Authorization: authHeader(),
+        "Content-Type": "application/json",
+        // 🔁09-18 밤 QA(SC-02) — 복귀 주소가 두 번 열려도 승인은 한 번만. 두 번째는 첫 응답을 그대로 받는다.
+        //   ⭐키에 `paymentKey`를 같이 넣는다. 주문번호만으로 만들면, 카드가 거절돼 «다시 결제하기»로 새로 시도할 때
+        //     같은 키가 돼서 토스가 첫 번째의 «실패»를 그대로 돌려준다 — 그 주문은 영영 결제가 안 된다.
+        "Idempotency-Key": idemKey("rent-confirm", orderId, paymentKey),
+      },
       body: JSON.stringify({ paymentKey, orderId, amount }),
     });
     const body = (await res.json()) as TossPayment & { message?: string; code?: string };
