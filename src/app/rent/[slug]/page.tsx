@@ -2,11 +2,11 @@ import type { Metadata } from "next";
 import { cache } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getSpacePublic, listLiveBookingsIn } from "@/lib/spaces";
+import { getSpacePublic, listBookingsForGuest, listLiveBookingsIn } from "@/lib/spaces";
 import { getProfileById, getSessionUserId } from "@/lib/profiles";
 import { isRentAdmin } from "@/lib/rent-actions";
 import { repo } from "@/lib/repo";
-import { accessHowLine, COFFEE_CHAT_WHEN_GUEST, CONTACT_RULE_GUEST, PRODUCT_HINT_GUEST, PRODUCT_LABEL } from "@/lib/rent-copy";
+import { accessHowLine, COFFEE_CHAT_WHEN_GUEST, CONTACT_RULE_GUEST, PRODUCT_HINT_GUEST, PRODUCT_LABEL, telHref } from "@/lib/rent-copy";
 import { lowestPrice, productNote, productPrice, sellableProducts } from "@/lib/rent-products";
 import { futureSlots } from "@/lib/rent-time";
 import { bizVerified } from "@/lib/bizcheck";
@@ -54,6 +54,19 @@ async function maySeeUnlisted(ownerUserId: number, uid: number | null): Promise<
   return (!!uid && uid === ownerUserId) || (await loadIsAdmin());
 }
 
+/** 🎫**이 공간에 예약을 잡아 둔 손님**(09-18 밤 QA G-03).
+ *  🩸사장님이 「잠시 쉬기」를 누르면 그 공간이 남에게 404가 됐다. 쉬기 팝업은 *「손님이 이미 결제한 예약은
+ *    그대로라 그날 손님은 오세요」*라고 약속하는데, 정작 그 손님이 주소·유의 사항·사진을 다시 못 봤다.
+ *    확정 메일의 링크도, 예약 목록의 공간 이름도 전부 404로 떨어졌다.
+ *  ⭐그래서 **읽기는 열고 신청만 닫는다.** 새 신청이 안 들어오는 것이 「쉬기」의 뜻이지, 잡힌 예약을 감추는 게 아니다.
+ *  🔒연 것은 이 사람의 예약이 살아 있는 동안뿐이다 — 취소·거절된 사람에겐 여전히 없는 공간이다. */
+const loadMyBookings = cache((uid: number) => listBookingsForGuest(uid));
+async function hasKeptBooking(spaceId: number, uid: number | null): Promise<boolean> {
+  if (!uid) return false;
+  const mine = await loadMyBookings(uid);
+  return mine.some((b) => b.spaceId === spaceId && (b.status === "paid" || b.status === "confirmed" || b.status === "done"));
+}
+
 export async function generateMetadata({
   params,
 }: {
@@ -66,7 +79,11 @@ export async function generateMetadata({
   //   전엔 제목에 공간 이름, 설명에 동네, 정본 주소에 slug가 실려서 «있지만 못 보는 공간»과 «없는 공간»이 갈렸다.
   //   주소를 훑어 아직 안 열린 공간 목록을 만들 수 있었다는 뜻이다. 이제 남에게는 없는 공간과 똑같은 메타가 간다.
   const listed = sp.status === "open";
-  if (!listed && !(await maySeeUnlisted(sp.ownerUserId, await loadViewerId()))) return NOT_FOUND_META;
+  if (!listed) {
+    const who = await loadViewerId();
+    // 🎫예약을 잡아 둔 손님에게도 연다(G-03). 본문과 메타가 갈리면 화면은 열리는데 탭 제목만 「찾을 수 없어요」가 된다.
+    if (!(await maySeeUnlisted(sp.ownerUserId, who)) && !(await hasKeptBooking(sp.id, who))) return NOT_FOUND_META;
+  }
   const url = `/rent/${sp.slug}`;
   // 링크 미리보기 설명은 한 줄 소개 또는 동네까지. 주소는 화면에서 열려 있지만(09-16) 카드엔 길 필요가 없다.
   // ⏱09-16 대표 — 시간 단위 대여. 「하루 빌려보세요」는 사실이 틀린 말이라 링크 카드에도 안 싣는다.
@@ -160,7 +177,9 @@ export default async function SpaceDetailPage({
   // 「있지만 못 본다」와 「없다」를 구분해 주면, 주소를 훑어 아직 안 열린 공간 목록을 만들 수 있다.
   // 🧾09-18 관리자도 연다 — 검토 화면(`/rent/review`)에서 공개 전 공간을 눈으로 봐야 한다. 판정은 `isRentAdmin` 한 벌.
   //   메타(`generateMetadata`)도 같은 함수(`maySeeUnlisted`)로 가린다.
-  if (sp.status !== "open" && !(await maySeeUnlisted(sp.ownerUserId, uid))) notFound();
+  // 🎫예약을 잡아 둔 손님은 통과시킨다(09-18 밤 QA G-03). 폼은 아래에서 따로 닫는다.
+  const keptBooking = sp.status !== "open" && !isOwner ? await hasKeptBooking(sp.id, uid) : false;
+  if (sp.status !== "open" && !keptBooking && !(await maySeeUnlisted(sp.ownerUserId, uid))) notFound();
 
   // 🔁09-16 하루 단위 → 시간 단위. 날짜는 시간대 목록에서 뽑고, 그 날 이미 팔린 시간도 같이 읽는다.
   // ⏳지난 시간대는 여기서 걸러 낸다. 사장님이 열어 둔 날이 지나가도 목록에는 그대로 남아 있어서,
@@ -200,7 +219,8 @@ export default async function SpaceDetailPage({
   // 규칙은 한 줄에 하나씩 적게 했다(`/rent/new`). 그 줄을 그대로 살려 한 줄씩 세운다.
   const ruleLines = sp.rules.split(/\n+/).map((s) => s.trim()).filter(Boolean);
   // 신청 폼이 뜨는 조건 — 모바일 하단 고정 바가 본문을 가리지 않게 이때만 바닥 여백을 더 준다.
-  const showForm = !isOwner && !!uid && openDates.length > 0;
+  // 🔒쉬는 중·검토 중인 공간엔 폼을 안 그린다(G-03). 서버(`startBookingAction`)도 `status !== "open"`을 막는다.
+  const showForm = !isOwner && !!uid && sp.status === "open" && openDates.length > 0;
 
   // 🧭09-17 디자인팀 — 데스크톱 오른쪽 기둥에 싣는 «가장 가까운 열린 시간».
   const nextSlot = openSlots[0];
@@ -346,8 +366,10 @@ export default async function SpaceDetailPage({
               {products.length > 1 ? "신청할 때 둘 중 하나를 골라요. " : ""}최소 {sp.minHours}시간부터 빌릴 수 있어요.
             </p>
             {sp.coffeeChat && sp.coffeeChatPrice > 0 && (
+              // 🔁09-18 밤 QA(G-17) — 「어느 쪽에든」은 상품이 둘일 때만 맞는 말이다. 하나뿐인 공간에선 고를 쪽이 없다.
               <p className="mt-1.5 text-[15px] text-mute">
-                커피챗 {sp.coffeeChatMinutes}분({won(sp.coffeeChatPrice)})은 어느 쪽에든 더할 수 있어요.
+                커피챗 {sp.coffeeChatMinutes}분({won(sp.coffeeChatPrice)})은{" "}
+                {products.length > 1 ? "어느 쪽에든 더할 수 있어요." : "신청하실 때 같이 담을 수 있어요."}
               </p>
             )}
           </Section>
@@ -380,12 +402,14 @@ export default async function SpaceDetailPage({
             {sp.contactPhone.trim() && (
               <p className="mt-1 text-[15px] leading-relaxed break-keep text-mute">
                 가게 전화{" "}
-                <a
-                  href={`tel:${sp.contactPhone.replace(/[^0-9+]/g, "")}`}
-                  className="text-body underline underline-offset-2"
-                >
-                  {sp.contactPhone}
-                </a>
+                {/* ☎️09-18 밤 QA(G-19) — 메모가 섞인 번호 칸에서 `tel:`이 틀어졌다. 번호 뽑기는 한 벌(`telHref`). */}
+                {telHref(sp.contactPhone) ? (
+                  <a href={`tel:${telHref(sp.contactPhone)}`} className="text-body underline underline-offset-2">
+                    {sp.contactPhone}
+                  </a>
+                ) : (
+                  <span className="text-body">{sp.contactPhone}</span>
+                )}
               </p>
             )}
           </Section>
@@ -396,9 +420,9 @@ export default async function SpaceDetailPage({
           {!showForm && (
             <Section title="빌릴 수 있는 날" nav="날짜">
               {openDates.length === 0 ? (
-                <p className="text-[17px] leading-relaxed text-body">
-                  지금은 열린 시간이 없어요. 곧 새 날짜가 올라올 거예요.
-                </p>
+                // ✍️09-18 밤 QA(G-26) — 「곧 새 날짜가 올라올 거예요」는 우리가 지킬 수 없는 약속이다.
+                //   새 날을 여는 건 사장님이고, 영영 안 열 수도 있다. 사실만 남긴다.
+                <p className="text-[17px] leading-relaxed text-body">지금은 열린 시간이 없어요.</p>
               ) : (
                 <>
                   <div className="flex flex-wrap gap-2">
@@ -541,6 +565,12 @@ export default async function SpaceDetailPage({
                   내 하루 가게
                 </Link>
                 에서 보실 수 있어요.
+              </p>
+            ) : sp.status !== "open" ? (
+              // 🎫09-18 밤 QA(G-03) — 쉬는 중·검토 중인 공간. 잡아 둔 예약이 있어 여기까지 온 손님에게
+              //   「없는 공간」 대신 사실을 말한다. 쉬기 팝업이 사장님께 약속한 문장과 같은 뜻이다.
+              <p className="text-[17px] leading-relaxed break-keep text-body">
+                지금은 새 신청을 받지 않는 공간이에요. 잡아 두신 예약은 그대로예요.
               </p>
             ) : openDates.length === 0 ? (
               // 🔁09-17 QA — 열린 시간이 없는데 비로그인 손님에게 「로그인하고 신청하기」가 섰다. 로그인하고 오면

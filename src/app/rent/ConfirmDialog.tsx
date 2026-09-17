@@ -26,6 +26,7 @@ export function ConfirmDialog({
   confirmLabel,
   cancelLabel = "다시 볼게요",
   busy = false,
+  error = "",
   onConfirm,
   onCancel,
 }: {
@@ -35,6 +36,9 @@ export function ConfirmDialog({
   children: ReactNode;
   confirmLabel: string;
   cancelLabel?: string;
+  /** 🚨확인을 눌렀는데 **서버가 거절한 이유**(09-18 밤 QA G-02). 팝업을 닫고 뒤 화면에 적으면
+   *  그 글자가 화면 밖에 생겨서 「버튼이 죽었다」로 읽힌다. 스크롤 밖으로 안 밀리게 버튼 줄 바로 위에 고정한다. */
+  error?: string;
   /** 액션이 도는 동안 버튼 둘 다 잠근다. 두 번 눌러 두 번 취소되는 일을 막는다. */
   busy?: boolean;
   onConfirm: () => void;
@@ -51,16 +55,26 @@ export function ConfirmDialog({
       className="fixed inset-0 z-[60] flex items-center justify-center bg-ink/55 p-4 backdrop-blur-[2px] print:hidden"
       {...dialog.overlayProps}
     >
+      {/* 📐09-18 밤 QA(G-06) — 팝업 전체가 스크롤 상자라, 본문이 길면 **버튼 줄이 화면 밖으로 밀려났다**
+          (375에서 「결제하러 가기」가 927px 자리에 있었다). 판을 세로 flex로 세우고 본문만 스크롤하게 한다.
+          ⭐버튼 줄은 `shrink-0` — 돈이 움직이는 자리라 어느 폭에서든 늘 보여야 한다. */}
       <div
         {...dialog.panelProps}
-        className="max-h-[calc(100dvh-2rem)] w-full max-w-[420px] overflow-y-auto rounded-lg bg-surface p-5 shadow-e3 sm:p-6"
+        className="flex max-h-[calc(100dvh-2rem)] w-full max-w-[420px] flex-col rounded-lg bg-surface p-5 shadow-e3 sm:p-6"
       >
-        <h2 id="rent-confirm-title" className="text-[18px] font-medium leading-snug break-keep text-ink">
+        <h2 id="rent-confirm-title" className="shrink-0 text-[18px] font-medium leading-snug break-keep text-ink">
           {title}
         </h2>
-        <div className="mt-3 space-y-2 text-[17px] leading-relaxed break-keep text-body">{children}</div>
+        <div className="mt-3 min-h-0 flex-1 space-y-2 overflow-y-auto text-[17px] leading-relaxed break-keep text-body">
+          {children}
+        </div>
+        {error && (
+          <p role="alert" className="mt-4 shrink-0 text-[15px] leading-relaxed break-keep text-danger">
+            {error}
+          </p>
+        )}
         {/* 확인이 오른쪽 — 엄지가 닿는 자리. 취소가 먼저 읽히고 확인이 마지막에 눌린다. */}
-        <div className="mt-6 flex gap-2">
+        <div className="mt-6 flex shrink-0 gap-2">
           <button type="button" onClick={onCancel} disabled={busy} className={`${secondaryBtnCls} flex-1 px-4`}>
             {cancelLabel}
           </button>

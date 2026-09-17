@@ -4,7 +4,7 @@ import { listOpenSpaces } from "@/lib/spaces";
 import type { SpaceCategory, SpacePublic, SpaceUseType } from "@/lib/types";
 import { EmptyState } from "@/components/EmptyState";
 import { RentFilters, type UseFilter } from "./RentFilters";
-import { categoryLabel, CoverPlaceholder, secondaryBtnCls, won } from "./ui";
+import { CATEGORY_OPTIONS, categoryLabel, CoverPlaceholder, secondaryBtnCls, won } from "./ui";
 import { PRODUCT_LABEL } from "@/lib/rent-copy";
 import { lowestPrice, productPrice, sellableProducts } from "@/lib/rent-products";
 import { OG_IMAGE } from "@/lib/site";
@@ -49,6 +49,15 @@ export const metadata: Metadata = {
  *  목록을 좁히는 값일 뿐이라 접근 범위와 무관하고, 404를 내면 오타 하나에 빈 화면이 된다. */
 function parseUse(raw: string | undefined): UseFilter {
   return raw === "as_is" || raw === "open" ? raw : "";
+}
+
+/** 📂업종도 같은 규칙(09-18 밤 QA G-24).
+ *  🩸전엔 주소의 값을 그대로 DB 조건으로 넘겨서, `?category=foo`처럼 모르는 값이 오면 **아무것도 안 걸린
+ *    빈 목록**이 떴다. 화면의 거르개는 「업종 전체」를 가리키고 있어서(그 값이 목록에 없으니) 손님 눈엔
+ *    조건이 하나도 안 걸렸는데 공간이 0곳인 상태가 된다. 오타 하나가 「이 서비스엔 공간이 없다」가 되는 셈이다.
+ *  ⭐아는 값만 받는다. 목록은 `CATEGORY_OPTIONS` 한 벌이라 고르개·거르개·여기가 같은 줄을 본다. */
+function parseCategory(raw: string | undefined): SpaceCategory | undefined {
+  return CATEGORY_OPTIONS.some(([v]) => v === raw) ? (raw as SpaceCategory) : undefined;
 }
 
 /** 카드 한 장 — 고르는 것이라 박스(디자인-시스템 §카드 어휘). `/search` 카드와 같은 옷:
@@ -112,15 +121,16 @@ export default async function RentPage({
 }) {
   const { area, category, use } = await searchParams;
   const useFilter = parseUse(use);
+  const categoryFilter = parseCategory(category);
   // ⚠️`listOpenSpaces`는 `useType`이 "both"면 거르기를 건너뛴다. 그래서 「전체」는 값을 **안 넘긴다** —
   //   "both"를 넘겨도 결과는 같지만, 뜻이 다른 두 값(전체 / 둘 다 가능한 공간)을 한 글자로 섞으면
   //   다음 사람이 필터 로직을 고칠 때 반드시 헷갈린다.
   const spaces = await listOpenSpaces({
     area: area?.trim() || undefined,
-    category: (category || undefined) as SpaceCategory | undefined,
+    category: categoryFilter,
     useType: (useFilter || undefined) as SpaceUseType | undefined,
   });
-  const filtered = !!(area?.trim() || category || useFilter);
+  const filtered = !!(area?.trim() || categoryFilter || useFilter);
 
   return (
     <main className="mx-auto w-full max-w-[880px] px-4 lg:max-w-[1120px] pb-10 pt-4 sm:px-6 sm:pb-14 sm:pt-6">
@@ -143,7 +153,7 @@ export default async function RentPage({
 
       <RentFilters
         initialArea={area?.trim() ?? ""}
-        initialCategory={(category ?? "") as SpaceCategory}
+        initialCategory={categoryFilter ?? ""}
         initialUse={useFilter}
       />
 

@@ -7,7 +7,7 @@ import { repo } from "@/lib/repo";
 import { ContactBlock } from "../../ContactBlock";
 import { KAKAO_CHAT_URL } from "@/lib/site";
 import { bookingFinished, bookingStarted } from "@/lib/rent-time";
-import { BOOKING_HEADLINE, COFFEE_CHAT_WHEN_GUEST, CONTACT_RULE_GUEST, PRODUCT_LABEL, REFUND_TIMING_LINE } from "@/lib/rent-copy";
+import { BOOKING_HEADLINE, COFFEE_CHAT_WHEN_GUEST, CONTACT_RULE_GUEST, CONTACT_RULE_GUEST_DONE, PRODUCT_LABEL, REFUND_TIMING_LINE } from "@/lib/rent-copy";
 import type { BookingStatus } from "@/lib/types";
 import { GuestCancel } from "../../my/Actions";
 import { bookingWhen, InfoPanel, InfoRow, primaryBtnCls, secondaryBtnCls, won } from "../../ui";
@@ -80,6 +80,11 @@ export default async function RentDonePage({ params }: { params: Promise<{ booki
   const moneyBack = b.status === "cancelled" || b.status === "refunded" || b.status === "rejected";
   const pay = moneyBack ? await getPaymentByOrderId(b.orderId) : null;
   const refunded = pay ? Math.max(0, pay.amount - pay.balanceAmount) : null;
+  // 💸09-18 밤 QA(G-07) — 거절됐는데 환불이 아직 안 끝난 예약이 **「돌려드린 돈 0원」**만 보여 줬다.
+  //   손님은 그 화면을 「한 푼도 못 받는다」로 읽는다. 거절은 규정상 전액이라(상세 §환불 규정) 아직 안 돈 건
+  //   «돌려드릴 돈»으로 부르고 처리 중이라는 것을 같이 말한다.
+  //   ⚠️취소(`cancelled`)엔 이 처리를 안 한다 — 당일 취소는 0원이 «정답»이라 「돌려드릴 돈 0원」이 거짓말이 된다.
+  const refundPending = b.status === "rejected" && (refunded === null || refunded === 0);
 
   return (
     <main className="mx-auto w-full max-w-[560px] px-4 py-14 sm:px-6">
@@ -127,9 +132,14 @@ export default async function RentDonePage({ params }: { params: Promise<{ booki
           )}
           {moneyBack && (
             <InfoRow
-              label="돌려드린 돈"
+              label={refundPending ? "돌려드릴 돈" : "돌려드린 돈"}
               value={
-                refunded === null ? (
+                refundPending ? (
+                  <>
+                    <span className="font-medium text-ink">{won(b.amountTotal)}</span>
+                    <span className="block text-[15px] text-mute">지금 돌려드리는 중이에요</span>
+                  </>
+                ) : refunded === null ? (
                   <span className="text-mute">신청 내역에서 확인해 주세요</span>
                 ) : (
                   <span className="font-medium text-ink">{won(refunded)}</span>
@@ -142,15 +152,17 @@ export default async function RentDonePage({ params }: { params: Promise<{ booki
 
       {open ? (
         <>
-          {b.status === "paid" && (
-            // 📌09-15 대표 문안을 바탕으로, 09-16 phase 1에 맞춰 첫 줄만 바꿨다.
-            //   전엔 「이틀 안에 연락이 없으면 전화번호를 신청 내역에서 확인」이었는데, 이제 번호가 바로 아래에 열린다.
+          {/* 🔁09-18 밤 QA(G-25) — 이 절을 결제 완료(`paid`)에만 그려서 상태마다 말이 어긋났다.
+              ①확정(`confirmed`)엔 연락 기한도 커피챗 조율 안내도 아예 없었다(4만원짜리 옵션을 산 손님이 언제 하는지 못 봤다).
+              ②이용이 끝난 예약엔 「연락처를 아래에 적어 두었어요」가 서 있는데 바로 아래 연락처는 가려져 있었다.
+              ⭐그래서 조건을 «살아 있고 아직 안 끝난 예약»으로 넓히고, 줄은 상태가 고르게 한다. */}
+          {(b.status === "paid" || b.status === "confirmed") && !bookingFinished(b) && (
             <section className="mt-8 border-t border-hairline pt-7">
               <h2 className="text-[19px] font-bold leading-snug tracking-tight text-ink">예약 안내 사항</h2>
               <ul className="mt-4 space-y-3">
                 {[
-                  // ⏱09-17 대표 — 확정 뒤 2일 안 연락 규칙.
-                  CONTACT_RULE_GUEST,
+                  // ⏱09-17 대표 — 확정 뒤 2일 안 연락 규칙. 이미 수락된 건은 조건형(「확정하면」) 대신 지난 일로 말한다.
+                  b.status === "confirmed" ? CONTACT_RULE_GUEST_DONE : CONTACT_RULE_GUEST,
                   // 💳09-18 환불 시점은 메일과 한 줄(`REFUND_TIMING_LINE`). 약관 제10조의 「3~5영업일」에 맞췄다.
                   `사장님 사정으로 어려워지면 전액 돌려드려요. ${REFUND_TIMING_LINE}`,
                   // ☕09-17 커피챗을 담았으면 «언제»를 여기서도 말한다. 문장은 한 벌(`rent-copy`)이다.
@@ -189,9 +201,22 @@ export default async function RentDonePage({ params }: { params: Promise<{ booki
         )
       )}
 
-      {/* 사장님 말씀은 거절한 건에도 붙을 수 있어서(이번엔 어려운 이유) 열림 여부와 따로 둔다. */}
+      {/* 💳09-18 밤 QA(G-25) — 취소·환불된 예약엔 «언제 돈이 들어오는지»가 어디에도 없었다.
+          거절은 위 「돌려드릴 돈」 줄이 처리 중임을 말하니 여기선 시점만 한 줄 더한다. 문장은 메일과 같은 한 벌이다. */}
+      {moneyBack && (
+        <p className="mt-6 text-[15px] leading-relaxed break-keep text-mute">{REFUND_TIMING_LINE}</p>
+      )}
+
+      {/* 사장님 말씀은 거절한 건에도 붙을 수 있어서(이번엔 어려운 이유) 열림 여부와 따로 둔다.
+          🏷09-18 밤 QA(G-25) — 관리자가 처리한 환불(손님·사장님이 전화로 신청한 건)에도 이 줄이 「사장님 말씀」으로 섰다.
+          그 말은 수락하실 때 남기신 것이라, 환불 이야기를 하는 것처럼 읽혔다. 언제 남긴 말인지를 라벨이 말한다. */}
       {b.hostMessage && (
-        <p className="mt-6 text-[16px] leading-relaxed break-keep text-body">사장님 말씀 · {b.hostMessage}</p>
+        <p className="mt-6 text-[16px] leading-relaxed break-keep text-body">
+          {b.refundRequestedAt && (b.status === "refunded" || b.status === "cancelled")
+            ? "수락하실 때 사장님이 남기신 말"
+            : "사장님 말씀"}{" "}
+          · {b.hostMessage}
+        </p>
       )}
 
       {/* ✉️09-17 QA — 확정 메일의 「예약 내용 보기」가 이 화면으로 오는데 취소 버튼이 없었다. 「그날 못 가는데」 싶은

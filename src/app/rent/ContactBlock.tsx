@@ -13,7 +13,7 @@
 import type { Profile } from "@/lib/profiles";
 import type { AccessHow } from "@/lib/types";
 import Link from "next/link";
-import { accessHowLine, withJosa } from "@/lib/rent-copy";
+import { accessHowLine, telHref, withJosa } from "@/lib/rent-copy";
 import { InfoList, InfoRow } from "./ui";
 
 export function ContactBlock({
@@ -76,9 +76,15 @@ export function ContactBlock({
           <InfoRow
             label="가게 전화"
             value={
-              <a href={`tel:${shopPhone.replace(/[^0-9+]/g, "")}`} className="underline underline-offset-2">
-                {shopPhone}
-              </a>
+              // ☎️09-18 밤 QA(G-19) — 번호 칸에 메모가 섞이면 `tel:` 값이 틀어졌다. 번호 뽑기는 한 벌(`telHref`).
+              //   못 뽑으면 링크를 안 건다 — 안 걸리는 번호로 연결되는 것보다 글자만 보이는 편이 낫다.
+              telHref(shopPhone) ? (
+                <a href={`tel:${telHref(shopPhone)}`} className="underline underline-offset-2">
+                  {shopPhone}
+                </a>
+              ) : (
+                <span>{shopPhone}</span>
+              )
             }
           />
         )}
@@ -89,11 +95,15 @@ export function ContactBlock({
               <span className="text-mute">-</span>
             ) : phone ? (
               // 눌러서 바로 걸 수 있게. 확정된 뒤의 연락은 대개 「지금」 해야 하는 일이다.
-              <a href={`tel:${phone.replace(/[^0-9+]/g, "")}`} className="underline underline-offset-2">
+              <a href={`tel:${telHref(phone) || phone}`} className="underline underline-offset-2">
                 {phone}
               </a>
             ) : (
-              <span className="text-mute">{withJosa(who, "이/가")} 번호를 안 남기셨어요. 이메일로 연락해 보세요.</span>
+              <span className="text-mute">
+                {/* ✍️09-18 밤 QA(G-26·H-30) — 이메일도 없는 분에게 「이메일로 연락해 보세요」가 떴다. 없는 길을 안내한 셈이다. */}
+                {withJosa(who, "이/가")} 번호를 안 남기셨어요.
+                {email ? " 이메일로 연락해 보세요." : " 적어 두신 연락처가 없어서, 닿을 길이 필요하시면 카카오톡으로 알려 주세요."}
+              </span>
             )
           }
         />

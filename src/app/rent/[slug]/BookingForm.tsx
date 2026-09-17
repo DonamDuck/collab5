@@ -25,7 +25,7 @@
 //   입력 48px/16px · 도움말 15 faint). 금액 표는 **한 문장**으로. 버튼은 화면 유일 키위 52px이고,
 //   모바일에선 `MakerActionBar`처럼 **하단 고정 바**에 금액과 같이 앉는다(폼이 길어서 버튼이
 //   화면 밖에 있으면 「어디서 내지」가 된다).
-import { useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { startBookingAction, confirmBookingAction } from "@/lib/rent-actions";
 import type { SpaceUseType, OpenSlot, RentProduct, Space } from "@/lib/types";
@@ -152,7 +152,17 @@ export function BookingForm({
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
-  const [err, setErr] = useState("");
+
+  // 📐09-18 밤 QA(G-21) — 하단 고정 바가 **푸터 마지막 줄을 가렸다**(폰에서 사업자 정보 줄이 바 뒤에 깔렸다).
+  //   상세 `main`은 이미 아래 여백을 두지만 푸터는 `main` 밖이라 그 여백이 안 닿는다.
+  //   ⭐그래서 바가 뜨는 동안만 `body` 아래에 바 높이만큼을 비워 둔다. 폼이 사라지면 원래대로 돌린다.
+  useEffect(() => {
+    const prev = document.body.style.paddingBottom;
+    document.body.style.paddingBottom = "104px";
+    return () => {
+      document.body.style.paddingBottom = prev;
+    };
+  }, []);
 
   // 🔁09-17 QA — 전엔 첫 열린 날이 미리 골라져 있었다. 달력을 안 보고 시간만 고르면 «고른 적 없는 날»로
   //   결제까지 갔다. 날짜도 시각도 손님이 직접 고른 값만 쓴다.
@@ -177,8 +187,14 @@ export function BookingForm({
   const [phone, setPhone] = useState(initialPhone);
   /** 🪪09-18 대표 — 이용하실 분 성함(실명). 당일 신분 확인에 쓴다. 프로필엔 실명 칸이 없어 미리 채우지 않는다. */
   const [guestName, setGuestName] = useState("");
-  /** 결제 직전 확인 팝업(대표 09-14: 의사 확인은 팝업으로). 열린 채로 `submit`이 돌지 않게 닫고 시작한다. */
+  /** 결제 직전 확인 팝업(대표 09-14: 의사 확인은 팝업으로). */
   const [confirming, setConfirming] = useState(false);
+  /** 🚨팝업 «안»에 서는 거절 이유(09-18 밤 QA G-02).
+   *  전엔 [결제하러 가기]를 누르는 순간 팝업을 닫고 서버에 갔다. 서버가 거절하면 그 말이 폼 아래
+   *  `err` 한 줄로 갔는데, 375에서 그 자리는 823px이라 **고정 바 뒤이거나 화면 밖**이었다.
+   *  화면엔 아무 변화가 없어 「눌렀는데 아무 일도 안 난다」로 읽힌다(09-15에 같은 병을 한 번 고쳤다).
+   *  ⭐그래서 팝업을 «응답 뒤에» 닫는다. 성공하면 어차피 다른 화면으로 떠나고, 실패하면 누른 자리에서 이유를 본다. */
+  const [dialogErr, setDialogErr] = useState("");
   /** 🚨**못 넘어간 이유를 «그 칸 옆»에 둔다**(대표 09-15 [2][3]).
    *  전엔 오류 한 줄이 폼 맨 아래 결제 버튼 위에만 떴다. 그런데 버튼은 화면 아래 고정 바에 있어서
    *  **누른 자리에서 3,000px 떨어진 곳에 글자가 생겼다.** 화면에는 아무 변화도 없고 팝업도 안 열리니
@@ -258,7 +274,7 @@ export function BookingForm({
   };
 
   const askConfirm = () => {
-    setErr("");
+    setDialogErr("");
     setBadField("");
     if (!product) { stopAt("product"); return; }
     if (!useDate) { stopAt("date"); return; }
@@ -269,10 +285,12 @@ export function BookingForm({
     setConfirming(true);
   };
 
+  /** 서버가 「그 시간은 이제 못 쓴다」고 답한 것인가. 그러면 화면이 든 «찬 시간»이 이미 낡았다. */
+  const slotGone = (m: string) => m.includes("이미 찼") || m.includes("열어 두신 시간") || m.includes("이미 지난 시간");
+
   const submit = () =>
     start(async () => {
-      setConfirming(false);
-      setErr("");
+      setDialogErr("");
 
       // ① 서버가 검사하고 자리를 잡는다. 주문번호와 청구액도 여기서 «서버가» 정해 돌려준다.
       const r = await startBookingAction({
@@ -288,13 +306,21 @@ export function BookingForm({
         guestPhone: phone.trim(),
         guestName: guestName.trim(),
       });
-      if (!r.ok || !r.orderId || !r.amount) { setErr(r.message || "신청을 시작하지 못했어요."); return; }
+      if (!r.ok || !r.orderId || !r.amount) {
+        const m = r.message || "신청을 시작하지 못했어요.";
+        setDialogErr(m);
+        // 🔁찬 시간이 바뀌어 거절된 것이면 화면이 든 목록이 낡았다. 다시 받아 와서 그 시각을 고르개에서 지운다.
+        //   ⚠️팝업은 열어 둔다 — 새로 고쳐진 폼 뒤에서 조용히 닫히면 왜 못 갔는지가 사라진다.
+        if (slotGone(m)) router.refresh();
+        return;
+      }
 
       // ② 키가 없으면 위젯을 건너뛰고 모의 승인으로 간다(로컬에서 흐름을 막지 않으려고).
       const clientKey = process.env.NEXT_PUBLIC_TOSS_CLIENT_KEY;
       if (!clientKey) {
         const done = await confirmBookingAction("", r.orderId);
-        if (!done.ok) { setErr(done.message); return; }
+        if (!done.ok) { setDialogErr(done.message); return; }
+        setConfirming(false);
         router.push(done.bookingId ? `/rent/done/${done.bookingId}` : "/rent/requests");
         router.refresh();
         return;
@@ -318,7 +344,7 @@ export function BookingForm({
       {sellable.length > 0 && (
         <div ref={productRef}>
           {/* 🔁09-18 대표 코멘트 — 「어떻게 빌리실까요」가 위 「빌릴 수 있는 것」과 겹쳐 읽혔다. 하나면 확인, 둘이면 고르기. */}
-          <p className={labelCls}>{sellable.length === 1 ? "신청 타입을 확인해 주세요" : "신청 타입을 골라 주세요"}</p>
+          <p className={labelCls}>{sellable.length === 1 ? "어떻게 빌리실지 확인해 주세요" : "어떻게 빌리실지 골라 주세요"}</p>
           {sellable.length === 1 ? (
             <div className="rounded-lg bg-surface-soft px-4 py-3">
               <p className="text-[16px] text-ink">
@@ -366,7 +392,7 @@ export function BookingForm({
                       </span>
                       <span className="mt-0.5 block text-[14px] leading-snug break-keep text-mute">{PRODUCT_HINT_GUEST[p]}</span>
                       {note && (
-                        <span className="mt-2 line-clamp-3 block whitespace-pre-line text-[15px] leading-relaxed break-keep text-body">
+                        <span className="mt-2 line-clamp-3 whitespace-pre-line text-[15px] leading-relaxed break-keep text-body">
                           {note}
                         </span>
                       )}
@@ -466,7 +492,7 @@ export function BookingForm({
             )}
           </div>
         )}
-        {badField === "time" && <p className={errCls}>시작 시각이 비어 있어요.</p>}
+        {badField === "time" && <p className={errCls}>몇 시부터 쓰실지 골라 주세요.</p>}
       </div>
 
       {useType !== "as_is" && (
@@ -597,7 +623,7 @@ export function BookingForm({
           placeholder="010-1234-5678"
         />
         {badField === "phone" && (
-          <p className={errCls}>{phone.trim() ? "번호 자릿수가 맞지 않아요." : "사장님이 연락드릴 번호가 필요해요."}</p>
+          <p className={errCls}>{phone.trim() ? "번호를 한 번 더 봐 주세요. 숫자 9~11자리예요." : "사장님이 연락드릴 번호가 필요해요."}</p>
         )}
         <p className={hintCls}>사장님이 예약을 받으면 이 번호로 연락드릴 수 있어요.</p>
       </div>
@@ -661,7 +687,6 @@ export function BookingForm({
       {/* 🔻09-15 대표 — 「대여 비용 · 거절하면 전액 환불 · 수락하면 주소가 열려요」 줄 삭제.
           금액은 화면 아래 고정 바가 늘 들고 있어서 같은 말이 두 번이었고, 환불 이야기는
           상세의 «환불 규정» 절로 옮겼다(대표 [2]). 한 문장이 세 가지 일을 하려다 셋 다 흐렸다. */}
-      {err && <p className="text-[15px] leading-relaxed break-keep text-danger">{err}</p>}
 
       {/* 🔻09-14 데스크톱 인라인 버튼 삭제 — 하단 고정 바가 이제 모든 폭에서 뜬다(대표 지시).
           같은 버튼이 화면에 둘이면 어느 쪽이 진짜인지 고민하게 된다. */}
@@ -683,8 +708,12 @@ export function BookingForm({
         title="이대로 신청할까요?"
         confirmLabel="결제하러 가기"
         busy={pending}
+        error={dialogErr}
         onConfirm={submit}
-        onCancel={() => setConfirming(false)}
+        onCancel={() => {
+          setConfirming(false);
+          setDialogErr("");
+        }}
       >
         {/* 🔁09-15 `sm:hidden` 제거 — 어느 폭에서나 여기서 고른다(대표 「데스크탑도 동일 UX」).
             바에서 옵션을 뺐으니 고르개가 둘로 보일 걱정도 없다. */}
@@ -705,12 +734,20 @@ export function BookingForm({
           <InfoRow label="장소" value={spaceName} />
           {/* 🛍09-18 — 무엇을 샀는지. 결제 화면·완료·메일이 같은 이름(`PRODUCT_LABEL`)을 쓴다. */}
           {product && <InfoRow label="상품" value={PRODUCT_LABEL[product]} />}
-          <InfoRow label="신청 날짜" value={dateLabel(useDate)} />
+          {/* 🔁09-18 밤 QA(G-12) — 「신청 날짜」는 신청한 날로도 읽힌다. 폼·완료 화면과 같은 말로. */}
+          <InfoRow label="빌리는 날" value={dateLabel(useDate)} />
           <InfoRow label="이용 시간" value={rangeLabel(activeStart, endTime)} />
           {/* 📋09-17 QA — 사장님이 「이 글만 보고 정한다」면서 손님은 결제 직전에 그 글을 다시 못 봤다.
-              인원과 앞부분만 싣는다. 팝업이 길어지면 버튼이 화면 밖으로 밀린다. */}
+              인원과 앞부분만 싣는다. */}
           {headcount && <InfoRow label="인원" value={`${headcount}명`} />}
           <InfoRow label="무엇을" value={planPreview(plan)} />
+          {/* 🪪☎️📎09-18 밤 QA(G-29) — 사장님께 «같이 가는 것» 셋이 확인 자리에 없었다. 성함과 번호는 고칠 기회가
+              여기가 마지막이고, 소개서는 「보낼까요」를 켠 줄이 폼 한참 위라 무엇을 보내는지 잊는다. */}
+          <InfoRow label="성함" value={guestName.trim()} />
+          <InfoRow label="연락처" value={phone.trim()} />
+          {brandSlug && (
+            <InfoRow label="보낼 소개서" value={myBrands.find((b) => b.slug === brandSlug)?.name ?? brandSlug} />
+          )}
           <InfoRow
             label="결제 금액"
             value={
@@ -736,14 +773,14 @@ export function BookingForm({
         {/* 🔁09-18 대표 코멘트 — 「예약 전 유의사항」 제목을 달고, 성격이 다른 두 문장을 점 하나씩으로 갈랐다.
             버튼과 붙어 있던 것도 아래 여백으로 뗐다. */}
         <div className="mt-6 mb-2">
-          <p className="text-[15px] font-bold text-ink">예약 전 유의사항</p>
+          <p className="text-[15px] font-bold text-ink">예약 전 유의 사항</p>
           {/* 📐09-18 대표 코멘트 — 위 「예약 정보 확인」과 같은 위계로 제목 밑에 선 하나. */}
           <ul className="mt-2 space-y-2 border-t border-hairline pt-3">
             {[
               CONTACT_RULE_GUEST,
               // 🪪09-18 대표 — 「신청할 때 약관 동의 같은 데 넣어야 할 수도」. 약관 제10조에 넣은 한 줄을 돈 내기 직전에 한 번 더.
               "이용 당일 사장님이 신분증으로 성함을 확인할 수 있어요.",
-              "공간은 사장님이 직접 빌려주세요. collab5는 신청과 결제를 이어 드리는 통신판매중개자라 거래의 당사자는 아니에요.",
+              "공간을 빌려주시는 분은 사장님이에요. collab5는 신청과 결제를 이어 드리는 통신판매중개자라 거래의 당사자는 아니에요.",
             ].map((line) => (
               <li key={line} className="flex gap-2 text-[15px] leading-relaxed break-keep text-body">
                 <span aria-hidden="true" className="text-mute">·</span>

@@ -14,7 +14,7 @@ import { getProfileById, type Profile } from "@/lib/profiles";
 import { repo } from "@/lib/repo";
 import type { Space, SpaceBooking } from "@/lib/types";
 import { bookingFinished, bookingStarted, dateLabel, rangeLabel } from "@/lib/rent-time";
-import { BOOKING_HEADLINE, PRODUCT_LABEL } from "@/lib/rent-copy";
+import { PRODUCT_LABEL, telHref } from "@/lib/rent-copy";
 import { GuestCancel } from "./my/Actions";
 import { BookingBadge, CoverPlaceholder, InfoList, InfoRow, ListRow, bookingWhen, won } from "./ui";
 
@@ -100,9 +100,14 @@ function CompactContact({ host, shopPhone, address }: { host: Profile | null; sh
           <InfoRow
             label="연락"
             value={
-              <a href={`tel:${phone.replace(/[^0-9+]/g, "")}`} className="underline underline-offset-2">
-                {phone}
-              </a>
+              // ☎️09-18 밤 QA(G-19) — 번호에 메모가 섞이면 `tel:` 값이 틀어졌다. 뽑기는 한 벌(`telHref`).
+              telHref(phone) ? (
+                <a href={`tel:${telHref(phone)}`} className="underline underline-offset-2">
+                  {phone}
+                </a>
+              ) : (
+                <span>{phone}</span>
+              )
             }
           />
         ) : email ? (
@@ -127,8 +132,10 @@ export function GuestBookingRow({ view }: { view: GuestBookingView }) {
   // 🔗09-17 QA — 줄 어디에도 링크가 없어서 완료 화면(`/rent/done`)은 결제 직후 한 번만 볼 수 있었다.
   //   「자세히」는 결제를 마친 건에만 건다 — 결제 전·만료 건은 완료 화면이 보여 줄 게 없다.
   const paidOnce = b.status !== "pending" && b.status !== "expired";
-  // 📛09-17 대표 — 결제 완료·확정 건은 첫 줄을 `BOOKING_HEADLINE`으로. 배지는 그 짧은 꼴이다.
-  const headline = b.status === "paid" ? BOOKING_HEADLINE.guestPaid : b.status === "confirmed" ? BOOKING_HEADLINE.guestConfirmed : "";
+  // 🔻09-18 밤 QA(G-27) — 카드 오른쪽 배지가 「예약 완료」인데 바로 아래에 「하루 가게 예약이 완료됐어요」가 또 섰다.
+  //   같은 말이 한 카드에 두 번이라, 목록을 세로로 훑으면 줄마다 같은 문장이 반복됐다.
+  //   ⭐긴 문장(`BOOKING_HEADLINE`)이 사는 자리는 «그 한 건만 보여 주는» 화면(`/rent/done`)과 메일 제목이다.
+  //     목록의 한 줄에선 배지가 그 짧은 꼴이라 둘 중 하나만 있으면 된다.
   return (
     <ListRow
       card
@@ -167,7 +174,8 @@ export function GuestBookingRow({ view }: { view: GuestBookingView }) {
               {[PRODUCT_LABEL[b.product], sp?.area ?? "", b.headcount ? `${b.headcount}명` : ""].filter(Boolean).join(" · ")}
             </p>
             <p className="mt-1 text-[15px] text-ink">
-              <span className="font-semibold tabular-nums">{won(b.amountTotal)}</span>
+              {/* 📐09-18 밤 QA(G-27) — 375에서 「150,000 / 원」처럼 «원»만 다음 줄로 떨어졌다. 금액은 한 덩어리다. */}
+              <span className="whitespace-nowrap font-semibold tabular-nums">{won(b.amountTotal)}</span>
               {(b.amountChat > 0 || b.amountMentor > 0) && <span className="whitespace-nowrap text-mute"> · 커피챗 포함</span>}
             </p>
           </div>
@@ -175,7 +183,6 @@ export function GuestBookingRow({ view }: { view: GuestBookingView }) {
       }
       status={<BookingBadge status={b.status} />}
     >
-      {headline && <p className="mt-3 text-[15px] text-body">{headline}</p>}
       {/* 🩸09-16 — `pending`에도 「사장님이 수락하면…」이 붙어 있었다. 그 신청은 **사장님에게
           보이지도 않는다**(`listBookingsForHost`가 거른다). 기다릴 것이 없는데 기다리라고 말하고,
           이어서 낼 길도 없어서 목록에 쌓이기만 했다. 결제 화면은 주문번호로 되돌아갈 수 있다. */}

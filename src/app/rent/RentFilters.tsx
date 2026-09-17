@@ -76,14 +76,19 @@ export function RentFilters({
           apply({});
         }}
       >
+        {/* 🔎09-18 밤 QA(G-23) — 375에서 안내 글이 「지역, 이름으로 검색해 보…」로 잘렸고, 자판에 [검색] 키가 없어
+            Enter를 누를 곳이 안 보였다. 말을 짧게 줄이고 자판에 검색 키를 띄운다.
+            ⚠️`type="search"`는 브라우저가 지우기 ×를 그려 준다 — 「조건 지우기」와 둘이 되지만, 이 칸 하나만 비우는 일이라 뜻이 다르다. */}
         <input
+          type="search"
+          enterKeyHint="search"
           className={`${rentQuietInputCls} min-w-0 flex-1`}
           value={area}
           onChange={(e) => setArea(e.target.value)}
           onBlur={() => {
             if (area.trim() !== initialArea) apply({});
           }}
-          placeholder="지역, 이름으로 검색해 보세요"
+          placeholder="동네·이름·설비"
           aria-label="지역이나 공간 이름"
         />
         {/* 업종도 고르는 순간이 곧 확정이다. 고른 뒤 버튼을 또 누르게 하면 한 번 더 일을 시킨다. */}

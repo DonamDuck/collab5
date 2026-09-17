@@ -339,7 +339,15 @@ export default async function MyPage({ searchParams }: { searchParams: Promise<{
               {
                 href: "/rent/my?tab=guest",
                 title: "빌린 공간 보기",
-                desc: rentGuestBookings.length > 0 ? `내가 신청한 예약 ${rentGuestBookings.length}건을 봐요` : "아직 빌린 공간이 없어요",
+                // 🔢09-18 밤 QA(G-28) — 바로 위 칸이 「빌린 예약 3」인데 이 줄은 「신청한 예약 16건」이었다.
+                //   한 화면에 같은 것을 세는 숫자 둘이 다르면 어느 쪽이 내 예약인지 알 수 없다.
+                //   ⭐숫자는 «예약 완료» 한 판정(`rentMyTrips`)만 쓰고, 나머지는 세지 말고 무엇이 있는지만 말한다.
+                desc:
+                  rentMyTrips > 0
+                    ? `빌린 예약 ${rentMyTrips}건을 봐요`
+                    : rentGuestBookings.length > 0
+                      ? "지난 예약과 취소한 예약을 봐요"
+                      : "아직 빌린 공간이 없어요",
               },
             ].map((c) => (
               <Link
