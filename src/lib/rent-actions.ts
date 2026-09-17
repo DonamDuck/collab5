@@ -856,7 +856,7 @@ export async function confirmBookingAction(
     const refund = await cancelPayment(key, "예약 확정 실패 — 자동 환불", undefined, approved.payment.balanceAmount ?? pay.amount);
     if (refund.ok) {
       await rentSync(orderId, { bookingStatus: "cancelled", toss: refund.payment });
-      return { ok: false, message: "그 사이 그 시간이 찼어요. 결제는 자동으로 취소했습니다.", code: PAY_FAIL_SLOT_TAKEN_REFUNDED };
+      return { ok: false, message: "그 사이 그 시간이 찼어요. 결제는 바로 취소해 드렸어요.", code: PAY_FAIL_SLOT_TAKEN_REFUNDED };
     }
     // 환불까지 실패하면 손님 돈이 붙잡혀 있다. 정산 화면 「손이 필요한 예약」에 뜨게 rejected로 둔다.
     console.error(`[rent-actions] 🚨승인 뒤 예약 실패 + 자동 환불 실패 — 수동 환불 필요 order=${orderId}`);
