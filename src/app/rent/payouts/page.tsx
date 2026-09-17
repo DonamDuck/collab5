@@ -13,6 +13,7 @@ import { PRODUCT_LABEL } from "@/lib/rent-copy";
 import { RefundDecision } from "./RefundDecision";
 import { listPayoutAccounts, type PayoutAccount } from "@/lib/payout-accounts";
 import { bankName, HOLDER_TYPE_LABEL } from "@/lib/banks";
+import { kstDateKey } from "@/lib/time";
 
 // 하루 가게 — 정산 (2026-09-16) · 대표만
 //
@@ -56,6 +57,13 @@ async function groupBySeller(rows: Row[]): Promise<SellerGroup[]> {
 }
 
 const sum = (rows: Row[]) => rows.reduce((x, r) => x + r.payment.payoutAmount, 0);
+
+/** 보낸 날짜 — 한국 날짜로(09-18 밤 QA SC-29). 저장된 시각은 UTC 표기라 앞 열 글자를 자르면
+ *  한국 아침 9시 전에 보낸 돈이 하루 앞 날짜로 찍혔다. 읽을 수 없는 값이면 예전처럼 글자만 자른다(화면이 죽지 않게). */
+function sentDate(at: string): string {
+  const d = new Date(at);
+  return Number.isNaN(d.getTime()) ? at.slice(0, 10) : kstDateKey(d);
+}
 
 export default async function RentPayoutsPage() {
   // 🔒없는 척한다. 「권한이 없어요」라고 말하면 이 주소가 무엇을 하는 곳인지 알려 주는 셈이다.
@@ -252,7 +260,7 @@ function SellerBlock({ group, spaces }: { group: SellerGroup; spaces: Map<number
               <p className="text-[15px] tabular-nums text-ink">{won(payment.payoutAmount)}</p>
               <p className="text-[13px] tabular-nums text-faint">
                 {payment.payoutStatus === "DONE" && payment.payoutDoneAt
-                  ? `${payment.payoutDoneAt.slice(0, 10)} 보냄`
+                  ? `${sentDate(payment.payoutDoneAt)} 보냄`
                   : payment.payoutStatus === "FAILED"
                     ? "보내지 못했어요"
                     : payment.payoutStatus === "REQUESTED"

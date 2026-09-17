@@ -485,7 +485,8 @@ function fullWorld(today: string, withAccount: boolean): MockWorld {
     payment(b.cancelledPast, U.host, { status: "PARTIAL_CANCELED", balance: Math.round(b.cancelledPast.amountTotal * 0.5), payoutStatus: "WAITING" }),
     payment(b.refundReq, U.host, { status: "DONE" }),
     payment(b.paidStarted, U.host, { status: "DONE" }),
-    payment(b.payoutDone, U.host2, { status: "DONE", payoutStatus: "DONE", payoutDoneAt: `${d(-13)}T02:00:00.000Z` }),
+    // 🕐보낸 시각을 UTC 자정 넘어(한국 아침 0시 30분)로 둔다 — 날짜를 UTC로 자르면 하루 앞 날짜가 찍히는 걸 정산 화면에서 본다(09-18 밤 QA SC-29).
+    payment(b.payoutDone, U.host2, { status: "DONE", payoutStatus: "DONE", payoutDoneAt: `${d(-13)}T15:30:00.000Z` }),
     payment(b.payoutRequested, U.host2, { status: "DONE", payoutStatus: "REQUESTED" }),
     payment(b.payoutFailed, U.host2, { status: "DONE", payoutStatus: "FAILED" }),
     payment(b.payoutWaiting2, U.host2, { status: "DONE", payoutStatus: "WAITING" }),
