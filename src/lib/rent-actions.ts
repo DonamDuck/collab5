@@ -23,8 +23,8 @@ import { signCertUpload } from "./host-docs";
 import { hasPayoutAccount, savePayoutAccount, toMasked, validatePayoutInput, type PayoutAccountInput, type PayoutAccountMasked } from "./payout-accounts";
 import {
   approvePayment, cancelPayment, guestCancelRefundPercent, GRACE_MINUTES,
-  PAY_EXPIRED_LINE, PAY_FAIL_NOT_AVAILABLE, PAY_FAIL_SLOT_TAKEN, PAY_FAIL_SLOT_TAKEN_REFUNDED,
-  PAY_FAIL_SLOT_TAKEN_REFUND_PENDING, PAY_FAIL_USE_STARTED, PAY_FAIL_WINDOW_OVER,
+  PAY_EXPIRED_LINE, PAY_FAIL_METHOD_UNSUPPORTED, PAY_FAIL_NOT_AVAILABLE, PAY_FAIL_SLOT_TAKEN,
+  PAY_FAIL_SLOT_TAKEN_REFUNDED, PAY_FAIL_SLOT_TAKEN_REFUND_PENDING, PAY_FAIL_USE_STARTED, PAY_FAIL_WINDOW_OVER,
 } from "./rent-payment";
 // ⭐신청이 «지금도» 말이 되나 — 신청 시작·결제 승인·결제 화면이 같이 쓰는 순수 규칙(09-18 밤 QA G-01).
 import { pendingBookingProblem, validateBookingRequest } from "./rent-booking-rules";
@@ -713,6 +713,22 @@ export async function confirmBookingAction(
     // 돈은 안 움직였다. 결제 줄만 ABORTED로 남기고 예약은 그대로 둔다(30분 안이면 다시 시도할 수 있다).
     await rentSync(orderId, { toss: { status: "ABORTED" } });
     return { ok: false, message: approved.message, code: approved.code };
+  }
+
+  // 🏦09-18 밤 QA(SC-12) — **돈이 실제로 들어왔을 때만** 예약을 올린다. 토스 응답이 `DONE`이 아니면(가상계좌 입금 대기 등)
+  //   그 자리에서 취소하고 돌려보낸다. 지금 결제창엔 가상계좌가 없지만, 수단을 하나 켜는 날 「입금 전인데 예약 완료」가 된다.
+  if (approved.payment.status !== "DONE") {
+    const waitKey = approved.payment.paymentKey || paymentKey;
+    const undo = await cancelPayment(
+      waitKey, "입금 전 결제 수단이라 자동 취소", undefined, approved.payment.balanceAmount ?? pay.amount,
+    );
+    // 취소가 됐으면 그 응답을, 실패했으면 승인 응답을 적는다 — 어느 쪽이든 결제 줄이 지금 상태를 말해야 한다.
+    await rentSync(orderId, { toss: undo.ok && undo.payment ? undo.payment : approved.payment });
+    if (!undo.ok) console.error(`[rent-actions] 🚨입금 대기 결제를 취소하지 못했다 — 손으로 확인 필요 order=${orderId}`);
+    return {
+      ok: false, code: PAY_FAIL_METHOD_UNSUPPORTED, bookingId: b.id,
+      message: "이 결제 수단은 아직 받지 않아요. 카드나 간편결제로 다시 결제해 주세요.",
+    };
   }
 
   // ⭐예약 paid + 결제 DONE을 «한 트랜잭션»으로. 시간이 겹쳐 예약이 막히면 결제 기록도 같이 안 바뀐다.
