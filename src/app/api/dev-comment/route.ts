@@ -25,7 +25,8 @@ export async function POST(req: NextRequest) {
   // 「다 남겼어요, 작업 시작」 — 깃발만 세우고 끝낸다.
   if (b.action === "go") {
     const raw = await readFile(FILE, "utf8").catch(() => "");
-    const n = raw.split("\n").filter(Boolean).length;
+    // 🔢09-18 대표 — 처리 끝난 코멘트까지 세서 「25건 보내고 작업 시작」이 떴다(24건은 이미 반영). 남은 것만 센다.
+    const n = raw.split("\n").filter(Boolean).filter((l) => (JSON.parse(l) as { done?: boolean }).done !== true).length;
     await writeFile(FLAG, `${n}건 · 마지막 화면 ${s(b.url, 200)}\n`, "utf8");
     return NextResponse.json({ ok: true, count: n });
   }
@@ -60,12 +61,14 @@ export async function GET(req: NextRequest) {
   const raw = await readFile(FILE, "utf8").catch(() => "");
   const rows = raw.split("\n").filter(Boolean).map((l) => JSON.parse(l) as Record<string, string>);
 
+  // 🔢버튼의 「N건」은 아직 처리 안 한 것만. 처리한 코멘트(`done: true`)는 같은 자리를 다시 누를 때 보이는 이력으로만 남는다.
+  const open = rows.filter((r) => (r as { done?: unknown }).done !== true);
   const sel = req.nextUrl.searchParams.get("selector");
   if (sel) {
     // ⚠️화면 주소까지 맞춘다 — 같은 생김새의 요소가 다른 페이지에도 있다(버튼·입력칸이 그렇다).
     const url = req.nextUrl.searchParams.get("url") ?? "";
     const mine = rows.filter((r) => r.selector === sel && r.url === url).map((r) => r.note);
-    return NextResponse.json({ count: rows.length, mine });
+    return NextResponse.json({ count: open.length, mine });
   }
-  return NextResponse.json({ count: rows.length });
+  return NextResponse.json({ count: open.length });
 }
