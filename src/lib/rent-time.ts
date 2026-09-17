@@ -85,13 +85,16 @@ export function rangeLabel(start: string, end: string): string {
 
 /** `2026-10-05` → `10월 5일 (월)`.
  *  ⚠️`new Date("2026-10-05")`는 UTC 자정으로 읽혀 KST에선 하루 전으로 밀린다.
- *    그래서 Date를 거치지 않고 글자를 쪼갠 뒤, 요일만 정오 기준으로 계산한다.
+ *    그래서 Date를 거치지 않고 글자를 쪼갠 뒤, 요일만 따로 계산한다.
  *  🩸09-16까지 같은 계산이 화면(`app/rent/ui.tsx`)과 메일(`lib/rent-notify.ts`)에 따로 있었다.
- *    한 벌이면 어느 날 서식이 갈라질 자리가 없다. */
+ *    한 벌이면 어느 날 서식이 갈라질 자리가 없다.
+ *  🩸09-18 밤 QA(SC-25) — 요일을 «KST 정오의 `getDay()`»로 셌다. `getDay()`는 기기 시간대를 타서 로스앤젤레스 같은 곳에선
+ *    하루 앞 요일(9월 21일이 (일))이 나왔고, 서버(서울)가 그린 글자와 달라 hydration 불일치가 났다.
+ *    이제 UTC 달력으로 세는 `dowOfIso`를 쓴다. 날짜 글자는 그대로 두고 요일만 날짜 글자에서 곧장 나온다. */
 export function dateLabel(iso: string): string {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
   if (!m) return iso;
-  const dow = "일월화수목금토"[new Date(`${iso}T12:00:00+09:00`).getDay()];
+  const dow = "일월화수목금토"[dowOfIso(iso)];
   return `${Number(m[2])}월 ${Number(m[3])}일 (${dow})`;
 }
 
