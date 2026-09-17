@@ -331,11 +331,14 @@ export async function saveSpaceAction(input: SpaceFormInput): Promise<ActionResu
     }
   }
 
+  // 🩸09-18 밤 QA(SC-17) — 주소를 바꿨는데 지오코딩이 실패하면 «옛 좌표»가 그대로 남아 지도 핀이 옛 자리를 가리켰다.
+  //   그 옛 좌표로 네이버 상호 매칭까지 돌아서 엉뚱한 가게가 붙을 수 있었다. 이제 실패하면 좌표를 비운다(핀이 없는 게 낫다).
   let lat = prev?.lat;
   let lng = prev?.lng;
-  if (input.address.trim() && input.address.trim() !== (prev?.address ?? "")) {
-    const hit = await geocode(input.address);
-    if (hit) { lat = hit.lat; lng = hit.lng; }
+  if (!prev || moved) {
+    const hit = input.address.trim() ? await geocode(input.address) : null;
+    lat = hit?.lat;
+    lng = hit?.lng;
   }
 
   let slug = input.slug || makeSlug(input.name);
