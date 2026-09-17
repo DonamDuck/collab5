@@ -748,10 +748,16 @@ export async function sweepBookings(): Promise<void> {
   }
 
   // ③
-  const { data: kept } = await c.from("payments")
+  // 🔎09-18 밤 QA(SC-08) — **취소된 «지난» 예약만 DB에서 거른다.** 전엔 살아 있는 결제(앞으로 올 예약 포함)를 통째로 받아
+  //   코드에서 걸렀다. 예약이 쌓일수록 이 화면 조회 하나가 사이트 전체의 결제를 훑는다.
+  //   묻힌 자원은 «별칭»으로 거른다(PostgREST 문서: 별칭이 있으면 별칭 이름을 쓴다). `!inner`라 여기서 걸린 행은 아예 안 온다.
+  const { data: kept, error: keptError } = await c.from("payments")
     .select("order_id,balance_amount,booking:space_bookings!inner(status,use_date)")
-    .eq("payout_status", "NONE").in("status", ["DONE", "PARTIAL_CANCELED"]).gt("balance_amount", 0);
+    .eq("payout_status", "NONE").in("status", ["DONE", "PARTIAL_CANCELED"]).gt("balance_amount", 0)
+    .eq("booking.status", "cancelled").lt("booking.use_date", today);
+  if (keptError) console.error(`[spaces] sweep ③ failed: ${keptError.message}`);
   for (const r of kept ?? []) {
+    // ⚠️거르기는 DB가 한다. 이 줄은 «조회가 조용히 달라졌을 때»를 위한 울타리다 — 지급은 되돌리기 어렵다.
     const b = (r as Row).booking as Row | undefined;
     if (!b || s(b.status) !== "cancelled" || s(b.use_date) >= today) continue;
     await rentSync(s((r as Row).order_id), { payoutStatus: "WAITING" });
