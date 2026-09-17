@@ -11,12 +11,16 @@ export function PhotoSlider({
   photos,
   sources,
   rounded = "rounded-lg",
+  altPrefix = "브랜드 사진",
 }: {
   photos: string[];
   /** 사진 주소 → 출처 글자. 소개서 전체가 표 하나를 공유하므로 **슬라이더마다 그대로 넘기면 된다.**
    *  대부분의 사진엔 출처가 없다 — 있는 장에서만 캡션이 뜬다(대표 확정 08-20). */
   sources?: Record<string, string>;
   rounded?: string;
+  /** 대체 글자 앞말 — 화면 낭독기가 「브랜드 사진 1」처럼 읽는다. 하루 가게 공간 상세는 「공간 사진」을 넘긴다(09-18 밤 QA SC-24).
+   *  기본값은 소개서·콜라보 카드가 쓰던 말 그대로. */
+  altPrefix?: string;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const [idx, setIdx] = useState(0);
@@ -124,7 +128,7 @@ export function PhotoSlider({
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={src}
-                alt={`브랜드 사진 ${i + 1}`}
+                alt={`${altPrefix} ${i + 1}`}
                 draggable={false}
                 className="absolute inset-0 h-full w-full object-cover"
               />
