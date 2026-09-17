@@ -105,12 +105,14 @@ export default async function RentPage({
       <header className="flex flex-col gap-6">
         <div className="max-w-[680px]">
           <h1 className="text-[28px] font-bold leading-[1.25] tracking-[-0.02em] break-keep text-ink">
-            안 쓰는 날, 하루만 빌려보세요
+            {/* ✅09-18 대표 확정 — 「하루만」이 시간 단위 대여와 어긋나서 바꿨다(09-16 결정). */}
+            사장님이 쉬는 날, 그 가게를 빌려보세요
           </h1>
           <p className="mt-3 text-[17px] leading-relaxed break-keep text-mute">
             {/* 🔁09-17 QA — 「대여해 보실 수 있어요」는 안내문 어미였고 제목과 말이 겹쳤다.
                 두 번째 문장이 이 서비스만 가진 것(커피챗)을 말한다. */}
-            사장님이 쉬는 날, 그 가게를 그대로 써 보세요. 커피챗으로 운영 이야기도 들을 수 있어요.
+            {/* 제목이 「사장님이 쉬는 날」을 가져가서, 여기선 같은 말을 되풀이하지 않고 «시간 단위»를 말한다. */}
+            필요한 시간만큼 그대로 써 보세요. 커피챗으로 운영 이야기도 들을 수 있어요.
           </p>
         </div>
       </header>

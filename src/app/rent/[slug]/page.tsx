@@ -49,6 +49,27 @@ export async function generateMetadata({
   };
 }
 
+/** 💸값 한 줄 — 굵은 시간당 값 + 「최소 N시간」·「최대 N명」 태그. 폰 헤더와 데스크톱 요약 카드가 같은 얼굴이다(09-18 대표).
+ *  태그는 읽고 지나가는 것이라 설비 칩(`Chip`)보다 한 단 작은 회색 pill로 둔다. 값 옆에 같은 크기 칩이 서면 값이 묻힌다. */
+function PriceLine({ priceHour, minHours, capacity }: { priceHour: number; minHours: number; capacity?: number }) {
+  const tags = [`최소 ${minHours}시간`, capacity ? `최대 ${capacity}명` : ""].filter(Boolean);
+  return (
+    <div className="flex flex-wrap items-center gap-x-2 gap-y-2">
+      <p className="text-ink">
+        <span className="text-[24px] font-bold leading-none tracking-tight tabular-nums">{won(priceHour)}</span>
+        <span className="ml-1 text-[15px] text-mute">/ 시간</span>
+      </p>
+      <span className="flex gap-1.5">
+        {tags.map((t) => (
+          <span key={t} className="rounded-pill bg-surface-soft px-2.5 py-1 text-[13px] leading-none text-body">
+            {t}
+          </span>
+        ))}
+      </span>
+    </div>
+  );
+}
+
 /** 소개서 본문 섹션과 같은 얼굴 — 상단 구분선 + 21px 제목 + 내용. */
 function Section({ title, id, children }: { title: string; id?: string; children: React.ReactNode }) {
   return (
@@ -140,10 +161,12 @@ export default async function SpaceDetailPage({
             {sp.tagline && (
               <p className="mt-3 text-[17px] leading-relaxed break-keep text-body">{sp.tagline}</p>
             )}
-            {/* 🔁09-14 금액 줄은 아래 「비용」 절로 내렸다(대표). 메타 한 줄의 시간당 값만 남긴다. */}
-            <p className="mt-2 text-[15px] text-mute lg:hidden">
-              {[sp.capacity ? `최대 ${sp.capacity}명` : "", `시간당 ${won(sp.priceHour)}`].filter(Boolean).join(" · ")}
-            </p>
+            {/* 💸09-18 대표 — *「금액은 이쁘게 넣어볼 수 있으면 넣는 방향으로」*. 09-14엔 금액 줄을 「비용」 절로 내렸는데,
+                그땐 흐린 메타 줄 끝의 글자였다. 이제 제목 아래 굵은 값 + 최소 시간·인원 태그로 세운다(아워플레이스 상세).
+                lg에선 오른쪽 요약 카드가 같은 줄을 들어서 여기선 숨긴다. 세부(커피챗 값 등)는 아래 「비용」 절이 맡는다. */}
+            <div className="mt-4 lg:hidden">
+              <PriceLine priceHour={sp.priceHour} minHours={sp.minHours} capacity={sp.capacity} />
+            </div>
             {/* 칩 줄 — 쓰임새 하나 + 설비 몇 개, 전부 같은 pill. 설비 전체는 아래 섹션에서 본다. */}
             <div className="mt-4 flex flex-wrap gap-2">
               <Chip>{scopeLabel(sp.scope)}</Chip>
@@ -429,13 +452,7 @@ export default async function SpaceDetailPage({
         <aside className="hidden lg:sticky lg:top-24 lg:block">
           {/* 메타 줄·소개서 줄은 lg에서 위 헤더에서 숨기고 여기로 모인다. 같은 값이 한 화면에 두 번 서지 않게. */}
           <div className="rounded-lg border border-hairline bg-surface p-6 shadow-e1">
-            <p className="text-ink">
-              <span className="text-[24px] font-bold tracking-tight">{won(sp.priceHour)}</span>
-              <span className="ml-1 text-[15px] text-mute">/ 시간</span>
-            </p>
-            <p className="mt-1 text-[15px] text-mute">
-              {[`최소 ${sp.minHours}시간부터`, sp.capacity ? `최대 ${sp.capacity}명` : ""].filter(Boolean).join(" · ")}
-            </p>
+            <PriceLine priceHour={sp.priceHour} minHours={sp.minHours} capacity={sp.capacity} />
             <InfoList className="mt-5 border-t border-hairline pt-5">
               <InfoRow
                 label="가까운 날"
