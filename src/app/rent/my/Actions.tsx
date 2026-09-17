@@ -132,7 +132,9 @@ function cancelReason(q: { refund: number; rate: number; daysBefore: number; gra
       ? "결제하고 한 시간이 안 지나서 전액 돌아와요."
       : `이용일까지 ${q.daysBefore}일 남아 전액 돌아와요.`;
   }
-  return `이용일이 ${q.daysBefore}일 남았을 때라 ${Math.round(q.rate * 100)}%만 돌아가요.`;
+  // ✍️09-18 밤 QA(G-26) — 바로 위 두 줄은 「돌아와요」(손님에게 오는 돈)인데 이 줄만 「돌아가요」였다.
+  //   셋은 같은 팝업의 갈래라 한 번에 하나만 뜨지만, 방향을 가리키는 말이 갈리면 누구 쪽으로 가는 돈인지가 흐려진다.
+  return `이용일이 ${q.daysBefore}일 남았을 때라 ${Math.round(q.rate * 100)}%만 돌아와요.`;
 }
 
 export function GuestCancel({ bookingId }: { bookingId: number }) {
