@@ -12,7 +12,7 @@ import {
   setBookingStatus, listSpacesByOwner, listSpacesByIds, payout, FEE_RATE,
   createPayment, getPaymentByOrderId, rentSync,
   type SpaceSaveInput,
-  listLiveBookings, setSpaceStatus, approveSpace, SLUG_TAKEN,
+  listLiveBookings, setSpaceStatus, approveSpace, markReminded, SLUG_TAKEN,
 } from "./spaces";
 // 🧾🏪09-18 사업자 확인 · 네이버 상호 매칭(대표 09-17). 규칙은 순수 함수(`bizcheck`·`place-match`), 바깥 호출은 서버 전용 파일에.
 import {
@@ -867,6 +867,10 @@ export async function confirmBookingAction(
 
   // 🔻09-16 `setOpenDate` 삭제 — 하루를 통째로 파는 모델이 아니다. 시간대가 겹치는지는
   //   DB의 배제 제약(`no_time_overlap`)이 판정하고, 호스트가 연 시간대는 그대로 둔다.
+  // ⏰09-18 밤 QA(SC-09) — 이용일이 «내일 이하»면 리마인드를 안 보낸다(대표 판단 추천안 「늦게 결제한 예약엔 안 보냄」).
+  //   방금 나간 결제 완료 메일에 날짜·시간·주소·연락처가 다 들어 있다. 보냄 표시를 그 자리에서 찍어 둔다.
+  if (kstDaysUntil(paid.useDate) <= 1) await markReminded(paid.id);
+
   revalidatePath("/rent");
   revalidatePath("/rent/my");
   await notifyLater(async () => {
