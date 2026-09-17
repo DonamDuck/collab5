@@ -245,17 +245,21 @@ export function ListRow({
   status,
   children,
   card = false,
+  id,
 }: {
   head: ReactNode;
   status: ReactNode;
   children?: ReactNode;
+  /** 🔗줄을 주소로 가리킬 이름(09-18 밤 QA H-08). 화면 위 결과 줄이 `#booking-12`로 이 줄까지 데려온다.
+   *  `scroll-mt`는 헤더(3.5rem)와 고정 탭이 덮는 만큼을 미리 비켜 둔 값이다. */
+  id?: string;
   /** 🗂09-18 대표 코멘트(/rent/requests) — 「각각의 예약이 분리돼 보이게. 라인 하나로만 나뉘어 아쉬워」.
    *  예약 한 건이 연락·주소·버튼까지 품어 길어지면 선 하나로는 어디서 다음 예약이 시작하는지 안 보인다. 그때 카드로 세운다. */
   card?: boolean;
 }) {
   if (card) {
     return (
-      <li className="mb-3 rounded-xl border border-hairline bg-surface p-4 last:mb-0 sm:p-5">
+      <li id={id} className="mb-3 scroll-mt-32 rounded-xl border border-hairline bg-surface p-4 last:mb-0 sm:p-5">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0 flex-1">{head}</div>
           {status}
@@ -265,7 +269,7 @@ export function ListRow({
     );
   }
   return (
-    <li className="border-t border-hairline py-5 last:border-b">
+    <li id={id} className="scroll-mt-32 border-t border-hairline py-5 last:border-b">
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0 flex-1">{head}</div>
         {status}

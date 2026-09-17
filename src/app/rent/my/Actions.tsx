@@ -281,13 +281,16 @@ export function RefundRequest({ bookingId }: { bookingId: number }) {
   const [pending, start] = useTransition();
   const [open, setOpen] = useState(false);
   const [note, setNote] = useState("");
-  const [msg, setMsg] = useState("");
+  // 🎨09-18 밤 QA(H-26) — 성공도 실패도 같은 회색 한 줄이었다. 「신청했어요」와 「이미 신청이 들어가 있어요」가
+  //   같은 얼굴로 서면 사장님은 둘을 구별할 수 없고, 실패한 줄 모른 채 전화를 기다린다.
+  //   ⭐다른 버튼들(`PublishButton`·`PauseToggle`)은 이미 성패를 색으로 가른다. 같은 결로 맞춘다.
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
   const run = () =>
     start(async () => {
       setOpen(false);
       const r = await requestRefundAction(bookingId, note);
-      setMsg(r.message);
+      setMsg({ ok: r.ok, text: r.message });
       if (r.ok) router.refresh();
     });
 
@@ -301,7 +304,11 @@ export function RefundRequest({ bookingId }: { bookingId: number }) {
       >
         관리자에게 환불 신청하기
       </button>
-      {msg && <p className="text-[15px] leading-relaxed break-keep text-mute">{msg}</p>}
+      {msg && (
+        <p role="status" className={`text-[15px] leading-relaxed break-keep ${msg.ok ? "text-mute" : "text-danger"}`}>
+          {msg.text}
+        </p>
+      )}
       <ConfirmDialog
         open={open}
         title="관리자에게 환불을 신청할까요"

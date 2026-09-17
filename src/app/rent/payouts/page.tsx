@@ -227,7 +227,7 @@ function SellerBlock({ group, spaces }: { group: SellerGroup; spaces: Map<number
     <div>
       <div className="flex items-baseline justify-between gap-3 border-b border-hairline pb-3">
         <div className="min-w-0">
-          <p className="truncate text-[17px] font-medium text-ink">{p?.brandName?.trim() || "이름을 안 적으셨어요"}</p>
+          <p className="truncate text-[17px] font-medium text-ink">{p?.brandName?.trim() || "이름을 안 남기셨어요"}</p>
           <p className="mt-0.5 text-[15px] break-all text-mute">{contact || "연락처가 없어요"}</p>
           <p className="mt-0.5 text-[15px] break-all text-mute">
             {group.account ? (

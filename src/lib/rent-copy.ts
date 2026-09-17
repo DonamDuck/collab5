@@ -32,7 +32,8 @@ export function accessMeetLine(how: AccessHow): string {
  *  ⚠️둘 다 없을 수 있다. 그때 빈 칸을 내보내면 손님이 「우리가 빠뜨렸다」고 읽으니 문장으로 말한다. */
 export function hostContactLine(shopPhone: string, personalPhone?: string, email?: string): string {
   const parts = [shopPhone?.trim(), personalPhone?.trim(), email?.trim()].filter(Boolean);
-  return parts.length > 0 ? Array.from(new Set(parts)).join(" · ") : "연락처를 안 적으셨어요";
+  // ✍️09-18 밤 QA(H-30) — 화면 세 곳이 「안 적으셨어요」와 「안 남기셨어요」를 섞어 썼다. 「남기다」 쪽으로 모았다.
+  return parts.length > 0 ? Array.from(new Set(parts)).join(" · ") : "연락처를 안 남기셨어요";
 }
 
 /** ☎️전화 링크의 `tel:` 값 — **적힌 글에서 첫 번째 번호만 뽑는다**(09-18 밤 QA G-19).
@@ -107,14 +108,13 @@ export const CONTACT_RULE_HOST =
 /** 📨같은 약속을 «수락이 막 끝난» 손님 메일에서 말하는 모양(09-18 메일 전수).
  *  확정 메일에 「사장님이 예약을 확정하면」을 그대로 두면 이미 끝난 일을 조건으로 말하게 된다.
  *  「오늘부터」인 이유: 이 메일은 수락 버튼을 누른 그 요청 안에서 나간다(`decideBookingAction`). 약관 문구는 「수락한 날부터 2일 안에」. */
-/** 📱같은 약속을 «이미 확정된» 예약 화면에서 나중에 다시 읽을 때(09-18 밤 QA G-25).
- *  🩸완료 화면은 결제 완료(`paid`)에만 안내 절을 그려서, 확정된 예약을 다시 열면 연락 기한도 커피챗 조율도 사라졌다.
- *  「오늘부터」를 쓸 수 없는 이유 — 그 메일은 수락하는 그 순간 나가지만 이 화면은 며칠 뒤에도 열린다. */
-export const CONTACT_RULE_GUEST_DONE =
-  "사장님이 수락하신 날부터 2일 안에 문자나 전화로 공간 안내를 드려요. 이용일이 그보다 가까우면 그 전에 연락드려요.";
-
 export const CONTACT_RULE_GUEST_CONFIRMED =
   "사장님이 오늘부터 2일 안에 문자나 전화로 공간 안내를 드려요. 이용일이 그보다 가까우면 그 전에 연락드려요.";
+/** 📱같은 약속을 «이미 확정된» 예약을 나중에 다시 열어 볼 때(09-18 밤 QA G-25).
+ *  🩸완료 화면이 결제 완료(`paid`)에만 안내 절을 그려서, 확정된 예약을 다시 열면 연락 기한도 커피챗 조율도 사라졌다.
+ *  ⚠️여기에 「오늘부터」를 쓸 수 없다 — 위 메일은 수락하는 그 순간 나가지만 이 화면은 며칠 뒤에도 열린다. */
+export const CONTACT_RULE_GUEST_DONE =
+  "사장님이 수락하신 날부터 2일 안에 문자나 전화로 공간 안내를 드려요. 이용일이 그보다 가까우면 그 전에 연락드려요.";
 
 /** 💳환불이 «언제» 들어오는지 — 완료 화면과 메일 네 통이 이 한 줄만 쓴다.
  *  🩸09-18 메일 전수 — 화면·메일은 「3~5일 안에 돌아가요」라고 약속했는데 손님 약관 제10조는

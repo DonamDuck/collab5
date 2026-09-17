@@ -93,13 +93,19 @@ export default async function MyRentPage({
   const { saved, did, b: didBooking, tab: tabParam, g: guestView } = await searchParams;
   const uid = await getSessionUserId();
   if (!uid) {
+    // 🔗09-18 밤 QA(H-07) — 사장님 메일의 「요청 보기」를 로그아웃 상태로 누르면 복귀 주소에 `?tab=host`가 빠져서
+    //   로그인 뒤 «빌린 공간» 칸이 열렸다. 요청을 보러 온 사장님이 남의 칸에 떨어진다.
+    //   ⭐복귀 주소는 «지금 열려던 주소»여야 한다. 아는 값만 실어 보낸다(주소를 그대로 이어 붙이지 않는다).
+    const backTab = tabParam === "host" ? "host" : tabParam === "guest" ? "guest" : "";
+    const backG = ["upcoming", "past", "cancel"].includes(guestView ?? "") ? guestView : "";
+    const back = backTab ? `/rent/my?tab=${backTab}${backTab === "guest" && backG ? `&g=${backG}` : ""}` : "/rent/my";
     return (
       <main className="mx-auto w-full max-w-[560px] px-4 py-14 sm:px-6">
         <h1 className="text-[28px] font-bold leading-[1.25] tracking-[-0.02em] text-ink">내 하루 가게</h1>
         <p className="mt-3 text-[17px] leading-relaxed break-keep text-mute">
           올리신 공간과 주고받은 신청을 보시려면 로그인해 주세요.
         </p>
-        <Link href={`/login?redirect=${encodeURIComponent("/rent/my")}`} className={`${primaryBtnCls} mt-8 h-[48px]`}>
+        <Link href={`/login?redirect=${encodeURIComponent(back)}`} className={`${primaryBtnCls} mt-8 h-[48px]`}>
           로그인
         </Link>
       </main>
@@ -171,6 +177,21 @@ export default async function MyRentPage({
 
   // 🗂세 무리 — 정렬(`hostOrder`)·카드 색(`tone`)과 같은 판정 한 벌(`lib/rent-groups`). `/my`의 숫자 세 칸도 이걸 센다.
   const { toAnswer, upcoming, past } = groupHostBookings(hostBookings);
+
+  // 💬09-18 밤 QA(H-08) — 수락·거절한 뒤의 결과 한 줄이 **그 카드 안**에 떴다. 답한 카드는 목록 아래쪽이라
+  //   1440에서 1,832px, 지난 요청 안이면 2,824px 자리였다. 누른 사람은 화면 맨 위에 있는데 결과는 화면 밖이다.
+  //   ⭐결과는 «누른 자리»가 아니라 «보고 있는 자리»에 떠야 한다. 탭 바로 아래에 두고, 그 카드로 가는 길을 같이 준다.
+  //   ⚠️거절의 환불 성패는 여전히 «상태»로 읽는다(버튼이 돌려준 값이 아니라). 거절 직후 `refunded`면 환불까지 끝난 것이다.
+  const didTarget = didId ? hostBookings.find((x) => x.id === didId) : undefined;
+  const didLine = !didTarget
+    ? ""
+    : did === "accept" && isRevealed(didTarget)
+      ? "수락했어요. 그 요청 카드에서 손님 연락처를 보실 수 있어요."
+      : did === "reject" && didTarget.status === "refunded"
+        ? "거절했어요. 손님께 전액 돌려드렸어요."
+        : did === "reject" && didTarget.status === "rejected"
+          ? "거절했어요. 환불이 늦어지고 있어 저희가 확인하고 있어요."
+          : "";
   const openSpaces = mySpaces.filter((sp) => sp.status === "open").length;
 
   // 🃏09-18 대표 코멘트 #63 — 「여기 영역도 UI 조정이 필요한데 지금 그냥 텍스트 나열처럼만 보인다」.
@@ -195,30 +216,21 @@ export default async function MyRentPage({
       const brandName = b.guestBrandSlug ? guestBrands.get(b.guestBrandSlug) : undefined;
       const refundAskable = b.status === "confirmed" || (b.status === "paid" && bookingStarted(b));
       const needAccount = !payoutAccount && (b.status === "confirmed" || b.status === "done");
-      // 💬방금 누른 수락·거절의 결과 한 줄(`HostDecide`가 `?did=&b=`로 실어 온다). 거절은 환불 성패를 상태로 읽는다.
-      const didLine =
-        didId === b.id
-          ? did === "accept" && open
-            ? "수락했어요. 아래에서 손님 연락처를 보실 수 있어요."
-            : did === "reject" && b.status === "refunded"
-              ? "거절했어요. 손님께 전액 돌려드렸어요."
-              : did === "reject" && b.status === "rejected"
-                ? "거절했어요. 환불이 늦어지고 있어 저희가 확인하고 있어요."
-                : ""
-          : "";
       // 👤카드 몸의 손님 한 줄 토막들. 연락처 판을 안 그리는 카드(수락 전·가려진 뒤)에만 쓴다.
       const guestBits: ReactNode[] = [];
-      if (!open && brief) {
+      if (!open) {
         // 👤수락 전 손님 정보 — 이름과 전화번호가 있는지만(09-17 QA). 번호 «값»은 수락 뒤 연락처 블록이 연다.
         //   🪪09-18 대표 — 이름은 신청 때 받은 성함(실명)이 먼저다. 옛 예약은 성함이 비어 있어 프로필 브랜드명으로 물러선다.
+        //   🩸09-18 밤 QA(H-29) — 이 줄을 «프로필을 읽어 둔 카드»(답할 요청)에만 그려서, 취소·거절된 요청 카드엔
+        //     손님 이름이 통째로 없었다. 한 목록 안에서 이름이 보이다 말다 한다. 예약 행에 적힌 성함은 늘 있으니 그걸 먼저 쓴다.
         guestBits.push(
           <>
-            손님 <span className="font-medium text-body">{b.guestName?.trim() || brief.name || "이름을 안 적으셨어요"}</span>
+            손님 <span className="font-medium text-body">{b.guestName?.trim() || brief?.name || "이름을 안 남기셨어요"}</span>
           </>,
         );
         // 📞「번호를 남기셨나」는 답해야 할 때만 뜻이 있다. 취소·환불 카드에 「이메일로 연락하셔야 해요」가 붙으면 할 일로 읽힌다.
         if (answerable) {
-          guestBits.push(brief.hasPhone || b.guestPhone ? "전화번호를 남기셨어요" : "전화번호가 없어 이메일로 연락하셔야 해요");
+          guestBits.push(brief?.hasPhone || b.guestPhone ? "전화번호를 남기셨어요" : "전화번호가 없어 이메일로 연락하셔야 해요");
         }
       }
       if (open && masked) {
@@ -243,6 +255,8 @@ export default async function MyRentPage({
         <Row
           card
           key={b.id}
+          // 🔗09-18 밤 QA(H-08) — 탭 아래 결과 줄이 이 카드로 데려온다. `scroll-mt`는 헤더와 고정 탭 높이.
+          id={`booking-${b.id}`}
           status={null}
           head={
             <RequestHead
@@ -254,12 +268,6 @@ export default async function MyRentPage({
             />
           }
         >
-          {didLine && (
-            <p role="status" className="mt-4 text-[15px] leading-relaxed break-keep text-mint-on">
-              {didLine}
-            </p>
-          )}
-
           {/* ⭐신청자가 쓴 「그날 무엇을」 — 사장님이 수락을 정하는 근거. 답할 카드는 세 줄, 나머지는 두 줄에서 자르고 「더 보기」. */}
           {b.plan && <PlanQuote text={b.plan} lines={tone === "answer" ? 3 : 2} quiet={tone === "past"} />}
 
@@ -393,13 +401,26 @@ export default async function MyRentPage({
 
       {tab === "host" && (
         <>
+      {didLine && (
+        <p
+          role="status"
+          className="mt-4 flex flex-wrap items-baseline gap-x-2 rounded-lg bg-surface-soft px-4 py-3 text-[15px] leading-relaxed break-keep text-mint-on"
+        >
+          <span className="min-w-0">{didLine}</span>
+          <a href={`#booking-${didId}`} className="shrink-0 text-body underline underline-offset-2">
+            그 요청 보기
+          </a>
+        </p>
+      )}
       {/* 📊09-17 디자인팀 — 숫자 세 칸. 절까지 내려가기 전에 «오늘 할 일이 있나»를 첫 화면에서 답한다(원티드·리멤버 대시보드).
           칸을 누르면 그 무리로 내려간다. 새 요청이 있을 때만 그 숫자에 레몬 글자색을 준다 — 기다리는 것의 색(`BookingBadge`)과 같다. */}
       {(mySpaces.length > 0 || hostBookings.length > 0) && (
         <nav aria-label="요약" className="mt-8 grid grid-cols-3 gap-2 sm:gap-3">
           {[
+            // 🔗09-18 밤 QA(H-19) — 「다가오는 예약」을 눌러도 `#requests`(절 머리)로 가서 **새 요청 무리**가 열렸다.
+            //   숫자를 누른 사람은 그 숫자가 센 무리를 보러 가는 것이다. 무리마다 이름을 달아 그리로 보낸다.
             { href: "#requests", n: toAnswer.length, label: "새 요청", hot: toAnswer.length > 0 },
-            { href: "#requests", n: upcoming.length, label: "다가오는 예약", hot: false },
+            { href: "#upcoming", n: upcoming.length, label: "다가오는 예약", hot: false },
             { href: "#spaces", n: openSpaces, label: "공개 중인 공간", hot: false },
           ].map((t) => (
             <a
@@ -423,7 +444,8 @@ export default async function MyRentPage({
           안 보여서, 새 요청 아래 취소 줄이 같은 얼굴로 이어졌다. 지난 요청은 접어 둔다. */}
       {/* 공간이 하나도 없는 분에겐 이 절을 안 그린다. 받을 수 없는 요청의 빈 상태가 「새로 올리기」보다 먼저 서게 된다. */}
       {(mySpaces.length > 0 || hostBookings.length > 0) && (
-      <section id="requests" className="mt-10 scroll-mt-20">
+      // 📐09-18 밤 QA(H-19) — 고정 탭이 3.5rem 헤더 아래에 또 붙어 있어서, 숫자 칸을 누르면 절 제목이 그 밑에 깔렸다.
+      <section id="requests" className="mt-10 scroll-mt-32">
         <h2 className={h2Cls}>들어온 요청</h2>
         {hostBookings.length === 0 ? (
           <p className={emptyCls}>아직 들어온 요청이 없어요.</p>
@@ -437,7 +459,9 @@ export default async function MyRentPage({
             )}
             {upcoming.length > 0 && (
               <>
-                <h3 className={h3Cls}>다가오는 예약 · {upcoming.length}</h3>
+                <h3 id="upcoming" className={`${h3Cls} scroll-mt-32`}>
+                  다가오는 예약 · {upcoming.length}
+                </h3>
                 <ul className="mt-3">{upcoming.map(hostRow)}</ul>
               </>
             )}
@@ -446,7 +470,8 @@ export default async function MyRentPage({
               //   방금 거절한 줄(`?did=reject`)이 여기 있으면 펼친 채로 연다 — 결과 한 줄을 봐야 한다.
               <details className="group mt-8" open={past.some((b) => b.id === didId)}>
                 <summary className="flex cursor-pointer list-none items-center gap-1.5 py-[12px] text-[15px] font-medium text-mute [&::-webkit-details-marker]:hidden">
-                  지난 요청 · {past.length}
+                  {/* ✍️09-18 밤 QA(H-30) — 「지난」이라기엔 이용일이 안 지난 취소·환불 건이 여기 섞인다. 끝난 요청으로. */}
+                  끝난 요청 · {past.length}
                   <svg aria-hidden="true" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="size-[16px] transition-transform group-open:rotate-180">
                     <path d="m5 7.5 5 5 5-5" />
                   </svg>
@@ -460,7 +485,7 @@ export default async function MyRentPage({
       )}
 
       {/* ── ② 내가 올린 공간 ── */}
-      <section id="spaces" className="mt-12 scroll-mt-20">
+      <section id="spaces" className="mt-12 scroll-mt-32">
         {/* 🔁09-18 대표 코멘트 — 제목 옆 글자 링크 「새로 올리기」 대신, 목록 아래 「+ 공간 올리기」 버튼. */}
         <h2 className={h2Cls}>내가 올린 공간</h2>
         {mySpaces.length === 0 ? (
@@ -482,13 +507,26 @@ export default async function MyRentPage({
                     {/* 🩸09-16까지 이 줄이 옛 칸(`priceDay`·`openDates`)을 읽고 있었다. 시간 단위로 바뀐 뒤
                         저장한 공간은 그 칸이 비어서 **「0원 · 비는 날 0일」**로 보였다. 자기 공간을 보는
                         화면에서 값이 0원이면 사장님은 안 올라간 줄 안다. */}
-                    <p className="mt-1 text-[15px] text-mute">
-                      {/* 🛍09-18 시간당 값 하나 → 켠 상품마다 이름과 값. */}
-                      {sp.area || "동네 미정"} ·{" "}
-                      {sellableProducts(sp).map((p) => `${PRODUCT_LABEL[p]} ${won(productPrice(sp, p))}`).join(" · ") ||
-                        `시간당 ${won(sp.priceHour)}`}{" "}
-                      · 열어 둔 날{" "}
-                      {new Set(sp.openSlots.map((sl) => sl.date)).size}일
+                    {/* 📐09-18 밤 QA(H-23) — 375에서 「대관 / 만」·「30,000 / 원」처럼 낱말과 금액이 가운데서 꺾였고,
+                        상품 값에 «시간당»이라는 말이 없어 하루 값으로 읽혔다(손님 화면엔 「/ 시간」이 붙어 있다).
+                        ⭐토막마다 줄바꿈을 막고 값 뒤에 단위를 붙인다. 줄은 토막 사이 `·`에서만 바뀐다.
+                        ✍️그리고 「동네 미정」을 뺐다 — 사장님이 안 적은 게 아니라 옛 공간이라 비어 있는 칸이고,
+                          모르는 값은 말하지 않는 편이 낫다(업종 라벨이 같은 이유로 09-17에 빈 값을 안 그린다). */}
+                    <p className="mt-1 text-[15px] leading-relaxed break-keep text-mute">
+                      {[
+                        sp.area,
+                        sellableProducts(sp)
+                          .map((p) => `${PRODUCT_LABEL[p]} 시간당 ${won(productPrice(sp, p))}`)
+                          .join(" · ") || `시간당 ${won(sp.priceHour)}`,
+                        `열어 둔 날 ${new Set(sp.openSlots.map((sl) => sl.date)).size}일`,
+                      ]
+                        .filter(Boolean)
+                        .map((t, i) => (
+                          <span key={t}>
+                            {i > 0 && " · "}
+                            <span className="whitespace-nowrap">{t}</span>
+                          </span>
+                        ))}
                       {/* 🔁09-17 — `openSlots`는 매주 규칙을 펼친 12주치까지 센다. 규칙이 있으면 요일을 짧게 붙인다(월요일부터). */}
                       {sp.repeatWeekly.length > 0 &&
                         ` · 매주 ${[...sp.repeatWeekly].sort((a, b) => ((a.dow + 6) % 7) - ((b.dow + 6) % 7)).map((r) => "일월화수목금토"[r.dow]).join("·")} 계속 열림`}
@@ -517,8 +555,11 @@ export default async function MyRentPage({
                     </Link>
                   </p>
                 )}
-                {/* 대표에게만 보이는 손잡이. 남의 등록을 세상에 내보내는 판정이라 화면에도 문을 둔다. */}
-                {admin && sp.status === "pending" && <PublishButton slug={sp.slug} />}
+                {/* 대표에게만 보이는 손잡이. 남의 등록을 세상에 내보내는 판정이라 화면에도 문을 둔다.
+                    🧾09-18 밤 QA(H-32) — 국세청 기록과 다른 공간에도 [공개하기]가 떴다. 서버(`publishSpaceAction`)는
+                    막으니 새는 건 없지만, 누르면 거절 한 줄이 돌아올 뿐인 버튼이라 «되는 일»처럼 보였다.
+                    바로 위 줄이 이미 「고치러 가기」로 할 일을 말한다. */}
+                {admin && sp.status === "pending" && sp.bizCheckStatus !== "mismatch" && <PublishButton slug={sp.slug} />}
                 {/* ⏸잠시 쉬기 / 다시 열기(09-17). 검토 대기·작성 중엔 안 뜬다 — 서버도 open↔paused만 받는다. */}
                 {(sp.status === "open" || sp.status === "paused") && (
                   <PauseToggle slug={sp.slug} paused={sp.status === "paused"} />
@@ -534,7 +575,7 @@ export default async function MyRentPage({
 
       {/* ── ①' 정산 받을 계좌 (09-17) ── 공간을 올린 분에게만. 🔗메일·확정 줄이 `#payout-account`로 곧장 내려온다. */}
       {mySpaces.length > 0 && (
-        <section id="payout-account" className="mt-12 scroll-mt-20">
+        <section id="payout-account" className="mt-12 scroll-mt-32">
           <h2 className={h2Cls}>정산 받을 계좌</h2>
           <PayoutAccount initial={payoutAccount} />
         </section>
