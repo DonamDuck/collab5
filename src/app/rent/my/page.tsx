@@ -80,9 +80,9 @@ const SAVED_LINE: Record<string, string> = {
 export default async function MyRentPage({
   searchParams,
 }: {
-  searchParams: Promise<{ saved?: string; did?: string; b?: string; tab?: string }>;
+  searchParams: Promise<{ saved?: string; did?: string; b?: string; tab?: string; g?: string }>;
 }) {
-  const { saved, did, b: didBooking, tab: tabParam } = await searchParams;
+  const { saved, did, b: didBooking, tab: tabParam, g: guestView } = await searchParams;
   const uid = await getSessionUserId();
   if (!uid) {
     return (
@@ -519,11 +519,63 @@ export default async function MyRentPage({
               </Link>
             </p>
           ) : (
-            <ul className="mt-5">
-              {guestBookings.map((v) => (
-                <GuestBookingRow key={v.booking.id} view={v} />
-              ))}
-            </ul>
+            <>
+              {/* 🏷09-18 대표 코멘트 — 「여기 미니탭이 있어야 할 것 같아. 예약 완료, 예약 취소, 지난 예약 정도」.
+                  나누는 기준:
+                    · 예약 완료 = 결제 완료·확정이고 이용이 안 끝남 + 결제 전인데 날짜가 안 지난 신청(이어서 결제할 수 있다)
+                    · 지난 예약 = 다녀옴, 또는 결제 완료·확정인데 이용이 끝남
+                    · 취소·환불 = 손님 취소·사장님 거절·환불, 그리고 결제 안 한 채 끝난 신청(만료·날짜 지난 결제 전)
+                  칩은 주소(`?g=`)로 나눠 새로고침해도 같은 칸이다. 기본은 «예약 완료». */}
+              {(() => {
+                const upcomingG = guestBookings.filter(({ booking: x }) =>
+                  ((x.status === "paid" || x.status === "confirmed") && !bookingFinished(x)) ||
+                  (x.status === "pending" && !bookingStarted(x)),
+                );
+                const pastG = guestBookings.filter(({ booking: x }) =>
+                  x.status === "done" || ((x.status === "paid" || x.status === "confirmed") && bookingFinished(x)),
+                );
+                const cancelG = guestBookings.filter((v) => !upcomingG.includes(v) && !pastG.includes(v));
+                const views = [
+                  { key: "upcoming", label: "예약 완료", list: upcomingG, empty: "다가오는 예약이 없어요." },
+                  { key: "past", label: "지난 예약", list: pastG, empty: "다녀온 예약이 아직 없어요." },
+                  { key: "cancel", label: "취소·환불", list: cancelG, empty: "취소하거나 돌려받은 예약이 없어요." },
+                ] as const;
+                const cur = views.find((x) => x.key === guestView) ?? views[0];
+                return (
+                  <>
+                    <div className="mt-4 flex flex-wrap gap-2" role="tablist" aria-label="빌린 공간 나누기">
+                      {views.map((x) => {
+                        const on = x.key === cur.key;
+                        return (
+                          <Link
+                            key={x.key}
+                            href={`/rent/my?tab=guest&g=${x.key}`}
+                            scroll={false}
+                            role="tab"
+                            aria-selected={on}
+                            className={`inline-flex h-[36px] items-center gap-1 rounded-pill px-4 text-[14px] font-medium transition-colors ${
+                              on ? "bg-ink text-surface" : "bg-surface-soft text-body hover:bg-surface-faint"
+                            }`}
+                          >
+                            {x.label}
+                            <span className={`tabular-nums ${on ? "text-surface/70" : "text-faint"}`}>{x.list.length}</span>
+                          </Link>
+                        );
+                      })}
+                    </div>
+                    {cur.list.length === 0 ? (
+                      <p className="mt-5 text-[15px] leading-relaxed break-keep text-mute">{cur.empty}</p>
+                    ) : (
+                      <ul className="mt-4">
+                        {cur.list.map((v) => (
+                          <GuestBookingRow key={v.booking.id} view={v} />
+                        ))}
+                      </ul>
+                    )}
+                  </>
+                );
+              })()}
+            </>
           )}
         </section>
       )}

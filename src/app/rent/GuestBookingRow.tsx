@@ -16,7 +16,7 @@ import type { Space, SpaceBooking } from "@/lib/types";
 import { bookingFinished, bookingStarted, dateLabel, rangeLabel } from "@/lib/rent-time";
 import { BOOKING_HEADLINE, PRODUCT_LABEL } from "@/lib/rent-copy";
 import { GuestCancel } from "./my/Actions";
-import { BookingBadge, InfoList, InfoRow, ListRow, bookingWhen, won } from "./ui";
+import { BookingBadge, CoverPlaceholder, InfoList, InfoRow, ListRow, bookingWhen, won } from "./ui";
 
 type Reveal = {
   accessNote: string; contactPhone: string; accessHow: Space["accessHow"];
@@ -84,17 +84,8 @@ export async function loadGuestBookings(uid: number): Promise<GuestBookingView[]
 /** 메타 줄의 토막들. 🩸09-17 QA(폰 375px) — 한 줄 글자열이라 「1 / 명」·「(4시 / 간)」처럼 낱말 중간에서 줄이 끊겼다.
  *  토막마다 `whitespace-nowrap`으로 감싸고, 줄바꿈은 토막 사이 `·`에서만 일어나게 한다.
  *  날짜와 시간도 따로 토막이다 — 둘을 한 덩어리로 묶으면 좁은 폭에서 한 토막이 줄보다 길어진다. */
-function metaParts(b: SpaceBooking, area?: string): string[] {
-  const when = b.startTime && b.endTime ? [dateLabel(b.useDate), rangeLabel(b.startTime, b.endTime)] : [bookingWhen(b)];
-  return [
-    // 🛍09-18 고른 상품이 맨 앞 — 같은 공간을 두 방식으로 빌린 줄이 나란히 서면 이 토막으로만 갈린다.
-    PRODUCT_LABEL[b.product],
-    ...when,
-    b.headcount ? `${b.headcount}명` : "",
-    area ?? "",
-    won(b.amountTotal),
-    b.amountChat > 0 || b.amountMentor > 0 ? "커피챗 포함" : "",
-  ].filter(Boolean);
+function whenParts(b: SpaceBooking): string[] {
+  return b.startTime && b.endTime ? [dateLabel(b.useDate), rangeLabel(b.startTime, b.endTime)] : [bookingWhen(b)];
 }
 
 /** 목록 줄 안의 연락처 두 줄 — 전화(가게 번호가 있으면 그것, 없으면 사장님 번호, 둘 다 없으면 이메일)와 주소.
@@ -142,29 +133,49 @@ export function GuestBookingRow({ view }: { view: GuestBookingView }) {
     <ListRow
       card
       head={
-        <>
-          <p className="truncate text-[17px] font-medium text-ink">
-            {sp ? (
-              <Link href={`/rent/${sp.slug}`} className="underline-offset-2 hover:underline">
-                {sp.name}
-              </Link>
+        // 🖼09-18 대표 코멘트 — 「가독성이 좀 떨어지고, 작은 정방형 이미지도 1장」. 한 줄에 여섯 토막이던 메타를
+        //   **언제 / 무엇을·어디서 / 얼마** 세 줄로 나누고, 왼쪽에 공간 첫 사진(정사각 64)을 둔다.
+        <div className="flex gap-3">
+          <div className="size-[64px] shrink-0 overflow-hidden rounded-lg bg-surface-soft">
+            {sp?.photo ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={sp.photo} alt="" loading="lazy" className="h-full w-full object-cover" />
             ) : (
-              "공간"
+              <CoverPlaceholder />
             )}
-          </p>
-          <p className="mt-1 text-[15px] text-mute">
-            {metaParts(b, sp?.area).map((t, i) => (
-              <span key={i}>
-                {i > 0 && " · "}
-                <span className="whitespace-nowrap">{t}</span>
-              </span>
-            ))}
-          </p>
-          {headline && <p className="mt-2 text-[15px] text-body">{headline}</p>}
-        </>
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-[17px] font-medium text-ink">
+              {sp ? (
+                <Link href={`/rent/${sp.slug}`} className="underline-offset-2 hover:underline">
+                  {sp.name}
+                </Link>
+              ) : (
+                "공간"
+              )}
+            </p>
+            {/* 토막마다 줄바꿈을 막아 「(2시 / 간)」·「포 / 함」처럼 낱말 가운데서 꺾이지 않게 한다(375 실측). */}
+            <p className="mt-0.5 text-[15px] text-body">
+              {whenParts(b).map((w, i) => (
+                <span key={i}>
+                  {i > 0 && " · "}
+                  <span className="whitespace-nowrap">{w}</span>
+                </span>
+              ))}
+            </p>
+            <p className="mt-0.5 text-[14px] text-mute">
+              {[PRODUCT_LABEL[b.product], sp?.area ?? "", b.headcount ? `${b.headcount}명` : ""].filter(Boolean).join(" · ")}
+            </p>
+            <p className="mt-1 text-[15px] text-ink">
+              <span className="font-semibold tabular-nums">{won(b.amountTotal)}</span>
+              {(b.amountChat > 0 || b.amountMentor > 0) && <span className="whitespace-nowrap text-mute"> · 커피챗 포함</span>}
+            </p>
+          </div>
+        </div>
       }
       status={<BookingBadge status={b.status} />}
     >
+      {headline && <p className="mt-3 text-[15px] text-body">{headline}</p>}
       {/* 🩸09-16 — `pending`에도 「사장님이 수락하면…」이 붙어 있었다. 그 신청은 **사장님에게
           보이지도 않는다**(`listBookingsForHost`가 거른다). 기다릴 것이 없는데 기다리라고 말하고,
           이어서 낼 길도 없어서 목록에 쌓이기만 했다. 결제 화면은 주문번호로 되돌아갈 수 있다. */}
