@@ -19,8 +19,10 @@ export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "내가 보낸 신청 — collab5",
-  // 로그인해야 보이는 화면이라 검색에 걸릴 이유가 없다. 대표 주소(canonical)도 두지 않는다.
+  // 로그인해야 보이는 화면이라 검색에 걸릴 이유가 없다.
   robots: { index: false },
+  // 🔎09-18 밤 QA SC-18 — 대표 주소를 안 두면 루트의 `canonical: "/"`가 상속돼 «이 화면은 홈의 사본»이라고 말하게 된다. 자기 주소로.
+  alternates: { canonical: "/rent/requests" },
 };
 
 const h2Cls = "text-[21px] font-bold leading-snug tracking-tight text-ink";

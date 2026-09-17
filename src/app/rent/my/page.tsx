@@ -42,6 +42,8 @@ export const metadata: Metadata = {
   // 로그인해야 보이는 화면이라 검색 결과에 뜰 일이 없다. 설명은 짧게.
   description: "내가 올린 공간과 들어온 요청, 내가 빌린 공간을 한곳에서 봐요.",
   alternates: { canonical: "/rent/my" },
+  // 🔎09-18 밤 QA SC-18 — 사람마다 다른 화면이라 색인하지 않는다. robots.txt에도 막았고, 이건 robots를 안 따르는 크롤러를 위한 두 번째 문이다.
+  robots: { index: false },
 };
 
 const emptyCls = "mt-5 text-[15px] leading-relaxed break-keep text-faint";
