@@ -35,7 +35,7 @@ export const RENT_GROUPS: Group[] = [
           { desc: "같은 공간을 로그인 안 하고 볼 때", c: "anon", to: `/rent/${S.full}` },
           { desc: "열린 시간이 없는 공간 · 공간 전체 하나만 팜", c: "guest-full", to: `/rent/${S.noSlots}` },
           { desc: "커피챗·소개서 없는 공간 · 대관만 하나만 팜 (신청 폼에 고르기 없이 한 줄)", c: "guest-full", to: `/rent/${S.other}` },
-          { desc: "긴 글 (사진 12장, 유의 사항 12줄, 주제 8줄)", c: "stress-guest", to: `/rent/${S.stress}` },
+          { desc: "긴 글 (사진 10장 · 폼 최대, 유의 사항 12줄, 주제 8줄)", c: "stress-guest", to: `/rent/${S.stress}` },
           { desc: "최소 입력 (사진·소개·설비·전화 없음), 번호 없는 손님", c: "minimal-guest", to: `/rent/${S.minimal}` },
           { desc: "검토 대기 공간을 남이 열면 404", c: "guest-full", to: `/rent/${S.pending}` },
           { desc: "쉬는 중인 공간을 남이 열면 404", c: "guest-full", to: `/rent/${S.paused}` },

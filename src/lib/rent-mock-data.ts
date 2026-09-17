@@ -537,7 +537,8 @@ function stressWorld(today: string): MockWorld {
     name: "오래된 골목 끝집 부엌 겸 작업실 전체와 뒷마당 평상, 그리고 2층 다락방까지 한꺼번에",
     brandSlug: "mock-long-kitchen", category: "restaurant", scope: "whole_shop",
     body: [para, para, para, para, para].join("\n\n"),
-    photos: Array.from({ length: 12 }, (_, i) => photo(`사진 ${i + 1}`, (i * 29) % 360, i % 3 === 0 ? 900 : 1200, i % 3 === 0 ? 1600 : 800)),
+    // 📸등록 폼이 받는 최대 장수(`SpaceForm`의 `PhotoGrid max={10}`)와 같게(09-18 밤 QA SC-34). 전엔 12장이라 실제로는 생길 수 없는 공간을 보고 있었다.
+    photos: Array.from({ length: 10 }, (_, i) => photo(`사진 ${i + 1}`, (i * 29) % 360, i % 3 === 0 ? 900 : 1200, i % 3 === 0 ? 1600 : 800)),
     area: "망원동", address: "서울 마포구 포은로 000-00, 골목 끝 파란 대문 집 1층과 2층 다락, 뒷마당 포함 (건물 이름 없음)",
     lat: 37.5563, lng: 126.9050,
     facilities: [
