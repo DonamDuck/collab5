@@ -795,6 +795,12 @@ export async function decideBookingAction(
     // 예약은 이미 rejected다(`decideBooking`). 환불이 «성공»하면 예약 refunded + 결제 CANCELED를 같이 옮긴다.
     //   실패하면 rejected로 남는다 — 정산 화면 「손이 필요한 예약」에 뜬다.
     const pay = await getPaymentByOrderId(b.orderId);
+    // 🔁09-18 밤 QA(G-16) — 그 사이 손님이 먼저 취소해 돈이 이미 돌아갔을 수 있다. 잔액이 없으면 토스를 안 부른다.
+    if (pay && pay.balanceAmount <= 0) {
+      await rentSync(b.orderId, { bookingStatus: "refunded" });
+      revalidatePath("/rent/my");
+      return { ok: true, message: "거절했어요. 그 사이 손님께 이미 돌아간 돈이라 따로 환불하지 않았어요." };
+    }
     const refund = pay
       ? await cancelPayment(pay.paymentKey || b.paymentKey, "사장님 거절 — 전액 환불", undefined, pay.balanceAmount)
       : { ok: false as const };
@@ -880,13 +886,26 @@ export async function cancelBookingAction(bookingId: number): Promise<ActionResu
 
   const { refund } = cancelRefund(b, pay.approvedAt);
   if (refund > 0) {
+    // 🔁09-18 밤 QA(G-16) — 토스를 부르기 «직전»에 예약을 다시 읽는다. 취소 팝업을 보는 사이 사장님이 거절했을 수 있다.
+    //   그대로 밀면 이미 환불된 결제에 취소가 한 번 더 가고, 장부의 「거절」이 「손님 취소」로 뒤집힌다.
+    const fresh = await getBooking(bookingId);
+    if (!fresh || (fresh.status !== "paid" && fresh.status !== "confirmed")) {
+      return { ok: false, message: "그 사이 예약 상태가 바뀌었어요. 신청 내역에서 한 번 더 봐 주세요." };
+    }
     const r = await cancelPayment(
       pay.paymentKey || b.paymentKey, "게스트 취소",
       refund >= pay.balanceAmount ? undefined : refund, pay.balanceAmount,
     );
     // 🩸09-16까지 이 결과를 안 봤다. 토스 환불이 실패해도 상태는 「취소」가 됐고 손님에겐
     //   「환불됩니다」라고 말했다. 돈은 안 돌아갔는데 예약은 사라진다. 실패면 아무것도 바꾸지 않는다.
-    if (!r.ok) return { ok: false, message: "환불을 처리하지 못해 취소하지 않았어요. 잠시 뒤 다시 시도해 주세요." };
+    if (!r.ok) {
+      // 겹쳐 눌린 두 번째일 수 있다. 첫 번째가 이미 끝냈으면 「안 했다」고 말하지 않는다(09-18 밤 QA SC-01).
+      const after = await getBooking(bookingId);
+      if (after && (after.status === "cancelled" || after.status === "refunded")) {
+        return { ok: true, message: "이미 취소된 예약이에요. 환불도 그대로 진행돼요." };
+      }
+      return { ok: false, message: "환불을 처리하지 못해 취소하지 않았어요. 잠시 뒤 다시 시도해 주세요." };
+    }
     // 💸예약 cancelled + 결제 CANCELED/PARTIAL_CANCELED(남은 돈)를 같이. 약관 제8조의 «남은 돈»이 여기 적힌다.
     // 🔁기록이 한 번 실패하면 한 번 더 한다(09-16 점검 v2). 환불은 이미 나갔는데 결제 줄이 DONE으로 남으면,
     //   이용일이 지나 정리 작업이 돌 때 «돌려준 돈»까지 사장님 지급 대기에 올라갈 수 있다.
@@ -955,6 +974,8 @@ export async function approveRefundAction(bookingId: number): Promise<ActionResu
   const pay = await getPaymentByOrderId(b.orderId);
   if (!pay) return { ok: false, message: "결제 기록을 찾지 못했어요." };
   const refundAmount = pay.balanceAmount;
+  // 🔁09-18 밤 QA(G-16) — 그 사이 손님이 먼저 취소했으면 돌려줄 돈이 없다. 토스를 부르기 전에 멈춘다.
+  if (refundAmount <= 0) return { ok: false, message: "이미 돌려드린 결제라 환불할 돈이 없어요." };
   const r = await cancelPayment(pay.paymentKey || b.paymentKey, "사장님 사정 — 관리자 승인 전액 환불", undefined, refundAmount);
   if (!r.ok) return { ok: false, message: "토스 환불이 실패했어요. 토스 관리자 화면에서 확인해 주세요." };
   let synced = await rentSync(b.orderId, { bookingStatus: "refunded", toss: r.payment });

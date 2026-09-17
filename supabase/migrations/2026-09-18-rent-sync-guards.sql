@@ -1,4 +1,4 @@
--- 하루 가게 — `rent_sync` 가드 (2026-09-18 밤 QA SC-02)
+-- 하루 가게 — `rent_sync` 가드 (2026-09-18 밤 QA SC-02 · G-16)
 --
 -- 🚨**아직 실행하지 않았다.** 대표가 Supabase SQL Editor에서 직접 돌린다(운영 DB 쓰기는 대표 손으로, 09-18).
 -- ⭐이 파일은 **함수 하나만 다시 만든다.** 표·칸·행·정책은 한 줄도 안 건드린다. 두 번 돌려도 같다.
@@ -11,6 +11,13 @@
 --       그때 앱이 쓰던 ABORTED가 첫 승인의 DONE을 덮었다. 장부만 보면 «받은 적 없는 돈»이 된다.
 --     같이 막는 것 = 이미 취소된 결제에 늦게 도착한 DONE·PARTIAL_CANCELED(순서가 뒤집힌 응답), 그리고 잔액이 도로 커지는 것.
 --     ⚠️단 «다른 결제 시도»(paymentKey가 다름)가 오면 그건 새 시도다 — 승인된 결제가 아직 살아 있을 때만 막는다.
+--  ② **취소(cancelled)는 결제 전·만료·결제 완료·확정에서만** 예약을 옮긴다. 거절·환불·다녀옴·이미 취소된 예약은 그대로 둔다.
+--  ③ **환불(refunded)은 거절·결제 완료·확정에서만** 옮긴다.
+--     🩸09-18 밤 QA(G-16): 손님 취소와 사장님 거절이 겹치면 늦게 도착한 쪽이 앞선 결과를 덮었다.
+--       거절해서 환불까지 끝난 예약이 「손님 취소」로 뒤집히면, 이용일이 지난 뒤 정리 작업이 남은 돈을 사장님 지급 대기로 올린다.
+--     ⭐②③에서 막는 것은 «예약 상태» 하나뿐이다. 토스 응답(돈의 상태)은 그대로 적는다 — 돈은 실제로 움직였고 장부는 토스를 따라야 한다.
+--     ⚠️`pending`·`expired`도 취소를 받는 이유 = 승인 뒤 예약을 못 올려 «자동 환불»한 갈래가 그 상태에서 cancelled로 온다
+--       (`confirmBookingAction`). 그 길을 막으면 돈은 돌려줬는데 신청이 만료로만 남는다.
 --
 -- 실행 전 / 실행 후
 --  · 실행 전에도 앱은 09-18 밤 수정으로 **ABORTED를 쓰기 전에 예약·결제를 다시 읽는다**(창이 좁아졌을 뿐 완전히 닫히지는 않는다).
@@ -34,6 +41,7 @@ declare
   v_new_key    text;
   v_same_pay   boolean := true;
   v_apply_toss boolean := p_toss is not null;
+  v_move_booking boolean := p_booking_status is not null;
 begin
   -- 결제 줄을 먼저 잡는다. 같은 주문의 호출은 여기서 한 줄로 선다(그 뒤에 읽는 상태는 최신이다).
   select booking_id, status, payment_key into v_booking_id, v_pay_status, v_pay_key
@@ -56,6 +64,13 @@ begin
     -- 결제 완료는 결제 전·만료에서만. 이미 취소·환불된 예약에 승인이 오는 건 있으면 안 되는 일이라 오류로 멈춘다.
     if p_booking_status = 'paid' and v_current not in ('pending', 'expired') then
       raise exception 'rent_sync: order=% 는 % 상태라 paid로 못 옮긴다', p_order_id, v_current;
+    end if;
+    -- 🆕②③ 겹쳐 들어온 취소·환불이 앞선 결과를 덮지 못하게. 예약만 그대로 두고 돈의 상태는 아래에서 그대로 적는다.
+    if p_booking_status = 'cancelled' and v_current not in ('paid', 'confirmed', 'pending', 'expired') then
+      v_move_booking := false;
+    end if;
+    if p_booking_status = 'refunded' and v_current not in ('rejected', 'paid', 'confirmed') then
+      v_move_booking := false;
     end if;
   end if;
 
@@ -116,7 +131,7 @@ begin
     where order_id = p_order_id;
   end if;
 
-  if p_booking_status is not null and v_booking_id is not null then
+  if v_move_booking and v_booking_id is not null then
     update space_bookings set status = p_booking_status where id = v_booking_id;
   end if;
 end;
