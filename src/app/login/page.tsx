@@ -12,6 +12,21 @@ import { GoogleButton } from "@/components/GoogleButton";
 import { KakaoButton } from "@/components/KakaoButton";
 import { SocialDivider } from "@/components/SocialDivider";
 
+/** 로그인 뒤 돌아갈 주소 — 우리 사이트 안 경로만 돌려준다.
+ *  🔒09-18 밤 QA — 예전 검사(`/`로 시작하고 `//`로 시작하지 않음)는 `/\evil.example`이나 탭이 낀 `/\t/evil.example`을
+ *    통과시켰고, 브라우저는 그걸 남의 사이트 주소로 읽었다. 글자 모양 대신 «실제로 해석한 주소의 origin»을 비교한다.
+ *  이벤트 처리 안에서만 부른다(window가 있을 때). */
+function safeRedirect(raw: string | null): string {
+  if (!raw) return "/";
+  try {
+    const u = new URL(raw, window.location.origin);
+    if (u.origin !== window.location.origin) return "/";
+    return u.pathname + u.search + u.hash;
+  } catch {
+    return "/";
+  }
+}
+
 export default function LoginPage() {
   return (
     <Suspense fallback={<main className="mx-auto w-full max-w-[400px] px-4 py-14 sm:px-6" />}>
@@ -41,9 +56,8 @@ function LoginForm() {
         setErr(r.error);
         return;
       }
-      // 로그인 후 복귀 경로 — 내부 절대경로(/…)만 허용(오픈 리다이렉트 방지). 없으면 홈.
-      const redirect = searchParams.get("redirect");
-      const dest = redirect && redirect.startsWith("/") && !redirect.startsWith("//") ? redirect : "/";
+      // 로그인 후 복귀 경로 — 우리 사이트 안 주소만 허용(오픈 리다이렉트 방지). 없으면 홈.
+      const dest = safeRedirect(searchParams.get("redirect"));
       router.replace(dest); // push+refresh 중복 제거 — 서버 렌더가 새 세션 헤더 반영
     });
 
