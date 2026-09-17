@@ -39,7 +39,8 @@ export default async function NewSpacePage({
     return (
       <main className="mx-auto w-full max-w-[560px] px-4 pb-14 pt-6 sm:px-6">
         <h1 className="text-[28px] font-bold leading-[1.25] tracking-[-0.02em] break-keep text-ink">
-          안 쓰는 날, 빌려주세요
+          {/* 🔁09-18 대표 코멘트 */}
+          공간을 안 쓰는 날, 필요한 누군가에게 빌려주세요
         </h1>
         <p className="mt-3 text-[17px] leading-relaxed break-keep text-mute">
           쉬는 날이나 비는 몇 시간만 내주셔도 돼요. 먼저 로그인해 주세요.
@@ -68,7 +69,8 @@ export default async function NewSpacePage({
           ← 하루 가게
         </Link>
         <h1 className="mt-3 text-[28px] font-bold leading-[1.25] tracking-[-0.02em] break-keep text-ink">
-          안 쓰는 날, 빌려주세요
+          {/* 🔁09-18 대표 코멘트 */}
+          공간을 안 쓰는 날, 필요한 누군가에게 빌려주세요
         </h1>
         <p className="mt-3 text-[17px] leading-relaxed break-keep text-mute">
           쉬는 날이나 비는 몇 시간만 내주셔도 돼요. 어떻게 써야 하는지는 사장님이 정하세요.

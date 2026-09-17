@@ -325,9 +325,9 @@ export async function notifyBookingConfirmed(
 
 /** 사장님이 그날까지 챙길 일. `accessHowLine`은 손님에게 하는 말이라 사장님 쪽으로 돌려 적는다. */
 function hostTodoLine(how: Space["accessHow"]): string {
-  if (how === "sms") return "이용 전에 손님께 문자로 이용 안내를 보내 주세요.";
+  if (how === "sms") return "이용 전에 손님께 문자나 전화로 이용 안내를 전해 주세요.";
   if (how === "onsite") return "이용 전에 손님을 직접 만나서 안내해 주세요.";
-  return "문자로 먼저 안내해 주시고, 이용 전에 한 번 만나서 알려 주세요.";
+  return "문자나 전화로 먼저 안내해 주시고, 이용 전에 한 번 만나서 알려 주세요.";
 }
 
 /** ②' 수락 → 사장님 (09-16). 누른 것이 잘 들어갔다는 확인과, 그날 필요한 손님 연락처. */

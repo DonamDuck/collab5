@@ -44,9 +44,10 @@ import { OpenSlotsCalendar } from "./OpenSlotsCalendar";
 
 /** 📨이용 안내 방식. 🚨내용(비밀번호 등)은 우리가 안 가진다 — 방식만 고른다(대표 09-16). */
 const ACCESS_OPTIONS: [AccessHow, string][] = [
-  ["sms", "문자로 미리 보내드려요"],
+  // 🔁09-18 대표 코멘트 — 「문자나 전화로 보내드릴게요」·「둘 다 진행할게요」. 값(`sms`)은 그대로, 말만 넓혔다.
+  ["sms", "문자나 전화로 보내 드릴게요"],
   ["onsite", "일정 전에 미리 만나서 알려드릴게요"],
-  ["both", "둘 다 해요"],
+  ["both", "둘 다 진행할게요"],
 ];
 
 const FACILITY_HINTS = [
@@ -605,8 +606,9 @@ export function SpaceForm({
             ⭐**우리는 그 내용을 안 가진다.** 담을 칸이 없으면 샐 일도 없다 — 방식만 고른다. */}
         {/* 🔁09-17 QA — 라벨에 «무엇을» 안내하는지가 없어서 힌트까지 읽어야 알았다. */}
         <L
-          label="열쇠·비밀번호·기계 쓰는 법은 어떻게 전하실래요"
-          hint="예약한 손님께 사장님이 직접 전해 주세요. 출입 비밀번호 같은 건 collab5가 갖고 있지 않아요."
+          // 🔁09-18 대표 코멘트 — 라벨·힌트 대표 문안(맞춤법만: 「전해주시겠나요」→「전해 주시겠어요」).
+          label="출입문 비밀번호, 공간 사용법, 안내 사항 등은 어떻게 전해 주시겠어요?"
+          hint="예약을 확정하면 아래에서 고른 방식으로 빌리는 분께 연락해 주세요. (예약 확정 후 2일 안에)"
         >
           <div className="flex flex-wrap gap-2">
             {ACCESS_OPTIONS.map(([v, t]) => (
@@ -944,7 +946,7 @@ export function SpaceForm({
       </Group>
 
       {/* ── 확인 ── */}
-      <Group title="마지막으로 확인할게요">
+      <Group title="마지막으로 확인해 주세요">
         {/* 🔻09-16 대표 — 음식 여부·임대인 동의 «체크박스» 둘 다 삭제.
             ⭐전대 확인은 없앤 게 아니라 **약관 한 줄로 옮겼다.** 체크박스는 읽지 않고 누르지만
               약관은 동의 시각이 남아 계약의 근거가 된다(약관규제법 제3조③④).
@@ -952,10 +954,16 @@ export function SpaceForm({
               우리 기존 약관엔 호스트 의무가 한 줄도 없었다. 수수료·정산·구상을 주장할 근거가 없었다. */}
         {/* 🏠09-17 대표 결정 6 — 임대인 동의 «체크»는 다시 넣지 않는다. 대신 동의 바로 위에 한 줄로 먼저 생각하게 한다.
             임차 가게 사장님은 여기서 처음 떠올린다(QA). */}
-        <p className="text-[15px] leading-relaxed break-keep text-body">
-          공간을 빌려주는 데 막히는 것이 없는지 미리 살펴봐 주세요. 임대차 계약이나 건물 관리 규약에 제한이 있을 수
-          있어요.
-        </p>
+        {/* 🔁09-18 대표 코멘트 — 문안(「제약 사항은 없는지」) + 불렛. */}
+        <ul className="space-y-1.5">
+          <li className="flex gap-2 text-[15px] leading-relaxed break-keep text-body">
+            <span aria-hidden="true" className="text-mute">·</span>
+            <span className="min-w-0 flex-1">
+              공간을 빌려주는 데 제약 사항은 없는지 미리 살펴봐 주세요. 임대차 계약이나 건물 관리 규약에 제한이 있을 수
+              있어요.
+            </span>
+          </li>
+        </ul>
         <div id="f-terms" className="space-y-4">
           <label className="flex cursor-pointer items-start gap-3">
             <input
@@ -971,10 +979,20 @@ export function SpaceForm({
               에 동의해요
             </span>
           </label>
-          <p className="text-[15px] leading-relaxed break-keep text-mute">
-            내 소유이거나 임대인 동의를 받았다는 것, 수수료 {Math.round(feeRate * 100)}%와 정산 방법,
-            환불 규정이 담겨 있어요. 손님은 신청하기 전에 브랜드 이름·주소·매장 전화번호를 볼 수 있어요.
-          </p>
+          {/* 🔁09-18 대표 코멘트 — 한 문단 → 불렛. 「제3자 정보 제공」 질문에 맞춰, 예약이 잡히면 연락처가 손님께 간다는 줄을 더했다
+              (계약 이행에 필요한 제공이라 따로 동의 체크는 두지 않고, 개인정보처리방침 «거래 상대방 제공»에 적어 두었다 · 09-17). */}
+          <ul className="space-y-1.5">
+            {[
+              `약관에는 내 소유이거나 임대인 동의를 받았다는 것, 수수료 ${Math.round(feeRate * 100)}%와 정산 방법, 환불 규정이 담겨 있어요.`,
+              "손님은 신청하기 전에 브랜드 이름·주소·매장 전화번호를 볼 수 있어요.",
+              "예약이 잡히면 예약한 손님께 사장님 연락처가 전달되고, 사장님도 손님 연락처를 받아요.",
+            ].map((line) => (
+              <li key={line} className="flex gap-2 text-[15px] leading-relaxed break-keep text-mute">
+                <span aria-hidden="true">·</span>
+                <span className="min-w-0 flex-1">{line}</span>
+              </li>
+            ))}
+          </ul>
           {fieldErr("terms") && <p className="text-[15px] leading-relaxed break-keep text-danger">{fieldErr("terms")}</p>}
         </div>
 
@@ -1252,7 +1270,7 @@ const FORM_STEPS = [
   // 🔁09-18 「얼마에 빌려주실까요」 → 상품 셋(대표).
   "무엇을 파실까요",
   "언제 빌려주실까요",
-  "마지막으로 확인할게요",
+  "마지막으로 확인해 주세요",
 ];
 
 /** 넓은 화면(xl)에서만 폼 오른쪽에 붙는 목차. 누르면 그 절로 가고, 읽고 있는 절이 진하게 선다.
