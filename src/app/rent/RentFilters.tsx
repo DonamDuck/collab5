@@ -87,8 +87,8 @@ export function RentFilters({
           onBlur={() => {
             if (area.trim() !== initialArea) apply({});
           }}
-          placeholder="동네로 찾기"
-          aria-label="동네"
+          placeholder="지역, 이름으로 검색해 보세요"
+          aria-label="지역이나 공간 이름"
         />
         {/* 업종도 고르는 순간이 곧 확정이다. 고른 뒤 버튼을 또 누르게 하면 한 번 더 일을 시킨다. */}
         <RentSelect

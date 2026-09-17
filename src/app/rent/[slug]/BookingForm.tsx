@@ -157,7 +157,12 @@ export function BookingForm({
   const [headcount, setHeadcount] = useState("");
   const [plan, setPlan] = useState("");
   const [withChat, setWithChat] = useState(false);
-  const [brandSlug, setBrandSlug] = useState("");
+  // 📎09-18 대표 코멘트 — 소개서 전달은 토글(예/아니요), **기본은 «예»**. 고르는 소개서는 첫 번째가 기본.
+  const [brandOn, setBrandOn] = useState(true);
+  const [brandPick, setBrandPick] = useState(myBrands[0]?.slug ?? "");
+  const brandSlug = myBrands.length > 0 && brandOn ? brandPick : "";
+  /** 👥09-18 대표 코멘트 — 「아직 잘 모르겠어요」 체크. 켜면 인원 칸을 비우고 잠근다. */
+  const [headUnsure, setHeadUnsure] = useState(false);
   const [phone, setPhone] = useState(initialPhone);
   /** 결제 직전 확인 팝업(대표 09-14: 의사 확인은 팝업으로). 열린 채로 `submit`이 돌지 않게 닫고 시작한다. */
   const [confirming, setConfirming] = useState(false);
@@ -284,7 +289,11 @@ export function BookingForm({
     <div className="space-y-7 sm:max-w-[520px]">
       <div ref={dateRef}>
         {/* ✍️09-17 「신청 날짜를 선택해주세요.」 → 말 걸듯(행정어 걷기). 아래 「몇 시부터 쓰실까요?」와 같은 말투다. */}
-        <p className={labelCls}>어느 날 쓰실까요?</p>
+        {/* 🔁09-18 대표 코멘트 — 제목은 「날짜를 선택해 주세요」, 그 아래에 날짜를 고르면 무엇이 보이는지 한 줄. */}
+        <p className="block text-[16px] font-medium text-body">날짜를 선택해 주세요</p>
+        <p className="mt-1 mb-3 text-[15px] leading-relaxed break-keep text-faint">
+          날짜를 선택하면 그날 예약할 수 있는 시간을 확인할 수 있어요.
+        </p>
         {/* 🔁09-14 `<select>` → 달력(대표). 못 고르는 날이 흐리게 «보이는» 것이 오히려 정보다 —
             「이 공간은 화요일만 열린다」가 격자에서 한눈에 읽힌다. 목록은 그 규칙을 안 보여준다. */}
         <PickDateCalendar
@@ -310,7 +319,7 @@ export function BookingForm({
           ⭐**시작을 먼저, 길이를 그다음.** 끝나는 시각을 직접 고르게 하면 열린 시간·최소 시간·이미 팔린 칸
             셋을 손님이 머리로 맞춰야 한다. 시작을 고르면 가능한 길이만 남겨 주는 쪽이 고를 것이 적다. */}
       <div ref={timeRef}>
-        <p className={labelCls}>몇 시부터 쓰실까요?</p>
+        <p className={labelCls}>몇 시부터 빌리실까요?</p>
         {!useDate ? (
           <p className={hintCls}>날짜를 고르면 열린 시각이 나와요.</p>
         ) : startChoices.length === 0 ? (
@@ -379,7 +388,9 @@ export function BookingForm({
               140px에선 「숫자를 입력…」, 200px에서도 한 글자가 끊겼다. **재서 240px**로 잡았다
               (글자 자리 ~196 + 「명」 자리 44). 전체 폭 380의 63%라 여전히 「짧은 칸」으로 읽힌다.
               ⭐폭은 기대 길이를 말하는 장치지 최소화할 값이 아니다 — 문구가 잘리면 그 장치가 거짓말을 한다. */}
-          <div className="relative w-[240px]">
+          {/* 📐09-18 대표 코멘트 — 칸을 조금 줄이고 옆에 「아직 잘 모르겠어요」. 「예) 3」은 180px에서도 안 잘린다. */}
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          <div className="relative w-[180px]">
             <input
               id="rent-head"
               type="number"
@@ -388,6 +399,7 @@ export function BookingForm({
               max={capacity}
               className={`${rentInputCls} pr-11`}
               value={headcount}
+              disabled={headUnsure}
               onChange={(e) => setHeadcount(e.target.value)}
               // ✍️09-17 「숫자를 입력해주세요」 → 예시 숫자(행정어 걷기). 칸 안 「명」과 붙여 읽힌다.
               placeholder="예) 3"
@@ -399,13 +411,26 @@ export function BookingForm({
               명
             </span>
           </div>
+          <label className="flex min-h-[44px] cursor-pointer items-center gap-2 text-[15px] text-body">
+            <input
+              type="checkbox"
+              className="size-[18px] accent-primary"
+              checked={headUnsure}
+              onChange={(e) => {
+                setHeadUnsure(e.target.checked);
+                if (e.target.checked) setHeadcount("");
+              }}
+            />
+            아직 잘 모르겠어요
+          </label>
+          </div>
           {capacity ? <p className={hintCls}>최대 {capacity}명까지 들어가요.</p> : null}
         </div>
       )}
 
       <div>
         <label htmlFor="rent-plan" className={labelCls}>
-          그날 무엇을 하실 건가요
+          공간에서 무엇을 하실 예정인지 알려 주세요
         </label>
         {/* ⭐이 칸이 사장님이 수락을 정하는 유일한 근거다. 「대관 문의드립니다」로는 아무것도 못 정한다.
             그래서 placeholder에 **답의 모양**을 보여준다 — 무엇을·누구와·몇 시간. */}
@@ -420,7 +445,9 @@ export function BookingForm({
             if (e.target.value.trim().length >= 10) setBadField((f) => (f === "plan" ? "" : f));
           }}
           // ⏱09-16 대표 — 시간 단위. 예시가 「하루 팝업」이면 바로 위에서 고른 몇 시간과 말이 어긋난다.
-          placeholder="예) 직접 만든 도자기 그릇 20점으로 네 시간짜리 팝업을 열려고 해요. 친구랑 둘이 와서 손님을 받을 거예요."
+          // ☕09-18 대표 코멘트 — 「카페 창업 전에 카페 일을 진짜 한번 해 보기」 같은 목적도 녹여 달라.
+          //   예시 둘을 나란히 두면 고르는 문제처럼 읽혀서, 한 문장 안에 «창업 전 연습 + 무엇을·누구와»를 담았다.
+          placeholder="예) 카페를 열기 전에 일일카페로 네 시간 장사를 해 보려고 해요. 친구랑 둘이 커피와 구움과자를 팔 거예요."
         />
         {badField === "plan" && <p className={errCls}>그날 무엇을 하실지 열 글자 이상 적어 주세요.</p>}
         <p className={hintCls}>사장님이 이 글만 보고 정하세요. 열 글자면 충분해요.</p>
@@ -458,22 +485,45 @@ export function BookingForm({
           ⭐**설명하는 자리와 고르는 자리를 갈랐다.** 한 줄 체크박스는 둘 다 하려다 둘 다 못 했다. */}
       {myBrands.length > 0 ? (
         <div>
-          <label htmlFor="rent-brand" className={labelCls}>
-            내 소개서도 같이 보여드릴까요 <span className="ml-1 text-[15px] font-normal text-faint">· 선택</span>
-          </label>
-          <RentSelect
-            id="rent-brand"
-            value={brandSlug}
-            onChange={(e) => setBrandSlug(e.target.value)}
-          >
-            <option value="">안 보여드릴래요</option>
-            {myBrands.map((b) => (
-              <option key={b.slug} value={b.slug}>
-                {b.name}
-              </option>
+          {/* 🔁09-18 대표 코멘트 — 고르개 → 예/아니요 토글(기본 «예»), 질문은 손님이 이미 가진 걸 짚어 준다. */}
+          <p className={labelCls}>등록한 collab5 소개서가 있으시네요? 사장님께 이것도 함께 전달드릴까요?</p>
+          <div role="radiogroup" aria-label="소개서 함께 전달" className="flex gap-2">
+            {[
+              { v: true, label: "예" },
+              { v: false, label: "아니요" },
+            ].map((o) => (
+              <button
+                key={String(o.v)}
+                type="button"
+                role="radio"
+                aria-checked={brandOn === o.v}
+                onClick={() => setBrandOn(o.v)}
+                className={`inline-flex h-[44px] min-w-[88px] items-center justify-center rounded-pill px-5 text-[15px] font-medium transition-colors ${
+                  brandOn === o.v
+                    ? "bg-primary-tint text-primary-on"
+                    : "border-[0.5px] border-[#DFDFE3] bg-surface text-body hover:bg-surface-soft"
+                }`}
+              >
+                {o.label}
+              </button>
             ))}
-          </RentSelect>
-          <p className={hintCls}>어떤 분이 오시는지 알면 사장님도 마음 놓고 맡기세요.</p>
+          </div>
+          {/* 소개서가 둘 이상일 때만 어느 것을 보낼지 고른다. */}
+          {brandOn && myBrands.length > 1 && (
+            <RentSelect
+              id="rent-brand"
+              wrapClassName="mt-3"
+              value={brandPick}
+              onChange={(e) => setBrandPick(e.target.value)}
+            >
+              {myBrands.map((b) => (
+                <option key={b.slug} value={b.slug}>
+                  {b.name}
+                </option>
+              ))}
+            </RentSelect>
+          )}
+          <p className={hintCls}>소개서를 전달하면 사장님이 조금 더 마음 놓고 맡기실 수 있어요.</p>
         </div>
       ) : (
         // 📎09-17 QA — 소개서가 없는 손님에겐 이 칸이 통째로 안 보였다. 소개서로 데려올 사람이 바로 이분들이라
@@ -526,7 +576,9 @@ export function BookingForm({
         {/* 📋09-15 대표 — *「줄글로 하지 말고 결제 화면의 항목처럼」*. 결제 화면(`PayPanel`)과 같은 문법이다.
             ⭐두 화면이 같은 모양이라 **방금 확인한 것을 다음 화면에서 다시 대조**할 수 있다.
             🔻「사장님이 거절하시면 전액 돌려드려요」는 뺐다 — 상세의 환불 규정 절이 맡는다(대표 [6]). */}
-        <InfoList className="border-t border-hairline pt-3">
+        {/* 📐09-18 대표 코멘트 — 옵션과 장소 사이가 빠듯했다. 여백을 벌리고 「예약 정보 확인」 제목을 세운다. */}
+        <p className="mt-6 text-[15px] font-bold text-ink">예약 정보 확인</p>
+        <InfoList className="mt-2 border-t border-hairline pt-3">
           <InfoRow label="장소" value={spaceName} />
           <InfoRow label="신청 날짜" value={dateLabel(useDate)} />
           <InfoRow label="이용 시간" value={rangeLabel(activeStart, endTime)} />
@@ -556,11 +608,22 @@ export function BookingForm({
               고지의 핵심 낱말이라 빼면 고지가 아니게 된다.
             📏15px — 위 항목 줄(16px)보다 한 단 작다. 강조가 아니라 «알림»이라 흐리게 둔다. */}
         {/* ⏱09-17 대표 — 결제 직전에 «그다음 누가 무엇을 하는지»를 한 줄로. */}
-        <p className="mt-4 text-[15px] leading-relaxed break-keep text-body">{CONTACT_RULE_GUEST}</p>
-        <p className="mt-2 text-[15px] leading-relaxed break-keep text-mute">
-          공간은 사장님이 직접 빌려주세요. collab5는 신청과 결제를 이어 드리는 통신판매중개자라 거래의 당사자는
-          아니에요.
-        </p>
+        {/* 🔁09-18 대표 코멘트 — 「예약 전 유의사항」 제목을 달고, 성격이 다른 두 문장을 점 하나씩으로 갈랐다.
+            버튼과 붙어 있던 것도 아래 여백으로 뗐다. */}
+        <div className="mt-6 mb-2">
+          <p className="text-[15px] font-bold text-ink">예약 전 유의사항</p>
+          <ul className="mt-2 space-y-2">
+            {[
+              CONTACT_RULE_GUEST,
+              "공간은 사장님이 직접 빌려주세요. collab5는 신청과 결제를 이어 드리는 통신판매중개자라 거래의 당사자는 아니에요.",
+            ].map((line) => (
+              <li key={line} className="flex gap-2 text-[15px] leading-relaxed break-keep text-body">
+                <span aria-hidden="true" className="text-mute">·</span>
+                <span className="min-w-0 flex-1">{line}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
       </ConfirmDialog>
     </div>
   );

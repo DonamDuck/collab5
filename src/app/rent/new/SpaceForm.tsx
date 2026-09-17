@@ -65,6 +65,8 @@ const RULE_EXAMPLES = [
   "재봉틀은 제가 먼저 알려드린 뒤에 써 주세요",
   "밤 10시 이후 음악은 꺼 주세요",
   "쓰신 그릇은 설거지까지 부탁드려요",
+  // ⏱09-18 대표 코멘트 — 시간을 넘길 때의 추가 비용을 사장님이 미리 적게 한다. 안 적혀 있으면 그날 현장에서 다툰다.
+  "예약한 시간을 넘기면 30분마다 추가 비용이 있어요",
 ];
 
 
@@ -797,7 +799,11 @@ export function SpaceForm({
             ))}
           </div>
 
-          <p className="mt-3 text-[15px] text-faint">
+          {/* ⏱09-18 대표 코멘트 — 「시간이 오버되는 경우 추가 비용 안내를 공급자가 인지할 수 있게」. */}
+          <p className="mt-3 text-[15px] leading-relaxed break-keep text-mute">
+            손님이 예약한 시간을 넘길 때 추가 비용이 있다면 얼마인지 꼭 적어 주세요. 적혀 있지 않으면 그날 따로 받기 어려워요.
+          </p>
+          <p className="mt-2 text-[15px] text-faint">
             {rules.trim().length < 10
               ? "열 글자 이상 적어 주셔야 올릴 수 있어요."
               : `${ruleList.length}가지 적으셨어요.`}

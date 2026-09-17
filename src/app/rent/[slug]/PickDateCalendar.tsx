@@ -108,15 +108,12 @@ export function PickDateCalendar({
       </div>
 
       {/* 고른 날을 글자로 한 번 더 적는다 — 격자의 키위 면만으로는 「몇 월 며칠 무슨 요일」이 안 읽힌다. */}
-      <p className="mt-2 text-[15px] text-body">
-        {value ? (
-          <>
-            고르신 날 <span className="font-medium text-ink">{dateLabel(value)}</span>
-          </>
-        ) : (
-          <span className="text-faint">빌릴 날을 골라 주세요.</span>
-        )}
-      </p>
+      {/* 🔻09-18 대표 코멘트 — 아무 날도 안 골랐을 때의 「빌릴 날을 골라 주세요.」는 지웠다. 바로 위 제목과 같은 말이다. */}
+      {value && (
+        <p className="mt-2 text-[15px] text-body">
+          고르신 날 <span className="font-medium text-ink">{dateLabel(value)}</span>
+        </p>
+      )}
     </div>
   );
 }

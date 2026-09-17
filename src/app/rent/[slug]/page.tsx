@@ -201,25 +201,6 @@ export default async function SpaceDetailPage({
             </Section>
           )}
 
-          {/* ⭐⭐「사용 유의 사항」이 이 화면에서 제일 눈에 띄어야 한다(설계 §공간 카드).
-              열쇠를 넘기는 두려움이 실제로 풀리는 자리다. 면색 대신 **한 줄씩 세운 구분선**과 ink 글자로
-              무게를 준다 — 줄로 세우면 세 줄이 세 가지 약속으로 읽히고, 문단이면 한 덩어리로 넘어간다. */}
-          <Section title="사용 유의 사항">
-            {/* 🔁09-14 구분선 → **번호**(대표: *「여기 라인을 빼주고, 불렛이나 1, 2, 3 식으로 하는 거 어떨까.
-                규칙이니 마크다운 형태로 보여도 이쁠 거 같음」*).
-                ⭐선은 「여기까지가 한 덩어리」만 말하고, 번호는 **몇 개인지와 몇 번째인지**를 같이 말한다.
-                  약속은 세어지는 편이 낫다 — 「셋 중 둘째」가 「가운데 줄」보다 분명하다. */}
-            <ol className="space-y-2.5">
-              {ruleLines.map((line, i) => (
-                <li key={i} className="flex gap-2.5 text-[17px] leading-relaxed break-keep text-ink">
-                  {/* 번호는 본문보다 한 단 물러난 색·크기 — 세는 표지지 내용이 아니다.
-                      `tabular-nums`로 폭을 고정해 두 자리가 와도 글줄 시작점이 안 흔들린다. */}
-                  <span className="shrink-0 pt-[3px] text-[15px] font-medium tabular-nums text-mute">{i + 1}.</span>
-                  <span className="min-w-0">{line}</span>
-                </li>
-              ))}
-            </ol>
-          </Section>
 
           {/* 🔁09-14 「이런 것들이 있어요」 → **「공간·시설 안내」**(대표 지시).
               ⭐그리고 **태그와 줄글을 같이 싣는다** — 대표: *「여기는 태그도 좋은데, 줄글도 쓸 수 있는
@@ -316,10 +297,24 @@ export default async function SpaceDetailPage({
               <p className="text-[17px] leading-relaxed break-keep text-body">
                 {sp.coffeeChatMinutes}분 동안 사장님께 현업 이야기를 들을 수 있어요. {COFFEE_CHAT_WHEN_GUEST}
               </p>
+              {/* ☕09-18 대표 코멘트 — 「사장님이 설정한 커피챗에서 제공할 수 있는 내용들이 여기 들어가야」.
+                  사장님이 적은 주제를 줄마다 한 점으로 세운다. 한 문단이면 무엇을 들을 수 있는지가 안 세어진다. */}
               {sp.coffeeChatTopics.trim() && (
-                <p className="mt-2 whitespace-pre-line text-[16px] leading-relaxed break-keep text-mute">
-                  {sp.coffeeChatTopics}
-                </p>
+                <div className="mt-4">
+                  <p className="text-[15px] font-medium text-body">이런 이야기를 나눌 수 있어요</p>
+                  <ul className="mt-2 space-y-1.5">
+                    {sp.coffeeChatTopics
+                      .split("\n")
+                      .map((l) => l.replace(/^[\s\-•·*]+/, "").trim())
+                      .filter(Boolean)
+                      .map((l, i) => (
+                        <li key={i} className="flex gap-2 text-[16px] leading-relaxed break-keep text-body">
+                          <span aria-hidden="true" className="text-mute">·</span>
+                          <span className="min-w-0 flex-1">{l}</span>
+                        </li>
+                      ))}
+                  </ul>
+                </div>
               )}
               {/* ✍️「고르시면 돼요」와 「(선택 사항)」이 같은 말 두 번이라 하나로. */}
               <p className="mt-3 text-[15px] text-mute">
@@ -357,6 +352,28 @@ export default async function SpaceDetailPage({
               출입 비밀번호 같은 건 사장님이 직접 알려 드려요. collab5는 따로 갖고 있지 않아요. 연락이 없으면 카카오톡으로
               알려 주세요.
             </p>
+          </Section>
+
+          {/* 🔁09-18 대표 코멘트 — 「유의사항 영역은 이용 안내 하단으로 빼자」. 소개·시설·위치로 공간을 먼저 보고,
+              빌리기로 마음이 기운 뒤에 지킬 것을 읽는 순서다.
+              ⭐⭐「사용 유의 사항」이 이 화면에서 제일 눈에 띄어야 한다(설계 §공간 카드).
+              열쇠를 넘기는 두려움이 실제로 풀리는 자리다. 면색 대신 **한 줄씩 세운 구분선**과 ink 글자로
+              무게를 준다 — 줄로 세우면 세 줄이 세 가지 약속으로 읽히고, 문단이면 한 덩어리로 넘어간다. */}
+          <Section title="사용 유의 사항">
+            {/* 🔁09-14 구분선 → **번호**(대표: *「여기 라인을 빼주고, 불렛이나 1, 2, 3 식으로 하는 거 어떨까.
+                규칙이니 마크다운 형태로 보여도 이쁠 거 같음」*).
+                ⭐선은 「여기까지가 한 덩어리」만 말하고, 번호는 **몇 개인지와 몇 번째인지**를 같이 말한다.
+                  약속은 세어지는 편이 낫다 — 「셋 중 둘째」가 「가운데 줄」보다 분명하다. */}
+            <ol className="space-y-2.5">
+              {ruleLines.map((line, i) => (
+                <li key={i} className="flex gap-2.5 text-[17px] leading-relaxed break-keep text-ink">
+                  {/* 번호는 본문보다 한 단 물러난 색·크기 — 세는 표지지 내용이 아니다.
+                      `tabular-nums`로 폭을 고정해 두 자리가 와도 글줄 시작점이 안 흔들린다. */}
+                  <span className="shrink-0 pt-[3px] text-[15px] font-medium tabular-nums text-mute">{i + 1}.</span>
+                  <span className="min-w-0">{line}</span>
+                </li>
+              ))}
+            </ol>
           </Section>
 
           <Section title="환불 규정">

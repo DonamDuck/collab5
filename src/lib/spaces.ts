@@ -164,7 +164,7 @@ export async function listOpenSpaces(f: SpaceFilter = {}): Promise<SpacePublic[]
     // 아래 DB 질의와 같은 거르기를 코드로 한다. 목 화면의 「0건」도 실제 조건과 같은 이유로 나와야 한다.
     const out = m.data.spaces
       .filter((sp) => sp.status === "open")
-      .filter((sp) => !f.area || sp.area.includes(f.area))
+      .filter((sp) => !f.area || [sp.area, sp.name, sp.address].some((v) => v.includes(f.area!)))
       .filter((sp) => !f.category || sp.category === f.category)
       .filter((sp) => !f.useType || f.useType === "both" || sp.useType === f.useType || sp.useType === "both")
       .filter((sp) => !f.date || sp.openSlots.some((sl) => sl.date === f.date));
@@ -173,7 +173,12 @@ export async function listOpenSpaces(f: SpaceFilter = {}): Promise<SpacePublic[]
   const c = db();
   if (!c) return [];
   let q = c.from("spaces").select("*").eq("status", "open").order("created_at", { ascending: false });
-  if (f.area) q = q.ilike("area", `%${f.area}%`);
+  // 🔎09-18 대표 코멘트 — 「지역, 이름으로 검색해 보세요」. 동네 칸 하나로 동네·공간 이름·주소를 같이 찾는다.
+  //   PostgREST `or`는 쉼표·괄호가 구분자라 사용자 글자에서 걷어 낸다(안 걷으면 질의가 깨지거나 조건이 늘어난다).
+  if (f.area) {
+    const kw = f.area.replace(/[,()*%\\]/g, " ").trim();
+    if (kw) q = q.or(`area.ilike.%${kw}%,name.ilike.%${kw}%,address.ilike.%${kw}%`);
+  }
   if (f.category) q = q.eq("category", f.category);
   if (f.useType && f.useType !== "both") q = q.in("use_type", [f.useType, "both"]);
   q = q.limit(f.limit ?? 60);
