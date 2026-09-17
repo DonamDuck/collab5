@@ -13,7 +13,7 @@ import { bookingFinished, bookingStarted } from "@/lib/rent-time";
 import type { SpaceBooking } from "@/lib/types";
 import { ClearQuery } from "./ClearQuery";
 import { GuestBookingRow, loadGuestBookings } from "../GuestBookingRow";
-import { FloatingTabs } from "@/components/FloatingTabs";
+import { StickyTabs } from "@/components/StickyTabs";
 import { BookingBadge, ListRow as Row, SpaceBadge, bookingWhen, primaryBtnCls, secondaryBtnCls, won } from "../ui";
 import { PRODUCT_LABEL } from "@/lib/rent-copy";
 import { productPrice, sellableProducts } from "@/lib/rent-products";
@@ -344,7 +344,7 @@ export default async function MyRentPage({
           ⭐두 칸은 같은 사람의 두 얼굴이다(빌려주는 나 · 빌리는 나). 위아래로 쌓으면 아래 것이 부록처럼 읽힌다.
           탭은 주소(`?tab=`)로 나눈다 — 새로고침·뒤로 가기·메일 링크에서도 같은 칸이 열린다.
           기본 칸: 공간이나 들어온 요청이 있으면 «빌려준 공간», 빌린 것만 있으면 «빌린 공간». */}
-      <FloatingTabs
+      <StickyTabs
         className="mt-6"
         label="내 하루 가게 나누기"
         active={tab}

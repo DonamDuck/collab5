@@ -13,7 +13,7 @@ import { SavedMakerRow } from "./SavedMakerRow";
 import { ReportArchiveCard } from "./ReportArchiveCard";
 import { BriefCard } from "./BriefCard";
 import { MyTabs } from "./MyTabs";
-import { FloatingTabs } from "@/components/FloatingTabs";
+import { StickyTabs } from "@/components/StickyTabs";
 import { ProfileAvatarEditor } from "./ProfileAvatarEditor";
 import { CollabRecorder } from "./CollabRecorder";
 import { EmptyState } from "@/components/EmptyState";
@@ -256,8 +256,8 @@ export default async function MyPage({ searchParams }: { searchParams: Promise<{
 
       {/* 🗂09-18 큰 칸 두 개 — 「소개서·콜라보 | 하루 가게」. `/rent/my`의 「빌려준 공간 | 빌린 공간」과 같은 알약 모양이라
           큰 칸 → 작은 칸의 두 단계로 읽힌다. 주소(`?area=`)로 나눠 새로고침·메일 링크에서도 같은 칸이 열린다. */}
-      {/* 🔁09-18 대표 코멘트 — 「플로팅 처럼 보이긴 하는데… 중앙 플로팅이면 어떨까?」 → 가운데 떠 따라오는 알약(`FloatingTabs`). */}
-      <FloatingTabs
+      {/* 🔁09-18 대표 코멘트 — 「플로팅 처럼 보이긴 하는데… 중앙 플로팅이면 어떨까?」 → 떠 있는 알약은 「안 이쁘다」로 한 번 더 바뀌어 폭을 채운 밑줄 탭(`StickyTabs`). */}
+      <StickyTabs
         className="mt-6"
         label="내 페이지 나누기"
         active={area}
