@@ -111,13 +111,12 @@ export default async function MyRentPage({
   await sweepBookings();
 
   // 보낸 신청은 줄과 함께 `loadGuestBookings`가 읽는다 — `/rent/requests`와 같은 한 벌(09-16).
-  const [me, mySpaces, hostBookingsRaw, guestBookings] = await Promise.all([
-    getProfileById(uid),
+  // 🧹09-18 밤 QA SC-28 — 여기서 내 프로필(`getProfileById(uid)`)도 같이 읽었는데 쓰는 곳이 없었다. 조회 하나를 뺐다.
+  const [mySpaces, hostBookingsRaw, guestBookings] = await Promise.all([
     listSpacesByOwner(uid),
     listBookingsForHost(uid),
     loadGuestBookings(uid),
   ]);
-  void me;
   const hostBookings = hostOrder(hostBookingsRaw);
   const admin = await isRentAdmin();
   // 🏦정산 받을 계좌(09-17). 🔒원문은 여기서 바로 마스킹본으로 줄인다 — 화면 컴포넌트로 번호 원문이 안 넘어간다.

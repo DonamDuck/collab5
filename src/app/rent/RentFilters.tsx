@@ -24,12 +24,8 @@ import type { SpaceCategory } from "@/lib/types";
 import { CATEGORY_OPTIONS, RentSelect, rentQuietInputCls } from "./ui";
 
 export type UseFilter = "" | "as_is" | "open";
-
-const USE_TABS: { v: UseFilter; label: string }[] = [
-  { v: "", label: "전체" },
-  { v: "as_is", label: "원래 목적대로" },
-  { v: "open", label: "대관" },
-];
+// 🧹09-18 밤 QA SC-28 — 쓰임새 탭 목록(`USE_TABS`)을 걷었다. 09-14에 화면에서 쓰임새 칩을 뺀 뒤로 그리는 곳이 없었다.
+//   주소의 `?use=`는 그대로 읽어 넘긴다.
 
 export function RentFilters({
   initialArea,

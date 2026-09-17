@@ -4,7 +4,7 @@ import { listOpenSpaces } from "@/lib/spaces";
 import type { SpaceCategory, SpacePublic, SpaceUseType } from "@/lib/types";
 import { EmptyState } from "@/components/EmptyState";
 import { RentFilters, type UseFilter } from "./RentFilters";
-import { categoryLabel, CoverPlaceholder, primaryBtnCls, secondaryBtnCls, won } from "./ui";
+import { categoryLabel, CoverPlaceholder, secondaryBtnCls, won } from "./ui";
 import { PRODUCT_LABEL } from "@/lib/rent-copy";
 import { lowestPrice, productPrice, sellableProducts } from "@/lib/rent-products";
 import { OG_IMAGE } from "@/lib/site";
@@ -55,8 +55,9 @@ function parseUse(raw: string | undefined): UseFilter {
  *  위 3:2 커버, 아래 이름 15 bold · 한 줄 15 · 메타 13 faint.
  *  ⭐카드 위 pill은 「사장님이 알려줘요」 하나뿐. 비는 날 개수·가까운 날·쓰임새 칩은 뺐다 —
  *    카드는 고르게만 하면 되고, 나머지는 눌러서 본다(칩 셋이 쌓이니 표처럼 보였다).
- *  🚨주소는 여기 없다. `listOpenSpaces`가 `SpacePublic`을 돌려주므로 **런타임 객체에 주소 자체가 없다** —
- *    확정 전에 가게가 특정되면 플랫폼을 건너뛴 직거래가 일어난다(설계 §이탈). */
+ *  📍09-16부터 공개 값(`toPublic`)에도 주소가 실린다(대표: 공간 이름이 이미 가게를 특정해서 감추는 게 무의미하다).
+ *    카드는 고르는 자리라 주소 앞 두 토막(「서울 성동구」)만 쓴다. 전체 주소와 지도는 상세 화면에 있다.
+ *    🧹09-18 밤 QA SC-28 — 여기 있던 「런타임 객체에 주소 자체가 없다」는 09-16 전의 설명이라 고쳤다. */
 function SpaceCard({ sp }: { sp: SpacePublic }) {
   const cover = sp.photos[0];
   return (

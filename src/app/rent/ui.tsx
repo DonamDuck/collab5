@@ -12,20 +12,15 @@
 //   만들고 있었다. 소개서(`/m`) 사다리와 디자인-시스템 정본에 맞춰 통째로 갈았다.
 //   ⛔`rem` 유틸 금지(루트 17px라 6.25% 부푼다) — 전부 px로 박는다.
 import type { ReactNode } from "react";
-import type { SpaceUseType, BookingStatus, SpaceCategory, SpaceScope } from "@/lib/types";
+import type { BookingStatus, SpaceCategory } from "@/lib/types";
 
 /** 금액은 늘 「12,000원」 한 모양으로. 숫자만 던져두면 자릿수를 눈으로 세게 된다. */
 export function won(n: number): string {
   return `${n.toLocaleString("ko-KR")}원`;
 }
 
-/** 쓰임새 라벨 — 설계 §화면의 두 갈래를 사람 말로.
- *  ⚠️`both`를 「둘 다」로 적지 않는다. 빌리는 사람 입장에선 「골라서 쓸 수 있다」가 정보다. */
-export function usageLabel(t: SpaceUseType): string {
-  if (t === "as_is") return "원래 목적대로";
-  if (t === "open") return "대관";
-  return "원래 목적대로 · 대관";
-}
+// 🧹09-18 밤 QA SC-28 — 09-16~09-18에 화면이 바뀌며 부르는 곳이 없어진 조각 넷을 걷었다:
+//   쓰임새 라벨 `usageLabel` · 범위 라벨 `scopeLabel`(09-18 상품 이름으로) · 판 `CardBox` · 잠긴 연락처 한 줄 `LockedLine`.
 
 /** 📂업종 목록 (2026-09-16). ⚠️화면에 쓰는 말은 여기 한 곳에만 둔다 —
  *  목록·상세·카드가 각자 적으면 언젠가 「카페」와 「카페·디저트」가 같이 돌아다닌다.
@@ -48,12 +43,6 @@ export const CATEGORY_OPTIONS: [Exclude<SpaceCategory, "">, string][] = [
  *    손님 눈엔 사장님이 성의 없이 올린 것으로 읽힌다. 모르는 값은 말하지 않는 편이 낫다. */
 export function categoryLabel(c: SpaceCategory): string {
   return CATEGORY_OPTIONS.find(([v]) => v === c)?.[1] ?? "";
-}
-
-/** 범위 라벨 — **손님 말로**(09-17 QA). 「공간만」은 사장님이 고를 때 쓰는 말이라, 목록을 훑는 손님에겐
- *  「장비는 못 쓴다」는 뜻이 안 읽혔다. 등록 폼의 고르개는 사장님 말(`SpaceForm`의 `SCOPES`)을 따로 쓴다. */
-export function scopeLabel(v: SpaceScope): string {
-  return { space_only: "자리만 빌려요", with_gear: "장비까지 써요", whole_shop: "가게 그대로" }[v] ?? "자리만 빌려요";
 }
 
 /** 날짜·일정 서식은 `lib/rent-time`이 정본이다(09-16). 서버 액션·메일도 같은 함수를 쓴다.
@@ -248,12 +237,6 @@ export function InfoPanel({ title, children }: { title?: string; children: React
   );
 }
 
-export function CardBox({ children, className = "" }: { children: ReactNode; className?: string }) {
-  return (
-    <div className={`rounded-lg border border-hairline bg-surface p-5 ${className}`}>{children}</div>
-  );
-}
-
 /** 읽는 목록의 한 줄 — 위 구분선 + 왼쪽 글 + 오른쪽 상태. 마지막 줄은 아래 구분선도 갖는다.
  *  🔁09-16 `/rent/my` 안에만 있던 것을 여기로 올렸다. 보낸 신청 줄(`GuestBookingRow`)이 `/rent/requests`와
  *    같이 쓰면서, 줄 모양이 한 화면에만 있으면 두 화면의 구분선·간격이 따로 놀게 된다. */
@@ -290,11 +273,6 @@ export function ListRow({
       {children}
     </li>
   );
-}
-
-/** 아직 안 열린 연락처 — 회색 상자 대신 한 줄. */
-export function LockedLine({ text }: { text: string }) {
-  return <p className="mt-3 text-[15px] leading-relaxed break-keep text-faint">{text}</p>;
 }
 
 /** 사진이 없을 때 커버 자리 — 회색 면에 아톰 마크를 옅게. 「사진 준비 중」 글자보다 조용하다.
