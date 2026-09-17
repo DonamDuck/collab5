@@ -108,6 +108,7 @@ const LINK_HINT =
 const ONBOARD_DUP = {
   phone: "이미 이 번호로 가입한 계정이 있어요." + LINK_HINT,
   brandName: "이미 같은 이름으로 가입한 계정이 있어요." + LINK_HINT,
+  email: "이미 이 이메일로 가입한 계정이 있어요." + LINK_HINT,
 } as const;
 const ONBOARD_EXPIRED = "로그인 정보를 확인하지 못했어요. 다시 로그인해주세요.";
 
@@ -183,6 +184,12 @@ export async function completeOnboardingAction(input: {
   if (!email) return { error: "이메일을 입력해주세요." };
   if (!known && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return { error: "이메일 형식을 확인해주세요." };
+  }
+  // 🔒09-18 밤 — 화면에서 «직접 친» 이메일도 중복을 본다. 이 검사가 빠져 있어서 남의 이메일(대표 이메일 포함)을
+  //   프로필에 굳힐 수 있었고, 이메일로 권한을 가르는 곳(매거진 편집)이 그 값을 믿었다.
+  if (!known) {
+    const dupEmail = await findDuplicates({ email, excludeUuid: user.id });
+    if (dupEmail.email) return { error: ONBOARD_DUP.email };
   }
   let userId: number | null = null;
   try {
