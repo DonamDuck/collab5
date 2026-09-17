@@ -150,7 +150,9 @@ export function PhotoSlider({
           type="button"
           onClick={() => setZoom(idx)}
           aria-label="사진 원본 보기"
-          className="absolute bottom-2 right-2 flex h-7 w-7 items-center justify-center rounded-pill bg-ink/55 text-white hover:bg-ink/75 print:hidden"
+          // 👆09-18 밤 QA(G-22) — 28px이라 손끝 하한(44)의 2/3였다. **보이는 동그라미는 그대로 두고** 누르는 자리만 넓힌다
+          //   (인디케이터 점이 쓰는 것과 같은 수법). 8px씩 = 44px. 사진 위라 옆 것과 겹칠 일이 없다.
+          className="absolute bottom-2 right-2 flex h-7 w-7 items-center justify-center rounded-pill bg-ink/55 text-white before:absolute before:-inset-[8px] before:content-[''] hover:bg-ink/75 print:hidden"
         >
           <svg viewBox="0 0 20 20" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8">
             <circle cx="8.5" cy="8.5" r="5.5" />
@@ -203,8 +205,8 @@ export function PhotoSlider({
               aria-label={`${i + 1}번째 사진`}
               // 점 자체는 6.4px이라 44px 규칙의 1/7이었다 — 원하는 사진으로 넘어가질 못한다(QA #21).
               // ⚠️ 점을 키우면 디자인이 무너지니 **시각 픽셀은 그대로 두고 히트영역만** pseudo로 넓힌다.
-              //    -inset-y-4(≈40px 세로) + 좌우 3px → 인접 점과 겹치지 않는 선에서 최대치.
-              className={`relative h-1.5 rounded-pill transition-all after:absolute after:-inset-x-[3px] after:-inset-y-4 after:content-[''] ${
+              // 🔁09-18 밤 QA(G-22) — 세로를 40 → **44**로 채웠다. 가로는 점 사이 간격(6px)이 상한이라 여기까지가 최대치다.
+              className={`relative h-1.5 rounded-pill transition-all after:absolute after:-inset-x-[3px] after:-inset-y-[19px] after:content-[''] ${
                 i === idx ? "w-4 bg-primary" : "w-1.5 bg-border-strong"
               }`}
             />

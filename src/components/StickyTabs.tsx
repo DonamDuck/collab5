@@ -34,7 +34,8 @@ export function StickyTabs({
               href={it.href}
               scroll={false}
               aria-current={on ? "page" : undefined}
-              className={`flex h-[40px] items-center justify-center gap-1.5 rounded-lg text-[15px] transition-colors ${
+              // 👆09-18 밤 QA(G-22·H-28) — 40px이라 4px 모자랐다. 판(`p-1`) 안쪽 여백을 히트영역으로 빌려 44를 채운다.
+              className={`relative flex h-[40px] items-center justify-center gap-1.5 rounded-lg text-[15px] transition-colors after:absolute after:-inset-y-[2px] after:content-[''] ${
                 on ? "bg-surface font-semibold text-ink shadow-[0_1px_2px_rgba(0,0,0,0.08)]" : "font-medium text-mute hover:text-body"
               }`}
             >

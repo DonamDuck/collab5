@@ -1222,7 +1222,9 @@ export function SpaceForm({
           </li>
         </ul>
         <div id="f-terms" className="space-y-4">
-          <label className="flex cursor-pointer items-start gap-3">
+          {/* 👆09-18 밤 QA(H-28) — 체크박스가 18px이었다. 글자까지가 누름 상자라 실제로는 넓지만, 한 줄로 끝나는 화면에선
+              줄 높이(28px)가 곧 누름 높이였다. 위아래 여백으로 줄 자체를 44px 이상으로 만든다(음수 여백으로 자리는 그대로). */}
+          <label className="-my-2 flex min-h-[44px] cursor-pointer items-start gap-3 py-2">
             <input
               type="checkbox"
               className="mt-[3px] size-[18px] shrink-0 accent-primary"
@@ -1668,10 +1670,20 @@ function L({
   return (
     // 📐09-18 밤 QA(H-18) — 막힌 칸으로 데려갈 때도 라벨이 헤더 밑에 깔린다. 절과 같은 값으로 비켜 둔다.
     <div id={anchor ? `f-${anchor}` : undefined} className="scroll-mt-24">
-      <label htmlFor={htmlFor} className="mb-2 block text-[16px] font-medium text-body">
-        {label}
-        {optional && <span className="ml-1 text-[15px] font-normal text-faint">· 선택</span>}
-      </label>
+      {/* 🏷09-18 밤 QA(H-28) — 칸이 «하나의 입력»이 아닌 자리(사진 격자·설비 알약·안내 방식·등록증 고르기)에서도
+          이 머리를 `<label>`로 그렸다. 가리키는 것이 없는 라벨은 낭독기에서 빈 이름으로 읽히고, 눌러도 아무 데도 안 간다.
+          ⭐가리킬 칸이 있을 때만 라벨이다. 없으면 그냥 제목(`<p>`)이다 — 보이는 모양은 같다. */}
+      {htmlFor ? (
+        <label htmlFor={htmlFor} className="mb-2 block text-[16px] font-medium text-body">
+          {label}
+          {optional && <span className="ml-1 text-[15px] font-normal text-faint">· 선택</span>}
+        </label>
+      ) : (
+        <p className="mb-2 block text-[16px] font-medium text-body">
+          {label}
+          {optional && <span className="ml-1 text-[15px] font-normal text-faint">· 선택</span>}
+        </p>
+      )}
       {hint && <p className="-mt-0.5 mb-2 text-[15px] leading-relaxed break-keep text-faint">{hint}</p>}
       {children}
       {error && <p className="mt-2 text-[15px] leading-relaxed break-keep text-danger">{error}</p>}

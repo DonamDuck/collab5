@@ -114,7 +114,8 @@ export function SectionNav({ afterId }: { afterId: string }) {
               tabIndex={shown ? 0 : -1}
               aria-current={i === active ? "true" : undefined}
               onClick={() => go(i)}
-              className={`h-[34px] shrink-0 whitespace-nowrap rounded-pill px-3.5 text-[14px] transition-colors motion-reduce:transition-none ${
+              // 👆09-18 밤 QA(G-22) — 34px 알약이라 손끝 하한(44)에 못 미쳤다. 보이는 알약은 그대로 두고 위아래 5px씩만 넓힌다.
+              className={`relative h-[34px] shrink-0 whitespace-nowrap rounded-pill px-3.5 text-[14px] transition-colors after:absolute after:-inset-y-[5px] after:content-[''] motion-reduce:transition-none ${
                 i === active ? "bg-ink font-medium text-on-dark" : "text-body hover:bg-surface-soft"
               }`}
             >

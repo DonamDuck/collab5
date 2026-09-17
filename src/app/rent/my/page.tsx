@@ -550,7 +550,12 @@ export default async function MyRentPage({
                 {sp.bizCheckStatus === "mismatch" && (
                   <p className="mt-2 text-[15px] leading-relaxed break-keep text-lemon-on">
                     사업자 정보가 국세청 기록과 달라 열어 드리지 못하고 있어요.{" "}
-                    <Link href={`/rent/${sp.slug}/edit#f-biz`} className="underline underline-offset-2">
+                    {/* 👆09-18 밤 QA(H-28) — 문장 안 링크라 누를 자리가 글자 높이(18px)뿐이었다.
+                        문단 흐름을 안 깨면서 위아래로 늘리려면 `inline-block` + 세로 여백이 답이다(음수 여백으로 줄 간격은 되돌린다). */}
+                    <Link
+                      href={`/rent/${sp.slug}/edit#f-biz`}
+                      className="-my-[13px] inline-block py-[13px] underline underline-offset-2"
+                    >
                       고치러 가기
                     </Link>
                   </p>
@@ -633,7 +638,8 @@ export default async function MyRentPage({
                             scroll={false}
                             role="tab"
                             aria-selected={on}
-                            className={`inline-flex h-[36px] items-center gap-1 rounded-pill px-4 text-[14px] font-medium transition-colors ${
+                            // 👆09-18 밤 QA(G-22) — 36px 칩이라 손끝 하한에 못 미쳤다. 보이는 칩은 그대로 두고 위아래 4px씩 넓힌다.
+                            className={`relative inline-flex h-[36px] items-center gap-1 rounded-pill px-4 text-[14px] font-medium transition-colors after:absolute after:-inset-y-1 after:content-[''] ${
                               on ? "bg-ink text-surface" : "bg-surface-soft text-body hover:bg-surface-faint"
                             }`}
                           >

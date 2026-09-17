@@ -229,7 +229,9 @@ export function OpenSlotsCalendar({
               onClick={() => toggleDow(i)}
               aria-label={`${d}요일 전부 담기`}
               // 누를 수 있는 얼굴 — 옅은 알약 면(09-17 QA: 회색 작은 글자라 표 머리로만 보였다).
-              className="mx-0.5 mb-1 rounded-pill bg-surface-soft py-1.5 text-center text-[14px] font-medium text-body transition-colors hover:bg-primary-pale"
+              // 👆09-18 밤 QA(H-28) — 41×34라 손끝 하한에 못 미쳤다. 「일괄 담기」가 이 자리에만 있어서 못 누르면 길이 없다.
+              //   보이는 알약은 그대로 두고 칸 사이 여백(mx-0.5)만큼을 히트영역으로 빌린다.
+              className="relative mx-0.5 mb-1 rounded-pill bg-surface-soft py-1.5 text-center text-[14px] font-medium text-body transition-colors after:absolute after:-inset-x-[2px] after:-inset-y-[5px] after:content-[''] hover:bg-primary-pale"
             >
               {d}
             </button>

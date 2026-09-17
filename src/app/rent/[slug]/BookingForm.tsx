@@ -658,8 +658,11 @@ export function BookingForm({
           </div>
           {/* 소개서가 둘 이상일 때만 어느 것을 보낼지 고른다. */}
           {brandOn && myBrands.length > 1 && (
+            // 🏷09-18 밤 QA(G-22) — 이 고르개엔 `<label>`이 없어서 낭독기가 「콤보 상자」라고만 읽었다.
+            //   위 질문 문장은 라디오 둘을 가리키고 있어 이 칸의 이름이 아니다.
             <RentSelect
               id="rent-brand"
+              aria-label="보낼 소개서 고르기"
               wrapClassName="mt-3"
               value={brandPick}
               onChange={(e) => setBrandPick(e.target.value)}

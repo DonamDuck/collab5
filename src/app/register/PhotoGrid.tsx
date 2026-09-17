@@ -100,7 +100,12 @@ export function PhotoGrid({
               type="button"
               onClick={() => onRemove(i)}
               aria-label={it.uploading ? "업로드 취소" : "사진 삭제"}
-              className="absolute right-1 top-1 z-10 flex h-5 w-5 items-center justify-center rounded-pill bg-ink/60 text-[11px] text-white"
+              // 👆09-18 밤 QA(H-28) — 20px이라 손끝 하한(44)의 절반도 안 됐다. 폰에서 지우려다 사진을 끌어 순서만 바뀐다.
+              //   보이는 동그라미는 그대로 두고 누르는 자리만 넓힌다.
+              //   ⚠️타일이 `overflow-hidden`이라 밖으로 나간 부분은 «눌리지도» 않는다. 그래서 16px을 줘도 실제로 커지는 건
+              //     타일 «안»쪽 40×40까지다. 44를 채우려면 20px이 필요한데, 그러면 80px 타일의 절반이 지우기 자리가 된다.
+              //     되돌릴 수 없는 버튼이라 거기까지는 안 간다(20 → 40이면 손끝이 닿는다).
+              className="absolute right-1 top-1 z-10 flex h-5 w-5 items-center justify-center rounded-pill bg-ink/60 text-[11px] text-white before:absolute before:-inset-4 before:content-['']"
             >
               ✕
             </button>
