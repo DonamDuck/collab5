@@ -84,6 +84,9 @@ export const PAY_FAIL_NOT_AVAILABLE = "RENT_NOT_AVAILABLE";
 /** 🆕09-18 밤 QA(SC-12) — 승인은 됐는데 «아직 받지 않은» 결제(입금 대기 가상계좌 등). 그 자리에서 취소하고 돌려보낸다. */
 export const PAY_FAIL_METHOD_UNSUPPORTED = "RENT_METHOD_UNSUPPORTED";
 
+/** 🆕09-18 밤 QA(G-05) — 취소 팝업이 본 금액보다 실제 환불액이 «적어졌다». 돌려주지 않고 다시 확인받는다. */
+export const PAY_FAIL_REFUND_CHANGED = "RENT_REFUND_CHANGED";
+
 /** 결제 시간이 지난 신청에 손님께 하는 말. 결제 화면과 승인이 같은 문장을 쓴다. */
 export const PAY_EXPIRED_LINE = "결제 시간 30분이 지나서 이 신청은 닫혔어요.";
 

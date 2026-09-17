@@ -157,9 +157,12 @@ export function GuestCancel({ bookingId }: { bookingId: number }) {
 
   const run = () =>
     start(async () => {
+      // 💸09-18 밤 QA(G-05) — 팝업이 «보여 준» 금액을 같이 넘긴다. 서버가 다시 계산한 값이 이보다 적으면
+      //   환불하지 않고 「금액이 바뀌었어요」로 돌아온다(경계 시각이 지난 경우). 그 값을 지우기 전에 집어 둔다.
+      const quoted = quote?.refund;
       setQuote(null);
       setErr("");
-      const r = await cancelBookingAction(bookingId);
+      const r = await cancelBookingAction(bookingId, quoted);
       if (!r.ok) {
         setErr(r.message);
         return;

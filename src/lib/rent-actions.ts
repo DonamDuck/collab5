@@ -24,7 +24,7 @@ import { signCertUpload } from "./host-docs";
 import { hasPayoutAccount, savePayoutAccount, toMasked, validatePayoutInput, type PayoutAccountInput, type PayoutAccountMasked } from "./payout-accounts";
 import {
   approvePayment, cancelPayment, guestCancelRefundPercent, GRACE_MINUTES,
-  PAY_EXPIRED_LINE, PAY_FAIL_METHOD_UNSUPPORTED, PAY_FAIL_NOT_AVAILABLE, PAY_FAIL_SLOT_TAKEN,
+  PAY_EXPIRED_LINE, PAY_FAIL_METHOD_UNSUPPORTED, PAY_FAIL_NOT_AVAILABLE, PAY_FAIL_REFUND_CHANGED, PAY_FAIL_SLOT_TAKEN,
   PAY_FAIL_SLOT_TAKEN_REFUNDED, PAY_FAIL_SLOT_TAKEN_REFUND_PENDING, PAY_FAIL_USE_STARTED, PAY_FAIL_WINDOW_OVER,
 } from "./rent-payment";
 // ⭐신청이 «지금도» 말이 되나 — 신청 시작·결제 승인·결제 화면이 같이 쓰는 순수 규칙(09-18 밤 QA G-01).
@@ -912,8 +912,10 @@ export async function quoteCancelAction(
   return { ok: true, message: "", total: b.amountTotal, refund, rate, daysBefore, grace };
 }
 
-/** 게스트 취소 — 환불률은 우리 규정표가 정한다(호스트 자율 금지). */
-export async function cancelBookingAction(bookingId: number): Promise<ActionResult> {
+/** 게스트 취소 — 환불률은 우리 규정표가 정한다(호스트 자율 금지).
+ *  @param quotedRefund 취소 팝업이 손님에게 «보여 준» 환불액(`quoteCancelAction`의 값). 서버가 다시 계산한 값이
+ *    이보다 적으면 돌려주지 않고 멈춘다(09-18 밤 QA G-05). 안 넘기면 검사하지 않는다. */
+export async function cancelBookingAction(bookingId: number, quotedRefund?: number): Promise<ActionResult> {
   if (await rentMockOn()) return { ...RENT_MOCK_BLOCKED };
   const uid = await getSessionUserId();
   if (!uid) return { ok: false, message: "로그인이 필요해요." };
@@ -928,6 +930,14 @@ export async function cancelBookingAction(bookingId: number): Promise<ActionResu
   if (!pay) return { ok: false, message: "결제 기록을 찾지 못해 취소하지 않았어요. 문의해 주세요." };
 
   const { refund } = cancelRefund(b, pay.approvedAt);
+  // 💸09-18 밤 QA(G-05) — 팝업이 본 금액보다 «적어졌으면» 돌려주지 않는다. 팝업을 연 뒤 경계 시각(결제 1시간 유예·이용일 며칠 전)이
+  //   지나면 서버가 다시 계산한 값이 작아지는데, 손님은 팝업에 적힌 금액을 보고 확인을 눌렀다. 더 받는 쪽(값이 커짐)은 그냥 진행한다.
+  if (typeof quotedRefund === "number" && Number.isFinite(quotedRefund) && refund < quotedRefund) {
+    return {
+      ok: false, code: PAY_FAIL_REFUND_CHANGED,
+      message: "기준 시간이 지나 돌려드릴 금액이 바뀌었어요. 다시 확인해 주세요.",
+    };
+  }
   if (refund > 0) {
     // 🔁09-18 밤 QA(G-16) — 토스를 부르기 «직전»에 예약을 다시 읽는다. 취소 팝업을 보는 사이 사장님이 거절했을 수 있다.
     //   그대로 밀면 이미 환불된 결제에 취소가 한 번 더 가고, 장부의 「거절」이 「손님 취소」로 뒤집힌다.
