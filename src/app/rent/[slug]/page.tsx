@@ -37,6 +37,14 @@ export const dynamic = "force-dynamic";
 /** 신청 폼이 없는 화면에서 「빌릴 수 있는 날」에 까는 칩 수. 둘씩 세 줄(폰)을 넘기지 않는 값. */
 const SLOT_PREVIEW = 6;
 
+/** 🔒없는 공간의 메타. 공개 전 공간을 남이 열 때도 «이것과 똑같이» 준다(09-18 밤 QA SEC-05). */
+const NOT_FOUND_META: Metadata = { title: "공간을 찾을 수 없어요 — collab5", robots: { index: false } };
+
+/** 공개 전(검토 대기·쉬는 중·초안) 공간을 볼 수 있는 사람 — 주인과 관리자. 본문과 메타가 같은 규칙을 쓴다. */
+async function maySeeUnlisted(ownerUserId: number, uid: number | null): Promise<boolean> {
+  return (!!uid && uid === ownerUserId) || (await isRentAdmin());
+}
+
 export async function generateMetadata({
   params,
 }: {
@@ -44,13 +52,20 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { slug } = await params;
   const sp = await getSpacePublic(slug);
-  if (!sp) return { title: "공간을 찾을 수 없어요 — collab5" };
+  if (!sp) return NOT_FOUND_META;
+  // 🔒09-18 밤 QA(SEC-05) — 공개 전 공간은 본문이 주인·관리자 말고는 404다. 메타도 같은 규칙으로 가린다.
+  //   전엔 제목에 공간 이름, 설명에 동네, 정본 주소에 slug가 실려서 «있지만 못 보는 공간»과 «없는 공간»이 갈렸다.
+  //   주소를 훑어 아직 안 열린 공간 목록을 만들 수 있었다는 뜻이다. 이제 남에게는 없는 공간과 똑같은 메타가 간다.
+  const listed = sp.status === "open";
+  if (!listed && !(await maySeeUnlisted(sp.ownerUserId, await getSessionUserId()))) return NOT_FOUND_META;
   return {
     title: `${sp.name} — 하루 가게`,
     // 링크 미리보기 설명은 한 줄 소개 또는 동네까지. 주소는 화면에서 열려 있지만(09-16) 카드엔 길 필요가 없다.
     // ⏱09-16 대표 — 시간 단위 대여. 「하루 빌려보세요」는 사실이 틀린 말이라 링크 카드에도 안 싣는다.
     description: sp.tagline || `${sp.area}에서 필요한 시간만큼 빌릴 수 있는 공간이에요.`,
     alternates: { canonical: `/rent/${sp.slug}` },
+    // 주인·관리자가 공개 전 공간을 볼 때도 검색엔진엔 안 올린다.
+    ...(listed ? {} : { robots: { index: false } }),
   };
 }
 
@@ -122,7 +137,8 @@ export default async function SpaceDetailPage({
   // 검토 중·쉬는 중인 공간은 주인에게만 보인다. 남에게 404인 이유 —
   // 「있지만 못 본다」와 「없다」를 구분해 주면, 주소를 훑어 아직 안 열린 공간 목록을 만들 수 있다.
   // 🧾09-18 관리자도 연다 — 검토 화면(`/rent/review`)에서 공개 전 공간을 눈으로 봐야 한다. 판정은 `isRentAdmin` 한 벌.
-  if (sp.status !== "open" && !isOwner && !(await isRentAdmin())) notFound();
+  //   메타(`generateMetadata`)도 같은 함수(`maySeeUnlisted`)로 가린다.
+  if (sp.status !== "open" && !(await maySeeUnlisted(sp.ownerUserId, uid))) notFound();
 
   // 상호(운영하는 브랜드 이름). 사장님 실명(profiles에 따로 없다)은 안 읽는다.
   const operatorName = (await getProfileById(sp.ownerUserId))?.brandName?.trim() ?? "";
