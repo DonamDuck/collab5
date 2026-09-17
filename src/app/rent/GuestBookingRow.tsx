@@ -140,6 +140,7 @@ export function GuestBookingRow({ view }: { view: GuestBookingView }) {
   const headline = b.status === "paid" ? BOOKING_HEADLINE.guestPaid : b.status === "confirmed" ? BOOKING_HEADLINE.guestConfirmed : "";
   return (
     <ListRow
+      card
       head={
         <>
           <p className="truncate text-[17px] font-medium text-ink">

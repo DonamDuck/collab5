@@ -149,12 +149,13 @@ export default async function RentDonePage({ params }: { params: Promise<{ booki
               <h2 className="text-[19px] font-bold leading-snug tracking-tight text-ink">예약 안내 사항</h2>
               <ul className="mt-4 space-y-3">
                 {[
-                  "사장님 연락처를 아래에 적어 두었어요. 이용 전에 궁금한 게 있으면 편하게 연락해 보세요.",
                   // ⏱09-17 대표 — 확정 뒤 2일 안 연락 규칙.
                   CONTACT_RULE_GUEST,
                   "사장님 사정으로 어려워지면 전액 돌려드려요. 결제한 수단으로 3~5일 안에 돌아가요.",
                   // ☕09-17 커피챗을 담았으면 «언제»를 여기서도 말한다. 문장은 한 벌(`rent-copy`)이다.
                   ...(withChat ? [COFFEE_CHAT_WHEN_GUEST] : []),
+                  // 🔁09-18 대표 코멘트 — 연락처 안내는 맨 마지막으로. 바로 아래 가게 정보로 이어진다.
+                  "사장님 연락처를 아래에 적어 두었어요. 이용 전에 궁금한 게 있으면 편하게 연락해 보세요.",
                 ].map((t) => (
                   <li key={t} className="flex gap-2 text-[16px] leading-relaxed break-keep text-body">
                     <span aria-hidden="true" className="text-mute">
@@ -213,9 +214,10 @@ export default async function RentDonePage({ params }: { params: Promise<{ booki
         </Link>
         {/* 💬09-16 phase 1 — 버튼 무게를 늘리지 않으려고 글자 링크로 둔다. 할 일은 위 두 버튼이고 이건 «막혔을 때». */}
         <p className="mt-5 text-center text-[15px] leading-relaxed break-keep text-mute">
-          궁금한 게 있으면{" "}
+          {/* 🔁09-18 대표 코멘트 — 「collab5에 궁금 사항이 있으신가요? 문의하기(밑줄)」 */}
+          collab5에 궁금한 사항이 있으신가요?{" "}
           <a href={KAKAO_CHAT_URL} target="_blank" rel="noreferrer" className="text-body underline underline-offset-2">
-            카카오톡으로 물어봐 주세요
+            문의하기
           </a>
         </p>
       </div>

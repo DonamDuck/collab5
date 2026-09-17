@@ -243,11 +243,26 @@ export function ListRow({
   head,
   status,
   children,
+  card = false,
 }: {
   head: ReactNode;
   status: ReactNode;
   children?: ReactNode;
+  /** 🗂09-18 대표 코멘트(/rent/requests) — 「각각의 예약이 분리돼 보이게. 라인 하나로만 나뉘어 아쉬워」.
+   *  예약 한 건이 연락·주소·버튼까지 품어 길어지면 선 하나로는 어디서 다음 예약이 시작하는지 안 보인다. 그때 카드로 세운다. */
+  card?: boolean;
 }) {
+  if (card) {
+    return (
+      <li className="mb-3 rounded-xl border border-hairline bg-surface p-4 last:mb-0 sm:p-5">
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0 flex-1">{head}</div>
+          {status}
+        </div>
+        {children}
+      </li>
+    );
+  }
   return (
     <li className="border-t border-hairline py-5 last:border-b">
       <div className="flex items-start justify-between gap-4">

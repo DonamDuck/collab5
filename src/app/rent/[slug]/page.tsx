@@ -244,6 +244,41 @@ export default async function SpaceDetailPage({
             </Section>
           )}
 
+          {/* 🔁09-18 대표 코멘트 — 「공간·시설 안내 하단으로, 좀 더 위로」. 무엇이 있는지 본 바로 다음에 무엇을 빌릴지 읽는다.
+              🛍09-18 「비용」 → 「빌릴 수 있는 것」(대표: 「대관만, 공간 전체, 커피챗 … 고객은 신청할 때 이걸 선택」).
+              앞선 코멘트 — 「일일카페로 하고 싶은 사람도, 예뻐서 대관만 하고 싶은 사람도 딱 보고 알 수 있게」.
+              ⭐그래서 값만 적지 않고 사장님이 적은 «무엇을 쓰고 할 수 있는지»를 상품마다 같이 싣는다.
+              상품 이름 밑 한 줄(`PRODUCT_HINT_GUEST`)은 우리 말, 그 아래 글은 사장님 말이다. */}
+          <Section title="빌릴 수 있는 것" nav="상품">
+            <div className="space-y-3">
+              {products.map((p) => (
+                <div key={p} className="rounded-lg border border-hairline bg-surface px-4 py-4">
+                  <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                    <p className="text-[17px] font-bold text-ink">{PRODUCT_LABEL[p]}</p>
+                    <p className="text-[16px] text-ink">
+                      <span className="font-medium tabular-nums">{won(productPrice(sp, p))}</span>
+                      <span className="ml-1 text-[15px] text-mute">/ 시간</span>
+                    </p>
+                  </div>
+                  <p className="mt-0.5 text-[15px] text-mute">{PRODUCT_HINT_GUEST[p]}</p>
+                  {productNote(sp, p) && (
+                    <p className="mt-3 whitespace-pre-line text-[16px] leading-relaxed break-keep text-body">
+                      {productNote(sp, p)}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+            <p className="mt-3 text-[15px] text-mute">
+              {products.length > 1 ? "신청할 때 둘 중 하나를 골라요. " : ""}최소 {sp.minHours}시간부터 빌릴 수 있어요.
+            </p>
+            {sp.coffeeChat && sp.coffeeChatPrice > 0 && (
+              <p className="mt-1.5 text-[15px] text-mute">
+                커피챗 {sp.coffeeChatMinutes}분({won(sp.coffeeChatPrice)})은 어느 쪽에든 더할 수 있어요.
+              </p>
+            )}
+          </Section>
+
           {/* 📍09-14 신설 — 대표 지시(아워플레이스 참고). 좌표는 사장님이 주소를 넣을 때 한 번 재서
               `spaces.lat/lng`에 굳혀 둔다(`lib/geocode.ts`). 좌표가 없으면 주소만 적는다.
               🔁09-16 — 정확한 핀·정확한 주소로(위 `AreaMap` 머리말). */}
@@ -344,39 +379,6 @@ export default async function SpaceDetailPage({
             </Section>
           )}
 
-          {/* 🛍09-18 「비용」 → 「빌릴 수 있는 것」(대표: 「대관만, 공간 전체, 커피챗 … 고객은 신청할 때 이걸 선택」).
-              앞선 코멘트 — 「일일카페로 하고 싶은 사람도, 예뻐서 대관만 하고 싶은 사람도 딱 보고 알 수 있게」.
-              ⭐그래서 값만 적지 않고 사장님이 적은 «무엇을 쓰고 할 수 있는지»를 상품마다 같이 싣는다.
-              상품 이름 밑 한 줄(`PRODUCT_HINT_GUEST`)은 우리 말, 그 아래 글은 사장님 말이다. */}
-          <Section title="빌릴 수 있는 것" nav="상품">
-            <div className="space-y-3">
-              {products.map((p) => (
-                <div key={p} className="rounded-lg border border-hairline bg-surface px-4 py-4">
-                  <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-                    <p className="text-[17px] font-bold text-ink">{PRODUCT_LABEL[p]}</p>
-                    <p className="text-[16px] text-ink">
-                      <span className="font-medium tabular-nums">{won(productPrice(sp, p))}</span>
-                      <span className="ml-1 text-[15px] text-mute">/ 시간</span>
-                    </p>
-                  </div>
-                  <p className="mt-0.5 text-[15px] text-mute">{PRODUCT_HINT_GUEST[p]}</p>
-                  {productNote(sp, p) && (
-                    <p className="mt-3 whitespace-pre-line text-[16px] leading-relaxed break-keep text-body">
-                      {productNote(sp, p)}
-                    </p>
-                  )}
-                </div>
-              ))}
-            </div>
-            <p className="mt-3 text-[15px] text-mute">
-              {products.length > 1 ? "신청할 때 둘 중 하나를 골라요. " : ""}최소 {sp.minHours}시간부터 빌릴 수 있어요.
-            </p>
-            {sp.coffeeChat && sp.coffeeChatPrice > 0 && (
-              <p className="mt-1.5 text-[15px] text-mute">
-                커피챗 {sp.coffeeChatMinutes}분({won(sp.coffeeChatPrice)})은 어느 쪽에든 더할 수 있어요.
-              </p>
-            )}
-          </Section>
 
           {/* 💸09-15 대표 — *「환불 규정 섹션 하나 만들고 환불 규정 넣자. 일단 제너럴하게 우리가 정한 환불규정으로」*.
               ⭐숫자는 `guestCancelRefundRate`(`lib/rent-payment.ts`)가 실제로 계산하는 값 그대로다.

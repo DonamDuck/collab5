@@ -308,7 +308,8 @@ export function BookingForm({
           하단 금액이 처음부터 맞게 선다. 둘이면 카드 라디오, 하나면 고르기 없이 한 줄. 설명은 상세 「빌릴 수 있는 것」과 같은 글이다. */}
       {sellable.length > 0 && (
         <div ref={productRef}>
-          <p className={labelCls}>어떻게 빌리실까요?</p>
+          {/* 🔁09-18 대표 코멘트 — 「어떻게 빌리실까요」가 위 「빌릴 수 있는 것」과 겹쳐 읽혔다. 하나면 확인, 둘이면 고르기. */}
+          <p className={labelCls}>{sellable.length === 1 ? "신청 타입을 확인해 주세요" : "신청 타입을 골라 주세요"}</p>
           {sellable.length === 1 ? (
             <div className="rounded-lg bg-surface-soft px-4 py-3">
               <p className="text-[16px] text-ink">
@@ -698,7 +699,8 @@ export function BookingForm({
             버튼과 붙어 있던 것도 아래 여백으로 뗐다. */}
         <div className="mt-6 mb-2">
           <p className="text-[15px] font-bold text-ink">예약 전 유의사항</p>
-          <ul className="mt-2 space-y-2">
+          {/* 📐09-18 대표 코멘트 — 위 「예약 정보 확인」과 같은 위계로 제목 밑에 선 하나. */}
+          <ul className="mt-2 space-y-2 border-t border-hairline pt-3">
             {[
               CONTACT_RULE_GUEST,
               "공간은 사장님이 직접 빌려주세요. collab5는 신청과 결제를 이어 드리는 통신판매중개자라 거래의 당사자는 아니에요.",

@@ -79,9 +79,9 @@ const SAVED_LINE: Record<string, string> = {
 export default async function MyRentPage({
   searchParams,
 }: {
-  searchParams: Promise<{ saved?: string; did?: string; b?: string }>;
+  searchParams: Promise<{ saved?: string; did?: string; b?: string; tab?: string }>;
 }) {
-  const { saved, did, b: didBooking } = await searchParams;
+  const { saved, did, b: didBooking, tab: tabParam } = await searchParams;
   const uid = await getSessionUserId();
   if (!uid) {
     return (
@@ -303,6 +303,13 @@ export default async function MyRentPage({
       );
     };
 
+  const tab: "host" | "guest" =
+    tabParam === "guest" || tabParam === "host"
+      ? tabParam
+      : mySpaces.length === 0 && hostBookings.length === 0 && guestBookings.length > 0
+        ? "guest"
+        : "host";
+
   return (
     <main className="mx-auto w-full max-w-[720px] px-4 pt-8 pb-16 sm:px-6 sm:pt-12">
       {/* 한 번 뜬 알림 표시(`saved`·`did`)를 주소에서 지운다. key로 새로 달아야 같은 화면 안의 두 번째 알림에서도 돈다. */}
@@ -326,6 +333,30 @@ export default async function MyRentPage({
         </p>
       )}
 
+      {/* 🗂09-18 대표 코멘트 — 「올린 공간과 빌린 공간이 위아래로 있으니 위계가 나뉜 거 같아. 같은 위계인데 탭 방식으로(우리 잘 쓰는 플로팅)」.
+          ⭐두 칸은 같은 사람의 두 얼굴이다(빌려주는 나 · 빌리는 나). 위아래로 쌓으면 아래 것이 부록처럼 읽힌다.
+          탭은 주소(`?tab=`)로 나눈다 — 새로고침·뒤로 가기·메일 링크에서도 같은 칸이 열린다.
+          기본 칸: 공간이나 들어온 요청이 있으면 «빌려준 공간», 빌린 것만 있으면 «빌린 공간». */}
+      <nav aria-label="내 하루 가게 나누기" className="mt-8 inline-flex rounded-pill bg-surface-soft p-1">
+        {([
+          { key: "host", label: "빌려준 공간" },
+          { key: "guest", label: "빌린 공간" },
+        ] as const).map((it) => (
+          <Link
+            key={it.key}
+            href={`/rent/my?tab=${it.key}`}
+            aria-current={tab === it.key ? "page" : undefined}
+            className={`flex h-[44px] items-center rounded-pill px-5 text-[15px] font-medium transition-colors sm:px-6 ${
+              tab === it.key ? "bg-surface text-ink shadow-[0_1px_3px_rgba(0,0,0,0.08)]" : "text-mute hover:text-body"
+            }`}
+          >
+            {it.label}
+          </Link>
+        ))}
+      </nav>
+
+      {tab === "host" && (
+        <>
       {/* 📊09-17 디자인팀 — 숫자 세 칸. 절까지 내려가기 전에 «오늘 할 일이 있나»를 첫 화면에서 답한다(원티드·리멤버 대시보드).
           칸을 누르면 그 무리로 내려간다. 새 요청이 있을 때만 그 숫자에 레몬 글자색을 준다 — 기다리는 것의 색(`BookingBadge`)과 같다. */}
       {(mySpaces.length > 0 || hostBookings.length > 0) && (
@@ -464,24 +495,36 @@ export default async function MyRentPage({
         </section>
       )}
 
+        </>
+      )}
+
       {/* ── ③ 내가 빌린 공간 ── */}
       {/* 🔗09-16 손님 전용 화면(`/rent/requests`, B81)이 생겼다. 이 절은 남긴다 — 사장님이면서 남의 공간을
           빌리는 분도 있어서, 여기서 통째로 빼면 그분은 두 화면을 오가야 한다. 옆에 건너가는 글자 링크만 둔다. */}
       {/* 🔻09-17 QA — 빈 상태면 절을 통째로 접는다. 사장님 화면 맨 아래에 손님용 빈 절이 늘 붙어 있었다.
           남의 공간을 빌린 적이 생기면 그때 나타난다. */}
-      {guestBookings.length > 0 && (
-        <section className="mt-12">
+      {tab === "guest" && (
+        <section className="mt-8">
           <div className="flex items-baseline justify-between gap-3">
             <h2 className={h2Cls}>내가 빌린 공간</h2>
             <Link href="/rent/requests" className="shrink-0 py-[12px] text-[15px] text-mute underline underline-offset-2">
               따로 모아 보기
             </Link>
           </div>
-          <ul className="mt-5">
-            {guestBookings.map((v) => (
-              <GuestBookingRow key={v.booking.id} view={v} />
-            ))}
-          </ul>
+          {guestBookings.length === 0 ? (
+            <p className="mt-5 text-[16px] leading-relaxed break-keep text-mute">
+              아직 빌린 공간이 없어요.{" "}
+              <Link href="/rent" className="text-body underline underline-offset-2">
+                빌릴 곳 둘러보기
+              </Link>
+            </p>
+          ) : (
+            <ul className="mt-5">
+              {guestBookings.map((v) => (
+                <GuestBookingRow key={v.booking.id} view={v} />
+              ))}
+            </ul>
+          )}
         </section>
       )}
     </main>
