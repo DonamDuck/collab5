@@ -22,6 +22,7 @@ import {
   setSpacePausedAction,
 } from "@/lib/rent-actions";
 import { InfoList, InfoRow, primaryBtnCls, rentTextareaCls, secondaryBtnCls, won } from "../ui";
+import { HOST_MESSAGE_MAX } from "@/lib/rent-limits";
 import { ConfirmDialog } from "../ConfirmDialog";
 
 /** 들어온 요청 — 수락 · 거절. 거절은 전액 환불이라 되돌릴 수 없다(대표 09-13).
@@ -68,6 +69,8 @@ export function HostDecide({
         className={`${rentTextareaCls} resize-y`}
         value={message}
         onChange={(e) => setMessage(e.target.value)}
+        // ✂️09-18 밤 QA(SEC-07) — 서버(`decideBookingAction`)와 같은 상한. 서버가 돌려보내면 그 말은 바로 아래 줄에 뜬다.
+        maxLength={HOST_MESSAGE_MAX}
         placeholder="한 줄 남기실 말 (예: 그날 오전엔 제가 있을게요)"
         aria-label="손님께 남길 말"
       />

@@ -26,6 +26,7 @@ import {
   PAY_FAIL_SLOT_TAKEN_REFUNDED, PAY_FAIL_SLOT_TAKEN_REFUND_PENDING,
 } from "./rent-payment";
 import { refundAmount } from "./rent-money";
+import { CONTACT_PHONE_MAX, HOST_MESSAGE_MAX, PLAN_MAX, storePhoneOk } from "./rent-limits";
 import { geocode } from "./geocode";
 import { repo } from "./repo";
 import {
@@ -172,6 +173,11 @@ export async function saveSpaceAction(input: SpaceFormInput): Promise<ActionResu
   if (!input.contactPhone.trim()) {
     // 🔁09-17 QA — 「법에 따라」가 위협조로 읽혔다. 근거는 위 주석에 두고 사장님께는 쓰임만 말한다.
     return { ok: false, message: "매장 전화번호가 비어 있어요. 손님이 신청하기 전에 보는 번호예요." };
+  }
+  // ✂️09-18 밤 QA(SEC-07) — 전화번호 모양과 길이. 전엔 아무 글이나 들어가 상세 화면의 전화 걸기 링크가 엉뚱한 번호가 됐다.
+  //   화면(`SpaceForm`)도 같은 함수로 먼저 막아 그 칸 밑에 말한다.
+  if (input.contactPhone.trim().length > CONTACT_PHONE_MAX || !storePhoneOk(input.contactPhone)) {
+    return { ok: false, message: "매장 전화번호를 다시 봐 주세요. 예) 02-1234-5678" };
   }
   // 📜호스트 약관 동의. 없으면 수수료·정산·구상을 나중에 주장할 근거가 없다.
   if (!input.hostTermsOk) {
@@ -522,6 +528,10 @@ export async function startBookingAction(input: BookingFormInput): Promise<Start
   if (!sp || sp.status !== "open") return { ok: false, message: "지금은 신청할 수 없는 공간이에요." };
   if (sp.ownerUserId === uid) return { ok: false, message: "내 공간은 내가 빌릴 수 없어요." };
   if (input.plan.trim().length < 10) return { ok: false, message: "그날 무엇을 하실지 열 글자 이상 적어 주세요." };
+  // ✂️09-18 밤 QA(SEC-07) — 상한. 화면 칸도 같은 숫자로 막는다(`PLAN_MAX`). 이 글은 사장님 메일·요청 카드로 그대로 간다.
+  if (input.plan.trim().length > PLAN_MAX) {
+    return { ok: false, message: `그날 무엇을 하실지 ${PLAN_MAX.toLocaleString()}자 안으로 줄여 주세요.` };
+  }
   // 🛍09-18 — 사장님이 켜 둔 상품인지. 화면을 거치지 않은 호출이면 꺼진 상품 이름이 올 수 있다.
   if (!isRentProduct(input.product) || !productOn(sp, input.product)) {
     return { ok: false, message: "이 공간에서 팔지 않는 상품이에요. 새로고침하고 다시 골라 주세요." };
@@ -692,6 +702,10 @@ export async function decideBookingAction(
   const uid = await getSessionUserId();
   if (!uid) return { ok: false, message: "로그인이 필요해요." };
 
+  // ✂️09-18 밤 QA(SEC-07) — 손님께 남기는 말의 상한. 화면 칸도 같은 숫자로 막고, 이 말은 칸 바로 밑에 뜬다.
+  if (message.trim().length > HOST_MESSAGE_MAX) {
+    return { ok: false, message: `남기실 말이 길어요. ${HOST_MESSAGE_MAX}자 안으로 줄여 주세요.` };
+  }
   const b = await getBooking(bookingId);
   if (!b) return { ok: false, message: "그 요청을 찾지 못했어요." };
   // ⚠️권한은 "이 사람이 그 공간의 주인인가"다. booking에는 주인이 안 적혀 있어 공간을 거쳐 확인한다.
