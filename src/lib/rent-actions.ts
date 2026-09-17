@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { getSessionUserId, getProfile, getProfileById, savePhoneIfEmpty } from "./profiles";
 import { getSessionUser } from "./supabase/server";
 // 🧪09-17 목 데이터 — 목 쿠키가 있으면 쓰기 액션은 첫 줄에서 멈춘다(DB·토스·메일 전부 안 건드린다). 개발 빌드 전용.
@@ -641,6 +642,16 @@ async function settledBooking(orderId: string, bookingId: number, samePaymentKey
   return { ok: true, message: "예약을 완료했어요.", bookingId: again?.id ?? bookingId };
 }
 
+/** 📨알림을 «응답 뒤»로 미룬다 (2026-09-18 밤 QA SC-19).
+ *  🩸결제 복귀·수락·거절·취소가 메일 두 통을 기다린 뒤에야 응답했다. 한 통에 8초 제한이 걸려 있어 최악엔 손님이 16초를 본다.
+ *  ⭐**목 모드 판정은 `after` «밖»에서 한다.** 콜백은 응답이 끝난 뒤에 도는데, 그 안에서 쿠키를 읽는 건
+ *    라우트 핸들러·서버 액션에서만 허용된다(Next 16 `after` 문서). 판정을 안에 두면 갈래가 조용히 달라진다.
+ *  ⚠️`after`는 응답이 실패하거나 `redirect`가 나도 돈다(같은 문서). 알림은 결과에 영향을 주지 않으니 그대로 둔다. */
+async function notifyLater(run: () => Promise<unknown>): Promise<void> {
+  if (await rentMockOn()) return;
+  after(() => safeNotify(run));
+}
+
 /** 알림 한 통 — 🚨**결과에 영향을 주면 안 된다.** `rent-notify.ts`가 스스로 삼키지만, 조회 단계(`notifyParties`)가
  *  던질 수도 있어 한 겹 더 감싼다. 결제는 끝났는데 메일 때문에 「실패」가 뜨는 일은 없어야 한다. */
 async function safeNotify(run: () => Promise<unknown>): Promise<void> {
@@ -759,7 +770,7 @@ export async function confirmBookingAction(
   //   DB의 배제 제약(`no_time_overlap`)이 판정하고, 호스트가 연 시간대는 그대로 둔다.
   revalidatePath("/rent");
   revalidatePath("/rent/my");
-  await safeNotify(async () => {
+  await notifyLater(async () => {
     const p = await notifyParties(paid);
     if (!p) return;
     // 📨대표 09-16 — 예약 신청(결제 완료) 때 사장님과 손님 둘 다. 사장님 메일엔 손님이 고른 소개서를 붙인다.
@@ -825,7 +836,7 @@ export async function decideBookingAction(
     revalidatePath("/rent/my");
     // 🩸환불이 실패했는데 「전액 돌려드려요」 메일이 나가면 안 된다. 돈이 아직 안 돌아왔다.
     //   그 예약은 rejected로 남아 정산 화면 「손이 필요한 예약」에 뜨고, 환불이 끝나면 그때 알린다.
-    if (refunded) await safeNotify(async () => {
+    if (refunded) await notifyLater(async () => {
       const p = await notifyParties(decided);
       if (p) await notifyBookingRejected(decided, p.space, p.host, p.guest);
     });
@@ -834,7 +845,7 @@ export async function decideBookingAction(
       : { ok: true, message: "거절했어요. 환불이 늦어지고 있어 저희가 확인하고 있어요." };
   }
   revalidatePath("/rent/my");
-  await safeNotify(async () => {
+  await notifyLater(async () => {
     const p = await notifyParties(decided);
     if (!p) return;
     // 📨대표 09-16 — 예약 확정 때 손님과 사장님 둘 다.
@@ -934,7 +945,7 @@ export async function cancelBookingAction(bookingId: number): Promise<ActionResu
     await rentSync(b.orderId, { bookingStatus: "cancelled" });
   }
   revalidatePath("/rent/my");
-  await safeNotify(async () => {
+  await notifyLater(async () => {
     const p = await notifyParties(b);
     if (!p) return;
     // 📨대표 09-16 — 취소 완료 때 사장님과 손님 둘 다. 손님 메일엔 실제로 돌려드린 금액을 넘긴다(다시 계산하지 않는다).
@@ -1000,7 +1011,7 @@ export async function approveRefundAction(bookingId: number): Promise<ActionResu
   revalidatePath("/rent/payouts");
   revalidatePath("/rent/my");
   // 📨대표 09-16 — 관리자 승인 환불도 «취소 완료»라 손님과 사장님 둘 다에게.
-  await safeNotify(async () => {
+  await notifyLater(async () => {
     const p = await notifyParties(b);
     if (p) await notifyAdminRefund({ ...b, status: "refunded" }, p.space, p.host, p.guest, refundAmount);
   });
