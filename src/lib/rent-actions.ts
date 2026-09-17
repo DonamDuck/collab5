@@ -313,7 +313,9 @@ export async function saveSpaceAction(input: SpaceFormInput): Promise<ActionResu
 
   let slug = input.slug || makeSlug(input.name);
   // 🔁09-16 대표 — 전엔 글자 하나만 바꿔도 검토 대기로 내려가 목록에서 사라졌다. 이제 이름·주소가 바뀔 때만 내려간다.
-  const status: Space["status"] = !prev ? "pending" : renamed || moved ? "pending" : prev.status;
+  // 📤09-18 밤 QA(H-10) — **초안은 저장하면 검토 대기로 올라간다.** 전엔 초안에 머물러서 관리자 검토 목록
+  //   (`pending`만 읽는다)에 영영 안 떴다. 사장님은 올린 줄 알고 기다렸다. 새 공간과 같은 검토 흐름으로 보낸다.
+  const status: Space["status"] = !prev || prev.status === "draft" || renamed || moved ? "pending" : prev.status;
 
   // 🧾국세청 조회 — 번호·대표자·개업일이 «바뀌었을 때»만 부른다(대표 설계). 🔁그리고 지난번에 못 물어본 경우(`none`·`error`)도
   //   다시 부른다. 키가 생기기 전에 올린 공간이 영영 「조회 전」으로 남지 않게.
@@ -423,7 +425,9 @@ export async function saveSpaceAction(input: SpaceFormInput): Promise<ActionResu
   if (status === "pending" && prev?.status !== "pending") {
     await safeNotify(async () => {
       const owner = await getProfileById(uid);
-      await notifySpaceReview(saved, owner, prev ? { name: prev.name, address: prev.address, status: prev.status } : null);
+      // 초안이 처음 올라온 건 «새 공간»과 같다 — 이름이 바뀌었어도 「바뀌어 다시 검토」가 아니라 「새로 올라와 검토」다.
+      const before = prev && prev.status !== "draft" ? { name: prev.name, address: prev.address, status: prev.status } : null;
+      await notifySpaceReview(saved, owner, before);
     });
   }
   // 화면은 이 말을 안 띄운다 — 저장 뒤 `/rent/my?saved=…`가 상황별 한 줄을 띄운다(09-17).
