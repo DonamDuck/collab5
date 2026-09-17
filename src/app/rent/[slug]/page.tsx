@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { cache } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getSpacePublic, listLiveBookingsIn } from "@/lib/spaces";
@@ -38,12 +39,19 @@ export const dynamic = "force-dynamic";
 /** 신청 폼이 없는 화면에서 「빌릴 수 있는 날」에 까는 칩 수. 둘씩 세 줄(폰)을 넘기지 않는 값. */
 const SLOT_PREVIEW = 6;
 
+// ⚡09-18 밤 QA(SC-23) — 한 요청 안에서 한 번만 읽는다. `generateMetadata`와 본문이 같은 공간·같은 사람을 따로 물었고,
+//   본문은 소개서 주인·사장님·나의 프로필을 따로 읽었다(대개 같은 사람이다). React `cache`는 요청 하나 동안만 기억한다.
+const loadSpace = cache((slug: string) => getSpacePublic(slug));
+const loadViewerId = cache(() => getSessionUserId());
+const loadIsAdmin = cache(() => isRentAdmin());
+const loadProfile = cache((id: number) => getProfileById(id));
+
 /** 🔒없는 공간의 메타. 공개 전 공간을 남이 열 때도 «이것과 똑같이» 준다(09-18 밤 QA SEC-05). */
 const NOT_FOUND_META: Metadata = { title: "공간을 찾을 수 없어요 — collab5", robots: { index: false } };
 
 /** 공개 전(검토 대기·쉬는 중·초안) 공간을 볼 수 있는 사람 — 주인과 관리자. 본문과 메타가 같은 규칙을 쓴다. */
 async function maySeeUnlisted(ownerUserId: number, uid: number | null): Promise<boolean> {
-  return (!!uid && uid === ownerUserId) || (await isRentAdmin());
+  return (!!uid && uid === ownerUserId) || (await loadIsAdmin());
 }
 
 export async function generateMetadata({
@@ -52,13 +60,13 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const { slug } = await params;
-  const sp = await getSpacePublic(slug);
+  const sp = await loadSpace(slug);
   if (!sp) return NOT_FOUND_META;
   // 🔒09-18 밤 QA(SEC-05) — 공개 전 공간은 본문이 주인·관리자 말고는 404다. 메타도 같은 규칙으로 가린다.
   //   전엔 제목에 공간 이름, 설명에 동네, 정본 주소에 slug가 실려서 «있지만 못 보는 공간»과 «없는 공간»이 갈렸다.
   //   주소를 훑어 아직 안 열린 공간 목록을 만들 수 있었다는 뜻이다. 이제 남에게는 없는 공간과 똑같은 메타가 간다.
   const listed = sp.status === "open";
-  if (!listed && !(await maySeeUnlisted(sp.ownerUserId, await getSessionUserId()))) return NOT_FOUND_META;
+  if (!listed && !(await maySeeUnlisted(sp.ownerUserId, await loadViewerId()))) return NOT_FOUND_META;
   const url = `/rent/${sp.slug}`;
   // 링크 미리보기 설명은 한 줄 소개 또는 동네까지. 주소는 화면에서 열려 있지만(09-16) 카드엔 길 필요가 없다.
   // ⏱09-16 대표 — 시간 단위 대여. 「하루 빌려보세요」는 사실이 틀린 말이라 링크 카드에도 안 싣는다.
@@ -143,10 +151,10 @@ export default async function SpaceDetailPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const sp = await getSpacePublic(slug);
+  const sp = await loadSpace(slug);
   if (!sp) notFound();
 
-  const uid = await getSessionUserId();
+  const uid = await loadViewerId();
   const isOwner = !!uid && uid === sp.ownerUserId;
   // 검토 중·쉬는 중인 공간은 주인에게만 보인다. 남에게 404인 이유 —
   // 「있지만 못 본다」와 「없다」를 구분해 주면, 주소를 훑어 아직 안 열린 공간 목록을 만들 수 있다.
@@ -154,32 +162,37 @@ export default async function SpaceDetailPage({
   //   메타(`generateMetadata`)도 같은 함수(`maySeeUnlisted`)로 가린다.
   if (sp.status !== "open" && !(await maySeeUnlisted(sp.ownerUserId, uid))) notFound();
 
-  // 상호(운영하는 브랜드 이름). 사장님 실명(profiles에 따로 없다)은 안 읽는다.
-  const operatorName = (await getProfileById(sp.ownerUserId))?.brandName?.trim() ?? "";
-  // 📎09-18 대표 결정 A — 소개서 줄이 카드가 되면서 이름에 더해 한 줄 소개와 로고도 꺼내 온다.
-  //   로고는 `/m`과 같은 출처(소개서 주인 계정의 프로필 사진). Maker 객체는 카드에 넘기지 않고 글자 셋만 넘긴다.
-  const brand = sp.brandSlug ? await repo.getMakerBySlug(sp.brandSlug) : null;
-  const brandName = brand?.name ?? "";
-  const brandOneLiner = brand?.oneLiner?.trim() ?? "";
-  const brandLogo = brand?.ownerUserId ? (await getProfileById(brand.ownerUserId))?.profileImage || undefined : undefined;
-  const brandHref = `/m/${encodeURIComponent(sp.brandSlug ?? "")}?back=${encodeURIComponent(`/rent/${sp.slug}`)}`;
-
-  // 신청자가 자기 소개서를 붙일 수 있게 목록을 준다(선택). 없어도 신청은 된다 —
-  // 이 기능은 소개서와 독립이라, 소개서를 요구하면 설계 전제가 깨진다(설계 §한 줄).
-  const myBrands =
-    uid && !isOwner
-      ? (await repo.listMakersByOwner(uid)).map((m) => ({ slug: m.slug, name: m.name }))
-      : [];
-  // ☎️09-17 — 신청 폼의 번호 칸을 프로필 번호로 미리 채운다. 로그인한 손님일 때만 읽는다.
-  const myPhone = uid && !isOwner ? ((await getProfileById(uid))?.phone?.trim() ?? "") : "";
-
   // 🔁09-16 하루 단위 → 시간 단위. 날짜는 시간대 목록에서 뽑고, 그 날 이미 팔린 시간도 같이 읽는다.
   // ⏳지난 시간대는 여기서 걸러 낸다. 사장님이 열어 둔 날이 지나가도 목록에는 그대로 남아 있어서,
   //   안 거르면 달력에 지난주가 「빌릴 수 있는 날」로 서 있고 결제까지 통과한다.
   const openSlots = futureSlots(sp.openSlots).sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
   const openDates = Array.from(new Set(openSlots.map((sl) => sl.date))).sort();
-  // ⚠️예약을 날짜마다 따로 부르면 열어 둔 날 수만큼 왕복이 는다. 한 번에 읽어 날짜별로 나눈다.
-  const liveBookings = openDates.length > 0 ? await listLiveBookingsIn(sp.id, openDates) : [];
+
+  // ⚡09-18 밤 QA(SC-23) — 아래 다섯 읽기는 서로를 기다릴 필요가 없다. 하나씩 기다리던 것을 한 번에 보낸다.
+  //   소개서 로고만 소개서를 읽은 «뒤»라 그 안에서 잇는다. 읽는 값과 조건은 전과 같다.
+  const [operatorProfile, brandCard, myBrands, myPhone, liveBookings] = await Promise.all([
+    // 상호(운영하는 브랜드 이름). 사장님 실명(profiles에 따로 없다)은 안 읽는다.
+    loadProfile(sp.ownerUserId),
+    // 📎09-18 대표 결정 A — 소개서 줄이 카드가 되면서 이름에 더해 한 줄 소개와 로고도 꺼내 온다.
+    //   로고는 `/m`과 같은 출처(소개서 주인 계정의 프로필 사진). Maker 객체는 카드에 넘기지 않고 글자 셋만 넘긴다.
+    (async () => {
+      const brand = sp.brandSlug ? await repo.getMakerBySlug(sp.brandSlug) : null;
+      const logo = brand?.ownerUserId ? (await loadProfile(brand.ownerUserId))?.profileImage || undefined : undefined;
+      return { name: brand?.name ?? "", oneLiner: brand?.oneLiner?.trim() ?? "", logo };
+    })(),
+    // 신청자가 자기 소개서를 붙일 수 있게 목록을 준다(선택). 없어도 신청은 된다 —
+    // 이 기능은 소개서와 독립이라, 소개서를 요구하면 설계 전제가 깨진다(설계 §한 줄).
+    uid && !isOwner
+      ? repo.listMakersByOwner(uid).then((ms) => ms.map((m) => ({ slug: m.slug, name: m.name })))
+      : Promise.resolve([] as { slug: string; name: string }[]),
+    // ☎️09-17 — 신청 폼의 번호 칸을 프로필 번호로 미리 채운다. 로그인한 손님일 때만 읽는다.
+    uid && !isOwner ? loadProfile(uid).then((p) => p?.phone?.trim() ?? "") : Promise.resolve(""),
+    // ⚠️예약을 날짜마다 따로 부르면 열어 둔 날 수만큼 왕복이 는다. 한 번에 읽어 날짜별로 나눈다.
+    openDates.length > 0 ? listLiveBookingsIn(sp.id, openDates) : Promise.resolve([]),
+  ]);
+  const operatorName = operatorProfile?.brandName?.trim() ?? "";
+  const { name: brandName, oneLiner: brandOneLiner, logo: brandLogo } = brandCard;
+  const brandHref = `/m/${encodeURIComponent(sp.brandSlug ?? "")}?back=${encodeURIComponent(`/rent/${sp.slug}`)}`;
   const takenByDate: Record<string, { start: string; end: string }[]> = {};
   for (const b of liveBookings) {
     (takenByDate[b.useDate] ??= []).push({ start: b.startTime, end: b.endTime });
