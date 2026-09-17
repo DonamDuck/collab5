@@ -13,6 +13,8 @@ import type { Profile } from "./profiles";
 import type { PayoutAccount } from "./payout-accounts";
 import { addDaysIso, expandRepeat, hoursBetween, todayKst } from "./rent-time";
 import { bookingAmount, compatScopePrice, productsFromLegacy } from "./rent-products";
+// 🔢정산액은 서버(`payout`)와 같은 정수 계산 함수로(09-18 밤 QA SEC-03). 이 파일은 import가 없어 고리가 안 생긴다.
+import { payoutAmount } from "./rent-money";
 
 /** `spaces.ts`의 `FEE_RATE`와 같은 값. ⚠️거기서 가져오면 spaces → rent-mock → 이 파일 → spaces로 고리가 생겨 따로 적었다. */
 const MOCK_FEE_RATE = 0.15;
@@ -186,7 +188,7 @@ function booking(p: BookingSeed, today: string): SpaceBooking {
     createdAt: at, updatedAt: at,
     ...rest,
     product, hoursCount, amountSpace, amountChat, amountTotal,
-    amountPayout: Math.floor(amountTotal * (1 - MOCK_FEE_RATE)),
+    amountPayout: payoutAmount(amountTotal, MOCK_FEE_RATE),
   } satisfies SpaceBooking;
 }
 
@@ -204,7 +206,7 @@ function payment(
     approvedAt: paid ? b.createdAt : undefined,
     canceledAt: p.status === "CANCELED" || p.status === "PARTIAL_CANCELED" ? b.updatedAt : undefined,
     feeRate: MOCK_FEE_RATE,
-    payoutAmount: Math.floor(balance * (1 - MOCK_FEE_RATE)),
+    payoutAmount: payoutAmount(balance, MOCK_FEE_RATE),
     payoutStatus: p.payoutStatus ?? "NONE",
     payoutRequestedAt: p.payoutStatus === "REQUESTED" || p.payoutStatus === "DONE" || p.payoutStatus === "FAILED" ? b.updatedAt : undefined,
     payoutDoneAt: p.payoutDoneAt,

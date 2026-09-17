@@ -23,6 +23,8 @@ import { uploadBizCert, uploadPhoto } from "@/lib/upload";
 import { PhotoGrid } from "@/app/register/PhotoGrid";
 import type { Space, SpaceUseType, SpaceCategory, OpenSlot, AccessHow, RepeatRule } from "@/lib/types";
 import { expandRepeat, hoursBetween, stripRepeat, todayKst } from "@/lib/rent-time";
+import { payoutAmount } from "@/lib/rent-money";
+import { CONTACT_PHONE_MAX, storePhoneOk } from "@/lib/rent-limits";
 import {
   BIZ_CERT_MAX_BYTES, BIZ_CERT_TYPES, BIZ_MISMATCH_LINE, bizCertPathOk, bizDigits, bizNumberProblem, formatBizNumber, fromOpenDate,
   hasAnyBiz, openDateProblem, toOpenDate,
@@ -349,11 +351,12 @@ export function SpaceForm({
     setRestored(false);
   };
 
-  // ⚠️`payout()`을 import하지 않고 식을 옮겨 적었다 — 그 함수는 `lib/spaces.ts`에 있고, 그 파일은
-  //   supabase 클라이언트를 끌고 온다. 클라이언트 번들에 데이터 계층 한 벌이 통째로 실린다.
+  // ⚠️`payout()`(`lib/spaces.ts`)을 import하지 않는다 — 그 파일은 supabase 클라이언트를 끌고 와서
+  //   클라이언트 번들에 데이터 계층 한 벌이 통째로 실린다.
   //   ⭐대신 **요율은 서버에서 받는다**(props). 바뀔 수 있는 값이 한 군데에만 있으면 어긋날 자리가 없다.
   // 🔢시간당 값으로 바뀌면서 정산액도 «한 시간치»로 보여 준다(대표 09-16). 09-18부터 상품마다 따로.
-  const payoutOf = (price: number) => Math.floor(price * (1 - feeRate));
+  // 🔢09-18 밤 QA(SEC-03) — 식을 옮겨 적던 것을 `payout()`과 같은 정수 계산 함수(`rent-money`)로 바꿨다. 그 파일은 DB를 안 부른다.
+  const payoutOf = (price: number) => payoutAmount(price, feeRate);
   const uploading = photos.some((p) => p.uploading) || certUploading;
   const readyPhotos = photos.filter((p) => !p.uploading && p.url);
 
@@ -448,6 +451,8 @@ export function SpaceForm({
     if (readyPhotos.length === 0) return ["photos", "사진을 한 장 이상 올려 주세요. 사진 없는 공간은 아무도 안 빌려요."];
     if (!addrBase.trim()) return ["address", "주소를 찾아 주세요."];
     if (!contactPhone.trim()) return ["phone", "매장 전화번호가 비어 있어요."];
+    // ✂️09-18 밤 QA(SEC-07) — 서버(`saveSpaceAction`)와 같은 함수. 숫자만 세어 전화번호 모양인지 본다.
+    if (!storePhoneOk(contactPhone)) return ["phone", "매장 전화번호를 다시 봐 주세요. 예) 02-1234-5678"];
     if (rules.trim().length < 10) return ["rules", "유의 사항을 열 글자 넘게 담아 주셔야 올릴 수 있어요."];
     // 🛍09-18 — 공간 상품 하나 이상, 켠 상품은 값과 설명. 서버(`saveSpaceAction`)가 같은 규칙으로 다시 본다.
     if (!spaceOn && !fullOn) return ["products", "파실 상품을 하나는 켜 주세요. 대관만이나 공간 전체 중에서요."];
@@ -691,6 +696,7 @@ export function SpaceForm({
             id="sp-phone"
             type="tel"
             inputMode="tel"
+            maxLength={CONTACT_PHONE_MAX}
             className={rentInputCls}
             value={contactPhone}
             onChange={(e) => setContactPhone(e.target.value)}

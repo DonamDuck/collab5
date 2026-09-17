@@ -31,6 +31,7 @@ import { startBookingAction, confirmBookingAction } from "@/lib/rent-actions";
 import type { SpaceUseType, OpenSlot, RentProduct, Space } from "@/lib/types";
 import { bookingAmount, productNote, productPrice, sellableProducts } from "@/lib/rent-products";
 import { hourMarks, hoursBetween, nowHhmmKst, overlaps, toHHMM, toMinutes, rangeLabel, todayKst } from "@/lib/rent-time";
+import { PLAN_MAX } from "@/lib/rent-limits";
 import { dateLabel, InfoList, InfoRow, primaryBtnCls, RentSelect, rentInputCls, rentTextareaCls, won } from "../ui";
 import Link from "next/link";
 import { COFFEE_CHAT_LABEL, CONTACT_RULE_GUEST, isTestPayment, PRODUCT_HINT_GUEST, PRODUCT_LABEL } from "@/lib/rent-copy";
@@ -530,6 +531,8 @@ export function BookingForm({
           id="rent-plan"
           ref={planRef}
           rows={4}
+          // ✂️09-18 밤 QA(SEC-07) — 서버(`startBookingAction`)와 같은 상한(`PLAN_MAX`).
+          maxLength={PLAN_MAX}
           className={`${rentTextareaCls} resize-y`}
           value={plan}
           onChange={(e) => {

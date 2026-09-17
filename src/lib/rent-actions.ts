@@ -1,7 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { getSessionUserId, getProfileById, savePhoneIfEmpty } from "./profiles";
+import { getSessionUserId, getProfile, getProfileById, savePhoneIfEmpty } from "./profiles";
+import { getSessionUser } from "./supabase/server";
 // 🧪09-17 목 데이터 — 목 쿠키가 있으면 쓰기 액션은 첫 줄에서 멈춘다(DB·토스·메일 전부 안 건드린다). 개발 빌드 전용.
 import { getRentMock, rentMockOn, RENT_MOCK_BLOCKED } from "./rent-mock";
 import {
@@ -10,7 +11,7 @@ import {
   setBookingStatus, listSpacesByOwner, listSpacesByIds, payout, FEE_RATE,
   createPayment, getPaymentByOrderId, rentSync,
   type SpaceSaveInput,
-  listLiveBookings, setSpaceStatus, approveSpace,
+  listLiveBookings, setSpaceStatus, approveSpace, SLUG_TAKEN,
 } from "./spaces";
 // 🧾🏪09-18 사업자 확인 · 네이버 상호 매칭(대표 09-17). 규칙은 순수 함수(`bizcheck`·`place-match`), 바깥 호출은 서버 전용 파일에.
 import {
@@ -20,7 +21,12 @@ import { checkBusiness } from "./nts-bizcheck";
 import { matchPlace } from "./naver-local";
 import { signCertUpload } from "./host-docs";
 import { hasPayoutAccount, savePayoutAccount, toMasked, validatePayoutInput, type PayoutAccountInput, type PayoutAccountMasked } from "./payout-accounts";
-import { approvePayment, cancelPayment, guestCancelRefundRate, GRACE_MINUTES } from "./rent-payment";
+import {
+  approvePayment, cancelPayment, guestCancelRefundPercent, GRACE_MINUTES,
+  PAY_FAIL_SLOT_TAKEN_REFUNDED, PAY_FAIL_SLOT_TAKEN_REFUND_PENDING,
+} from "./rent-payment";
+import { refundAmount } from "./rent-money";
+import { CONTACT_PHONE_MAX, HOST_MESSAGE_MAX, PLAN_MAX, storePhoneOk } from "./rent-limits";
 import { geocode } from "./geocode";
 import { repo } from "./repo";
 import {
@@ -28,7 +34,7 @@ import {
   notifyBookingPaidToGuest, notifyBookingConfirmedToHost, notifyBookingCancelledToGuest, notifyAdminRefund,
   notifySpacePublished, notifySpaceReview,
 } from "./rent-notify";
-import { bookingStarted, dateLabel, kstDaysUntil, hoursBetween, fitsOpenSlot, nowHhmmKst, overlaps, toMinutes, todayKst } from "./rent-time";
+import { bookingStarted, dateLabel, kstDaysUntil, hoursBetween, fitsOpenSlot, isHourMark, nowHhmmKst, overlaps, toMinutes, todayKst } from "./rent-time";
 import type { Space, SpaceBooking, SpaceUseType, SpaceCategory, OpenSlot, AccessHow, RentProduct, BizCheckStatus } from "./types";
 import { bookingAmount, compatScopePrice, isRentProduct, productOn } from "./rent-products";
 import { PRODUCT_LABEL, withJosa } from "./rent-copy";
@@ -49,6 +55,9 @@ export interface ActionResult {
   field?: string;
   /** 🧾09-18 저장 뒤 국세청 조회 결과. `mismatch`면 폼이 고치기 화면으로 가서 그 칸에 말을 띄운다. */
   bizStatus?: BizCheckStatus;
+  /** 🔒09-18 밤 QA(SEC-06) 결제 승인 실패의 사유 코드. 승인 라우트가 실패 화면에 `message` 대신 이걸 넘긴다
+   *  (주소의 글을 화면에 쓰면 누구나 우리 화면에 문장을 띄울 수 있다). 토스 코드 또는 `PAY_FAIL_*`. */
+  code?: string;
 }
 
 /** 공간을 공개로 넘길 수 있는 사람 — 지금은 대표뿐이다.
@@ -62,10 +71,17 @@ export async function isRentAdmin(): Promise<boolean> {
   //   환경변수 이름이 어긋나는 날 버튼은 보이는데 안 눌리는 상태가 된다. 판정은 한 벌만 둔다.
   const raw = process.env.RENT_ADMIN_EMAILS ?? process.env.MAGAZINE_EDITOR_EMAILS ?? "dudejrthd@gmail.com";
   const allow = raw.split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
-  const uid = await getSessionUserId();
-  if (!uid) return false;
-  const p = await getProfileById(uid);
-  return !!p?.email && allow.includes(p.email.toLowerCase());
+  const user = await getSessionUser();
+  if (!user) return false;
+  // 🔒09-18 밤 QA(SEC-01) — 판정은 «로그인 수단이 확인해 준 이메일»로 한다. 매거진 편집자 판정(`isMagazineEditor`)과 같은 방식이다.
+  //   `users.email`만 보던 때는 구멍이 있었다. 카카오가 이메일을 안 주면 /welcome에서 손님이 이메일을 «직접» 치는데,
+  //   그 값이 프로필에 그대로 들어가서 대표 이메일을 적으면 누구나 공개·환불 승인·정산 화면을 열 수 있었다.
+  const authEmail = user.email?.trim().toLowerCase();
+  if (!authEmail || !user.email_confirmed_at) return false;
+  if (!allow.includes(authEmail)) return false;
+  // 세션만 믿지 않고 DB(`users`)도 다시 읽는다. 프로필이 지워졌거나 계정이 바뀐 경우를 세션만으로는 알 수 없다.
+  const profile = await getProfile(user.id);
+  return profile?.email?.trim().toLowerCase() === authEmail;
 }
 
 /** 주소 후보를 슬러그로. 한글 이름이면 옮길 글자가 없어 난수로 떨어진다(매거진이 같은 함정을 겪었다). */
@@ -74,9 +90,19 @@ function makeSlug(name: string): string {
   //   그 대시 넉 자가 「3자 이상」을 통과했다. 그래서 대시를 접고 양끝을 자른 «뒤에» 길이를 잰다.
   const ascii = name.toLowerCase()
     .replace(/[^a-z0-9\s-]/g, "").trim().replace(/[\s-]+/g, "-").replace(/^-+|-+$/g, "");
-  const tail = Date.now().toString(36).slice(-4);
-  return ascii.length >= 3 ? `${ascii}-${tail}` : `space-${Date.now().toString(36)}`;
+  // 🔒09-18 밤 QA(SEC-02) — 꼬리를 시각이 아니라 난수로. 전엔 `Date.now()` 36진수 끝 네 자리라 약 28분(36^4 ms)마다 같은 꼬리가 다시 나왔다.
+  //   36^6(약 21억)이면 같은 이름끼리도 겹칠 일이 드물고, 겹쳐도 저장이 insert라 남의 행은 안 바뀐다(`saveSpaceAction`이 다시 뽑는다).
+  return ascii.length >= 3 ? `${ascii}-${randomTail(6)}` : `space-${randomTail(8)}`;
 }
+
+/** 소문자·숫자 n자 난수. 주소에 쓰는 값이라 비밀일 필요는 없고 «겹치지 않으면» 된다. */
+function randomTail(n: number): string {
+  const abc = "0123456789abcdefghijklmnopqrstuvwxyz";
+  return Array.from(crypto.getRandomValues(new Uint8Array(n)), (b) => abc[b % 36]).join("");
+}
+
+/** 새 공간 slug가 겹쳤을 때 다시 뽑는 횟수. 난수 여섯 자리라 두 번째에서 끝나는 게 보통이다. */
+const SLUG_TRIES = 5;
 
 export interface SpaceFormInput {
   slug?: string;
@@ -148,12 +174,21 @@ export async function saveSpaceAction(input: SpaceFormInput): Promise<ActionResu
     // 🔁09-17 QA — 「법에 따라」가 위협조로 읽혔다. 근거는 위 주석에 두고 사장님께는 쓰임만 말한다.
     return { ok: false, message: "매장 전화번호가 비어 있어요. 손님이 신청하기 전에 보는 번호예요." };
   }
+  // ✂️09-18 밤 QA(SEC-07) — 전화번호 모양과 길이. 전엔 아무 글이나 들어가 상세 화면의 전화 걸기 링크가 엉뚱한 번호가 됐다.
+  //   화면(`SpaceForm`)도 같은 함수로 먼저 막아 그 칸 밑에 말한다.
+  if (input.contactPhone.trim().length > CONTACT_PHONE_MAX || !storePhoneOk(input.contactPhone)) {
+    return { ok: false, message: "매장 전화번호를 다시 봐 주세요. 예) 02-1234-5678" };
+  }
   // 📜호스트 약관 동의. 없으면 수수료·정산·구상을 나중에 주장할 근거가 없다.
   if (!input.hostTermsOk) {
     return { ok: false, message: "공간 제공자 약관에 동의해 주세요." };
   }
   // 열어 둔 시간대가 말이 되는지. 거꾸로거나 최소 시간보다 짧은 칸은 아무도 못 빌린다.
   for (const sl of input.openSlots) {
+    // 못 읽는 시각(`24:30` 같은 것)을 「거꾸로」로 말하지 않게 먼저 거른다(09-18 밤 QA SEC-08).
+    if (toMinutes(sl.start ?? "") < 0 || toMinutes(sl.end ?? "") < 0) {
+      return { ok: false, message: `${dateLabel(sl.date)}의 시각을 알아보지 못했어요. 시작과 끝 시각을 다시 골라 주세요.` };
+    }
     const h = hoursBetween(sl.start, sl.end);
     if (h <= 0) return { ok: false, message: `${dateLabel(sl.date)}의 시간이 거꾸로예요. 끝나는 시각이 더 늦어야 해요.` };
     if (h < input.minHours) {
@@ -190,6 +225,23 @@ export async function saveSpaceAction(input: SpaceFormInput): Promise<ActionResu
   //   실패해도 저장은 그대로 간다 — 지도는 있으면 좋은 것이지 올리기를 막을 것이 아니다.
   const prev = input.slug ? await getSpaceFull(input.slug) : null;
 
+  // ⏱09-18 밤 QA(SEC-08) — 여는 시각은 정시만(눈금 1시간, 대표 09-16). 고르개는 정시만 주지만 액션을 직접 부르면
+  //   10:30 시작·24:30 끝 같은 칸이 저장됐다.
+  //   ⚠️09-16 전에 30분으로 열어 둔 칸이 운영에 남아 있다(09-18 읽기: 공간 한 곳, 10:30 시작 두 날). 그 칸을 «그대로» 다시 보내면 받는다.
+  //   안 받으면 그 사장님은 다른 곳을 고치려다 저장이 막히고, 고르개엔 10:30이 없어 고칠 방법도 안 보인다. 새로 넣거나 바꾼 칸만 막는다.
+  const keptSlots = new Set((prev?.openSlots ?? []).map((sl) => `${sl.date} ${sl.start}~${sl.end}`));
+  for (const sl of input.openSlots) {
+    if (isHourMark(sl.start) && isHourMark(sl.end)) continue;
+    if (keptSlots.has(`${sl.date} ${sl.start}~${sl.end}`) && toMinutes(sl.start) >= 0 && toMinutes(sl.end) >= 0) continue;
+    return { ok: false, message: `${dateLabel(sl.date)}은 정시로만 열 수 있어요. 시작과 끝 시각을 다시 골라 주세요.` };
+  }
+  const keptRules = new Set((prev?.repeatWeekly ?? []).map((r) => `${r.dow} ${r.start}~${r.end}`));
+  for (const r of repeat) {
+    if (isHourMark(r.start) && isHourMark(r.end)) continue;
+    if (keptRules.has(`${r.dow} ${r.start}~${r.end}`) && toMinutes(r.start) >= 0 && toMinutes(r.end) >= 0) continue;
+    return { ok: false, message: `매주 ${"일월화수목금토"[r.dow]}요일은 정시로만 열 수 있어요. 시작과 끝 시각을 다시 골라 주세요.` };
+  }
+
   // 🧾사업자 정보(대표 09-17: 「개인까지 받으면 너무 무방비」). 바깥 호출(좌표·국세청·네이버) «전에» 모양부터 본다.
   //   ⭐필수인 경우 = 새 공간 · 이미 사업자 정보가 있던 공간(지우지 못한다) · 넷 중 하나라도 적은 고치기.
   //   옛 공간(09-18 전)이 넷 다 비운 채 고치면 그대로 저장한다 — 공개 중인 공간의 저장을 막지 않는다(대표 설계).
@@ -222,7 +274,7 @@ export async function saveSpaceAction(input: SpaceFormInput): Promise<ActionResu
     if (hit) { lat = hit.lat; lng = hit.lng; }
   }
 
-  const slug = input.slug || makeSlug(input.name);
+  let slug = input.slug || makeSlug(input.name);
   // 🔁09-16 대표 — **고쳐도 공개가 유지된다.** 전엔 글자 하나만 바꿔도 검토 대기로 내려가 목록에서 사라졌다.
   //   다시 검토받는 건 «가게가 바뀌는» 둘뿐이다: 주소와 매장 이름. 나머지는 사장님이 알아서 고친다.
   const renamed = !!prev && prev.name.trim() !== input.name.trim();
@@ -311,7 +363,21 @@ export async function saveSpaceAction(input: SpaceFormInput): Promise<ActionResu
     ...place,
     status,
   };
-  const saved = await saveSpace(row);
+  // 🔒09-18 밤 QA(SEC-02) — 새 공간은 insert로만 넣는다. slug가 이미 있으면(남의 공간일 수 있다) 그 행은 그대로 두고 꼬리를 다시 뽑는다.
+  //   고치기(`input.slug`)는 위에서 주인 확인을 마쳤으니 그 slug에 덮어쓴다.
+  let saved: Space | null = null;
+  if (input.slug) {
+    const r = await saveSpace(row, { isNew: false });
+    saved = r === SLUG_TAKEN ? null : r;
+  } else {
+    for (let i = 0; i < SLUG_TRIES; i++) {
+      if (i > 0) slug = makeSlug(input.name);
+      const r = await saveSpace({ ...row, slug }, { isNew: true });
+      if (r === SLUG_TAKEN) continue;
+      saved = r;
+      break;
+    }
+  }
   if (!saved) return { ok: false, message: "저장에 실패했어요. 잠시 뒤 다시 시도해 주세요." };
   revalidatePath("/rent");
   revalidatePath(`/rent/${slug}`);
@@ -483,6 +549,10 @@ export async function startBookingAction(input: BookingFormInput): Promise<Start
   if (!sp || sp.status !== "open") return { ok: false, message: "지금은 신청할 수 없는 공간이에요." };
   if (sp.ownerUserId === uid) return { ok: false, message: "내 공간은 내가 빌릴 수 없어요." };
   if (input.plan.trim().length < 10) return { ok: false, message: "그날 무엇을 하실지 열 글자 이상 적어 주세요." };
+  // ✂️09-18 밤 QA(SEC-07) — 상한. 화면 칸도 같은 숫자로 막는다(`PLAN_MAX`). 이 글은 사장님 메일·요청 카드로 그대로 간다.
+  if (input.plan.trim().length > PLAN_MAX) {
+    return { ok: false, message: `그날 무엇을 하실지 ${PLAN_MAX.toLocaleString()}자 안으로 줄여 주세요.` };
+  }
   // 🛍09-18 — 사장님이 켜 둔 상품인지. 화면을 거치지 않은 호출이면 꺼진 상품 이름이 올 수 있다.
   if (!isRentProduct(input.product) || !productOn(sp, input.product)) {
     return { ok: false, message: "이 공간에서 팔지 않는 상품이에요. 새로고침하고 다시 골라 주세요." };
@@ -505,6 +575,11 @@ export async function startBookingAction(input: BookingFormInput): Promise<Start
   if (input.useDate < today) return { ok: false, message: "지난 날짜는 신청할 수 없어요." };
 
   // ⏱시간 검사 — 화면에서도 막지만 관문은 여기다.
+  // ⏱09-18 밤 QA(SEC-08) — 정시만 받는다(눈금 1시간, 대표 09-16). 신청 폼은 정시만 고르게 하는데 액션을 직접 부르면
+  //   10:30~12:00처럼 한 시간 반이 팔렸고, 값이 «시간당 값 × 1.5»라 반올림된 금액으로 결제까지 갔다.
+  if (!isHourMark(input.startTime) || !isHourMark(input.endTime)) {
+    return { ok: false, message: "시작과 끝 시각은 정시로만 고를 수 있어요. 새로고침하고 다시 골라 주세요." };
+  }
   const hours = hoursBetween(input.startTime, input.endTime);
   if (hours <= 0) return { ok: false, message: "끝나는 시각이 시작보다 늦어야 해요." };
   // ⚠️지난 «시각» 검사는 모양 검사 «뒤»다. 앞에 두면 못 읽은 시각(`-1`)이 「이미 지났다」로 잡혀
@@ -607,7 +682,7 @@ export async function confirmBookingAction(
   if (!approved.ok || !approved.payment) {
     // 돈은 안 움직였다. 결제 줄만 ABORTED로 남기고 예약은 그대로 둔다(30분 안이면 다시 시도할 수 있다).
     await rentSync(orderId, { toss: { status: "ABORTED" } });
-    return { ok: false, message: approved.message };
+    return { ok: false, message: approved.message, code: approved.code };
   }
 
   // ⭐예약 paid + 결제 DONE을 «한 트랜잭션»으로. 시간이 겹쳐 예약이 막히면 결제 기록도 같이 안 바뀐다.
@@ -620,12 +695,12 @@ export async function confirmBookingAction(
     const refund = await cancelPayment(key, "예약 확정 실패 — 자동 환불", undefined, pay.amount);
     if (refund.ok) {
       await rentSync(orderId, { bookingStatus: "cancelled", toss: refund.payment });
-      return { ok: false, message: "그 사이 그 시간이 찼어요. 결제는 자동으로 취소했습니다." };
+      return { ok: false, message: "그 사이 그 시간이 찼어요. 결제는 자동으로 취소했습니다.", code: PAY_FAIL_SLOT_TAKEN_REFUNDED };
     }
     // 환불까지 실패하면 손님 돈이 붙잡혀 있다. 정산 화면 「손이 필요한 예약」에 뜨게 rejected로 둔다.
     console.error(`[rent-actions] 🚨승인 뒤 예약 실패 + 자동 환불 실패 — 수동 환불 필요 order=${orderId}`);
     await rentSync(orderId, { bookingStatus: "rejected" });
-    return { ok: false, message: "그 사이 그 시간이 찼어요. 환불을 처리하고 있으니 곧 연락드릴게요." };
+    return { ok: false, message: "그 사이 그 시간이 찼어요. 환불을 처리하고 있으니 곧 연락드릴게요.", code: PAY_FAIL_SLOT_TAKEN_REFUND_PENDING };
   }
   const paid = (await getBookingByOrderId(orderId)) ?? { ...b, status: "paid" as const };
 
@@ -653,6 +728,10 @@ export async function decideBookingAction(
   const uid = await getSessionUserId();
   if (!uid) return { ok: false, message: "로그인이 필요해요." };
 
+  // ✂️09-18 밤 QA(SEC-07) — 손님께 남기는 말의 상한. 화면 칸도 같은 숫자로 막고, 이 말은 칸 바로 밑에 뜬다.
+  if (message.trim().length > HOST_MESSAGE_MAX) {
+    return { ok: false, message: `남기실 말이 길어요. ${HOST_MESSAGE_MAX}자 안으로 줄여 주세요.` };
+  }
   const b = await getBooking(bookingId);
   if (!b) return { ok: false, message: "그 요청을 찾지 못했어요." };
   // ⚠️권한은 "이 사람이 그 공간의 주인인가"다. booking에는 주인이 안 적혀 있어 공간을 거쳐 확인한다.
@@ -719,8 +798,9 @@ function cancelRefund(b: SpaceBooking, paidAt?: string): { rate: number; refund:
   //   🩸09-17 QA: 예약 행이 생긴 시각(결제창을 연 때)부터 셌다. 결제 화면에 오래 머문 손님은 결제 뒤 한 시간을 다 못 받았다.
   //     화면은 「결제하고 1시간 안에」라고 말하니 승인 시각부터 센다. 승인 기록이 없는 옛 예약만 행 생성 시각으로.
   const mins = minutesSincePaid(b, paidAt);
-  const rate = guestCancelRefundRate(days, mins);
-  return { rate, refund: Math.floor(b.amountTotal * rate) };
+  // 🔢09-18 밤 QA(SEC-03) — 퍼센트 정수로 정수 연산. `Math.floor(total * 0.7)`은 90,000원에서 62,999원을 냈다.
+  const percent = guestCancelRefundPercent(days, mins);
+  return { rate: percent / 100, refund: refundAmount(b.amountTotal, percent) };
 }
 
 function minutesSincePaid(b: SpaceBooking, paidAt?: string): number {

@@ -49,7 +49,14 @@ export interface ApproveResult {
   payment?: TossPayment;
   /** 실패했을 때 사람이 읽을 이유. 화면에 그대로 보여도 되는 문장만 담는다. */
   message: string;
+  /** 토스가 준 실패 코드(`REJECT_CARD_PAYMENT` 등). 결제 실패 화면이 이 코드로 우리 문장을 고른다(09-18 밤 QA SEC-06). */
+  code?: string;
 }
+
+/** 🧾결제 실패 화면(`/rent/pay/fail?code=`)이 알아듣는 «우리» 사유 코드. 토스 코드와 안 겹치게 `RENT_`로 시작한다.
+ *  승인은 됐는데 그 사이 시간이 차서 예약을 못 올렸을 때 — 자동 환불이 됐는지에 따라 둘로 나뉜다(`confirmBookingAction`). */
+export const PAY_FAIL_SLOT_TAKEN_REFUNDED = "RENT_SLOT_TAKEN_REFUNDED";
+export const PAY_FAIL_SLOT_TAKEN_REFUND_PENDING = "RENT_SLOT_TAKEN_REFUND_PENDING";
 
 /** 결제 승인 — 결제창이 돌려준 `paymentKey`·`orderId`·`amount`를 서버에서 다시 확정한다.
  *  🚨**금액을 클라이언트가 준 값으로 믿지 마라.** 호출부가 결제 줄에 적힌 금액을 넘겨야 한다.
@@ -85,8 +92,8 @@ export async function approvePayment(
       headers: { Authorization: authHeader(), "Content-Type": "application/json" },
       body: JSON.stringify({ paymentKey, orderId, amount }),
     });
-    const body = (await res.json()) as TossPayment & { message?: string };
-    if (!res.ok) return { ok: false, message: body.message || "결제 승인에 실패했어요." };
+    const body = (await res.json()) as TossPayment & { message?: string; code?: string };
+    if (!res.ok) return { ok: false, message: body.message || "결제 승인에 실패했어요.", code: body.code };
     return { ok: true, message: "", payment: body };
   } catch (e) {
     console.error(`[rent-payment] approve threw order=${orderId}: ${String(e)}`);
@@ -148,13 +155,21 @@ export const GRACE_MINUTES = 60;
  *  호스트 자율로 두면 전자상거래법 제35조로 무효가 될 수 있다(09-13 법규 조사).
  *  값은 공정위 지침 Ⅲ.1 라가 허용하는 **숙박업 공제율을 상한으로** 잡았다.
  *
+ *  🔢09-18 밤 QA(SEC-03) — 표는 «정수 퍼센트»로 둔다. 돈 계산(`refundAmount`)이 이 정수를 받는다.
+ *    소수 비율(0.7)을 금액에 바로 곱하면 90,000원의 70%가 62,999원이 됐다.
+ *
  *  @param daysBefore 쓰기로 한 날까지 남은 일수
  *  @param minutesSinceBooked 신청한 지 지난 분. 넘기지 않으면 유예 창을 안 본다(옛 호출부 호환).
  */
-export function guestCancelRefundRate(daysBefore: number, minutesSinceBooked?: number): number {
-  if (typeof minutesSinceBooked === "number" && minutesSinceBooked <= GRACE_MINUTES) return 1;
-  if (daysBefore >= 7) return 1;      // 7일 전까지 전액
-  if (daysBefore >= 3) return 0.7;
-  if (daysBefore >= 1) return 0.5;
+export function guestCancelRefundPercent(daysBefore: number, minutesSinceBooked?: number): number {
+  if (typeof minutesSinceBooked === "number" && minutesSinceBooked <= GRACE_MINUTES) return 100;
+  if (daysBefore >= 7) return 100;    // 7일 전까지 전액
+  if (daysBefore >= 3) return 70;
+  if (daysBefore >= 1) return 50;
   return 0;                            // 당일 취소는 환불 없음
+}
+
+/** 같은 표를 비율(1·0.7·0.5·0)로. 화면 문장(「70%」·「전액」)을 만드는 곳이 쓴다. ⚠️금액 계산엔 쓰지 않는다 — `refundAmount`에 퍼센트를 넘긴다. */
+export function guestCancelRefundRate(daysBefore: number, minutesSinceBooked?: number): number {
+  return guestCancelRefundPercent(daysBefore, minutesSinceBooked) / 100;
 }
