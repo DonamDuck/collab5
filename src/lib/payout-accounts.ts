@@ -7,6 +7,8 @@ import "server-only"; // 🔒클라이언트 컴포넌트가 import하면 빌드
 // ⏳토스 지급대행 셀러 등록(셀러 id·상태 칸)은 계약 뒤에 붙인다. 지금은 계좌를 받아 두기만 한다.
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { bankName, isBankCode, type PayoutHolderType } from "./banks";
+// 🔢09-18 밤 QA(H-35) — 사업자등록번호는 «검증번호»까지 본다. 등록 폼이 쓰는 그 함수다(규칙을 두 벌로 적지 않는다).
+import { bizNumberProblem } from "./bizcheck";
 // 🧪09-17 목 데이터 — 읽기는 목 세계에서, 쓰기는 멈춘다. 개발 빌드 전용(`rent-mock.ts` 머리말).
 import { getRentMock, rentMockOn } from "./rent-mock";
 
@@ -90,7 +92,9 @@ export function validatePayoutInput(
   let businessNumber = "";
   if (holderType !== "individual") {
     businessNumber = (input.businessNumber ?? "").replace(/[\s-]/g, "");
-    if (!/^\d{10}$/.test(businessNumber)) return { ok: false, message: "사업자등록번호 10자리를 다시 봐 주세요." };
+    // 자릿수만 세던 것을 국세청 검증번호 규칙까지 보게 바꿨다(09-18 밤 QA H-35). 오타 대부분을 여기서 거른다.
+    const problem = bizNumberProblem(businessNumber);
+    if (problem) return { ok: false, message: problem };
   }
   return { ok: true, value: { holderType, holderName, businessNumber, bankCode: input.bankCode, accountNumber } };
 }

@@ -9,7 +9,7 @@ import { getRentMock, rentMockOn, RENT_MOCK_BLOCKED } from "./rent-mock";
 import {
   saveSpace, getSpaceFull, getBooking, createPendingBooking, getBookingByOrderId,
   decideBooking, requestRefund, clearRefundRequest,
-  setBookingStatus, listSpacesByOwner, listSpacesByIds, payout, FEE_RATE,
+  setBookingStatus, listSpacesByOwner, listSpacesByIds,
   createPayment, getPaymentByOrderId, rentSync,
   type SpaceSaveInput,
   listLiveBookings, setSpaceStatus, approveSpace, markReminded, SLUG_TAKEN,
@@ -1067,12 +1067,6 @@ export async function cancelBookingAction(bookingId: number, quotedRefund?: numb
   });
   // ✍️09-17 — 「환불됩니다」·「없습니다」 피동·합니다체를 걷었다. 누가 돌려주는지 주어가 보이게.
   return { ok: true, message: refund > 0 ? `취소했어요. ${refund.toLocaleString()}원을 돌려드릴게요.` : "취소했어요. 당일 취소라 돌려드릴 돈은 없어요." };
-}
-
-/** 화면에서 금액을 보여줄 때 쓰는 계산 — 호스트에게 얼마가 가는지 정직하게 적기 위한 것. */
-export async function quotePayout(total: number): Promise<{ fee: number; payout: number; rate: number }> {
-  const out = payout(total);
-  return { fee: total - out, payout: out, rate: FEE_RATE };
 }
 
 // 🔻`markPaidOutAction`(대표가 손으로 입금했다고 적는 버튼)은 09-16에 지웠다.
