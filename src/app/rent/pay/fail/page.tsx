@@ -1,6 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { PAY_FAIL_SLOT_TAKEN_REFUNDED, PAY_FAIL_SLOT_TAKEN_REFUND_PENDING } from "@/lib/rent-payment";
+import {
+  PAY_FAIL_METHOD_UNSUPPORTED, PAY_FAIL_NOT_AVAILABLE, PAY_FAIL_SLOT_TAKEN,
+  PAY_FAIL_SLOT_TAKEN_REFUNDED, PAY_FAIL_SLOT_TAKEN_REFUND_PENDING,
+  PAY_FAIL_USE_STARTED, PAY_FAIL_WINDOW_OVER,
+} from "@/lib/rent-payment";
 import { KAKAO_CHAT_URL } from "@/lib/site";
 import { secondaryBtnCls } from "../../ui";
 
@@ -34,11 +38,21 @@ const REASONS = new Map<string, string>([
   // 우리 승인 라우트 — 돈은 승인됐는데 그 사이 시간이 찼다(`confirmBookingAction`).
   [PAY_FAIL_SLOT_TAKEN_REFUNDED, "그 사이 그 시간이 찼어요. 결제는 바로 취소해 드렸어요."],
   [PAY_FAIL_SLOT_TAKEN_REFUND_PENDING, "그 사이 그 시간이 찼어요. 환불을 처리하고 있으니 곧 연락드릴게요."],
+  // 🛑승인 «전»에 우리가 막은 갈래 — 돈은 한 번도 움직이지 않았다(09-18 밤 QA).
+  [PAY_FAIL_WINDOW_OVER, "결제 시간 30분이 지나서 이 신청은 닫혔어요. 공간에서 다시 골라 주세요."],
+  [PAY_FAIL_USE_STARTED, "신청하신 시간이 이미 시작돼서 결제할 수 없어요."],
+  [PAY_FAIL_SLOT_TAKEN, "그 사이 다른 분이 그 시간을 먼저 예약했어요. 돈은 움직이지 않았어요."],
+  [PAY_FAIL_NOT_AVAILABLE, "그 사이 사장님이 이 시간이나 상품을 바꾸셨어요. 돈은 움직이지 않았어요."],
+  [PAY_FAIL_METHOD_UNSUPPORTED, "이 결제 수단은 아직 받지 않아요. 카드나 간편결제로 다시 결제해 주세요."],
 ]);
 const DEFAULT_REASON = "결제를 마치지 못했어요. 잠시 뒤 다시 시도해 주세요.";
 
 /** 다시 결제할 수 없는 사유 — 그 신청은 이미 닫혔다. */
-const CLOSED = new Set([PAY_FAIL_SLOT_TAKEN_REFUNDED, PAY_FAIL_SLOT_TAKEN_REFUND_PENDING]);
+const CLOSED = new Set([
+  PAY_FAIL_SLOT_TAKEN_REFUNDED, PAY_FAIL_SLOT_TAKEN_REFUND_PENDING,
+  // 이 넷은 신청 자체가 닫혔거나 조건이 바뀌었다. 같은 주문으로 다시 결제하면 또 막힌다.
+  PAY_FAIL_WINDOW_OVER, PAY_FAIL_USE_STARTED, PAY_FAIL_SLOT_TAKEN, PAY_FAIL_NOT_AVAILABLE,
+]);
 
 /** 우리 주문번호 모양(`startBookingAction`: `rent-{공간}-{YYYYMMDD}-{난수}`)과 목 데이터 모양만 받는다. 링크에 그대로 넣기 때문이다. */
 const ORDER_ID_RE = /^(rent-\d+-\d{8}-[a-z0-9]{1,16}|mock-order-\d+)$/;

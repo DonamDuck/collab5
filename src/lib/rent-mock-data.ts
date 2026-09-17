@@ -178,7 +178,12 @@ function booking(p: BookingSeed, today: string): SpaceBooking {
   const amountSpace = amt?.space ?? 0;
   const amountChat = amt?.chat ?? 0;
   const amountTotal = amountSpace + amountChat;
-  const at = `${addDaysIso(p.useDate < today ? p.useDate : today, -2)}T03:${String(p.id % 60).padStart(2, "0")}:00.000Z`;
+  // 🕒09-18 밤 — 앞으로 있을 «결제 전» 신청은 «방금» 만든 것으로 둔다. 결제 시간(30분)이 생기면서
+  //   이틀 전으로 만들면 목 결제 화면이 늘 「시간이 지났어요」로만 보였다(지난 날짜 신청은 그대로 둔다).
+  const fresh = rest.status === "pending" && p.useDate >= today;
+  const at = fresh
+    ? new Date(Date.now() - 3 * 60 * 1000).toISOString()
+    : `${addDaysIso(p.useDate < today ? p.useDate : today, -2)}T03:${String(p.id % 60).padStart(2, "0")}:00.000Z`;
   return {
     // 🪪guestName 빈 값 = 성함 칸이 생기기 전 옛 예약. 화면·메일이 프로필 브랜드명으로 물러서는 모양을 같이 본다.
     guestBrandSlug: "", guestPhone: "", guestName: "", hours: "", headcount: undefined,
@@ -566,7 +571,7 @@ function stressWorld(today: string): MockWorld {
     ].join("\n"),
     minHours: 8,
     rentSpaceOn: true, rentSpacePrice: 950000, rentSpaceNote: [para, para].join("\n"),
-    rentFullOn: true, rentFullPrice: 1250000, rentFullNote: [para, para, para].join("\n"),
+    rentFullOn: true, rentFullPrice: 1000000, rentFullNote: [para, para, para].join("\n"),
     coffeeChat: true, coffeeChatMinutes: 120, coffeeChatPrice: 150000,
     coffeeChatTopics: Array.from({ length: 8 }, (_, i) => `${i + 1}. 식당을 열고 첫 해에 겪은 일 중 하나를 아주 길게 풀어서 이야기해 드릴 수 있어요. 재료값이 두 배로 뛰었던 달 이야기도요.`).join("\n"),
     accessHow: "both", contactPhone: "02-0000-0000 (내선 3번, 점심시간엔 안 받아요)",
