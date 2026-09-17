@@ -7,6 +7,7 @@ import { FEE_RATE } from "@/lib/spaces";
 import { SpaceForm } from "./SpaceForm";
 import { redirect } from "next/navigation";
 import { primaryBtnCls } from "../ui";
+import { OG_IMAGE } from "@/lib/site";
 
 // 하루 가게 — 공간 올리기 (2026-09-13)
 //
@@ -17,10 +18,24 @@ import { primaryBtnCls } from "../ui";
 // 🎨09-13 재작업 — 한 열 560px, 제목 28 · 한 줄 17, 섹션은 register 규칙(21px 제목 → 첫 입력 23px, 섹션 사이 12).
 export const dynamic = "force-dynamic";
 
+const TITLE = "공간 올리기 — 하루 가게";
+const DESCRIPTION = "공간이 비는 시간만 골라 빌려주세요. 규칙은 사장님이 정하세요.";
+
 export const metadata: Metadata = {
-  title: "공간 올리기 — 하루 가게",
-  description: "공간이 비는 시간만 골라 빌려주세요. 규칙은 사장님이 정하세요.",
+  title: TITLE,
+  description: DESCRIPTION,
   alternates: { canonical: "/rent/new" },
+  // 🔗링크 미리보기(09-18 밤 QA SC-06) — 사장님께 「여기서 올리시면 돼요」로 보내는 링크라 홈 카드가 뜨면 안 된다.
+  //   `openGraph`는 루트 것을 통째로 갈아 끼우므로 사이트 이름·언어·썸네일도 같이 적는다(`/rent` 목록과 같은 이유).
+  openGraph: {
+    type: "website",
+    siteName: "collab5",
+    locale: "ko_KR",
+    url: "/rent/new",
+    title: TITLE,
+    description: DESCRIPTION,
+    images: [{ url: OG_IMAGE, width: 1200, height: 630 }],
+  },
 };
 
 export default async function NewSpacePage({

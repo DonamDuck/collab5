@@ -7,6 +7,7 @@ import { RentFilters, type UseFilter } from "./RentFilters";
 import { categoryLabel, CoverPlaceholder, primaryBtnCls, secondaryBtnCls, won } from "./ui";
 import { PRODUCT_LABEL } from "@/lib/rent-copy";
 import { lowestPrice, productPrice, sellableProducts } from "@/lib/rent-products";
+import { OG_IMAGE } from "@/lib/site";
 
 // 하루 가게 — 목록 (2026-09-13)
 // 스펙 = docs/superpowers/specs/2026-09-13-daily-shop-design.md
@@ -20,12 +21,28 @@ import { lowestPrice, productPrice, sellableProducts } from "@/lib/rent-products
 //     히어로 옆의 키위 버튼 하나가 더 잘한다(배너는 목록을 훑으러 온 사람에게 광고처럼 읽혔다).
 export const dynamic = "force-dynamic";
 
+const TITLE = "하루 가게 — collab5";
+const DESCRIPTION =
+  "안 쓰는 날의 공간을 시간 단위로 빌려드려요. 가게를 열어보고 싶은 사람이 그 시간만큼 사장님이 됩니다.";
+
 export const metadata: Metadata = {
-  title: "하루 가게 — collab5",
-  description:
-    "안 쓰는 날의 공간을 시간 단위로 빌려드려요. 가게를 열어보고 싶은 사람이 그 시간만큼 사장님이 됩니다.",
+  title: TITLE,
+  description: DESCRIPTION,
   // ⚠️필수 — 루트 layout의 `canonical: "/"`가 자식에 상속돼, 안 덮으면 이 페이지가 홈의 사본이 된다.
   alternates: { canonical: "/rent" },
+  // 🔗링크 미리보기(09-18 밤 QA SC-06). 안 주면 루트의 홈 카드(주소 `/`·홈 제목)가 그대로 상속돼서
+  //   카톡에 하루 가게 링크를 붙여도 홈 카드가 떴다.
+  //   ⚠️`openGraph`는 칸 하나만 줘도 루트 것을 «통째로» 갈아 끼운다(Next 메타데이터는 얕게 합친다).
+  //   그래서 사이트 이름·언어·기본 썸네일도 여기 같이 적는다. 빼면 카드에서 그림이 사라진다.
+  openGraph: {
+    type: "website",
+    siteName: "collab5",
+    locale: "ko_KR",
+    url: "/rent",
+    title: TITLE,
+    description: DESCRIPTION,
+    images: [{ url: OG_IMAGE, width: 1200, height: 630 }],
+  },
 };
 
 /** 주소로 들어온 쓰임새 값을 걸러 낸다. 모르는 값은 「전체」로 떨어뜨린다 —
