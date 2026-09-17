@@ -17,6 +17,7 @@ export function PayPanel({
   orderName,
   backHref,
   placeLabel,
+  productLabel,
   scheduleLabel,
   amountLabel,
   breakdown,
@@ -28,9 +29,11 @@ export function PayPanel({
   /** 「신청 내용 고치기」가 돌아갈 곳 — 그 공간의 상세 화면. */
   backHref: string;
   placeLabel: string;
+  /** 🛍고른 상품 이름(09-18, `PRODUCT_LABEL`). 확인 팝업과 같은 줄 순서다. */
+  productLabel: string;
   scheduleLabel: string;
   amountLabel: string;
-  /** 「대여 4시간 60,000원 + 커피챗 60분 40,000원」. 서버가 예약 행에서 만든다. 비면 합계만. */
+  /** 「대관만 4시간 60,000원 + 커피챗 60분 40,000원」(09-18부터 「대여」 자리에 상품 이름). 서버가 예약 행에서 만든다. 비면 합계만. */
   breakdown: string;
   /** 이 예약 날짜로 계산한 취소 규정 한 줄. 서버가 환불표에 물어 만든다(`page.tsx`). */
   cancelLine: string;
@@ -179,6 +182,7 @@ export function PayPanel({
           ⚠️표 태그를 쓰지 않는다 — 두 칸짜리 표는 좁은 화면에서 칸이 깨진다. 왼쪽 라벨 고정폭이면 충분하다. */}
       <InfoPanel title="결제 정보 확인">
         <InfoRow label="장소" value={placeLabel} />
+        <InfoRow label="상품" value={productLabel} />
         <InfoRow label="일정" value={scheduleLabel} />
         <InfoRow
           label="금액"

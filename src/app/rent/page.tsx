@@ -4,7 +4,9 @@ import { listOpenSpaces } from "@/lib/spaces";
 import type { SpaceCategory, SpacePublic, SpaceUseType } from "@/lib/types";
 import { EmptyState } from "@/components/EmptyState";
 import { RentFilters, type UseFilter } from "./RentFilters";
-import { categoryLabel, CoverPlaceholder, primaryBtnCls, scopeLabel, secondaryBtnCls, won } from "./ui";
+import { categoryLabel, CoverPlaceholder, primaryBtnCls, secondaryBtnCls, won } from "./ui";
+import { PRODUCT_LABEL } from "@/lib/rent-copy";
+import { lowestPrice, productPrice, sellableProducts } from "@/lib/rent-products";
 
 // 하루 가게 — 목록 (2026-09-13)
 // 스펙 = docs/superpowers/specs/2026-09-13-daily-shop-design.md
@@ -67,14 +69,18 @@ function SpaceCard({ sp }: { sp: SpacePublic }) {
             카드마다 길이가 들쭉날쭉했는데, 이 둘은 늘 같은 자리에 같은 길이로 선다. */}
         {/* 🙈업종이 빈 옛 공간은 업종 글자를 아예 안 그린다(09-17 QA — 「업종 미정」이 손님에게 그대로 보였다). */}
         <p className="mt-1 line-clamp-1 text-[15px] leading-relaxed text-body">
-          {[categoryLabel(sp.category), scopeLabel(sp.scope)].filter(Boolean).join(" · ")}
+          {/* 🛍09-18 옛 범위(`scopeLabel`) → 켜진 상품 이름. 대관만·공간 전체를 다 파는 공간이 「공간만」으로 서면 틀린 말이다. */}
+          {[categoryLabel(sp.category), ...sellableProducts(sp).map((p) => PRODUCT_LABEL[p])].filter(Boolean).join(" · ")}
         </p>
         <p className="mt-1 text-[14px] text-faint">{sp.address.split(/\s+/).slice(0, 2).join(" ") || "위치 미정"}</p>
         {/* 💸09-17 디자인팀 — 값을 흐린 13px 꼬리에서 **굵은 줄 하나**로 올렸다. 목록을 훑는 손님이 이름 다음으로
             대 보는 것이 값인데, 동네 뒤에 붙은 faint 글자라 카드 둘을 나란히 두고 비교가 안 됐다(아워플레이스 카드). */}
         <p className="mt-2.5 text-ink">
-          <span className="text-[16px] font-bold tabular-nums">{won(sp.priceHour)}</span>
-          <span className="ml-0.5 text-[14px] text-mute">/ 시간</span>
+          {/* 🛍09-18 값이 상품마다 다르면 낮은 값에 「부터」. */}
+          <span className="text-[16px] font-bold tabular-nums">{won(lowestPrice(sp) || sp.priceHour)}</span>
+          <span className="ml-0.5 text-[14px] text-mute">
+            {new Set(sellableProducts(sp).map((p) => productPrice(sp, p))).size > 1 ? "부터 / 시간" : "/ 시간"}
+          </span>
         </p>
       </div>
     </Link>

@@ -21,9 +21,11 @@ import { useRouter } from "next/navigation";
 import { saveSpaceAction } from "@/lib/rent-actions";
 import { uploadPhoto } from "@/lib/upload";
 import { PhotoGrid } from "@/app/register/PhotoGrid";
-import type { Space, SpaceUseType, SpaceCategory, SpaceScope, OpenSlot, AccessHow, RepeatRule } from "@/lib/types";
+import type { Space, SpaceUseType, SpaceCategory, OpenSlot, AccessHow, RepeatRule } from "@/lib/types";
 import { expandRepeat, hoursBetween, stripRepeat } from "@/lib/rent-time";
-import { COFFEE_CHAT_WHEN_HOST } from "@/lib/rent-copy";
+import {
+  COFFEE_CHAT_LABEL, COFFEE_CHAT_WHEN_HOST, PRODUCT_HINT_HOST, PRODUCT_LABEL, PRODUCT_NOTE_PLACEHOLDER,
+} from "@/lib/rent-copy";
 import { CATEGORY_OPTIONS, dateLabel, primaryBtnCls, RentSelect, rentInputCls, rentTextareaCls, secondaryBtnCls, won } from "../ui";
 import { AddressField } from "./AddressField";
 import { OpenSlotsCalendar } from "./OpenSlotsCalendar";
@@ -35,15 +37,10 @@ import { OpenSlotsCalendar } from "./OpenSlotsCalendar";
  *  🩸여기 같은 목록을 따로 들고 있었는데, 목록 거르개도 업종 축으로 바뀌면서 **두 벌이 세 벌이 될 뻔했다.**
  *    고르개와 거르개가 다른 목록을 보면 올릴 수는 있는데 걸리지는 않는 업종이 생긴다. */
 
-/** 📂빌려드리는 범위 — 값의 근거가 되는 축. 대표가 말한 네 경우가 여기 다 들어간다
- *  (카페 공간만 / 카페 + 머신 / 국밥집 화구까지 / 예쁜 식당을 라운지로). */
-const SCOPES: [SpaceScope, string, string][] = [
-  // 🔁09-17 QA — 설명이 손님 시점(「내 식으로」)이었다. 이 칸은 사장님이 읽고 고르는 자리라 손님을 3인칭으로 둔다.
-  ["space_only", "공간만 빌려드려요", "손님은 장비 없이 자리만 써요. 모임·촬영·라운지 대관 같은 것들이요."],
-  ["with_gear", "공간과 장비까지", "커피 머신·화구·재봉틀까지 쓰게 해 드려요. 손님이 빌린 시간 동안 자기 식으로 가게를 돌려 봐요."],
-  // 🔻09-16 대표 — 「가게 그대로」 제거. 간판·메뉴까지 넘기는 건 무신고 영업 문제가 정리돼야 열 수 있고,
-  //   지금 단계에서 고르게 두면 사장님이 무심코 골랐다가 법에 걸린다. `SpaceScope` 타입엔 남겨 둔다.
-];
+/** 🔻09-18 「어디까지 빌려드릴까요」(범위 라디오 `SCOPES`)를 지웠다 — 「무엇을 파실까요」의 상품 카드 셋이 맡는다.
+ *  대표: 「대관만, 공간 전체(대관·시설), 커피챗 이렇게 3개 상품을 설정할 수 있게 하고 가격도 각각」.
+ *  ⭐범위는 «하나를 고르는» 축이었고 상품은 «여럿을 켜는» 축이다. 카페 사장님은 자리만도, 머신까지도 팔 수 있다.
+ *  옛 `scope`는 DB에 남고 서버가 켠 상품에서 호환 값을 만든다(`compatScopePrice`). */
 
 /** 📨이용 안내 방식. 🚨내용(비밀번호 등)은 우리가 안 가진다 — 방식만 고른다(대표 09-16). */
 const ACCESS_OPTIONS: [AccessHow, string][] = [
@@ -112,15 +109,18 @@ type Photo = { url: string; uploading?: boolean };
 //   ⭐새로 올리기에서만 한다. 고치기는 이미 DB에 있고, 낡은 초안을 얹으면 저장된 값을 되돌린다.
 //   🔑키에 사용자 id를 넣는다. 안 넣으면 같은 기기에서 다른 계정으로 들어온 사람에게 남의 초안이 뜬다.
 //   ✋약관 동의는 안 담는다. 다시 눌러야 동의다.
-const DRAFT_VERSION = 1;
+// 🔁09-18 v2 — 범위(`scope`)·시간당 값 하나(`priceHour`)가 상품 두 벌로 바뀌었다. v1 초안은 읽을 때 옮긴다(`draftFromV1`).
+const DRAFT_VERSION = 2;
 const DRAFT_DEBOUNCE_MS = 700;
 const draftKeyOf = (uid: number) => `collab5:rent-new-draft:u${uid}`;
 
 interface SpaceDraft {
-  name: string; category: SpaceCategory; scope: SpaceScope; body: string; photos: string[];
+  name: string; category: SpaceCategory; body: string; photos: string[];
   addrBase: string; addrDetail: string; contactPhone: string; accessHow: AccessHow;
   facilities: string[]; facilitiesNote: string; capacity: string; rules: string;
-  priceHour: number; minHours: string;
+  spaceOn: boolean; spacePrice: number; spaceNote: string;
+  fullOn: boolean; fullPrice: number; fullNote: string;
+  minHours: string;
   chatOn: boolean; chatMin: string; chatPrice: number; chatTopics: string;
   openSlots: OpenSlot[]; repeatWeekly: RepeatRule[];
   brandOn: boolean; brandPick: string;
@@ -164,7 +164,6 @@ export function SpaceForm({
   //   🆕넣은 것: 업종/범위 · 시간당 값 · 최소 대여 시간 · 시간대 달력 · 커피챗 · 안내 방식 · 매장 전화 · 호스트 약관
   const [name, setName] = useState(initial?.name ?? defaultName);
   const [category, setCategory] = useState<SpaceCategory>(initial?.category ?? "");
-  const [scope, setScope] = useState<SpaceScope>(initial?.scope ?? "space_only");
   const [body, setBody] = useState(initial?.body ?? "");
   const [photos, setPhotos] = useState<Photo[]>((initial?.photos ?? []).map((url) => ({ url })));
   const [addrBase, setAddrBase] = useState(() => splitAddress(initial?.address ?? "")[0]);
@@ -179,7 +178,13 @@ export function SpaceForm({
   const [capacity, setCapacity] = useState(initial?.capacity ? String(initial.capacity) : "");
   const [rules, setRules] = useState(initial?.rules ?? "");
   const [ruleInput, setRuleInput] = useState("");
-  const [priceHour, setPriceHour] = useState<number>(initial?.priceHour ?? 0);
+  // 🛍09-18 상품 셋. 고치기면 저장된 상품을 그대로(SQL 전 옛 공간은 `toSpace`가 옛 범위에서 만들어 준다).
+  const [spaceOn, setSpaceOn] = useState(initial?.rentSpaceOn ?? false);
+  const [spacePrice, setSpacePrice] = useState<number>(initial?.rentSpacePrice ?? 0);
+  const [spaceNote, setSpaceNote] = useState(initial?.rentSpaceNote ?? "");
+  const [fullOn, setFullOn] = useState(initial?.rentFullOn ?? false);
+  const [fullPrice, setFullPrice] = useState<number>(initial?.rentFullPrice ?? 0);
+  const [fullNote, setFullNote] = useState(initial?.rentFullNote ?? "");
   const [minHours, setMinHours] = useState(String(initial?.minHours || 2));
   const [chatOn, setChatOn] = useState(initial?.coffeeChat ?? false);
   /** 🔁09-14 한 시간 «고정»에서 **30분 단위 고르기**로(대표). 기본은 60분 — 제일 흔한 답을 미리 얹어 둔다. */
@@ -202,10 +207,11 @@ export function SpaceForm({
   const draftKey = !initial && userId ? draftKeyOf(userId) : null;
   /** 아무것도 안 쓴 첫 모습. 지금 폼이 이것과 같으면 초안을 안 남긴다(열어만 봤는데 「불러왔어요」가 뜨면 이상하다). */
   const [blank] = useState<SpaceDraft>(() => ({
-    name: defaultName, category: "", scope: "space_only", body: "", photos: [],
+    name: defaultName, category: "", body: "", photos: [],
     addrBase: "", addrDetail: "", contactPhone: defaultPhone, accessHow: "sms",
     facilities: [], facilitiesNote: "", capacity: "", rules: "",
-    priceHour: 0, minHours: "2",
+    spaceOn: false, spacePrice: 0, spaceNote: "", fullOn: false, fullPrice: 0, fullNote: "",
+    minHours: "2",
     chatOn: false, chatMin: "60", chatPrice: 0, chatTopics: "",
     openSlots: [], repeatWeekly: [],
     brandOn: !!defaultBrandSlug, brandPick: defaultBrandSlug || myBrands[0]?.slug || "",
@@ -216,11 +222,13 @@ export function SpaceForm({
   const draftDone = useRef(false);
 
   const applyDraft = (d: SpaceDraft) => {
-    setName(d.name); setCategory(d.category); setScope(d.scope); setBody(d.body);
+    setName(d.name); setCategory(d.category); setBody(d.body);
     setPhotos(d.photos.map((url) => ({ url })));
     setAddrBase(d.addrBase); setAddrDetail(d.addrDetail); setContactPhone(d.contactPhone); setAccessHow(d.accessHow);
     setFacilities(d.facilities); setFacilitiesNote(d.facilitiesNote); setCapacity(d.capacity); setRules(d.rules);
-    setPriceHour(d.priceHour); setMinHours(d.minHours);
+    setSpaceOn(!!d.spaceOn); setSpacePrice(Number(d.spacePrice) || 0); setSpaceNote(d.spaceNote ?? "");
+    setFullOn(!!d.fullOn); setFullPrice(Number(d.fullPrice) || 0); setFullNote(d.fullNote ?? "");
+    setMinHours(d.minHours);
     setChatOn(d.chatOn); setChatMin(d.chatMin); setChatPrice(d.chatPrice); setChatTopics(d.chatTopics);
     setOpenSlots(d.openSlots); setRepeatWeekly(d.repeatWeekly);
     setBrandOn(d.brandOn);
@@ -235,10 +243,10 @@ export function SpaceForm({
     if (!draftKey) return;
     try {
       const raw = localStorage.getItem(draftKey);
-      const env = raw ? (JSON.parse(raw) as { v?: number; data?: Partial<SpaceDraft> }) : null;
-      if (env?.v === DRAFT_VERSION && env.data && typeof env.data === "object") {
+      const env = raw ? (JSON.parse(raw) as { v?: number; data?: Partial<SpaceDraft> & DraftV1Extra }) : null;
+      if ((env?.v === DRAFT_VERSION || env?.v === 1) && env.data && typeof env.data === "object") {
         // 모양이 어긋난 칸은 빈 모습으로 메운다. 초안 하나 때문에 폼이 안 뜨면 안 된다.
-        const d = { ...blank, ...env.data } as SpaceDraft;
+        const d = { ...blank, ...(env.v === 1 ? draftFromV1(env.data) : env.data) } as SpaceDraft;
         if (!Array.isArray(d.photos)) d.photos = [];
         d.photos = d.photos.filter((u) => typeof u === "string" && /^https?:\/\//.test(u));
         if (!Array.isArray(d.facilities)) d.facilities = [];
@@ -258,10 +266,11 @@ export function SpaceForm({
 
   const draftSnap: SpaceDraft = {
     // 주소가 http(s)인 사진만. 저장소 없는 로컬에선 사진이 data URL로 와서 한 장이 저장소 한도를 넘긴다.
-    name, category, scope, body, photos: readyPhotosOf(photos).filter((u) => /^https?:\/\//.test(u)),
+    name, category, body, photos: readyPhotosOf(photos).filter((u) => /^https?:\/\//.test(u)),
     addrBase, addrDetail, contactPhone, accessHow,
     facilities, facilitiesNote, capacity, rules,
-    priceHour, minHours,
+    spaceOn, spacePrice, spaceNote, fullOn, fullPrice, fullNote,
+    minHours,
     chatOn, chatMin, chatPrice, chatTopics,
     openSlots, repeatWeekly,
     brandOn, brandPick,
@@ -302,8 +311,8 @@ export function SpaceForm({
   // ⚠️`payout()`을 import하지 않고 식을 옮겨 적었다 — 그 함수는 `lib/spaces.ts`에 있고, 그 파일은
   //   supabase 클라이언트를 끌고 온다. 클라이언트 번들에 데이터 계층 한 벌이 통째로 실린다.
   //   ⭐대신 **요율은 서버에서 받는다**(props). 바뀔 수 있는 값이 한 군데에만 있으면 어긋날 자리가 없다.
-  // 🔢시간당 값으로 바뀌면서 정산액도 «한 시간치»로 보여 준다(대표 09-16).
-  const payoutNum = Math.floor(priceHour * (1 - feeRate));
+  // 🔢시간당 값으로 바뀌면서 정산액도 «한 시간치»로 보여 준다(대표 09-16). 09-18부터 상품마다 따로.
+  const payoutOf = (price: number) => Math.floor(price * (1 - feeRate));
   const uploading = photos.some((p) => p.uploading);
   const readyPhotos = photos.filter((p) => !p.uploading && p.url);
 
@@ -377,7 +386,12 @@ export function SpaceForm({
     if (!addrBase.trim()) return ["address", "주소를 찾아 주세요."];
     if (!contactPhone.trim()) return ["phone", "매장 전화번호가 비어 있어요."];
     if (rules.trim().length < 10) return ["rules", "유의 사항을 열 글자 넘게 담아 주셔야 올릴 수 있어요."];
-    if (priceHour <= 0) return ["price", "한 시간에 얼마 받으실지 적어 주세요."];
+    // 🛍09-18 — 공간 상품 하나 이상, 켠 상품은 값과 설명. 서버(`saveSpaceAction`)가 같은 규칙으로 다시 본다.
+    if (!spaceOn && !fullOn) return ["products", "파실 상품을 하나는 켜 주세요. 대관만이나 공간 전체 중에서요."];
+    if (spaceOn && spacePrice <= 0) return ["spacePrice", "한 시간 값이 비어 있어요."];
+    if (spaceOn && spaceNote.trim().length < 10) return ["spaceNote", "손님이 무엇을 쓰고 할 수 있는지 열 글자는 넘게 담아 주세요."];
+    if (fullOn && fullPrice <= 0) return ["fullPrice", "한 시간 값이 비어 있어요."];
+    if (fullOn && fullNote.trim().length < 10) return ["fullNote", "어떤 시설까지 쓰는지 조금 더 적어 주세요. 열 글자면 돼요."];
     // 🔁09-17 — 매주 계속 여는 요일이 있으면 그걸로 하루 이상이 찬다. 시간 검사도 규칙이 연 날까지 본다.
     if (openSlots.length === 0 && repeatWeekly.length === 0) return ["slots", "빌려줄 날을 달력에서 하루 이상 골라 주세요."];
     const badSlot = expandRepeat(openSlots, repeatWeekly).find((sl) => hoursBetween(sl.start, sl.end) < Number(minHours));
@@ -413,13 +427,17 @@ export function SpaceForm({
         photos: readyPhotos.map((p) => p.url),
         address,
         category,
-        scope,
         useType,
         facilities,
         facilitiesNote,
         capacity: capacity ? Number(capacity) : undefined,
         rules,
-        priceHour,
+        rentSpaceOn: spaceOn,
+        rentSpacePrice: spaceOn ? spacePrice : 0,
+        rentSpaceNote: spaceOn ? spaceNote : "",
+        rentFullOn: fullOn,
+        rentFullPrice: fullOn ? fullPrice : 0,
+        rentFullNote: fullOn ? fullNote : "",
         minHours: Number(minHours) || 1,
         openSlots,
         repeatWeekly,
@@ -489,7 +507,8 @@ export function SpaceForm({
         </L>
         {/* 🔻09-16 「한 줄로 말하면」을 빼고 그 자리에 **업종**을 넣었다(대표) — 검색하고 거를 수 있어야 한다.
             ⭐**두 축**으로 가른 이유는 조합이 폭발해서다. 카페 공간만 / 카페 + 머신 / 국밥집 화구까지 /
-              예쁜 식당을 라운지로… 를 한 목록으로 만들면 끝이 없는데, 업종 × 범위면 두 칸으로 끝난다. */}
+              예쁜 식당을 라운지로… 를 한 목록으로 만들면 끝이 없는데, 업종 × 범위면 두 칸으로 끝난다.
+            🔁09-18 범위 축은 아래 「무엇을 파실까요」의 상품 카드로 옮겼다. */}
         {/* 🔁09-17 QA — 빈 선택지가 「고르지 않음」이라 안 골라도 되는 칸처럼 보였다. 업종은 필수다(폼·서버 둘 다 막는다). */}
         <L label="업종" htmlFor="sp-category" anchor="category" error={fieldErr("category")}>
           <RentSelect id="sp-category" value={category} onChange={(e) => setCategory(e.target.value as SpaceCategory)}>
@@ -502,35 +521,6 @@ export function SpaceForm({
               </option>
             ))}
           </RentSelect>
-        </L>
-        <L label="어디까지 빌려드릴까요" hint="값을 정하는 근거가 돼요. 손님도 이걸 보고 골라요.">
-          <div role="radiogroup" aria-label="빌려드리는 범위" className="space-y-2">
-            {SCOPES.map(([v, t, d]) => (
-              <button
-                key={v}
-                type="button"
-                role="radio"
-                aria-checked={scope === v}
-                onClick={() => setScope(v)}
-                className={`flex w-full items-start gap-3 rounded-lg border px-4 py-3.5 text-left transition-colors ${
-                  scope === v ? "border-primary-tint bg-primary-pale" : "border-hairline bg-surface hover:bg-surface-soft"
-                }`}
-              >
-                <span
-                  aria-hidden="true"
-                  className={`mt-0.5 grid size-[18px] shrink-0 place-items-center rounded-full border-2 ${
-                    scope === v ? "border-primary-on" : "border-border-strong"
-                  }`}
-                >
-                  {scope === v && <span className="size-[8px] rounded-full bg-primary-on" />}
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block text-[16px] font-medium text-ink">{t}</span>
-                  <span className="mt-0.5 block text-[14px] leading-snug break-keep text-mute">{d}</span>
-                </span>
-              </button>
-            ))}
-          </div>
         </L>
         <L
           label="공간 소개"
@@ -811,37 +801,66 @@ export function SpaceForm({
         </div>
       </Group>
 
-      {/* ── 값 ── */}
-      <Group title="얼마에 빌려주실까요">
-        {/* 🔁09-16 하루 값 → **시간당 값**(대표). 사장님마다 열 수 있는 시간이 다르고, 빌리는 쪽도
-            하루 통째보다 「오후 세 시간」이 현실적이다. 눈금은 1시간 — 30분은 가게가 그렇게 생각하지 않고
-            달력·요금·겹침이 두 배로 복잡해진다. 그 대신 «최소 대여 시간»이 30분의 필요를 덮는다. */}
-        <L
-          label="대여 비용"
-          htmlFor="sp-price"
-          anchor="price"
-          error={fieldErr("price")}
-          hint="한 시간 값을 적어 주세요. 손님은 한 시간 단위로 골라요."
+      {/* ── 파는 것 ── 🛍09-18 대표 결정.
+           「공급자 섹션에서 바로 해야 하는 것 같아. 즉 대관만, 공간 전체(대관, 시설), 커피챗 이렇게 3개 상품을 설정할 수 있게 하고
+            가격도 각각 설정하게 하고, 고객은 신청할 때 이걸 선택할 수 있게 하자.」
+           ⭐앞선 코멘트: 「카페를 일일카페로 하고 싶은 사람도, 카페가 예뻐서 대관만 하고 싶은 사람도 딱 보고 알 수 있게」.
+             그래서 상품마다 «무엇을 쓰고 할 수 있는지» 설명 칸이 필수다. 이름과 값만으로는 둘의 차이가 안 읽힌다.
+           🔁09-16 하루 값 → **시간당 값**(대표). 눈금은 1시간이고 «최소 대여 시간»이 30분의 필요를 덮는다(두 상품 공통 하나). */}
+      <Group
+        title="무엇을 파실까요"
+        sub="파실 것을 켜고 값을 정해 주세요. 손님은 켜 두신 것 중에서 골라 신청해요."
+        anchor="products"
+        error={fieldErr("products")}
+      >
+        <ProductCard
+          title={PRODUCT_LABEL.space}
+          hint={PRODUCT_HINT_HOST.space}
+          on={spaceOn}
+          onToggle={() => setSpaceOn((v) => !v)}
         >
-          <WonInput id="sp-price" value={priceHour} onChange={setPriceHour} placeholder="예) 15,000" />
-          {/* ⭐정직하게 적는다. 「수수료 15%」만 적어 두면 사장님은 손에 쥐는 금액을 직접 계산해야 하고,
-              그 계산을 화면이 안 해 주면 첫 정산 때 「듣던 것과 다르다」가 된다. */}
-          {/* 💰09-16 대표 — *「수수료는 여기에만 쓰면 잘 못 본 것 같기도 한데, 상단에 좀 더 써 주면 어떨까」*.
-              ⭐값을 적는 «그 순간»이 수수료를 알아야 하는 순간이다. 맨 아래 약관 줄에만 있으면
-                값을 다 정하고 나서야 본다. 금액을 안 적었을 때도 요율은 먼저 말해 둔다. */}
-          {priceHour > 0 ? (
-            <p className="mt-2 text-[15px] text-mute">
-              수수료 {Math.round(feeRate * 100)}%를 뺀{" "}
-              <span className="font-medium text-ink">{won(payoutNum)}</span>이 한 시간마다 사장님께 가요.
-            </p>
-          ) : (
-            <p className="mt-2 text-[15px] text-faint">
-              성사된 금액에서 수수료 {Math.round(feeRate * 100)}%를 뺀 나머지를 사장님께 드려요.
-            </p>
-          )}
-        </L>
+          <ProductFields
+            idPrefix="sp-space"
+            price={spacePrice}
+            onPrice={setSpacePrice}
+            note={spaceNote}
+            onNote={setSpaceNote}
+            notePlaceholder={PRODUCT_NOTE_PLACEHOLDER.space}
+            noteLabel="무엇을 쓰고, 무엇을 할 수 있나요"
+            noteHint="손님은 이 글을 읽고 어느 쪽을 빌릴지 정해요. 못 쓰는 것도 적어 두시면 그날 서로 편해요."
+            feeRate={feeRate}
+            payout={payoutOf(spacePrice)}
+            priceErr={fieldErr("spacePrice")}
+            noteErr={fieldErr("spaceNote")}
+            priceAnchor="spacePrice"
+            noteAnchor="spaceNote"
+          />
+        </ProductCard>
+        <ProductCard
+          title={PRODUCT_LABEL.full}
+          hint={PRODUCT_HINT_HOST.full}
+          on={fullOn}
+          onToggle={() => setFullOn((v) => !v)}
+        >
+          <ProductFields
+            idPrefix="sp-full"
+            price={fullPrice}
+            onPrice={setFullPrice}
+            note={fullNote}
+            onNote={setFullNote}
+            notePlaceholder={PRODUCT_NOTE_PLACEHOLDER.full}
+            noteLabel="어떤 시설까지 쓰고, 무엇을 할 수 있나요"
+            noteHint="기계 쓰는 법을 알려 주시는지, 손님이 챙겨 올 재료가 있는지도 같이 담아 주세요."
+            feeRate={feeRate}
+            payout={payoutOf(fullPrice)}
+            priceErr={fieldErr("fullPrice")}
+            noteErr={fieldErr("fullNote")}
+            priceAnchor="fullPrice"
+            noteAnchor="fullNote"
+          />
+        </ProductCard>
 
-        <L label="최소 몇 시간부터 빌려드릴까요" htmlFor="sp-minh" hint="이보다 짧게는 신청이 안 들어와요.">
+        <L label="최소 몇 시간부터 빌려드릴까요" htmlFor="sp-minh" hint="두 상품에 똑같이 걸려요. 이보다 짧게는 신청이 안 들어와요.">
           <RentSelect id="sp-minh" wrapClassName="w-full sm:max-w-[240px]" value={minHours} onChange={(e) => setMinHours(e.target.value)}>
             {[1, 2, 3, 4, 5, 6, 8].map((h) => (
               <option key={h} value={String(h)}>
@@ -855,80 +874,56 @@ export function SpaceForm({
             ⭐대표 정리: *「선배한테 현업 이야기 듣기, 현업을 들여다보기 같은 자리를 부가 상품으로」*.
               레시피나 비법이 아니다 — 하루가 어떻게 돌아가는지, 재료는 어디서 떼는지, 언제 몰리고 언제 비는지.
               사장님이 안 내놓을 것은 빼고도 들려줄 수 있고, 창업을 생각하는 사람에겐 그쪽이 값어치다.
-            🔻설비 사용법 같은 «필수» 안내는 여기 없다. 그건 상품이 아니라 인수인계라 위 「안내 방식」이 맡는다. */}
-        <div>
-          <p className="text-[16px] font-medium leading-[28px] text-body">
-            커피챗(유료)
-          </p>
-          {/* 🔁09-17 QA — 「현업에서의」「제공하실」 행정어, 고를 것은 예/아니요뿐인데 「골라 주세요」였다.
-              카페 사장님이 쓰는 말(「가게를 열려는 분」)로 풀었다. */}
-          <p className="mt-1 text-[15px] leading-relaxed break-keep text-mute">
-            가게를 열어 보려는 분께 하루가 어떻게 돌아가는지 들려주실 수 있나요? 레시피는 안 알려 주셔도 돼요. 재료를
-            어디서 떼는지, 언제 몰리고 언제 비는지 같은 이야기면 충분해요.
-          </p>
-
-          {/* 아니요가 먼저이자 기본 — 대부분의 사장님에게 「안 해도 된다」가 먼저 보여야 부담이 없다. */}
-          <div role="radiogroup" aria-label="커피챗 제공 여부" className="mt-3 flex gap-2">
-            {[
-              { v: false, label: "아니요" },
-              { v: true, label: "예" },
-            ].map((o) => (
-              <button
-                key={String(o.v)}
-                type="button"
-                role="radio"
-                aria-checked={chatOn === o.v}
-                onClick={() => setChatOn(o.v)}
-                className={`inline-flex h-[44px] min-w-[88px] items-center justify-center rounded-pill px-5 text-[15px] font-medium transition-colors ${
-                  chatOn === o.v
-                    ? "bg-primary-tint text-primary-on"
-                    : "border-[0.5px] border-[#DFDFE3] bg-surface text-body hover:bg-surface-soft"
-                }`}
-              >
-                {o.label}
-              </button>
-            ))}
-          </div>
-
-          {chatOn && (
-            <div className="mt-5 space-y-6">
-              {/* ☕「언제」는 `rent-copy` 한 줄만 쓴다(대표 09-17 결정 1). 손님 쪽 화면·메일이 같은 말을 한다. */}
-              <p className="text-[15px] leading-relaxed break-keep text-body">{COFFEE_CHAT_WHEN_HOST}</p>
-              <L label="얼마나 이야기 나누실까요" htmlFor="sp-cm">
-                <RentSelect
-                  id="sp-cm"
-                  wrapClassName="w-full sm:max-w-[240px]"
-                  value={chatMin}
-                  onChange={(e) => setChatMin(e.target.value)}
-                >
-                  {chatChoices.map((m) => (
-                    <option key={m} value={m}>
-                      {minutesLabel(m)}
-                    </option>
-                  ))}
-                </RentSelect>
-              </L>
-              <L label="커피챗 비용" htmlFor="sp-cp" anchor="chatPrice" error={fieldErr("chatPrice")}>
-                <WonInput id="sp-cp" value={chatPrice} onChange={setChatPrice} placeholder="예) 20,000" />
-              </L>
-              <L
-                label="어떤 이야기를 들려주실 수 있나요"
-                htmlFor="sp-ct"
-                optional
-                hint="적어 두시면 손님이 무슨 이야기를 듣게 될지 알고 골라요."
-              >
-                <textarea
-                  id="sp-ct"
-                  rows={4}
-                  className={`${rentTextareaCls} resize-y`}
-                  value={chatTopics}
-                  onChange={(e) => setChatTopics(e.target.value)}
-                  placeholder={"예) 재료를 어디서 얼마에 떼는지\n손님이 몰리는 시간과 비는 시간\n처음 1년에 제일 크게 틀렸던 것"}
-                />
-              </L>
-            </div>
-          )}
-        </div>
+            🔻설비 사용법 같은 «필수» 안내는 여기 없다. 그건 상품이 아니라 인수인계라 위 「안내 방식」이 맡는다.
+            🔁09-17 QA — 「현업에서의」「제공하실」 행정어를 카페 사장님이 쓰는 말(「가게를 열려는 분」)로 풀었다.
+            🔁09-18 아니요/예 두 알약 → 위 두 상품과 같은 켜기 카드(세 상품이 한 얼굴). 커피챗은 공간 예약에 «더하는» 상품이다. */}
+        <ProductCard
+          title={COFFEE_CHAT_LABEL}
+          hint="가게를 열어 보려는 분께 하루가 어떻게 돌아가는지 들려주세요. 레시피는 안 알려 주셔도 돼요. 재료를 어디서 떼는지, 언제 몰리고 언제 비는지 같은 이야기면 충분해요."
+          on={chatOn}
+          onToggle={() => setChatOn((v) => !v)}
+          addon
+        >
+          {/* ☕「언제」는 `rent-copy` 한 줄만 쓴다(대표 09-17 결정 1). 손님 쪽 화면·메일이 같은 말을 한다. */}
+          <p className="text-[15px] leading-relaxed break-keep text-body">{COFFEE_CHAT_WHEN_HOST}</p>
+          <L label="얼마나 이야기 나누실까요" htmlFor="sp-cm">
+            <RentSelect
+              id="sp-cm"
+              wrapClassName="w-full sm:max-w-[240px]"
+              value={chatMin}
+              onChange={(e) => setChatMin(e.target.value)}
+            >
+              {chatChoices.map((m) => (
+                <option key={m} value={m}>
+                  {minutesLabel(m)}
+                </option>
+              ))}
+            </RentSelect>
+          </L>
+          <L label="커피챗 비용" htmlFor="sp-cp" anchor="chatPrice" error={fieldErr("chatPrice")}>
+            <WonInput id="sp-cp" value={chatPrice} onChange={setChatPrice} placeholder="예) 20,000" />
+            {chatPrice > 0 && (
+              <p className="mt-2 text-[15px] text-mute">
+                수수료를 빼고 <span className="font-medium text-ink">{won(payoutOf(chatPrice))}</span>이 사장님께 가요.
+              </p>
+            )}
+          </L>
+          <L
+            label="어떤 이야기를 들려주실 수 있나요"
+            htmlFor="sp-ct"
+            optional
+            hint="적어 두시면 손님이 무슨 이야기를 듣게 될지 알고 골라요."
+          >
+            <textarea
+              id="sp-ct"
+              rows={4}
+              className={`${rentTextareaCls} resize-y`}
+              value={chatTopics}
+              onChange={(e) => setChatTopics(e.target.value)}
+              placeholder={"예) 재료를 어디서 얼마에 떼는지\n손님이 몰리는 시간과 비는 시간\n처음 1년에 제일 크게 틀렸던 것"}
+            />
+          </L>
+        </ProductCard>
       </Group>
 
       {/* ── 여는 날·시간 ── 실사에서 이 데이터를 가진 곳이 23곳 중 0곳이었다(설계 §조사 ②). */}
@@ -1106,6 +1101,147 @@ function WonInput({
   );
 }
 
+/** 🛍상품 카드 한 장(09-18) — 이름·한 줄 설명·켜기 스위치. 켜면 그 상품의 칸이 열린다.
+ *  ⭐카드 머리 전체가 스위치다. 폰에서 작은 토글만 누르게 하면 손가락이 빗나간다.
+ *  `addon` = 공간 예약에 «더하는» 상품(커피챗). 머리에 작게 표시한다. */
+function ProductCard({
+  title,
+  hint,
+  on,
+  onToggle,
+  addon,
+  children,
+}: {
+  title: string;
+  hint: string;
+  on: boolean;
+  onToggle: () => void;
+  addon?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <div
+      className={`rounded-lg border transition-colors ${on ? "border-primary-strong bg-surface" : "border-hairline bg-surface"}`}
+    >
+      <button
+        type="button"
+        role="switch"
+        aria-checked={on}
+        onClick={onToggle}
+        className="flex w-full items-start gap-3 px-4 py-4 text-left"
+      >
+        <span className="min-w-0 flex-1">
+          <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <span className="text-[17px] font-bold text-ink">{title}</span>
+            {addon && (
+              <span className="rounded-pill bg-surface-soft px-2 py-0.5 text-[13px] text-mute">공간 예약에 더하는 상품</span>
+            )}
+          </span>
+          <span className="mt-1 block text-[15px] leading-relaxed break-keep text-mute">{hint}</span>
+        </span>
+        <span
+          aria-hidden="true"
+          className={`mt-0.5 flex h-[26px] w-11 shrink-0 items-center rounded-pill p-[2px] transition-colors ${
+            on ? "bg-primary" : "bg-border-strong"
+          }`}
+        >
+          <span
+            className={`h-[22px] w-[22px] rounded-pill bg-white transition-transform ${on ? "translate-x-[18px]" : "translate-x-0"}`}
+          />
+        </span>
+      </button>
+      {on && <div className="space-y-6 border-t border-hairline px-4 pt-5 pb-5">{children}</div>}
+    </div>
+  );
+}
+
+/** 공간 상품 하나의 칸 — 시간당 값(수수료 뺀 금액) + «무엇을 쓰고 할 수 있는지» 설명. 대관만·공간 전체가 같이 쓴다. */
+function ProductFields({
+  idPrefix,
+  price,
+  onPrice,
+  note,
+  onNote,
+  notePlaceholder,
+  noteLabel,
+  noteHint,
+  feeRate,
+  payout,
+  priceErr,
+  noteErr,
+  priceAnchor,
+  noteAnchor,
+}: {
+  idPrefix: string;
+  price: number;
+  onPrice: (n: number) => void;
+  note: string;
+  onNote: (s: string) => void;
+  notePlaceholder: string;
+  noteLabel: string;
+  noteHint: string;
+  feeRate: number;
+  payout: number;
+  priceErr: string;
+  noteErr: string;
+  priceAnchor: string;
+  noteAnchor: string;
+}) {
+  return (
+    <>
+      <L label="한 시간에 얼마인가요" htmlFor={`${idPrefix}-price`} anchor={priceAnchor} error={priceErr}>
+        <WonInput id={`${idPrefix}-price`} value={price} onChange={onPrice} placeholder="예) 15,000" />
+        {/* ⭐정직하게 적는다. 「수수료 15%」만 적어 두면 사장님은 손에 쥐는 금액을 직접 계산해야 한다(09-16).
+            💰값을 적는 «그 순간»이 수수료를 알아야 하는 순간이라 상품마다 붙인다. */}
+        {price > 0 ? (
+          <p className="mt-2 text-[15px] text-mute">
+            수수료 {Math.round(feeRate * 100)}%를 뺀 <span className="font-medium text-ink">{won(payout)}</span>이 한 시간마다
+            사장님께 가요.
+          </p>
+        ) : (
+          <p className="mt-2 text-[15px] text-faint">
+            성사된 금액에서 수수료 {Math.round(feeRate * 100)}%를 뺀 나머지를 사장님께 드려요.
+          </p>
+        )}
+      </L>
+      <L
+        label={noteLabel}
+        htmlFor={`${idPrefix}-note`}
+        anchor={noteAnchor}
+        error={noteErr}
+        hint={noteHint}
+      >
+        <textarea
+          id={`${idPrefix}-note`}
+          rows={3}
+          className={`${rentTextareaCls} resize-y`}
+          value={note}
+          onChange={(e) => onNote(e.target.value)}
+          placeholder={notePlaceholder}
+        />
+      </L>
+    </>
+  );
+}
+
+/** 💾v1 초안(09-17)의 옛 칸 둘. 읽을 때만 쓴다. */
+interface DraftV1Extra {
+  scope?: string;
+  priceHour?: number;
+}
+
+/** v1 → v2. 범위가 «공간만»이면 대관만, 그 밖이면 공간 전체를 켜고 옛 값을 옮긴다(SQL의 채우기 규칙과 같다). */
+function draftFromV1(d: Partial<SpaceDraft> & DraftV1Extra): Partial<SpaceDraft> {
+  const { scope, priceHour, ...rest } = d;
+  const price = Number(priceHour) || 0;
+  const full = !!scope && scope !== "space_only";
+  return {
+    ...rest,
+    spaceOn: price > 0 && !full, spacePrice: full ? 0 : price, spaceNote: "",
+    fullOn: price > 0 && full, fullPrice: full ? price : 0, fullNote: "",
+  };
+}
+
 /** 🧭09-17 디자인팀 — 폼의 단계. **`Group`의 `title`과 글자가 같아야 번호가 붙는다**(제목을 바꾸면 여기도).
  *  폰에서 이 폼은 여덟 화면을 내려간다. 절 제목 위 「3 / 7」과 넓은 화면의 오른쪽 목차가 «지금 어디쯤인지»를 말한다. */
 const FORM_STEPS = [
@@ -1113,7 +1249,8 @@ const FORM_STEPS = [
   "어디에 있나요",
   "공간 안내",
   "사용 유의 사항",
-  "얼마에 빌려주실까요",
+  // 🔁09-18 「얼마에 빌려주실까요」 → 상품 셋(대표).
+  "무엇을 파실까요",
   "언제 빌려주실까요",
   "마지막으로 확인할게요",
 ];

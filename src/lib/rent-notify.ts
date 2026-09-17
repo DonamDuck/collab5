@@ -15,6 +15,7 @@ import { bookingWhen, dateLabel } from "./rent-time";
 import {
   accessHowLine, hostContactLine, withJosa, CONTACT_RULE_GUEST, CONTACT_RULE_HOST,
   BOOKING_HEADLINE, COFFEE_CHAT_WHEN_GUEST, COFFEE_CHAT_WHEN_HOST, HOST_REQUEST_STEPS,
+  PRODUCT_HINT_GUEST, PRODUCT_LABEL,
 } from "./rent-copy";
 import type { Space, SpaceBooking } from "./types";
 import type { Profile } from "./profiles";
@@ -155,6 +156,13 @@ function boughtChat(b: SpaceBooking): boolean {
   return b.amountChat > 0 || b.amountMentor > 0;
 }
 
+/** 🛍고른 상품 한 줄(09-18) — 「공간 전체 · 자리에 시설과 장비까지 같이 써요」.
+ *  사장님 메일엔 「손님이」를 붙인다. 공간 전체면 그날 시설까지 준비해 둬야 해서 사장님이 먼저 알아야 한다.
+ *  ⭐이름은 `PRODUCT_LABEL` 한 벌. 화면(확인 팝업·결제·완료)과 같은 말이다. */
+function productLine(b: SpaceBooking, forHost = false): string {
+  return `${PRODUCT_LABEL[b.product]} · ${forHost ? "손님이 " : ""}${PRODUCT_HINT_GUEST[b.product]}`;
+}
+
 /** 💳환불이 «언제» 들어오는지 — 메일 네 통이 이 한 줄만 쓴다(09-17 QA).
  *  🩸09-16까지 「카드사에 따라 며칠 걸릴 수 있어요」와 완료 화면의 「사흘에서 닷새」가 달랐고,
  *    계좌이체·간편결제는 카드사가 아닌데 카드사를 말했다. */
@@ -192,6 +200,7 @@ export function buildBookingPaid(
     ["소개서", brandLine],
     ["언제", bookingWhen(booking)],
     ["공간", space.name],
+    ["상품", productLine(booking, true)],
     ["무엇을", booking.plan],
     // ☕사장님이 커피챗을 해 줘야 하는 신청인지 — 09-16까지 이 메일에 없었다. 「언제」는 `rent-copy` 한 줄(대표 09-17).
     ["커피챗", boughtChat(booking) ? `손님이 커피챗도 함께 골랐어요. ${COFFEE_CHAT_WHEN_HOST}` : ""],
@@ -239,6 +248,7 @@ export function buildBookingPaidToGuest(
     ["언제", bookingWhen(booking)],
     // 🏷「어디」와 「주소」가 나란히 서서 같은 정보 둘로 읽혔다(09-17 QA). 이름 칸은 「공간」이다.
     ["공간", space.name],
+    ["상품", productLine(booking)],
     ["주소", space.address],
     ["결제한 돈", won(booking.amountTotal)],
     // ☕🩸09-16까지 「그날 사장님과 이야기 나눌 시간이 있어요」 — 화면은 「협의한 날짜」였다. 이제 `rent-copy` 한 줄.
@@ -283,6 +293,7 @@ export function buildBookingConfirmed(
   const rows: [string, string][] = [
     ["언제", bookingWhen(booking)],
     ["공간", space.name],
+    ["상품", productLine(booking)],
     ["주소", space.address],
     // 📨09-16 「들어오는 법」(옛 `accessNote`)에서 «안내 방식»으로. 비밀번호 같은 건 우리가 안 가진다.
     ["이용 안내", `${accessHowLine(space.accessHow)} ${CONTACT_RULE_GUEST}`],
@@ -348,6 +359,7 @@ export function buildBookingConfirmedToHost(
     ["연락처", guestContact],
     ["언제", bookingWhen(booking)],
     ["공간", space.name],
+    ["상품", productLine(booking, true)],
     ["무엇을", booking.plan],
     ["그날까지", `${hostTodoLine(space.accessHow)} ${CONTACT_RULE_HOST}`],
     ["커피챗", boughtChat(booking) ? `손님이 커피챗도 함께 골랐어요. ${COFFEE_CHAT_WHEN_HOST}` : ""],
@@ -386,6 +398,7 @@ export function buildBookingRejected(
   const rows: [string, string][] = [
     ["언제", bookingWhen(booking)],
     ["공간", space.name],
+    ["상품", productLine(booking)],
     ["환불", `${won(booking.amountTotal)} 전액. ${REFUND_TIMING_LINE}`],
     ["사장님 말씀", booking.hostMessage],
   ];
@@ -419,7 +432,7 @@ export function buildBookingCancelled(
   // 🔁09-17 QA — 「신청을 취소」였는데 손님 화면은 결제 뒤 «예약»이다. 사장님이 받은 건 이미 결제된 예약이라 «예약»으로.
   const subject = `[collab5] ${withJosa(guestName, "이/가")} ${when} ${space.name} 예약을 취소했어요`;
   const link = `${SITE_URL}/rent/my`;
-  const rows: [string, string][] = [["언제", bookingWhen(booking)], ["공간", space.name]];
+  const rows: [string, string][] = [["언제", bookingWhen(booking)], ["공간", space.name], ["상품", productLine(booking, true)]];
   const lead = `${withJosa(guestName, "이/가")} ${when} ${space.name} 예약을 취소했어요. 그 시간이 다시 비었어요.`;
   const text = [
     lead,
@@ -461,6 +474,7 @@ export function buildBookingCancelledToGuest(
   const rows: [string, string][] = [
     ["언제", bookingWhen(booking)],
     ["공간", space.name],
+    ["상품", productLine(booking)],
     ["결제한 돈", won(booking.amountTotal)],
     ["돌려드리는 돈", refund > 0 ? `${won(refund)}\n${REFUND_TIMING_LINE}` : "0원"],
   ];
@@ -502,6 +516,7 @@ export function buildAdminRefund(
   const gRows: [string, string][] = [
     ["언제", bookingWhen(booking)],
     ["공간", space.name],
+    ["상품", productLine(booking)],
     ["돌려드린 돈", `${amount}\n${REFUND_TIMING_LINE}`],
   ];
   const gText = [
@@ -522,6 +537,7 @@ export function buildAdminRefund(
     ["누가", guestName],
     ["언제", bookingWhen(booking)],
     ["공간", space.name],
+    ["상품", productLine(booking, true)],
     ["환불한 돈", amount],
     // 표 칸 모양을 맞춘다 — 값 자리에 문장만 있으면 다른 줄과 어긋나 보였다(QA).
     ["정산", "없음 (이 예약은 정산에서 빠져요)"],
@@ -589,6 +605,7 @@ export function buildRemindGuest(
   const rows: [string, string][] = [
     ["언제", bookingWhen(booking)],
     ["공간", space.name],
+    ["상품", productLine(booking)],
     ["주소", space.address],
     ["사장님", `${hostName} · ${contact}`],
     ["커피챗", boughtChat(booking) ? COFFEE_CHAT_WHEN_GUEST : ""],
@@ -632,6 +649,7 @@ export function buildRemindHost(
     : `내일 ${space.name}에 손님이 와요. 아직 수락 전인 예약이라, 오늘 들어가서 수락해 주세요.`;
   const rows: [string, string][] = [
     ["언제", bookingWhen(booking)],
+    ["상품", productLine(booking, true)],
     ["누가", guestName],
     ["연락처", guestContact],
     ["무엇을", booking.plan],

@@ -12,6 +12,7 @@ import type { Maker, Payment, PaymentStatus, PayoutStatus, RepeatRule, Space, Sp
 import type { Profile } from "./profiles";
 import type { PayoutAccount } from "./payout-accounts";
 import { addDaysIso, expandRepeat, hoursBetween, todayKst } from "./rent-time";
+import { bookingAmount, compatScopePrice, productsFromLegacy } from "./rent-products";
 
 /** `spaces.ts`의 `FEE_RATE`와 같은 값. ⚠️거기서 가져오면 spaces → rent-mock → 이 파일 → spaces로 고리가 생겨 따로 적었다. */
 const MOCK_FEE_RATE = 0.15;
@@ -108,6 +109,7 @@ const SPACE_BASE = {
   servesFood: false, subleaseOk: true,
   category: "" as Space["category"], scope: "space_only" as Space["scope"],
   priceHour: 0, minHours: 1, openSlots: [] as OpenSlot[], repeatWeekly: [] as RepeatRule[],
+  rentSpaceOn: false, rentSpacePrice: 0, rentSpaceNote: "", rentFullOn: false, rentFullPrice: 0, rentFullNote: "",
   coffeeChat: false, coffeeChatMinutes: 0, coffeeChatPrice: 0, coffeeChatTopics: "",
   accessHow: "sms" as Space["accessHow"], contactPhone: "", hostTermsAt: undefined,
 } satisfies Omit<Space, "id" | "slug" | "ownerUserId" | "name" | "status" | "createdAt" | "updatedAt">;
@@ -119,27 +121,48 @@ function space(
   const { direct, ...rest } = p;
   const repeatWeekly = rest.repeatWeekly ?? [];
   const at = `${addDaysIso(today, -30)}T01:00:00.000Z`;
+  // 🛍09-18 상품 셋. 상품을 안 적은 공간은 `toSpace`가 SQL 전 DB를 읽을 때처럼 옛 범위·값에서 만든다.
+  //   상품을 적었으면 옛 칸 둘은 저장(`saveSpaceAction`)과 같은 호환 값으로 맞춘다.
+  const hasProducts = rest.rentSpaceOn !== undefined || rest.rentFullOn !== undefined;
+  const products = hasProducts
+    ? { ...productsFromLegacy("space_only", 0), rentSpaceOn: false, rentFullOn: false, ...pickProducts(rest) }
+    : productsFromLegacy(rest.scope ?? "space_only", rest.priceHour ?? 0);
   return {
     ...SPACE_BASE,
     createdAt: at,
     updatedAt: at,
     ...rest,
+    ...products,
+    ...(hasProducts ? compatScopePrice(products) : {}),
     repeatWeekly,
     // `toSpace`와 똑같이 «읽을 때 펼친» 값을 담는다.
     openSlots: expandRepeat(direct ?? [], repeatWeekly, today),
   } satisfies Space;
 }
 
+function pickProducts(p: Partial<Space>) {
+  const out: Partial<Space> = {};
+  for (const k of ["rentSpaceOn", "rentSpacePrice", "rentSpaceNote", "rentFullOn", "rentFullPrice", "rentFullNote"] as const) {
+    if (p[k] !== undefined) (out as Record<string, unknown>)[k] = p[k];
+  }
+  return out;
+}
+
 // ─── 예약·결제 ───
 
+/** 🛍09-18 — 값은 공간을 넘겨 «고른 상품 값 × 시간»으로 만든다. 서버(`startBookingAction`)와 같은 함수다. */
 type BookingSeed = Pick<SpaceBooking, "id" | "spaceId" | "guestUserId" | "status" | "useDate" | "startTime" | "endTime" | "plan">
-  & Partial<SpaceBooking> & { priceHour: number; chatPrice?: number };
+  & Partial<SpaceBooking> & { sp: Space };
 
 function booking(p: BookingSeed, today: string): SpaceBooking {
-  const { priceHour, chatPrice, ...rest } = p;
+  const { sp, ...rest } = p;
   const hoursCount = hoursBetween(p.startTime, p.endTime);
-  const amountSpace = hoursCount * priceHour;
-  const amountChat = p.withChat ? chatPrice ?? 0 : 0;
+  // 사장님이 안 파는 상품을 적은 시드면 켜진 쪽으로 물러선다(목 데이터가 조용히 0원을 만들지 않게).
+  const product = p.product ?? (sp.rentSpaceOn ? "space" : "full");
+  const amt = bookingAmount(sp, product, hoursCount, !!p.withChat)
+    ?? bookingAmount(sp, product === "space" ? "full" : "space", hoursCount, !!p.withChat);
+  const amountSpace = amt?.space ?? 0;
+  const amountChat = amt?.chat ?? 0;
   const amountTotal = amountSpace + amountChat;
   const at = `${addDaysIso(p.useDate < today ? p.useDate : today, -2)}T03:${String(p.id % 60).padStart(2, "0")}:00.000Z`;
   return {
@@ -149,7 +172,7 @@ function booking(p: BookingSeed, today: string): SpaceBooking {
     refundRequestedAt: undefined, refundRequestNote: "", hostMessage: "", decidedAt: undefined, remindedAt: undefined,
     createdAt: at, updatedAt: at,
     ...rest,
-    hoursCount, amountSpace, amountChat, amountTotal,
+    product, hoursCount, amountSpace, amountChat, amountTotal,
     amountPayout: Math.floor(amountTotal * (1 - MOCK_FEE_RATE)),
   } satisfies SpaceBooking;
 }
@@ -278,7 +301,12 @@ function fullWorld(today: string, withAccount: boolean): MockWorld {
     capacity: 14,
     rules:
       "쓰신 컵과 도구는 설거지해서 제자리에 둬 주세요\n벽에 테이프·못은 안 돼요. 이젤은 빌려 드려요\n밤 9시 이후엔 1층 이웃을 위해 음악을 줄여 주세요\n음식은 포장해 온 것만 드실 수 있어요\n나가실 때 창문과 머신 전원을 꺼 주세요",
-    priceHour: 25000, minHours: 3,
+    minHours: 3,
+    // 🛍둘 다 켠 공간 — 값과 설명이 다르다(09-18).
+    rentSpaceOn: true, rentSpacePrice: 18000,
+    rentSpaceNote: "촬영·모임·작은 전시에 좋아요. 원목 테이블과 의자 열두 개, 창가 자리를 써요. 머신과 그라인더는 못 써요.",
+    rentFullOn: true, rentFullPrice: 30000,
+    rentFullNote: "일일카페·팝업 운영까지 할 수 있어요. 에스프레소 머신·그라인더·냉장고를 같이 써요. 원두는 직접 가져오셔야 해요.",
     coffeeChat: true, coffeeChatMinutes: 60, coffeeChatPrice: 30000,
     coffeeChatTopics:
       "첫 가게 보증금과 인테리어에 얼마 들었는지\n원두 거래처를 어떻게 골랐는지\n혼자 운영하면서 쉬는 날을 어떻게 지키는지",
@@ -305,7 +333,8 @@ function fullWorld(today: string, withAccount: boolean): MockWorld {
     area: "성수동", address: "서울 성동구 연무장길 00, 지하 1층", lat: 37.5436, lng: 127.0559,
     facilities: ["진열대 4", "조명 레일", "와이파이"], facilitiesNote: "환기창이 없어서 향초는 피해 주세요.",
     capacity: 20, rules: "진열대는 옮기지 말아 주세요\n쓰레기는 가져가 주세요",
-    priceHour: 18000, minHours: 4, accessHow: "sms", contactPhone: "02-123-4567",
+    minHours: 4, accessHow: "sms", contactPhone: "02-123-4567",
+    rentFullOn: true, rentFullPrice: 18000, rentFullNote: "팝업 매장을 통째로 꾸려요. 진열대 네 개와 조명 레일을 마음대로 쓰세요.",
     direct: [{ date: d(9), start: "11:00", end: "19:00" }],
   }, today);
 
@@ -316,7 +345,8 @@ function fullWorld(today: string, withAccount: boolean): MockWorld {
     body: "날 좋은 계절에만 여는 옥상이에요. 겨울 동안은 잠시 쉬어요.",
     photos: [photo("옥상", 190)], area: "성수동", address: "서울 성동구 연무장길 00, 옥상",
     facilities: ["파라솔 2", "캠핑 의자 8"], capacity: 10, rules: "난간에 기대지 말아 주세요",
-    priceHour: 15000, minHours: 2, accessHow: "onsite", contactPhone: "02-123-4567",
+    minHours: 2, accessHow: "onsite", contactPhone: "02-123-4567",
+    rentSpaceOn: true, rentSpacePrice: 15000, rentSpaceNote: "야외 모임이나 촬영 자리로 써요. 파라솔 두 개와 캠핑 의자 여덟 개가 있어요.",
     repeatWeekly: [{ dow: 6, start: "13:00", end: "19:00" }],
   }, today);
 
@@ -336,7 +366,9 @@ function fullWorld(today: string, withAccount: boolean): MockWorld {
     area: "을지로", address: "서울 중구 을지로 000, 3층", lat: 37.5660, lng: 126.9910,
     facilities: ["재봉틀 4", "다리미", "재단 테이블"], capacity: 6,
     rules: "재봉틀 바늘이 부러지면 말씀해 주세요\n원단 자투리는 가져가셔도 돼요",
-    priceHour: 20000, minHours: 2, accessHow: "sms", contactPhone: "02-765-4321",
+    minHours: 2, accessHow: "sms", contactPhone: "02-765-4321",
+    // 🛍하나만 켠 공간 ① — 공간 전체만.
+    rentFullOn: true, rentFullPrice: 20000, rentFullNote: "재봉 원데이 클래스를 열 수 있어요. 재봉틀 네 대와 다리미, 재단 테이블을 같이 써요.",
   }, today);
 
   // 🍽S6 — 다른 사장님, 커피챗·소개서 없음
@@ -347,13 +379,17 @@ function fullWorld(today: string, withAccount: boolean): MockWorld {
     photos: [photo("백반집 저녁", 8)], area: "을지로", address: "서울 중구 수표로 00, 1층",
     lat: 37.5657, lng: 126.9890, facilities: ["4인 테이블 5", "냉장고"], capacity: 20,
     rules: "주방 화구는 쓸 수 없어요\n가게 앞 입간판은 치우지 말아 주세요",
-    priceHour: 30000, minHours: 2, accessHow: "onsite", contactPhone: "02-777-0000",
+    minHours: 2, accessHow: "onsite", contactPhone: "02-777-0000",
+    // 🛍하나만 켠 공간 ② — 대관만. 신청 폼에 고르기 없이 한 줄로 보인다.
+    rentSpaceOn: true, rentSpacePrice: 30000, rentSpaceNote: "저녁 모임·시식회·북토크 자리로 써요. 4인 테이블 다섯 개와 냉장고 한 칸을 써요. 주방 화구는 못 써요.",
     direct: [{ date: d(2), start: "17:00", end: "22:00" }, { date: d(4), start: "17:00", end: "22:00" }],
   }, today);
 
   const spaces = [s1, s2, s3, s4, s5, s6];
-  const P1 = { priceHour: s1.priceHour, chatPrice: s1.coffeeChatPrice };
-  const P6 = { priceHour: s6.priceHour };
+  // 🛍s1은 두 상품을 섞어 판다 — 공간 전체로 산 예약이 줄마다 섞여 보이게.
+  const P1 = { sp: s1 };
+  const P1F = { sp: s1, product: "full" as const };
+  const P6 = { sp: s6 };
   const plan =
     "주말 이틀 동안 사워도우 팝업을 열어 보려고 해요. 오전에 집에서 구워 가져가고, 2층에서는 커피와 같이 팔 생각이에요. " +
     "머신은 아메리카노 정도만 쓸게요. 인스타에 미리 알린 분들이 열 명 남짓 오실 것 같아요.";
@@ -364,15 +400,15 @@ function fullWorld(today: string, withAccount: boolean): MockWorld {
     expired1: booking({ id: 90003, spaceId: s1.id, guestUserId: U.guest, status: "expired", useDate: d(6), startTime: "14:00", endTime: "17:00", plan: "결제창만 열어 본 신청이에요.", ...P1 }, today),
     expired2: booking({ id: 90004, spaceId: s6.id, guestUserId: U.guest, status: "expired", useDate: d(2), startTime: "17:00", endTime: "19:00", plan: "결제창만 열어 본 신청이에요.", ...P6 }, today),
     expired3: booking({ id: 90005, spaceId: s1.id, guestUserId: U.guest, status: "expired", useDate: d(-5), startTime: "10:00", endTime: "13:00", plan: "결제창만 열어 본 신청이에요.", ...P1 }, today),
-    paid: booking({ id: 90006, spaceId: s1.id, guestUserId: U.guest, status: "paid", useDate: d(3), startTime: "13:00", endTime: "17:00", plan, withChat: true, headcount: 4, guestPhone: "010-3456-7890", guestBrandSlug: "mock-flour-diary", ...P1 }, today),
+    paid: booking({ id: 90006, spaceId: s1.id, guestUserId: U.guest, status: "paid", useDate: d(3), startTime: "13:00", endTime: "17:00", plan, withChat: true, headcount: 4, guestPhone: "010-3456-7890", guestBrandSlug: "mock-flour-diary", ...P1F }, today),
     confirmed: booking({ id: 90007, spaceId: s1.id, guestUserId: U.guest, status: "confirmed", useDate: d(10), startTime: "10:00", endTime: "16:00", plan: "동네 분들과 원데이 베이킹 클래스를 열어요. 반죽은 미리 해 가고 굽는 건 집에서 해요.", withChat: true, headcount: 8, guestPhone: "010-3456-7890", guestBrandSlug: "mock-flour-diary", hostMessage: "머신 쓰는 법은 그날 아침 10분 먼저 오시면 알려 드릴게요.", decidedAt: `${d(-1)}T05:00:00.000Z`, ...P1 }, today),
     confirmedOther: booking({ id: 90008, spaceId: s6.id, guestUserId: U.guest, status: "confirmed", useDate: d(2), startTime: "18:00", endTime: "21:00", plan: "빵 시식회 겸 저녁 모임을 해요. 스무 명 정도예요.", headcount: 18, guestPhone: "010-3456-7890", decidedAt: `${d(-1)}T05:00:00.000Z`, ...P6 }, today),
-    done: booking({ id: 90009, spaceId: s1.id, guestUserId: U.guest, status: "done", useDate: d(-7), startTime: "10:00", endTime: "15:00", plan: "첫 팝업이었어요. 빵 스무 개를 가져갔어요.", withChat: true, headcount: 2, guestPhone: "010-3456-7890", guestBrandSlug: "mock-flour-diary", ...P1 }, today),
+    done: booking({ id: 90009, spaceId: s1.id, guestUserId: U.guest, status: "done", useDate: d(-7), startTime: "10:00", endTime: "15:00", plan: "첫 팝업이었어요. 빵 스무 개를 가져갔어요.", withChat: true, headcount: 2, guestPhone: "010-3456-7890", guestBrandSlug: "mock-flour-diary", ...P1F }, today),
     rejected: booking({ id: 90010, spaceId: s1.id, guestUserId: U.guest, status: "rejected", useDate: d(6), startTime: "15:00", endTime: "19:00", plan: "필사 모임 여섯 명이 조용히 앉아 있다 가려고 해요.", headcount: 6, guestPhone: "010-3456-7890", hostMessage: "그날 원두 입고가 있어서 2층이 어수선해요. 다음 주 월요일은 어떠세요?", decidedAt: `${d(-1)}T06:00:00.000Z`, ...P1 }, today),
     refunded: booking({ id: 90011, spaceId: s1.id, guestUserId: U.guest, status: "refunded", useDate: d(8), startTime: "11:00", endTime: "14:00", plan: "사워도우 사진을 찍으려고 해요. 창가 자리만 쓰면 돼요.", guestPhone: "010-3456-7890", hostMessage: "그날 가족 행사가 생겼어요. 정말 미안해요.", decidedAt: `${d(-2)}T06:00:00.000Z`, ...P1 }, today),
     cancelledFuture: booking({ id: 90012, spaceId: s1.id, guestUserId: U.guest, status: "cancelled", useDate: d(14), startTime: "10:00", endTime: "13:00", plan: "친구들과 빵 굽는 모임을 하려다 일정이 바뀌었어요.", headcount: 5, guestPhone: "010-3456-7890", ...P1 }, today),
     cancelledPast: booking({ id: 90013, spaceId: s1.id, guestUserId: U.guest, status: "cancelled", useDate: d(-3), startTime: "13:00", endTime: "16:00", plan: "전날 취소한 예약이에요. 반만 돌려받았어요.", guestPhone: "010-3456-7890", ...P1 }, today),
-    refundReq: booking({ id: 90014, spaceId: s1.id, guestUserId: U.guest2, status: "confirmed", useDate: d(4), startTime: "10:00", endTime: "18:00", plan: "작은 책 장터를 열어요. 셀러 다섯 팀이 와요.", headcount: 12, guestPhone: "010-5678-9012", decidedAt: `${d(-3)}T06:00:00.000Z`, refundRequestedAt: `${d(-1)}T09:00:00.000Z`, refundRequestNote: "건물 누수 공사가 그 주로 잡혔어요. 2층 천장을 열어야 한대요.", ...P1 }, today),
+    refundReq: booking({ id: 90014, spaceId: s1.id, guestUserId: U.guest2, status: "confirmed", useDate: d(4), startTime: "10:00", endTime: "18:00", plan: "작은 책 장터를 열어요. 셀러 다섯 팀이 와요.", headcount: 12, guestPhone: "010-5678-9012", decidedAt: `${d(-3)}T06:00:00.000Z`, refundRequestedAt: `${d(-1)}T09:00:00.000Z`, refundRequestNote: "건물 누수 공사가 그 주로 잡혔어요. 2층 천장을 열어야 한대요.", ...P1F }, today),
     paidStarted: booking({ id: 90015, spaceId: s1.id, guestUserId: U.guest, status: "paid", useDate: d(-1), startTime: "10:00", endTime: "13:00", plan: "어제 쓴 예약인데 사장님이 수락을 안 누르셨어요.", guestPhone: "010-3456-7890", ...P1 }, today),
     payoutDone: booking({ id: 90016, spaceId: s6.id, guestUserId: U.guest, status: "done", useDate: d(-20), startTime: "17:00", endTime: "21:00", plan: "저녁 시식회를 했어요.", headcount: 15, ...P6 }, today),
     payoutRequested: booking({ id: 90017, spaceId: s6.id, guestUserId: U.guest2, status: "done", useDate: d(-12), startTime: "17:00", endTime: "20:00", plan: "북토크를 했어요.", headcount: 20, guestPhone: "010-5678-9012", ...P6 }, today),
@@ -474,7 +510,9 @@ function stressWorld(today: string): MockWorld {
       "끝나면 창문 일곱 개를 다 닫았는지 한 번 더 봐 주세요",
       "문제가 생기면 시간과 상관없이 전화 주세요",
     ].join("\n"),
-    priceHour: 1250000, minHours: 8,
+    minHours: 8,
+    rentSpaceOn: true, rentSpacePrice: 950000, rentSpaceNote: [para, para].join("\n"),
+    rentFullOn: true, rentFullPrice: 1250000, rentFullNote: [para, para, para].join("\n"),
     coffeeChat: true, coffeeChatMinutes: 120, coffeeChatPrice: 150000,
     coffeeChatTopics: Array.from({ length: 8 }, (_, i) => `${i + 1}. 식당을 열고 첫 해에 겪은 일 중 하나를 아주 길게 풀어서 이야기해 드릴 수 있어요. 재료값이 두 배로 뛰었던 달 이야기도요.`).join("\n"),
     accessHow: "both", contactPhone: "02-0000-0000 (내선 3번, 점심시간엔 안 받아요)",
@@ -482,7 +520,7 @@ function stressWorld(today: string): MockWorld {
     direct: [],
   }, today);
   const longPlan = Array.from({ length: 6 }, () => "그날은 여섯 팀이 각자 테이블 하나씩 맡아서 손으로 만든 물건을 팔아요. 오전 열 시에 들어가서 세팅하고 오후 여섯 시에 정리해요.").join(" ");
-  const P = { priceHour: s.priceHour, chatPrice: s.coffeeChatPrice };
+  const P = { sp: s, product: "full" as const };
   const bookings = [
     booking({ id: 90101, spaceId: s.id, guestUserId: U.stressGuest, status: "paid", useDate: d(6), startTime: "08:00", endTime: "23:00", plan: longPlan, withChat: true, headcount: 120, guestPhone: "010-9999-8888", guestBrandSlug: "mock-weekend-market", ...P }, today),
     booking({ id: 90102, spaceId: s.id, guestUserId: U.stressGuest, status: "confirmed", useDate: d(9), startTime: "00:00", endTime: "24:00", plan: longPlan, withChat: true, headcount: 99, guestPhone: "010-9999-8888", guestBrandSlug: "mock-weekend-market", hostMessage: longPlan, refundRequestedAt: `${d(-1)}T00:00:00.000Z`, refundRequestNote: longPlan, ...P }, today),
@@ -511,9 +549,11 @@ function minimalWorld(today: string): MockWorld {
   const s = space({
     id: 9108, slug: "mock-minimal-room", ownerUserId: U.minHost, status: "open",
     name: "작업실", address: "서울 종로구 창신길 00", rules: "깨끗이 써 주세요",
-    priceHour: 10000, minHours: 1, direct: [{ date: d(4), start: "13:00", end: "15:00" }],
+    minHours: 1, direct: [{ date: d(4), start: "13:00", end: "15:00" }],
+    // 🛍최소 세계는 대관만 하나(09-18).
+    rentSpaceOn: true, rentSpacePrice: 10000, rentSpaceNote: "책상 두 개를 쓸 수 있어요.",
   }, today);
-  const P = { priceHour: s.priceHour };
+  const P = { sp: s };
   const bookings = [
     // 옛 예약처럼 손님 번호가 비어 있다(신청 때 번호를 받기 전).
     booking({ id: 90201, spaceId: s.id, guestUserId: U.minGuest, status: "paid", useDate: d(4), startTime: "13:00", endTime: "14:00", plan: "사진 찍으려고 해요.", ...P }, today),

@@ -76,3 +76,24 @@ export const HOST_REQUEST_STEPS = [
   "이용 시작 전까지 수락하거나 거절해 주세요. 거절하시면 손님께 전액 돌아가요.",
   CONTACT_RULE_HOST,
 ] as const;
+
+/** 🛍사장님이 파는 상품 이름 — 화면·메일·정산이 이 한 벌만 쓴다(대표 09-18).
+ *  ⭐대표 어휘 그대로: 「대관만」·「공간 전체」·「커피챗」. 바꾸고 싶으면 여기 한 곳만 고친다. */
+export const PRODUCT_LABEL = { space: "대관만", full: "공간 전체" } as const;
+export const COFFEE_CHAT_LABEL = "커피챗";
+
+/** 이름 밑에 붙는 짧은 한 줄. 손님은 «내가 무엇을 쓰나», 사장님은 «내가 무엇을 내주나»로 읽는다. */
+export const PRODUCT_HINT_GUEST = {
+  space: "자리만 빌려 써요",
+  full: "자리에 시설과 장비까지 같이 써요",
+} as const;
+export const PRODUCT_HINT_HOST = {
+  space: "자리만 빌려드려요. 기계나 장비는 빼고요.",
+  full: "자리에 시설과 장비까지 같이 내드려요.",
+} as const;
+
+/** 설명 칸 자리표시 — 좋은 답의 모양을 보여 준다(대표 09-18: 「딱 보고 알 수 있게」). */
+export const PRODUCT_NOTE_PLACEHOLDER = {
+  space: "예) 촬영·모임·작은 전시. 테이블 여섯 개와 창가 자리를 써요. 커피 머신은 못 써요.",
+  full: "예) 일일카페·팝업 운영. 에스프레소 머신·냉장고·쇼케이스까지 써요. 원두는 직접 가져오셔야 해요.",
+} as const;

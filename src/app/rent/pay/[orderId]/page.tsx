@@ -5,6 +5,7 @@ import { getSessionUserId } from "@/lib/profiles";
 import { GRACE_MINUTES, guestCancelRefundRate } from "@/lib/rent-payment";
 import { kstDaysUntil } from "@/lib/rent-time";
 import { bookingWhen, dateLabel, won } from "../../ui";
+import { COFFEE_CHAT_LABEL, PRODUCT_LABEL } from "@/lib/rent-copy";
 import { PayPanel } from "./PayPanel";
 
 // 하루 가게 — 결제 화면 (2026-09-15)
@@ -77,8 +78,9 @@ export default async function RentPayPage({ params }: { params: Promise<{ orderI
   const chatMinutes = chat > 0 ? (await getSpaceFull(brief.slug))?.coffeeChatMinutes ?? 0 : 0;
   const hours = b.hoursCount % 1 === 0 ? b.hoursCount : b.hoursCount.toFixed(1);
   const breakdown = [
-    b.amountSpace > 0 ? `대여 ${b.hoursCount > 0 ? `${hours}시간 ` : ""}${won(b.amountSpace)}` : "",
-    chat > 0 ? `커피챗 ${chatMinutes > 0 ? `${chatMinutes}분 ` : ""}${won(chat)}` : "",
+    // 🛍09-18 「대여」 → 고른 상품 이름. 확인 팝업 내역과 같은 말이다.
+    b.amountSpace > 0 ? `${PRODUCT_LABEL[b.product]} ${b.hoursCount > 0 ? `${hours}시간 ` : ""}${won(b.amountSpace)}` : "",
+    chat > 0 ? `${COFFEE_CHAT_LABEL} ${chatMinutes > 0 ? `${chatMinutes}분 ` : ""}${won(chat)}` : "",
   ].filter(Boolean).join(" + ");
 
   // 📐09-15 위 여백을 줄였다(대표: 「결제 위에 마진이 너무 넓다」). 겸사겸사 **결제창이 화면에 들어올
@@ -109,9 +111,10 @@ export default async function RentPayPage({ params }: { params: Promise<{ orderI
       <PayPanel
         orderId={b.orderId}
         amount={b.amountTotal}
-        orderName={`${brief.name} · ${dateLabel(b.useDate)}`}
+        orderName={`${brief.name} ${PRODUCT_LABEL[b.product]} · ${dateLabel(b.useDate)}`}
         backHref={`/rent/${brief.slug}`}
         placeLabel={brief.name}
+        productLabel={PRODUCT_LABEL[b.product]}
         scheduleLabel={bookingWhen(b)}
         amountLabel={won(b.amountTotal)}
         breakdown={breakdown}

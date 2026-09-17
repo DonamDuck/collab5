@@ -444,6 +444,9 @@ export interface RepeatRule {
 /** 📨이용 안내를 어떻게 할지. 🚨비밀번호 같은 «내용»은 우리가 안 가진다 — 방식만 고른다. */
 export type AccessHow = "sms" | "onsite" | "both";
 
+/** 🛍손님이 고르는 공간 상품(09-18). `space` = 대관만, `full` = 공간 전체. 이름은 `rent-copy`의 `PRODUCT_LABEL`. */
+export type RentProduct = "space" | "full";
+
 export type SpaceStatus = "draft" | "pending" | "open" | "paused";
 
 export interface Space {
@@ -495,12 +498,25 @@ export interface Space {
   //   **아직 안 지운다.** 화면이 다 옮겨간 뒤에 따로 내린다([[schema-rename-checklist]]: 축소는 맨 마지막).
 
   category: SpaceCategory;
+  /** ⚠️옛 칸(09-18 상품 셋으로 바뀜). 읽는 곳이 남아 있어 저장 때 호환 값을 같이 쓴다 —
+   *  공간 전체만 켜졌으면 `with_gear`, 아니면 `space_only`(`rent-products`의 `compatScopePrice`). */
   scope: SpaceScope;
 
   /** ⏱시간당 값. 눈금은 1시간이다 — 30분은 가게가 그렇게 생각하지 않고 달력·요금·겹침이 두 배가 된다.
    *  ⭐그 대신 `minHours`가 있어서 「두 시간부터」 같은 규칙이 30분의 필요를 덮는다. */
   priceHour: number;
   minHours: number;
+
+  /** 🛍사장님이 파는 공간 상품 둘(대표 09-18: 「대관만, 공간 전체(대관·시설), 커피챗 이렇게 3개 상품」).
+   *  대관만 = 자리만 쓴다. 공간 전체 = 자리에 시설·장비까지. 켠 것마다 시간당 값과 «무엇을 쓰고 할 수 있는지» 설명.
+   *  ⭐최소 하나는 켜져 있어야 올릴 수 있다. 커피챗은 아래 옛 칸(`coffeeChat*`)이 셋째 상품이다.
+   *  ⚠️`priceHour`는 이제 «켜진 상품 중 낮은 값»이다(목록 「N원부터」). 금액 계산은 이 칸들로 한다. */
+  rentSpaceOn: boolean;
+  rentSpacePrice: number;
+  rentSpaceNote: string;
+  rentFullOn: boolean;
+  rentFullPrice: number;
+  rentFullNote: string;
   /** 날짜별로 열어 두는 시간대. 비었으면 아무도 신청할 수 없다(폼에서 막는다). */
   openSlots: OpenSlot[];
   /** 🔁매주 계속 여는 요일 규칙. ⚠️`openSlots`는 이미 이 규칙을 펼친 값이다(`toSpace`). 저장할 때 펼친 칸은 도로 뺀다. */
@@ -578,6 +594,8 @@ export interface SpaceBooking {
   /** 끝 − 시작(시간). ⭐**금액의 근거를 행에 박아 둔다** — 나중에 공간의 시간당 값이 바뀌어도
    *  이 거래가 얼마짜리였는지는 이 숫자와 `amountSpace`로 되짚을 수 있다(`feeRate`를 박아 두는 것과 같은 이유). */
   hoursCount: number;
+  /** 🛍고른 공간 상품(09-18). 옛 예약은 SQL이 그 공간의 옛 범위로 채웠다. `amountSpace`는 이 상품 값 × 시간이다. */
+  product: RentProduct;
   /** ⭐게스트가 쓴 「그날 무엇을 할 건지」. 호스트가 수락을 결정하는 근거이자,
    *  나중에 이 사람 소개서의 첫 활동 기록이 되는 문장이다. */
   plan: string;
