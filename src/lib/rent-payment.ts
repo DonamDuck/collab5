@@ -9,9 +9,24 @@
 //     ⭐배포 전에 사람이 확인해야 하는 것은 언젠가 한 번은 빠진다. 그래서 코드가 막는다.
 //   운영에서 키가 비어 있으면 결제는 **실패로 떨어진다** — 조용히 통과하는 것보다 낫다.
 
+import { createHash } from "node:crypto";
 import type { TossPayment } from "./types";
 
 const TOSS_BASE = "https://api.tosspayments.com/v1/payments";
+
+/** 🔁**멱등키** — 같은 요청이 두 번 가도 돈이 두 번 움직이지 않게 (2026-09-18 밤 QA SC-01·SC-02).
+ *
+ *  토스 문서(09-18 확인): 헤더 이름은 `Idempotency-Key`, 최대 300자, 첫 요청 날부터 15일 유효.
+ *  토스는 «멱등키 + API 키 + API 주소 + HTTP 메서드»가 같은 요청이 있으면 **다시 처리하지 않고 첫 응답을 그대로** 준다.
+ *  앞선 요청이 아직 처리 중이면 409 `IDEMPOTENT_REQUEST_PROCESSING`이다.
+ *  ⚠️본문은 비교하지 않는다. 그래서 키에는 «무엇을 바꾸는 요청인지»를 통째로 넣는다 —
+ *    다른 요청이 같은 키를 쓰면 엉뚱한 첫 응답을 받는다.
+ *  ⭐문서는 UUID 같은 «무작위» 값을 권하지만 우리는 **주문에서 뽑은 값**을 쓴다. 무작위로 만들면
+ *    겹쳐 들어온 두 요청의 키가 서로 달라져서 막으려던 중복이 그대로 지나간다.
+ *  길이는 sha-256 16진수라 늘 70자 안쪽(상한 300 안). */
+function idemKey(kind: string, ...parts: (string | number)[]): string {
+  return `${kind}-${createHash("sha256").update(parts.join("|")).digest("hex")}`;
+}
 
 function secret(): string {
   return process.env.TOSS_SECRET_KEY || "";
@@ -58,6 +73,23 @@ export interface ApproveResult {
 export const PAY_FAIL_SLOT_TAKEN_REFUNDED = "RENT_SLOT_TAKEN_REFUNDED";
 export const PAY_FAIL_SLOT_TAKEN_REFUND_PENDING = "RENT_SLOT_TAKEN_REFUND_PENDING";
 
+/** 🆕09-18 밤 QA(G-01·SC-11·SC-30) — 승인을 «부르기 전에» 막은 넷. 돈은 한 푼도 안 움직인 상태다.
+ *  · `WINDOW_OVER` 결제 시간 30분이 지났다 · `USE_STARTED` 이용 시각이 이미 시작했다
+ *  · `SLOT_TAKEN` 그 사이 다른 분이 먼저 결제했다 · `NOT_AVAILABLE` 공간·상품·열린 시간이 바뀌었다 */
+export const PAY_FAIL_WINDOW_OVER = "RENT_PAY_WINDOW_OVER";
+export const PAY_FAIL_USE_STARTED = "RENT_USE_STARTED";
+export const PAY_FAIL_SLOT_TAKEN = "RENT_SLOT_TAKEN";
+export const PAY_FAIL_NOT_AVAILABLE = "RENT_NOT_AVAILABLE";
+
+/** 🆕09-18 밤 QA(SC-12) — 승인은 됐는데 «아직 받지 않은» 결제(입금 대기 가상계좌 등). 그 자리에서 취소하고 돌려보낸다. */
+export const PAY_FAIL_METHOD_UNSUPPORTED = "RENT_METHOD_UNSUPPORTED";
+
+/** 🆕09-18 밤 QA(G-05) — 취소 팝업이 본 금액보다 실제 환불액이 «적어졌다». 돌려주지 않고 다시 확인받는다. */
+export const PAY_FAIL_REFUND_CHANGED = "RENT_REFUND_CHANGED";
+
+/** 결제 시간이 지난 신청에 손님께 하는 말. 결제 화면과 승인이 같은 문장을 쓴다. */
+export const PAY_EXPIRED_LINE = "결제 시간 30분이 지나서 이 신청은 닫혔어요.";
+
 /** 결제 승인 — 결제창이 돌려준 `paymentKey`·`orderId`·`amount`를 서버에서 다시 확정한다.
  *  🚨**금액을 클라이언트가 준 값으로 믿지 마라.** 호출부가 결제 줄에 적힌 금액을 넘겨야 한다.
  *  ⭐09-16부터 토스 응답(Payment)을 «그대로» 돌려준다. 돈의 상태는 우리가 계산하지 않고 토스 말을 옮긴다. */
@@ -89,7 +121,14 @@ export async function approvePayment(
   try {
     const res = await fetch(`${TOSS_BASE}/confirm`, {
       method: "POST",
-      headers: { Authorization: authHeader(), "Content-Type": "application/json" },
+      headers: {
+        Authorization: authHeader(),
+        "Content-Type": "application/json",
+        // 🔁09-18 밤 QA(SC-02) — 복귀 주소가 두 번 열려도 승인은 한 번만. 두 번째는 첫 응답을 그대로 받는다.
+        //   ⭐키에 `paymentKey`를 같이 넣는다. 주문번호만으로 만들면, 카드가 거절돼 «다시 결제하기»로 새로 시도할 때
+        //     같은 키가 돼서 토스가 첫 번째의 «실패»를 그대로 돌려준다 — 그 주문은 영영 결제가 안 된다.
+        "Idempotency-Key": idemKey("rent-confirm", orderId, paymentKey),
+      },
       body: JSON.stringify({ paymentKey, orderId, amount }),
     });
     const body = (await res.json()) as TossPayment & { message?: string; code?: string };
@@ -109,16 +148,24 @@ export interface CancelResult {
 
 /** 결제 취소 — 호스트 거절과 게스트 취소가 둘 다 이리로 온다.
  *  ⚠️`amount`를 주면 부분 취소, 안 주면 전액이다. **호스트 거절은 언제나 전액**이다(대표 09-13).
- *  `balanceBefore`는 모의 모드에서 토스와 같은 모양의 응답을 만들 때만 쓴다(지금 남은 돈). */
+ *
+ *  🔁09-18 밤 QA(SC-01) — `refundableAmount`(호출부가 «취소 전»에 읽은 잔액)와 멱등키를 같이 보낸다.
+ *    · 취소 버튼이 두 번 눌리거나 두 창에서 같이 눌리면 부분 환불이 두 번 나갔다(90,000원 예약에서 45,000원씩 두 번).
+ *    · 멱등키가 같으면 토스는 두 번째를 처리하지 않고 첫 응답을 그대로 준다 — 돈은 한 번만 움직인다.
+ *    · 그래도 금액이 달라져 키가 갈리는 경우(그 사이 경계 시각이 지남)가 남는데, 그건 `refundableAmount`가 잡는다.
+ *      토스 문서: *「환불 가능한 잔액 정보가 refundableAmount의 값과 다르면 취소를 처리하지 않고 에러를 내보낸다」*
+ *      (400 `NOT_MATCHES_REFUNDABLE_AMOUNT`). ⚠️문서에 «deprecated»로 적혀 있지만 동작은 그대로다.
+ *      나중에 토스가 이 칸을 받지 않게 되면 멱등키만 남는다 — 그때도 겹친 같은 취소는 막힌다.
+ *  모의 모드에서는 이 값으로 토스와 같은 모양의 응답을 만든다(지금 남은 돈). */
 export async function cancelPayment(
-  paymentKey: string, reason: string, amount: number | undefined, balanceBefore: number,
+  paymentKey: string, reason: string, amount: number | undefined, refundableAmount: number,
 ): Promise<CancelResult> {
   if (!paymentsLive()) {
     // 🔁취소는 승인과 «반대로» 관대하게 둔다. 운영에 키가 없으면 애초에 승인이 안 되니
     //   취소할 실제 결제도 없다. 여기서 막으면 환불 흐름만 붙잡혀 예약이 취소 불가로 남는다.
     console.warn(`[rent-payment] 모의 취소 — key=${paymentKey} (${reason})`);
-    const cancelAmount = amount ?? balanceBefore;
-    const balance = Math.max(0, balanceBefore - cancelAmount);
+    const cancelAmount = amount ?? refundableAmount;
+    const balance = Math.max(0, refundableAmount - cancelAmount);
     return {
       ok: true,
       payment: {
@@ -130,8 +177,17 @@ export async function cancelPayment(
   try {
     const res = await fetch(`${TOSS_BASE}/${encodeURIComponent(paymentKey)}/cancel`, {
       method: "POST",
-      headers: { Authorization: authHeader(), "Content-Type": "application/json" },
-      body: JSON.stringify(amount ? { cancelReason: reason, cancelAmount: amount } : { cancelReason: reason }),
+      headers: {
+        Authorization: authHeader(),
+        "Content-Type": "application/json",
+        // 같은 결제·같은 잔액·같은 금액이면 한 번만 나간다. 겹쳐 눌린 두 번째는 첫 응답을 그대로 받는다.
+        "Idempotency-Key": idemKey("rent-cancel", paymentKey, refundableAmount, amount ?? refundableAmount),
+      },
+      body: JSON.stringify({
+        cancelReason: reason,
+        ...(amount ? { cancelAmount: amount } : {}),
+        ...(refundableAmount > 0 ? { refundableAmount } : {}),
+      }),
     });
     const body = (await res.json().catch(() => ({}))) as TossPayment & { message?: string };
     if (!res.ok) {

@@ -332,7 +332,9 @@ export async function saveSpace(input: SpaceSaveInput, opts: { isNew: boolean })
   //   ⚠️`repeat_weekly` 칸이 없는 DB(SQL 전)에선 이 저장이 통째로 실패한다 — SQL이 먼저다.
   const today = todayKst();
   const repeatWeekly = pruneRepeat(input.repeatWeekly ?? [], today);
-  const openSlots = stripRepeat(input.openSlots, repeatWeekly, today);
+  // 🗓09-18 밤 QA(SC-32) — 지난 날짜는 아예 저장하지 않는다. 아무도 못 빌리는 칸인데 행에 쌓여서
+  //   「열어 둔 날 N일」을 부풀리고, 최소 대여 시간을 늘리면 그 지난 칸 때문에 저장이 막혔다(H-12).
+  const openSlots = stripRepeat(input.openSlots, repeatWeekly, today).filter((sl) => sl.date >= today);
   const row = {
     slug: input.slug, owner_user_id: input.ownerUserId, brand_slug: input.brandSlug,
     name: input.name, tagline: input.tagline, body: input.body, photos: input.photos,
@@ -607,16 +609,18 @@ export async function setBookingStatus(id: number, status: BookingStatus): Promi
 /** 그날(대개 «내일») 이용하는 살아 있는 예약 중 아직 리마인드를 안 보낸 것.
  *  ⚠️`paid`도 넣는다 — phase 1은 결제가 곧 예약이라 사장님이 수락을 안 눌렀어도 손님은 온다.
  *  환불 신청이 걸린 예약도 뺀다. 우리가 전화로 확인하는 중이라 「내일 뵈어요」가 엇나갈 수 있다. */
-export async function listBookingsToRemind(useDate: string): Promise<SpaceBooking[]> {
+export async function listBookingsToRemind(useDates: string[]): Promise<SpaceBooking[]> {
+  // 🗓09-18 밤 QA(SC-09) — 날짜를 «여럿» 받는다. 크론이 빠진 날을 챙기려면 오늘 것도 같이 봐야 한다(고를지는 `rent-remind`가 정한다).
+  if (useDates.length === 0) return [];
   const m = await getRentMock();
-  if (m) return m.data.bookings.filter((b) => b.useDate === useDate && (b.status === "paid" || b.status === "confirmed") && !b.remindedAt && !b.refundRequestedAt);
+  if (m) return m.data.bookings.filter((b) => useDates.includes(b.useDate) && (b.status === "paid" || b.status === "confirmed") && !b.remindedAt && !b.refundRequestedAt);
   const c = db();
   if (!c) return [];
   const { data, error } = await c.from("space_bookings").select("*")
-    .eq("use_date", useDate).in("status", ["paid", "confirmed"])
+    .in("use_date", useDates).in("status", ["paid", "confirmed"])
     .is("reminded_at", null).is("refund_requested_at", null)
     .order("start_time", { ascending: true });
-  if (error) { console.error(`[spaces] listBookingsToRemind failed date=${useDate}: ${error.message}`); return []; }
+  if (error) { console.error(`[spaces] listBookingsToRemind failed dates=${useDates.join(",")}: ${error.message}`); return []; }
   return (data ?? []).map((r) => toBooking(r as Row));
 }
 
@@ -744,10 +748,16 @@ export async function sweepBookings(): Promise<void> {
   }
 
   // ③
-  const { data: kept } = await c.from("payments")
+  // 🔎09-18 밤 QA(SC-08) — **취소된 «지난» 예약만 DB에서 거른다.** 전엔 살아 있는 결제(앞으로 올 예약 포함)를 통째로 받아
+  //   코드에서 걸렀다. 예약이 쌓일수록 이 화면 조회 하나가 사이트 전체의 결제를 훑는다.
+  //   묻힌 자원은 «별칭»으로 거른다(PostgREST 문서: 별칭이 있으면 별칭 이름을 쓴다). `!inner`라 여기서 걸린 행은 아예 안 온다.
+  const { data: kept, error: keptError } = await c.from("payments")
     .select("order_id,balance_amount,booking:space_bookings!inner(status,use_date)")
-    .eq("payout_status", "NONE").in("status", ["DONE", "PARTIAL_CANCELED"]).gt("balance_amount", 0);
+    .eq("payout_status", "NONE").in("status", ["DONE", "PARTIAL_CANCELED"]).gt("balance_amount", 0)
+    .eq("booking.status", "cancelled").lt("booking.use_date", today);
+  if (keptError) console.error(`[spaces] sweep ③ failed: ${keptError.message}`);
   for (const r of kept ?? []) {
+    // ⚠️거르기는 DB가 한다. 이 줄은 «조회가 조용히 달라졌을 때»를 위한 울타리다 — 지급은 되돌리기 어렵다.
     const b = (r as Row).booking as Row | undefined;
     if (!b || s(b.status) !== "cancelled" || s(b.use_date) >= today) continue;
     await rentSync(s((r as Row).order_id), { payoutStatus: "WAITING" });

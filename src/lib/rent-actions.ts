@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { getSessionUserId, getProfile, getProfileById, savePhoneIfEmpty } from "./profiles";
 import { getSessionUser } from "./supabase/server";
 // 🧪09-17 목 데이터 — 목 쿠키가 있으면 쓰기 액션은 첫 줄에서 멈춘다(DB·토스·메일 전부 안 건드린다). 개발 빌드 전용.
@@ -8,14 +9,15 @@ import { getRentMock, rentMockOn, RENT_MOCK_BLOCKED } from "./rent-mock";
 import {
   saveSpace, getSpaceFull, getBooking, createPendingBooking, getBookingByOrderId,
   decideBooking, requestRefund, clearRefundRequest,
-  setBookingStatus, listSpacesByOwner, listSpacesByIds, payout, FEE_RATE,
+  setBookingStatus, listSpacesByOwner, listSpacesByIds,
   createPayment, getPaymentByOrderId, rentSync,
   type SpaceSaveInput,
-  listLiveBookings, setSpaceStatus, approveSpace, SLUG_TAKEN,
+  listLiveBookings, setSpaceStatus, approveSpace, markReminded, SLUG_TAKEN,
 } from "./spaces";
 // 🧾🏪09-18 사업자 확인 · 네이버 상호 매칭(대표 09-17). 규칙은 순수 함수(`bizcheck`·`place-match`), 바깥 호출은 서버 전용 파일에.
 import {
-  BIZ_CERT_MAX_BYTES, BIZ_CERT_TYPES, BIZ_MISMATCH_LINE, bizCertPathOk, bizDigits, bizNumberProblem, hasAnyBiz, openDateProblem,
+  BIZ_CERT_MAX_BYTES, BIZ_CERT_TYPES, BIZ_MISMATCH_LINE, bizCertPathOk, bizDigits, bizNumberProblem, hasAnyBiz,
+  needsBizInfo, openDateProblem,
 } from "./bizcheck";
 import { checkBusiness } from "./nts-bizcheck";
 import { matchPlace } from "./naver-local";
@@ -23,10 +25,16 @@ import { signCertUpload } from "./host-docs";
 import { hasPayoutAccount, savePayoutAccount, toMasked, validatePayoutInput, type PayoutAccountInput, type PayoutAccountMasked } from "./payout-accounts";
 import {
   approvePayment, cancelPayment, guestCancelRefundPercent, GRACE_MINUTES,
-  PAY_FAIL_SLOT_TAKEN_REFUNDED, PAY_FAIL_SLOT_TAKEN_REFUND_PENDING,
+  PAY_EXPIRED_LINE, PAY_FAIL_METHOD_UNSUPPORTED, PAY_FAIL_NOT_AVAILABLE, PAY_FAIL_REFUND_CHANGED, PAY_FAIL_SLOT_TAKEN,
+  PAY_FAIL_SLOT_TAKEN_REFUNDED, PAY_FAIL_SLOT_TAKEN_REFUND_PENDING, PAY_FAIL_USE_STARTED, PAY_FAIL_WINDOW_OVER,
 } from "./rent-payment";
+// ⭐신청이 «지금도» 말이 되나 — 신청 시작·결제 승인·결제 화면이 같이 쓰는 순수 규칙(09-18 밤 QA G-01).
+import { pendingBookingProblem, validateBookingRequest } from "./rent-booking-rules";
 import { refundAmount } from "./rent-money";
-import { CONTACT_PHONE_MAX, HOST_MESSAGE_MAX, PLAN_MAX, storePhoneOk } from "./rent-limits";
+import {
+  CAPACITY_MAX, COFFEE_CHAT_MINUTES_MAX, COFFEE_CHAT_MINUTES_MIN, COFFEE_CHAT_MINUTES_STEP, COFFEE_CHAT_PRICE_MAX,
+  CONTACT_PHONE_MAX, HOST_MESSAGE_MAX, MIN_HOURS_MAX, PHOTOS_MAX, PLAN_MAX, PRICE_HOUR_MAX, storePhoneOk,
+} from "./rent-limits";
 import { geocode } from "./geocode";
 import { repo } from "./repo";
 import {
@@ -34,9 +42,9 @@ import {
   notifyBookingPaidToGuest, notifyBookingConfirmedToHost, notifyBookingCancelledToGuest, notifyAdminRefund,
   notifySpacePublished, notifySpaceReview,
 } from "./rent-notify";
-import { bookingStarted, dateLabel, kstDaysUntil, hoursBetween, fitsOpenSlot, isHourMark, nowHhmmKst, overlaps, toMinutes, todayKst } from "./rent-time";
+import { bookingStarted, dateLabel, kstDaysUntil, hoursBetween, isHourMark, toMinutes, todayKst } from "./rent-time";
 import type { Space, SpaceBooking, SpaceUseType, SpaceCategory, OpenSlot, AccessHow, RentProduct, BizCheckStatus } from "./types";
-import { bookingAmount, compatScopePrice, isRentProduct, productOn } from "./rent-products";
+import { bookingAmount, compatScopePrice } from "./rent-products";
 import { PRODUCT_LABEL, withJosa } from "./rent-copy";
 
 // 하루 가게 — 쓰기 서버 액션 (2026-09-13)
@@ -101,6 +109,21 @@ function randomTail(n: number): string {
   return Array.from(crypto.getRandomValues(new Uint8Array(n)), (b) => abc[b % 36]).join("");
 }
 
+/** 📸공간 사진으로 받을 주소의 앞부분 — **우리 저장소의 하루 가게 폴더**만 (09-18 밤 QA SC-20·H-17).
+ *  등록 폼이 부르는 `uploadPhoto(파일, 1200, "rent")`가 만드는 모양 그대로다:
+ *  `createUploadUrlAction`이 버킷 `maker-photos`의 `rent/p/{uuid}.jpg`에 서명 URL을 내주고, 공개 주소는 그 경로 앞에
+ *  `{프로젝트}/storage/v1/object/public/`이 붙는다(supabase-js `getPublicUrl`). */
+function rentPhotoPrefix(): string {
+  const base = (process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || "").trim();
+  return base ? `${base.replace(/\/+$/, "")}/storage/v1/object/public/maker-photos/rent/` : "";
+}
+
+/** 그 주소가 우리가 만든 사진인가. 꼬리는 `p/{uuid}.jpg` 한 모양뿐이다. */
+function rentPhotoOk(url: string, prefix: string): boolean {
+  if (!prefix || typeof url !== "string" || !url.startsWith(prefix)) return false;
+  return /^p\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.jpg$/.test(url.slice(prefix.length));
+}
+
 /** 새 공간 slug가 겹쳤을 때 다시 뽑는 횟수. 난수 여섯 자리라 두 번째에서 끝나는 게 보통이다. */
 const SLUG_TRIES = 5;
 
@@ -162,11 +185,35 @@ export async function saveSpaceAction(input: SpaceFormInput): Promise<ActionResu
   ] as const) {
     if (!on) continue;
     if (!(price > 0)) return { ok: false, message: `${withJosa(label, "은/는")} 한 시간에 얼마인지 적어 주세요.` };
+    // 💰09-18 밤 QA(H-13) — 상한. 전엔 칸(`integer`)을 넘기는 값이 들어가 「저장에 실패했어요」로만 떨어졌다.
+    if (!Number.isFinite(price) || price > PRICE_HOUR_MAX) {
+      return { ok: false, message: `${label} 한 시간 값은 ${PRICE_HOUR_MAX.toLocaleString()}원까지 받을 수 있어요.` };
+    }
     if ((note ?? "").trim().length < 10) {
       return { ok: false, message: `${label} 설명이 짧아요. 손님이 무엇을 쓰고 할 수 있는지 열 글자 넘게 담아 주세요.` };
     }
   }
-  if (input.minHours < 1) return { ok: false, message: "최소 대여 시간은 한 시간 이상이어야 해요." };
+  // ⏱09-18 밤 QA(H-36) — 최소 대여 시간은 «하루 안»의 정수다. 전엔 소수·25시간·빈 값이 그대로 저장됐다.
+  if (!Number.isInteger(input.minHours) || input.minHours < 1 || input.minHours > MIN_HOURS_MAX) {
+    return { ok: false, message: `최소 대여 시간은 한 시간부터 ${MIN_HOURS_MAX}시간까지 고를 수 있어요.` };
+  }
+  // ☕09-18 밤 QA(H-36) — 켠 커피챗은 값과 길이가 있어야 한다. 값 0원짜리 커피챗이 상품으로 서 있었다.
+  if (input.coffeeChat) {
+    if (!(input.coffeeChatPrice > 0)) return { ok: false, message: "커피챗을 켜셨으면 얼마인지 적어 주세요." };
+    if (input.coffeeChatPrice > COFFEE_CHAT_PRICE_MAX) {
+      return { ok: false, message: `커피챗 값은 ${COFFEE_CHAT_PRICE_MAX.toLocaleString()}원까지 받을 수 있어요.` };
+    }
+    const cm = input.coffeeChatMinutes;
+    if (!Number.isInteger(cm) || cm < COFFEE_CHAT_MINUTES_MIN || cm > COFFEE_CHAT_MINUTES_MAX || cm % COFFEE_CHAT_MINUTES_STEP !== 0) {
+      return { ok: false, message: `커피챗 길이는 ${COFFEE_CHAT_MINUTES_MIN}분부터 ${COFFEE_CHAT_MINUTES_MAX / 60}시간까지 ${COFFEE_CHAT_MINUTES_STEP}분 단위로 골라 주세요.` };
+    }
+  }
+  // 🙋09-18 밤 QA(H-25) — 정원. 안 적어도 되지만 적으면 1명 이상 정수다(신청 인원 검사와 같은 상한).
+  if (input.capacity !== undefined && input.capacity !== null) {
+    if (!Number.isInteger(input.capacity) || input.capacity < 1 || input.capacity > CAPACITY_MAX) {
+      return { ok: false, message: `들어올 수 있는 인원은 1명부터 ${CAPACITY_MAX.toLocaleString()}명까지 적어 주세요.` };
+    }
+  }
   // ☎️🚨청약 «전»에 보여야 하는 값이라 빈칸으로 못 넘어간다.
   //   전자상거래법 제20조②(시행 2026-07-21): 중개자는 사업자 호스트의 성명·주소·전화번호를 확인해
   //   청약 전에 소비자에게 제공해야 하고, 안 하면 제20조의2②로 **우리가 연대 책임**을 진다.
@@ -184,7 +231,11 @@ export async function saveSpaceAction(input: SpaceFormInput): Promise<ActionResu
     return { ok: false, message: "공간 제공자 약관에 동의해 주세요." };
   }
   // 열어 둔 시간대가 말이 되는지. 거꾸로거나 최소 시간보다 짧은 칸은 아무도 못 빌린다.
-  for (const sl of input.openSlots) {
+  // 🗓09-18 밤 QA(H-12·SC-32) — **지난 날짜는 검사에서 뺀다.** 아무도 못 빌리는 칸인데, 최소 대여 시간을 늘리는 순간
+  //   지난 칸이 「N시간을 못 채워요」로 저장을 막았다. 저장할 때도 털어낸다(`saveSpace`).
+  const today = todayKst();
+  const futureSlotsIn = input.openSlots.filter((sl) => sl.date >= today);
+  for (const sl of futureSlotsIn) {
     // 못 읽는 시각(`24:30` 같은 것)을 「거꾸로」로 말하지 않게 먼저 거른다(09-18 밤 QA SEC-08).
     if (toMinutes(sl.start ?? "") < 0 || toMinutes(sl.end ?? "") < 0) {
       return { ok: false, message: `${dateLabel(sl.date)}의 시각을 알아보지 못했어요. 시작과 끝 시각을 다시 골라 주세요.` };
@@ -215,22 +266,55 @@ export async function saveSpaceAction(input: SpaceFormInput): Promise<ActionResu
   }
 
   // 수정이면 주인 확인부터. ⚠️입력에 실린 slug를 믿지 않고 DB에서 소유자를 다시 읽는다.
+  //   ⭐아래 검사들이 다 이 «전 모습»을 본다(사진·이름·주소·사업자). 09-18 밤에 같은 행을 두 번 읽던 것을 한 번으로 합쳤다.
+  const prev = input.slug ? await getSpaceFull(input.slug) : null;
   if (input.slug) {
-    const cur = await getSpaceFull(input.slug);
-    if (!cur) return { ok: false, message: "그 공간을 찾지 못했어요." };
-    if (cur.ownerUserId !== uid) return { ok: false, message: "내 공간만 고칠 수 있어요." };
+    if (!prev) return { ok: false, message: "그 공간을 찾지 못했어요." };
+    if (prev.ownerUserId !== uid) return { ok: false, message: "내 공간만 고칠 수 있어요." };
   }
 
-  // 📍주소가 «바뀔 때만» 좌표를 다시 잰다(대표 09-14 지도 요청). 유료 호출이라 매번 부르지 않고,
-  //   실패해도 저장은 그대로 간다 — 지도는 있으면 좋은 것이지 올리기를 막을 것이 아니다.
-  const prev = input.slug ? await getSpaceFull(input.slug) : null;
+  // 📸09-18 밤 QA(SC-20·H-17·H-24) — 장수와 주소를 서버가 본다. 전엔 아무 https 주소(남의 서버·data URL)나 받았고 12장도 들어갔다.
+  //   ⭐이미 저장돼 있던 사진은 그대로 다시 보낼 수 있다 — 옛 사진 때문에 공간 고치기가 통째로 막히면 안 된다.
+  if (input.photos.length > PHOTOS_MAX) {
+    return { ok: false, field: "photos", message: `사진은 ${PHOTOS_MAX}장까지 올릴 수 있어요. 몇 장만 빼 주세요.` };
+  }
+  const keptPhotos = new Set(prev?.photos ?? []);
+  const photoPrefix = rentPhotoPrefix();
+  if (input.photos.some((u) => !keptPhotos.has(u) && !rentPhotoOk(u, photoPrefix))) {
+    return { ok: false, field: "photos", message: "사진을 다시 올려 주세요." };
+  }
+
+  // 🔁09-16 대표 — **고쳐도 공개가 유지된다.** 다시 검토받는 건 «가게가 바뀌는» 둘뿐이다: 매장 이름과 주소.
+  const renamed = !!prev && prev.name.trim() !== input.name.trim();
+  const moved = !!prev && prev.address.trim() !== input.address.trim();
+
+  // ⏸09-18 밤 QA(H-02·SC-04) — 쉬는 동안엔 이름·주소를 못 바꾼다(대표 판단용 추천안 중 «스키마를 안 건드리는» 쪽).
+  //   바꾸면 검토 대기로 내려가는데, 관리자가 검토를 통과시키는 순간 «쉬는 중»이던 공간이 그대로 목록에 열린다.
+  //   사장님이 본 고치기 화면은 그때도 「다시 열 때 그대로 보여요」라고 말하고 있었다.
+  if (prev?.status === "paused" && (renamed || moved)) {
+    return {
+      ok: false, field: renamed ? "name" : "address",
+      message: "쉬는 동안엔 이름과 주소를 못 바꿔요. 다시 여신 뒤에 바꿔 주세요.",
+    };
+  }
+
+  // 🪪09-18 밤 QA(G-04·H-01) — 붙이는 소개서가 «내 것»인지 서버가 본다. 전엔 남의 소개서 주소를 그대로 붙일 수 있었고,
+  //   공개된 공간이 남의 브랜드를 달고 목록에 서도 검토를 거치지 않았다.
+  //   ⭐이미 붙어 있던 값을 그대로 다시 보내는 건 막지 않는다 — 소개서 소유권이 옮겨 간 날 공간 저장까지 막히면 안 된다.
+  const brandSlug = (input.brandSlug ?? "").trim();
+  if (brandSlug && brandSlug !== (prev?.brandSlug ?? "")) {
+    const maker = await repo.getMakerBySlug(brandSlug);
+    if (maker?.ownerUserId !== uid && !(await isRentAdmin())) {
+      return { ok: false, message: "내 소개서만 붙일 수 있어요.", field: "brand" };
+    }
+  }
 
   // ⏱09-18 밤 QA(SEC-08) — 여는 시각은 정시만(눈금 1시간, 대표 09-16). 고르개는 정시만 주지만 액션을 직접 부르면
   //   10:30 시작·24:30 끝 같은 칸이 저장됐다.
   //   ⚠️09-16 전에 30분으로 열어 둔 칸이 운영에 남아 있다(09-18 읽기: 공간 한 곳, 10:30 시작 두 날). 그 칸을 «그대로» 다시 보내면 받는다.
   //   안 받으면 그 사장님은 다른 곳을 고치려다 저장이 막히고, 고르개엔 10:30이 없어 고칠 방법도 안 보인다. 새로 넣거나 바꾼 칸만 막는다.
   const keptSlots = new Set((prev?.openSlots ?? []).map((sl) => `${sl.date} ${sl.start}~${sl.end}`));
-  for (const sl of input.openSlots) {
+  for (const sl of futureSlotsIn) {
     if (isHourMark(sl.start) && isHourMark(sl.end)) continue;
     if (keptSlots.has(`${sl.date} ${sl.start}~${sl.end}`) && toMinutes(sl.start) >= 0 && toMinutes(sl.end) >= 0) continue;
     return { ok: false, message: `${dateLabel(sl.date)}은 정시로만 열 수 있어요. 시작과 끝 시각을 다시 골라 주세요.` };
@@ -252,34 +336,46 @@ export async function saveSpaceAction(input: SpaceFormInput): Promise<ActionResu
     bizOpenDate: (input.bizOpenDate ?? "").trim(),
     bizCertPath: (input.bizCertPath ?? "").trim(),
   };
-  const bizRequired = !prev || hasAnyBiz(prev) || hasAnyBiz(biz);
+  // 🧾09-18 밤 QA(H-03) — 판정은 순수 함수 한 벌(`needsBizInfo`). 화면(`SpaceForm`)이 같은 함수로 먼저 막는다.
+  const bizRequired = needsBizInfo(prev, { name: input.name, address: input.address, ...biz });
   if (bizRequired) {
     const problem =
       bizNumberProblem(biz.bizNumber) ||
       (!biz.bizOwnerName ? "대표자 이름을 사업자등록증 그대로 적어 주세요." : "") ||
       (biz.bizOwnerName.length > 50 ? "대표자 이름이 너무 길어요. 사업자등록증 그대로 적어 주세요." : "") ||
-      openDateProblem(biz.bizOpenDate, todayKst()) ||
+      openDateProblem(biz.bizOpenDate, today) ||
       (!biz.bizCertPath ? "사업자등록증 파일을 올려 주세요." : "");
-    if (problem) return { ok: false, message: problem, field: "biz" };
+    if (problem) {
+      // 옛 공간이 이름·주소를 바꿔서 «이제» 필요해진 경우엔 왜 필요한지부터 말한다. 그냥 번호를 적으라고만 하면 뜬금없다.
+      const firstTime = !!prev && !hasAnyBiz(prev) && (renamed || moved);
+      return {
+        ok: false, field: "biz",
+        message: firstTime ? `이름이나 주소를 바꾸시려면 사업자 정보가 필요해요. ${problem}` : problem,
+      };
+    }
     // 🔒새로 올린 경로면 «이 사람 폴더»의 모양인지. 남의 등록증 경로를 끼워 넣어 확인 표시를 받는 길을 막는다.
     if (biz.bizCertPath !== (prev?.bizCertPath ?? "") && !bizCertPathOk(biz.bizCertPath, uid)) {
       return { ok: false, message: "사업자등록증 파일을 다시 올려 주세요.", field: "biz" };
     }
   }
 
+  // 📍주소가 «바뀔 때만» 좌표를 다시 잰다(대표 09-14 지도 요청). 유료 호출이라 매번 부르지 않고,
+  //   실패해도 저장은 그대로 간다 — 지도는 있으면 좋은 것이지 올리기를 막을 것이 아니다.
+  // 🩸09-18 밤 QA(SC-17) — 주소를 바꿨는데 지오코딩이 실패하면 «옛 좌표»가 그대로 남아 지도 핀이 옛 자리를 가리켰다.
+  //   그 옛 좌표로 네이버 상호 매칭까지 돌아서 엉뚱한 가게가 붙을 수 있었다. 이제 실패하면 좌표를 비운다(핀이 없는 게 낫다).
   let lat = prev?.lat;
   let lng = prev?.lng;
-  if (input.address.trim() && input.address.trim() !== (prev?.address ?? "")) {
-    const hit = await geocode(input.address);
-    if (hit) { lat = hit.lat; lng = hit.lng; }
+  if (!prev || moved) {
+    const hit = input.address.trim() ? await geocode(input.address) : null;
+    lat = hit?.lat;
+    lng = hit?.lng;
   }
 
   let slug = input.slug || makeSlug(input.name);
-  // 🔁09-16 대표 — **고쳐도 공개가 유지된다.** 전엔 글자 하나만 바꿔도 검토 대기로 내려가 목록에서 사라졌다.
-  //   다시 검토받는 건 «가게가 바뀌는» 둘뿐이다: 주소와 매장 이름. 나머지는 사장님이 알아서 고친다.
-  const renamed = !!prev && prev.name.trim() !== input.name.trim();
-  const moved = !!prev && prev.address.trim() !== input.address.trim();
-  const status: Space["status"] = !prev ? "pending" : renamed || moved ? "pending" : prev.status;
+  // 🔁09-16 대표 — 전엔 글자 하나만 바꿔도 검토 대기로 내려가 목록에서 사라졌다. 이제 이름·주소가 바뀔 때만 내려간다.
+  // 📤09-18 밤 QA(H-10) — **초안은 저장하면 검토 대기로 올라간다.** 전엔 초안에 머물러서 관리자 검토 목록
+  //   (`pending`만 읽는다)에 영영 안 떴다. 사장님은 올린 줄 알고 기다렸다. 새 공간과 같은 검토 흐름으로 보낸다.
+  const status: Space["status"] = !prev || prev.status === "draft" || renamed || moved ? "pending" : prev.status;
 
   // 🧾국세청 조회 — 번호·대표자·개업일이 «바뀌었을 때»만 부른다(대표 설계). 🔁그리고 지난번에 못 물어본 경우(`none`·`error`)도
   //   다시 부른다. 키가 생기기 전에 올린 공간이 영영 「조회 전」으로 남지 않게.
@@ -325,7 +421,7 @@ export async function saveSpaceAction(input: SpaceFormInput): Promise<ActionResu
   }
 
   const row: SpaceSaveInput = {
-    slug, ownerUserId: uid, brandSlug: input.brandSlug,
+    slug, ownerUserId: uid, brandSlug,
     name: input.name.trim(), tagline: "", body: input.body, photos: input.photos,
     // 동네는 이제 안 묻는다(대표 09-16: 「주소면 충분」). 옛 칸은 주소에서 앞 두 조각만 넣어 둔다 —
     // 목록의 동네 거르개가 아직 이 칸을 본다.
@@ -389,7 +485,9 @@ export async function saveSpaceAction(input: SpaceFormInput): Promise<ActionResu
   if (status === "pending" && prev?.status !== "pending") {
     await safeNotify(async () => {
       const owner = await getProfileById(uid);
-      await notifySpaceReview(saved, owner, prev ? { name: prev.name, address: prev.address, status: prev.status } : null);
+      // 초안이 처음 올라온 건 «새 공간»과 같다 — 이름이 바뀌었어도 「바뀌어 다시 검토」가 아니라 「새로 올라와 검토」다.
+      const before = prev && prev.status !== "draft" ? { name: prev.name, address: prev.address, status: prev.status } : null;
+      await notifySpaceReview(saved, owner, before);
     });
   }
   // 화면은 이 말을 안 띄운다 — 저장 뒤 `/rent/my?saved=…`가 상황별 한 줄을 띄운다(09-17).
@@ -553,10 +651,6 @@ export async function startBookingAction(input: BookingFormInput): Promise<Start
   if (input.plan.trim().length > PLAN_MAX) {
     return { ok: false, message: `그날 무엇을 하실지 ${PLAN_MAX.toLocaleString()}자 안으로 줄여 주세요.` };
   }
-  // 🛍09-18 — 사장님이 켜 둔 상품인지. 화면을 거치지 않은 호출이면 꺼진 상품 이름이 올 수 있다.
-  if (!isRentProduct(input.product) || !productOn(sp, input.product)) {
-    return { ok: false, message: "이 공간에서 팔지 않는 상품이에요. 새로고침하고 다시 골라 주세요." };
-  }
   // ☎️09-17 대표 — 손님 번호는 필수. 화면도 막지만 관문은 여기다(액션은 화면 없이도 불린다).
   //   숫자만 세서 0으로 시작하는 9~11자리면 받는다(지역번호 02 포함). 모양은 손님이 적은 그대로 둔다.
   const phoneDigits = (input.guestPhone ?? "").replace(/\D/g, "");
@@ -569,34 +663,17 @@ export async function startBookingAction(input: BookingFormInput): Promise<Start
   if (guestName.length < 2) return { ok: false, message: "이용하실 분 성함을 두 글자 이상 적어 주세요." };
   if (guestName.length > 50) return { ok: false, message: "성함이 너무 길어요. 50자 안으로 적어 주세요." };
 
-  // ⏳지난 «날»은 여기서 자른다. 화면도 거르지만(`futureSlots`) 관문은 여기다 —
-  //   열어 둔 날이 지나가도 목록에는 남아 있어서, 주소를 그대로 들고 온 사람은 화면을 안 거친다.
-  const today = todayKst();
-  if (input.useDate < today) return { ok: false, message: "지난 날짜는 신청할 수 없어요." };
+  // 🪪09-18 밤 QA(G-04) — 손님이 붙이는 소개서도 «내 것»만 받는다. 신청은 막지 않고 남의 것이면 빈 값으로 저장한다 —
+  //   이 값은 사장님 메일과 요청 카드에 그대로 붙어서, 남의 브랜드를 달면 그 브랜드가 신청한 것처럼 읽힌다.
+  const wantBrand = (input.guestBrandSlug ?? "").trim();
+  const guestBrandSlug = wantBrand && (await repo.getMakerBySlug(wantBrand))?.ownerUserId === uid ? wantBrand : "";
 
-  // ⏱시간 검사 — 화면에서도 막지만 관문은 여기다.
-  // ⏱09-18 밤 QA(SEC-08) — 정시만 받는다(눈금 1시간, 대표 09-16). 신청 폼은 정시만 고르게 하는데 액션을 직접 부르면
-  //   10:30~12:00처럼 한 시간 반이 팔렸고, 값이 «시간당 값 × 1.5»라 반올림된 금액으로 결제까지 갔다.
-  if (!isHourMark(input.startTime) || !isHourMark(input.endTime)) {
-    return { ok: false, message: "시작과 끝 시각은 정시로만 고를 수 있어요. 새로고침하고 다시 골라 주세요." };
-  }
-  const hours = hoursBetween(input.startTime, input.endTime);
-  if (hours <= 0) return { ok: false, message: "끝나는 시각이 시작보다 늦어야 해요." };
-  // ⚠️지난 «시각» 검사는 모양 검사 «뒤»다. 앞에 두면 못 읽은 시각(`-1`)이 「이미 지났다」로 잡혀
-  //   글자가 깨졌을 때 엉뚱한 지적이 나간다.
-  if (input.useDate === today && toMinutes(input.startTime) <= toMinutes(nowHhmmKst())) {
-    return { ok: false, message: "이미 지난 시간이에요. 다른 시간을 골라 주세요." };
-  }
-  if (hours < sp.minHours) return { ok: false, message: `이 공간은 최소 ${sp.minHours}시간부터 빌릴 수 있어요.` };
-  if (!fitsOpenSlot(sp.openSlots, input.useDate, input.startTime, input.endTime)) {
-    return { ok: false, message: "사장님이 열어 두신 시간 안에서 골라 주세요." };
-  }
-  // 이미 팔린 시간과 겹치는지. ⚠️여기서 막아도 «관문은 DB»다 — 두 사람이 같은 순간에 들어오면
-  //   이 검사는 둘 다 통과시키고, 승인 때 배제 제약이 뒤에 온 쪽을 떨어뜨린다.
+  // ⭐09-18 밤 QA(G-01·SC-11) — 날짜·시각·상품·열린 시간·겹침·인원은 «순수 함수 한 벌»이 본다.
+  //   결제 승인(`confirmBookingAction`)과 결제 화면이 같은 함수로 다시 보므로, 규칙이 여기에만 있으면 안 된다.
   const taken = await listLiveBookings(sp.id, input.useDate);
-  if (taken.some((b) => overlaps(b.startTime, b.endTime, input.startTime, input.endTime))) {
-    return { ok: false, message: "그 시간은 이미 찼어요. 다른 시간을 골라 주세요." };
-  }
+  const rule = validateBookingRequest(sp, input, new Date(), taken);
+  if (!rule.ok) return { ok: false, message: rule.message };
+  const hours = rule.hours;
 
   // ⭐금액은 공간 행의 «고른 상품 값»으로 다시 계산한다(09-18). 화면이 본 값과 같은 함수(`bookingAmount`)다.
   const amt = bookingAmount(sp, input.product, hours, input.withChat);
@@ -607,7 +684,7 @@ export async function startBookingAction(input: BookingFormInput): Promise<Start
   const orderId = `rent-${sp.id}-${input.useDate.replace(/-/g, "")}-${Math.random().toString(36).slice(2, 10)}`;
 
   const booking = await createPendingBooking({
-    spaceId: sp.id, guestUserId: uid, guestBrandSlug: input.guestBrandSlug, guestPhone: input.guestPhone.trim(), guestName,
+    spaceId: sp.id, guestUserId: uid, guestBrandSlug, guestPhone: input.guestPhone.trim(), guestName,
     useDate: input.useDate, hours: `${input.startTime}~${input.endTime}`, plan: input.plan.trim(),
     startTime: input.startTime, endTime: input.endTime, hoursCount: hours, product: input.product,
     headcount: input.headcount, withChat: amountChat > 0, amountChat,
@@ -650,6 +727,30 @@ async function notifyParties(b: SpaceBooking): Promise<{ space: Space; host: Awa
   return { space, host, guest };
 }
 
+/** 🔁토스가 「이 결제는 지금 처리 중」이라고 돌려주는 코드 둘(09-18 문서 확인). 겹쳐 들어온 우리 요청이 곧 결과를 쓴다. */
+const PAY_IN_FLIGHT_CODES = ["IDEMPOTENT_REQUEST_PROCESSING", "ALREADY_PROCESSING_REQUEST"];
+
+/** 이 주문이 «이미 끝나 있나» — 겹쳐 온 다른 요청이 먼저 올렸을 수 있다(09-18 밤 QA SC-02).
+ *  예약이 결제 완료 이상이거나 결제 줄이 DONE이면 성공으로 돌려준다. 알림은 먼저 끝낸 쪽이 이미 보냈다.
+ *  @param samePaymentKey 주면 «그 결제로» 올라간 것만 성공으로 본다(다른 결제가 올린 거면 우리 돈은 돌려줘야 한다). */
+async function settledBooking(orderId: string, bookingId: number, samePaymentKey?: string): Promise<ActionResult | null> {
+  const [again, payNow] = await Promise.all([getBookingByOrderId(orderId), getPaymentByOrderId(orderId)]);
+  const alive = !!again && ["paid", "confirmed", "done"].includes(again.status);
+  if (!alive && payNow?.status !== "DONE") return null;
+  if (samePaymentKey && payNow?.paymentKey && payNow.paymentKey !== samePaymentKey) return null;
+  return { ok: true, message: "예약을 완료했어요.", bookingId: again?.id ?? bookingId };
+}
+
+/** 📨알림을 «응답 뒤»로 미룬다 (2026-09-18 밤 QA SC-19).
+ *  🩸결제 복귀·수락·거절·취소가 메일 두 통을 기다린 뒤에야 응답했다. 한 통에 8초 제한이 걸려 있어 최악엔 손님이 16초를 본다.
+ *  ⭐**목 모드 판정은 `after` «밖»에서 한다.** 콜백은 응답이 끝난 뒤에 도는데, 그 안에서 쿠키를 읽는 건
+ *    라우트 핸들러·서버 액션에서만 허용된다(Next 16 `after` 문서). 판정을 안에 두면 갈래가 조용히 달라진다.
+ *  ⚠️`after`는 응답이 실패하거나 `redirect`가 나도 돈다(같은 문서). 알림은 결과에 영향을 주지 않으니 그대로 둔다. */
+async function notifyLater(run: () => Promise<unknown>): Promise<void> {
+  if (await rentMockOn()) return;
+  after(() => safeNotify(run));
+}
+
 /** 알림 한 통 — 🚨**결과에 영향을 주면 안 된다.** `rent-notify.ts`가 스스로 삼키지만, 조회 단계(`notifyParties`)가
  *  던질 수도 있어 한 겹 더 감싼다. 결제는 끝났는데 메일 때문에 「실패」가 뜨는 일은 없어야 한다. */
 async function safeNotify(run: () => Promise<unknown>): Promise<void> {
@@ -671,6 +772,10 @@ export async function confirmBookingAction(
   const b = await getBookingByOrderId(orderId);
   if (!b) return { ok: false, message: "그 신청을 찾지 못했어요." };
   if (b.guestUserId !== uid) return { ok: false, message: "내 신청만 결제할 수 있어요." };
+  // ⏳결제 시간이 지나 이미 닫힌 신청. 조용히 완료로 보내면 손님은 「됐다」고 읽는다(09-18 밤 QA SC-30).
+  if (b.status === "expired") {
+    return { ok: false, message: PAY_EXPIRED_LINE, code: PAY_FAIL_WINDOW_OVER, bookingId: b.id };
+  }
   // 새로고침·뒤로가기로 이 함수가 두 번 불릴 수 있다. 이미 끝난 건 조용히 성공으로 돌려준다.
   if (b.status !== "pending") return { ok: true, message: "이미 신청이 끝났어요.", bookingId: b.id };
 
@@ -678,24 +783,80 @@ export async function confirmBookingAction(
   const pay = await getPaymentByOrderId(orderId);
   if (!pay) return { ok: false, message: "결제 기록을 찾지 못했어요. 처음부터 다시 신청해 주세요." };
 
+  // ⭐09-18 밤 QA(G-01·SC-11·SC-30) — **승인을 부르기 «전»에** 공간을 다시 읽어 신청 시작과 같은 판정을 돌린다.
+  //   결제창에 다녀오는 30분 사이에 이용 시각이 지나거나, 사장님이 공간을 쉬게 하거나, 그 시간이 닫히거나,
+  //   다른 분이 먼저 결제할 수 있다. 걸리면 토스를 아예 안 부른다 — **돈이 움직이지 않는다.**
+  //   ⏳시각이 시작했거나 30분이 지난 신청은 만료로 옮긴다(정리 작업이 하는 일과 같다).
+  const brief = (await listSpacesByIds([b.spaceId])).get(b.spaceId);
+  const space = brief ? await getSpaceFull(brief.slug) : null;
+  const taken = space ? await listLiveBookings(space.id, b.useDate) : [];
+  const problem = pendingBookingProblem(b, space, taken);
+  if (problem) {
+    const expire = problem.code === "expired" || problem.code === "started";
+    if (expire) await rentSync(orderId, { bookingStatus: "expired", toss: { status: "EXPIRED" } });
+    return {
+      ok: false,
+      message: `${problem.message} ${expire ? "공간에서 다른 시간을 골라 주세요." : "잠시 뒤 공간에서 다시 골라 주세요."}`,
+      code: problem.code === "taken" ? PAY_FAIL_SLOT_TAKEN
+        : problem.code === "started" ? PAY_FAIL_USE_STARTED
+          : problem.code === "expired" ? PAY_FAIL_WINDOW_OVER : PAY_FAIL_NOT_AVAILABLE,
+      bookingId: b.id,
+    };
+  }
+
   const approved = await approvePayment(paymentKey, orderId, pay.amount);
   if (!approved.ok || !approved.payment) {
+    // 🔁09-18 밤 QA(SC-02) — 복귀 주소가 두 번 열리면 두 번째 승인은 「이미 처리된 결제」로 실패한다.
+    //   그때 ABORTED를 쓰면 **먼저 끝난 승인의 DONE을 덮는다.** 쓰기 «전»에 예약·결제를 다시 읽는다.
+    const settled = await settledBooking(orderId, b.id);
+    if (settled) return settled;
+    // 다른 요청이 «아직 처리 중»이면 ABORTED를 쓰지 않는다 — 그 요청이 곧 DONE을 쓴다. 잠깐 기다렸다 한 번 더 본다.
+    if (approved.code && PAY_IN_FLIGHT_CODES.includes(approved.code)) {
+      await new Promise((r) => setTimeout(r, 700));
+      const late = await settledBooking(orderId, b.id);
+      if (late) return late;
+      return {
+        ok: false, code: approved.code, bookingId: b.id,
+        message: "결제를 확인하고 있어요. 잠시 뒤 신청 내역에서 한 번 더 봐 주세요.",
+      };
+    }
     // 돈은 안 움직였다. 결제 줄만 ABORTED로 남기고 예약은 그대로 둔다(30분 안이면 다시 시도할 수 있다).
     await rentSync(orderId, { toss: { status: "ABORTED" } });
     return { ok: false, message: approved.message, code: approved.code };
   }
 
+  // 🏦09-18 밤 QA(SC-12) — **돈이 실제로 들어왔을 때만** 예약을 올린다. 토스 응답이 `DONE`이 아니면(가상계좌 입금 대기 등)
+  //   그 자리에서 취소하고 돌려보낸다. 지금 결제창엔 가상계좌가 없지만, 수단을 하나 켜는 날 「입금 전인데 예약 완료」가 된다.
+  if (approved.payment.status !== "DONE") {
+    const waitKey = approved.payment.paymentKey || paymentKey;
+    const undo = await cancelPayment(
+      waitKey, "입금 전 결제 수단이라 자동 취소", undefined, approved.payment.balanceAmount ?? pay.amount,
+    );
+    // 취소가 됐으면 그 응답을, 실패했으면 승인 응답을 적는다 — 어느 쪽이든 결제 줄이 지금 상태를 말해야 한다.
+    await rentSync(orderId, { toss: undo.ok && undo.payment ? undo.payment : approved.payment });
+    if (!undo.ok) console.error(`[rent-actions] 🚨입금 대기 결제를 취소하지 못했다 — 손으로 확인 필요 order=${orderId}`);
+    return {
+      ok: false, code: PAY_FAIL_METHOD_UNSUPPORTED, bookingId: b.id,
+      message: "이 결제 수단은 아직 받지 않아요. 카드나 간편결제로 다시 결제해 주세요.",
+    };
+  }
+
   // ⭐예약 paid + 결제 DONE을 «한 트랜잭션»으로. 시간이 겹쳐 예약이 막히면 결제 기록도 같이 안 바뀐다.
   const synced = await rentSync(orderId, { bookingStatus: "paid", toss: approved.payment });
   if (!synced.ok) {
+    // 🔁09-18 밤 QA(SC-02) — 겹쳐 온 요청이 «같은 결제»로 이미 올렸을 수 있다(멱등키 덕에 둘 다 같은 승인 응답을 받는다).
+    //   그 경우 예약은 멀쩡히 살아 있으니 환불하면 안 된다. 손님 돈을 되돌리기 «전»에 그것부터 확인한다.
+    const twin = await settledBooking(orderId, b.id, approved.payment.paymentKey || paymentKey);
+    if (twin) return twin;
     // 🩸돈은 승인됐는데 예약을 못 올렸다(대개 그 사이 누가 같은 시간을 먼저 결제했다).
     //   돈만 받고 예약이 없는 상태를 남기면 안 된다 — 들어온 돈을 먼저 적고, 바로 전액 환불한다.
     await rentSync(orderId, { toss: approved.payment });
     const key = approved.payment.paymentKey || paymentKey;
-    const refund = await cancelPayment(key, "예약 확정 실패 — 자동 환불", undefined, pay.amount);
+    // 💸막 승인된 돈이라 잔액 = 방금 승인한 금액이다. 토스가 준 값이 있으면 그걸 먼저 쓴다(09-18 밤 QA SC-01의 잔액 검증).
+    const refund = await cancelPayment(key, "예약 확정 실패 — 자동 환불", undefined, approved.payment.balanceAmount ?? pay.amount);
     if (refund.ok) {
       await rentSync(orderId, { bookingStatus: "cancelled", toss: refund.payment });
-      return { ok: false, message: "그 사이 그 시간이 찼어요. 결제는 자동으로 취소했습니다.", code: PAY_FAIL_SLOT_TAKEN_REFUNDED };
+      return { ok: false, message: "그 사이 그 시간이 찼어요. 결제는 바로 취소해 드렸어요.", code: PAY_FAIL_SLOT_TAKEN_REFUNDED };
     }
     // 환불까지 실패하면 손님 돈이 붙잡혀 있다. 정산 화면 「손이 필요한 예약」에 뜨게 rejected로 둔다.
     console.error(`[rent-actions] 🚨승인 뒤 예약 실패 + 자동 환불 실패 — 수동 환불 필요 order=${orderId}`);
@@ -706,9 +867,13 @@ export async function confirmBookingAction(
 
   // 🔻09-16 `setOpenDate` 삭제 — 하루를 통째로 파는 모델이 아니다. 시간대가 겹치는지는
   //   DB의 배제 제약(`no_time_overlap`)이 판정하고, 호스트가 연 시간대는 그대로 둔다.
+  // ⏰09-18 밤 QA(SC-09) — 이용일이 «내일 이하»면 리마인드를 안 보낸다(대표 판단 추천안 「늦게 결제한 예약엔 안 보냄」).
+  //   방금 나간 결제 완료 메일에 날짜·시간·주소·연락처가 다 들어 있다. 보냄 표시를 그 자리에서 찍어 둔다.
+  if (kstDaysUntil(paid.useDate) <= 1) await markReminded(paid.id);
+
   revalidatePath("/rent");
   revalidatePath("/rent/my");
-  await safeNotify(async () => {
+  await notifyLater(async () => {
     const p = await notifyParties(paid);
     if (!p) return;
     // 📨대표 09-16 — 예약 신청(결제 완료) 때 사장님과 손님 둘 다. 사장님 메일엔 손님이 고른 소개서를 붙인다.
@@ -760,6 +925,12 @@ export async function decideBookingAction(
     // 예약은 이미 rejected다(`decideBooking`). 환불이 «성공»하면 예약 refunded + 결제 CANCELED를 같이 옮긴다.
     //   실패하면 rejected로 남는다 — 정산 화면 「손이 필요한 예약」에 뜬다.
     const pay = await getPaymentByOrderId(b.orderId);
+    // 🔁09-18 밤 QA(G-16) — 그 사이 손님이 먼저 취소해 돈이 이미 돌아갔을 수 있다. 잔액이 없으면 토스를 안 부른다.
+    if (pay && pay.balanceAmount <= 0) {
+      await rentSync(b.orderId, { bookingStatus: "refunded" });
+      revalidatePath("/rent/my");
+      return { ok: true, message: "거절했어요. 그 사이 손님께 이미 돌아간 돈이라 따로 환불하지 않았어요." };
+    }
     const refund = pay
       ? await cancelPayment(pay.paymentKey || b.paymentKey, "사장님 거절 — 전액 환불", undefined, pay.balanceAmount)
       : { ok: false as const };
@@ -768,7 +939,7 @@ export async function decideBookingAction(
     revalidatePath("/rent/my");
     // 🩸환불이 실패했는데 「전액 돌려드려요」 메일이 나가면 안 된다. 돈이 아직 안 돌아왔다.
     //   그 예약은 rejected로 남아 정산 화면 「손이 필요한 예약」에 뜨고, 환불이 끝나면 그때 알린다.
-    if (refunded) await safeNotify(async () => {
+    if (refunded) await notifyLater(async () => {
       const p = await notifyParties(decided);
       if (p) await notifyBookingRejected(decided, p.space, p.host, p.guest);
     });
@@ -777,7 +948,7 @@ export async function decideBookingAction(
       : { ok: true, message: "거절했어요. 환불이 늦어지고 있어 저희가 확인하고 있어요." };
   }
   revalidatePath("/rent/my");
-  await safeNotify(async () => {
+  await notifyLater(async () => {
     const p = await notifyParties(decided);
     if (!p) return;
     // 📨대표 09-16 — 예약 확정 때 손님과 사장님 둘 다.
@@ -828,8 +999,10 @@ export async function quoteCancelAction(
   return { ok: true, message: "", total: b.amountTotal, refund, rate, daysBefore, grace };
 }
 
-/** 게스트 취소 — 환불률은 우리 규정표가 정한다(호스트 자율 금지). */
-export async function cancelBookingAction(bookingId: number): Promise<ActionResult> {
+/** 게스트 취소 — 환불률은 우리 규정표가 정한다(호스트 자율 금지).
+ *  @param quotedRefund 취소 팝업이 손님에게 «보여 준» 환불액(`quoteCancelAction`의 값). 서버가 다시 계산한 값이
+ *    이보다 적으면 돌려주지 않고 멈춘다(09-18 밤 QA G-05). 안 넘기면 검사하지 않는다. */
+export async function cancelBookingAction(bookingId: number, quotedRefund?: number): Promise<ActionResult> {
   if (await rentMockOn()) return { ...RENT_MOCK_BLOCKED };
   const uid = await getSessionUserId();
   if (!uid) return { ok: false, message: "로그인이 필요해요." };
@@ -844,14 +1017,35 @@ export async function cancelBookingAction(bookingId: number): Promise<ActionResu
   if (!pay) return { ok: false, message: "결제 기록을 찾지 못해 취소하지 않았어요. 문의해 주세요." };
 
   const { refund } = cancelRefund(b, pay.approvedAt);
+  // 💸09-18 밤 QA(G-05) — 팝업이 본 금액보다 «적어졌으면» 돌려주지 않는다. 팝업을 연 뒤 경계 시각(결제 1시간 유예·이용일 며칠 전)이
+  //   지나면 서버가 다시 계산한 값이 작아지는데, 손님은 팝업에 적힌 금액을 보고 확인을 눌렀다. 더 받는 쪽(값이 커짐)은 그냥 진행한다.
+  if (typeof quotedRefund === "number" && Number.isFinite(quotedRefund) && refund < quotedRefund) {
+    return {
+      ok: false, code: PAY_FAIL_REFUND_CHANGED,
+      message: "기준 시간이 지나 돌려드릴 금액이 바뀌었어요. 다시 확인해 주세요.",
+    };
+  }
   if (refund > 0) {
+    // 🔁09-18 밤 QA(G-16) — 토스를 부르기 «직전»에 예약을 다시 읽는다. 취소 팝업을 보는 사이 사장님이 거절했을 수 있다.
+    //   그대로 밀면 이미 환불된 결제에 취소가 한 번 더 가고, 장부의 「거절」이 「손님 취소」로 뒤집힌다.
+    const fresh = await getBooking(bookingId);
+    if (!fresh || (fresh.status !== "paid" && fresh.status !== "confirmed")) {
+      return { ok: false, message: "그 사이 예약 상태가 바뀌었어요. 신청 내역에서 한 번 더 봐 주세요." };
+    }
     const r = await cancelPayment(
       pay.paymentKey || b.paymentKey, "게스트 취소",
       refund >= pay.balanceAmount ? undefined : refund, pay.balanceAmount,
     );
     // 🩸09-16까지 이 결과를 안 봤다. 토스 환불이 실패해도 상태는 「취소」가 됐고 손님에겐
     //   「환불됩니다」라고 말했다. 돈은 안 돌아갔는데 예약은 사라진다. 실패면 아무것도 바꾸지 않는다.
-    if (!r.ok) return { ok: false, message: "환불을 처리하지 못해 취소하지 않았어요. 잠시 뒤 다시 시도해 주세요." };
+    if (!r.ok) {
+      // 겹쳐 눌린 두 번째일 수 있다. 첫 번째가 이미 끝냈으면 「안 했다」고 말하지 않는다(09-18 밤 QA SC-01).
+      const after = await getBooking(bookingId);
+      if (after && (after.status === "cancelled" || after.status === "refunded")) {
+        return { ok: true, message: "이미 취소된 예약이에요. 환불도 그대로 진행돼요." };
+      }
+      return { ok: false, message: "환불을 처리하지 못해 취소하지 않았어요. 잠시 뒤 다시 시도해 주세요." };
+    }
     // 💸예약 cancelled + 결제 CANCELED/PARTIAL_CANCELED(남은 돈)를 같이. 약관 제8조의 «남은 돈»이 여기 적힌다.
     // 🔁기록이 한 번 실패하면 한 번 더 한다(09-16 점검 v2). 환불은 이미 나갔는데 결제 줄이 DONE으로 남으면,
     //   이용일이 지나 정리 작업이 돌 때 «돌려준 돈»까지 사장님 지급 대기에 올라갈 수 있다.
@@ -864,7 +1058,7 @@ export async function cancelBookingAction(bookingId: number): Promise<ActionResu
     await rentSync(b.orderId, { bookingStatus: "cancelled" });
   }
   revalidatePath("/rent/my");
-  await safeNotify(async () => {
+  await notifyLater(async () => {
     const p = await notifyParties(b);
     if (!p) return;
     // 📨대표 09-16 — 취소 완료 때 사장님과 손님 둘 다. 손님 메일엔 실제로 돌려드린 금액을 넘긴다(다시 계산하지 않는다).
@@ -873,12 +1067,6 @@ export async function cancelBookingAction(bookingId: number): Promise<ActionResu
   });
   // ✍️09-17 — 「환불됩니다」·「없습니다」 피동·합니다체를 걷었다. 누가 돌려주는지 주어가 보이게.
   return { ok: true, message: refund > 0 ? `취소했어요. ${refund.toLocaleString()}원을 돌려드릴게요.` : "취소했어요. 당일 취소라 돌려드릴 돈은 없어요." };
-}
-
-/** 화면에서 금액을 보여줄 때 쓰는 계산 — 호스트에게 얼마가 가는지 정직하게 적기 위한 것. */
-export async function quotePayout(total: number): Promise<{ fee: number; payout: number; rate: number }> {
-  const out = payout(total);
-  return { fee: total - out, payout: out, rate: FEE_RATE };
 }
 
 // 🔻`markPaidOutAction`(대표가 손으로 입금했다고 적는 버튼)은 09-16에 지웠다.
@@ -920,6 +1108,8 @@ export async function approveRefundAction(bookingId: number): Promise<ActionResu
   const pay = await getPaymentByOrderId(b.orderId);
   if (!pay) return { ok: false, message: "결제 기록을 찾지 못했어요." };
   const refundAmount = pay.balanceAmount;
+  // 🔁09-18 밤 QA(G-16) — 그 사이 손님이 먼저 취소했으면 돌려줄 돈이 없다. 토스를 부르기 전에 멈춘다.
+  if (refundAmount <= 0) return { ok: false, message: "이미 돌려드린 결제라 환불할 돈이 없어요." };
   const r = await cancelPayment(pay.paymentKey || b.paymentKey, "사장님 사정 — 관리자 승인 전액 환불", undefined, refundAmount);
   if (!r.ok) return { ok: false, message: "토스 환불이 실패했어요. 토스 관리자 화면에서 확인해 주세요." };
   let synced = await rentSync(b.orderId, { bookingStatus: "refunded", toss: r.payment });
@@ -928,7 +1118,7 @@ export async function approveRefundAction(bookingId: number): Promise<ActionResu
   revalidatePath("/rent/payouts");
   revalidatePath("/rent/my");
   // 📨대표 09-16 — 관리자 승인 환불도 «취소 완료»라 손님과 사장님 둘 다에게.
-  await safeNotify(async () => {
+  await notifyLater(async () => {
     const p = await notifyParties(b);
     if (p) await notifyAdminRefund({ ...b, status: "refunded" }, p.space, p.host, p.guest, refundAmount);
   });
