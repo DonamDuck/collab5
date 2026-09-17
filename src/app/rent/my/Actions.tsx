@@ -218,12 +218,27 @@ export function GuestCancel({ bookingId }: { bookingId: number }) {
   );
 }
 
-/** 검토 통과 → 공개. 대표에게만 보이는 버튼이다(진짜 관문은 `publishSpaceAction` 안에 있다). */
-export function PublishButton({ slug }: { slug: string }) {
+/** 검토 통과 → 공개. 대표에게만 보이는 버튼이다(진짜 관문은 `publishSpaceAction` 안에 있다).
+ *  🧾09-18 검토 화면(`/rent/review`)도 같이 쓴다. 이미 열린 공간엔 「확인 표시 붙이기」로 이름만 바꿔 단다.
+ *  결과 한 줄을 띄운다 — 국세청 조회 전이면 공개는 됐는데 표시는 안 붙는다는 걸 관리자가 알아야 한다. */
+export function PublishButton({
+  slug,
+  label = "공개하기",
+  refresh = true,
+}: {
+  slug: string;
+  label?: string;
+  /** 누른 뒤 화면을 다시 읽을지. 검토 화면은 안 읽는다 — 다시 읽으면 그 줄이 목록에서 빠져 결과 한 줄도 같이 사라진다. */
+  refresh?: boolean;
+}) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [err, setErr] = useState("");
+  const [done, setDone] = useState("");
 
+  if (done && !refresh) {
+    return <p role="status" className="mt-3 text-[15px] leading-relaxed break-keep text-mint-on">{done}</p>;
+  }
   return (
     <div className="mt-3">
       <button
@@ -232,19 +247,22 @@ export function PublishButton({ slug }: { slug: string }) {
         onClick={() =>
           start(async () => {
             setErr("");
+            setDone("");
             const r = await publishSpaceAction(slug);
             if (!r.ok) {
               setErr(r.message);
               return;
             }
-            router.refresh();
+            setDone(r.message);
+            if (refresh) router.refresh();
           })
         }
         className={`${secondaryBtnCls} text-[15px]`}
       >
-        {pending ? "여는 중…" : "공개하기"}
+        {pending ? "처리하는 중…" : label}
       </button>
-      {err && <p className="mt-2 text-[15px] text-danger">{err}</p>}
+      {err && <p className="mt-2 text-[15px] leading-relaxed break-keep text-danger">{err}</p>}
+      {done && <p role="status" className="mt-2 text-[15px] leading-relaxed break-keep text-mint-on">{done}</p>}
     </div>
   );
 }

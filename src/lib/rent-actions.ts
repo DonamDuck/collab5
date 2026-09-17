@@ -10,8 +10,15 @@ import {
   setBookingStatus, listSpacesByOwner, listSpacesByIds, payout, FEE_RATE,
   createPayment, getPaymentByOrderId, rentSync,
   type SpaceSaveInput,
-  listLiveBookings, setSpaceStatus,
+  listLiveBookings, setSpaceStatus, approveSpace,
 } from "./spaces";
+// 🧾🏪09-18 사업자 확인 · 네이버 상호 매칭(대표 09-17). 규칙은 순수 함수(`bizcheck`·`place-match`), 바깥 호출은 서버 전용 파일에.
+import {
+  BIZ_CERT_MAX_BYTES, BIZ_CERT_TYPES, BIZ_MISMATCH_LINE, bizCertPathOk, bizDigits, bizNumberProblem, hasAnyBiz, openDateProblem,
+} from "./bizcheck";
+import { checkBusiness } from "./nts-bizcheck";
+import { matchPlace } from "./naver-local";
+import { signCertUpload } from "./host-docs";
 import { hasPayoutAccount, savePayoutAccount, toMasked, validatePayoutInput, type PayoutAccountInput, type PayoutAccountMasked } from "./payout-accounts";
 import { approvePayment, cancelPayment, guestCancelRefundRate, GRACE_MINUTES } from "./rent-payment";
 import { geocode } from "./geocode";
@@ -22,7 +29,7 @@ import {
   notifySpacePublished,
 } from "./rent-notify";
 import { bookingStarted, dateLabel, kstDaysUntil, hoursBetween, fitsOpenSlot, nowHhmmKst, overlaps, toMinutes, todayKst } from "./rent-time";
-import type { Space, SpaceBooking, SpaceUseType, SpaceCategory, OpenSlot, AccessHow, RentProduct } from "./types";
+import type { Space, SpaceBooking, SpaceUseType, SpaceCategory, OpenSlot, AccessHow, RentProduct, BizCheckStatus } from "./types";
 import { bookingAmount, compatScopePrice, isRentProduct, productOn } from "./rent-products";
 import { PRODUCT_LABEL, withJosa } from "./rent-copy";
 
@@ -36,7 +43,13 @@ import { PRODUCT_LABEL, withJosa } from "./rent-copy";
 // 🚨**모든 함수가 첫 줄에서 로그인·권한을 검사한다.** 화면에서 버튼을 숨기는 건 UX일 뿐이고,
 //   주소를 직접 치거나 액션을 직접 호출하는 경로는 늘 열려 있다(08-06 소개서 편집에서 실제로 났던 구멍).
 
-export interface ActionResult { ok: boolean; message: string; slug?: string; bookingId?: number }
+export interface ActionResult {
+  ok: boolean; message: string; slug?: string; bookingId?: number;
+  /** 🧾09-18 화면이 이 말을 어느 칸 밑에 띄울지(`f-<field>`). 지금은 사업자 칸(`biz`)만 쓴다. */
+  field?: string;
+  /** 🧾09-18 저장 뒤 국세청 조회 결과. `mismatch`면 폼이 고치기 화면으로 가서 그 칸에 말을 띄운다. */
+  bizStatus?: BizCheckStatus;
+}
 
 /** 공간을 공개로 넘길 수 있는 사람 — 지금은 대표뿐이다.
  *  ⚠️`lib/staff.ts`를 안 쓴다. 그 파일 주석이 *「소유·권한 판정에는 쓰지 마라」*고 못 박았고,
@@ -83,6 +96,12 @@ export interface SpaceFormInput {
   /** 📜호스트 약관 동의. 화면의 체크 하나지만 계약의 근거라 서버가 다시 본다. */
   hostTermsOk: boolean;
   brandSlug: string;
+  /** 🧾09-18 사업자 확인(대표 09-17: 필수). 새 공간은 넷 다 필수, 고치기는 옛 공간이 비어 있으면 그대로 저장된다.
+   *  번호는 숫자 10자리(하이픈이 섞여 와도 서버가 걷는다) · 개업일 `YYYYMMDD` · 등록증은 `createBizCertUploadAction`이 준 경로. */
+  bizNumber: string;
+  bizOwnerName: string;
+  bizOpenDate: string;
+  bizCertPath: string;
 }
 
 /** 공간 등록·수정. 저장하면 `pending`(검토 대기)로 들어간다. */
@@ -170,6 +189,32 @@ export async function saveSpaceAction(input: SpaceFormInput): Promise<ActionResu
   // 📍주소가 «바뀔 때만» 좌표를 다시 잰다(대표 09-14 지도 요청). 유료 호출이라 매번 부르지 않고,
   //   실패해도 저장은 그대로 간다 — 지도는 있으면 좋은 것이지 올리기를 막을 것이 아니다.
   const prev = input.slug ? await getSpaceFull(input.slug) : null;
+
+  // 🧾사업자 정보(대표 09-17: 「개인까지 받으면 너무 무방비」). 바깥 호출(좌표·국세청·네이버) «전에» 모양부터 본다.
+  //   ⭐필수인 경우 = 새 공간 · 이미 사업자 정보가 있던 공간(지우지 못한다) · 넷 중 하나라도 적은 고치기.
+  //   옛 공간(09-18 전)이 넷 다 비운 채 고치면 그대로 저장한다 — 공개 중인 공간의 저장을 막지 않는다(대표 설계).
+  //   그 공간은 확인 표시가 없고, 검토로 다시 가면 공개가 막힌다(`publishSpaceAction`).
+  const biz = {
+    bizNumber: bizDigits(input.bizNumber ?? ""),
+    bizOwnerName: (input.bizOwnerName ?? "").trim(),
+    bizOpenDate: (input.bizOpenDate ?? "").trim(),
+    bizCertPath: (input.bizCertPath ?? "").trim(),
+  };
+  const bizRequired = !prev || hasAnyBiz(prev) || hasAnyBiz(biz);
+  if (bizRequired) {
+    const problem =
+      bizNumberProblem(biz.bizNumber) ||
+      (!biz.bizOwnerName ? "대표자 이름을 사업자등록증 그대로 적어 주세요." : "") ||
+      (biz.bizOwnerName.length > 50 ? "대표자 이름이 너무 길어요. 사업자등록증 그대로 적어 주세요." : "") ||
+      openDateProblem(biz.bizOpenDate, todayKst()) ||
+      (!biz.bizCertPath ? "사업자등록증 파일을 올려 주세요." : "");
+    if (problem) return { ok: false, message: problem, field: "biz" };
+    // 🔒새로 올린 경로면 «이 사람 폴더»의 모양인지. 남의 등록증 경로를 끼워 넣어 확인 표시를 받는 길을 막는다.
+    if (biz.bizCertPath !== (prev?.bizCertPath ?? "") && !bizCertPathOk(biz.bizCertPath, uid)) {
+      return { ok: false, message: "사업자등록증 파일을 다시 올려 주세요.", field: "biz" };
+    }
+  }
+
   let lat = prev?.lat;
   let lng = prev?.lng;
   if (input.address.trim() && input.address.trim() !== (prev?.address ?? "")) {
@@ -183,6 +228,49 @@ export async function saveSpaceAction(input: SpaceFormInput): Promise<ActionResu
   const renamed = !!prev && prev.name.trim() !== input.name.trim();
   const moved = !!prev && prev.address.trim() !== input.address.trim();
   const status: Space["status"] = !prev ? "pending" : renamed || moved ? "pending" : prev.status;
+
+  // 🧾국세청 조회 — 번호·대표자·개업일이 «바뀌었을 때»만 부른다(대표 설계). 🔁그리고 지난번에 못 물어본 경우(`none`·`error`)도
+  //   다시 부른다. 키가 생기기 전에 올린 공간이 영영 「조회 전」으로 남지 않게.
+  const idChanged =
+    !prev || prev.bizNumber !== biz.bizNumber || prev.bizOwnerName !== biz.bizOwnerName || prev.bizOpenDate !== biz.bizOpenDate;
+  const bizChanged = idChanged || !prev || prev.bizCertPath !== biz.bizCertPath;
+  const needCheck = bizRequired && (idChanged || prev?.bizCheckStatus === "none" || prev?.bizCheckStatus === "error");
+  // 🏪네이버 상호 — 이름·주소가 바뀌었거나 아직 매칭이 없을 때. 매칭이 있고 둘 다 그대로면 안 부른다.
+  const placeStale = !prev || renamed || moved;
+  const needPlace = placeStale || !prev?.placeMatchedAt;
+  const [checked, placeHit] = await Promise.all([
+    needCheck ? checkBusiness({ number: biz.bizNumber, ownerName: biz.bizOwnerName, openDate: biz.bizOpenDate }) : null,
+    needPlace ? matchPlace({ name: input.name.trim(), address: input.address.trim(), lat, lng }) : null,
+  ]);
+  // 🚫휴업·폐업은 올릴 수 없다(대표 설계). 저장하지 않고 그 칸에 말한다.
+  if (checked?.status === "closed") {
+    const what = checked.detail.bSttCd === "02" ? "휴업 중인" : "폐업한";
+    return {
+      ok: false,
+      message: `국세청 기록에 ${what} 사업자로 나와요. 지금 영업 중인 사업자만 공간을 올릴 수 있어요.`,
+      field: "biz",
+    };
+  }
+  const bizCheckStatus: BizCheckStatus = !bizRequired ? "none" : checked ? checked.status : prev?.bizCheckStatus ?? "none";
+  const bizCheckDetail = !bizRequired ? undefined : checked ? checked.detail : prev?.bizCheckDetail;
+  const bizCheckedAt = !bizRequired ? undefined : checked ? new Date().toISOString() : prev?.bizCheckedAt;
+  // 🔒사업자 정보(등록증 포함)가 바뀌면 관리자 승인을 지운다. 승인은 «그 등록증»을 본 것이지 사람을 본 게 아니다.
+  //   공개는 그대로 두고 확인 표시만 내려간다. 관리자 검토 목록에 「확인 표시만」으로 다시 뜬다(`listSpacesForReview`).
+  const bizApprovedAt = bizChanged ? undefined : prev?.bizApprovedAt;
+
+  const noPlace = { placeName: "", placeAddress: "", placeLat: undefined, placeLng: undefined, placeMatchedAt: undefined };
+  let place: Pick<Space, "placeName" | "placeAddress" | "placeLat" | "placeLng" | "placeMatchedAt"> = prev
+    ? { placeName: prev.placeName, placeAddress: prev.placeAddress, placeLat: prev.placeLat, placeLng: prev.placeLng, placeMatchedAt: prev.placeMatchedAt }
+    : noPlace;
+  if (placeHit?.status === "matched") {
+    place = {
+      placeName: placeHit.place.name, placeAddress: placeHit.place.address,
+      placeLat: placeHit.place.lat, placeLng: placeHit.place.lng, placeMatchedAt: new Date().toISOString(),
+    };
+  } else if (placeHit?.status === "nomatch" || placeStale) {
+    // 같은 가게가 없거나, 이름·주소가 바뀌었는데 네이버에 못 물어봤다. 옛 매칭은 이제 다른 가게를 가리킬 수 있어 지운다.
+    place = noPlace;
+  }
 
   const row: SpaceSaveInput = {
     slug, ownerUserId: uid, brandSlug: input.brandSlug,
@@ -218,34 +306,87 @@ export async function saveSpaceAction(input: SpaceFormInput): Promise<ActionResu
     coffeeChatTopics: input.coffeeChat ? input.coffeeChatTopics.trim() : "",
     accessHow: input.accessHow, contactPhone: input.contactPhone.trim(),
     hostTermsAt: prev?.hostTermsAt ?? new Date().toISOString(),
+    ...biz,
+    bizCheckStatus, bizCheckDetail, bizCheckedAt, bizApprovedAt,
+    ...place,
     status,
   };
   const saved = await saveSpace(row);
   if (!saved) return { ok: false, message: "저장에 실패했어요. 잠시 뒤 다시 시도해 주세요." };
   revalidatePath("/rent");
   revalidatePath(`/rent/${slug}`);
+  revalidatePath("/rent/review");
   // 화면은 이 말을 안 띄운다 — 저장 뒤 `/rent/my?saved=…`가 상황별 한 줄을 띄운다(09-17).
-  return { ok: true, message: "올렸어요. 읽어 보고 목록에 열어 드릴게요.", slug };
+  // 🧾국세청 기록과 다르면 저장은 하고(관리자가 등록증과 같이 본다) 폼이 그 칸에 고칠 말을 띄운다. 공개는 막힌다.
+  if (bizCheckStatus === "mismatch") return { ok: true, message: BIZ_MISMATCH_LINE, slug, bizStatus: bizCheckStatus, field: "biz" };
+  return { ok: true, message: "올렸어요. 읽어 보고 목록에 열어 드릴게요.", slug, bizStatus: bizCheckStatus };
 }
 
-/** 검토 통과 — 대표만. `pending` → `open`. */
+/** 🧾사업자등록증 올릴 자리(09-18) — 비공개 버킷 `host-docs`의 이 사람 폴더에 서명 업로드 URL.
+ *  🔒공개 URL을 만들지 않는다. 돌려주는 경로는 폼이 저장할 때 다시 보내고, 서버가 «이 사람 폴더»인지 또 본다.
+ *  크기·형식은 여기서 한 번, 버킷 설정에서 한 번 더 막는다(서명 URL로 직접 올리는 길이 있어서). */
+export async function createBizCertUploadAction(
+  mime: string,
+  size: number,
+): Promise<{ path: string; token: string } | { error: string }> {
+  if (await rentMockOn()) return { error: RENT_MOCK_BLOCKED.message };
+  const uid = await getSessionUserId();
+  if (!uid) return { error: "로그인이 필요해요." };
+  if (!BIZ_CERT_TYPES[mime]) return { error: "사진(JPG·PNG·HEIC)이나 PDF 파일로 올려 주세요." };
+  if (!(size > 0) || size > BIZ_CERT_MAX_BYTES) return { error: "10MB가 넘는 파일은 못 올려요. 사진으로 찍어 올려 주셔도 돼요." };
+  const r = await signCertUpload(uid, mime);
+  if ("error" in r) return { error: "파일을 올릴 자리를 만들지 못했어요. 잠시 뒤 다시 시도해 주세요." };
+  return r;
+}
+
+/** 검토 통과 — 대표만. 검토 대기면 공개하고, 이미 공개·쉬는 중이면 사업자 확인 승인만 적는다(09-18).
+ *
+ *  🧾09-18 대표 — 사업자 확인이 공개의 조건이다.
+ *   · 등록증·사업자 정보가 비었으면 못 연다
+ *   · 국세청 기록과 다르거나(mismatch) 휴업·폐업(closed)이면 못 연다
+ *   · 국세청에 아직 못 물어봤거나(none, 키 없음) 조회가 실패했으면(error) 관리자가 등록증을 눈으로 보고 연다.
+ *     승인 시각은 적되 「사업자 확인된 가게」는 안 붙는다(`bizVerified` = 승인 && valid).
+ *  ⭐행 전체를 다시 쓰지 않는다(`approveSpace`). 옛 코드는 `saveSpace({ ...sp, status })`라 관리자가 누르는 순간
+ *    사장님이 옆 탭에서 고친 내용을 옛 값으로 덮을 수 있었다. */
 export async function publishSpaceAction(slug: string): Promise<ActionResult> {
   if (await rentMockOn()) return { ...RENT_MOCK_BLOCKED };
   if (!(await isRentAdmin())) return { ok: false, message: "권한이 없어요." };
   const sp = await getSpaceFull(slug);
   if (!sp) return { ok: false, message: "그 공간을 찾지 못했어요." };
-  const saved = await saveSpace({ ...sp, status: "open" });
+  if (!sp.bizCertPath || !sp.bizNumber || !sp.bizOwnerName || !sp.bizOpenDate) {
+    return { ok: false, message: "사업자등록증이나 사업자 정보가 비어 있어 열 수 없어요. 사장님께 채워 달라고 연락해 주세요." };
+  }
+  if (sp.bizCheckStatus === "mismatch") {
+    return { ok: false, message: "국세청 기록과 달라 열 수 없어요. 사장님이 사업자 정보를 고치시면 다시 조회돼요." };
+  }
+  if (sp.bizCheckStatus === "closed") {
+    return { ok: false, message: "휴업이나 폐업으로 나오는 사업자라 열 수 없어요." };
+  }
+  const saved = await approveSpace(slug, { status: sp.status, bizNumber: sp.bizNumber, bizCertPath: sp.bizCertPath });
   revalidatePath("/rent");
-  if (!saved) return { ok: false, message: "실패했어요." };
+  revalidatePath(`/rent/${slug}`);
+  revalidatePath("/rent/review");
+  revalidatePath("/rent/my");
+  if (!saved) return { ok: false, message: "그 사이 사장님이 고치셨을 수 있어요. 새로고침하고 다시 봐 주세요." };
   // 📨09-17 대표 — 공개되면 사장님께 한 통. 🪤버튼을 두 번 누르거나 이미 열린 공간에 다시 누르면
-  //   이 함수가 또 불린다. «원래 공개가 아니었을 때만» 보낸다. 메일이 실패해도 공개는 그대로 성공이다.
-  if (sp.status !== "open") {
+  //   이 함수가 또 불린다. «이번에 처음 열렸을 때만» 보낸다. 메일이 실패해도 공개는 그대로 성공이다.
+  const opened = sp.status !== "open" && saved.status === "open";
+  if (opened) {
     await safeNotify(async () => {
       const [host, hasAccount] = await Promise.all([getProfileById(sp.ownerUserId), hasPayoutAccount(sp.ownerUserId)]);
       await notifySpacePublished(saved, host, hasAccount);
     });
   }
-  return { ok: true, message: "공개했어요.", slug };
+  const badge = sp.bizCheckStatus === "valid";
+  // none = 아직 못 물어봄(키 없음), error = 물어봤는데 실패. 관리자에게 둘을 다르게 말한다.
+  const why = sp.bizCheckStatus === "error" ? "국세청 조회가 실패해서" : "국세청 조회 전이라";
+  return {
+    ok: true,
+    message: opened
+      ? badge ? "공개했어요. 사업자 확인 표시도 붙었어요." : `공개했어요. ${why} 확인 표시는 아직 안 붙어요.`
+      : badge ? "확인 표시를 붙였어요." : `승인해 뒀어요. ${why} 확인 표시는 국세청 기록과 맞춰 본 뒤에 붙어요.`,
+    slug,
+  };
 }
 
 /** ⏸공간 잠시 쉬기 / 다시 열기 — 주인만(09-17). `open` ↔ `paused` 둘만 오간다.

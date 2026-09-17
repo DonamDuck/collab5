@@ -112,7 +112,19 @@ const SPACE_BASE = {
   rentSpaceOn: false, rentSpacePrice: 0, rentSpaceNote: "", rentFullOn: false, rentFullPrice: 0, rentFullNote: "",
   coffeeChat: false, coffeeChatMinutes: 0, coffeeChatPrice: 0, coffeeChatTopics: "",
   accessHow: "sms" as Space["accessHow"], contactPhone: "", hostTermsAt: undefined,
+  // 🧾🏪09-18 기본은 «아무것도 없음» — 사업자 확인 전 · 네이버 매칭 없음(옛 공간과 같은 모습).
+  bizNumber: "", bizOwnerName: "", bizOpenDate: "", bizCertPath: "",
+  bizCheckStatus: "none" as Space["bizCheckStatus"], bizCheckDetail: undefined, bizCheckedAt: undefined, bizApprovedAt: undefined,
+  placeName: "", placeAddress: "", placeLat: undefined, placeLng: undefined, placeMatchedAt: undefined,
 } satisfies Omit<Space, "id" | "slug" | "ownerUserId" | "name" | "status" | "createdAt" | "updatedAt">;
+
+/** 🧾09-18 목 사업자 정보. ⛔실제 사업자와 겹치지 않게 번호는 전부 «000»으로 시작한다(세무서 코드 000은 없다).
+ *  검증번호(마지막 자리)는 규칙대로 맞춰 둬서 폼·서버 검사를 통과하는 모양이다. 등록증은 가짜 경로라 열면 안내 문구만 뜬다. */
+function bizOf(
+  userId: number, n: string, owner: string, open: string, ext: "jpg" | "png" | "pdf", uuidTail: string,
+): Pick<Space, "bizNumber" | "bizOwnerName" | "bizOpenDate" | "bizCertPath"> {
+  return { bizNumber: n, bizOwnerName: owner, bizOpenDate: open, bizCertPath: `${userId}/00000000-0000-4000-8000-${uuidTail}.${ext}` };
+}
 
 function space(
   p: Pick<Space, "id" | "slug" | "ownerUserId" | "name" | "status"> & Partial<Space> & { direct?: OpenSlot[] },
@@ -312,6 +324,12 @@ function fullWorld(today: string, withAccount: boolean): MockWorld {
     coffeeChatTopics:
       "첫 가게 보증금과 인테리어에 얼마 들었는지\n원두 거래처를 어떻게 골랐는지\n혼자 운영하면서 쉬는 날을 어떻게 지키는지",
     accessHow: "both", contactPhone: "02-123-4567", hostTermsAt: `${d(-30)}T01:00:00.000Z`,
+    // 🧾🏪신뢰 표시 둘 다 — 국세청 일치 + 관리자 승인 + 네이버 상호 일치.
+    ...bizOf(U.host, "0000112347", "김느린", "20210315", "jpg", "000000009101"),
+    bizCheckStatus: "valid", bizCheckedAt: `${d(-30)}T01:00:00.000Z`, bizApprovedAt: `${d(-29)}T02:00:00.000Z`,
+    bizCheckDetail: { valid: "01", bSttCd: "01", bStt: "계속사업자", taxType: "부가가치세 일반과세자" },
+    placeName: "느린오후 로스터리", placeAddress: "서울특별시 성동구 연무장길 00",
+    placeLat: 37.5436, placeLng: 127.0559, placeMatchedAt: `${d(-30)}T01:00:00.000Z`,
     repeatWeekly: [
       { dow: 1, start: "09:00", end: "18:00", skip: [nextDow(today, 1, 2)] },
       { dow: 2, start: "12:00", end: "21:00" },
@@ -335,6 +353,10 @@ function fullWorld(today: string, withAccount: boolean): MockWorld {
     facilities: ["진열대 4", "조명 레일", "와이파이"], facilitiesNote: "환기창이 없어서 향초는 피해 주세요.",
     capacity: 20, rules: "진열대는 옮기지 말아 주세요\n쓰레기는 가져가 주세요",
     minHours: 4, accessHow: "sms", contactPhone: "02-123-4567",
+    // 🧾검토 대기 ① 국세청 기록과 다름 — 공개하기를 누르면 막힌다. 네이버 매칭 없음(이름이 안 맞는다).
+    ...bizOf(U.host, "0000212344", "김느린", "20230901", "pdf", "000000009102"),
+    bizCheckStatus: "mismatch", bizCheckedAt: `${d(-1)}T03:00:00.000Z`,
+    bizCheckDetail: { valid: "02", validMsg: "확인할 수 없습니다" },
     rentFullOn: true, rentFullPrice: 18000, rentFullNote: "팝업 매장을 통째로 꾸려요. 진열대 네 개와 조명 레일을 마음대로 쓰세요.",
     direct: [{ date: d(9), start: "11:00", end: "19:00" }],
   }, today);
@@ -347,6 +369,9 @@ function fullWorld(today: string, withAccount: boolean): MockWorld {
     photos: [photo("옥상", 190)], area: "성수동", address: "서울 성동구 연무장길 00, 옥상",
     facilities: ["파라솔 2", "캠핑 의자 8"], capacity: 10, rules: "난간에 기대지 말아 주세요",
     minHours: 2, accessHow: "onsite", contactPhone: "02-123-4567",
+    // 🧾쉬는 중인데 사업자 정보를 새로 채움 → 관리자 검토의 「확인 표시만」 줄. 국세청 조회는 실패(네트워크).
+    ...bizOf(U.host, "0000312341", "김느린", "20210315", "png", "000000009103"),
+    bizCheckStatus: "error", bizCheckedAt: `${d(-2)}T03:00:00.000Z`, bizCheckDetail: { reason: "network" },
     rentSpaceOn: true, rentSpacePrice: 15000, rentSpaceNote: "야외 모임이나 촬영 자리로 써요. 파라솔 두 개와 캠핑 의자 여덟 개가 있어요.",
     repeatWeekly: [{ dow: 6, start: "13:00", end: "19:00" }],
   }, today);
@@ -368,6 +393,10 @@ function fullWorld(today: string, withAccount: boolean): MockWorld {
     facilities: ["재봉틀 4", "다리미", "재단 테이블"], capacity: 6,
     rules: "재봉틀 바늘이 부러지면 말씀해 주세요\n원단 자투리는 가져가셔도 돼요",
     minHours: 2, accessHow: "sms", contactPhone: "02-765-4321",
+    // 🧾신뢰 표시 하나(사업자 확인만). 네이버엔 못 찾았다.
+    ...bizOf(U.host2, "0000456782", "박바늘", "20190402", "jpg", "000000009105"),
+    bizCheckStatus: "valid", bizCheckedAt: `${d(-40)}T01:00:00.000Z`, bizApprovedAt: `${d(-40)}T05:00:00.000Z`,
+    bizCheckDetail: { valid: "01", bSttCd: "01", bStt: "계속사업자", taxType: "부가가치세 간이과세자" },
     // 🛍하나만 켠 공간 ① — 공간 전체만.
     rentFullOn: true, rentFullPrice: 20000, rentFullNote: "재봉 원데이 클래스를 열 수 있어요. 재봉틀 네 대와 다리미, 재단 테이블을 같이 써요.",
   }, today);
@@ -381,12 +410,32 @@ function fullWorld(today: string, withAccount: boolean): MockWorld {
     lat: 37.5657, lng: 126.9890, facilities: ["4인 테이블 5", "냉장고"], capacity: 20,
     rules: "주방 화구는 쓸 수 없어요\n가게 앞 입간판은 치우지 말아 주세요",
     minHours: 2, accessHow: "onsite", contactPhone: "02-777-0000",
+    // 🏪신뢰 표시 하나(네이버만) — 09-18 전에 올린 옛 공간이라 사업자 정보가 비어 있다.
+    placeName: "을지로 저녁", placeAddress: "서울특별시 중구 수표로 00 1층",
+    placeLat: 37.5657, placeLng: 126.9890, placeMatchedAt: `${d(-20)}T01:00:00.000Z`,
     // 🛍하나만 켠 공간 ② — 대관만. 신청 폼에 고르기 없이 한 줄로 보인다.
     rentSpaceOn: true, rentSpacePrice: 30000, rentSpaceNote: "저녁 모임·시식회·북토크 자리로 써요. 4인 테이블 다섯 개와 냉장고 한 칸을 써요. 주방 화구는 못 써요.",
     direct: [{ date: d(2), start: "17:00", end: "22:00" }, { date: d(4), start: "17:00", end: "22:00" }],
   }, today);
 
-  const spaces = [s1, s2, s3, s4, s5, s6];
+  // 🧾S7 — 검토 대기 ② 국세청 키가 아직 없어 조회 전(none). 관리자가 등록증을 보고 열 수 있다(확인 표시는 안 붙는다).
+  //   네이버엔 같은 건물의 「바늘숲 공방」이 있어 매칭됐다 — 검토 화면에서 네이버 상호·주소를 사장님이 적은 것과 나란히 본다.
+  const s7 = space({
+    id: 9109, slug: "mock-needle-forest-class", ownerUserId: U.host2, status: "pending",
+    name: "바늘숲 공방 2층 교실", category: "workshop",
+    body: "수업이 없는 평일 오전에 2층 교실을 빌려드려요. 재봉틀은 없고 큰 재단 테이블 두 개가 있어요.",
+    photos: [photo("2층 교실", 310)], area: "을지로", address: "서울 중구 을지로 000, 2층", lat: 37.5660, lng: 126.9910,
+    facilities: ["재단 테이블 2", "와이파이"], capacity: 10, rules: "테이블 위에서 칼질할 땐 매트를 깔아 주세요",
+    minHours: 2, accessHow: "sms", contactPhone: "02-765-4321",
+    rentSpaceOn: true, rentSpacePrice: 12000, rentSpaceNote: "모임이나 작은 수업 자리로 써요. 재단 테이블 두 개를 같이 써요.",
+    ...bizOf(U.host2, "0008155668", "박바늘", "20190402", "png", "000000009109"),
+    bizCheckStatus: "none", bizCheckedAt: `${d(-1)}T02:00:00.000Z`, bizCheckDetail: { reason: "no-key" },
+    placeName: "바늘숲 공방", placeAddress: "서울특별시 중구 을지로 000 3층",
+    placeLat: 37.5661, placeLng: 126.9911, placeMatchedAt: `${d(-1)}T02:00:00.000Z`,
+    direct: [{ date: d(8), start: "09:00", end: "13:00" }],
+  }, today);
+
+  const spaces = [s1, s2, s3, s4, s5, s6, s7];
   // 🛍s1은 두 상품을 섞어 판다 — 공간 전체로 산 예약이 줄마다 섞여 보이게.
   const P1 = { sp: s1 };
   const P1F = { sp: s1, product: "full" as const };
@@ -517,6 +566,12 @@ function stressWorld(today: string): MockWorld {
     coffeeChat: true, coffeeChatMinutes: 120, coffeeChatPrice: 150000,
     coffeeChatTopics: Array.from({ length: 8 }, (_, i) => `${i + 1}. 식당을 열고 첫 해에 겪은 일 중 하나를 아주 길게 풀어서 이야기해 드릴 수 있어요. 재료값이 두 배로 뛰었던 달 이야기도요.`).join("\n"),
     accessHow: "both", contactPhone: "02-0000-0000 (내선 3번, 점심시간엔 안 받아요)",
+    // 🧾🏪긴 상호가 지도 라벨·신뢰 표시 줄에서 어떻게 접히는지.
+    ...bizOf(U.stressHost, "0001234560", "남궁오래된골목끝집", "20150101", "pdf", "000000009107"),
+    bizCheckStatus: "valid", bizCheckedAt: `${d(-50)}T01:00:00.000Z`, bizApprovedAt: `${d(-50)}T02:00:00.000Z`,
+    bizCheckDetail: { valid: "01", bSttCd: "01", bStt: "계속사업자" },
+    placeName: "오래된 골목 끝집 부엌 겸 작업실", placeAddress: "서울특별시 마포구 포은로 000-00 파란 대문 집",
+    placeLat: 37.5563, placeLng: 126.9050, placeMatchedAt: `${d(-50)}T01:00:00.000Z`,
     repeatWeekly: [0, 1, 2, 3, 4, 5, 6].map((dow) => ({ dow, start: "00:00", end: "24:00" })),
     direct: [],
   }, today);
@@ -570,6 +625,8 @@ export const MOCK_IDS = {
     full: "mock-slow-afternoon-2f", pending: "mock-slow-afternoon-showroom", paused: "mock-slow-afternoon-rooftop",
     draft: "mock-slow-afternoon-draft", noSlots: "mock-needle-forest-bench", other: "mock-euljiro-evening",
     stress: "mock-long-kitchen-space", minimal: "mock-minimal-room",
+    /** 🧾09-18 검토 대기 · 국세청 조회 전(키 없음) · 네이버 매칭됨 */
+    pendingNoKey: "mock-needle-forest-class",
   },
   maker: { host: "mock-slow-afternoon", guest: "mock-flour-diary", stress: "mock-long-kitchen" },
   booking: {

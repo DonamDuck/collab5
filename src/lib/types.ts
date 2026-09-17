@@ -541,6 +541,30 @@ export interface Space {
   /** 📜호스트 약관에 동의한 시각. 약관규제법 제3조③④ — 중요 내용은 설명하고 동의받아야 계약 내용이 된다. */
   hostTermsAt?: string;
 
+  // ─── 🧾09-18 사업자 확인(대표 09-17: 공간 등록에 사업자 확인 필수) ───
+  //   «공간마다» 둔다. 사장님 한 분이 가게 둘을 올릴 수 있다. 규칙 = `lib/bizcheck.ts`, 국세청 조회 = `lib/nts-bizcheck.ts`.
+  //   🔒번호·대표자·개업일·등록증 경로는 공개 투영(`SpacePublic`)에서 뺀다. 공개 화면이 쓰는 건 «확인됐나» 하나뿐이다.
+  /** 숫자 10자리. 옛 공간(09-18 전)은 빈 문자열이다. */
+  bizNumber: string;
+  /** 대표자 이름 — 사업자등록증 그대로 */
+  bizOwnerName: string;
+  /** 개업일 `YYYYMMDD` */
+  bizOpenDate: string;
+  /** 🔒비공개 저장소 `host-docs`의 경로. URL이 아니다. 관리자만 서명 URL로 연다. */
+  bizCertPath: string;
+  bizCheckStatus: BizCheckStatus;
+  bizCheckDetail?: BizCheckDetail;
+  bizCheckedAt?: string;
+  /** 관리자가 등록증을 보고 승인한 시각. 사업자 정보가 바뀌면 지운다. 「사업자 확인된 가게」 = 이 값 && valid(`bizVerified`). */
+  bizApprovedAt?: string;
+
+  // ─── 🏪09-18 네이버 상호 매칭(대표) — 이름 일치 AND 같은 건물일 때만 채운다(`lib/place-match.ts`) ───
+  placeName: string;
+  placeAddress: string;
+  placeLat?: number;
+  placeLng?: number;
+  placeMatchedAt?: string;
+
   status: SpaceStatus;
   createdAt: string;
   updatedAt: string;
@@ -561,7 +585,28 @@ export interface Space {
  *  도어락 번호 같은 건 애초에 담지 않기로 했고(09-16 `accessHow`), 남아 있는 옛 값도 내보내지 않는다.
  *  호스트 «개인 휴대폰»은 여기 실리지 않는다(프로필에 있고 확정 후에만 열린다).
  *  📌이탈을 막는 건 이제 주소가 아니라 **결제가 먼저라는 순서**다. 그 설계는 그대로다. */
-export type SpacePublic = Omit<Space, "accessNote" | "hostTermsAt">;
+export type SpacePublic = Omit<Space, "accessNote" | "hostTermsAt" | SpaceBizPrivateKey>;
+
+/** 🔒09-18 공개 화면에 안 나가는 사업자 칸. 상세가 쓰는 건 `bizCheckStatus`·`bizApprovedAt`(확인 표시)뿐이다.
+ *  ⚖️전자상거래법 제20조②가 사업자 호스트의 성명·사업자번호 표시를 요구하는지는 대표 판단으로 남겼다(보고서). */
+export type SpaceBizPrivateKey = "bizNumber" | "bizOwnerName" | "bizOpenDate" | "bizCertPath" | "bizCheckDetail";
+
+/** 국세청 조회 상태. none = 아직 못 물어봄(키 없음 등) · valid · mismatch(기록과 다름) · closed(휴업·폐업) · error(조회 실패). */
+export type BizCheckStatus = "none" | "valid" | "mismatch" | "closed" | "error";
+
+/** 조회 결과 요약. 국세청 응답 통째가 아니라 판단에 쓴 코드만 남긴다. */
+export interface BizCheckDetail {
+  /** none·error의 사유 — no-key · mock · network · http-4xx · bad-response · unknown-status */
+  reason?: string;
+  /** 진위확인 "01" 일치 / "02" 불일치 */
+  valid?: string;
+  validMsg?: string;
+  /** 납세자 상태 "01" 계속 / "02" 휴업 / "03" 폐업 */
+  bSttCd?: string;
+  bStt?: string;
+  endDt?: string;
+  taxType?: string;
+}
 
 /** ⭐`pending`만 돈이 오기 «전»이다. 나머지는 전부 결제가 끝난 뒤의 이야기다.
  *  pending   결제창으로 보내기 직전에 잡아 둔 자리. 🚨**호스트에게는 안 보인다**

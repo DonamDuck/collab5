@@ -9,7 +9,7 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type {
   Space, SpacePublic, SpaceBooking, SpaceStatus, BookingStatus, OpenSlot,
-  Payment, PaymentStatus, PayoutStatus, TossPayment, RepeatRule,
+  Payment, PaymentStatus, PayoutStatus, TossPayment, RepeatRule, BizCheckStatus, BizCheckDetail,
 } from "./types";
 import { bookingFinished, todayKst, expandRepeat, stripRepeat, pruneRepeat } from "./rent-time";
 import { productsFromLegacy } from "./rent-products";
@@ -70,6 +70,9 @@ function repeatRules(v: unknown): RepeatRule[] {
   });
 }
 
+const BIZ_STATUSES: BizCheckStatus[] = ["none", "valid", "mismatch", "closed", "error"];
+const bizStatus = (v: unknown): BizCheckStatus => (BIZ_STATUSES.includes(v as BizCheckStatus) ? (v as BizCheckStatus) : "none");
+
 function toSpace(r: Row): Space {
   // ⭐«읽을 때 펼친다» — 여기 한 곳에서. 목록 날짜 거르기·상세 달력·결제 전 `fitsOpenSlot`이 전부 이 값을 본다.
   const repeatWeekly = repeatRules(r.repeat_weekly);
@@ -109,6 +112,17 @@ function toSpace(r: Row): Space {
     accessHow: (s(r.access_how) || "sms") as Space["accessHow"],
     contactPhone: s(r.contact_phone),
     hostTermsAt: s(r.host_terms_at) || undefined,
+    // 🧾09-18 사업자 확인 · 🏪네이버 상호. ⚠️SQL 전 DB엔 칸이 없어 전부 빈 값·`none`으로 읽힌다(화면은 «확인 전»으로 그린다).
+    bizNumber: s(r.biz_number), bizOwnerName: s(r.biz_owner_name), bizOpenDate: s(r.biz_open_date),
+    bizCertPath: s(r.biz_cert_path),
+    bizCheckStatus: bizStatus(r.biz_check_status),
+    bizCheckDetail: r.biz_check_detail && typeof r.biz_check_detail === "object" ? (r.biz_check_detail as BizCheckDetail) : undefined,
+    bizCheckedAt: s(r.biz_checked_at) || undefined,
+    bizApprovedAt: s(r.biz_approved_at) || undefined,
+    placeName: s(r.place_name), placeAddress: s(r.place_address),
+    placeLat: typeof r.place_lat === "number" ? r.place_lat : undefined,
+    placeLng: typeof r.place_lng === "number" ? r.place_lng : undefined,
+    placeMatchedAt: s(r.place_matched_at) || undefined,
     status: (s(r.status) || "draft") as SpaceStatus,
     createdAt: s(r.created_at), updatedAt: s(r.updated_at),
   };
@@ -124,8 +138,13 @@ function toSpace(r: Row): Space {
  *  ⚠️`Omit` 타입만 믿지 마라 — 타입은 컴파일 때만 있고 런타임 객체엔 그대로 실려 나간다. 여기서 실제로 지운다.
  *  📌목록·상세는 여전히 **반드시 이 함수를 거친 값**을 쓴다. 나중에 또 감출 것이 생기면 그 자리가 여기다. */
 export function toPublic(sp: Space): SpacePublic {
-  const { accessNote: _n, hostTermsAt: _t, ...rest } = sp;
-  void _n; void _t;
+  // 🔒09-18 사업자 번호·대표자 이름·개업일·등록증 경로·조회 원문도 여기서 지운다. 확인 표시는 상태·승인 시각 둘로 충분하다.
+  const {
+    accessNote: _n, hostTermsAt: _t,
+    bizNumber: _b1, bizOwnerName: _b2, bizOpenDate: _b3, bizCertPath: _b4, bizCheckDetail: _b5,
+    ...rest
+  } = sp;
+  void _n; void _t; void _b1; void _b2; void _b3; void _b4; void _b5;
   return rest;
 }
 
@@ -325,6 +344,14 @@ export async function saveSpace(input: SpaceSaveInput): Promise<Space | null> {
     coffee_chat_price: input.coffeeChatPrice, coffee_chat_topics: input.coffeeChatTopics,
     access_how: input.accessHow, contact_phone: input.contactPhone,
     host_terms_at: input.hostTermsAt ?? null,
+    // 🧾🏪09-18. ⚠️칸이 없는 DB(SQL 전)에선 저장이 통째로 실패한다 — `2026-09-18-rent-bizcheck.sql`이 먼저다.
+    //   조용히 빼는 길은 두지 않았다. 사장님이 올린 등록증 경로가 말없이 사라진다.
+    biz_number: input.bizNumber, biz_owner_name: input.bizOwnerName, biz_open_date: input.bizOpenDate,
+    biz_cert_path: input.bizCertPath, biz_check_status: input.bizCheckStatus,
+    biz_check_detail: input.bizCheckDetail ? JSON.parse(JSON.stringify(input.bizCheckDetail)) : null,
+    biz_checked_at: input.bizCheckedAt ?? null, biz_approved_at: input.bizApprovedAt ?? null,
+    place_name: input.placeName, place_address: input.placeAddress,
+    place_lat: input.placeLat ?? null, place_lng: input.placeLng ?? null, place_matched_at: input.placeMatchedAt ?? null,
   };
   let { data, error } = await c.from("spaces").upsert(row, { onConflict: "slug" }).select().maybeSingle();
   // 🧯SQL을 돌리기 전에 코드가 먼저 나가도 «규칙 없는» 저장은 살린다. 규칙이 있는데 칸이 없으면 그대로 실패시킨다 —
@@ -349,6 +376,59 @@ export async function setSpaceStatus(slug: string, from: SpaceStatus, to: SpaceS
     .eq("slug", slug).eq("status", from).select("id");
   if (error) { console.error(`[spaces] setSpaceStatus failed slug=${slug}: ${error.message}`); return false; }
   return (data ?? []).length === 1;
+}
+
+/** 🧾관리자 승인(09-18) — 공개하고(검토 대기·초안이면) 승인 시각을 적는다. 쉬는 중·공개 중이면 상태는 그대로 두고 시각만.
+ *  ⭐행 전체를 다시 쓰는 `saveSpace`를 안 쓴다(`setSpaceStatus`와 같은 이유 — 사장님이 옆 탭에서 고치는 중이면 옛 값으로 덮는다).
+ *  🔒조건절에 «읽었을 때의 사업자 정보»를 건다. 관리자가 화면을 보는 사이 사장님이 번호를 바꿨으면 이 승인은 안 먹는다.
+ *  참 = 이번에 바뀌었다. 권한은 호출부가 확인한다. */
+export async function approveSpace(
+  slug: string,
+  seen: { status: SpaceStatus; bizNumber: string; bizCertPath: string },
+): Promise<Space | null> {
+  if (await rentMockOn()) return null;
+  const c = db();
+  if (!c) return null;
+  const next = seen.status === "pending" || seen.status === "draft" ? "open" : seen.status;
+  const { data, error } = await c.from("spaces")
+    .update({ status: next, biz_approved_at: new Date().toISOString() })
+    .eq("slug", slug).eq("status", seen.status)
+    .eq("biz_number", seen.bizNumber).eq("biz_cert_path", seen.bizCertPath)
+    .select().maybeSingle();
+  if (error) { console.error(`[spaces] approveSpace failed slug=${slug}: ${error.message}`); return null; }
+  return data ? toSpace(data as Row) : null;
+}
+
+/** 🧾관리자 검토 목록(09-18) — 둘을 한 번에.
+ *  ① 검토 대기(`pending`) 전부 — 공개 여부를 정한다
+ *  ② 이미 열려 있거나 쉬는 공간 중 «등록증은 있는데 승인이 없는» 곳 — 사장님이 사업자 정보를 새로 채우거나 바꾼 곳이다.
+ *     공개는 그대로 두고 확인 표시만 정한다. 이게 없으면 옛 공간은 확인 표시를 받을 길이 없다.
+ *  오래 기다린 것부터. */
+export async function listSpacesForReview(): Promise<{ pending: Space[]; approveOnly: Space[] }> {
+  const byUpdated = (a: Space, b: Space) => (a.updatedAt < b.updatedAt ? -1 : a.updatedAt > b.updatedAt ? 1 : 0);
+  const m = await getRentMock();
+  if (m) {
+    return {
+      pending: m.data.spaces.filter((sp) => sp.status === "pending").sort(byUpdated),
+      approveOnly: m.data.spaces
+        .filter((sp) => (sp.status === "open" || sp.status === "paused") && !!sp.bizCertPath && !sp.bizApprovedAt)
+        .sort(byUpdated),
+    };
+  }
+  const c = db();
+  if (!c) return { pending: [], approveOnly: [] };
+  const [a, b] = await Promise.all([
+    c.from("spaces").select("*").eq("status", "pending").order("updated_at", { ascending: true }),
+    c.from("spaces").select("*").in("status", ["open", "paused"]).neq("biz_cert_path", "").is("biz_approved_at", null)
+      .order("updated_at", { ascending: true }),
+  ]);
+  if (a.error) console.error(`[spaces] listSpacesForReview pending failed: ${a.error.message}`);
+  // ⚠️SQL 전 DB엔 `biz_cert_path` 칸이 없어 ②가 실패한다. ①은 살린다.
+  if (b.error) console.error(`[spaces] listSpacesForReview approveOnly failed: ${b.error.message}`);
+  return {
+    pending: (a.data ?? []).map((r) => toSpace(r as Row)),
+    approveOnly: (b.data ?? []).map((r) => toSpace(r as Row)),
+  };
 }
 
 // 🔻하루 단위로 「그날을 판매 목록에서 빼던」 함수는 09-16에 지웠다. 시간 단위로 바뀌면서 할 일이 사라졌다.

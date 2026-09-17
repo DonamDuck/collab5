@@ -4,6 +4,7 @@
 import { createBrowserAuthClient, authEnvReady } from "@/lib/supabase/client";
 import { fileToResizedBlob, fileToResizedDataUrl } from "@/lib/image";
 import { createUploadUrlAction } from "@/lib/actions";
+import { createBizCertUploadAction } from "@/lib/rent-actions";
 
 const PHOTO_BUCKET = "maker-photos";
 
@@ -54,6 +55,24 @@ export async function uploadPhoto(
   );
   if (error) throw new Error("upload-failed");
   return signed.publicUrl;
+}
+
+/** 🧾하루 가게 사업자등록증 업로드(2026-09-18) — 사진과 같은 서명 URL 방식이되 **비공개 버킷 `host-docs`**.
+ *  리사이즈하지 않는다(글자가 뭉개지면 검토를 못 한다). 공개 URL이 없어서 «경로»를 돌려준다. 저장할 때 서버가 이 사람 폴더인지 다시 본다.
+ *  실패하면 사장님께 그대로 보일 문장을 담아 던진다. `mime`은 호출부가 파일에서 정한 값(확장자로 보충한 것 포함). */
+export async function uploadBizCert(file: File, mime: string): Promise<string> {
+  if (!authEnvReady) throw new Error("지금은 파일을 올릴 수 없어요. 잠시 뒤 다시 시도해 주세요.");
+  const signed = await withTimeout(createBizCertUploadAction(mime, file.size), 15_000, "sign").catch(() => null);
+  if (!signed) throw new Error("파일을 올릴 자리를 만들지 못했어요. 잠시 뒤 다시 시도해 주세요.");
+  if ("error" in signed) throw new Error(signed.error);
+  const supabase = createBrowserAuthClient();
+  const res = await withTimeout(
+    supabase.storage.from("host-docs").uploadToSignedUrl(signed.path, signed.token, file, { contentType: mime }),
+    45_000,
+    "upload",
+  ).catch(() => null);
+  if (!res || res.error) throw new Error("파일을 올리지 못했어요. 다시 골라 주세요.");
+  return signed.path;
 }
 
 /** 소개자료 PDF 업로드(리사이즈 없음, 10MB 제한). Storage 미설정이면 에러. */
