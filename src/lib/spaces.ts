@@ -332,7 +332,9 @@ export async function saveSpace(input: SpaceSaveInput, opts: { isNew: boolean })
   //   ⚠️`repeat_weekly` 칸이 없는 DB(SQL 전)에선 이 저장이 통째로 실패한다 — SQL이 먼저다.
   const today = todayKst();
   const repeatWeekly = pruneRepeat(input.repeatWeekly ?? [], today);
-  const openSlots = stripRepeat(input.openSlots, repeatWeekly, today);
+  // 🗓09-18 밤 QA(SC-32) — 지난 날짜는 아예 저장하지 않는다. 아무도 못 빌리는 칸인데 행에 쌓여서
+  //   「열어 둔 날 N일」을 부풀리고, 최소 대여 시간을 늘리면 그 지난 칸 때문에 저장이 막혔다(H-12).
+  const openSlots = stripRepeat(input.openSlots, repeatWeekly, today).filter((sl) => sl.date >= today);
   const row = {
     slug: input.slug, owner_user_id: input.ownerUserId, brand_slug: input.brandSlug,
     name: input.name, tagline: input.tagline, body: input.body, photos: input.photos,

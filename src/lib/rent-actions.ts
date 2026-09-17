@@ -231,7 +231,11 @@ export async function saveSpaceAction(input: SpaceFormInput): Promise<ActionResu
     return { ok: false, message: "공간 제공자 약관에 동의해 주세요." };
   }
   // 열어 둔 시간대가 말이 되는지. 거꾸로거나 최소 시간보다 짧은 칸은 아무도 못 빌린다.
-  for (const sl of input.openSlots) {
+  // 🗓09-18 밤 QA(H-12·SC-32) — **지난 날짜는 검사에서 뺀다.** 아무도 못 빌리는 칸인데, 최소 대여 시간을 늘리는 순간
+  //   지난 칸이 「N시간을 못 채워요」로 저장을 막았다. 저장할 때도 털어낸다(`saveSpace`).
+  const today = todayKst();
+  const futureSlotsIn = input.openSlots.filter((sl) => sl.date >= today);
+  for (const sl of futureSlotsIn) {
     // 못 읽는 시각(`24:30` 같은 것)을 「거꾸로」로 말하지 않게 먼저 거른다(09-18 밤 QA SEC-08).
     if (toMinutes(sl.start ?? "") < 0 || toMinutes(sl.end ?? "") < 0) {
       return { ok: false, message: `${dateLabel(sl.date)}의 시각을 알아보지 못했어요. 시작과 끝 시각을 다시 골라 주세요.` };
@@ -310,7 +314,7 @@ export async function saveSpaceAction(input: SpaceFormInput): Promise<ActionResu
   //   ⚠️09-16 전에 30분으로 열어 둔 칸이 운영에 남아 있다(09-18 읽기: 공간 한 곳, 10:30 시작 두 날). 그 칸을 «그대로» 다시 보내면 받는다.
   //   안 받으면 그 사장님은 다른 곳을 고치려다 저장이 막히고, 고르개엔 10:30이 없어 고칠 방법도 안 보인다. 새로 넣거나 바꾼 칸만 막는다.
   const keptSlots = new Set((prev?.openSlots ?? []).map((sl) => `${sl.date} ${sl.start}~${sl.end}`));
-  for (const sl of input.openSlots) {
+  for (const sl of futureSlotsIn) {
     if (isHourMark(sl.start) && isHourMark(sl.end)) continue;
     if (keptSlots.has(`${sl.date} ${sl.start}~${sl.end}`) && toMinutes(sl.start) >= 0 && toMinutes(sl.end) >= 0) continue;
     return { ok: false, message: `${dateLabel(sl.date)}은 정시로만 열 수 있어요. 시작과 끝 시각을 다시 골라 주세요.` };
@@ -339,7 +343,7 @@ export async function saveSpaceAction(input: SpaceFormInput): Promise<ActionResu
       bizNumberProblem(biz.bizNumber) ||
       (!biz.bizOwnerName ? "대표자 이름을 사업자등록증 그대로 적어 주세요." : "") ||
       (biz.bizOwnerName.length > 50 ? "대표자 이름이 너무 길어요. 사업자등록증 그대로 적어 주세요." : "") ||
-      openDateProblem(biz.bizOpenDate, todayKst()) ||
+      openDateProblem(biz.bizOpenDate, today) ||
       (!biz.bizCertPath ? "사업자등록증 파일을 올려 주세요." : "");
     if (problem) {
       // 옛 공간이 이름·주소를 바꿔서 «이제» 필요해진 경우엔 왜 필요한지부터 말한다. 그냥 번호를 적으라고만 하면 뜬금없다.
