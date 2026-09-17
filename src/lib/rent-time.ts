@@ -6,14 +6,22 @@
 //   대신 호스트가 정하는 «최소 대여 시간»이 그 필요를 덮는다.
 import type { OpenSlot, RepeatRule } from "./types";
 
-/** "HH:MM" → 분. 모양이 아니면 -1 — 호출부가 「못 읽었다」와 「0시」를 가를 수 있어야 한다. */
+/** "HH:MM" → 분. 모양이 아니면 -1 — 호출부가 「못 읽었다」와 「0시」를 가를 수 있어야 한다.
+ *  ⏱24시는 «끝나는 시각» 자리에 오는 `24:00` 하나뿐이다. 🩸09-18 밤 QA(SEC-08) — 전엔 `24:30`이 1470분으로 읽혀서
+ *    화면 없이 부른 액션이 자정 넘은 칸을 열고 팔 수 있었다. */
 export function toMinutes(hhmm: string): number {
   const m = /^(\d{1,2}):(\d{2})/.exec(hhmm.trim());
   if (!m) return -1;
   const h = Number(m[1]);
   const mi = Number(m[2]);
-  if (h < 0 || h > 24 || mi < 0 || mi > 59) return -1;
+  if (h < 0 || h > 24 || mi < 0 || mi > 59 || (h === 24 && mi > 0)) return -1;
   return h * 60 + mi;
+}
+
+/** 정시 모양(`HH:00`, 00시~24시)인가. 눈금이 1시간이라(대표 09-16) 서버가 새로 받는 시각은 이 모양이어야 한다.
+ *  화면 고르개(`OpenSlotsCalendar`의 `HOURS`, 신청 폼의 `hourMarks`)도 이 모양만 만든다(09-18 밤 QA SEC-08). */
+export function isHourMark(hhmm: string): boolean {
+  return /^([01]\d|2[0-4]):00$/.test(hhmm ?? "");
 }
 
 /** 분 → "HH:MM". */

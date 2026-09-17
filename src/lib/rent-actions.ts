@@ -34,7 +34,7 @@ import {
   notifyBookingPaidToGuest, notifyBookingConfirmedToHost, notifyBookingCancelledToGuest, notifyAdminRefund,
   notifySpacePublished, notifySpaceReview,
 } from "./rent-notify";
-import { bookingStarted, dateLabel, kstDaysUntil, hoursBetween, fitsOpenSlot, nowHhmmKst, overlaps, toMinutes, todayKst } from "./rent-time";
+import { bookingStarted, dateLabel, kstDaysUntil, hoursBetween, fitsOpenSlot, isHourMark, nowHhmmKst, overlaps, toMinutes, todayKst } from "./rent-time";
 import type { Space, SpaceBooking, SpaceUseType, SpaceCategory, OpenSlot, AccessHow, RentProduct, BizCheckStatus } from "./types";
 import { bookingAmount, compatScopePrice, isRentProduct, productOn } from "./rent-products";
 import { PRODUCT_LABEL, withJosa } from "./rent-copy";
@@ -185,6 +185,10 @@ export async function saveSpaceAction(input: SpaceFormInput): Promise<ActionResu
   }
   // 열어 둔 시간대가 말이 되는지. 거꾸로거나 최소 시간보다 짧은 칸은 아무도 못 빌린다.
   for (const sl of input.openSlots) {
+    // 못 읽는 시각(`24:30` 같은 것)을 「거꾸로」로 말하지 않게 먼저 거른다(09-18 밤 QA SEC-08).
+    if (toMinutes(sl.start ?? "") < 0 || toMinutes(sl.end ?? "") < 0) {
+      return { ok: false, message: `${dateLabel(sl.date)}의 시각을 알아보지 못했어요. 시작과 끝 시각을 다시 골라 주세요.` };
+    }
     const h = hoursBetween(sl.start, sl.end);
     if (h <= 0) return { ok: false, message: `${dateLabel(sl.date)}의 시간이 거꾸로예요. 끝나는 시각이 더 늦어야 해요.` };
     if (h < input.minHours) {
@@ -220,6 +224,23 @@ export async function saveSpaceAction(input: SpaceFormInput): Promise<ActionResu
   // 📍주소가 «바뀔 때만» 좌표를 다시 잰다(대표 09-14 지도 요청). 유료 호출이라 매번 부르지 않고,
   //   실패해도 저장은 그대로 간다 — 지도는 있으면 좋은 것이지 올리기를 막을 것이 아니다.
   const prev = input.slug ? await getSpaceFull(input.slug) : null;
+
+  // ⏱09-18 밤 QA(SEC-08) — 여는 시각은 정시만(눈금 1시간, 대표 09-16). 고르개는 정시만 주지만 액션을 직접 부르면
+  //   10:30 시작·24:30 끝 같은 칸이 저장됐다.
+  //   ⚠️09-16 전에 30분으로 열어 둔 칸이 운영에 남아 있다(09-18 읽기: 공간 한 곳, 10:30 시작 두 날). 그 칸을 «그대로» 다시 보내면 받는다.
+  //   안 받으면 그 사장님은 다른 곳을 고치려다 저장이 막히고, 고르개엔 10:30이 없어 고칠 방법도 안 보인다. 새로 넣거나 바꾼 칸만 막는다.
+  const keptSlots = new Set((prev?.openSlots ?? []).map((sl) => `${sl.date} ${sl.start}~${sl.end}`));
+  for (const sl of input.openSlots) {
+    if (isHourMark(sl.start) && isHourMark(sl.end)) continue;
+    if (keptSlots.has(`${sl.date} ${sl.start}~${sl.end}`) && toMinutes(sl.start) >= 0 && toMinutes(sl.end) >= 0) continue;
+    return { ok: false, message: `${dateLabel(sl.date)}은 정시로만 열 수 있어요. 시작과 끝 시각을 다시 골라 주세요.` };
+  }
+  const keptRules = new Set((prev?.repeatWeekly ?? []).map((r) => `${r.dow} ${r.start}~${r.end}`));
+  for (const r of repeat) {
+    if (isHourMark(r.start) && isHourMark(r.end)) continue;
+    if (keptRules.has(`${r.dow} ${r.start}~${r.end}`) && toMinutes(r.start) >= 0 && toMinutes(r.end) >= 0) continue;
+    return { ok: false, message: `매주 ${"일월화수목금토"[r.dow]}요일은 정시로만 열 수 있어요. 시작과 끝 시각을 다시 골라 주세요.` };
+  }
 
   // 🧾사업자 정보(대표 09-17: 「개인까지 받으면 너무 무방비」). 바깥 호출(좌표·국세청·네이버) «전에» 모양부터 본다.
   //   ⭐필수인 경우 = 새 공간 · 이미 사업자 정보가 있던 공간(지우지 못한다) · 넷 중 하나라도 적은 고치기.
@@ -554,6 +575,11 @@ export async function startBookingAction(input: BookingFormInput): Promise<Start
   if (input.useDate < today) return { ok: false, message: "지난 날짜는 신청할 수 없어요." };
 
   // ⏱시간 검사 — 화면에서도 막지만 관문은 여기다.
+  // ⏱09-18 밤 QA(SEC-08) — 정시만 받는다(눈금 1시간, 대표 09-16). 신청 폼은 정시만 고르게 하는데 액션을 직접 부르면
+  //   10:30~12:00처럼 한 시간 반이 팔렸고, 값이 «시간당 값 × 1.5»라 반올림된 금액으로 결제까지 갔다.
+  if (!isHourMark(input.startTime) || !isHourMark(input.endTime)) {
+    return { ok: false, message: "시작과 끝 시각은 정시로만 고를 수 있어요. 새로고침하고 다시 골라 주세요." };
+  }
   const hours = hoursBetween(input.startTime, input.endTime);
   if (hours <= 0) return { ok: false, message: "끝나는 시각이 시작보다 늦어야 해요." };
   // ⚠️지난 «시각» 검사는 모양 검사 «뒤»다. 앞에 두면 못 읽은 시각(`-1`)이 「이미 지났다」로 잡혀
