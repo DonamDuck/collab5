@@ -228,6 +228,19 @@ export async function saveSpaceAction(input: SpaceFormInput): Promise<ActionResu
   // 📍주소가 «바뀔 때만» 좌표를 다시 잰다(대표 09-14 지도 요청). 유료 호출이라 매번 부르지 않고,
   //   실패해도 저장은 그대로 간다 — 지도는 있으면 좋은 것이지 올리기를 막을 것이 아니다.
   const prev = input.slug ? await getSpaceFull(input.slug) : null;
+  // 🔁09-16 대표 — **고쳐도 공개가 유지된다.** 다시 검토받는 건 «가게가 바뀌는» 둘뿐이다: 매장 이름과 주소.
+  const renamed = !!prev && prev.name.trim() !== input.name.trim();
+  const moved = !!prev && prev.address.trim() !== input.address.trim();
+
+  // ⏸09-18 밤 QA(H-02·SC-04) — 쉬는 동안엔 이름·주소를 못 바꾼다(대표 판단용 추천안 중 «스키마를 안 건드리는» 쪽).
+  //   바꾸면 검토 대기로 내려가는데, 관리자가 검토를 통과시키는 순간 «쉬는 중»이던 공간이 그대로 목록에 열린다.
+  //   사장님이 본 고치기 화면은 그때도 「다시 열 때 그대로 보여요」라고 말하고 있었다.
+  if (prev?.status === "paused" && (renamed || moved)) {
+    return {
+      ok: false, field: renamed ? "name" : "address",
+      message: "쉬는 동안엔 이름과 주소를 못 바꿔요. 다시 여신 뒤에 바꿔 주세요.",
+    };
+  }
 
   // 🪪09-18 밤 QA(G-04·H-01) — 붙이는 소개서가 «내 것»인지 서버가 본다. 전엔 남의 소개서 주소를 그대로 붙일 수 있었고,
   //   공개된 공간이 남의 브랜드를 달고 목록에 서도 검토를 거치지 않았다.
@@ -290,10 +303,7 @@ export async function saveSpaceAction(input: SpaceFormInput): Promise<ActionResu
   }
 
   let slug = input.slug || makeSlug(input.name);
-  // 🔁09-16 대표 — **고쳐도 공개가 유지된다.** 전엔 글자 하나만 바꿔도 검토 대기로 내려가 목록에서 사라졌다.
-  //   다시 검토받는 건 «가게가 바뀌는» 둘뿐이다: 주소와 매장 이름. 나머지는 사장님이 알아서 고친다.
-  const renamed = !!prev && prev.name.trim() !== input.name.trim();
-  const moved = !!prev && prev.address.trim() !== input.address.trim();
+  // 🔁09-16 대표 — 전엔 글자 하나만 바꿔도 검토 대기로 내려가 목록에서 사라졌다. 이제 이름·주소가 바뀔 때만 내려간다.
   const status: Space["status"] = !prev ? "pending" : renamed || moved ? "pending" : prev.status;
 
   // 🧾국세청 조회 — 번호·대표자·개업일이 «바뀌었을 때»만 부른다(대표 설계). 🔁그리고 지난번에 못 물어본 경우(`none`·`error`)도
