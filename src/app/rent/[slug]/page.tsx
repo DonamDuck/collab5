@@ -10,6 +10,8 @@ import { PhotoSlider } from "@/components/PhotoSlider";
 import { BookingForm } from "./BookingForm";
 import { categoryLabel, Chip, dateLabel, InfoList, InfoRow, primaryBtnCls, scopeLabel, secondaryBtnCls, won } from "../ui";
 import { AreaMap } from "./AreaMap";
+import { HostBrandCard } from "./HostBrandCard";
+import { SectionNav } from "./SectionNav";
 
 // 하루 가게 — 공간 한 곳 + 신청 (2026-09-13)
 //
@@ -70,10 +72,12 @@ function PriceLine({ priceHour, minHours, capacity }: { priceHour: number; minHo
   );
 }
 
-/** 소개서 본문 섹션과 같은 얼굴 — 상단 구분선 + 21px 제목 + 내용. */
-function Section({ title, id, children }: { title: string; id?: string; children: React.ReactNode }) {
+/** 소개서 본문 섹션과 같은 얼굴 — 상단 구분선 + 21px 제목 + 내용.
+ *  🧭09-18 알약 줄(`SectionNav`)이 `data-nav-label`을 단 절을 DOM에서 모은다. 알약 이름은 `nav`, 없으면 제목 그대로.
+ *  `scroll-margin-top` 7.25rem = 헤더 3.5 + 알약 줄 3.25 + 숨 0.5. 알약을 누르거나 `#apply`로 올 때 제목이 줄 밑에 안 깔린다. */
+function Section({ title, nav, id, children }: { title: string; nav?: string; id?: string; children: React.ReactNode }) {
   return (
-    <section id={id} className="mt-9 scroll-mt-20 border-t border-hairline pt-8">
+    <section id={id} data-nav-label={nav ?? title} className="mt-9 scroll-mt-[7.25rem] border-t border-hairline pt-8">
       <h2 className="mb-4 text-[21px] font-bold leading-snug tracking-tight text-ink">{title}</h2>
       {children}
     </section>
@@ -95,10 +99,14 @@ export default async function SpaceDetailPage({
   // 「있지만 못 본다」와 「없다」를 구분해 주면, 주소를 훑어 아직 안 열린 공간 목록을 만들 수 있다.
   if (sp.status !== "open" && !isOwner) notFound();
 
-  // 연결된 소개서는 **이름 글자만** 꺼내 온다. 링크는 slug로 건다 — Maker 객체를 통째로 넘길 이유가 없다.
   // 상호(운영하는 브랜드 이름). 사장님 실명(profiles에 따로 없다)은 안 읽는다.
   const operatorName = (await getProfileById(sp.ownerUserId))?.brandName?.trim() ?? "";
-  const brandName = sp.brandSlug ? (await repo.getMakerBySlug(sp.brandSlug))?.name ?? "" : "";
+  // 📎09-18 대표 결정 A — 소개서 줄이 카드가 되면서 이름에 더해 한 줄 소개와 로고도 꺼내 온다.
+  //   로고는 `/m`과 같은 출처(소개서 주인 계정의 프로필 사진). Maker 객체는 카드에 넘기지 않고 글자 셋만 넘긴다.
+  const brand = sp.brandSlug ? await repo.getMakerBySlug(sp.brandSlug) : null;
+  const brandName = brand?.name ?? "";
+  const brandOneLiner = brand?.oneLiner?.trim() ?? "";
+  const brandLogo = brand?.ownerUserId ? (await getProfileById(brand.ownerUserId))?.profileImage || undefined : undefined;
   const brandHref = `/m/${encodeURIComponent(sp.brandSlug ?? "")}?back=${encodeURIComponent(`/rent/${sp.slug}`)}`;
 
   // 신청자가 자기 소개서를 붙일 수 있게 목록을 준다(선택). 없어도 신청은 된다 —
@@ -145,15 +153,17 @@ export default async function SpaceDetailPage({
              ⛔오른쪽에 키위 버튼을 두지 않는다 — 결제 버튼은 하단 고정 바 하나뿐이다(09-14 대표). */}
       <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start lg:gap-14">
         <div className="min-w-0">
+          {/* 🧭09-18 알약 줄 — 높이 0짜리 sticky 자리라 여기 둬도 흐름이 안 밀린다. 사진(없으면 제목 머리)을 지나면 내려온다. */}
+          <SectionNav afterId={sp.photos.length > 0 ? "space-photos" : "space-head"} />
           {sp.photos.length > 0 && (
-            <div className="-mx-4 sm:mx-0">
+            <div id="space-photos" className="-mx-4 sm:mx-0">
               <PhotoSlider photos={sp.photos} rounded="rounded-none sm:rounded-lg" />
             </div>
           )}
 
           {/* 🔻09-14 「← 하루 가게」 삭제 — 대표: *「앱이 아닌 경우 다들 모바일 기기의 뒤로 가기 버튼을
               잘 쓸 거 같은데, 일단 뒤로 가기 버튼은 지워도 될 거 같아」*. */}
-          <header className={sp.photos.length > 0 ? "mt-5 sm:mt-7" : ""}>
+          <header id="space-head" className={sp.photos.length > 0 ? "mt-5 sm:mt-7" : ""}>
             {eyebrow && <p className="text-[15px] text-mute">{eyebrow}</p>}
             <h1 className="mt-1.5 text-[24px] font-bold leading-tight tracking-tight break-keep text-ink sm:text-[28px]">
               {sp.name}
@@ -176,12 +186,14 @@ export default async function SpaceDetailPage({
             </div>
             {brandName && sp.brandSlug && (
               // 📎09-17 대표 — 소개서 링크를 연다. `back`을 달아 소개서 화면에서 이 공간으로 돌아올 수 있게 한다.
-              <p className="mt-4 text-[15px] text-mute lg:hidden">
-                사장님 소개서 ·{" "}
-                <Link href={brandHref} className="text-body underline underline-offset-2">
-                  {brandName}
-                </Link>
-              </p>
+              // 🔁09-18 대표 결정 A — 흐린 글자 한 줄 → 카드(`HostBrandCard` 머리말). lg에선 오른쪽 요약 카드 안으로 옮긴다.
+              <HostBrandCard
+                href={brandHref}
+                name={brandName}
+                oneLiner={brandOneLiner}
+                logoUrl={brandLogo}
+                className="mt-5 lg:hidden"
+              />
             )}
             {isOwner && sp.status !== "open" && (
               // ⏸09-17 잠시 쉬기 — 쉬는 공간에 「저희가 확인하고 열어 드릴게요」가 뜨면 검토에 걸린 줄 안다.
@@ -194,7 +206,7 @@ export default async function SpaceDetailPage({
           </header>
 
           {sp.body && (
-            <Section title="공간 소개">
+            <Section title="공간 소개" nav="소개">
               <p className="whitespace-pre-line text-[17px] leading-relaxed break-keep text-body">
                 {sp.body}
               </p>
@@ -207,7 +219,7 @@ export default async function SpaceDetailPage({
                 구조로 짜야 할 거 같아」*. 태그는 훑어서 고르는 것이고, 줄글은 「HDMI 케이블은 없어요」처럼
                 태그로 못 담는 단서다. 둘 중 하나만 있어도 그 절은 뜬다. */}
           {(sp.facilities.length > 0 || sp.facilitiesNote) && (
-            <Section title="공간·시설 안내">
+            <Section title="공간·시설 안내" nav="시설">
               {sp.facilities.length > 0 && (
                 <div className="flex flex-wrap gap-2">
                   {sp.facilities.map((f) => (
@@ -264,7 +276,7 @@ export default async function SpaceDetailPage({
               여기서 열린 시간 30개를 칩으로 다 깔면 폰에서 한 화면 반이 칩 벽이 됐다(모든 칸이 찬 공간 기준).
               폼이 없는 화면(로그인 전·사장님 본인)에선 가까운 여섯 개만 보이고 나머지는 개수로 말한다. */}
           {!showForm && (
-            <Section title="빌릴 수 있는 날">
+            <Section title="빌릴 수 있는 날" nav="날짜">
               {openDates.length === 0 ? (
                 <p className="text-[17px] leading-relaxed text-body">
                   지금은 열린 시간이 없어요. 곧 새 날짜가 올라올 거예요.
@@ -288,7 +300,7 @@ export default async function SpaceDetailPage({
               「사장님께 잠깐 배워 볼 수 있어요」로 정규 타이틀로 섹션으로 다루자」*.
               ⭐설명하는 자리와 고르는 자리를 갈랐다. 고르는 일은 결제 단계의 옵션이 맡는다. */}
           {sp.coffeeChat && sp.coffeeChatMinutes > 0 && (
-            <Section title="사장님과 커피챗">
+            <Section title="사장님과 커피챗" nav="커피챗">
               {/* ☕09-16 대표 — 「사장님께 잠깐 배워보기」를 커피챗으로 다시 잡았다. 파는 것은 «현업 이야기»다.
                   🔁09-17 — 「언제」는 `COFFEE_CHAT_WHEN_GUEST` 한 줄만 쓴다(대표: 시간은 사장님이 정한다).
                     전엔 「사장님과 협의한 날짜에」라 메일의 「그날」과 말이 갈렸다.
@@ -359,7 +371,7 @@ export default async function SpaceDetailPage({
               ⭐⭐「사용 유의 사항」이 이 화면에서 제일 눈에 띄어야 한다(설계 §공간 카드).
               열쇠를 넘기는 두려움이 실제로 풀리는 자리다. 면색 대신 **한 줄씩 세운 구분선**과 ink 글자로
               무게를 준다 — 줄로 세우면 세 줄이 세 가지 약속으로 읽히고, 문단이면 한 덩어리로 넘어간다. */}
-          <Section title="사용 유의 사항">
+          <Section title="사용 유의 사항" nav="유의 사항">
             {/* 🔁09-14 구분선 → **번호**(대표: *「여기 라인을 빼주고, 불렛이나 1, 2, 3 식으로 하는 거 어떨까.
                 규칙이니 마크다운 형태로 보여도 이쁠 거 같음」*).
                 ⭐선은 「여기까지가 한 덩어리」만 말하고, 번호는 **몇 개인지와 몇 번째인지**를 같이 말한다.
@@ -376,7 +388,7 @@ export default async function SpaceDetailPage({
             </ol>
           </Section>
 
-          <Section title="환불 규정">
+          <Section title="환불 규정" nav="환불">
             <p className="text-[17px] leading-relaxed break-keep text-body">
               사장님이 거절하시면 <span className="font-medium text-ink">전액</span> 돌려드려요.
             </p>
@@ -413,7 +425,7 @@ export default async function SpaceDetailPage({
           </Section>
 
           {/* ── 신청 ── */}
-          <Section title="신청하기" id="apply">
+          <Section title="신청하기" nav="신청" id="apply">
             {isOwner ? (
               <p className="text-[17px] leading-relaxed break-keep text-body">
                 사장님 공간이라 신청은 못 하세요. 받은 신청은{" "}
@@ -490,17 +502,17 @@ export default async function SpaceDetailPage({
                 <InfoRow label="커피챗" value={`${sp.coffeeChatMinutes}분 +${won(sp.coffeeChatPrice)}`} />
               )}
               {operatorName && <InfoRow label="운영" value={operatorName} />}
-              {brandName && sp.brandSlug && (
-                <InfoRow
-                  label="소개서"
-                  value={
-                    <Link href={brandHref} className="underline underline-offset-2">
-                      {brandName}
-                    </Link>
-                  }
-                />
-              )}
             </InfoList>
+            {/* 🔁09-18 대표 결정 A — 「소개서」 키-값 줄 → 폰과 같은 카드. 표 한 칸의 밑줄 글자는 누를 곳으로 안 읽혔다. */}
+            {brandName && sp.brandSlug && (
+              <HostBrandCard
+                href={brandHref}
+                name={brandName}
+                oneLiner={brandOneLiner}
+                logoUrl={brandLogo}
+                className="mt-5"
+              />
+            )}
             {/* 로그인한 손님은 아래에 붙은 결제 바가 이 카드의 버튼 노릇을 한다. 바가 없는 로그인 전에만 길을 둔다. */}
             {!isOwner && !uid && openDates.length > 0 && (
               <a href="#apply" className={`${secondaryBtnCls} mt-6 w-full`}>

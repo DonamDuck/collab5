@@ -147,7 +147,7 @@ function toBooking(r: Row): SpaceBooking {
 // ─── 공간 읽기 ───
 
 export interface SpaceFilter {
-  /** 동네 부분일치 */
+  /** 찾기 낱말 — 동네·공간 이름·주소·설비 태그 부분일치(대소문자 무시). 칸 이름은 옛 「동네」 그대로다. */
   area?: string;
   /** 이 날짜에 열린 시간대가 있는 곳만. 화면엔 고르개가 없고 주소로만 들어온다(09-16 B84). */
   date?: string;
@@ -157,39 +157,53 @@ export interface SpaceFilter {
   limit?: number;
 }
 
+/** 찾기 낱말이 이 공간에 걸리나 — 목 분기와 DB 분기가 같은 함수로 거른다. 둘이 따로 적히면 목 화면의 「0건」이 운영과 갈린다.
+ *  🔎09-18 대표 — 동네·이름·주소에 **설비 태그**(「와이파이」·「에스프레소 머신」)까지. 소개 글(body)은 안 넣는다(대표 결정: 태그까지만).
+ *  태그도 부분일치다. 「에스프레소」로 「에스프레소 머신」이 걸려야 한다. */
+function matchesKeyword(sp: Pick<Space, "area" | "name" | "address" | "facilities">, kw: string): boolean {
+  const k = kw.toLowerCase();
+  return [sp.area, sp.name, sp.address, ...sp.facilities].some((v) => v.toLowerCase().includes(k));
+}
+
 /** 목록 — 공개된 것만. ⭐돌려주는 값에 주소가 없다(`toPublic`). */
 export async function listOpenSpaces(f: SpaceFilter = {}): Promise<SpacePublic[]> {
+  const kw = f.area?.trim() ?? "";
+  const limit = f.limit ?? 60;
   const m = await getRentMock();
   if (m) {
     // 아래 DB 질의와 같은 거르기를 코드로 한다. 목 화면의 「0건」도 실제 조건과 같은 이유로 나와야 한다.
     const out = m.data.spaces
       .filter((sp) => sp.status === "open")
-      .filter((sp) => !f.area || [sp.area, sp.name, sp.address].some((v) => v.includes(f.area!)))
+      .filter((sp) => !kw || matchesKeyword(sp, kw))
       .filter((sp) => !f.category || sp.category === f.category)
       .filter((sp) => !f.useType || f.useType === "both" || sp.useType === f.useType || sp.useType === "both")
       .filter((sp) => !f.date || sp.openSlots.some((sl) => sl.date === f.date));
-    return out.slice(0, f.limit ?? 60).map(toPublic);
+    return out.slice(0, limit).map(toPublic);
   }
   const c = db();
   if (!c) return [];
   let q = c.from("spaces").select("*").eq("status", "open").order("created_at", { ascending: false });
-  // 🔎09-18 대표 코멘트 — 「지역, 이름으로 검색해 보세요」. 동네 칸 하나로 동네·공간 이름·주소를 같이 찾는다.
-  //   PostgREST `or`는 쉼표·괄호가 구분자라 사용자 글자에서 걷어 낸다(안 걷으면 질의가 깨지거나 조건이 늘어난다).
-  if (f.area) {
-    const kw = f.area.replace(/[,()*%\\]/g, " ").trim();
-    if (kw) q = q.or(`area.ilike.%${kw}%,name.ilike.%${kw}%,address.ilike.%${kw}%`);
-  }
+  // 🔎09-18 찾기 낱말은 **DB에서 거르지 않고 코드에서 네 칸을 한 번에 본다.**
+  //   설비(`facilities`)가 jsonb 배열이라 PostgREST `or`에 부분일치로 못 넣는다. `cs`(포함)는 원소가 정확히 같아야 해서
+  //   「에스프레소」로 「에스프레소 머신」을 못 찾고, jsonb를 글자로 바꿔 ilike 하는 필터는 PostgREST에 없다.
+  //   DB에서 동네·이름·주소만 거르고 설비는 코드에서 «합치면» 설비로만 걸리는 공간이 DB 단계에서 이미 빠져 합칠 게 없다.
+  //   그래서 낱말이 있으면 열린 공간을 다 받아 코드에서 거른다. 열린 공간이 수백 곳일 동안은 한 번 읽기로 충분하다.
+  //   (천 단위가 되면 `facilities`를 글자로 굳힌 생성 칸 + trigram 색인으로 DB에 돌려보낸다.)
+  // 🔁09-18 첫판은 `or(area.ilike…)`라 사용자 글자에서 PostgREST 구분자(쉼표·괄호)를 걷어 냈다. 코드에서 거르니 그 일도 없어졌다.
   if (f.category) q = q.eq("category", f.category);
   if (f.useType && f.useType !== "both") q = q.in("use_type", [f.useType, "both"]);
-  q = q.limit(f.limit ?? 60);
+  // ⚠️코드에서 더 거를 게 있으면 DB에서 자르지 않는다. 먼저 60개로 자르고 거르면 61번째부터의 결과가 조용히 빠진다.
+  const filterInCode = !!kw || !!f.date;
+  if (!filterInCode) q = q.limit(limit);
   const { data, error } = await q;
   if (error) { console.error(`[spaces] list failed: ${error.message}`); return []; }
   let out = (data ?? []).map((r) => toSpace(r as Row));
+  if (kw) out = out.filter((sp) => matchesKeyword(sp, kw));
   // 날짜 거르기는 jsonb 안을 봐야 해서 코드에서 한다 — 공간 수가 수백 단위일 동안은 이게 싸다.
   // 🩸09-16까지 여기가 옛 `open_dates`를 보고 있었다. 시간 단위로 바뀌면서 새 등록은 그 칸을 안 채우니
   //   날짜를 고르면 «항상 0건»이었다. 열린 시간대(`openSlots`)가 정본이다.
   if (f.date) out = out.filter((sp) => sp.openSlots.some((sl) => sl.date === f.date));
-  return out.map(toPublic);
+  return out.slice(0, limit).map(toPublic);
 }
 
 /** 상세(공개). 09-16부터 주소·좌표는 공개다(대표: 공간 이름이 이미 보여 감추는 게 무의미). 빠지는 건 옛 「들어오는 법」과 약관 동의 시각뿐. */

@@ -20,6 +20,7 @@ export const RENT_GROUPS: Group[] = [
           { desc: "공간 여럿 (공개 중인 곳만 카드로)", c: "guest-full", to: "/rent" },
           { desc: "업종으로 거른 결과", c: "guest-full", to: "/rent?category=cafe" },
           { desc: "거르기 결과 0건", c: "guest-full", to: "/rent?area=제주" },
+          { desc: "설비 낱말로 찾기 (와이파이)", c: "guest-full", to: "/rent?area=와이파이" },
           { desc: "공간이 한 곳도 없을 때", c: "guest-empty", to: "/rent" },
           { desc: "긴 이름 카드", c: "stress-guest", to: "/rent" },
           { desc: "사진·업종 없는 카드", c: "minimal-guest", to: "/rent" },
@@ -30,7 +31,7 @@ export const RENT_GROUPS: Group[] = [
         path: "/rent/[slug]",
         note: "신청 폼은 상세 맨 아래에 있어요. 날짜를 고르면 시간이, 시간을 고르면 아래 바에 금액이 떠요. 전화번호를 지우고 「신청하기」를 누르면 번호 오류 줄을 볼 수 있어요.",
         rows: [
-          { desc: "모든 칸이 찬 공간 · 신청 폼 · 커피챗 · 소개서 링크", c: "guest-full", to: `/rent/${S.full}` },
+          { desc: "모든 칸이 찬 공간 · 신청 폼 · 커피챗 · 소개서 카드 · 내리면 뜨는 알약 줄", c: "guest-full", to: `/rent/${S.full}` },
           { desc: "같은 공간을 로그인 안 하고 볼 때", c: "anon", to: `/rent/${S.full}` },
           { desc: "열린 시간이 없는 공간", c: "guest-full", to: `/rent/${S.noSlots}` },
           { desc: "커피챗·소개서 없는 공간", c: "guest-full", to: `/rent/${S.other}` },
