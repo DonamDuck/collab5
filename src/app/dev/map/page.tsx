@@ -159,7 +159,7 @@ export default async function SiteMapPage() {
         <ul className="mt-2">
           {SITE_MAIL_KINDS.map((k) => (
             <li key={k.kind} className="border-b border-hairline py-2.5">
-              <Link href={`/dev/rent-mail/${k.kind}`} className={`${linkCls} text-[15px] break-keep`}>
+              <Link href={`/dev/mail/${k.kind}`} className={`${linkCls} text-[15px] break-keep`}>
                 {k.label}
               </Link>
             </li>
@@ -169,7 +169,7 @@ export default async function SiteMapPage() {
         <ul className="mt-2">
           {MOCK_MAIL_KINDS.map((k) => (
             <li key={k.kind} className="border-b border-hairline py-2.5">
-              <Link href={`/dev/rent-mail/${k.kind}`} className={`${linkCls} text-[15px] break-keep`}>
+              <Link href={`/dev/mail/${k.kind}`} className={`${linkCls} text-[15px] break-keep`}>
                 {k.label}
               </Link>
             </li>
