@@ -726,7 +726,8 @@ export async function confirmBookingAction(
     //   돈만 받고 예약이 없는 상태를 남기면 안 된다 — 들어온 돈을 먼저 적고, 바로 전액 환불한다.
     await rentSync(orderId, { toss: approved.payment });
     const key = approved.payment.paymentKey || paymentKey;
-    const refund = await cancelPayment(key, "예약 확정 실패 — 자동 환불", undefined, pay.amount);
+    // 💸막 승인된 돈이라 잔액 = 방금 승인한 금액이다. 토스가 준 값이 있으면 그걸 먼저 쓴다(09-18 밤 QA SC-01의 잔액 검증).
+    const refund = await cancelPayment(key, "예약 확정 실패 — 자동 환불", undefined, approved.payment.balanceAmount ?? pay.amount);
     if (refund.ok) {
       await rentSync(orderId, { bookingStatus: "cancelled", toss: refund.payment });
       return { ok: false, message: "그 사이 그 시간이 찼어요. 결제는 자동으로 취소했습니다.", code: PAY_FAIL_SLOT_TAKEN_REFUNDED };

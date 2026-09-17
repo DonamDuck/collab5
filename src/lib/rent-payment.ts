@@ -142,16 +142,24 @@ export interface CancelResult {
 
 /** 결제 취소 — 호스트 거절과 게스트 취소가 둘 다 이리로 온다.
  *  ⚠️`amount`를 주면 부분 취소, 안 주면 전액이다. **호스트 거절은 언제나 전액**이다(대표 09-13).
- *  `balanceBefore`는 모의 모드에서 토스와 같은 모양의 응답을 만들 때만 쓴다(지금 남은 돈). */
+ *
+ *  🔁09-18 밤 QA(SC-01) — `refundableAmount`(호출부가 «취소 전»에 읽은 잔액)와 멱등키를 같이 보낸다.
+ *    · 취소 버튼이 두 번 눌리거나 두 창에서 같이 눌리면 부분 환불이 두 번 나갔다(90,000원 예약에서 45,000원씩 두 번).
+ *    · 멱등키가 같으면 토스는 두 번째를 처리하지 않고 첫 응답을 그대로 준다 — 돈은 한 번만 움직인다.
+ *    · 그래도 금액이 달라져 키가 갈리는 경우(그 사이 경계 시각이 지남)가 남는데, 그건 `refundableAmount`가 잡는다.
+ *      토스 문서: *「환불 가능한 잔액 정보가 refundableAmount의 값과 다르면 취소를 처리하지 않고 에러를 내보낸다」*
+ *      (400 `NOT_MATCHES_REFUNDABLE_AMOUNT`). ⚠️문서에 «deprecated»로 적혀 있지만 동작은 그대로다.
+ *      나중에 토스가 이 칸을 받지 않게 되면 멱등키만 남는다 — 그때도 겹친 같은 취소는 막힌다.
+ *  모의 모드에서는 이 값으로 토스와 같은 모양의 응답을 만든다(지금 남은 돈). */
 export async function cancelPayment(
-  paymentKey: string, reason: string, amount: number | undefined, balanceBefore: number,
+  paymentKey: string, reason: string, amount: number | undefined, refundableAmount: number,
 ): Promise<CancelResult> {
   if (!paymentsLive()) {
     // 🔁취소는 승인과 «반대로» 관대하게 둔다. 운영에 키가 없으면 애초에 승인이 안 되니
     //   취소할 실제 결제도 없다. 여기서 막으면 환불 흐름만 붙잡혀 예약이 취소 불가로 남는다.
     console.warn(`[rent-payment] 모의 취소 — key=${paymentKey} (${reason})`);
-    const cancelAmount = amount ?? balanceBefore;
-    const balance = Math.max(0, balanceBefore - cancelAmount);
+    const cancelAmount = amount ?? refundableAmount;
+    const balance = Math.max(0, refundableAmount - cancelAmount);
     return {
       ok: true,
       payment: {
@@ -163,8 +171,17 @@ export async function cancelPayment(
   try {
     const res = await fetch(`${TOSS_BASE}/${encodeURIComponent(paymentKey)}/cancel`, {
       method: "POST",
-      headers: { Authorization: authHeader(), "Content-Type": "application/json" },
-      body: JSON.stringify(amount ? { cancelReason: reason, cancelAmount: amount } : { cancelReason: reason }),
+      headers: {
+        Authorization: authHeader(),
+        "Content-Type": "application/json",
+        // 같은 결제·같은 잔액·같은 금액이면 한 번만 나간다. 겹쳐 눌린 두 번째는 첫 응답을 그대로 받는다.
+        "Idempotency-Key": idemKey("rent-cancel", paymentKey, refundableAmount, amount ?? refundableAmount),
+      },
+      body: JSON.stringify({
+        cancelReason: reason,
+        ...(amount ? { cancelAmount: amount } : {}),
+        ...(refundableAmount > 0 ? { refundableAmount } : {}),
+      }),
     });
     const body = (await res.json().catch(() => ({}))) as TossPayment & { message?: string };
     if (!res.ok) {
