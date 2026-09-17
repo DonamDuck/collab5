@@ -19,6 +19,7 @@ import { StickyTabs } from "@/components/StickyTabs";
 import { BookingBadge, ListRow as Row, SpaceBadge, primaryBtnCls, secondaryBtnCls, won } from "../ui";
 import { PRODUCT_LABEL } from "@/lib/rent-copy";
 import { productPrice, sellableProducts } from "@/lib/rent-products";
+import { groupGuestBookings, groupHostBookings, hostBookingGroup, type HostBookingGroup } from "@/lib/rent-groups";
 
 // 하루 가게 — 내 공간 · 들어온 요청 · 내가 빌린 공간 (2026-09-13)
 //
@@ -60,11 +61,13 @@ const h3Cls = "mt-6 text-[15px] font-medium text-mute";
  *  🩸09-16까지 `created_at` 최신순이라 답해야 할 새 요청이 취소 세 건 아래 네 번째에 있었다.
  *  사장님이 이 절을 여는 첫 질문은 「답할 게 있나」, 두 번째는 「다음에 누가 오나」다.
  *  ⚠️읽기(`listBookingsForHost`)는 그대로 두고 화면에서 가른다 — 시간 판정(`bookingStarted`·`bookingFinished`)이
- *    «지금»에 달려 있어서 DB 정렬로는 못 한다. */
+ *    «지금»에 달려 있어서 DB 정렬로는 못 한다.
+ *  🗂순위는 무리 판정 한 벌(`lib/rent-groups`의 `hostBookingGroup`)에서 온다. `/my`의 숫자도 같은 판정을 쓴다(09-18 밤 QA SC-14). */
+const HOST_RANK: Record<HostBookingGroup, number> = { answer: 0, upcoming: 1, past: 2 };
+
 function hostOrder(list: SpaceBooking[]): SpaceBooking[] {
   const at = (b: SpaceBooking) => `${b.useDate} ${b.startTime || "00:00"}`;
-  const rank = (b: SpaceBooking) =>
-    b.status === "paid" && !bookingStarted(b) ? 0 : (b.status === "paid" || b.status === "confirmed") && !bookingFinished(b) ? 1 : 2;
+  const rank = (b: SpaceBooking) => HOST_RANK[hostBookingGroup(b)];
   return [...list].sort((a, b) => {
     const r = rank(a) - rank(b);
     if (r !== 0) return r;
@@ -167,12 +170,8 @@ export default async function MyRentPage({
   const savedLine = saved ? SAVED_LINE[saved] ?? "" : "";
   const didId = Number(didBooking) || 0;
 
-  // 🗂세 무리 — 판정은 `hostOrder`의 순위와 같은 식이다. 한쪽만 고치면 정렬과 무리가 어긋난다.
-  const toAnswer = hostBookings.filter((b) => b.status === "paid" && !bookingStarted(b));
-  const upcoming = hostBookings.filter(
-    (b) => !toAnswer.includes(b) && (b.status === "paid" || b.status === "confirmed") && !bookingFinished(b),
-  );
-  const past = hostBookings.filter((b) => !toAnswer.includes(b) && !upcoming.includes(b));
+  // 🗂세 무리 — 정렬(`hostOrder`)·카드 색(`tone`)과 같은 판정 한 벌(`lib/rent-groups`). `/my`의 숫자 세 칸도 이걸 센다.
+  const { toAnswer, upcoming, past } = groupHostBookings(hostBookings);
   const openSpaces = mySpaces.filter((sp) => sp.status === "open").length;
 
   // 🃏09-18 대표 코멘트 #63 — 「여기 영역도 UI 조정이 필요한데 지금 그냥 텍스트 나열처럼만 보인다」.
@@ -188,10 +187,11 @@ export default async function MyRentPage({
       const sp = spaceById.get(b.spaceId);
       const open = isRevealed(b);
       const brief = guestBriefs.get(b.guestUserId);
-      const answerable = b.status === "paid" && !bookingStarted(b);
+      // 무리 판정(`toAnswer`·`upcoming`·`past`)과 같은 함수. 따로 적으면 레몬 칸이 엉뚱한 무리에 선다.
+      const tone: RowTone = hostBookingGroup(b);
+      // 답할 수 있나 = «답을 기다려요» 무리(결제 완료·이용 시작 전). 수락·거절 버튼과 손님 한 줄이 이걸 본다.
+      const answerable = tone === "answer";
       const finished = bookingFinished(b);
-      // 무리 판정(`toAnswer`·`upcoming`·`past`)과 같은 식. 한쪽만 고치면 레몬 칸이 엉뚱한 무리에 선다.
-      const tone: RowTone = answerable ? "answer" : (b.status === "paid" || b.status === "confirmed") && !finished ? "upcoming" : "past";
       const masked = b.status === "done" || finished;
       const brandName = b.guestBrandSlug ? guestBrands.get(b.guestBrandSlug) : undefined;
       const refundAskable = b.status === "confirmed" || (b.status === "paid" && bookingStarted(b));
@@ -573,14 +573,8 @@ export default async function MyRentPage({
                     · 취소·환불 = 손님 취소·사장님 거절·환불, 그리고 결제 안 한 채 끝난 신청(만료·날짜 지난 결제 전)
                   칩은 주소(`?g=`)로 나눠 새로고침해도 같은 칸이다. 기본은 «예약 완료». */}
               {(() => {
-                const upcomingG = guestBookings.filter(({ booking: x }) =>
-                  ((x.status === "paid" || x.status === "confirmed") && !bookingFinished(x)) ||
-                  (x.status === "pending" && !bookingStarted(x)),
-                );
-                const pastG = guestBookings.filter(({ booking: x }) =>
-                  x.status === "done" || ((x.status === "paid" || x.status === "confirmed") && bookingFinished(x)),
-                );
-                const cancelG = guestBookings.filter((v) => !upcomingG.includes(v) && !pastG.includes(v));
+                // 나누는 판정은 `lib/rent-groups`의 `groupGuestBookings` 한 벌 — `/my`의 「빌린 예약」 숫자가 «예약 완료» 칸을 센다.
+                const { upcoming: upcomingG, past: pastG, cancel: cancelG } = groupGuestBookings(guestBookings, (v) => v.booking);
                 const views = [
                   { key: "upcoming", label: "예약 완료", list: upcomingG, empty: "다가오는 예약이 없어요." },
                   { key: "past", label: "지난 예약", list: pastG, empty: "다녀온 예약이 아직 없어요." },
@@ -631,8 +625,9 @@ export default async function MyRentPage({
 
 // ─── 들어온 요청 카드의 머리 (09-18 대표 코멘트 #63) ───
 
-/** 카드가 어느 무리에 서나 — 답할 것 / 다가오는 예약 / 지난 요청. 모양(레몬 칸·흐린 글자)이 이걸로 갈린다. */
-type RowTone = "answer" | "upcoming" | "past";
+/** 카드가 어느 무리에 서나 — 답할 것 / 다가오는 예약 / 지난 요청. 모양(레몬 칸·흐린 글자)이 이걸로 갈린다.
+ *  무리 이름은 판정 한 벌(`lib/rent-groups`)의 것을 그대로 쓴다. */
+type RowTone = HostBookingGroup;
 
 /** 이용일까지 남은 날 한 토막. 답할 카드와 다가오는 카드에만 붙인다(지난 카드는 날짜 칸이 이미 말한다).
  *  ⭐오늘·내일은 레몬 글자 — 답할 시간이 곧 닫힌다는 뜻이라 날짜 칸을 읽기 전에 눈에 걸려야 한다.

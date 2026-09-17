@@ -2,8 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { sweepBookings } from "@/lib/spaces";
 import { getSessionUserId } from "@/lib/profiles";
-import { bookingFinished } from "@/lib/rent-time";
-import type { BookingStatus } from "@/lib/types";
+import { groupGuestBookings } from "@/lib/rent-groups";
 import { GuestBookingRow, loadGuestBookings, type GuestBookingView } from "../GuestBookingRow";
 import { primaryBtnCls } from "../ui";
 import { KAKAO_CHAT_URL } from "@/lib/site";
@@ -13,8 +12,9 @@ import { KAKAO_CHAT_URL } from "@/lib/site";
 // 🩸전엔 손님이 자기 신청을 보려면 `/rent/my`로 갔다. 거기는 사장님 화면이라 내가 올린 공간과 받은 신청
 //   두 덩이를 지나야 자기 것이 나왔다. 대표: *「신청 내역 정리 페이지 만들어서 그쪽으로 보내자」*.
 // ⭐줄은 `/rent/my`와 **같은 한 벌**(`../GuestBookingRow`)을 쓴다. 이 화면이 새로 정하는 건 순서와 나눔뿐이다.
-// ⏱나눔의 시간 판정은 `lib/rent-time`의 `bookingFinished` 한 벌로 한다. 여기서 날짜를 따로 비교하면
-//   「다녀왔어요」로 넘기는 기준과 이 화면의 「지난 신청」 기준이 언젠가 갈라진다.
+// 🗂나눔의 판정도 `/rent/my` 빌린 공간 칸과 한 벌이다(`lib/rent-groups`, 09-18 밤 QA SC-14). 그쪽 «예약 완료»가 여기 「앞으로 갈 곳」이고,
+//   나머지(지난 예약·취소·환불)를 「지난 신청」으로 묶는다.
+//   🩸전엔 여기서 따로 적어서, 이용 시각이 이미 시작된 결제 전 신청이 이 화면엔 「앞으로 갈 곳」, `/rent/my`엔 「취소·환불」로 섰다.
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
@@ -26,9 +26,6 @@ export const metadata: Metadata = {
 };
 
 const h2Cls = "text-[21px] font-bold leading-snug tracking-tight text-ink";
-
-/** 더 이상 움직이지 않는 상태. 날이 남았어도 거절·취소된 신청은 「지난 신청」으로 내린다. */
-const CLOSED: BookingStatus[] = ["rejected", "refunded", "cancelled", "done", "expired"];
 
 /** 정렬 열쇠 — 날짜 + 시작 시각. 둘 다 고정폭 글자라 문자열 비교로 순서가 맞다. */
 const whenKey = (v: GuestBookingView) => `${v.booking.useDate} ${v.booking.startTime ?? ""}`;
@@ -57,14 +54,14 @@ export default async function RentRequestsPage() {
 
   const all = await loadGuestBookings(uid);
   // 다가오는 것은 가까운 날부터(다음에 챙길 것이 맨 위), 지난 것은 최근 것부터.
+  //   거절·취소된 신청은 날이 남았어도 「지난 신청」이다(더 움직이지 않는다) — 판정은 `groupGuestBookings`가 한다.
+  const { upcoming: ahead } = groupGuestBookings(all, (v) => v.booking);
   const past = all
-    .filter((v) => CLOSED.includes(v.booking.status) || bookingFinished(v.booking))
+    .filter((v) => !ahead.includes(v))
     .sort((a, b) => whenKey(b).localeCompare(whenKey(a)));
   const expired = past.filter((v) => v.booking.status === "expired");
   const pastKept = past.filter((v) => v.booking.status !== "expired");
-  const upcoming = all
-    .filter((v) => !past.includes(v))
-    .sort((a, b) => whenKey(a).localeCompare(whenKey(b)));
+  const upcoming = ahead.sort((a, b) => whenKey(a).localeCompare(whenKey(b)));
 
   return (
     <main className="mx-auto w-full max-w-[720px] px-4 pt-8 pb-16 sm:px-6 sm:pt-12">

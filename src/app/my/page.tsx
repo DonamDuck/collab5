@@ -23,7 +23,7 @@ import { BRIEFS } from "@/lib/brief-samples/registry";
 import { listBriefsByOwner } from "@/lib/briefs";
 import { DEV_OWNED_SLUGS } from "@/lib/dev-session";
 import { listBookingsForGuest, listBookingsForHost, listSpacesByOwner } from "@/lib/spaces";
-import { bookingFinished, bookingStarted } from "@/lib/rent-time";
+import { groupGuestBookings, groupHostBookings } from "@/lib/rent-groups";
 
 // 🚨 로그인 사용자별 화면이라 절대 프리렌더되면 안 된다.
 // 쿠키 접근으로 자동 dynamic이 되긴 하지만, 그 판정이 "빌드 시점에 auth env가 있느냐"에 달려 있어
@@ -55,13 +55,14 @@ export default async function MyPage({ searchParams }: { searchParams: Promise<{
   const [rentSpaces, rentHostBookings, rentGuestBookings] = profile
     ? await Promise.all([listSpacesByOwner(profile.id), listBookingsForHost(profile.id), listBookingsForGuest(profile.id)])
     : [[], [], []];
-  const rentToAnswer = rentHostBookings.filter((b) => b.status === "paid" && !bookingStarted(b)).length;
-  const rentUpcoming = rentHostBookings.filter(
-    (b) => (b.status === "paid" || b.status === "confirmed") && !bookingFinished(b),
-  ).length;
-  const rentMyTrips = rentGuestBookings.filter(
-    (b) => (b.status === "paid" || b.status === "confirmed") && !bookingFinished(b),
-  ).length;
+  // 🔢숫자는 `/rent/my`와 같은 판정 한 벌(`lib/rent-groups`)로 센다(09-18 밤 QA SC-14).
+  //   🩸전엔 여기서 따로 적어서 「다가오는 예약」에 답할 새 요청까지 들어갔고(목 host-full 3 vs 2),
+  //   「빌린 예약」은 이어서 결제할 수 있는 신청을 빼서 `/rent/my`의 «예약 완료» 칸과 달랐다(guest-full 3 vs 4).
+  const rentHost = groupHostBookings(rentHostBookings);
+  const rentToAnswer = rentHost.toAnswer.length;
+  const rentUpcoming = rentHost.upcoming.length;
+  // 「빌린 예약」 = `/rent/my?tab=guest`가 처음 여는 «예약 완료» 칸의 수.
+  const rentMyTrips = groupGuestBookings(rentGuestBookings, (b) => b).upcoming.length;
   // 큰 칸의 기본: 답할 새 요청이 있으면 하루 가게, 아니면 소개서·콜라보. 주소(`?area=`)가 있으면 그게 이긴다.
   //   소개서 안쪽 탭(`?tab=`)으로 들어온 주소는 소개서 칸을 연다.
   const area: "brand" | "rent" =
@@ -305,7 +306,7 @@ export default async function MyPage({ searchParams }: { searchParams: Promise<{
 
       {area === "rent" && (
         <section className="mt-6">
-          {/* 숫자 세 칸 — `/rent/my` 첫 화면의 숫자와 같은 판정이다(새 요청 = 결제 완료·시작 전). */}
+          {/* 숫자 세 칸 — `/rent/my`의 숫자와 같은 판정 한 벌(`lib/rent-groups`)이다. 새 요청·다가오는 예약은 빌려준 공간 칸, 빌린 예약은 빌린 공간 칸의 «예약 완료». */}
           <div className="grid grid-cols-3 gap-2 sm:gap-3">
             {[
               { href: "/rent/my?tab=host", n: rentToAnswer, label: "새 요청", hot: rentToAnswer > 0 },
