@@ -33,7 +33,7 @@ import { pendingBookingProblem, validateBookingRequest } from "./rent-booking-ru
 import { refundAmount } from "./rent-money";
 import {
   CAPACITY_MAX, COFFEE_CHAT_MINUTES_MAX, COFFEE_CHAT_MINUTES_MIN, COFFEE_CHAT_MINUTES_STEP, COFFEE_CHAT_PRICE_MAX,
-  CONTACT_PHONE_MAX, HOST_MESSAGE_MAX, MIN_HOURS_MAX, PLAN_MAX, PRICE_HOUR_MAX, storePhoneOk,
+  CONTACT_PHONE_MAX, HOST_MESSAGE_MAX, MIN_HOURS_MAX, PHOTOS_MAX, PLAN_MAX, PRICE_HOUR_MAX, storePhoneOk,
 } from "./rent-limits";
 import { geocode } from "./geocode";
 import { repo } from "./repo";
@@ -107,6 +107,21 @@ function makeSlug(name: string): string {
 function randomTail(n: number): string {
   const abc = "0123456789abcdefghijklmnopqrstuvwxyz";
   return Array.from(crypto.getRandomValues(new Uint8Array(n)), (b) => abc[b % 36]).join("");
+}
+
+/** 📸공간 사진으로 받을 주소의 앞부분 — **우리 저장소의 하루 가게 폴더**만 (09-18 밤 QA SC-20·H-17).
+ *  등록 폼이 부르는 `uploadPhoto(파일, 1200, "rent")`가 만드는 모양 그대로다:
+ *  `createUploadUrlAction`이 버킷 `maker-photos`의 `rent/p/{uuid}.jpg`에 서명 URL을 내주고, 공개 주소는 그 경로 앞에
+ *  `{프로젝트}/storage/v1/object/public/`이 붙는다(supabase-js `getPublicUrl`). */
+function rentPhotoPrefix(): string {
+  const base = (process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || "").trim();
+  return base ? `${base.replace(/\/+$/, "")}/storage/v1/object/public/maker-photos/rent/` : "";
+}
+
+/** 그 주소가 우리가 만든 사진인가. 꼬리는 `p/{uuid}.jpg` 한 모양뿐이다. */
+function rentPhotoOk(url: string, prefix: string): boolean {
+  if (!prefix || typeof url !== "string" || !url.startsWith(prefix)) return false;
+  return /^p\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.jpg$/.test(url.slice(prefix.length));
 }
 
 /** 새 공간 slug가 겹쳤을 때 다시 뽑는 횟수. 난수 여섯 자리라 두 번째에서 끝나는 게 보통이다. */
@@ -247,15 +262,24 @@ export async function saveSpaceAction(input: SpaceFormInput): Promise<ActionResu
   }
 
   // 수정이면 주인 확인부터. ⚠️입력에 실린 slug를 믿지 않고 DB에서 소유자를 다시 읽는다.
+  //   ⭐아래 검사들이 다 이 «전 모습»을 본다(사진·이름·주소·사업자). 09-18 밤에 같은 행을 두 번 읽던 것을 한 번으로 합쳤다.
+  const prev = input.slug ? await getSpaceFull(input.slug) : null;
   if (input.slug) {
-    const cur = await getSpaceFull(input.slug);
-    if (!cur) return { ok: false, message: "그 공간을 찾지 못했어요." };
-    if (cur.ownerUserId !== uid) return { ok: false, message: "내 공간만 고칠 수 있어요." };
+    if (!prev) return { ok: false, message: "그 공간을 찾지 못했어요." };
+    if (prev.ownerUserId !== uid) return { ok: false, message: "내 공간만 고칠 수 있어요." };
   }
 
-  // 📍주소가 «바뀔 때만» 좌표를 다시 잰다(대표 09-14 지도 요청). 유료 호출이라 매번 부르지 않고,
-  //   실패해도 저장은 그대로 간다 — 지도는 있으면 좋은 것이지 올리기를 막을 것이 아니다.
-  const prev = input.slug ? await getSpaceFull(input.slug) : null;
+  // 📸09-18 밤 QA(SC-20·H-17·H-24) — 장수와 주소를 서버가 본다. 전엔 아무 https 주소(남의 서버·data URL)나 받았고 12장도 들어갔다.
+  //   ⭐이미 저장돼 있던 사진은 그대로 다시 보낼 수 있다 — 옛 사진 때문에 공간 고치기가 통째로 막히면 안 된다.
+  if (input.photos.length > PHOTOS_MAX) {
+    return { ok: false, field: "photos", message: `사진은 ${PHOTOS_MAX}장까지 올릴 수 있어요. 몇 장만 빼 주세요.` };
+  }
+  const keptPhotos = new Set(prev?.photos ?? []);
+  const photoPrefix = rentPhotoPrefix();
+  if (input.photos.some((u) => !keptPhotos.has(u) && !rentPhotoOk(u, photoPrefix))) {
+    return { ok: false, field: "photos", message: "사진을 다시 올려 주세요." };
+  }
+
   // 🔁09-16 대표 — **고쳐도 공개가 유지된다.** 다시 검토받는 건 «가게가 바뀌는» 둘뿐이다: 매장 이름과 주소.
   const renamed = !!prev && prev.name.trim() !== input.name.trim();
   const moved = !!prev && prev.address.trim() !== input.address.trim();
@@ -331,6 +355,8 @@ export async function saveSpaceAction(input: SpaceFormInput): Promise<ActionResu
     }
   }
 
+  // 📍주소가 «바뀔 때만» 좌표를 다시 잰다(대표 09-14 지도 요청). 유료 호출이라 매번 부르지 않고,
+  //   실패해도 저장은 그대로 간다 — 지도는 있으면 좋은 것이지 올리기를 막을 것이 아니다.
   // 🩸09-18 밤 QA(SC-17) — 주소를 바꿨는데 지오코딩이 실패하면 «옛 좌표»가 그대로 남아 지도 핀이 옛 자리를 가리켰다.
   //   그 옛 좌표로 네이버 상호 매칭까지 돌아서 엉뚱한 가게가 붙을 수 있었다. 이제 실패하면 좌표를 비운다(핀이 없는 게 낫다).
   let lat = prev?.lat;

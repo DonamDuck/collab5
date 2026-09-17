@@ -12,6 +12,9 @@ export const HOST_MESSAGE_MAX = 500;
 /** 매장 전화 칸 글자 수(하이픈·괄호·띄어쓰기 포함). 가장 긴 모양 `0507-1234-5678`도 14자다. */
 export const CONTACT_PHONE_MAX = 20;
 
+/** 📸공간 사진 장수 — 등록 폼의 사진 격자(`PhotoGrid max`)와 같은 숫자다(09-18 밤 QA H-24·SC-20). */
+export const PHOTOS_MAX = 10;
+
 /** 💰시간당 값 상한 — **대표 판단용 추천값**(09-18 밤 QA H-13). 상한이 없어서 큰 수를 넣으면 칸(`integer`)을 넘겨
  *  「저장에 실패했어요」로만 떨어졌고, 사장님은 어디가 문제인지 알 수 없었다. 화면과 서버가 같은 숫자를 쓴다. */
 export const PRICE_HOUR_MAX = 1_000_000;
