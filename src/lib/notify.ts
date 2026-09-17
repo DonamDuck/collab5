@@ -11,6 +11,7 @@
 // 발송은 Resend REST API를 fetch로 직접 친다. `resend` 패키지를 안 쓰는 이유:
 // 요청이 POST 한 방이라 의존성을 늘릴 이유가 없고, 번들도 안 커진다.
 import { kstIso } from "./time";
+import { rentMockOn } from "./rent-mock";
 
 const RESEND_ENDPOINT = "https://api.resend.com/emails";
 
@@ -49,18 +50,9 @@ function kstReadable(): string {
   return kstIso().slice(0, 16).replace("T", " ");
 }
 
-/**
- * 새 가입 알림을 대표에게 보낸다.
- *
- * 성공/실패 여부를 boolean으로 돌려주지만 **호출부가 무시해도 된다** — 로깅용이다.
- * RESEND_API_KEY나 ADMIN_EMAIL이 없으면 아무것도 안 하고 false를 준다(정상 상황).
- */
-export async function notifySignup(n: SignupNotice): Promise<boolean> {
-  const apiKey = process.env.RESEND_API_KEY;
-  const to = process.env.ADMIN_EMAIL;
-  // 키 미설정 = 아직 안 켰다는 뜻. 에러로 취급하지 않는다.
-  if (!apiKey || !to) return false;
-
+/** 가입 알림 한 통의 제목·본문. 보내는 함수와 개발용 미리보기(`/dev/rent-mail/signup-*`)가 같이 쓴다(09-18).
+ *  ⭐미리보기가 따로 글을 만들면 보이는 글과 가는 글이 갈라진다. 그래서 글 만들기를 여기 하나로 뺐다. */
+export function buildSignupMail(n: SignupNotice): { subject: string; text: string; html: string } {
   const when = kstReadable();
   const originLabel = ORIGIN_LABEL[n.origin];
   const idText = n.userId === null ? "(조회 실패)" : `#${n.userId}`;
@@ -89,6 +81,23 @@ export async function notifySignup(n: SignupNotice): Promise<boolean> {
     <tr><td style="padding:4px 16px 4px 0;color:#666">가입 시각</td><td style="padding:4px 0">${esc(when)} <span style="color:#888">(KST)</span></td></tr>
   </table>
 </div>`;
+  return { subject, text, html };
+}
+
+/**
+ * 새 가입 알림을 대표에게 보낸다. 글은 `buildSignupMail`이 만든다.
+ *
+ * 성공/실패 여부를 boolean으로 돌려주지만 **호출부가 무시해도 된다** — 로깅용이다.
+ * RESEND_API_KEY나 ADMIN_EMAIL이 없으면 아무것도 안 하고 false를 준다(정상 상황).
+ */
+export async function notifySignup(n: SignupNotice): Promise<boolean> {
+  // 🧪09-18 목 데이터 보기 중(개발 빌드 전용)엔 보내지 않는다. 첫 울타리는 가입 액션 첫 줄.
+  if (await rentMockOn()) return false;
+  const apiKey = process.env.RESEND_API_KEY;
+  const to = process.env.ADMIN_EMAIL;
+  // 키 미설정 = 아직 안 켰다는 뜻. 에러로 취급하지 않는다.
+  if (!apiKey || !to) return false;
+  const { subject, text, html } = buildSignupMail(n);
 
   try {
     const res = await fetch(RESEND_ENDPOINT, {

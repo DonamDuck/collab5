@@ -2037,19 +2037,30 @@ function pickProvider(): SearchProvider {
   if (process.env.ANTHROPIC_API_KEY?.startsWith("sk-ant")) return new ClaudeSearchProvider();
   return new MockSearchProvider();
 }
-const provider: SearchProvider = pickProvider();
+const realProvider: SearchProvider = pickProvider();
+
+/** 🧪09-18 목 데이터 보기 중(개발 빌드 전용)이면 키가 있어도 Mock 검색단으로 간다. 외부 AI(Gemini·Claude)는 유료다.
+ *  첫 울타리는 `/api/enrich` 라우트 첫 줄이고 여기가 두 번째다. `rent-mock`을 늦게 불러오는 이유 = 이 파일은
+ *  위저드(클라이언트)가 타입을 가져가는 파일이라, 서버 전용 모듈을 맨 위에서 끌어오지 않으려고. */
+async function live(): Promise<SearchProvider> {
+  const { rentMockOn } = await import("./rent-mock");
+  return (await rentMockOn()) ? new MockSearchProvider() : realProvider;
+}
 
 export async function enrichLookup(query: string, hintUrl?: string): Promise<EnrichResult> {
+  const provider = await live();
   return { candidates: await provider.lookup(query, hintUrl) };
 }
 
 /** 재크롤링 — provider가 지원하면 더 풍부한 단일 후보, 아니면 null. */
 export async function enrichRecrawl(input: RecrawlInput): Promise<EnrichCandidate | null> {
+  const provider = await live();
   return provider.recrawl ? provider.recrawl(input) : null;
 }
 
 /** 소개 초안 5지선다 — provider가 지원하면 AI 생성, 아니면 규칙 기반 1개. */
 export async function enrichDraft(input: DraftInput): Promise<string[]> {
+  const provider = await live();
   if (provider.draft) return provider.draft(input);
   const bits: string[] = [];
   if (input.oneLiner?.trim()) bits.push(input.oneLiner.trim().replace(/[.\s]*$/, "."));
@@ -2061,6 +2072,7 @@ export async function enrichDraft(input: DraftInput): Promise<string[]> {
 
 /** 한 줄 소개 후보 3개(초안받기 2스텝용) — provider가 지원하면 AI 생성, 아니면 규칙 기반. 각 40자 이내. */
 export async function enrichOneLiners(input: DraftInput): Promise<string[]> {
+  const provider = await live();
   if (provider.oneLiners) return provider.oneLiners(input);
   // 규칙 기반 폴백 — ruleDraft 스타일 후보
   const name = input.name.trim() || "우리 브랜드";
@@ -2078,6 +2090,7 @@ export async function enrichOneLiners(input: DraftInput): Promise<string[]> {
 export async function enrichDraftBoth(
   input: DraftInput
 ): Promise<{ oneLiners: string[]; descriptions: string[]; researchMemo?: string }> {
+  const provider = await live();
   if (provider.draftBoth) return provider.draftBoth(input);
   const oneLiners = await enrichOneLiners(input);
   const descriptions = await enrichDraft(input);
@@ -2099,6 +2112,7 @@ export function ownerNoteCovered(note: string, texts: string[]): boolean {
 }
 
 export async function enrichRegenDescriptions(input: RegenDescInput): Promise<string[]> {
+  const provider = await live();
   if (provider.regenDescriptions) return provider.regenDescriptions(input);
   const ol = input.chosenOneLiner.trim();
   return ol ? [`${ol.replace(/[.\s]*$/, "")}. 저희다운 방식으로 꾸준히 이어가고 있어요.`] : [];
@@ -2110,11 +2124,13 @@ export async function enrichResearch(
   region?: string,
   businessType?: string
 ): Promise<string> {
+  const provider = await live();
   return provider.research ? provider.research(name, region, businessType) : "";
 }
 
 /** 조사 메모 + 가중 키워드 → 한줄소개·브랜드소개 5지선다. */
 export async function enrichOptions(input: OptionsInput): Promise<EnrichOptions | null> {
+  const provider = await live();
   return provider.options ? provider.options(input) : null;
 }
 

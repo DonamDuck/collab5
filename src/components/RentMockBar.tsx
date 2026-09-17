@@ -1,9 +1,9 @@
 "use client";
 
-// 🧪하루 가게 목 데이터 띠 (2026-09-17) · 개발 빌드 전용
+// 🧪목 데이터 띠 (2026-09-17 하루 가게 → 09-18 사이트 전체) · 개발 빌드 전용
 //
-// 목 쿠키가 켜져 있는 동안 모든 화면 위에 뜬다. `getSessionUserId`가 사이트 전체에서 가상 사용자를 돌려주므로,
-//   하루 가게 밖 화면(내 소개서 등)이 이상해 보여도 「목 데이터라서」라는 걸 바로 알게 하려고.
+// 목 쿠키가 켜져 있는 동안 모든 화면 위에 뜬다. 세션·소개서·매거진까지 사이트 전체가 가상 데이터로 보이므로,
+//   진짜 화면으로 착각하지 않게 하려고.
 // 🎨화면 구성을 보러 온 사람을 가리지 않게 왼쪽 아래 작은 알약으로 두고, 눌러서 접을 수 있다.
 //   하단 고정 신청 바(`BookingForm`) 위로 올려 둔다.
 // 서버 쪽 판정은 `RentMockBarSlot`이 한다. 여기는 받은 글자를 그리기만 한다.
@@ -21,10 +21,10 @@ export function RentMockBar({ label }: { label: string }) {
         <div className="flex max-w-[calc(100vw-24px)] flex-wrap items-center gap-x-3 gap-y-1 rounded-lg bg-ink px-3 py-2 text-[13px] leading-snug text-on-dark shadow-lg">
           <span className="font-medium">목 데이터 보는 중</span>
           <span className="min-w-0 break-keep opacity-80">{label}</span>
-          <Link href="/dev/rent-map" className="underline underline-offset-2">
+          <Link href="/dev/map" className="underline underline-offset-2">
             지도로
           </Link>
-          <a href="/dev/rent-mock?off=1" className="underline underline-offset-2">
+          <a href="/dev/mock?off=1" className="underline underline-offset-2">
             끄기
           </a>
           <button type="button" onClick={() => setOpen(false)} aria-label="띠 접기" className="px-1 opacity-70">

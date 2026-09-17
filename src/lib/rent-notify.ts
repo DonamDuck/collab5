@@ -9,6 +9,7 @@
 //
 // 🔗링크 base는 `SITE_URL`이다. 로컬에서 찍히는 링크가 운영 주소인 건 의도한 것 — 메일은 어디서 보내든
 //   받는 사람이 여는 곳은 하나다.
+import { rentMockOn } from "./rent-mock";
 import { KAKAO_CHAT_URL, SITE_URL } from "./site";
 import { bookingWhen, dateLabel } from "./rent-time";
 import {
@@ -109,6 +110,11 @@ export interface MailResult {
  *  ⚠️수신자가 비어 있으면(카카오 가입은 이메일이 없을 수 있다) 보낼 곳이 없으니 스킵. 에러가 아니다. */
 async function send(to: string, subject: string, html: string, text: string): Promise<MailResult> {
   const out: MailResult = { sent: false, subject, html, text };
+  // 🧪09-18 목 데이터 보기 중(개발 빌드 전용)엔 보내지 않는다. 첫 울타리는 `rent-actions.ts` 액션 첫 줄.
+  if (await rentMockOn()) {
+    console.info(`[rent-notify] 스킵(목 데이터 보기 중) · ${subject}`);
+    return out;
+  }
   const apiKey = process.env.RESEND_API_KEY;
   const admin = (process.env.ADMIN_EMAIL ?? "").trim();
   if (!apiKey) {

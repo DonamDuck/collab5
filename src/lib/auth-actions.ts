@@ -5,6 +5,8 @@ import { authEnabled, createAuthClient, getSessionUser } from "./supabase/server
 import { upsertProfile, findDuplicates, getProfile, type DuplicateFlags } from "./profiles";
 import { validatePassword } from "./validation";
 import { notifySignup, type SignupOrigin } from "./notify";
+// 🧪09-18 목 데이터 보기 중(개발 빌드 전용)엔 쓰기 액션이 첫 줄에서 멈춘다(첫 번째 울타리).
+import { MOCK_BLOCKED_MSG, rentMockOn } from "./rent-mock";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://collab5.vercel.app";
 const NO_AUTH_MSG = "로그인 설정이 아직 준비되지 않았어요. (환경변수 미설정)";
@@ -35,6 +37,7 @@ const DUP_MSG = {
 } as const;
 
 export async function signUpAction(input: SignUpInput): Promise<{ error?: string }> {
+  if (await rentMockOn()) return { error: MOCK_BLOCKED_MSG };
   if (!authEnabled()) return { error: NO_AUTH_MSG };
   const pwErr = validatePassword(input.password);
   if (pwErr) return { error: pwErr };
@@ -149,6 +152,7 @@ export async function completeOnboardingAction(input: {
    */
   email?: string;
 }): Promise<{ error?: string }> {
+  if (await rentMockOn()) return { error: MOCK_BLOCKED_MSG };
   if (!authEnabled()) return { error: NO_AUTH_MSG };
   const user = await getSessionUser();
   if (!user) return { error: ONBOARD_EXPIRED };
@@ -210,6 +214,7 @@ export async function signInAction(
   email: string,
   password: string
 ): Promise<{ error?: string }> {
+  if (await rentMockOn()) return { error: MOCK_BLOCKED_MSG };
   if (!authEnabled()) return { error: NO_AUTH_MSG };
   const supabase = await createAuthClient();
   // 🧪로컬 테스트 로그인 (대표 지시 09-13) — 폼에 `collab5`/`collab5`를 치면 테스트 계정으로 들어간다.
@@ -239,6 +244,8 @@ export async function signInAction(
 }
 
 export async function signOutAction(): Promise<void> {
+  // 🧪09-18 목 데이터 보기 중엔 브라우저의 진짜 로그인을 건드리지 않는다. 목 케이스를 끄려면 띠의 「끄기」.
+  if (await rentMockOn()) redirect("/");
   if (authEnabled()) {
     const supabase = await createAuthClient();
     await supabase.auth.signOut();
@@ -247,6 +254,7 @@ export async function signOutAction(): Promise<void> {
 }
 
 export async function requestPasswordResetAction(email: string): Promise<{ error?: string }> {
+  if (await rentMockOn()) return { error: MOCK_BLOCKED_MSG };
   if (!authEnabled()) return { error: NO_AUTH_MSG };
   const supabase = await createAuthClient();
   const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {

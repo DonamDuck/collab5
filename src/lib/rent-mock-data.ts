@@ -29,6 +29,8 @@ export interface MockViewer {
   /** null = 로그인 안 한 사람 */
   userId: number | null;
   admin: boolean;
+  /** 매거진 편집자인가(09-18 사이트 지도). 없으면 아니다. `magazine-auth.ts`가 목 모드에서 이 값만 본다. */
+  editor?: boolean;
 }
 
 export interface MockCaseDef {
@@ -44,6 +46,8 @@ export interface MockCaseDef {
 export const MOCK_USER = {
   host: 9001, guest: 9002, admin: 9003, host2: 9004,
   stressHost: 9005, stressGuest: 9006, guest2: 9007, minHost: 9008, minGuest: 9009,
+  /** 09-18 사이트 지도 — 가입만 하고 브랜드명을 비워 둔 새 회원(09-17부터 가입 브랜드명이 선택이다). */
+  newbie: 9010,
 } as const;
 
 /** 목 사용자 번호의 하한. 이보다 작으면 실제 DB로 보낸다(`profiles.ts`·`repo.ts`). */
@@ -66,6 +70,12 @@ export const MOCK_CASES: MockCaseDef[] = [
   { id: "stress-admin", label: "긴 글 · 관리자로 보기", viewer: { userId: MOCK_USER.admin, admin: true }, world: "stress" },
   { id: "minimal-guest", label: "최소 입력 · 손님으로 보기", viewer: { userId: MOCK_USER.minGuest, admin: false }, world: "minimal" },
   { id: "minimal-host", label: "최소 입력 · 사장님으로 보기", viewer: { userId: MOCK_USER.minHost, admin: false }, world: "minimal" },
+  // 🗺09-18 사이트 전체 지도(`/dev/map`)가 더한 케이스. 세계는 하루 가게와 같고, 소개서·매거진·찜·리포트 층은
+  //   `site-mock-data.ts`가 그 위에 얹는다. 같은 가상 인물(느린오후·밀가루 일기)이 두 서비스에 이어서 나온다.
+  { id: "member-full", label: "브랜드 회원 · 소개서 셋, 찜·리포트·성사 기록·요약 리포트 있음", viewer: { userId: MOCK_USER.host, admin: false }, world: "full" },
+  { id: "member-new", label: "새 회원 · 브랜드명 비움, 소개서 없음", viewer: { userId: MOCK_USER.newbie, admin: false }, world: "full" },
+  { id: "editor", label: "매거진 편집자 · 초안까지 보임", viewer: { userId: MOCK_USER.admin, admin: true, editor: true }, world: "full" },
+  { id: "stress-editor", label: "긴 글 · 매거진 편집자로 보기", viewer: { userId: MOCK_USER.admin, admin: true, editor: true }, world: "stress" },
 ];
 
 function profile(id: number, brandName: string, phone: string, email: string): Profile {
@@ -75,7 +85,7 @@ function profile(id: number, brandName: string, phone: string, email: string): P
 // ─── 사진 ───
 
 /** 색면 사진 한 장. 비율을 섞어 두면 슬라이더·커버가 세로 사진에서 어떻게 잘리는지도 같이 본다. */
-function photo(label: string, hue: number, w = 1200, h = 800): string {
+export function photo(label: string, hue: number, w = 1200, h = 800): string {
   const svg =
     `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">` +
     `<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">` +
@@ -168,7 +178,7 @@ function payment(
 
 // ─── 소개서 ───
 
-function maker(p: Pick<Maker, "id" | "slug" | "name" | "oneLiner" | "ownerUserId"> & Partial<Maker>): Maker {
+export function maker(p: Pick<Maker, "id" | "slug" | "name" | "oneLiner" | "ownerUserId"> & Partial<Maker>): Maker {
   return {
     region: "서울", offers: ["팝업", "워크숍"], seeks: ["공동콘텐츠"], targetAudience: [],
     collabHistory: [], description: "", story: "", activities: [], offersDescription: "", seeksDescription: "",

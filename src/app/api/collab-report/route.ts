@@ -14,6 +14,7 @@ import { generateDna, generateReport, isDnaStale, isMyBrandEditedSince, isReport
 import { logTotal, type CallMeter } from "@/lib/ai-cost";
 import { distinctTypeCount } from "@/lib/dna-pool";
 import type { BrandDna, Maker } from "@/lib/types";
+import { rentMockOn } from "@/lib/rent-mock";
 
 // 무거운 AI 호출=라우트(enrich 관례): DNA 최대 2콜 + 리포트 1콜 여유
 export const maxDuration = 60;
@@ -123,6 +124,10 @@ export async function POST(req: Request) {
           : { stale: isMyBrandEditedSince(latest, cachedFromDna, from) ? "mine" : "other" }),
       });
     }
+
+    // 🧪09-18 목 데이터 보기 중(개발 빌드 전용)엔 여기서 멈춘다. 위 ④의 저장본 읽기까지만 하고 DNA·리포트(Gemini, 유료)는
+    //   절대 안 만든다. 두 번째 울타리는 `generateDna`·`generateReport` 첫 줄. 화면은 「disabled」를 받아 실패 안내를 띄운다.
+    if (await rentMockOn()) return NextResponse.json({ error: "disabled" }, { status: 503 });
 
     // ⑤ DNA 확보(양쪽 병렬, stale만 재생성 — 소개서 '내용 지문' 변화 + DNA_REFRESH_BEFORE 기준)
     //   ④에서 이미 읽어 둔 내 DNA는 다시 읽지 않는다(같은 요청 안에서 중복 조회 제거).

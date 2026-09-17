@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { BRIEFS, BRIEF_BY_SLUG, type BriefSample } from "./brief-samples/registry";
+import { getRentMock } from "./rent-mock";
 
 // 브리프 읽기 (2026-09-14) — 설계 `docs/superpowers/specs/2026-09-14-brief-page-design.md`
 //
@@ -64,6 +65,9 @@ function toBrief(r: {
  *    ⭐고친 규칙 = **표가 «있으면» 표의 답이 최종이다.** 목록은 표가 «아직 없을 때»만 쓴다.
  *    🪤화면이 200을 주고 있어서 겉으론 멀쩡했다 — 한 줄을 draft로 내려 보고서야 알았다. */
 export async function getBrief(slug: string): Promise<Brief | null> {
+  // 🧪09-18 목 데이터(개발 빌드 전용) — 목 세계의 가상 브리프만. 실제 고객 브리프(코드 안 목록)로 떨어지지 않는다.
+  const mock = await getRentMock();
+  if (mock) return mock.data.briefs.find((b) => b.slug === slug) ?? null;
   const client = db();
   if (client) {
     const { data, error } = await client
@@ -83,6 +87,8 @@ export async function getBrief(slug: string): Promise<Brief | null> {
 /** 이 사람 것으로 «연결된» 브리프들. `/my`의 요약 보고서 절이 쓴다.
  *  ⚠️표가 없으면 빈 목록이다 — 연결이라는 개념 자체가 표에만 있어서, 목록으로 흉내 내면 거짓이 된다. */
 export async function listBriefsByOwner(userId: number): Promise<Brief[]> {
+  const mock = await getRentMock();
+  if (mock) return mock.data.briefs.filter((b) => b.ownerUserId === userId);
   const client = db();
   if (!client) return [];
   const { data, error } = await client

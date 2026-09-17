@@ -4,8 +4,7 @@
 // 앱은 세션의 auth UUID(authUuid)로 조회한다.
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { getSessionUser } from "./supabase/server";
-import { getRentMock, rentMockOn } from "./rent-mock";
-import { MOCK_USER_MIN } from "./rent-mock-data";
+import { getRentMock, rentMockOn, throwIfMock } from "./rent-mock";
 
 export interface Profile {
   id: number; // 정수 user_id (1,2,3)
@@ -33,6 +32,7 @@ export async function upsertProfile(p: {
   email: string;
   profileImage: string;
 }): Promise<number | null> {
+  await throwIfMock("upsertProfile"); // 🧪09-18 목 데이터 보기 중엔 쓰지 않는다(두 번째 울타리 — 첫 울타리는 가입 액션)
   const client = db();
   if (!client) return null; // 로컬 mock — DB 없음
   const { data, error } = await client
@@ -67,6 +67,19 @@ export async function findDuplicates(p: {
   excludeUuid?: string;
 }): Promise<DuplicateFlags> {
   const flags: DuplicateFlags = { email: false, phone: false, brandName: false };
+  // 🧪09-18 목 모드 — 가입 화면의 중복 경고를 목 세계 사람들로 띄운다. 느린오후 이메일을 치면 경고가 뜬다.
+  const m = await getRentMock();
+  if (m) {
+    const others = m.data.profiles.filter((x) => x.uuid !== p.excludeUuid);
+    const e = p.email?.trim().toLowerCase();
+    const ph = p.phone?.trim();
+    const b = p.brandName?.trim();
+    return {
+      email: !!e && others.some((x) => x.email.toLowerCase() === e),
+      phone: !!ph && others.some((x) => x.phone === ph),
+      brandName: !!b && others.some((x) => x.brandName === b),
+    };
+  }
   const client = db();
   if (!client) return flags; // 로컬 mock — 중복 없음 취급
 
@@ -97,6 +110,7 @@ export async function findDuplicates(p: {
 
 /** 프로필 사진만 갱신 — /my 프로필 사진 변경용(brandName·phone 등 미변경). */
 export async function updateProfileImage(uuid: string, imageUrl: string): Promise<void> {
+  await throwIfMock("updateProfileImage");
   const client = db();
   if (!client) return; // 로컬 mock
   const { error } = await client.from("users").update({ profile_image: imageUrl }).eq("uuid", uuid);
@@ -106,11 +120,10 @@ export async function updateProfileImage(uuid: string, imageUrl: string): Promis
 /** 정수 user_id로 프로필 조회 — 소개서 소유자 표시(로고 등)용.
  *  세션 → 프로필은 `getProfile(authUuid)`, 소유자 id → 프로필은 이 함수. */
 export async function getProfileById(userId: number): Promise<Profile | null> {
-  // 🧪09-17 하루 가게 목 데이터(개발 빌드 전용). 목 사용자 번호(9000번대)만 가로채고 실제 번호는 DB로 보낸다.
-  if (userId >= MOCK_USER_MIN) {
-    const m = await getRentMock();
-    if (m) return m.data.profiles.find((p) => p.id === userId) ?? null;
-  }
+  // 🧪목 데이터(개발 빌드 전용). 09-17엔 9000번대만 가로챘는데, 09-18 사이트 지도부터는 목 모드면 전부 목 세계를 본다
+  //   (목 모드에서 DB를 한 번도 안 부르게).
+  const m = await getRentMock();
+  if (m) return m.data.profiles.find((p) => p.id === userId) ?? null;
   const client = db();
   if (!client) return null;
   const { data } = await client
@@ -142,6 +155,9 @@ export async function getSessionUserId(): Promise<number | null> {
 }
 
 export async function getProfile(authUuid: string): Promise<Profile | null> {
+  // 🧪09-18 목 모드 — 세션(`getSessionUser`)이 `mock-uuid-<번호>`를 돌려주므로 같은 모양으로 찾는다.
+  const m = await getRentMock();
+  if (m) return m.data.profiles.find((p) => p.uuid === authUuid) ?? null;
   const client = db();
   if (!client) return null;
   const { data } = await client

@@ -1,5 +1,6 @@
 import { getSessionUser } from "./supabase/server";
 import { getProfile } from "./profiles";
+import { getRentMock } from "./rent-mock";
 
 // 매거진 편집 권한 (2026-08-10) — 스펙 = Obsidian [[매거진-기능-개발지시]] §5
 //
@@ -28,6 +29,9 @@ function editorEmails(): string[] {
  *    08-06에 소개서 편집에서 똑같은 구멍(`/register?edit=`로 화면 분기를 건너뜀)이 났다.
  */
 export async function isMagazineEditor(): Promise<boolean> {
+  // 🧪09-18 목 데이터(개발 빌드 전용) — 케이스가 편집자라고 적었을 때만. 편집자 명단 이메일을 목 세계에 넣지 않으려고.
+  const mock = await getRentMock();
+  if (mock) return !!mock.viewer.editor;
   const user = await getSessionUser();
   if (!user) return false;
   // 세션의 이메일을 그대로 믿지 않고 DB(`users`)에서 다시 읽는다 —

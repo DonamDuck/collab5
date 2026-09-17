@@ -4,6 +4,20 @@ import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import type { User } from "@supabase/supabase-js";
 import { devSessionActive, devUser } from "@/lib/dev-session";
+import { getRentMock, type MockCase } from "@/lib/rent-mock";
+
+/** 🧪09-18 목 데이터 — 케이스의 가상 사용자를 세션처럼 돌려준다(개발 빌드 전용, `getRentMock`이 운영에선 null).
+ *  09-17엔 `getSessionUserId`만 가상 사용자였고 헤더·`/my`는 실제 계정이라 둘이 어긋났다. 이제 같은 사람이다.
+ *  `id`는 `mock-uuid-<번호>` — `profiles.ts`의 `getProfile`이 목 모드에서 이 모양으로 찾는다. */
+function mockUser(m: MockCase): User | null {
+  const id = m.viewer.userId;
+  if (id === null) return null;
+  const p = m.data.profiles.find((x) => x.id === id);
+  return {
+    id: `mock-uuid-${id}`, email: p?.email || undefined, aud: "authenticated", role: "authenticated",
+    app_metadata: {}, user_metadata: { brand_name: p?.brandName ?? "" }, created_at: "2026-01-01T00:00:00.000Z",
+  } as unknown as User;
+}
 
 export function authEnabled(): boolean {
   return !!(
@@ -41,6 +55,8 @@ export function isDevSession(): boolean {
 }
 
 export async function getSessionUser(): Promise<User | null> {
+  const mock = await getRentMock();
+  if (mock) return mockUser(mock);
   // 🔒로컬 전용 가짜 로그인 — 진짜 인증이 «설정돼 있으면 절대 안 탄다**(`lib/dev-session.ts` 게이트 참조).
   if (devSessionActive(authEnabled())) return devUser();
   if (!authEnabled()) return null;
@@ -56,6 +72,8 @@ export async function getSessionUser(): Promise<User | null> {
 /** 현재 로그인 유저 — 쿠키의 세션만 읽음(네트워크 없음). 미들웨어가 매 요청 getUser로 이미 검증·갱신하므로
  *  헤더 등 표시용 조회는 이걸로 왕복을 아낀다. (보안 게이트에는 getSessionUser 사용) */
 export async function getSessionUserLight(): Promise<User | null> {
+  const mock = await getRentMock();
+  if (mock) return mockUser(mock);
   // 🔒로컬 전용 가짜 로그인 — 진짜 인증이 «설정돼 있으면 절대 안 탄다**(`lib/dev-session.ts` 게이트 참조).
   if (devSessionActive(authEnabled())) return devUser();
   if (!authEnabled()) return null;
