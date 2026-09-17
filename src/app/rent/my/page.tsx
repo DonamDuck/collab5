@@ -328,9 +328,15 @@ export default async function MyRentPage({
         </div>
         {/* 🏦대표만 보인다. 판정은 `isRentAdmin` 한 벌이고, 정산 화면도 같은 판정으로 다시 막는다. */}
         {admin && (
-          <Link href="/rent/payouts" className="mt-2 inline-block py-[12px] text-[15px] text-mute underline underline-offset-2">
-            정산하기
-          </Link>
+          // 🧾09-18 「검토하기」 — 남이 올린 공간을 공개하는 화면(`/rent/review`). 이 화면의 [공개하기]는 내 공간에만 뜬다.
+          <div className="mt-2 flex gap-5">
+            <Link href="/rent/payouts" className="inline-block py-[12px] text-[15px] text-mute underline underline-offset-2">
+              정산하기
+            </Link>
+            <Link href="/rent/review" className="inline-block py-[12px] text-[15px] text-mute underline underline-offset-2">
+              검토하기
+            </Link>
+          </div>
         )}
       </header>
 
@@ -472,6 +478,15 @@ export default async function MyRentPage({
                   </div>
                 }
               >
+                {/* 🧾09-18 국세청 기록과 달라 공개가 막힌 공간 — 사장님이 떠난 뒤에도 알 수 있게 그 줄에 한 번 더. */}
+                {sp.bizCheckStatus === "mismatch" && (
+                  <p className="mt-2 text-[15px] leading-relaxed break-keep text-lemon-on">
+                    사업자 정보가 국세청 기록과 달라 열어 드리지 못하고 있어요.{" "}
+                    <Link href={`/rent/${sp.slug}/edit#f-biz`} className="underline underline-offset-2">
+                      고치러 가기
+                    </Link>
+                  </p>
+                )}
                 {/* 대표에게만 보이는 손잡이. 남의 등록을 세상에 내보내는 판정이라 화면에도 문을 둔다. */}
                 {admin && sp.status === "pending" && <PublishButton slug={sp.slug} />}
                 {/* ⏸잠시 쉬기 / 다시 열기(09-17). 검토 대기·작성 중엔 안 뜬다 — 서버도 open↔paused만 받는다. */}

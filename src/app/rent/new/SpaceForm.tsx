@@ -19,10 +19,14 @@
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { saveSpaceAction } from "@/lib/rent-actions";
-import { uploadPhoto } from "@/lib/upload";
+import { uploadBizCert, uploadPhoto } from "@/lib/upload";
 import { PhotoGrid } from "@/app/register/PhotoGrid";
 import type { Space, SpaceUseType, SpaceCategory, OpenSlot, AccessHow, RepeatRule } from "@/lib/types";
-import { expandRepeat, hoursBetween, stripRepeat } from "@/lib/rent-time";
+import { expandRepeat, hoursBetween, stripRepeat, todayKst } from "@/lib/rent-time";
+import {
+  BIZ_CERT_MAX_BYTES, BIZ_CERT_TYPES, BIZ_MISMATCH_LINE, bizCertPathOk, bizDigits, bizNumberProblem, formatBizNumber, fromOpenDate,
+  hasAnyBiz, openDateProblem, toOpenDate,
+} from "@/lib/bizcheck";
 import {
   COFFEE_CHAT_LABEL, COFFEE_CHAT_WHEN_HOST, PRODUCT_HINT_HOST, PRODUCT_LABEL, PRODUCT_NOTE_PLACEHOLDER,
 } from "@/lib/rent-copy";
@@ -125,6 +129,8 @@ interface SpaceDraft {
   chatOn: boolean; chatMin: string; chatPrice: number; chatTopics: string;
   openSlots: OpenSlot[]; repeatWeekly: RepeatRule[];
   brandOn: boolean; brandPick: string;
+  /** 🧾09-18 사업자 정보. 개업일은 날짜 칸 모양(`YYYY-MM-DD`)으로 담는다. 등록증은 올린 경로(파일 자체가 아니다). */
+  bizNumber: string; bizOwnerName: string; bizOpenDate: string; bizCertPath: string;
 }
 
 export function SpaceForm({
@@ -204,6 +210,31 @@ export function SpaceForm({
   const [brandPick, setBrandPick] = useState(initial?.brandSlug || defaultBrandSlug || myBrands[0]?.slug || "");
   const brandSlug = brandOn ? brandPick : "";
 
+  // ─── 🧾사업자 정보 (09-18 대표: 공간 등록에 사업자 확인 필수) ───
+  //   규칙은 서버와 같은 함수(`lib/bizcheck`)다. 화면이 먼저 막는 건 왕복을 아끼려는 것이고 관문은 `saveSpaceAction`이다.
+  const [bizNumber, setBizNumber] = useState(initial?.bizNumber ?? "");
+  const [bizOwnerName, setBizOwnerName] = useState(initial?.bizOwnerName ?? "");
+  /** 날짜 칸 모양 `YYYY-MM-DD`. 보낼 때 국세청 모양 `YYYYMMDD`로 바꾼다. */
+  const [bizOpenDate, setBizOpenDate] = useState(fromOpenDate(initial?.bizOpenDate ?? ""));
+  const [bizCertPath, setBizCertPath] = useState(initial?.bizCertPath ?? "");
+  const [certName, setCertName] = useState("");
+  const [certUploading, setCertUploading] = useState(false);
+  const [certErr, setCertErr] = useState("");
+  /** 서버가 사업자 칸에 돌려준 말(국세청 기록과 다름·휴업·폐업)과 «그때의 세 칸». 칸을 고치면 말이 내려간다.
+   *  고치기 화면을 국세청 불일치 공간으로 열면 처음부터 그 말이 서 있다(새로 올리다 불일치면 저장 뒤 이 화면으로 온다). */
+  const bizKey = `${bizDigits(bizNumber)}|${bizOwnerName.trim()}|${bizOpenDate}`;
+  const [bizServer, setBizServer] = useState<{ msg: string; key: string } | null>(() =>
+    initial?.bizCheckStatus === "mismatch"
+      ? { msg: BIZ_MISMATCH_LINE, key: `${initial.bizNumber}|${initial.bizOwnerName.trim()}|${fromOpenDate(initial.bizOpenDate)}` }
+      : null,
+  );
+  const bizServerMsg = bizServer && bizServer.key === bizKey ? bizServer.msg : "";
+  /** 새 공간은 넷 다 필수. 고치기는 옛 공간(09-18 전)이 넷 다 비어 있으면 그대로 저장된다(서버와 같은 판정). */
+  const bizNeeded =
+    !initial || hasAnyBiz(initial) || hasAnyBiz({ bizNumber, bizOwnerName, bizOpenDate, bizCertPath });
+  /** 저장 뒤 사업자 칸만 남았을 때의 한 줄(나머지는 저장됐다는 것). */
+  const [savedNote, setSavedNote] = useState("");
+
   // ─── 💾임시 저장 (새로 올리기만) ───
   const draftKey = !initial && userId ? draftKeyOf(userId) : null;
   /** 아무것도 안 쓴 첫 모습. 지금 폼이 이것과 같으면 초안을 안 남긴다(열어만 봤는데 「불러왔어요」가 뜨면 이상하다). */
@@ -216,6 +247,7 @@ export function SpaceForm({
     chatOn: false, chatMin: "60", chatPrice: 0, chatTopics: "",
     openSlots: [], repeatWeekly: [],
     brandOn: !!defaultBrandSlug, brandPick: defaultBrandSlug || myBrands[0]?.slug || "",
+    bizNumber: "", bizOwnerName: "", bizOpenDate: "", bizCertPath: "",
   }));
   const [draftLoaded, setDraftLoaded] = useState(false);
   const [restored, setRestored] = useState(false);
@@ -235,6 +267,8 @@ export function SpaceForm({
     setBrandOn(d.brandOn);
     // 그새 소개서를 지웠으면 옛 slug를 붙들지 않는다.
     setBrandPick(myBrands.some((b) => b.slug === d.brandPick) ? d.brandPick : blank.brandPick);
+    setBizNumber(d.bizNumber); setBizOwnerName(d.bizOwnerName); setBizOpenDate(d.bizOpenDate); setBizCertPath(d.bizCertPath);
+    setCertName(""); setCertErr("");
   };
 
   // 열 때 한 번 읽는다. ⚠️useState 초기값에서 읽으면 서버 렌더와 모양이 달라 하이드레이션이 깨진다.
@@ -253,6 +287,11 @@ export function SpaceForm({
         if (!Array.isArray(d.facilities)) d.facilities = [];
         if (!Array.isArray(d.openSlots)) d.openSlots = [];
         if (!Array.isArray(d.repeatWeekly)) d.repeatWeekly = [];
+        // 🧾사업자 칸 — 모양이 틀리면 비운다. 등록증 경로는 «이 계정 폴더»일 때만 되살린다(같은 기기의 다른 계정 초안이 섞이지 않게).
+        d.bizNumber = typeof d.bizNumber === "string" ? bizDigits(d.bizNumber).slice(0, 10) : "";
+        d.bizOwnerName = typeof d.bizOwnerName === "string" ? d.bizOwnerName : "";
+        d.bizOpenDate = typeof d.bizOpenDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(d.bizOpenDate) ? d.bizOpenDate : "";
+        d.bizCertPath = typeof d.bizCertPath === "string" && userId && bizCertPathOk(d.bizCertPath, userId) ? d.bizCertPath : "";
         applyDraft(d);
         setRestored(true);
       }
@@ -275,6 +314,7 @@ export function SpaceForm({
     chatOn, chatMin, chatPrice, chatTopics,
     openSlots, repeatWeekly,
     brandOn, brandPick,
+    bizNumber, bizOwnerName, bizOpenDate, bizCertPath,
   };
   const draftJson = JSON.stringify(draftSnap);
   useEffect(() => {
@@ -314,7 +354,7 @@ export function SpaceForm({
   //   ⭐대신 **요율은 서버에서 받는다**(props). 바뀔 수 있는 값이 한 군데에만 있으면 어긋날 자리가 없다.
   // 🔢시간당 값으로 바뀌면서 정산액도 «한 시간치»로 보여 준다(대표 09-16). 09-18부터 상품마다 따로.
   const payoutOf = (price: number) => Math.floor(price * (1 - feeRate));
-  const uploading = photos.some((p) => p.uploading);
+  const uploading = photos.some((p) => p.uploading) || certUploading;
   const readyPhotos = photos.filter((p) => !p.uploading && p.url);
 
   // 🔻09-16 「동네」 칸이 통째로 없어졌다(대표: 「주소면 충분」). 주소 찾기는 주소만 채운다.
@@ -367,6 +407,28 @@ export function SpaceForm({
     }
   };
 
+  /** 🧾사업자등록증 한 장. 형식은 파일의 MIME으로 보고, 비어 오면(일부 브라우저의 HEIC) 확장자로 보충한다. */
+  const pickCert = async (input: HTMLInputElement) => {
+    const file = input.files?.[0];
+    input.value = ""; // 같은 파일을 다시 골라도 onChange가 돌게
+    if (!file) return;
+    setCertErr("");
+    const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
+    const mime = file.type || ({ heic: "image/heic", heif: "image/heif", pdf: "application/pdf" } as Record<string, string>)[ext] || "";
+    if (!BIZ_CERT_TYPES[mime]) return setCertErr("사진(JPG·PNG·HEIC)이나 PDF 파일로 올려 주세요.");
+    if (file.size > BIZ_CERT_MAX_BYTES) return setCertErr("10MB가 넘는 파일은 못 올려요. 사진으로 찍어 올려 주셔도 돼요.");
+    setCertUploading(true);
+    try {
+      const path = await uploadBizCert(file, mime);
+      setBizCertPath(path);
+      setCertName(file.name);
+    } catch (e) {
+      setCertErr(e instanceof Error && e.message ? e.message : "파일을 올리지 못했어요. 다시 골라 주세요.");
+    } finally {
+      setCertUploading(false);
+    }
+  };
+
   /** 격자 안에서 자리 바꾸기(끌기 · ← →). 첫 장이 대표 사진이라 순서가 곧 정보다. */
   const movePhoto = (from: number, to: number) =>
     setPhotos((p) => {
@@ -398,6 +460,15 @@ export function SpaceForm({
     const badSlot = expandRepeat(openSlots, repeatWeekly).find((sl) => hoursBetween(sl.start, sl.end) < Number(minHours));
     if (badSlot) return ["slots", `${dateLabel(badSlot.date)}은 최소 ${minHours}시간을 못 채워요. 시간을 늘리거나 그날을 빼 주세요.`];
     if (chatOn && chatPrice <= 0) return ["chatPrice", "커피챗 값이 비어 있어요."];
+    // 🧾09-18 사업자 정보 — 폼 순서대로(번호 → 대표자 → 개업일 → 등록증). 서버(`saveSpaceAction`)가 같은 함수로 다시 본다.
+    if (bizNeeded) {
+      const numberProblem = bizNumberProblem(bizNumber);
+      if (numberProblem) return ["bizNumber", numberProblem];
+      if (!bizOwnerName.trim()) return ["bizOwner", "대표자 이름을 사업자등록증 그대로 적어 주세요."];
+      const dateProblem = openDateProblem(toOpenDate(bizOpenDate), todayKst());
+      if (dateProblem) return ["bizOpenDate", dateProblem];
+      if (!bizCertPath) return ["bizCert", "사업자등록증 파일을 올려 주세요."];
+    }
     if (!termsOk) return ["terms", "공간 제공자 약관에 동의해 주세요."];
     return null;
   };
@@ -414,6 +485,7 @@ export function SpaceForm({
   const submit = () =>
     start(async () => {
       setErr("");
+      setSavedNote("");
       setTried(true);
       if (blockedPair) {
         // 빨간 말은 칸 밑에만 둔다(`fieldErr`). 버튼 위엔 같은 말이 옅은 글씨로 남아, 아래에서 다시 봐도 이유가 보인다.
@@ -450,14 +522,38 @@ export function SpaceForm({
         contactPhone,
         hostTermsOk: termsOk,
         brandSlug,
+        bizNumber: bizDigits(bizNumber),
+        bizOwnerName: bizOwnerName.trim(),
+        bizOpenDate: toOpenDate(bizOpenDate),
+        bizCertPath,
       });
+      const toBiz = () => document.getElementById("f-biz")?.scrollIntoView({ behavior: "smooth", block: "start" });
       if (!r.ok) {
+        // 🧾사업자 칸의 말(휴업·폐업 등)은 그 칸 밑에 둔다. 버튼 위엔 옅게 한 번 더(다른 칸의 막힘과 같은 처리).
+        if (r.field === "biz") {
+          setBizServer({ msg: r.message, key: bizKey });
+          toBiz();
+          return;
+        }
         setErr(r.message);
         return;
       }
       // 💾올라갔으니 초안은 끝이다. 떠나기 전에 남은 타이머가 되살리지 않게 먼저 막는다.
       draftDone.current = true;
       clearDraft();
+      // 🧾국세청 기록과 다름 — 저장은 됐다(관리자가 등록증과 같이 본다). 사장님은 사업자 칸만 고치면 되니 그 칸으로 보낸다.
+      //   새로 올리기였으면 이제 행이 있으니 고치기 화면으로 간다. 여기 남아 다시 누르면 공간이 하나 더 생긴다.
+      if (r.bizStatus === "mismatch" && r.slug) {
+        if (!initial) {
+          router.push(`/rent/${r.slug}/edit#f-biz`);
+          return;
+        }
+        setBizServer({ msg: r.message, key: bizKey });
+        setSavedNote("다른 내용은 저장해 뒀어요. 사업자 정보만 고쳐서 한 번 더 올려 주세요.");
+        router.refresh();
+        toBiz();
+        return;
+      }
       // 검토 대기라 `/rent/{slug}`는 아직 남에게 안 보인다. 자기 것이 어디 있는지 보이는 화면으로 보낸다.
       // 💬09-17 QA — 말없이 목록으로 떨어져서 「된 건가?」 했다. `saved`로 무슨 일이 났는지 한 줄 띄운다.
       //   ⚠️검토로 내려가는 조건은 `saveSpaceAction`과 같은 규칙이다(이름·주소가 바뀌면). 거기를 바꾸면 여기도.
@@ -945,6 +1041,88 @@ export function SpaceForm({
         />
       </Group>
 
+      {/* ── 🧾사업자 정보 ── 09-18 대표: 「개인까지 받으면 너무 무방비 범죄가 일어날 것 같다. 개인 수요는 추후 검증 과정을 거쳐서」.
+           사업자등록증 + 국세청 자동 조회 + 저희 검토. 왜 받는지를 먼저 말하고(손님이 믿고 빌리게), 파일을 누가 보는지 같이 말한다. */}
+      <Group
+        title="사업자 정보"
+        sub="손님이 믿고 빌릴 수 있게 사업자등록증으로 가게를 확인해요. 확인되면 공간 화면에 「사업자 확인된 가게」가 붙어요. 올려 주신 파일은 검토하는 사람만 봐요."
+        anchor="biz"
+      >
+        {editing && !hasAnyBiz(initial) && (
+          // 09-18 전에 올린 공간 — 비워 둬도 저장은 되지만 확인 표시를 받을 길이 이것뿐이다.
+          <p className="rounded-md bg-surface-soft px-4 py-3 text-[15px] leading-relaxed break-keep text-body">
+            아직 사업자 정보가 없어요. 채워 주시면 저희가 확인한 뒤 표시를 붙여 드려요.
+          </p>
+        )}
+        {editing && !!initial?.bizApprovedAt && (
+          <p className="text-[15px] leading-relaxed break-keep text-mute">
+            사업자 정보나 등록증을 바꾸시면 확인 표시가 잠시 내려가요. 저희가 다시 확인하고 붙여 드려요.
+          </p>
+        )}
+        <L label="사업자등록번호" htmlFor="sp-biz-no" anchor="bizNumber" error={fieldErr("bizNumber")}>
+          <input
+            id="sp-biz-no"
+            inputMode="numeric"
+            autoComplete="off"
+            className={`${rentInputCls} sm:max-w-[260px]`}
+            value={formatBizNumber(bizNumber)}
+            onChange={(e) => setBizNumber(bizDigits(e.target.value).slice(0, 10))}
+            placeholder="예) 123-45-67890"
+          />
+        </L>
+        <L label="대표자 이름" htmlFor="sp-biz-owner" anchor="bizOwner" error={fieldErr("bizOwner")} hint="사업자등록증에 적힌 이름 그대로 적어 주세요.">
+          <input
+            id="sp-biz-owner"
+            autoComplete="off"
+            className={`${rentInputCls} sm:max-w-[260px]`}
+            value={bizOwnerName}
+            onChange={(e) => setBizOwnerName(e.target.value)}
+            placeholder="예) 김하루"
+          />
+        </L>
+        <L label="개업일" htmlFor="sp-biz-open" anchor="bizOpenDate" error={fieldErr("bizOpenDate")}>
+          <input
+            id="sp-biz-open"
+            type="date"
+            max={todayKst()}
+            className={`${rentInputCls} sm:max-w-[260px]`}
+            value={bizOpenDate}
+            onChange={(e) => setBizOpenDate(e.target.value)}
+          />
+        </L>
+        {/* 국세청 기록과 다를 때의 말 — 세 칸에 걸친 말이라 세 칸 바로 밑에 둔다. 칸을 고치면 내려간다. */}
+        {bizServerMsg && (
+          <p role="alert" className="-mt-2 text-[15px] leading-relaxed break-keep text-danger">
+            {bizServerMsg}
+          </p>
+        )}
+        <L
+          label="사업자등록증"
+          anchor="bizCert"
+          error={fieldErr("bizCert") || certErr}
+          hint="사진이나 PDF로 올려 주세요. 10MB까지 돼요."
+        >
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+            <label className={`${secondaryBtnCls} cursor-pointer text-[15px] ${certUploading ? "pointer-events-none opacity-60" : ""}`}>
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/heic,image/heif,application/pdf,.heic,.heif,.pdf"
+                className="sr-only"
+                disabled={certUploading}
+                onChange={(e) => void pickCert(e.currentTarget)}
+              />
+              {certUploading ? "올리는 중이에요…" : bizCertPath ? "다른 파일로 바꾸기" : "파일 고르기"}
+            </label>
+            {bizCertPath && !certUploading && (
+              <p className="flex min-w-0 items-center gap-1.5 text-[15px] break-all text-body">
+                <CheckIcon />
+                {certName || "올려 두신 파일이 있어요"}
+              </p>
+            )}
+          </div>
+        </L>
+      </Group>
+
       {/* ── 확인 ── */}
       <Group title="마지막으로 확인해 주세요">
         {/* 🔻09-16 대표 — 음식 여부·임대인 동의 «체크박스» 둘 다 삭제.
@@ -1055,12 +1233,14 @@ export function SpaceForm({
       </Group>
 
       <div>
-        {(err || (tried && blocked)) && (
+        {(err || (tried && blocked) || bizServerMsg) && (
           // 서버가 돌려준 말이 있으면 그것을, 없으면 지금 막고 있는 이유를. 둘이 같이 뜨면 잔소리가 된다.
+          // 🧾사업자 칸의 서버 말은 칸 밑이 빨갛고 여기선 옅게 한 번 더(칸 막힘과 같은 처리).
           <p className={`mb-4 text-[15px] leading-relaxed break-keep ${err ? "text-danger" : "text-faint"}`}>
-            {err || blocked}
+            {err || (tried && blocked) || bizServerMsg}
           </p>
         )}
+        {savedNote && <p role="status" className="mb-4 text-[15px] leading-relaxed break-keep text-mute">{savedNote}</p>}
         <button
           type="button"
           onClick={submit}
@@ -1070,7 +1250,7 @@ export function SpaceForm({
           {pending
             ? "올리는 중이에요…"
             : uploading
-              ? "사진을 올리는 중이에요…"
+              ? certUploading ? "파일을 올리는 중이에요…" : "사진을 올리는 중이에요…"
               : editing
                 ? "고친 내용 올리기"
                 : "등록하기"}
@@ -1270,8 +1450,19 @@ const FORM_STEPS = [
   // 🔁09-18 「얼마에 빌려주실까요」 → 상품 셋(대표).
   "무엇을 파실까요",
   "언제 빌려주실까요",
+  // 🧾09-18 대표 — 공간 등록에 사업자 확인 필수.
+  "사업자 정보",
   "마지막으로 확인해 주세요",
 ];
+
+/** 조용한 체크 — 올린 파일 이름 앞. 초록 배지 대신 글자색과 같은 선 하나(공간 상세의 확인 표시와 같은 얼굴). */
+function CheckIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="size-[16px] shrink-0 text-mute">
+      <path d="m4.5 10.5 3.5 3.5 7.5-8" />
+    </svg>
+  );
+}
 
 /** 넓은 화면(xl)에서만 폼 오른쪽에 붙는 목차. 누르면 그 절로 가고, 읽고 있는 절이 진하게 선다.
  *  📐폼 폭 560의 오른쪽 끝(50%+280)에서 40 띄운 자리. `/rent/new`·`/rent/[slug]/edit` 두 화면의 폭과 한 쌍이다. */

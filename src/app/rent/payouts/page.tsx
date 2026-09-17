@@ -89,9 +89,15 @@ export default async function RentPayoutsPage() {
   return (
     <main className="mx-auto w-full max-w-[720px] px-4 pt-8 pb-16 sm:px-6 sm:pt-12">
       <header>
-        <Link href="/rent/my?tab=host" className="inline-block py-[12px] text-[15px] text-mute underline underline-offset-2">
-          ← 내 하루 가게
-        </Link>
+        {/* 🧾09-18 「검토하기」 — 관리자 화면 둘을 오간다. */}
+        <div className="flex flex-wrap items-center justify-between gap-x-5">
+          <Link href="/rent/my?tab=host" className="inline-block py-[12px] text-[15px] text-mute underline underline-offset-2">
+            ← 내 하루 가게
+          </Link>
+          <Link href="/rent/review" className="inline-block py-[12px] text-[15px] text-mute underline underline-offset-2">
+            검토하기
+          </Link>
+        </div>
         <h1 className="mt-3 text-[28px] font-bold leading-[1.25] tracking-[-0.02em] text-ink">정산</h1>
         <p className="mt-3 text-[17px] leading-relaxed break-keep text-mute">
           사장님께 보낼 돈이에요. 이용일이 지난 예약만 올라와요.

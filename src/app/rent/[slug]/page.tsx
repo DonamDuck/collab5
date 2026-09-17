@@ -3,10 +3,12 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getSpacePublic, listLiveBookingsIn } from "@/lib/spaces";
 import { getProfileById, getSessionUserId } from "@/lib/profiles";
+import { isRentAdmin } from "@/lib/rent-actions";
 import { repo } from "@/lib/repo";
 import { accessHowLine, COFFEE_CHAT_WHEN_GUEST, CONTACT_RULE_GUEST, PRODUCT_HINT_GUEST, PRODUCT_LABEL } from "@/lib/rent-copy";
 import { lowestPrice, productNote, productPrice, sellableProducts } from "@/lib/rent-products";
 import { futureSlots } from "@/lib/rent-time";
+import { bizVerified } from "@/lib/bizcheck";
 import { PhotoSlider } from "@/components/PhotoSlider";
 import { BookingForm } from "./BookingForm";
 import { categoryLabel, Chip, dateLabel, InfoList, InfoRow, primaryBtnCls, secondaryBtnCls, won } from "../ui";
@@ -74,6 +76,26 @@ function PriceLine({ priceHour, from, minHours, capacity }: { priceHour: number;
   );
 }
 
+/** 🧾🏪믿을 근거 줄(09-18 대표) — 「사업자 확인된 가게」·「네이버 지도에 등록된 가게」. 둘 다 없으면 안 그린다.
+ *  ⭐초록 배지로 세우지 않는다. 값·제목보다 한 단 조용한 15px 글자에 체크 선 하나. 배지는 «고를 것»처럼 읽힌다.
+ *  판정은 여기서 안 한다 — 사업자는 `bizVerified`(승인 && 국세청 일치), 네이버는 매칭 시각이 있을 때(`place-match` 판정을 통과한 것만 저장된다). */
+function TrustMarks({ biz, naver, className = "" }: { biz: boolean; naver: boolean; className?: string }) {
+  if (!biz && !naver) return null;
+  const items = [biz ? "사업자 확인된 가게" : "", naver ? "네이버 지도에 등록된 가게" : ""].filter(Boolean);
+  return (
+    <ul aria-label="확인된 정보" className={`flex flex-wrap gap-x-4 gap-y-1.5 ${className}`}>
+      {items.map((t) => (
+        <li key={t} className="flex items-center gap-1.5 text-[15px] leading-snug text-body">
+          <svg aria-hidden="true" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="size-[16px] shrink-0 text-mint-on">
+            <path d="m4.5 10.5 3.5 3.5 7.5-8" />
+          </svg>
+          {t}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 /** 소개서 본문 섹션과 같은 얼굴 — 상단 구분선 + 21px 제목 + 내용.
  *  🧭09-18 알약 줄(`SectionNav`)이 `data-nav-label`을 단 절을 DOM에서 모은다. 알약 이름은 `nav`, 없으면 제목 그대로.
  *  `scroll-margin-top` 7.25rem = 헤더 3.5 + 알약 줄 3.25 + 숨 0.5. 알약을 누르거나 `#apply`로 올 때 제목이 줄 밑에 안 깔린다. */
@@ -99,7 +121,8 @@ export default async function SpaceDetailPage({
   const isOwner = !!uid && uid === sp.ownerUserId;
   // 검토 중·쉬는 중인 공간은 주인에게만 보인다. 남에게 404인 이유 —
   // 「있지만 못 본다」와 「없다」를 구분해 주면, 주소를 훑어 아직 안 열린 공간 목록을 만들 수 있다.
-  if (sp.status !== "open" && !isOwner) notFound();
+  // 🧾09-18 관리자도 연다 — 검토 화면(`/rent/review`)에서 공개 전 공간을 눈으로 봐야 한다. 판정은 `isRentAdmin` 한 벌.
+  if (sp.status !== "open" && !isOwner && !(await isRentAdmin())) notFound();
 
   // 상호(운영하는 브랜드 이름). 사장님 실명(profiles에 따로 없다)은 안 읽는다.
   const operatorName = (await getProfileById(sp.ownerUserId))?.brandName?.trim() ?? "";
@@ -143,6 +166,11 @@ export default async function SpaceDetailPage({
   const products = sellableProducts(sp);
   const fromPrice = lowestPrice(sp) || sp.priceHour;
   const priceVaries = new Set(products.map((p) => productPrice(sp, p))).size > 1;
+  // 🧾🏪09-18 믿을 근거 둘. 네이버 매칭이 있으면 지도 핀도 네이버가 아는 그 가게 자리에 찍는다.
+  const bizOk = bizVerified(sp);
+  const onNaver = !!sp.placeMatchedAt && !!sp.placeName;
+  const mapLat = onNaver && sp.placeLat != null ? sp.placeLat : sp.lat;
+  const mapLng = onNaver && sp.placeLng != null ? sp.placeLng : sp.lng;
 
   return (
     <main
@@ -174,6 +202,8 @@ export default async function SpaceDetailPage({
             <h1 className="mt-1.5 text-[24px] font-bold leading-tight tracking-tight break-keep text-ink sm:text-[28px]">
               {sp.name}
             </h1>
+            {/* 🧾🏪폰에선 제목 바로 밑. lg에선 오른쪽 요약 카드가 같은 줄을 든다. */}
+            <TrustMarks biz={bizOk} naver={onNaver} className="mt-2.5 lg:hidden" />
             {sp.tagline && (
               <p className="mt-3 text-[17px] leading-relaxed break-keep text-body">{sp.tagline}</p>
             )}
@@ -283,8 +313,9 @@ export default async function SpaceDetailPage({
               `spaces.lat/lng`에 굳혀 둔다(`lib/geocode.ts`). 좌표가 없으면 주소만 적는다.
               🔁09-16 — 정확한 핀·정확한 주소로(위 `AreaMap` 머리말). */}
           <Section title="위치">
-            {sp.lat != null && sp.lng != null ? (
-              <AreaMap lat={sp.lat} lng={sp.lng} address={sp.address} />
+            {/* 🏪09-18 대표 — 네이버 지도의 가게와 일치한다고 판정된 공간만 상호 라벨·상호 검색 링크. 아니면 지금처럼 주소 핀만. */}
+            {mapLat != null && mapLng != null ? (
+              <AreaMap lat={mapLat} lng={mapLng} address={sp.address} placeName={onNaver ? sp.placeName : undefined} />
             ) : (
               <p className="text-[17px] leading-relaxed break-keep text-body">{sp.address}</p>
             )}
@@ -519,6 +550,7 @@ export default async function SpaceDetailPage({
           {/* 메타 줄·소개서 줄은 lg에서 위 헤더에서 숨기고 여기로 모인다. 같은 값이 한 화면에 두 번 서지 않게. */}
           <div className="rounded-lg border border-hairline bg-surface p-6 shadow-e1">
             <PriceLine priceHour={fromPrice} from={priceVaries} minHours={sp.minHours} capacity={sp.capacity} />
+            <TrustMarks biz={bizOk} naver={onNaver} className="mt-4 flex-col" />
             <InfoList className="mt-5 border-t border-hairline pt-5">
               {/* 🛍09-18 켜진 상품 이름 — 「부터」가 무엇 중 낮은 값인지 요약 카드에서도 읽히게. */}
               {products.length > 0 && (
