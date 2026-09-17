@@ -42,6 +42,10 @@ export function buildPreviewMail(kind: string): Mail | null {
     case "cancelled-host": { const x = pick(full, B.cancelledFuture); return buildBookingCancelled(x.b, x.sp, x.host, x.guest); }
     case "cancelled-guest": { const x = pick(full, B.cancelledFuture); return buildBookingCancelledToGuest(x.b, x.sp, x.host, x.guest, Math.round(x.b.amountTotal * 0.7)); }
     case "cancelled-guest-sameday": { const x = pick(full, B.cancelledPast); return buildBookingCancelledToGuest(x.b, x.sp, x.host, x.guest, 0); }
+    // 📨09-18 밤 QA SC-15 — 첫 문장이 갈리는 갈래 중 지도에 없던 둘. 손님 취소는 «전액»(결제 한 시간 안 · 7일 전까지),
+    //   관리자 환불은 «일부»(결제 줄의 남은 돈이 낸 돈보다 적을 때) 문장이 따로 있다.
+    case "cancelled-guest-full": { const x = pick(full, B.cancelledFuture); return buildBookingCancelledToGuest(x.b, x.sp, x.host, x.guest, x.b.amountTotal); }
+    case "admin-refund-guest-partial": { const x = pick(full, B.refundReq); return buildAdminRefund({ ...x.b, status: "refunded" }, x.sp, x.host, x.guest, Math.round(x.b.amountTotal * 0.5))[0]; }
     case "admin-refund-guest": { const x = pick(full, B.refundReq); return buildAdminRefund({ ...x.b, status: "refunded" }, x.sp, x.host, x.guest, x.b.amountTotal)[0]; }
     case "admin-refund-host": { const x = pick(full, B.refundReq); return buildAdminRefund({ ...x.b, status: "refunded" }, x.sp, x.host, x.guest, x.b.amountTotal)[1]; }
     case "published": { const x = pick(full, B.paid); return buildSpacePublished(x.sp, x.host, false); }
