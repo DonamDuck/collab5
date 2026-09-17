@@ -11,7 +11,7 @@ import {
   setBookingStatus, listSpacesByOwner, listSpacesByIds, payout, FEE_RATE,
   createPayment, getPaymentByOrderId, rentSync,
   type SpaceSaveInput,
-  listLiveBookings, setSpaceStatus, approveSpace,
+  listLiveBookings, setSpaceStatus, approveSpace, SLUG_TAKEN,
 } from "./spaces";
 // 🧾🏪09-18 사업자 확인 · 네이버 상호 매칭(대표 09-17). 규칙은 순수 함수(`bizcheck`·`place-match`), 바깥 호출은 서버 전용 파일에.
 import {
@@ -82,9 +82,19 @@ function makeSlug(name: string): string {
   //   그 대시 넉 자가 「3자 이상」을 통과했다. 그래서 대시를 접고 양끝을 자른 «뒤에» 길이를 잰다.
   const ascii = name.toLowerCase()
     .replace(/[^a-z0-9\s-]/g, "").trim().replace(/[\s-]+/g, "-").replace(/^-+|-+$/g, "");
-  const tail = Date.now().toString(36).slice(-4);
-  return ascii.length >= 3 ? `${ascii}-${tail}` : `space-${Date.now().toString(36)}`;
+  // 🔒09-18 밤 QA(SEC-02) — 꼬리를 시각이 아니라 난수로. 전엔 `Date.now()` 36진수 끝 네 자리라 약 28분(36^4 ms)마다 같은 꼬리가 다시 나왔다.
+  //   36^6(약 21억)이면 같은 이름끼리도 겹칠 일이 드물고, 겹쳐도 저장이 insert라 남의 행은 안 바뀐다(`saveSpaceAction`이 다시 뽑는다).
+  return ascii.length >= 3 ? `${ascii}-${randomTail(6)}` : `space-${randomTail(8)}`;
 }
+
+/** 소문자·숫자 n자 난수. 주소에 쓰는 값이라 비밀일 필요는 없고 «겹치지 않으면» 된다. */
+function randomTail(n: number): string {
+  const abc = "0123456789abcdefghijklmnopqrstuvwxyz";
+  return Array.from(crypto.getRandomValues(new Uint8Array(n)), (b) => abc[b % 36]).join("");
+}
+
+/** 새 공간 slug가 겹쳤을 때 다시 뽑는 횟수. 난수 여섯 자리라 두 번째에서 끝나는 게 보통이다. */
+const SLUG_TRIES = 5;
 
 export interface SpaceFormInput {
   slug?: string;
@@ -230,7 +240,7 @@ export async function saveSpaceAction(input: SpaceFormInput): Promise<ActionResu
     if (hit) { lat = hit.lat; lng = hit.lng; }
   }
 
-  const slug = input.slug || makeSlug(input.name);
+  let slug = input.slug || makeSlug(input.name);
   // 🔁09-16 대표 — **고쳐도 공개가 유지된다.** 전엔 글자 하나만 바꿔도 검토 대기로 내려가 목록에서 사라졌다.
   //   다시 검토받는 건 «가게가 바뀌는» 둘뿐이다: 주소와 매장 이름. 나머지는 사장님이 알아서 고친다.
   const renamed = !!prev && prev.name.trim() !== input.name.trim();
@@ -319,7 +329,21 @@ export async function saveSpaceAction(input: SpaceFormInput): Promise<ActionResu
     ...place,
     status,
   };
-  const saved = await saveSpace(row);
+  // 🔒09-18 밤 QA(SEC-02) — 새 공간은 insert로만 넣는다. slug가 이미 있으면(남의 공간일 수 있다) 그 행은 그대로 두고 꼬리를 다시 뽑는다.
+  //   고치기(`input.slug`)는 위에서 주인 확인을 마쳤으니 그 slug에 덮어쓴다.
+  let saved: Space | null = null;
+  if (input.slug) {
+    const r = await saveSpace(row, { isNew: false });
+    saved = r === SLUG_TAKEN ? null : r;
+  } else {
+    for (let i = 0; i < SLUG_TRIES; i++) {
+      if (i > 0) slug = makeSlug(input.name);
+      const r = await saveSpace({ ...row, slug }, { isNew: true });
+      if (r === SLUG_TAKEN) continue;
+      saved = r;
+      break;
+    }
+  }
   if (!saved) return { ok: false, message: "저장에 실패했어요. 잠시 뒤 다시 시도해 주세요." };
   revalidatePath("/rent");
   revalidatePath(`/rent/${slug}`);

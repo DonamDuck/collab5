@@ -313,8 +313,15 @@ export async function listSpacesByOwner(ownerUserId: number): Promise<Space[]> {
 
 export type SpaceSaveInput = Omit<Space, "id" | "createdAt" | "updatedAt">;
 
-/** slug 기준 upsert. ⚠️권한 검사는 호출부(서버 액션)의 책임이다. */
-export async function saveSpace(input: SpaceSaveInput): Promise<Space | null> {
+/** 새 공간 저장에서 slug가 이미 있을 때 돌려주는 표시. 호출부가 꼬리를 다시 뽑아 한 번 더 부른다. */
+export const SLUG_TAKEN = "slug-taken" as const;
+
+/** 공간 저장. ⚠️권한 검사는 호출부(서버 액션)의 책임이다.
+ *  - `isNew: true` — **insert만 한다.** slug가 이미 있으면 그 행을 건드리지 않고 `SLUG_TAKEN`을 돌려준다.
+ *  - `isNew: false` — slug 기준 upsert. 호출부가 «그 slug의 주인»인지 확인을 마친 고치기에서만 쓴다.
+ *  🩸09-18 밤 QA(SEC-02) — 전엔 새 공간도 upsert였다. slug 꼬리(`Date.now()` 36진수 끝 네 자리)가 약 28분마다 되돌아와서,
+ *    같은 이름을 28분 간격으로 올리면 뒤에 올린 사람이 앞사람의 행을 «주인까지» 덮었다. 그래서 `isNew`를 필수로 받는다. */
+export async function saveSpace(input: SpaceSaveInput, opts: { isNew: boolean }): Promise<Space | typeof SLUG_TAKEN | null> {
   if (await rentMockOn()) return null;
   const c = db();
   if (!c) return null;
@@ -353,13 +360,22 @@ export async function saveSpace(input: SpaceSaveInput): Promise<Space | null> {
     place_name: input.placeName, place_address: input.placeAddress,
     place_lat: input.placeLat ?? null, place_lng: input.placeLng ?? null, place_matched_at: input.placeMatchedAt ?? null,
   };
-  let { data, error } = await c.from("spaces").upsert(row, { onConflict: "slug" }).select().maybeSingle();
+  const write = (r: Partial<typeof row>) =>
+    opts.isNew
+      ? c.from("spaces").insert(r).select().maybeSingle()
+      : c.from("spaces").upsert(r, { onConflict: "slug" }).select().maybeSingle();
+  let { data, error } = await write(row);
   // 🧯SQL을 돌리기 전에 코드가 먼저 나가도 «규칙 없는» 저장은 살린다. 규칙이 있는데 칸이 없으면 그대로 실패시킨다 —
   //   조용히 빼고 저장하면 사장님은 켰다고 믿는데 아무 날도 안 열린다.
   if (error && repeatWeekly.length === 0 && /repeat_weekly/.test(error.message)) {
     const { repeat_weekly: _r, ...rest } = row;
     void _r;
-    ({ data, error } = await c.from("spaces").upsert(rest, { onConflict: "slug" }).select().maybeSingle());
+    ({ data, error } = await write(rest));
+  }
+  // 🔒새 공간인데 slug가 겹쳤다(유일 제약 23505). 아무 행도 안 바뀌었다 — 호출부가 다른 slug로 다시 부른다.
+  //   spaces의 유일 제약은 slug 하나지만, 나중에 다른 유일 제약이 생겨도 그걸 slug 충돌로 착각하지 않게 글자까지 본다.
+  if (error && opts.isNew && error.code === "23505" && /slug/.test(`${error.message} ${error.details ?? ""}`)) {
+    return SLUG_TAKEN;
   }
   if (error) { console.error(`[spaces] save failed slug=${input.slug}: ${error.message}`); return null; }
   return data ? toSpace(data as Row) : null;
