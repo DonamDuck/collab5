@@ -106,8 +106,26 @@ const TONE_FOR: Record<"guest" | "host", Partial<Record<BookingStatus, { label: 
   },
 };
 
-export function BookingBadge({ status, viewer = "guest" }: { status: BookingStatus; viewer?: "guest" | "host" }) {
+export function BookingBadge({
+  status,
+  viewer = "guest",
+  dot = false,
+}: {
+  status: BookingStatus;
+  viewer?: "guest" | "host";
+  /** 🔵09-18 들어온 요청 카드(대표 코멘트 #63) — 카드 맨 앞에 설 때 앞에 작은 점과 medium 굵기를 얹는다.
+   *  ⚠️알약(면)은 여전히 안 쓴다(09-13 대표 지시). 점은 탭의 「새 요청 있음」 점(`StickyTabs`)과 같은 7px이다. */
+  dot?: boolean;
+}) {
   const t = TONE_FOR[viewer][status] ?? BOOKING_TONE[status] ?? BOOKING_TONE.paid;
+  if (dot) {
+    return (
+      <span className={`inline-flex shrink-0 items-center gap-1.5 text-[15px] font-medium ${t.cls}`}>
+        <span aria-hidden="true" className="size-[7px] rounded-full bg-current" />
+        {t.label}
+      </span>
+    );
+  }
   return <span className={`shrink-0 text-[15px] ${t.cls}`}>{t.label}</span>;
 }
 

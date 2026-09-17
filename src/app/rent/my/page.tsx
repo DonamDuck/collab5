@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { sweepBookings, listSpacesByOwner, listBookingsForHost, isRevealed } from "@/lib/spaces";
 import { getSessionUserId, getProfileById, type Profile } from "@/lib/profiles";
@@ -9,12 +10,13 @@ import { HostDecide, PauseToggle, PublishButton, RefundRequest } from "./Actions
 import { PayoutAccount } from "./PayoutAccount";
 import { getPayoutAccount, toMasked } from "@/lib/payout-accounts";
 import { ContactBlock } from "../ContactBlock";
-import { bookingFinished, bookingStarted } from "@/lib/rent-time";
+import { bookingFinished, bookingStarted, dateLabel, hoursBetween, kstDaysUntil } from "@/lib/rent-time";
 import type { SpaceBooking } from "@/lib/types";
 import { ClearQuery } from "./ClearQuery";
+import { PlanQuote } from "./PlanQuote";
 import { GuestBookingRow, loadGuestBookings } from "../GuestBookingRow";
 import { StickyTabs } from "@/components/StickyTabs";
-import { BookingBadge, ListRow as Row, SpaceBadge, bookingWhen, primaryBtnCls, secondaryBtnCls, won } from "../ui";
+import { BookingBadge, ListRow as Row, SpaceBadge, primaryBtnCls, secondaryBtnCls, won } from "../ui";
 import { PRODUCT_LABEL } from "@/lib/rent-copy";
 import { productPrice, sellableProducts } from "@/lib/rent-products";
 
@@ -32,6 +34,7 @@ import { productPrice, sellableProducts } from "@/lib/rent-products";
 //   왼쪽 글(이름 17 medium · 메타 15 mute), 오른쪽 상태 글자 15px(색만). 상태 배지 pill·회색 안내 상자·
 //   민트 연락처 상자를 전부 뺐다 — 세 섹션이 다 카드면 화면이 서류철이 된다.
 //   빈 상태도 `EmptyState` 대신 15px 한 줄. 아톰 마크 셋이 세로로 서면 무겁다.
+// 🃏09-18 들어온 요청만 다시 카드로 세웠다(대표 코멘트 #63 「텍스트 나열처럼만 보인다」). 빌린 공간 카드와 같은 틀이다. `hostRow` 머리말.
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
@@ -170,10 +173,27 @@ export default async function MyRentPage({
   const past = hostBookings.filter((b) => !toAnswer.includes(b) && !upcoming.includes(b));
   const openSpaces = mySpaces.filter((sp) => sp.status === "open").length;
 
+  // 🃏09-18 대표 코멘트 #63 — 「여기 영역도 UI 조정이 필요한데 지금 그냥 텍스트 나열처럼만 보인다」.
+  //   한 줄에 공간 이름·상품·날짜·인원·커피챗이 같은 크기로 이어지고, 계획·소개서·손님·돈이 같은 15px 줄로 쌓여서
+  //   무엇을 먼저 봐야 하는지가 모양에 없었다. 카드 한 장을 **머리(언제·무슨 상태·얼마) / 몸(손님이 적은 계획·손님) / 발(할 일)**로 나눈다.
+  //   · 왼쪽 날짜 칸 — 날짜를 카드에서 가장 크게. 세로로 훑으면 달력처럼 읽힌다.
+  //     빌린 공간 카드(`GuestBookingRow`)의 64px 사진 자리와 같은 자리·크기라 두 탭이 한 집안으로 보인다.
+  //   · 답해야 할 요청만 날짜 칸이 레몬 면이다(기다리는 것의 색 — 숫자 칸·탭 점과 같다). 지난 요청은 글자를 흐린다.
+  //   · 받을 돈은 넓은 화면에서 오른쪽 기둥으로 뺀다. 720 칸에서 한 줄에 글만 길게 늘어서지 않게. 폰에선 날짜 옆 글 기둥 맨 아래.
+  //   · 수락·거절은 카드 발에 선을 긋고 모은다. 넓은 화면은 오른쪽 정렬, 폰은 한 줄을 나눠 쓴다.
+  //   ⚠️문(`isRevealed`)·버튼 조건·환불 신청 흐름은 그대로다. 바꾼 건 자리와 크기뿐이다.
   const hostRow = (b: SpaceBooking) => {
       const sp = spaceById.get(b.spaceId);
       const open = isRevealed(b);
       const brief = guestBriefs.get(b.guestUserId);
+      const answerable = b.status === "paid" && !bookingStarted(b);
+      const finished = bookingFinished(b);
+      // 무리 판정(`toAnswer`·`upcoming`·`past`)과 같은 식. 한쪽만 고치면 레몬 칸이 엉뚱한 무리에 선다.
+      const tone: RowTone = answerable ? "answer" : (b.status === "paid" || b.status === "confirmed") && !finished ? "upcoming" : "past";
+      const masked = b.status === "done" || finished;
+      const brandName = b.guestBrandSlug ? guestBrands.get(b.guestBrandSlug) : undefined;
+      const refundAskable = b.status === "confirmed" || (b.status === "paid" && bookingStarted(b));
+      const needAccount = !payoutAccount && (b.status === "confirmed" || b.status === "done");
       // 💬방금 누른 수락·거절의 결과 한 줄(`HostDecide`가 `?did=&b=`로 실어 온다). 거절은 환불 성패를 상태로 읽는다.
       const didLine =
         didId === b.id
@@ -185,103 +205,81 @@ export default async function MyRentPage({
                 ? "거절했어요. 환불이 늦어지고 있어 저희가 확인하고 있어요."
                 : ""
           : "";
+      // 👤카드 몸의 손님 한 줄 토막들. 연락처 판을 안 그리는 카드(수락 전·가려진 뒤)에만 쓴다.
+      const guestBits: ReactNode[] = [];
+      if (!open && brief) {
+        // 👤수락 전 손님 정보 — 이름과 전화번호가 있는지만(09-17 QA). 번호 «값»은 수락 뒤 연락처 블록이 연다.
+        //   🪪09-18 대표 — 이름은 신청 때 받은 성함(실명)이 먼저다. 옛 예약은 성함이 비어 있어 프로필 브랜드명으로 물러선다.
+        guestBits.push(
+          <>
+            손님 <span className="font-medium text-body">{b.guestName?.trim() || brief.name || "이름을 안 적으셨어요"}</span>
+          </>,
+        );
+        // 📞「번호를 남기셨나」는 답해야 할 때만 뜻이 있다. 취소·환불 카드에 「이메일로 연락하셔야 해요」가 붙으면 할 일로 읽힌다.
+        if (answerable) {
+          guestBits.push(brief.hasPhone || b.guestPhone ? "전화번호를 남기셨어요" : "전화번호가 없어 이메일로 연락하셔야 해요");
+        }
+      }
+      if (open && masked) {
+        // 🙈다녀간 뒤 — 「-」 넷짜리 판 대신 한 줄. 문은 그대로 `masked`이고, 문장은 `ContactBlock`의 가림 문장과 같다.
+        const who = withBookingContact(contacts.get(b.guestUserId) ?? null, b.guestPhone, b.guestName)?.brandName?.trim();
+        if (who) guestBits.push(<>손님 <span className="font-medium text-body">{who}</span></>);
+        guestBits.push("이용일이 지나 연락처는 가려 두었어요");
+      }
+      // 📎손님이 고른 소개서 — 어떤 브랜드가 오는지 사장님이 미리 볼 수 있게(대표 09-16). 연락처 판이 열린 카드는 판 안 「소개서」 칸으로.
+      if (brandName && !(open && !masked)) {
+        guestBits.push(
+          <>
+            소개서{" "}
+            <Link href={`/m/${b.guestBrandSlug}`} className="text-body underline underline-offset-2">
+              {brandName}
+            </Link>
+          </>,
+        );
+      }
+
       return (
         <Row
+          card
           key={b.id}
+          status={null}
           head={
-            <>
-              <p className="truncate text-[17px] font-medium text-ink">{sp?.name ?? "내 공간"}</p>
-              {/* 375px에서 「커/피챗」처럼 낱말 중간이 꺾였다(09-17 QA) — break-keep. */}
-              <p className="mt-1 text-[15px] break-keep text-mute">
-                {/* 🛍09-18 손님이 고른 상품 — 공간 전체면 사장님이 시설까지 준비해야 해서 요청 줄 첫머리에 둔다. */}
-                <span className="font-medium text-body">{PRODUCT_LABEL[b.product]}</span>
-                {" · "}
-                {bookingWhen(b)}
-                {b.headcount ? ` · ${b.headcount}명` : ""}
-                {/* ☕🩸09-16까지 사장님 쪽엔 커피챗 표시가 없었다. 손님 화면 네 곳엔 「커피챗 포함」이 뜨는데
-                    정작 커피챗을 해 줄 사람이 모르는 상태였다. 옛 예약은 옛 칸에만 값이 있어 둘 다 본다. */}
-                {b.amountChat > 0 || b.amountMentor > 0 ? " · 커피챗 신청" : ""}
-              </p>
-            </>
+            <RequestHead
+              b={b}
+              tone={tone}
+              spaceName={sp?.name ?? "내 공간"}
+              // 🙋환불 신청이 들어간 확정 예약 — 상태는 그대로 「예약 확정」이라 머리에 한 토막 더 붙인다.
+              refundPending={refundAskable && !!b.refundRequestedAt}
+            />
           }
-          status={<BookingBadge status={b.status} viewer="host" />}
         >
-          {/* ⭐신청자가 쓴 「그날 무엇을」 — 사장님이 수락을 정하는 근거라 이 줄에서 제일 크게 읽힌다. */}
-          <p className="mt-3 whitespace-pre-line text-[16px] leading-relaxed break-keep text-body">
-            {b.plan}
-          </p>
-          {/* 📎손님이 고른 소개서 — 어떤 브랜드가 오는지 사장님이 미리 볼 수 있게(대표 09-16). */}
-          {b.guestBrandSlug && guestBrands.get(b.guestBrandSlug) && (
-            <p className="mt-2 text-[15px] text-mute">
-              소개서{" "}
-              <Link href={`/m/${b.guestBrandSlug}`} className="text-body underline underline-offset-2">
-                {guestBrands.get(b.guestBrandSlug)}
-              </Link>
-            </p>
-          )}
-          {/* 👤수락 전 손님 정보 — 이름과 전화번호가 있는지만(09-17 QA). 번호 «값»은 수락 뒤 연락처 블록이 연다.
-              🪪09-18 대표 — 이름은 신청 때 받은 성함(실명)이 먼저다. 옛 예약은 성함이 비어 있어 프로필 브랜드명으로 물러선다. */}
-          {brief && !open && (
-            <p className="mt-2 text-[15px] leading-relaxed break-keep text-mute">
-              손님 <span className="text-body">{b.guestName?.trim() || brief.name || "이름을 안 적으셨어요"}</span>
-              {" · "}
-              {brief.hasPhone || b.guestPhone ? "전화번호를 남기셨어요" : "전화번호가 없어 이메일로 연락하셔야 해요"}
-            </p>
-          )}
-          {/* 받는 금액을 적는다. 낸 금액만 보이면 정산 때 「이만큼 들어올 줄 알았는데」가 된다.
-              💸09-17 QA — 거절·환불·취소 줄에도 「받으실 돈」이 그대로 떠 있었다. 받을 돈이 아닌 줄은 무슨 돈인지 바꿔 적고 흐리게.
-              ⚠️손님 취소는 날에 따라 일부가 남아 정산될 수 있어(약관 제8조) 금액을 단정하지 않는다. */}
-          <p className="mt-2 text-[15px] text-mute">
-            {b.status === "refunded" ? (
-              <span className="text-faint">손님께 전액 돌려드렸어요 · {won(b.amountTotal)}</span>
-            ) : b.status === "rejected" ? (
-              <span className="text-faint">돌려드릴 돈 {won(b.amountTotal)} · 저희가 환불을 챙기고 있어요</span>
-            ) : b.status === "cancelled" ? (
-              <span className="text-faint">손님 취소 · 낸 돈 {won(b.amountTotal)}</span>
-            ) : (
-              <>
-                받으실 돈 {won(b.amountPayout)}
-                <span className="text-faint"> · 손님이 낸 돈 {won(b.amountTotal)}</span>
-              </>
-            )}
-          </p>
-
-          {/* ⏯이용 시간이 시작하면 수락·거절 버튼을 거둔다(서버도 막는다). 결제 완료는 phase 1에서 곧 예약 완료다. */}
-          {b.status === "paid" && !bookingStarted(b) && (
-            <HostDecide bookingId={b.id} amountTotal={b.amountTotal} />
-          )}
-          {/* 🙋관리자에게 환불 신청(대표 09-16) — 수락해 확정한 예약에서만. 수락 전(결제 완료)엔 거절이 곧 전액 환불이라
-              관리자를 거칠 일이 없다. 단 수락 안 한 채 이용 시간이 시작되면 거절이 막히니 그때는 신청으로 연다.
-              신청이 들어가 있으면 버튼 대신 상태 한 줄. */}
-          {(b.status === "confirmed" || (b.status === "paid" && bookingStarted(b))) &&
-            (b.refundRequestedAt ? (
-              <p className="mt-3 text-[15px] leading-relaxed break-keep text-lemon-on">
-                환불 신청을 받았어요. 사장님과 손님께 전화로 확인한 뒤 처리해 드릴게요.
-              </p>
-            ) : (
-              <RefundRequest bookingId={b.id} />
-            ))}
-
-          {/* 🏦수락한 예약인데 계좌가 없으면 한 줄(09-17). 이용일이 지나도 보낼 곳이 없다. 날짜 약속은 안 한다. */}
-          {!payoutAccount && (b.status === "confirmed" || b.status === "done") && (
-            <p className="mt-2 text-[15px] leading-relaxed break-keep text-lemon-on">
-              <Link href="#payout-account" className="underline underline-offset-2">
-                정산 받을 계좌를 등록해 주세요
-              </Link>
-            </p>
-          )}
-
           {didLine && (
-            <p role="status" className="mt-3 text-[15px] leading-relaxed break-keep text-mint-on">
+            <p role="status" className="mt-4 text-[15px] leading-relaxed break-keep text-mint-on">
               {didLine}
             </p>
           )}
 
-          {open ? (
+          {/* ⭐신청자가 쓴 「그날 무엇을」 — 사장님이 수락을 정하는 근거. 답할 카드는 세 줄, 나머지는 두 줄에서 자르고 「더 보기」. */}
+          {b.plan && <PlanQuote text={b.plan} lines={tone === "answer" ? 3 : 2} quiet={tone === "past"} />}
+
+          {guestBits.length > 0 && (
+            // 375px에서 「커/피챗」처럼 낱말 중간이 꺾였다(09-17 QA) — 토막마다 줄바꿈은 `·` 사이에서만.
+            <p className="mt-3 text-[15px] leading-relaxed break-keep text-mute">
+              {guestBits.map((bit, i) => (
+                <span key={i}>
+                  {i > 0 && " · "}
+                  {bit}
+                </span>
+              ))}
+            </p>
+          )}
+
+          {open && !masked ? (
             // 🎨09-17 QA — 연락처 블록이 `section` + 위 구분선 + 19px 제목이라 **다음 절처럼** 떠 보였다.
             //   블록(`ContactBlock`)은 `/rent/done`과 같이 쓰는 파일이라 안 고치고, 이 줄 안에서만 옷을 줄인다:
             //   옅은 판 안으로 넣고 구분선·위 여백을 지우고 제목을 본문 크기로. 자식 선택자라 이 자리에만 먹는다.
-            <div className="mt-4 rounded-lg bg-surface-soft px-4 py-3 [&>section]:mt-0 [&>section]:border-t-0 [&>section]:pt-0 [&_h2]:text-[16px] [&_h2]:font-medium">
+            //   📐09-18 카드 안으로 들어가며 판이 32px 좁아져 375에서 메일 주소가 「.co / m」으로 꺾였다. 라벨 칸 88 → 72(「전화번호」 네 글자 폭).
+            <div className="mt-4 rounded-lg bg-surface-soft px-4 py-3 [&>section]:mt-0 [&>section]:border-t-0 [&>section]:pt-0 [&_h2]:text-[16px] [&_h2]:font-medium [&_dt]:w-[72px]">
               <ContactBlock
                 who="손님"
                 // 🩸09-16까지 제목을 안 넘겨서 기본값 「가게 정보」가 떴다. 사장님이 보는 건 손님 정보다.
@@ -289,17 +287,46 @@ export default async function MyRentPage({
                 // ☎️신청 때 받은 번호가 프로필 번호보다 먼저다(09-17). 옛 예약은 프로필 번호로.
                 // 🪪이름도 신청 때 받은 성함(실명)이 먼저다(09-18). 옛 예약은 프로필 브랜드명 그대로.
                 profile={withBookingContact(contacts.get(b.guestUserId) ?? null, b.guestPhone, b.guestName)}
+                // 📎소개서 칸은 블록이 이미 가진 자리를 쓴다(09-18). 카드 몸에 따로 한 줄 두면 판 위아래로 손님 정보가 갈라진다.
+                brand={brandName ? { name: brandName, slug: b.guestBrandSlug } : null}
                 // 🙈이용일이 지난 예약은 가린다 — 손님 쪽(`GuestBookingRow`)과 같은 규칙(09-17 QA 🔴).
                 //   09-16까지 사장님 화면만 안 넘겨서, 다녀간 뒤에도 손님 번호·메일이 계속 열려 있었다.
-                masked={b.status === "done" || bookingFinished(b)}
+                //   ⚠️여기 오는 카드는 `masked`가 거짓인 것뿐이다. 가려진 카드는 위 한 줄로 말한다.
+                masked={masked}
               />
             </div>
           ) : null}
           {/* 🔻09-17 QA — 「수락하시면 신청하신 분의 연락처가 열려요」 줄 삭제. 바로 위 버튼 「수락하고 연락처 열기」가 같은 말이었다. */}
 
           {b.hostMessage && (
-            <p className="mt-2 text-[15px] leading-relaxed break-keep text-faint">
+            <p className="mt-3 text-[15px] leading-relaxed break-keep text-faint">
               남기신 말 · {b.hostMessage}
+            </p>
+          )}
+
+          {/* ⏯이용 시간이 시작하면 수락·거절 버튼을 거둔다(서버도 막는다). 결제 완료는 phase 1에서 곧 예약 완료다. */}
+          {answerable && <HostDecide bookingId={b.id} amountTotal={b.amountTotal} />}
+          {/* 🙋관리자에게 환불 신청(대표 09-16) — 수락해 확정한 예약에서만. 수락 전(결제 완료)엔 거절이 곧 전액 환불이라
+              관리자를 거칠 일이 없다. 단 수락 안 한 채 이용 시간이 시작되면 거절이 막히니 그때는 신청으로 연다.
+              신청이 들어가 있으면 버튼 대신 상태 한 줄. */}
+          {refundAskable &&
+            (b.refundRequestedAt ? (
+              <p className="mt-3 text-[15px] leading-relaxed break-keep text-lemon-on">
+                환불 신청을 받았어요. 사장님과 손님께 전화로 확인한 뒤 처리해 드릴게요.
+              </p>
+            ) : (
+              // 글자 버튼의 터치 여백(아래 12px)이 카드 아래 여백에 겹쳐 바닥이 휑했다. 보이는 간격만 되돌린다.
+              <div className="-mb-[12px]">
+                <RefundRequest bookingId={b.id} />
+              </div>
+            ))}
+
+          {/* 🏦수락한 예약인데 계좌가 없으면 한 줄(09-17). 이용일이 지나도 보낼 곳이 없다. 날짜 약속은 안 한다. */}
+          {needAccount && (
+            <p className="mt-3 text-[15px] leading-relaxed break-keep text-lemon-on">
+              <Link href="#payout-account" className="underline underline-offset-2">
+                정산 받을 계좌를 등록해 주세요
+              </Link>
             </p>
           )}
         </Row>
@@ -404,13 +431,13 @@ export default async function MyRentPage({
             {toAnswer.length > 0 && (
               <>
                 <h3 className={h3Cls}>답을 기다려요 · {toAnswer.length}</h3>
-                <ul className="mt-2">{toAnswer.map(hostRow)}</ul>
+                <ul className="mt-3">{toAnswer.map(hostRow)}</ul>
               </>
             )}
             {upcoming.length > 0 && (
               <>
                 <h3 className={h3Cls}>다가오는 예약 · {upcoming.length}</h3>
-                <ul className="mt-2">{upcoming.map(hostRow)}</ul>
+                <ul className="mt-3">{upcoming.map(hostRow)}</ul>
               </>
             )}
             {past.length > 0 && (
@@ -423,7 +450,7 @@ export default async function MyRentPage({
                     <path d="m5 7.5 5 5 5-5" />
                   </svg>
                 </summary>
-                <ul className="mt-2">{past.map(hostRow)}</ul>
+                <ul className="mt-3">{past.map(hostRow)}</ul>
               </details>
             )}
           </>
@@ -597,6 +624,162 @@ export default async function MyRentPage({
         </section>
       )}
     </main>
+  );
+}
+
+// ─── 들어온 요청 카드의 머리 (09-18 대표 코멘트 #63) ───
+
+/** 카드가 어느 무리에 서나 — 답할 것 / 다가오는 예약 / 지난 요청. 모양(레몬 칸·흐린 글자)이 이걸로 갈린다. */
+type RowTone = "answer" | "upcoming" | "past";
+
+/** 이용일까지 남은 날 한 토막. 답할 카드와 다가오는 카드에만 붙인다(지난 카드는 날짜 칸이 이미 말한다).
+ *  ⭐오늘·내일은 레몬 글자 — 답할 시간이 곧 닫힌다는 뜻이라 날짜 칸을 읽기 전에 눈에 걸려야 한다.
+ *  ⚠️날 수는 `kstDaysUntil`(달력 날짜 차이)로만 센다. 시각까지 따지는 판정은 `bookingStarted`의 몫이다. */
+function dayTag(b: SpaceBooking, tone: RowTone): { text: string; hot: boolean } | null {
+  if (tone === "past") return null;
+  if (bookingStarted(b)) return { text: "이용 중", hot: false };
+  const n = kstDaysUntil(b.useDate);
+  // 「오늘 22:00 시작」으로 적었다가 바로 아래 시간 줄과 같은 말이 두 번이 됐다(09-18 실측). 날만 말한다.
+  if (n <= 0) return { text: "오늘", hot: tone === "answer" };
+  if (n === 1) return { text: "내일", hot: tone === "answer" };
+  return { text: `${n}일 뒤`, hot: false };
+}
+
+/** 🗓날짜 칸 — 「9월 / 20 / 일」 세 줄. 서식은 `dateLabel` 한 벌에서 떼어 쓴다(날짜 계산을 여기서 다시 하지 않는다). */
+function DateTile({ b, tone }: { b: SpaceBooking; tone: RowTone }) {
+  const label = dateLabel(b.useDate);
+  const m = /^(\d+)월 (\d+)일 \((.)\)$/.exec(label);
+  const face =
+    tone === "answer" ? "bg-lemon-pale text-lemon-on" : tone === "upcoming" ? "bg-surface-soft text-ink" : "bg-surface-soft text-faint";
+  const small = tone === "upcoming" ? "text-mute" : "";
+  return (
+    <div className={`flex size-[64px] shrink-0 flex-col items-center justify-center rounded-lg ${face}`}>
+      <span className="sr-only">{label}</span>
+      {m ? (
+        <>
+          <span aria-hidden="true" className={`text-[13px] leading-none ${small}`}>{m[1]}월</span>
+          <span aria-hidden="true" className="mt-1 text-[24px] font-bold leading-none tabular-nums">{m[2]}</span>
+          <span aria-hidden="true" className={`mt-1 text-[13px] leading-none ${small}`}>{m[3]}</span>
+        </>
+      ) : (
+        <span aria-hidden="true" className="px-1 text-center text-[13px] leading-tight break-keep">{label}</span>
+      )}
+    </div>
+  );
+}
+
+/** 💸받을 돈. 낸 금액만 보이면 정산 때 「이만큼 들어올 줄 알았는데」가 된다.
+ *  💸09-17 QA — 거절·환불·취소 카드엔 받을 돈이 아니라 무슨 돈인지 바꿔 적고 흐리게.
+ *  ⚠️손님 취소는 날에 따라 일부가 남아 정산될 수 있어(약관 제8조) 금액을 단정하지 않는다.
+ *  📐`wide` — 넓은 화면은 오른쪽 기둥(세 줄, 오른쪽 정렬), 폰은 글 기둥 맨 아래 두 줄. 문장은 둘이 같다. */
+function Money({ b, wide, tone }: { b: SpaceBooking; wide: boolean; tone: RowTone }) {
+  const gone = b.status === "refunded" || b.status === "rejected" || b.status === "cancelled";
+  const [label, sub] =
+    b.status === "refunded"
+      ? ["손님께 전액 돌려드렸어요", ""]
+      : b.status === "rejected"
+        ? ["돌려드릴 돈", "저희가 환불을 챙기고 있어요"]
+        : b.status === "cancelled"
+          ? ["손님 취소 · 낸 돈", ""]
+          : ["받으실 돈", `손님이 낸 돈 ${won(b.amountTotal)}`];
+  const amount = won(gone ? b.amountTotal : b.amountPayout);
+  // 지난 카드는 받을 돈도 한 단 낮춘다 — 굵은 잉크 금액이 지난 요청 목록에서 「지금 볼 것」처럼 튀었다.
+  const amountCls = gone ? "font-medium text-faint" : tone === "past" ? "font-medium text-body" : "font-bold text-ink";
+  if (wide) {
+    return (
+      <div className="hidden w-[168px] shrink-0 text-right sm:block">
+        <p className={`text-[14px] leading-snug break-keep ${gone ? "text-faint" : "text-mute"}`}>{label}</p>
+        <p className={`mt-0.5 text-[19px] leading-snug tabular-nums ${amountCls}`}>{amount}</p>
+        {sub && <p className="mt-0.5 text-[14px] leading-snug break-keep text-faint">{sub}</p>}
+      </div>
+    );
+  }
+  // 폰 — 「받으실 돈 127,500원」 한 줄 + 보조 한 줄. 한 줄에 붙이면 375에서 「손님이 낸 돈 / 150,000원」으로 꺾였다.
+  return (
+    <div className="mt-2 text-[14px] leading-snug break-keep sm:hidden">
+      <p>
+        <span className={gone ? "text-faint" : "text-mute"}>{label}</span>{" "}
+        <span className={`whitespace-nowrap text-[16px] tabular-nums ${amountCls}`}>{amount}</span>
+      </p>
+      {sub && <p className="mt-0.5 text-faint">{sub}</p>}
+    </div>
+  );
+}
+
+/** 카드 머리 — 왼쪽 날짜 칸 · 가운데 상태와 시간과 무엇을 · 오른쪽 돈(넓은 화면). */
+function RequestHead({
+  b,
+  tone,
+  spaceName,
+  refundPending,
+}: {
+  b: SpaceBooking;
+  tone: RowTone;
+  spaceName: string;
+  refundPending: boolean;
+}) {
+  const day = dayTag(b, tone);
+  const hours = b.startTime && b.endTime ? hoursBetween(b.startTime, b.endTime) : 0;
+  // ☕🩸09-16까지 사장님 쪽엔 커피챗 표시가 없었다. 손님 화면 네 곳엔 「커피챗 포함」이 뜨는데
+  //   정작 커피챗을 해 줄 사람이 모르는 상태였다. 옛 예약은 옛 칸에만 값이 있어 둘 다 본다.
+  const chat = b.amountChat > 0 || b.amountMentor > 0;
+  // 🏷칩 = 사장님이 «준비할 것»(상품·인원·커피챗). 한 카드 안의 알약은 이 한 종류뿐이다(디자인-시스템 §형태가 의미를 만든다).
+  //   🛍09-18 공간 전체면 사장님이 시설까지 준비해야 해서 첫 칩이다.
+  const chips = [PRODUCT_LABEL[b.product], b.headcount ? `${b.headcount}명` : "", chat ? "커피챗 신청" : ""].filter(Boolean);
+  const chipCls = tone === "past" ? "text-faint" : "text-body";
+  return (
+    <div className="flex gap-3 sm:gap-4">
+      <DateTile b={b} tone={tone} />
+      <div className="min-w-0 flex-1">
+        <p className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[15px] leading-snug">
+          {/* ⏯수락 안 한 채 이용 시간이 시작된 결제 완료 — phase 1에선 곧 예약 완료다(버튼도 거둔다).
+              「새 요청」으로 두면 답할 수 없는 카드가 답을 기다리는 이름을 달고 지난 요청에 선다. 손님 쪽 이름을 빌린다. */}
+          <BookingBadge dot status={b.status} viewer={b.status === "paid" && bookingStarted(b) ? "guest" : "host"} />
+          {day && (
+            <>
+              <span aria-hidden="true" className="text-faint">·</span>
+              <span className={day.hot ? "font-medium text-lemon-on" : "text-mute"}>{day.text}</span>
+            </>
+          )}
+          {refundPending && (
+            <>
+              <span aria-hidden="true" className="text-faint">·</span>
+              <span className="font-medium text-lemon-on">환불 신청 중</span>
+            </>
+          )}
+        </p>
+        {/* ⭐시간이 카드에서 제일 큰 글자다. 날짜는 왼쪽 칸이 말한다. */}
+        <p className={`mt-1 text-[19px] font-bold leading-snug tabular-nums ${tone === "past" ? "text-mute" : "text-ink"}`}>
+          {b.startTime && b.endTime ? (
+            <>
+              <span className="whitespace-nowrap">
+                {b.startTime}~{b.endTime}
+              </span>
+              {hours > 0 && (
+                <span className="ml-1.5 whitespace-nowrap text-[15px] font-normal text-mute">
+                  {hours % 1 === 0 ? hours : hours.toFixed(1)}시간
+                </span>
+              )}
+            </>
+          ) : (
+            // 옛 예약 — 시각 칸이 비어 옛 `hours` 글만 있다(`bookingWhen`과 같은 물러섬).
+            b.hours || dateLabel(b.useDate)
+          )}
+        </p>
+        <p className="mt-0.5 truncate text-[15px] text-mute">{spaceName}</p>
+        {chips.length > 0 && (
+          <ul className="mt-2 flex flex-wrap gap-1.5" aria-label="요청 내용">
+            {chips.map((c) => (
+              <li key={c} className={`inline-flex h-[28px] items-center rounded-pill bg-surface-soft px-2.5 text-[14px] ${chipCls}`}>
+                {c}
+              </li>
+            ))}
+          </ul>
+        )}
+        <Money b={b} tone={tone} wide={false} />
+      </div>
+      <Money b={b} tone={tone} wide />
+    </div>
   );
 }
 
