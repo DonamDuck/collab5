@@ -23,6 +23,7 @@ import { uploadBizCert, uploadPhoto } from "@/lib/upload";
 import { PhotoGrid } from "@/app/register/PhotoGrid";
 import type { Space, SpaceUseType, SpaceCategory, OpenSlot, AccessHow, RepeatRule } from "@/lib/types";
 import { expandRepeat, hoursBetween, stripRepeat, todayKst } from "@/lib/rent-time";
+import { payoutAmount } from "@/lib/rent-money";
 import {
   BIZ_CERT_MAX_BYTES, BIZ_CERT_TYPES, BIZ_MISMATCH_LINE, bizCertPathOk, bizDigits, bizNumberProblem, formatBizNumber, fromOpenDate,
   hasAnyBiz, openDateProblem, toOpenDate,
@@ -349,11 +350,12 @@ export function SpaceForm({
     setRestored(false);
   };
 
-  // ⚠️`payout()`을 import하지 않고 식을 옮겨 적었다 — 그 함수는 `lib/spaces.ts`에 있고, 그 파일은
-  //   supabase 클라이언트를 끌고 온다. 클라이언트 번들에 데이터 계층 한 벌이 통째로 실린다.
+  // ⚠️`payout()`(`lib/spaces.ts`)을 import하지 않는다 — 그 파일은 supabase 클라이언트를 끌고 와서
+  //   클라이언트 번들에 데이터 계층 한 벌이 통째로 실린다.
   //   ⭐대신 **요율은 서버에서 받는다**(props). 바뀔 수 있는 값이 한 군데에만 있으면 어긋날 자리가 없다.
   // 🔢시간당 값으로 바뀌면서 정산액도 «한 시간치»로 보여 준다(대표 09-16). 09-18부터 상품마다 따로.
-  const payoutOf = (price: number) => Math.floor(price * (1 - feeRate));
+  // 🔢09-18 밤 QA(SEC-03) — 식을 옮겨 적던 것을 `payout()`과 같은 정수 계산 함수(`rent-money`)로 바꿨다. 그 파일은 DB를 안 부른다.
+  const payoutOf = (price: number) => payoutAmount(price, feeRate);
   const uploading = photos.some((p) => p.uploading) || certUploading;
   const readyPhotos = photos.filter((p) => !p.uploading && p.url);
 

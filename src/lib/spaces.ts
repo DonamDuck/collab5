@@ -13,6 +13,7 @@ import type {
 } from "./types";
 import { bookingFinished, todayKst, expandRepeat, stripRepeat, pruneRepeat } from "./rent-time";
 import { productsFromLegacy } from "./rent-products";
+import { payoutAmount } from "./rent-money";
 // 🧪09-17 목 데이터 — 읽기 함수는 첫 줄에서 목 세계를 돌려주고, 쓰기 함수는 첫 줄에서 멈춘다. 개발 빌드 전용(`rent-mock.ts` 머리말).
 import { getRentMock, rentMockOn } from "./rent-mock";
 
@@ -28,9 +29,10 @@ function db(): SupabaseClient | null {
  *     옛 거래를 새 요율로 정산하면 호스트에게 약속한 금액이 사후에 달라진다. */
 export const FEE_RATE = 0.15;
 
-/** 게스트가 낸 돈에서 호스트 몫을 계산한다. 원 단위 내림 — 1원이 남으면 우리가 갖는다. */
+/** 게스트가 낸 돈에서 호스트 몫을 계산한다. 원 단위 내림 — 1원이 남으면 우리가 갖는다.
+ *  🔢09-18 밤 QA(SEC-03) — 계산은 `rent-money.ts`의 정수 연산 한 벌이다(등록 폼·목 데이터와 같은 함수). */
 export function payout(total: number, rate: number = FEE_RATE): number {
-  return Math.floor(total * (1 - rate));
+  return payoutAmount(total, rate);
 }
 
 // ─── 행 ↔ 타입 ───

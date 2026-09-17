@@ -21,7 +21,8 @@ import { checkBusiness } from "./nts-bizcheck";
 import { matchPlace } from "./naver-local";
 import { signCertUpload } from "./host-docs";
 import { hasPayoutAccount, savePayoutAccount, toMasked, validatePayoutInput, type PayoutAccountInput, type PayoutAccountMasked } from "./payout-accounts";
-import { approvePayment, cancelPayment, guestCancelRefundRate, GRACE_MINUTES } from "./rent-payment";
+import { approvePayment, cancelPayment, guestCancelRefundPercent, GRACE_MINUTES } from "./rent-payment";
+import { refundAmount } from "./rent-money";
 import { geocode } from "./geocode";
 import { repo } from "./repo";
 import {
@@ -751,8 +752,9 @@ function cancelRefund(b: SpaceBooking, paidAt?: string): { rate: number; refund:
   //   🩸09-17 QA: 예약 행이 생긴 시각(결제창을 연 때)부터 셌다. 결제 화면에 오래 머문 손님은 결제 뒤 한 시간을 다 못 받았다.
   //     화면은 「결제하고 1시간 안에」라고 말하니 승인 시각부터 센다. 승인 기록이 없는 옛 예약만 행 생성 시각으로.
   const mins = minutesSincePaid(b, paidAt);
-  const rate = guestCancelRefundRate(days, mins);
-  return { rate, refund: Math.floor(b.amountTotal * rate) };
+  // 🔢09-18 밤 QA(SEC-03) — 퍼센트 정수로 정수 연산. `Math.floor(total * 0.7)`은 90,000원에서 62,999원을 냈다.
+  const percent = guestCancelRefundPercent(days, mins);
+  return { rate: percent / 100, refund: refundAmount(b.amountTotal, percent) };
 }
 
 function minutesSincePaid(b: SpaceBooking, paidAt?: string): number {

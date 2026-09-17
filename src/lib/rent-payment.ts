@@ -148,13 +148,21 @@ export const GRACE_MINUTES = 60;
  *  호스트 자율로 두면 전자상거래법 제35조로 무효가 될 수 있다(09-13 법규 조사).
  *  값은 공정위 지침 Ⅲ.1 라가 허용하는 **숙박업 공제율을 상한으로** 잡았다.
  *
+ *  🔢09-18 밤 QA(SEC-03) — 표는 «정수 퍼센트»로 둔다. 돈 계산(`refundAmount`)이 이 정수를 받는다.
+ *    소수 비율(0.7)을 금액에 바로 곱하면 90,000원의 70%가 62,999원이 됐다.
+ *
  *  @param daysBefore 쓰기로 한 날까지 남은 일수
  *  @param minutesSinceBooked 신청한 지 지난 분. 넘기지 않으면 유예 창을 안 본다(옛 호출부 호환).
  */
-export function guestCancelRefundRate(daysBefore: number, minutesSinceBooked?: number): number {
-  if (typeof minutesSinceBooked === "number" && minutesSinceBooked <= GRACE_MINUTES) return 1;
-  if (daysBefore >= 7) return 1;      // 7일 전까지 전액
-  if (daysBefore >= 3) return 0.7;
-  if (daysBefore >= 1) return 0.5;
+export function guestCancelRefundPercent(daysBefore: number, minutesSinceBooked?: number): number {
+  if (typeof minutesSinceBooked === "number" && minutesSinceBooked <= GRACE_MINUTES) return 100;
+  if (daysBefore >= 7) return 100;    // 7일 전까지 전액
+  if (daysBefore >= 3) return 70;
+  if (daysBefore >= 1) return 50;
   return 0;                            // 당일 취소는 환불 없음
+}
+
+/** 같은 표를 비율(1·0.7·0.5·0)로. 화면 문장(「70%」·「전액」)을 만드는 곳이 쓴다. ⚠️금액 계산엔 쓰지 않는다 — `refundAmount`에 퍼센트를 넘긴다. */
+export function guestCancelRefundRate(daysBefore: number, minutesSinceBooked?: number): number {
+  return guestCancelRefundPercent(daysBefore, minutesSinceBooked) / 100;
 }
