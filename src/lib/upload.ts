@@ -1,12 +1,17 @@
 "use client";
 // 사진 1장을 리사이즈해 Storage에 직접 업로드하고 public URL을 돌려준다.
 // Storage env 미설정(로컬 mock)이면 base64 data URL로 폴백.
-import { createBrowserAuthClient, authEnvReady } from "@/lib/supabase/client";
 import { fileToResizedBlob, fileToResizedDataUrl } from "@/lib/image";
 import { createUploadUrlAction } from "@/lib/actions";
 import { createBizCertUploadAction } from "@/lib/rent-actions";
 
 const PHOTO_BUCKET = "maker-photos";
+
+/** 🪶Supabase 브라우저 클라이언트는 «올릴 때» 불러온다(09-18 밤 QA SC-33).
+ *  🩸파일 머리에서 import하면 이 파일을 쓰는 화면(공간 올리기·고치기, 소개서 작성 등)의 첫 JS에
+ *    supabase-js 묶음(gzip 약 64KB)이 통째로 실렸다. 사진을 안 올리고 나가는 사람도 그 값을 냈다.
+ *  한 번 불러오면 브라우저가 들고 있어서 두 번째 사진부터는 기다림이 없다. 환경 판정(`authEnvReady`)도 같은 파일 것을 그대로 쓴다. */
+const loadAuthClient = () => import("@/lib/supabase/client");
 
 /** 단계별 타임아웃 — **무한 스피너의 유일한 탈출구**(2026-07-29, 대표가 실제로 갇힘).
  *
@@ -35,6 +40,7 @@ export async function uploadPhoto(
   /** 🆕저장 경로 접두사(2026-08-10) — 매거진은 `"magazine"`. 안 주면 기존 위치 그대로. */
   prefix?: string
 ): Promise<string> {
+  const { authEnvReady, createBrowserAuthClient } = await loadAuthClient();
   if (!authEnvReady) return fileToResizedDataUrl(file, maxDim);
   // ① 서명 URL 발급(서버 액션) — 서버가 조용히 안 돌아오는 경우가 여기다
   const signed = await withTimeout(createUploadUrlAction("photo", prefix), 15_000, "sign");
@@ -61,6 +67,7 @@ export async function uploadPhoto(
  *  리사이즈하지 않는다(글자가 뭉개지면 검토를 못 한다). 공개 URL이 없어서 «경로»를 돌려준다. 저장할 때 서버가 이 사람 폴더인지 다시 본다.
  *  실패하면 사장님께 그대로 보일 문장을 담아 던진다. `mime`은 호출부가 파일에서 정한 값(확장자로 보충한 것 포함). */
 export async function uploadBizCert(file: File, mime: string): Promise<string> {
+  const { authEnvReady, createBrowserAuthClient } = await loadAuthClient();
   if (!authEnvReady) throw new Error("지금은 파일을 올릴 수 없어요. 잠시 뒤 다시 시도해 주세요.");
   const signed = await withTimeout(createBizCertUploadAction(mime, file.size), 15_000, "sign").catch(() => null);
   if (!signed) throw new Error("파일을 올릴 자리를 만들지 못했어요. 잠시 뒤 다시 시도해 주세요.");
@@ -79,6 +86,7 @@ export async function uploadBizCert(file: File, mime: string): Promise<string> {
 export async function uploadPdf(file: File): Promise<string> {
   if (file.type !== "application/pdf") throw new Error("pdf-only");
   if (file.size > 10 * 1024 * 1024) throw new Error("too-large");
+  const { authEnvReady, createBrowserAuthClient } = await loadAuthClient();
   if (!authEnvReady) throw new Error("storage-required");
   const signed = await createUploadUrlAction("pdf");
   if ("error" in signed) throw new Error(signed.error);
