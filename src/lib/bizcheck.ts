@@ -86,6 +86,28 @@ export function hasAnyBiz(b: { bizNumber: string; bizOwnerName: string; bizOpenD
   return !!(bizDigits(b.bizNumber) || b.bizOwnerName.trim() || b.bizOpenDate.trim() || b.bizCertPath.trim());
 }
 
+/** 🧾이 저장에 사업자 정보가 필요한가 — 등록 폼(화면)과 서버 액션이 «같은 함수»로 판정한다 (09-18 밤 QA H-03).
+ *  필요한 경우
+ *   ① 새 공간 · ② 아직 안 올린 초안
+ *   ③ 이미 사업자 정보가 있던 공간(한 번 낸 것은 지우지 못한다) · ④ 넷 중 하나라도 적은 고치기
+ *   ⑤ 🆕**옛 공간(09-18 전, 넷 다 비어 있음)이 이름이나 주소를 바꿀 때.** 가게가 바뀌면 검토 대기로 내려가는데
+ *      공개의 조건이 사업자 확인이라, 그냥 두면 검토 대기에서 멈춘 채 사장님은 이유를 모른다.
+ *  ⚠️옛 공간이 «다른 칸만» 고치는 건 그대로 저장된다(대표 설계 — 공개 중인 공간의 저장을 막지 않는다). */
+export function needsBizInfo(
+  prev: {
+    status?: string; name: string; address: string;
+    bizNumber: string; bizOwnerName: string; bizOpenDate: string; bizCertPath: string;
+  } | null,
+  next: {
+    name: string; address: string;
+    bizNumber: string; bizOwnerName: string; bizOpenDate: string; bizCertPath: string;
+  },
+): boolean {
+  if (!prev || prev.status === "draft") return true;
+  if (hasAnyBiz(prev) || hasAnyBiz(next)) return true;
+  return prev.name.trim() !== next.name.trim() || prev.address.trim() !== next.address.trim();
+}
+
 /** 🏷공간 상세의 「사업자 확인된 가게」 — 관리자가 등록증을 보고 승인했고 «그리고» 국세청 기록과 맞을 때만.
  *  ⚠️키가 없던 때(none)·조회 실패(error)로 관리자가 눈으로 보고 공개한 공간엔 안 붙는다(대표 09-17 설계). */
 export function bizVerified(sp: { bizApprovedAt?: string; bizCheckStatus: BizCheckStatus }): boolean {

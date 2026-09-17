@@ -16,7 +16,8 @@ import {
 } from "./spaces";
 // 🧾🏪09-18 사업자 확인 · 네이버 상호 매칭(대표 09-17). 규칙은 순수 함수(`bizcheck`·`place-match`), 바깥 호출은 서버 전용 파일에.
 import {
-  BIZ_CERT_MAX_BYTES, BIZ_CERT_TYPES, BIZ_MISMATCH_LINE, bizCertPathOk, bizDigits, bizNumberProblem, hasAnyBiz, openDateProblem,
+  BIZ_CERT_MAX_BYTES, BIZ_CERT_TYPES, BIZ_MISMATCH_LINE, bizCertPathOk, bizDigits, bizNumberProblem, hasAnyBiz,
+  needsBizInfo, openDateProblem,
 } from "./bizcheck";
 import { checkBusiness } from "./nts-bizcheck";
 import { matchPlace } from "./naver-local";
@@ -280,7 +281,8 @@ export async function saveSpaceAction(input: SpaceFormInput): Promise<ActionResu
     bizOpenDate: (input.bizOpenDate ?? "").trim(),
     bizCertPath: (input.bizCertPath ?? "").trim(),
   };
-  const bizRequired = !prev || hasAnyBiz(prev) || hasAnyBiz(biz);
+  // 🧾09-18 밤 QA(H-03) — 판정은 순수 함수 한 벌(`needsBizInfo`). 화면(`SpaceForm`)이 같은 함수로 먼저 막는다.
+  const bizRequired = needsBizInfo(prev, { name: input.name, address: input.address, ...biz });
   if (bizRequired) {
     const problem =
       bizNumberProblem(biz.bizNumber) ||
@@ -288,7 +290,14 @@ export async function saveSpaceAction(input: SpaceFormInput): Promise<ActionResu
       (biz.bizOwnerName.length > 50 ? "대표자 이름이 너무 길어요. 사업자등록증 그대로 적어 주세요." : "") ||
       openDateProblem(biz.bizOpenDate, todayKst()) ||
       (!biz.bizCertPath ? "사업자등록증 파일을 올려 주세요." : "");
-    if (problem) return { ok: false, message: problem, field: "biz" };
+    if (problem) {
+      // 옛 공간이 이름·주소를 바꿔서 «이제» 필요해진 경우엔 왜 필요한지부터 말한다. 그냥 번호를 적으라고만 하면 뜬금없다.
+      const firstTime = !!prev && !hasAnyBiz(prev) && (renamed || moved);
+      return {
+        ok: false, field: "biz",
+        message: firstTime ? `이름이나 주소를 바꾸시려면 사업자 정보가 필요해요. ${problem}` : problem,
+      };
+    }
     // 🔒새로 올린 경로면 «이 사람 폴더»의 모양인지. 남의 등록증 경로를 끼워 넣어 확인 표시를 받는 길을 막는다.
     if (biz.bizCertPath !== (prev?.bizCertPath ?? "") && !bizCertPathOk(biz.bizCertPath, uid)) {
       return { ok: false, message: "사업자등록증 파일을 다시 올려 주세요.", field: "biz" };
