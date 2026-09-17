@@ -174,6 +174,8 @@ export function BookingForm({
   /** 👥09-18 대표 코멘트 — 「아직 잘 모르겠어요」 체크. 켜면 인원 칸을 비우고 잠근다. */
   const [headUnsure, setHeadUnsure] = useState(false);
   const [phone, setPhone] = useState(initialPhone);
+  /** 🪪09-18 대표 — 이용하실 분 성함(실명). 당일 신분 확인에 쓴다. 프로필엔 실명 칸이 없어 미리 채우지 않는다. */
+  const [guestName, setGuestName] = useState("");
   /** 결제 직전 확인 팝업(대표 09-14: 의사 확인은 팝업으로). 열린 채로 `submit`이 돌지 않게 닫고 시작한다. */
   const [confirming, setConfirming] = useState(false);
   /** 🚨**못 넘어간 이유를 «그 칸 옆»에 둔다**(대표 09-15 [2][3]).
@@ -181,11 +183,12 @@ export function BookingForm({
    *  **누른 자리에서 3,000px 떨어진 곳에 글자가 생겼다.** 화면에는 아무 변화도 없고 팝업도 안 열리니
    *  「버튼이 죽었다」로 읽힌다. 실제로 대표가 그렇게 읽었다.
    *  ⭐그래서 둘을 같이 한다 — 문구는 그 칸 아래에 놓고, 화면을 그 칸으로 끌어올린다. */
-  const [badField, setBadField] = useState<"product" | "date" | "time" | "plan" | "phone" | "">("");
+  const [badField, setBadField] = useState<"product" | "date" | "time" | "plan" | "name" | "phone" | "">("");
   const productRef = useRef<HTMLDivElement>(null);
   const dateRef = useRef<HTMLDivElement>(null);
   const timeRef = useRef<HTMLDivElement>(null);
   const planRef = useRef<HTMLTextAreaElement>(null);
+  const nameRef = useRef<HTMLInputElement>(null);
   const phoneRef = useRef<HTMLInputElement>(null);
 
   // ⏱고른 날의 시간대와 이미 팔린 칸에서 «지금 고를 수 있는 것»을 만든다.
@@ -234,6 +237,8 @@ export function BookingForm({
   const timePicked = !!useDate && !!endTime;
   // ☎️서버(`startBookingAction`)와 같은 규칙 — 숫자만 세서 0으로 시작하는 9~11자리.
   const phoneOk = /^0\d{8,10}$/.test(phone.replace(/\D/g, ""));
+  // 🪪서버(`startBookingAction`)와 같은 규칙 — 앞뒤 공백을 뺀 두 글자 이상.
+  const nameOk = guestName.trim().length >= 2;
   // ⚠️열 글자는 서버(`confirmBookingAction`)가 강제하는 값이다. 여기서 먼저 막는 건 왕복을 아끼려는 것이지
   //   이게 관문이라서가 아니다 — 관문은 늘 서버 쪽이다.
   const planShort = plan.trim().length < 10;
@@ -241,12 +246,13 @@ export function BookingForm({
   /** 버튼이 부르는 건 이것 — 싼 검사만 하고 팝업을 연다. 서버 왕복은 팝업에서 [신청하기]를 누른 뒤다. */
   /** 위에서부터 첫 번째로 비어 있는 칸으로 데려간다. 두 칸이 다 비어도 «위엣것» 하나만 말한다 —
    *  한 번에 둘을 고치라고 하면 어디부터 볼지 또 고민하게 된다. */
-  const stopAt = (f: "product" | "date" | "time" | "plan" | "phone") => {
+  const stopAt = (f: "product" | "date" | "time" | "plan" | "name" | "phone") => {
     setBadField(f);
-    const el = { product: productRef.current, date: dateRef.current, time: timeRef.current, plan: planRef.current, phone: phoneRef.current }[f];
+    const el = { product: productRef.current, date: dateRef.current, time: timeRef.current, plan: planRef.current, name: nameRef.current, phone: phoneRef.current }[f];
     el?.scrollIntoView({ behavior: "smooth", block: "center" });
     // 글 칸은 커서까지 넣어 준다. 날짜는 격자라 커서가 갈 곳이 없다.
     if (f === "plan") planRef.current?.focus({ preventScroll: true });
+    if (f === "name") nameRef.current?.focus({ preventScroll: true });
     if (f === "phone") phoneRef.current?.focus({ preventScroll: true });
   };
 
@@ -257,6 +263,7 @@ export function BookingForm({
     if (!useDate) { stopAt("date"); return; }
     if (!endTime) { stopAt("time"); return; }
     if (planShort) { stopAt("plan"); return; }
+    if (!nameOk) { stopAt("name"); return; }
     if (!phoneOk) { stopAt("phone"); return; }
     setConfirming(true);
   };
@@ -278,6 +285,7 @@ export function BookingForm({
         product: product as RentProduct,
         guestBrandSlug: brandSlug,
         guestPhone: phone.trim(),
+        guestName: guestName.trim(),
       });
       if (!r.ok || !r.orderId || !r.amount) { setErr(r.message || "신청을 시작하지 못했어요."); return; }
 
@@ -537,6 +545,33 @@ export function BookingForm({
         <p className={hintCls}>사장님이 이 글만 보고 정하세요. 열 글자면 충분해요.</p>
       </div>
 
+      {/* 🪪09-18 대표 코멘트 — 「실명 확인 당일날도 필요하고」. 사장님 메일·내 하루 가게의 「성함」 칸이 이 값이다.
+          번호 칸 «위»에 둔다. 누가 오는지를 먼저 적고, 그 사람에게 닿는 번호를 다음에 적는 순서다.
+          ⚠️두 글자 검사는 서버(`startBookingAction`)가 관문이다. 여기는 왕복을 아끼려고 먼저 막는다. */}
+      <div>
+        <label htmlFor="rent-name" className={labelCls}>
+          이용하실 분 성함(실명)
+        </label>
+        <input
+          id="rent-name"
+          ref={nameRef}
+          type="text"
+          autoComplete="name"
+          maxLength={50}
+          className={`${rentInputCls} max-w-[240px]`}
+          value={guestName}
+          onChange={(e) => {
+            setGuestName(e.target.value);
+            if (e.target.value.trim().length >= 2) setBadField((f) => (f === "name" ? "" : f));
+          }}
+          placeholder="예) 김하루"
+        />
+        {badField === "name" && (
+          <p className={errCls}>{guestName.trim() ? "성함을 두 글자 이상 적어 주세요." : "이용하실 분 성함이 필요해요."}</p>
+        )}
+        <p className={hintCls}>이용 당일 신분 확인에 쓰여요. 사장님께만 전달돼요.</p>
+      </div>
+
       {/* ☎️09-17 대표 — 손님 전화번호 필수. 사장님이 예약을 받은 뒤 보는 손님 연락처가 프로필 전화인데,
           소셜로 가입한 손님은 그 칸이 비어 있어 사장님이 연락할 길이 이메일뿐이었다.
           프로필에 번호가 있으면 미리 채우고, 없으면 여기서 받아 서버가 프로필에 적는다(`savePhoneIfEmpty`). */}
@@ -703,6 +738,8 @@ export function BookingForm({
           <ul className="mt-2 space-y-2 border-t border-hairline pt-3">
             {[
               CONTACT_RULE_GUEST,
+              // 🪪09-18 대표 — 「신청할 때 약관 동의 같은 데 넣어야 할 수도」. 약관 제10조에 넣은 한 줄을 돈 내기 직전에 한 번 더.
+              "이용 당일 사장님이 신분증으로 성함을 확인할 수 있어요.",
               "공간은 사장님이 직접 빌려주세요. collab5는 신청과 결제를 이어 드리는 통신판매중개자라 거래의 당사자는 아니에요.",
             ].map((line) => (
               <li key={line} className="flex gap-2 text-[15px] leading-relaxed break-keep text-body">

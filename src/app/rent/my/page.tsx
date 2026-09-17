@@ -178,7 +178,7 @@ export default async function MyRentPage({
       const didLine =
         didId === b.id
           ? did === "accept" && open
-            ? "수락했어요. 아래에 손님 연락처가 열렸어요."
+            ? "수락했어요. 아래에서 손님 연락처를 보실 수 있어요."
             : did === "reject" && b.status === "refunded"
               ? "거절했어요. 손님께 전액 돌려드렸어요."
               : did === "reject" && b.status === "rejected"
@@ -219,10 +219,11 @@ export default async function MyRentPage({
               </Link>
             </p>
           )}
-          {/* 👤수락 전 손님 정보 — 이름과 전화번호가 있는지만(09-17 QA). 번호 «값»은 수락 뒤 연락처 블록이 연다. */}
+          {/* 👤수락 전 손님 정보 — 이름과 전화번호가 있는지만(09-17 QA). 번호 «값»은 수락 뒤 연락처 블록이 연다.
+              🪪09-18 대표 — 이름은 신청 때 받은 성함(실명)이 먼저다. 옛 예약은 성함이 비어 있어 프로필 브랜드명으로 물러선다. */}
           {brief && !open && (
             <p className="mt-2 text-[15px] leading-relaxed break-keep text-mute">
-              손님 <span className="text-body">{brief.name || "이름을 안 적으셨어요"}</span>
+              손님 <span className="text-body">{b.guestName?.trim() || brief.name || "이름을 안 적으셨어요"}</span>
               {" · "}
               {brief.hasPhone || b.guestPhone ? "전화번호를 남기셨어요" : "전화번호가 없어 이메일로 연락하셔야 해요"}
             </p>
@@ -286,7 +287,8 @@ export default async function MyRentPage({
                 // 🩸09-16까지 제목을 안 넘겨서 기본값 「가게 정보」가 떴다. 사장님이 보는 건 손님 정보다.
                 title="손님 연락처"
                 // ☎️신청 때 받은 번호가 프로필 번호보다 먼저다(09-17). 옛 예약은 프로필 번호로.
-                profile={withBookingPhone(contacts.get(b.guestUserId) ?? null, b.guestPhone)}
+                // 🪪이름도 신청 때 받은 성함(실명)이 먼저다(09-18). 옛 예약은 프로필 브랜드명 그대로.
+                profile={withBookingContact(contacts.get(b.guestUserId) ?? null, b.guestPhone, b.guestName)}
                 // 🙈이용일이 지난 예약은 가린다 — 손님 쪽(`GuestBookingRow`)과 같은 규칙(09-17 QA 🔴).
                 //   09-16까지 사장님 화면만 안 넘겨서, 다녀간 뒤에도 손님 번호·메일이 계속 열려 있었다.
                 masked={b.status === "done" || bookingFinished(b)}
@@ -583,9 +585,11 @@ export default async function MyRentPage({
   );
 }
 
-/** 예약에 적힌 손님 번호를 프로필 번호 자리에 얹는다. 둘 다 없으면 프로필 그대로(블록이 「번호를 안 남기셨어요」라고 말한다). */
-function withBookingPhone(p: Profile | null, bookingPhone: string): Profile | null {
+/** 예약에 적힌 손님 번호·성함을 프로필의 번호·이름 자리에 얹는다. 비어 있는 쪽은 프로필 그대로
+ *  (블록이 「번호를 안 남기셨어요」라고 말한다). 🪪성함(09-18)은 이용 당일 신분을 맞춰 보는 이름이라 브랜드명보다 먼저다. */
+function withBookingContact(p: Profile | null, bookingPhone: string, bookingName: string): Profile | null {
+  if (!p) return p;
   const phone = bookingPhone?.trim();
-  if (!phone) return p;
-  return p ? { ...p, phone } : p;
+  const name = bookingName?.trim();
+  return { ...p, ...(phone ? { phone } : {}), ...(name ? { brandName: name } : {}) };
 }

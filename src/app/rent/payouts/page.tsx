@@ -125,7 +125,8 @@ export default async function RentPayoutsPage() {
                     <p className="mt-0.5 text-[14px] text-mute">{PRODUCT_LABEL[b.product]} · {bookingWhen(b)}</p>
                     <dl className="mt-2 space-y-1 text-[14px] leading-relaxed">
                       <div className="flex gap-2"><dt className="w-[48px] shrink-0 text-mute">사장님</dt><dd className="min-w-0 break-all text-body">{line(host)}</dd></div>
-                      <div className="flex gap-2"><dt className="w-[48px] shrink-0 text-mute">손님</dt><dd className="min-w-0 break-all text-body">{line(guest && b.guestPhone ? { ...guest, phone: b.guestPhone } : guest)}</dd></div>
+                      {/* 🪪손님 이름은 신청 때 받은 성함(실명)이 먼저, 번호도 신청 때 받은 번호가 먼저다(09-17·09-18). 옛 예약은 프로필 그대로. */}
+                      <div className="flex gap-2"><dt className="w-[48px] shrink-0 text-mute">손님</dt><dd className="min-w-0 break-all text-body">{line(guest ? { ...guest, ...(b.guestPhone ? { phone: b.guestPhone } : {}), ...(b.guestName?.trim() ? { brandName: b.guestName.trim() } : {}) } : guest)}</dd></div>
                       {b.refundRequestNote && (
                         <div className="flex gap-2"><dt className="w-[48px] shrink-0 text-mute">사정</dt><dd className="min-w-0 whitespace-pre-line text-body">{b.refundRequestNote}</dd></div>
                       )}

@@ -308,6 +308,8 @@ export interface BookingFormInput {
   guestBrandSlug: string;
   /** ☎️손님 연락처 — 필수(대표 09-17). 예약 행(`guest_phone`)에 적고, 프로필이 비었으면 거기도 채운다. */
   guestPhone: string;
+  /** 🪪이용하실 분 성함(실명) — 필수(대표 09-18). 이용 당일 사장님이 신분을 확인하는 이름이라 예약 행(`guest_name`)에 적는다. */
+  guestName: string;
 }
 
 export interface StartBookingResult extends ActionResult {
@@ -340,6 +342,11 @@ export async function startBookingAction(input: BookingFormInput): Promise<Start
   if (!/^0\d{8,10}$/.test(phoneDigits)) {
     return { ok: false, message: "연락받을 전화번호를 다시 봐 주세요. 숫자 9~11자리예요." };
   }
+  // 🪪09-18 대표 — 이용하실 분 성함(실명) 필수. 당일 신분 확인에 쓰는 이름이라 두 글자 미만이면 받지 않는다.
+  //   위 번호와 같이 화면도 막지만 관문은 여기다. 너무 긴 값은 메일 표를 깨뜨려서 50자를 넘으면 돌려보낸다.
+  const guestName = (input.guestName ?? "").trim().replace(/\s+/g, " ");
+  if (guestName.length < 2) return { ok: false, message: "이용하실 분 성함을 두 글자 이상 적어 주세요." };
+  if (guestName.length > 50) return { ok: false, message: "성함이 너무 길어요. 50자 안으로 적어 주세요." };
 
   // ⏳지난 «날»은 여기서 자른다. 화면도 거르지만(`futureSlots`) 관문은 여기다 —
   //   열어 둔 날이 지나가도 목록에는 남아 있어서, 주소를 그대로 들고 온 사람은 화면을 안 거친다.
@@ -374,7 +381,7 @@ export async function startBookingAction(input: BookingFormInput): Promise<Start
   const orderId = `rent-${sp.id}-${input.useDate.replace(/-/g, "")}-${Math.random().toString(36).slice(2, 10)}`;
 
   const booking = await createPendingBooking({
-    spaceId: sp.id, guestUserId: uid, guestBrandSlug: input.guestBrandSlug, guestPhone: input.guestPhone.trim(),
+    spaceId: sp.id, guestUserId: uid, guestBrandSlug: input.guestBrandSlug, guestPhone: input.guestPhone.trim(), guestName,
     useDate: input.useDate, hours: `${input.startTime}~${input.endTime}`, plan: input.plan.trim(),
     startTime: input.startTime, endTime: input.endTime, hoursCount: hours, product: input.product,
     headcount: input.headcount, withChat: amountChat > 0, amountChat,
@@ -548,7 +555,7 @@ export async function decideBookingAction(
     // 🏦계좌가 없으면 메일에 등록 한 줄이 붙는다(09-17).
     await notifyBookingConfirmedToHost(decided, p.space, p.host, p.guest, await hasPayoutAccount(uid));
   });
-  return { ok: true, message: "수락했어요. 아래에 손님 연락처가 열렸어요." };
+  return { ok: true, message: "수락했어요. 아래에서 손님 연락처를 보실 수 있어요." };
 }
 
 /** 취소 환불액 — 견적과 실제 취소가 **같은 계산**을 써야 한다. 둘이 따로 계산하면 팝업엔 70%라 적고 50%만 돌려주는 날이 온다. */
