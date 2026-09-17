@@ -58,6 +58,17 @@ export interface ApproveResult {
 export const PAY_FAIL_SLOT_TAKEN_REFUNDED = "RENT_SLOT_TAKEN_REFUNDED";
 export const PAY_FAIL_SLOT_TAKEN_REFUND_PENDING = "RENT_SLOT_TAKEN_REFUND_PENDING";
 
+/** 🆕09-18 밤 QA(G-01·SC-11·SC-30) — 승인을 «부르기 전에» 막은 넷. 돈은 한 푼도 안 움직인 상태다.
+ *  · `WINDOW_OVER` 결제 시간 30분이 지났다 · `USE_STARTED` 이용 시각이 이미 시작했다
+ *  · `SLOT_TAKEN` 그 사이 다른 분이 먼저 결제했다 · `NOT_AVAILABLE` 공간·상품·열린 시간이 바뀌었다 */
+export const PAY_FAIL_WINDOW_OVER = "RENT_PAY_WINDOW_OVER";
+export const PAY_FAIL_USE_STARTED = "RENT_USE_STARTED";
+export const PAY_FAIL_SLOT_TAKEN = "RENT_SLOT_TAKEN";
+export const PAY_FAIL_NOT_AVAILABLE = "RENT_NOT_AVAILABLE";
+
+/** 결제 시간이 지난 신청에 손님께 하는 말. 결제 화면과 승인이 같은 문장을 쓴다. */
+export const PAY_EXPIRED_LINE = "결제 시간 30분이 지나서 이 신청은 닫혔어요.";
+
 /** 결제 승인 — 결제창이 돌려준 `paymentKey`·`orderId`·`amount`를 서버에서 다시 확정한다.
  *  🚨**금액을 클라이언트가 준 값으로 믿지 마라.** 호출부가 결제 줄에 적힌 금액을 넘겨야 한다.
  *  ⭐09-16부터 토스 응답(Payment)을 «그대로» 돌려준다. 돈의 상태는 우리가 계산하지 않고 토스 말을 옮긴다. */

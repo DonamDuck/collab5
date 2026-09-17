@@ -1,10 +1,12 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { getBookingByOrderId, getSpaceFull, listSpacesByIds } from "@/lib/spaces";
+import { getBookingByOrderId, getSpaceFull, listLiveBookings, listSpacesByIds } from "@/lib/spaces";
 import { getSessionUserId } from "@/lib/profiles";
 import { GRACE_MINUTES, guestCancelRefundRate } from "@/lib/rent-payment";
 import { kstDaysUntil } from "@/lib/rent-time";
-import { bookingWhen, dateLabel, won } from "../../ui";
+import { payWindowLeftMs, pendingBookingProblem } from "@/lib/rent-booking-rules";
+import { bookingWhen, dateLabel, secondaryBtnCls, won } from "../../ui";
 import { COFFEE_CHAT_LABEL, PRODUCT_LABEL } from "@/lib/rent-copy";
 import { PayPanel } from "./PayPanel";
 
@@ -72,10 +74,40 @@ export default async function RentPayPage({ params }: { params: Promise<{ orderI
   const brief = (await listSpacesByIds([b.spaceId])).get(b.spaceId);
   if (!brief) notFound();
 
+  // ⭐09-18 밤 QA(G-01·SC-30) — **결제 승인과 같은 판정을 화면에서도 돌린다.**
+  //   이 화면이 위젯을 보여 주면 손님은 「지금 결제된다」고 읽는다. 승인이 거절할 신청에 결제창을 띄우면
+  //   카드 인증까지 다 하고 실패 화면으로 떨어진다. 그래서 여기서 먼저 말한다.
+  const space = await getSpaceFull(brief.slug);
+  const taken = space ? await listLiveBookings(space.id, b.useDate) : [];
+  const problem = pendingBookingProblem(b, space, taken);
+  if (problem) {
+    // 🔒쉬는 중·검토 대기 공간의 상세는 손님에게 404라(`/rent/[slug]`), 그때는 목록으로 보낸다.
+    const backToSpace = space?.status === "open";
+    return (
+      <main className="mx-auto w-full max-w-[560px] px-4 pt-6 pb-14 sm:px-6">
+        <h1 className="text-[22px] font-bold leading-tight tracking-tight text-ink">결제를 이어갈 수 없어요</h1>
+        <p className="mt-3 text-[17px] leading-relaxed break-keep text-body">
+          {problem.message} 괜찮으시면 {backToSpace ? "이 공간에서 다른 시간을" : "다른 공간을"} 한 번 더 봐 주세요.
+        </p>
+        <div className="mt-8 flex flex-wrap gap-2">
+          <Link href={backToSpace ? `/rent/${brief.slug}` : "/rent"} className={secondaryBtnCls}>
+            {backToSpace ? `${brief.name} 다시 보기` : "다른 공간 보기"}
+          </Link>
+          <Link href="/rent/requests" className={secondaryBtnCls}>
+            내 신청 보기
+          </Link>
+        </div>
+      </main>
+    );
+  }
+  // ⏳5분 아래로 남았으면 한 줄로 알린다. 결제창 안에서 시간이 지나면 처음부터 다시 신청해야 한다(09-18 밤 QA SC-30).
+  const leftMin = Math.ceil(payWindowLeftMs(b.createdAt) / 60_000);
+  const hurryLine = leftMin <= 5 ? `결제 시간이 ${Math.max(1, leftMin)}분 남았어요. 지나면 처음부터 다시 신청하셔야 해요.` : "";
+
   // 💸09-17 QA — 금액 내역. 합계만 있으면 「왜 이 값인가」를 손님이 셈한다. 커피챗 분은 공간의 지금 값이다
   //   (예약 행엔 분이 안 남는다). ☕`amountMentor`는 옛 칸 — 둘 다 본다.
   const chat = b.amountChat || b.amountMentor;
-  const chatMinutes = chat > 0 ? (await getSpaceFull(brief.slug))?.coffeeChatMinutes ?? 0 : 0;
+  const chatMinutes = chat > 0 ? space?.coffeeChatMinutes ?? 0 : 0;
   const hours = b.hoursCount % 1 === 0 ? b.hoursCount : b.hoursCount.toFixed(1);
   const breakdown = [
     // 🛍09-18 「대여」 → 고른 상품 이름. 확인 팝업 내역과 같은 말이다.
@@ -108,6 +140,11 @@ export default async function RentPayPage({ params }: { params: Promise<{ orderI
           __html: `(function(){try{var k='rent-pay-retry:'+location.pathname;var n=+(sessionStorage.getItem(k)||0);if(n>=2)return;setTimeout(function(){if(document.querySelector('#rent-pay-methods iframe'))return;sessionStorage.setItem(k,String(n+1));location.replace(location.pathname+'?r='+Date.now());},9000);}catch(e){}})();`,
         }}
       />
+      {hurryLine && (
+        <p className="mb-4 text-[15px] leading-relaxed break-keep text-mute" role="status">
+          {hurryLine}
+        </p>
+      )}
       <PayPanel
         orderId={b.orderId}
         amount={b.amountTotal}

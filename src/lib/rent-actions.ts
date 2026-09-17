@@ -23,8 +23,11 @@ import { signCertUpload } from "./host-docs";
 import { hasPayoutAccount, savePayoutAccount, toMasked, validatePayoutInput, type PayoutAccountInput, type PayoutAccountMasked } from "./payout-accounts";
 import {
   approvePayment, cancelPayment, guestCancelRefundPercent, GRACE_MINUTES,
-  PAY_FAIL_SLOT_TAKEN_REFUNDED, PAY_FAIL_SLOT_TAKEN_REFUND_PENDING,
+  PAY_EXPIRED_LINE, PAY_FAIL_NOT_AVAILABLE, PAY_FAIL_SLOT_TAKEN, PAY_FAIL_SLOT_TAKEN_REFUNDED,
+  PAY_FAIL_SLOT_TAKEN_REFUND_PENDING, PAY_FAIL_USE_STARTED, PAY_FAIL_WINDOW_OVER,
 } from "./rent-payment";
+// ⭐신청이 «지금도» 말이 되나 — 신청 시작·결제 승인·결제 화면이 같이 쓰는 순수 규칙(09-18 밤 QA G-01).
+import { pendingBookingProblem, validateBookingRequest } from "./rent-booking-rules";
 import { refundAmount } from "./rent-money";
 import { CONTACT_PHONE_MAX, HOST_MESSAGE_MAX, PLAN_MAX, storePhoneOk } from "./rent-limits";
 import { geocode } from "./geocode";
@@ -34,9 +37,9 @@ import {
   notifyBookingPaidToGuest, notifyBookingConfirmedToHost, notifyBookingCancelledToGuest, notifyAdminRefund,
   notifySpacePublished, notifySpaceReview,
 } from "./rent-notify";
-import { bookingStarted, dateLabel, kstDaysUntil, hoursBetween, fitsOpenSlot, isHourMark, nowHhmmKst, overlaps, toMinutes, todayKst } from "./rent-time";
+import { bookingStarted, dateLabel, kstDaysUntil, hoursBetween, isHourMark, toMinutes, todayKst } from "./rent-time";
 import type { Space, SpaceBooking, SpaceUseType, SpaceCategory, OpenSlot, AccessHow, RentProduct, BizCheckStatus } from "./types";
-import { bookingAmount, compatScopePrice, isRentProduct, productOn } from "./rent-products";
+import { bookingAmount, compatScopePrice } from "./rent-products";
 import { PRODUCT_LABEL, withJosa } from "./rent-copy";
 
 // 하루 가게 — 쓰기 서버 액션 (2026-09-13)
@@ -553,10 +556,6 @@ export async function startBookingAction(input: BookingFormInput): Promise<Start
   if (input.plan.trim().length > PLAN_MAX) {
     return { ok: false, message: `그날 무엇을 하실지 ${PLAN_MAX.toLocaleString()}자 안으로 줄여 주세요.` };
   }
-  // 🛍09-18 — 사장님이 켜 둔 상품인지. 화면을 거치지 않은 호출이면 꺼진 상품 이름이 올 수 있다.
-  if (!isRentProduct(input.product) || !productOn(sp, input.product)) {
-    return { ok: false, message: "이 공간에서 팔지 않는 상품이에요. 새로고침하고 다시 골라 주세요." };
-  }
   // ☎️09-17 대표 — 손님 번호는 필수. 화면도 막지만 관문은 여기다(액션은 화면 없이도 불린다).
   //   숫자만 세서 0으로 시작하는 9~11자리면 받는다(지역번호 02 포함). 모양은 손님이 적은 그대로 둔다.
   const phoneDigits = (input.guestPhone ?? "").replace(/\D/g, "");
@@ -569,34 +568,12 @@ export async function startBookingAction(input: BookingFormInput): Promise<Start
   if (guestName.length < 2) return { ok: false, message: "이용하실 분 성함을 두 글자 이상 적어 주세요." };
   if (guestName.length > 50) return { ok: false, message: "성함이 너무 길어요. 50자 안으로 적어 주세요." };
 
-  // ⏳지난 «날»은 여기서 자른다. 화면도 거르지만(`futureSlots`) 관문은 여기다 —
-  //   열어 둔 날이 지나가도 목록에는 남아 있어서, 주소를 그대로 들고 온 사람은 화면을 안 거친다.
-  const today = todayKst();
-  if (input.useDate < today) return { ok: false, message: "지난 날짜는 신청할 수 없어요." };
-
-  // ⏱시간 검사 — 화면에서도 막지만 관문은 여기다.
-  // ⏱09-18 밤 QA(SEC-08) — 정시만 받는다(눈금 1시간, 대표 09-16). 신청 폼은 정시만 고르게 하는데 액션을 직접 부르면
-  //   10:30~12:00처럼 한 시간 반이 팔렸고, 값이 «시간당 값 × 1.5»라 반올림된 금액으로 결제까지 갔다.
-  if (!isHourMark(input.startTime) || !isHourMark(input.endTime)) {
-    return { ok: false, message: "시작과 끝 시각은 정시로만 고를 수 있어요. 새로고침하고 다시 골라 주세요." };
-  }
-  const hours = hoursBetween(input.startTime, input.endTime);
-  if (hours <= 0) return { ok: false, message: "끝나는 시각이 시작보다 늦어야 해요." };
-  // ⚠️지난 «시각» 검사는 모양 검사 «뒤»다. 앞에 두면 못 읽은 시각(`-1`)이 「이미 지났다」로 잡혀
-  //   글자가 깨졌을 때 엉뚱한 지적이 나간다.
-  if (input.useDate === today && toMinutes(input.startTime) <= toMinutes(nowHhmmKst())) {
-    return { ok: false, message: "이미 지난 시간이에요. 다른 시간을 골라 주세요." };
-  }
-  if (hours < sp.minHours) return { ok: false, message: `이 공간은 최소 ${sp.minHours}시간부터 빌릴 수 있어요.` };
-  if (!fitsOpenSlot(sp.openSlots, input.useDate, input.startTime, input.endTime)) {
-    return { ok: false, message: "사장님이 열어 두신 시간 안에서 골라 주세요." };
-  }
-  // 이미 팔린 시간과 겹치는지. ⚠️여기서 막아도 «관문은 DB»다 — 두 사람이 같은 순간에 들어오면
-  //   이 검사는 둘 다 통과시키고, 승인 때 배제 제약이 뒤에 온 쪽을 떨어뜨린다.
+  // ⭐09-18 밤 QA(G-01·SC-11) — 날짜·시각·상품·열린 시간·겹침·인원은 «순수 함수 한 벌»이 본다.
+  //   결제 승인(`confirmBookingAction`)과 결제 화면이 같은 함수로 다시 보므로, 규칙이 여기에만 있으면 안 된다.
   const taken = await listLiveBookings(sp.id, input.useDate);
-  if (taken.some((b) => overlaps(b.startTime, b.endTime, input.startTime, input.endTime))) {
-    return { ok: false, message: "그 시간은 이미 찼어요. 다른 시간을 골라 주세요." };
-  }
+  const rule = validateBookingRequest(sp, input, new Date(), taken);
+  if (!rule.ok) return { ok: false, message: rule.message };
+  const hours = rule.hours;
 
   // ⭐금액은 공간 행의 «고른 상품 값»으로 다시 계산한다(09-18). 화면이 본 값과 같은 함수(`bookingAmount`)다.
   const amt = bookingAmount(sp, input.product, hours, input.withChat);
@@ -671,12 +648,37 @@ export async function confirmBookingAction(
   const b = await getBookingByOrderId(orderId);
   if (!b) return { ok: false, message: "그 신청을 찾지 못했어요." };
   if (b.guestUserId !== uid) return { ok: false, message: "내 신청만 결제할 수 있어요." };
+  // ⏳결제 시간이 지나 이미 닫힌 신청. 조용히 완료로 보내면 손님은 「됐다」고 읽는다(09-18 밤 QA SC-30).
+  if (b.status === "expired") {
+    return { ok: false, message: PAY_EXPIRED_LINE, code: PAY_FAIL_WINDOW_OVER, bookingId: b.id };
+  }
   // 새로고침·뒤로가기로 이 함수가 두 번 불릴 수 있다. 이미 끝난 건 조용히 성공으로 돌려준다.
   if (b.status !== "pending") return { ok: true, message: "이미 신청이 끝났어요.", bookingId: b.id };
 
   // 🚨승인 금액은 «결제 줄»에 적힌 값이다. 주소창의 amount는 안 믿는다.
   const pay = await getPaymentByOrderId(orderId);
   if (!pay) return { ok: false, message: "결제 기록을 찾지 못했어요. 처음부터 다시 신청해 주세요." };
+
+  // ⭐09-18 밤 QA(G-01·SC-11·SC-30) — **승인을 부르기 «전»에** 공간을 다시 읽어 신청 시작과 같은 판정을 돌린다.
+  //   결제창에 다녀오는 30분 사이에 이용 시각이 지나거나, 사장님이 공간을 쉬게 하거나, 그 시간이 닫히거나,
+  //   다른 분이 먼저 결제할 수 있다. 걸리면 토스를 아예 안 부른다 — **돈이 움직이지 않는다.**
+  //   ⏳시각이 시작했거나 30분이 지난 신청은 만료로 옮긴다(정리 작업이 하는 일과 같다).
+  const brief = (await listSpacesByIds([b.spaceId])).get(b.spaceId);
+  const space = brief ? await getSpaceFull(brief.slug) : null;
+  const taken = space ? await listLiveBookings(space.id, b.useDate) : [];
+  const problem = pendingBookingProblem(b, space, taken);
+  if (problem) {
+    const expire = problem.code === "expired" || problem.code === "started";
+    if (expire) await rentSync(orderId, { bookingStatus: "expired", toss: { status: "EXPIRED" } });
+    return {
+      ok: false,
+      message: `${problem.message} ${expire ? "공간에서 다른 시간을 골라 주세요." : "잠시 뒤 공간에서 다시 골라 주세요."}`,
+      code: problem.code === "taken" ? PAY_FAIL_SLOT_TAKEN
+        : problem.code === "started" ? PAY_FAIL_USE_STARTED
+          : problem.code === "expired" ? PAY_FAIL_WINDOW_OVER : PAY_FAIL_NOT_AVAILABLE,
+      bookingId: b.id,
+    };
+  }
 
   const approved = await approvePayment(paymentKey, orderId, pay.amount);
   if (!approved.ok || !approved.payment) {
