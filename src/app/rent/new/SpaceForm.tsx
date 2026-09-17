@@ -471,7 +471,7 @@ export function SpaceForm({
             : initial.status === "open"
               ? "ok"
               : "kept";
-      router.push(`/rent/my?saved=${saved}`);
+      router.push(`/rent/my?tab=host&saved=${saved}`);
       router.refresh();
     });
 

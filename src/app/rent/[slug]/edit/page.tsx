@@ -33,7 +33,7 @@ export default async function EditSpacePage({ params }: { params: Promise<{ slug
   return (
     <main className="mx-auto w-full max-w-[560px] px-4 pt-8 pb-16 sm:px-6 sm:pt-12">
       <header>
-        <Link href="/rent/my" className="inline-block py-[12px] text-[15px] text-mute underline underline-offset-2">
+        <Link href="/rent/my?tab=host" className="inline-block py-[12px] text-[15px] text-mute underline underline-offset-2">
           ← 내 하루 가게
         </Link>
         <h1 className="mt-3 text-[28px] font-bold leading-[1.25] tracking-[-0.02em] break-keep text-ink">

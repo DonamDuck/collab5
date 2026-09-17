@@ -54,7 +54,7 @@ export function HostDecide({
       // 💬09-17 QA — 누르면 버튼이 사라지고 화면이 조용히 바뀌어서 됐는지 배지를 찾아봐야 했다.
       //   이 버튼은 상태가 바뀌면 화면에서 빠지므로(부모가 `paid`일 때만 그린다) 결과 줄은 부모가 띄운다.
       //   `did`와 예약 번호를 주소에 실어 보내면 그 줄 안에 한 번 뜬다. 거절 뒤 환불 성패는 부모가 상태로 읽는다.
-      router.replace(`/rent/my?did=${accept ? "accept" : "reject"}&b=${bookingId}`, { scroll: false });
+      router.replace(`/rent/my?tab=host&did=${accept ? "accept" : "reject"}&b=${bookingId}`, { scroll: false });
       router.refresh();
     });
 

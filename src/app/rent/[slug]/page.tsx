@@ -463,7 +463,7 @@ export default async function SpaceDetailPage({
             {isOwner ? (
               <p className="text-[17px] leading-relaxed break-keep text-body">
                 사장님 공간이라 신청은 못 하세요. 받은 신청은{" "}
-                <Link href="/rent/my" className="underline underline-offset-4">
+                <Link href="/rent/my?tab=host" className="underline underline-offset-4">
                   내 하루 가게
                 </Link>
                 에서 보실 수 있어요.

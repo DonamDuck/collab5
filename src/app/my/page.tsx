@@ -13,6 +13,7 @@ import { SavedMakerRow } from "./SavedMakerRow";
 import { ReportArchiveCard } from "./ReportArchiveCard";
 import { BriefCard } from "./BriefCard";
 import { MyTabs } from "./MyTabs";
+import { FloatingTabs } from "@/components/FloatingTabs";
 import { ProfileAvatarEditor } from "./ProfileAvatarEditor";
 import { CollabRecorder } from "./CollabRecorder";
 import { EmptyState } from "@/components/EmptyState";
@@ -255,27 +256,16 @@ export default async function MyPage({ searchParams }: { searchParams: Promise<{
 
       {/* 🗂09-18 큰 칸 두 개 — 「소개서·콜라보 | 하루 가게」. `/rent/my`의 「빌려준 공간 | 빌린 공간」과 같은 알약 모양이라
           큰 칸 → 작은 칸의 두 단계로 읽힌다. 주소(`?area=`)로 나눠 새로고침·메일 링크에서도 같은 칸이 열린다. */}
-      <nav aria-label="내 페이지 나누기" className="mt-8 inline-flex rounded-pill bg-surface-soft p-1">
-        {([
-          { key: "brand", label: "소개서·콜라보" },
-          { key: "rent", label: "하루 가게" },
-        ] as const).map((it) => (
-          <Link
-            key={it.key}
-            href={`/my?area=${it.key}`}
-            aria-current={area === it.key ? "page" : undefined}
-            className={`flex h-[44px] items-center gap-1.5 rounded-pill px-5 text-[15px] font-medium transition-colors sm:px-6 ${
-              area === it.key ? "bg-surface text-ink shadow-[0_1px_3px_rgba(0,0,0,0.08)]" : "text-mute hover:text-body"
-            }`}
-          >
-            {it.label}
-            {/* 답할 새 요청이 있으면 칸 이름 옆에 작은 점 — 다른 칸을 보고 있어도 알 수 있게. */}
-            {it.key === "rent" && rentToAnswer > 0 && (
-              <span aria-label={`새 요청 ${rentToAnswer}건`} className="size-[7px] rounded-full bg-lemon-on" />
-            )}
-          </Link>
-        ))}
-      </nav>
+      {/* 🔁09-18 대표 코멘트 — 「플로팅 처럼 보이긴 하는데… 중앙 플로팅이면 어떨까?」 → 가운데 떠 따라오는 알약(`FloatingTabs`). */}
+      <FloatingTabs
+        className="mt-6"
+        label="내 페이지 나누기"
+        active={area}
+        items={[
+          { key: "brand", label: "소개서·콜라보", href: "/my?area=brand" },
+          { key: "rent", label: "하루 가게", href: "/my?area=rent", dot: rentToAnswer > 0 },
+        ]}
+      />
 
       {area === "brand" && (
         <>

@@ -13,7 +13,9 @@ export function ClearQuery() {
     try {
       const url = new URL(window.location.href);
       if (!url.search) return;
-      window.history.replaceState(window.history.state, "", url.pathname + url.hash);
+      // 🗂09-18 칸(`tab`)은 남긴다 — 지우면 새로고침 때 기본 칸(빌린 공간)으로 튄다. 한 번 뜨는 알림 표시만 걷는다.
+      const tab = url.searchParams.get("tab");
+      window.history.replaceState(window.history.state, "", url.pathname + (tab ? `?tab=${tab}` : "") + url.hash);
     } catch {
       // 주소를 못 고쳐도 화면에는 영향이 없다. 조용히 둔다.
     }

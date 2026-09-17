@@ -13,7 +13,8 @@ import { bookingFinished, bookingStarted } from "@/lib/rent-time";
 import type { SpaceBooking } from "@/lib/types";
 import { ClearQuery } from "./ClearQuery";
 import { GuestBookingRow, loadGuestBookings } from "../GuestBookingRow";
-import { BookingBadge, ListRow as Row, SpaceBadge, bookingWhen, primaryBtnCls, won } from "../ui";
+import { FloatingTabs } from "@/components/FloatingTabs";
+import { BookingBadge, ListRow as Row, SpaceBadge, bookingWhen, primaryBtnCls, secondaryBtnCls, won } from "../ui";
 import { PRODUCT_LABEL } from "@/lib/rent-copy";
 import { productPrice, sellableProducts } from "@/lib/rent-products";
 
@@ -303,22 +304,28 @@ export default async function MyRentPage({
       );
     };
 
-  const tab: "host" | "guest" =
-    tabParam === "guest" || tabParam === "host"
-      ? tabParam
-      : mySpaces.length === 0 && hostBookings.length === 0 && guestBookings.length > 0
-        ? "guest"
-        : "host";
+  // 🔁09-18 대표 코멘트 — 기본 칸은 «빌린 공간». 사장님에게 가는 링크(메일·저장 뒤·정산)는 `?tab=host`를 달고 온다.
+  const tab: "host" | "guest" = tabParam === "host" ? "host" : "guest";
 
   return (
     <main className="mx-auto w-full max-w-[720px] px-4 pt-8 pb-16 sm:px-6 sm:pt-12">
       {/* 한 번 뜬 알림 표시(`saved`·`did`)를 주소에서 지운다. key로 새로 달아야 같은 화면 안의 두 번째 알림에서도 돈다. */}
       {(saved || did) && <ClearQuery key={`${saved ?? ""}-${did ?? ""}-${didBooking ?? ""}`} />}
       <header>
-        <Link href="/rent" className="inline-block py-[12px] text-[15px] text-mute underline underline-offset-2">
-          ← 하루 가게
-        </Link>
-        <h1 className="mt-3 text-[28px] font-bold leading-[1.25] tracking-[-0.02em] text-ink">내 하루 가게</h1>
+        {/* 🔁09-18 대표 코멘트 — 「← 하루 가게」가 제목 위 한 줄을 통째로 차지해 상단이 비어 보였다.
+            앱처럼 헤더에 넣기엔 우리 헤더가 사이트 공용이라, 제목 왼쪽에 44px 화살표 하나로 붙인다(원티드·리멤버 웹의 상세 제목 줄). */}
+        <div className="flex items-center gap-1">
+          <Link
+            href="/rent"
+            aria-label="하루 가게로 돌아가기"
+            className="-ml-3 flex size-[44px] shrink-0 items-center justify-center rounded-pill text-body transition-colors hover:bg-surface-soft"
+          >
+            <svg aria-hidden="true" viewBox="0 0 24 24" className="size-[22px]" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M15 18l-6-6 6-6" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </Link>
+          <h1 className="text-[28px] font-bold leading-[1.25] tracking-[-0.02em] text-ink">내 하루 가게</h1>
+        </div>
         {/* 🏦대표만 보인다. 판정은 `isRentAdmin` 한 벌이고, 정산 화면도 같은 판정으로 다시 막는다. */}
         {admin && (
           <Link href="/rent/payouts" className="mt-2 inline-block py-[12px] text-[15px] text-mute underline underline-offset-2">
@@ -337,23 +344,16 @@ export default async function MyRentPage({
           ⭐두 칸은 같은 사람의 두 얼굴이다(빌려주는 나 · 빌리는 나). 위아래로 쌓으면 아래 것이 부록처럼 읽힌다.
           탭은 주소(`?tab=`)로 나눈다 — 새로고침·뒤로 가기·메일 링크에서도 같은 칸이 열린다.
           기본 칸: 공간이나 들어온 요청이 있으면 «빌려준 공간», 빌린 것만 있으면 «빌린 공간». */}
-      <nav aria-label="내 하루 가게 나누기" className="mt-8 inline-flex rounded-pill bg-surface-soft p-1">
-        {([
-          { key: "host", label: "빌려준 공간" },
-          { key: "guest", label: "빌린 공간" },
-        ] as const).map((it) => (
-          <Link
-            key={it.key}
-            href={`/rent/my?tab=${it.key}`}
-            aria-current={tab === it.key ? "page" : undefined}
-            className={`flex h-[44px] items-center rounded-pill px-5 text-[15px] font-medium transition-colors sm:px-6 ${
-              tab === it.key ? "bg-surface text-ink shadow-[0_1px_3px_rgba(0,0,0,0.08)]" : "text-mute hover:text-body"
-            }`}
-          >
-            {it.label}
-          </Link>
-        ))}
-      </nav>
+      <FloatingTabs
+        className="mt-6"
+        label="내 하루 가게 나누기"
+        active={tab}
+        items={[
+          // 🔁09-18 대표 코멘트 — 「대부분 공급자보다 신청자가 많을 거라 빌린 공간이 먼저, default 왼쪽으로」.
+          { key: "guest", label: "빌린 공간", href: "/rent/my?tab=guest" },
+          { key: "host", label: "빌려준 공간", href: "/rent/my?tab=host", dot: toAnswer.length > 0 },
+        ]}
+      />
 
       {tab === "host" && (
         <>
@@ -425,14 +425,11 @@ export default async function MyRentPage({
 
       {/* ── ② 내가 올린 공간 ── */}
       <section id="spaces" className="mt-12 scroll-mt-20">
-        <div className="flex items-baseline justify-between gap-3">
-          <h2 className={h2Cls}>내가 올린 공간</h2>
-          <Link href="/rent/new" className="shrink-0 py-[12px] text-[15px] text-mute underline underline-offset-2">
-            새로 올리기
-          </Link>
-        </div>
+        {/* 🔁09-18 대표 코멘트 — 제목 옆 글자 링크 「새로 올리기」 대신, 목록 아래 「+ 공간 올리기」 버튼. */}
+        <h2 className={h2Cls}>내가 올린 공간</h2>
         {mySpaces.length === 0 ? (
-          <p className={emptyCls}>아직 올리신 공간이 없어요. 몇 시간만 비어도 괜찮아요.</p>
+          // ⚠️대표 문안은 「1시간, 30분 단위」였는데 열리는 시간은 정시만이다(`OpenSlotsCalendar` 09-16 대표 결정). 사실에 맞춰 1시간으로.
+          <p className={emptyCls}>아직 올린 공간이 없어요. 내 공간이 있다면 비는 시간을 1시간 단위로 빌려줄 수 있어요.</p>
         ) : (
           <ul className="mt-5">
             {mySpaces.map((sp) => (
@@ -485,6 +482,9 @@ export default async function MyRentPage({
             ))}
           </ul>
         )}
+        <Link href="/rent/new" className={`${secondaryBtnCls} mt-5 h-[48px] w-full sm:w-auto sm:px-6`}>
+          + 공간 올리기
+        </Link>
       </section>
 
       {/* ── ①' 정산 받을 계좌 (09-17) ── 공간을 올린 분에게만. 🔗메일·확정 줄이 `#payout-account`로 곧장 내려온다. */}

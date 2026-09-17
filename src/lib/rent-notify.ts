@@ -174,7 +174,7 @@ function spaceLink(space: Space): string {
 }
 
 /** 🏦사장님이 정산 계좌를 등록하는 자리(09-17). `/rent/my`의 그 절로 곧장 내려간다. */
-const PAYOUT_ACCOUNT_LINK = `${SITE_URL}/rent/my#payout-account`;
+const PAYOUT_ACCOUNT_LINK = `${SITE_URL}/rent/my?tab=host#payout-account`;
 
 /** 취소·환불 규정 한 줄. 상세 페이지 «환불 규정» 절과 호스트 약관 제8조의 숫자 그대로다 — 바뀌면 셋 다. */
 const CANCEL_POLICY_LINE =
@@ -191,7 +191,7 @@ export function buildBookingPaid(
   // 🔁09-16 대표 — 「신청했어요」 → 「예약이 들어왔어요」. 09-17 대표 결정 4로 한 번 더 — 사장님 쪽에 들어온 것은 «요청»,
   //   수락한 뒤가 «예약»이다. 제목 문장은 `BOOKING_HEADLINE.hostPaid` 한 벌을 쓴다.
   const subject = `[collab5] ${when} ${space.name} · ${BOOKING_HEADLINE.hostPaid} · ${won(booking.amountTotal)}`;
-  const link = `${SITE_URL}/rent/my`;
+  const link = `${SITE_URL}/rent/my?tab=host`;
   const brandLine = guestBrand?.slug
     ? `${guestBrand.name.trim() || guestName}\n${SITE_URL}/m/${encodeURIComponent(guestBrand.slug)}`
     : "";
@@ -341,7 +341,7 @@ export function buildBookingConfirmedToHost(
   // 🔁09-17 QA — 제목이 「수락이 잘 들어갔어요」였다. 방금 자기 손으로 누른 일을 되풀이하는 시스템 말이라,
   //   제목을 «그날 챙길 것»으로 바꿨다.
   const subject = `[collab5] ${when} ${space.name} · 손님 연락처와 그날 챙기실 일`;
-  const link = `${SITE_URL}/rent/my`;
+  const link = `${SITE_URL}/rent/my?tab=host`;
   // ☎️번호가 없는 손님이면 «이메일로만 연락된다»고 분명히 쓴다. 문자 안내를 고른 사장님이 할 일을 알 수 있게.
   // ☎️신청 때 받은 번호가 먼저다(09-17). 옛 예약만 프로필 번호로.
   const gPhone = booking.guestPhone?.trim() || guest?.phone?.trim() || "";
@@ -431,7 +431,7 @@ export function buildBookingCancelled(
   const when = dateLabel(booking.useDate);
   // 🔁09-17 QA — 「신청을 취소」였는데 손님 화면은 결제 뒤 «예약»이다. 사장님이 받은 건 이미 결제된 예약이라 «예약»으로.
   const subject = `[collab5] ${withJosa(guestName, "이/가")} ${when} ${space.name} 예약을 취소했어요`;
-  const link = `${SITE_URL}/rent/my`;
+  const link = `${SITE_URL}/rent/my?tab=host`;
   const rows: [string, string][] = [["언제", bookingWhen(booking)], ["공간", space.name], ["상품", productLine(booking, true)]];
   const lead = `${withJosa(guestName, "이/가")} ${when} ${space.name} 예약을 취소했어요. 그 시간이 다시 비었어요.`;
   const text = [
@@ -529,7 +529,7 @@ export function buildAdminRefund(
   const gHtml = layout(gLead, gRows, { href: gLink, label: "다른 하루 가게 둘러보기" }, gTail);
 
   // → 사장님
-  const hLink = `${SITE_URL}/rent/my`;
+  const hLink = `${SITE_URL}/rent/my?tab=host`;
   const hSubject = `[collab5] 신청하신 환불을 처리했어요 · ${when} ${guestName}`;
   const hLead = `신청하신 환불을 처리했어요. ${when} 예약은 취소됐고, ${withJosa(guestName, "은/는")} ${amount}을 돌려받았어요.`;
   const hTail = "확인 전화에 시간 내 주셔서 고마워요.";
@@ -639,7 +639,7 @@ export function buildRemindHost(
   const guestName = displayName(guest, "손님");
   const start = booking.startTime || "";
   const subject = `[collab5] 내일${start ? ` ${start}` : ""} ${space.name} · ${guestName}`;
-  const link = `${SITE_URL}/rent/my`;
+  const link = `${SITE_URL}/rent/my?tab=host`;
   const accepted = booking.status === "confirmed";
   const gPhone = booking.guestPhone?.trim() || guest?.phone?.trim() || "";
   const gEmail = guest?.email?.trim() ?? "";
