@@ -23,9 +23,9 @@ const FROM = process.env.NOTIFY_FROM || "collab5 <onboarding@resend.dev>";
 export type SignupOrigin = "email" | "google" | "kakao";
 
 const ORIGIN_LABEL: Record<SignupOrigin, string> = {
-  email: "이메일 가입",
-  google: "구글 로그인",
-  kakao: "카카오 로그인",
+  email: "이메일로 가입",
+  google: "구글 계정으로 가입",
+  kakao: "카카오 계정으로 가입",
 };
 
 export interface SignupNotice {
@@ -53,32 +53,36 @@ function kstReadable(): string {
 /** 가입 알림 한 통의 제목·본문. 보내는 함수와 개발용 미리보기(`/dev/rent-mail/signup-*`)가 같이 쓴다(09-18).
  *  ⭐미리보기가 따로 글을 만들면 보이는 글과 가는 글이 갈라진다. 그래서 글 만들기를 여기 하나로 뺐다. */
 export function buildSignupMail(n: SignupNotice): { subject: string; text: string; html: string } {
-  const when = kstReadable();
+  const when = `${kstReadable()} (한국 시간)`;
   const originLabel = ORIGIN_LABEL[n.origin];
-  const idText = n.userId === null ? "(조회 실패)" : `#${n.userId}`;
+  const idText = n.userId === null ? "번호를 못 읽어 왔어요" : `#${n.userId}`;
+  const brand = n.brandName?.trim() ?? "";
 
-  // 🙋09-17 브랜드명이 선택이 됐다. 비면 제목 끝이 「—」로 끊기니 이메일로 대신한다.
-  const who = n.brandName?.trim() || `(브랜드명 없음) ${n.email}`;
-  const subject = `[collab5] 새 가입 — ${who}`;
+  // 🔁09-18 메일 전수 — 대표 결정 「메일 제목과 라벨은 사람 말로」를 가입 알림에도 옮겼다.
+  //   제목 「새 가입 — 느린오후」는 대시로 잇는 꼴이었고, 표 칸(ID·업체명·가입 시각)은 행정 낱말이었다.
+  // 🙋09-17 브랜드명이 선택이 됐다. 비면 이메일로 대신 부른다(그래야 받은편지함에서 누구인지 보인다).
+  const subject = `[collab5] ${brand || n.email} 님이 새로 가입했어요`;
+  const lead = "새로운 브랜드가 collab5에 가입했어요.";
+  // 세 번째 값 = 굵게 쓸까. 번호와 브랜드 이름이 알아볼 열쇠라 굵게 두고, 빈 값을 대신하는 말은 굵게 두지 않는다.
+  const rows: [string, string, boolean][] = [
+    ["회원 번호", idText, n.userId !== null],
+    ["브랜드 이름", brand || "비워 두셨어요", !!brand],
+    ["이메일", n.email, false],
+    ["가입한 방법", originLabel, false],
+    ["가입한 때", when, false],
+  ];
 
-  const text = [
-    `새로운 브랜드가 collab5에 가입했어요.`,
-    ``,
-    `ID: ${idText}`,
-    `업체명: ${n.brandName?.trim() || "(비워 둠)"}`,
-    `이메일: ${n.email}`,
-    `가입 경로: ${originLabel}`,
-    `가입 시각: ${when} (KST)`,
-  ].join("\n");
+  const text = [lead, ``, ...rows.map(([k, v]) => `${k}: ${v}`)].join("\n");
 
+  const tr = rows
+    .map(([k, v, bold]) =>
+      `<tr><td style="padding:4px 16px 4px 0;color:#666;white-space:nowrap;vertical-align:top">${esc(k)}</td><td style="padding:4px 0;word-break:keep-all;overflow-wrap:anywhere">${bold ? `<strong>${esc(v)}</strong>` : esc(v)}</td></tr>`,
+    )
+    .join("\n    ");
   const html = `<div style="font-family:-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo',sans-serif;font-size:15px;line-height:1.7;color:#1a1a1a">
   <p style="margin:0 0 16px">새로운 브랜드가 <strong>collab5</strong>에 가입했어요.</p>
   <table style="border-collapse:collapse;font-size:15px">
-    <tr><td style="padding:4px 16px 4px 0;color:#666">ID</td><td style="padding:4px 0"><strong>${esc(idText)}</strong></td></tr>
-    <tr><td style="padding:4px 16px 4px 0;color:#666">업체명</td><td style="padding:4px 0"><strong>${esc(n.brandName?.trim() || "(비워 둠)")}</strong></td></tr>
-    <tr><td style="padding:4px 16px 4px 0;color:#666">이메일</td><td style="padding:4px 0">${esc(n.email)}</td></tr>
-    <tr><td style="padding:4px 16px 4px 0;color:#666">가입 경로</td><td style="padding:4px 0">${esc(originLabel)}</td></tr>
-    <tr><td style="padding:4px 16px 4px 0;color:#666">가입 시각</td><td style="padding:4px 0">${esc(when)} <span style="color:#888">(KST)</span></td></tr>
+    ${tr}
   </table>
 </div>`;
   return { subject, text, html };

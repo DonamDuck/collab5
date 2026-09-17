@@ -26,7 +26,7 @@ import { repo } from "./repo";
 import {
   notifyBookingPaid, notifyBookingConfirmed, notifyBookingRejected, notifyBookingCancelled,
   notifyBookingPaidToGuest, notifyBookingConfirmedToHost, notifyBookingCancelledToGuest, notifyAdminRefund,
-  notifySpacePublished,
+  notifySpacePublished, notifySpaceReview,
 } from "./rent-notify";
 import { bookingStarted, dateLabel, kstDaysUntil, hoursBetween, fitsOpenSlot, nowHhmmKst, overlaps, toMinutes, todayKst } from "./rent-time";
 import type { Space, SpaceBooking, SpaceUseType, SpaceCategory, OpenSlot, AccessHow, RentProduct, BizCheckStatus } from "./types";
@@ -316,6 +316,16 @@ export async function saveSpaceAction(input: SpaceFormInput): Promise<ActionResu
   revalidatePath("/rent");
   revalidatePath(`/rent/${slug}`);
   revalidatePath("/rent/review");
+  // 📨09-18 대표 — 「나한테도 메일 오나? 내가 등록 처리해 줘야 하는데 어떻게 확인하지?」 검토 대기가 생기면 대표에게 한 통.
+  //   🪤이 액션은 사장님이 «저장»을 누를 때마다 불린다. 검토 대기 중에 고쳐 저장해도, 기록과 다름을 고쳐 다시 올려도 또 불린다.
+  //     그래서 «이번 저장으로 처음 검토 대기가 됐을 때만» 보낸다 = 새 공간이거나, 전엔 검토 대기가 아니었는데 이름·주소가 바뀌었을 때.
+  //   메일이 실패해도 저장은 그대로 성공이다(`safeNotify`). 목 모드는 이 함수 첫 줄에서 이미 멈췄다.
+  if (status === "pending" && prev?.status !== "pending") {
+    await safeNotify(async () => {
+      const owner = await getProfileById(uid);
+      await notifySpaceReview(saved, owner, prev ? { name: prev.name, address: prev.address, status: prev.status } : null);
+    });
+  }
   // 화면은 이 말을 안 띄운다 — 저장 뒤 `/rent/my?saved=…`가 상황별 한 줄을 띄운다(09-17).
   // 🧾국세청 기록과 다르면 저장은 하고(관리자가 등록증과 같이 본다) 폼이 그 칸에 고칠 말을 띄운다. 공개는 막힌다.
   if (bizCheckStatus === "mismatch") return { ok: true, message: BIZ_MISMATCH_LINE, slug, bizStatus: bizCheckStatus, field: "biz" };
