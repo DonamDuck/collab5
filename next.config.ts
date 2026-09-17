@@ -18,7 +18,9 @@ const nextConfig: NextConfig = {
   // 로그인 버튼은 옛날식 GET 제출(`/login?email=…`)로 떨어진다. 서버 로그에 ⚠ Blocked cross-origin … 이 찍힌다.
   // ⭐IP는 와이파이를 옮길 때마다 바뀌니 Bonjour 이름(`<맥 이름>.local`)도 같이 연다.
   //   운영 빌드에는 영향이 없는 개발 전용 설정이다.
-  allowedDevOrigins: ["192.168.35.121", "song-yeongdeog-ui-MacBookAir-5.local", "*.local"],
+  // 🧪09-18 밤 — `127.0.0.1`도 연다. 목 쿠키(`rent_mock`)는 localhost 포트를 가리지 않아서 다른 포트는 127.0.0.1로 여는데,
+  //   여기 없으면 화면만 그려지고 버튼·「더 보기」가 하나도 안 눌렸다(요청 줄 카드 작업 중 실측).
+  allowedDevOrigins: ["192.168.35.121", "song-yeongdeog-ui-MacBookAir-5.local", "*.local", "127.0.0.1"],
 
   experimental: {
     // 브랜드 사진(리사이즈 data URL)을 서버 액션으로 저장 → 기본 1MB보다 여유 필요
