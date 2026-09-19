@@ -72,6 +72,8 @@ export async function uploadBizCert(file: File, mime: string): Promise<string> {
   const signed = await withTimeout(createBizCertUploadAction(mime, file.size), 15_000, "sign").catch(() => null);
   if (!signed) throw new Error("파일을 올릴 자리를 만들지 못했어요. 잠시 뒤 다시 시도해 주세요.");
   if ("error" in signed) throw new Error(signed.error);
+  // 🧪09-20 목 모드(개발 빌드 전용)는 저장소에 안 올린다. 서버가 준 가짜 경로로 «올린 뒤» 화면을 보여 준다.
+  if (signed.mock) return signed.path;
   const supabase = createBrowserAuthClient();
   const res = await withTimeout(
     supabase.storage.from("host-docs").uploadToSignedUrl(signed.path, signed.token, file, { contentType: mime }),

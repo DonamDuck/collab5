@@ -7,6 +7,7 @@ import { FEE_RATE, getSpaceFull } from "@/lib/spaces";
 import { bizMissingLine, bizOnFile } from "@/lib/bizcheck";
 import { needsFix } from "@/lib/rent-review";
 import { SpaceForm } from "../../new/SpaceForm";
+import { readBizCertAction } from "@/lib/rent-actions";
 
 // 하루 팝업 — 공간 고치기 (2026-09-14)
 //
@@ -82,7 +83,8 @@ export default async function EditSpacePage({ params }: { params: Promise<{ slug
         )}
       </header>
 
-      <SpaceForm myBrands={myBrands} feeRate={FEE_RATE} initial={sp} noEmail={!me?.email?.trim()} />
+      {/* 🧾09-20 등록증을 바꿔 올리면 글자를 읽어 «빈» 사업자 칸만 채운다(이미 적힌 칸은 안 덮는다). */}
+      <SpaceForm myBrands={myBrands} feeRate={FEE_RATE} initial={sp} noEmail={!me?.email?.trim()} certPrefill={readBizCertAction} />
     </main>
   );
 }

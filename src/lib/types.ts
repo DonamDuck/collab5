@@ -635,6 +635,24 @@ export interface BizCheckDetail {
   taxType?: string;
 }
 
+/** 🧾등록증에서 읽은 칸 (2026-09-20, `lib/bizcert-ocr.ts`). 못 읽었거나 모양이 틀린 칸은 아예 없다.
+ *  번호는 숫자 열 자리, 개업일은 국세청 모양 `YYYYMMDD`. 🔒저장하지 않는다 — 폼의 빈 칸을 채우는 데만 쓴다. */
+export interface BizCertFields {
+  bizName?: string;
+  bizNumber?: string;
+  bizOwnerName?: string;
+  bizOpenDate?: string;
+  /** 사업장 소재지. 폼은 자동으로 넣지 않고 「등록증 주소로 채우기」 버튼으로만 쓴다. */
+  bizAddress?: string;
+}
+
+/** 등록증 읽기의 답(`readBizCertAction`). 화면은 `ok:false`의 이유를 가르지 않는다(전부 「직접 적어 주세요」).
+ *  unreadable 등록증이 아니거나 한 칸도 못 읽음 · error 받기·호출 실패 · timeout 20초 초과 · rate 1분에 세 번 넘음 ·
+ *  off 키 없음 · auth 로그인 안 함이거나 남의 경로. */
+export type BizCertRead =
+  | { ok: true; fields: BizCertFields }
+  | { ok: false; reason: "unreadable" | "error" | "timeout" | "rate" | "off" | "auth" };
+
 /** ⭐`pending`만 돈이 오기 «전»이다. 나머지는 전부 결제가 끝난 뒤의 이야기다.
  *  pending   결제창으로 보내기 직전에 잡아 둔 자리. 🚨**호스트에게는 안 보인다**
  *  paid      결제 완료, 호스트 답 기다리는 중

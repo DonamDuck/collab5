@@ -22,7 +22,7 @@ import { useRouter } from "next/navigation";
 import { saveSpaceAction } from "@/lib/rent-actions";
 import { uploadBizCert, uploadPhoto } from "@/lib/upload";
 import { PhotoGrid } from "@/app/register/PhotoGrid";
-import type { Space, SpaceUseType, SpaceCategory, OpenSlot, AccessHow, RepeatRule } from "@/lib/types";
+import type { Space, SpaceUseType, SpaceCategory, OpenSlot, AccessHow, RepeatRule, BizCertFields, BizCertRead } from "@/lib/types";
 import { durationLabel, expandRepeat, minutesBetween, RENT_MIN_MINUTES, stripRepeat, todayKst } from "@/lib/rent-time";
 import { payoutAmount } from "@/lib/rent-money";
 import { coffeeChatFree } from "@/lib/rent-products";
@@ -117,8 +117,14 @@ const pickCls = (on: boolean) =>
 
 type Photo = { url: string; uploading?: boolean };
 
-/** 🔜등록증에서 읽은 사업자 칸(09-19 #110 OCR 자리). 못 읽은 칸은 비워 온다. 개업일은 국세청 모양 `YYYYMMDD`. */
-export type BizPrefill = Partial<Record<"bizName" | "bizNumber" | "bizOwnerName" | "bizOpenDate", string>>;
+/** 🧾등록증 글자 읽기가 채우는 네 칸(09-20). 주소는 따로 — 자동으로 안 넣고 버튼으로만 쓴다. */
+const CERT_FILL_KEYS = ["bizName", "bizNumber", "bizOwnerName", "bizOpenDate"] as const;
+type CertFillKey = (typeof CERT_FILL_KEYS)[number];
+
+/** 등록증의 사업장 소재지 → 폼의 두 칸(도로명 · 층·호). 끝의 참고항목 「(성수동2가)」는 떼고, 쉼표 뒤는 상세 주소로. */
+function certAddressParts(addr: string): [string, string] {
+  return splitAddress(addr.replace(/\s*\([^()]*\)\s*$/, "").trim());
+}
 
 // 💾새로 올리기 임시 저장 (2026-09-17 대표 「오늘 다 구현」)
 //   칸이 스무 개 가까이라 한 번에 못 끝내는 사장님이 많다. 나갔다 오면 처음부터였다.
@@ -173,9 +179,9 @@ export function SpaceForm({
   noEmail?: boolean;
   /** 🏠이미 올린 공간 수(09-18 밤 QA H-16). 새로 올리기 폼에서만 쓴다. */
   mySpaceCount?: number;
-  /** 🔜등록증을 읽어 사업자 칸 값을 돌려주는 함수(09-19 대표 #110 OCR 자리 — 결정 대기라 아직 아무도 안 넘긴다).
-   *  넘기면 등록증을 올린 직후 부르고, 돌려준 값으로 «비어 있는 칸만» 채운다(`fillEmptyBiz`). 서버 액션을 그대로 넘기면 된다. */
-  certPrefill?: (file: File) => Promise<BizPrefill | null>;
+  /** 🧾등록증을 읽어 사업자 칸 값을 돌려주는 함수(09-19 대표 #110 → 09-20 「OCR 가로 고고」). 올리기 페이지와 고치기 페이지가
+   *  `readBizCertAction`을 그대로 넘긴다. 등록증을 올린 직후 «올린 경로»로 부르고, 돌려준 값으로 «비어 있는 칸만» 채운다(`fillEmptyBiz`). */
+  certPrefill?: (path: string) => Promise<BizCertRead>;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -248,6 +254,12 @@ export function SpaceForm({
   const [certName, setCertName] = useState("");
   const [certUploading, setCertUploading] = useState(false);
   const [certErr, setCertErr] = useState("");
+  /** 🧾등록증 읽기(09-20) — reading 읽는 중 · filled 빈 칸을 채움 · none 못 읽음(「직접 적어 주세요」) · "" 아무 말 안 함. */
+  const [certRead, setCertRead] = useState<"" | "reading" | "filled" | "none">("");
+  /** 등록증에서 읽은 사업장 주소. 공간 주소 칸이 비어 있을 때만 「등록증 주소로 채우기」로 제안한다. */
+  const [certAddr, setCertAddr] = useState("");
+  /** 파일을 연달아 바꾸면 앞 파일의 답이 늦게 와서 뒤 파일의 칸을 채울 수 있다. 마지막 파일의 답만 받는다. */
+  const certSeq = useRef(0);
   /** 서버가 사업자 칸에 돌려준 말(국세청 기록과 다름·휴업·폐업)과 «그때의 세 칸». 칸을 고치면 말이 내려간다.
    *  고치기 화면을 국세청 불일치 공간으로 열면 처음부터 그 말이 서 있다(새로 올리다 불일치면 저장 뒤 이 화면으로 온다). */
   const bizKey = `${bizDigits(bizNumber)}|${bizOwnerName.trim()}|${bizOpenDate}`;
@@ -317,7 +329,7 @@ export function SpaceForm({
     // 그새 소개서를 지웠으면 옛 slug를 붙들지 않는다.
     setBrandPick(myBrands.some((b) => b.slug === d.brandPick) ? d.brandPick : blank.brandPick);
     setBizNumber(d.bizNumber); setBizOwnerName(d.bizOwnerName); setBizOpenDate(d.bizOpenDate); setBizCertPath(d.bizCertPath);
-    setCertName(""); setCertErr("");
+    setCertName(""); setCertErr(""); setCertRead(""); setCertAddr("");
   };
 
   // 열 때 한 번 읽는다. ⚠️useState 초기값에서 읽으면 서버 렌더와 모양이 달라 하이드레이션이 깨진다.
@@ -463,14 +475,42 @@ export function SpaceForm({
     }
   };
 
-  /** 🔜등록증에서 읽은 값으로 «빈 칸만» 채운다(09-19 #110 자리). 사장님이 이미 적은 값을 덮으면
-   *  읽기 오류가 그대로 국세청 조회로 가고, 사장님은 자기가 적은 값이 바뀐 줄 모른다. 개업일은 `YYYYMMDD`로 받는다. */
-  const fillEmptyBiz = (v: BizPrefill | null) => {
-    if (!v) return;
-    if (v.bizName?.trim()) setBizName((cur) => cur.trim() ? cur : v.bizName!.trim());
-    if (v.bizNumber) setBizNumber((cur) => bizDigits(cur) ? cur : bizDigits(v.bizNumber!).slice(0, 10));
-    if (v.bizOwnerName?.trim()) setBizOwnerName((cur) => cur.trim() ? cur : v.bizOwnerName!.trim());
-    if (v.bizOpenDate) setBizOpenDate((cur) => cur || fromOpenDate(v.bizOpenDate!));
+  /** 🧾등록증에서 읽은 값으로 «빈 칸만» 채운다(09-19 #110 자리 → 09-20 연결). 사장님이 이미 적은 값을 덮으면
+   *  읽기 오류가 그대로 국세청 조회로 가고, 사장님은 자기가 적은 값이 바뀐 줄 모른다. 개업일은 `YYYYMMDD`로 받는다.
+   *  돌려주는 건 «실제로 채운» 칸. 비었는지는 지금 화면 값(`bizNow`)으로 보고, 쓰기는 그래도 갱신 함수로 한 번 더 지킨다. */
+  //   ⚠️렌더 중엔 ref를 못 쓴다(react-hooks/refs). 그림이 끝난 뒤 옮겨 둔다 — 읽기 답은 늘 그보다 늦게 온다.
+  const bizNow = useRef({ bizName, bizNumber, bizOwnerName, bizOpenDate });
+  useEffect(() => {
+    bizNow.current = { bizName, bizNumber, bizOwnerName, bizOpenDate };
+  }, [bizName, bizNumber, bizOwnerName, bizOpenDate]);
+  const fillEmptyBiz = (v: BizCertFields): CertFillKey[] => {
+    const now = bizNow.current;
+    const filled: CertFillKey[] = [];
+    if (v.bizName?.trim() && !now.bizName.trim()) {
+      setBizName((cur) => cur.trim() ? cur : v.bizName!.trim());
+      filled.push("bizName");
+    }
+    if (v.bizNumber && !bizDigits(now.bizNumber)) {
+      setBizNumber((cur) => bizDigits(cur) ? cur : bizDigits(v.bizNumber!).slice(0, 10));
+      filled.push("bizNumber");
+    }
+    if (v.bizOwnerName?.trim() && !now.bizOwnerName.trim()) {
+      setBizOwnerName((cur) => cur.trim() ? cur : v.bizOwnerName!.trim());
+      filled.push("bizOwnerName");
+    }
+    if (v.bizOpenDate && fromOpenDate(v.bizOpenDate) && !now.bizOpenDate) {
+      setBizOpenDate((cur) => cur || fromOpenDate(v.bizOpenDate!));
+      filled.push("bizOpenDate");
+    }
+    return filled;
+  };
+
+  /** 등록증 주소로 채우기 — 누를 때만. 층·호 칸은 비어 있을 때만 채운다. */
+  const fillCertAddress = () => {
+    const [base, detail] = certAddressParts(certAddr);
+    if (!base) return;
+    setAddrBase(base);
+    if (detail) setAddrDetail((cur) => cur.trim() ? cur : detail);
   };
 
   /** 🧾사업자등록증 한 장. 형식은 파일의 MIME으로 보고, 비어 오면(일부 브라우저의 HEIC) 확장자로 보충한다. */
@@ -479,28 +519,45 @@ export function SpaceForm({
     input.value = ""; // 같은 파일을 다시 골라도 onChange가 돌게
     if (!file) return;
     setCertErr("");
+    // 새 파일을 고르면 앞 파일에서 읽은 말·주소 제안은 내린다(그 파일의 이야기라서).
+    const seq = ++certSeq.current;
+    setCertRead("");
+    setCertAddr("");
     const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
     const mime = file.type || ({ heic: "image/heic", heif: "image/heif", pdf: "application/pdf" } as Record<string, string>)[ext] || "";
     if (!BIZ_CERT_TYPES[mime]) return setCertErr("사진(JPG·PNG·HEIC)이나 PDF 파일로 올려 주세요.");
     if (file.size > BIZ_CERT_MAX_BYTES) return setCertErr("10MB가 넘는 파일은 못 올려요. 사진으로 찍어 올려 주셔도 돼요.");
     setCertUploading(true);
+    let path = "";
     try {
-      const path = await uploadBizCert(file, mime);
+      path = await uploadBizCert(file, mime);
       setBizCertPath(path);
       setCertName(file.name);
-      // 🔜등록증 → 사업자 칸 미리 채우기(09-19 #110, 대표 결정 대기). 넘겨받은 게 있을 때만 부르고, 실패해도 올리기는 끝난 것이다.
-      if (certPrefill) {
-        try {
-          fillEmptyBiz(await certPrefill(file));
-        } catch {
-          /* 못 읽었으면 사장님이 적으시면 된다 — 올린 파일은 그대로 */
-        }
-      }
     } catch (e) {
       setCertErr(e instanceof Error && e.message ? e.message : "파일을 올리지 못했어요. 다시 골라 주세요.");
+      return;
     } finally {
       setCertUploading(false);
     }
+    // 🧾등록증 → 사업자 칸 미리 채우기(09-19 #110 → 09-20 대표 「OCR 가로 고고」). 올리기는 이미 끝났다 —
+    //   읽기가 실패해도 파일은 그대로고, 사장님은 한 줄(「직접 적어 주세요」)만 본다. 제출도 막지 않는다.
+    if (!certPrefill) return;
+    setCertRead("reading");
+    let read: BizCertRead;
+    try {
+      read = await certPrefill(path);
+    } catch {
+      read = { ok: false, reason: "error" };
+    }
+    if (seq !== certSeq.current) return; // 그새 다른 파일을 골랐다
+    const readAny = read.ok && CERT_FILL_KEYS.some((k) => read.ok && read.fields[k]);
+    if (!read.ok || !readAny) {
+      setCertRead("none");
+      return;
+    }
+    const filled = fillEmptyBiz(read.fields);
+    setCertRead(filled.length > 0 ? "filled" : "");
+    setCertAddr(read.fields.bizAddress ?? "");
   };
 
   /** 격자 안에서 자리 바꾸기(끌기 · ← →). 첫 장이 대표 사진이라 순서가 곧 정보다. */
@@ -1228,8 +1285,8 @@ export function SpaceForm({
           </p>
         )}
         {/* 🔝09-19 대표 코멘트 #110 — 사업자등록증 올리기를 절 맨 위로(상태 안내 줄 바로 밑). 등록증을 먼저 올리고
-            그걸 보며 아래 칸을 채우는 순서다. 대표는 올린 등록증을 읽어(OCR) 아래 칸을 미리 채우길 바랐고, 그건 결정 대기라
-            자리만 깔아 뒀다(`certPrefill`, `pickCert`). */}
+            그걸 보며 아래 칸을 채우는 순서다. 🧾09-20 대표 「OCR 가로 고고」 — 올리면 글자를 읽어 «빈 칸만» 채운다
+            (`certPrefill` = `readBizCertAction`, `pickCert`). 채운 칸 위에 「맞는지 확인해 주세요」 한 줄. */}
         <L
           label="사업자등록증"
           anchor="bizCert"
@@ -1241,12 +1298,14 @@ export function SpaceForm({
           hint="사업장 주소가 위에 적으신 주소와 같은 등록증으로 올려 주세요. 사진이나 PDF, 10MB까지 돼요."
         >
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-            <label className={`${secondaryBtnCls} cursor-pointer text-[15px] ${certUploading ? "pointer-events-none opacity-60" : ""}`}>
+            <label
+              className={`${secondaryBtnCls} cursor-pointer text-[15px] ${certUploading || certRead === "reading" ? "pointer-events-none opacity-60" : ""}`}
+            >
               <input
                 type="file"
                 accept="image/jpeg,image/png,image/webp,image/heic,image/heif,application/pdf,.heic,.heif,.pdf"
                 className="sr-only"
-                disabled={certUploading}
+                disabled={certUploading || certRead === "reading"}
                 onChange={(e) => void pickCert(e.currentTarget)}
               />
               {certUploading ? "올리는 중이에요…" : bizCertPath ? "다른 파일로 바꾸기" : "파일 고르기"}
@@ -1259,6 +1318,30 @@ export function SpaceForm({
             )}
           </div>
         </L>
+        {/* 🧾09-20 등록증 읽기의 말 — 읽는 중 · 채움 · 못 읽음. 채운 칸(상호부터) «위»에 선다. 화면 낭독기도 바뀔 때 읽는다. */}
+        <div aria-live="polite" className="empty:hidden">
+          {certRead === "reading" && (
+            <p className="text-[15px] leading-relaxed break-keep text-mute">등록증을 읽고 있어요…</p>
+          )}
+          {certRead === "filled" && (
+            <p className="rounded-md bg-primary-tint px-4 py-3 text-[15px] leading-relaxed break-keep text-primary-on">
+              등록증에서 읽었어요. 맞는지 한 번 확인해 주세요.
+            </p>
+          )}
+          {certRead === "none" && (
+            <p className="text-[15px] leading-relaxed break-keep text-mute">등록증을 읽지 못했어요. 아래 칸은 직접 적어 주세요.</p>
+          )}
+        </div>
+        {/* 🏠사업장 주소는 자동으로 안 넣는다. 공간 주소 칸이 비어 있을 때만 제안하고, 누르면 위 주소 칸에 들어간다(대표 09-20). */}
+        {certAddr && !addrBase.trim() && (
+          <div className="rounded-md bg-surface-soft px-4 py-3">
+            <p className="text-[15px] leading-relaxed break-keep text-mute">위 공간 주소가 비어 있어요. 등록증에 적힌 사업장 주소는 이래요.</p>
+            <p className="mt-1 text-[15px] leading-relaxed break-keep text-ink">{certAddr}</p>
+            <button type="button" onClick={fillCertAddress} className={`${secondaryBtnCls} mt-3`}>
+              등록증 주소로 채우기
+            </button>
+          </div>
+        )}
         {/* 🏷09-19 대표 [J] — 판매자 정보(상호·대표자·사업자번호·주소·가게 전화)를 손님이 결제 전에 보는 화면이 생겼다.
             상호 칸이 없어서 새로 받는다. 국세청 조회엔 안 넣는다(번호·대표자·개업일만 묻는 조회라서). */}
         <L

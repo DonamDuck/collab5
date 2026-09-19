@@ -23,7 +23,9 @@ import {
 } from "./bizcheck";
 import { checkBusiness } from "./nts-bizcheck";
 import { matchPlace } from "./naver-local";
-import { signCertUpload } from "./host-docs";
+import { downloadCert, signCertUpload } from "./host-docs";
+// 🧾09-20 등록증 글자 읽기(Gemini). 모양 검사·한도·목 결과는 그 파일에 있다.
+import { bizCertRateOk, mockBizCertRead, readBizCertFile } from "./bizcert-ocr";
 import { hasPayoutAccount, savePayoutAccount, toMasked, validatePayoutInput, type PayoutAccountInput, type PayoutAccountMasked } from "./payout-accounts";
 import {
   approvePayment, cancelPayment, guestCancelQuote, AUTO_CANCEL_WAITING_REASON, AUTO_REFUND_REASON,
@@ -48,7 +50,7 @@ import {
   notifySpacePublished, notifySpaceReview, notifyRefundRequest, notifyDeal, notifySpaceFixRequest, type DealKind,
 } from "./rent-notify";
 import { bookingStarted, dateLabel, kstDaysUntil, durationLabel, isTimeMark, minutesBetween, RENT_MIN_MINUTES, toMinutes, todayKst } from "./rent-time";
-import type { Space, SpaceBooking, SpaceUseType, SpaceCategory, OpenSlot, AccessHow, RentProduct, BizCheckStatus } from "./types";
+import type { Space, SpaceBooking, SpaceUseType, SpaceCategory, OpenSlot, AccessHow, RentProduct, BizCheckStatus, BizCertRead } from "./types";
 import { bookingAmount, compatScopePrice } from "./rent-products";
 import { PRODUCT_LABEL, withJosa } from "./rent-copy";
 
@@ -545,15 +547,35 @@ export async function saveSpaceAction(input: SpaceFormInput): Promise<ActionResu
 export async function createBizCertUploadAction(
   mime: string,
   size: number,
-): Promise<{ path: string; token: string } | { error: string }> {
-  if (await rentMockOn()) return { error: RENT_MOCK_BLOCKED.message };
-  const uid = await getSessionUserId();
+): Promise<{ path: string; token: string; mock?: true } | { error: string }> {
+  const mock = await getRentMock();
+  const uid = mock ? mock.viewer.userId : await getSessionUserId();
   if (!uid) return { error: "로그인이 필요해요." };
   if (!BIZ_CERT_TYPES[mime]) return { error: "사진(JPG·PNG·HEIC)이나 PDF 파일로 올려 주세요." };
   if (!(size > 0) || size > BIZ_CERT_MAX_BYTES) return { error: "10MB가 넘는 파일은 못 올려요. 사진으로 찍어 올려 주셔도 돼요." };
+  // 🧪09-20 목 모드 — 저장소를 안 부르고 가짜 경로만 준다(`mock: true`면 폼이 올리기를 건너뛴다). 그래야 지도에서
+  //   등록증 올리기 → 글자 읽기(정해 둔 결과) → 칸 채우기까지 걸어 볼 수 있다. 공간 저장은 그대로 막힌다(`saveSpaceAction`).
+  if (mock) return { path: `${uid}/00000000-0000-4000-8000-0000000000c1.${BIZ_CERT_TYPES[mime]}`, token: "", mock: true };
   const r = await signCertUpload(uid, mime);
   if ("error" in r) return { error: "파일을 올릴 자리를 만들지 못했어요. 잠시 뒤 다시 시도해 주세요." };
   return r;
+}
+
+/** 🧾등록증 글자 읽기 (2026-09-20 대표: 「OCR 가로 고고 1원도 안 들면 당연히!」).
+ *  방금 올린 등록증을 읽어 사업자 칸 값을 돌려준다. 폼이 «빈 칸만» 채우고 결과는 어디에도 저장하지 않는다.
+ *  🔒순서가 곧 울타리다. ① 목 모드면 Gemini 0회로 정해 둔 결과 ② 로그인 ③ 경로가 «이 사람 폴더»인가(남의 등록증을 못 읽게)
+ *    ④ 1분에 세 번 ⑤ 서비스 롤로 파일을 받아 Gemini(20초 한도). 어느 단계가 실패해도 던지지 않고 `ok:false`다. */
+export async function readBizCertAction(path: string): Promise<BizCertRead> {
+  const mock = await getRentMock();
+  if (mock) return mockBizCertRead(mock.world);
+  const uid = await getSessionUserId();
+  if (!uid) return { ok: false, reason: "auth" };
+  if (typeof path !== "string" || !bizCertPathOk(path, uid)) return { ok: false, reason: "auth" };
+  if (!process.env.GEMINI_API_KEY) return { ok: false, reason: "off" };
+  if (!bizCertRateOk(uid)) return { ok: false, reason: "rate" };
+  const file = await downloadCert(path);
+  if (!file) return { ok: false, reason: "error" };
+  return readBizCertFile(file);
 }
 
 /** 검토 통과 — 대표만. 검토 대기면 공개하고, 이미 공개·쉬는 중이면 사업자 확인 승인만 적는다(09-18).

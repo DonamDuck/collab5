@@ -4,6 +4,7 @@ import { getSessionUserId, getProfileById } from "@/lib/profiles";
 import { repo } from "@/lib/repo";
 import { FEE_RATE, listSpacesByOwner } from "@/lib/spaces";
 import { SpaceForm } from "./SpaceForm";
+import { readBizCertAction } from "@/lib/rent-actions";
 import { redirect } from "next/navigation";
 import { primaryBtnCls } from "../ui";
 import { OG_IMAGE } from "@/lib/site";
@@ -109,6 +110,8 @@ export default async function NewSpacePage({
         userId={uid}
         noEmail={!me?.email?.trim()}
         mySpaceCount={mySpaceCount}
+        // 🧾09-20 등록증을 올리면 글자를 읽어 사업자 빈 칸을 채운다(대표 「OCR 가로 고고」).
+        certPrefill={readBizCertAction}
       />
     </main>
   );
