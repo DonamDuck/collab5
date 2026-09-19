@@ -157,7 +157,8 @@ export default async function RentPayPage({ params }: { params: Promise<{ orderI
       <PayPanel
         orderId={b.orderId}
         amount={b.amountTotal}
-        orderName={`${brief.name} ${PRODUCT_LABEL[b.product]} · ${dateLabel(b.useDate)}`}
+        // 🧾토스 주문명은 100자까지다. 09-20 상품 이름이 「공간 전체(시설 및 공간)」로 길어졌고 공간 이름엔 상한이 없어서 끝을 자른다.
+        orderName={`${brief.name} ${PRODUCT_LABEL[b.product]} · ${dateLabel(b.useDate)}`.slice(0, 100)}
         backHref={`/rent/${brief.slug}`}
         placeLabel={brief.name}
         productLabel={PRODUCT_LABEL[b.product]}

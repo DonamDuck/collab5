@@ -34,7 +34,7 @@ import {
 } from "@/lib/bizcheck";
 import { pausedChangeProblem, spaceSaveReview } from "@/lib/rent-review";
 import {
-  COFFEE_CHAT_FREE, COFFEE_CHAT_WHEN_HOST, HOST_REQUEST_STEPS, hostFeeLine, PRODUCT_HINT_HOST, PRODUCT_LABEL_HOST, PRODUCT_NOTE_PLACEHOLDER, withJosa,
+  COFFEE_CHAT_FREE, COFFEE_CHAT_WHEN_HOST, HOST_REQUEST_STEPS, hostFeeLine, PRODUCT_HINT_HOST, PRODUCT_LABEL, PRODUCT_NOTE_PLACEHOLDER, withJosa,
 } from "@/lib/rent-copy";
 import { CATEGORY_OPTIONS, dateLabel, primaryBtnCls, RentSelect, rentInputCls, rentTextareaCls, secondaryBtnCls, won } from "../ui";
 import { AddressField } from "./AddressField";
@@ -585,7 +585,7 @@ export function SpaceForm({
     if (!storePhoneOk(contactPhone)) return ["phone", "전화번호를 다시 봐 주세요. 예) 02-1234-5678"];
     if (rulesV.trim().length < 10) return ["rules", "유의 사항을 열 글자 넘게 담아 주셔야 올릴 수 있어요."];
     // 🛍09-18 — 공간 상품 하나 이상, 켠 상품은 값과 설명. 서버(`saveSpaceAction`)가 같은 규칙으로 다시 본다.
-    if (!spaceOn && !fullOn) return ["products", "파실 상품을 하나는 켜 주세요. 대관만이나 공간 전체 중에서요."];
+    if (!spaceOn && !fullOn) return ["products", `파실 상품을 하나는 켜 주세요. ${PRODUCT_LABEL.space}이나 ${PRODUCT_LABEL.full} 중에서요.`];
     if (spaceOn && spacePrice <= 0) return ["spacePrice", "한 시간 값이 비어 있어요."];
     if (spaceOn && spaceNote.trim().length < 10) return ["spaceNote", "손님이 무엇을 쓰고 할 수 있는지 열 글자는 넘게 담아 주세요."];
     if (fullOn && fullPrice <= 0) return ["fullPrice", "한 시간 값이 비어 있어요."];
@@ -1120,7 +1120,7 @@ export function SpaceForm({
         error={fieldErr("products")}
       >
         <ProductCard
-          title={PRODUCT_LABEL_HOST.space}
+          title={PRODUCT_LABEL.space}
           hint={PRODUCT_HINT_HOST.space}
           on={spaceOn}
           onToggle={() => setSpaceOn((v) => !v)}
@@ -1143,8 +1143,8 @@ export function SpaceForm({
           />
         </ProductCard>
         <ProductCard
-          // 🔁09-19 대표 코멘트 #87 — 사장님 폼에서만 「공간 전체(시설 및 공간)」. 손님 화면·메일의 이름은 그대로(`PRODUCT_LABEL`).
-          title={PRODUCT_LABEL_HOST.full}
+          // 🔁09-19 대표 코멘트 #87 — 「공간 전체(시설 및 공간)」. 09-20부터 손님 화면·메일도 같은 이름이다(`PRODUCT_LABEL` 한 벌).
+          title={PRODUCT_LABEL.full}
           hint={PRODUCT_HINT_HOST.full}
           on={fullOn}
           onToggle={() => setFullOn((v) => !v)}

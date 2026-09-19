@@ -75,7 +75,8 @@ export function isTestPayment(): boolean {
  *    틀린 쪽 하나를 고르는 것보다 낫다. */
 export function withJosa(word: string, pair: "이/가" | "을/를" | "은/는"): string {
   const [withBatchim, without] = pair.split("/");
-  const last = word.trim().slice(-1);
+  // 끝에 붙은 괄호 풀이는 건너뛰고 그 앞 말에 맞춘다(「공간 전체(시설 및 공간)는」, 09-20). 괄호만 있는 말이면 그대로 본다.
+  const last = (word.trim().replace(/\s*\([^()]*\)$/, "") || word.trim()).slice(-1);
   const code = last.charCodeAt(0) - 0xac00;
   if (!last || code < 0 || code > 11171) return `${word}${withBatchim}(${without})`;
   return `${word}${code % 28 === 0 ? without : withBatchim}`;
@@ -148,11 +149,10 @@ export function hostFeeLine(feeRate: number): string {
 }
 
 /** 🛍사장님이 파는 상품 이름 — 화면·메일·정산이 이 한 벌만 쓴다(대표 09-18).
- *  ⭐대표 어휘 그대로: 「대관만」·「공간 전체」·「커피챗」. 바꾸고 싶으면 여기 한 곳만 고친다. */
-export const PRODUCT_LABEL = { space: "대관만", full: "공간 전체" } as const;
-/** 🏷사장님 등록 폼에서만 쓰는 이름(대표 09-19 #87) — 「공간 전체」가 무엇을 내주는지 괄호로 붙였다.
- *  ⚠️손님 화면·메일·정산은 위 `PRODUCT_LABEL`을 그대로 쓴다. 거기도 바꿀지는 대표 판단이라 따로 뒀다. */
-export const PRODUCT_LABEL_HOST = { space: PRODUCT_LABEL.space, full: "공간 전체(시설 및 공간)" } as const;
+ *  ⭐대표 어휘 그대로: 「대관만」·「공간 전체(시설 및 공간)」·「커피챗」. 바꾸고 싶으면 여기 한 곳만 고친다.
+ *  🔁09-19 #87엔 사장님 등록 폼에서만 괄호를 붙였다(`PRODUCT_LABEL_HOST`). 09-20 대표 결정으로 손님 화면·메일·정산도
+ *    같은 이름이 됐고, 두 벌이 같아져서 사장님용 따로 두던 것은 지웠다. 조사는 `withJosa`가 괄호 앞 말(「전체」)에 맞춘다. */
+export const PRODUCT_LABEL = { space: "대관만", full: "공간 전체(시설 및 공간)" } as const;
 export const COFFEE_CHAT_LABEL = "커피챗";
 /** ☕무료 커피챗의 값 자리 글자(대표 09-19 #93). 「0원」 대신 이 말로 적는다 — 0원은 값을 안 적은 것처럼 읽힌다. */
 export const COFFEE_CHAT_FREE = "무료";
