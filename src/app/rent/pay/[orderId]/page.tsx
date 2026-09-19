@@ -42,22 +42,23 @@ function minusDays(iso: string, n: number): string {
 function cancelRuleLine(useDate: string): string {
   const pct = (r: number) => (r >= 1 ? "전액" : `${Math.round(r * 100)}%`);
   const days = kstDaysUntil(useDate);
+  // 표만 묻는다(두 번째 인자 없음). 수락 전·수락 뒤 한 시간은 아래 `head`가 따로 말한다.
   const now = guestCancelRefundRate(days);
   let d = days;
   while (d > 0 && guestCancelRefundRate(d - 1) === now) d -= 1;
   const until = dateLabel(minusDays(useDate, d));
   const next = d > 0 ? guestCancelRefundRate(d - 1) : null;
-  // ⏳09-19 대표 — 전액 창이 «결제하고 1시간»에서 «사장님이 수락하신 뒤 1시간»으로 옮겨 갔다(`GRACE_MINUTES` 주석).
-  //   결제 직전 화면이라 창은 아직 열리지 않았다. 그래서 표를 먼저 말하고, 창은 «앞으로 생기는 것»으로 뒤에 붙인다.
-  //   표가 이용일까지 줄곧 전액이면 창이 바꾸는 게 없어서 붙이지 않는다.
-  const grace = `사장님이 수락하신 뒤 ${GRACE_MINUTES / 60}시간 안에 취소하면 전액이에요.`;
+  // 🆕09-19 오후 대표 — 수락 전 취소는 전액이다(`CancelStage`). 결제를 마친 손님은 먼저 수락을 기다리니,
+  //   손님이 가장 먼저 겪는 구간부터 말한다. 수락 뒤 한 시간(`GRACE_MINUTES`)도 같은 전액이라 한 문장에 묶는다.
+  //   표는 그 «밖»의 때다. 표가 이용일까지 줄곧 전액이면 두 창이 바꾸는 게 없어서 붙이지 않는다.
+  const head = `사장님이 수락하시기 전이나 수락하시고 ${GRACE_MINUTES / 60}시간 안에 취소하면 전액 돌려드려요.`;
   if (now >= 1) {
     return next === null || next === now
       ? `${until}까지 취소하면 전액 돌려드려요.`
-      : `${until}까지 취소하면 전액 돌려드리고, 그 뒤엔 ${next > 0 ? `${pct(next)}로 줄어요` : "돌려드릴 수 없어요"}. ${grace}`;
+      : `${head} 그 밖엔 ${until}까지 전액이고, 그 뒤엔 ${next > 0 ? `${pct(next)}로 줄어요` : "돌려드릴 수 없어요"}.`;
   }
-  if (now === 0) return `오늘 쓰는 예약이라 취소하면 돌려드릴 수 없어요. ${grace}`;
-  return `${until}까지 취소하면 ${pct(now)}를 돌려드려요. ${grace}`;
+  if (now === 0) return `${head} 그 밖엔 오늘 쓰는 예약이라 돌려드릴 수 없어요.`;
+  return `${head} 그 밖엔 ${until}까지 취소하면 ${pct(now)}를 돌려드려요.`;
 }
 
 export default async function RentPayPage({ params }: { params: Promise<{ orderId: string }> }) {

@@ -163,6 +163,8 @@ export default async function RentDonePage({ params }: { params: Promise<{ booki
                 {[
                   // ⏱09-17 대표 — 확정 뒤 2일 안 연락 규칙. 이미 수락된 건은 조건형(「확정하면」) 대신 지난 일로 말한다.
                   b.status === "confirmed" ? CONTACT_RULE_GUEST_DONE : CONTACT_RULE_GUEST,
+                  // 🆕09-19 오후 대표 — 수락 전 취소는 전액(`CancelStage`). 수락을 기다리는 동안만 참인 말이라 그때만 선다.
+                  ...(b.status === "paid" ? ["사장님이 아직 수락하기 전이라, 지금 취소하시면 날짜와 상관없이 전액 돌려드려요."] : []),
                   // 💳09-18 환불 시점은 메일과 한 줄(`REFUND_TIMING_LINE`). 약관 제10조의 「3~5영업일」에 맞췄다.
                   `사장님 사정으로 어려워지면 전액 돌려드려요. ${REFUND_TIMING_LINE}`,
                   // ☕09-17 커피챗을 담았으면 «언제»를 여기서도 말한다. 문장은 한 벌(`rent-copy`)이다.

@@ -975,7 +975,8 @@ export async function decideBookingAction(
 
 /** 취소 환불액 — 견적과 실제 취소가 **같은 계산**을 써야 한다. 둘이 따로 계산하면 팝업엔 70%라 적고 50%만 돌려주는 날이 온다.
  *  ⭐계산은 `guestCancelQuote`(`rent-payment.ts`) 한 벌이다. 여기서 한 번 더 감싸는 건 두 액션이 부르는 이름을 하나로 두려는 것뿐이다.
- *  🔁09-19 대표 — 유예 창 기준이 «결제 승인 시각»에서 «사장님 수락 시각»(`decidedAt`)으로 옮겨 갔다. 결제 줄은 더 안 본다. */
+ *  🔁09-19 대표 — 유예 창 기준이 «결제 승인 시각»에서 «사장님 수락 시각»(`decidedAt`)으로 옮겨 갔다. 결제 줄은 더 안 본다.
+ *  🆕09-19 오후 대표 — 수락 전(`paid`) 취소는 날짜와 상관없이 전액이다. 상태는 예약 행이 말한다. */
 function cancelRefund(b: SpaceBooking) {
   return guestCancelQuote(b);
 }
@@ -984,18 +985,19 @@ function cancelRefund(b: SpaceBooking) {
  *  화면에 표를 다시 적으면 표가 바뀌는 날 화면만 뒤처진다. 그래서 화면은 늘 이걸 부른다. */
 export async function quoteCancelAction(
   bookingId: number,
-): Promise<{ ok: boolean; message: string; total: number; refund: number; rate: number; daysBefore: number; grace: boolean }> {
-  const none = { total: 0, refund: 0, rate: 0, daysBefore: 0, grace: false };
+): Promise<{ ok: boolean; message: string; total: number; refund: number; rate: number; daysBefore: number; beforeAccept: boolean; grace: boolean }> {
+  const none = { total: 0, refund: 0, rate: 0, daysBefore: 0, beforeAccept: false, grace: false };
   const uid = await getSessionUserId();
   if (!uid) return { ok: false, message: "로그인이 필요해요.", ...none };
   const b = await getBooking(bookingId);
   if (!b || b.guestUserId !== uid) return { ok: false, message: "내 신청만 볼 수 있어요.", ...none };
   if (b.status !== "paid" && b.status !== "confirmed") return { ok: false, message: "이미 끝난 신청이에요.", ...none };
   if (bookingStarted(b)) return { ok: false, message: "이미 시작한 예약은 취소할 수 없어요.", ...none };
-  // 💬09-17 QA — 팝업이 「왜 그 %인지」를 한 줄로 말하게 재료(`daysBefore`·`grace`)를 같이 준다. 같은 계산에서 나온 값이다.
+  // 💬09-17 QA — 팝업이 「왜 그 %인지」를 한 줄로 말하게 재료(`daysBefore`·`beforeAccept`·`grace`)를 같이 준다. 같은 계산에서 나온 값이다.
+  //   `beforeAccept` = 사장님이 아직 수락하기 전이다(09-19 오후부터 전액).
   //   `grace` = 사장님이 수락한 지 한 시간이 안 됐다(09-19부터. 그 전엔 결제한 지 한 시간).
-  const { rate, refund, daysBefore, grace } = cancelRefund(b);
-  return { ok: true, message: "", total: b.amountTotal, refund, rate, daysBefore, grace };
+  const { rate, refund, daysBefore, beforeAccept, grace } = cancelRefund(b);
+  return { ok: true, message: "", total: b.amountTotal, refund, rate, daysBefore, beforeAccept, grace };
 }
 
 /** 게스트 취소 — 환불률은 우리 규정표가 정한다(호스트 자율 금지).
