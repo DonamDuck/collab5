@@ -13,7 +13,7 @@ import { bizVerified } from "@/lib/bizcheck";
 import { OG_IMAGE } from "@/lib/site";
 import { PhotoSlider } from "@/components/PhotoSlider";
 import { BookingForm } from "./BookingForm";
-import { categoryLabel, Chip, dateLabel, InfoList, InfoRow, primaryBtnCls, secondaryBtnCls, won } from "../ui";
+import { categoryLabel, Chip, dateLabel, InfoList, InfoRow, won } from "../ui";
 import { AreaMap } from "./AreaMap";
 import { HostBrandCard } from "./HostBrandCard";
 import { SectionNav } from "./SectionNav";
@@ -220,7 +220,9 @@ export default async function SpaceDetailPage({
   const ruleLines = sp.rules.split(/\n+/).map((s) => s.trim()).filter(Boolean);
   // 신청 폼이 뜨는 조건 — 모바일 하단 고정 바가 본문을 가리지 않게 이때만 바닥 여백을 더 준다.
   // 🔒쉬는 중·검토 중인 공간엔 폼을 안 그린다(G-03). 서버(`startBookingAction`)도 `status !== "open"`을 막는다.
-  const showForm = !isOwner && !!uid && sp.status === "open" && openDates.length > 0;
+  // 🔑09-19 대표 [G] — 로그인 안 한 사람에게도 폼과 결제 바를 보인다. 바 버튼이 「로그인하고 신청하기」가 되어
+  //   고른 값을 맡기고 로그인으로 보낸다(`BookingForm`의 `goLogin`). 서버 관문(`startBookingAction`의 로그인 검사)은 그대로다.
+  const showForm = !isOwner && sp.status === "open" && openDates.length > 0;
 
   // 🧭09-17 디자인팀 — 데스크톱 오른쪽 기둥에 싣는 «가장 가까운 열린 시간».
   const nextSlot = openSlots[0];
@@ -416,7 +418,7 @@ export default async function SpaceDetailPage({
 
           {/* 🔻09-17 디자인팀 — 신청 폼이 뜨는 화면에선 이 절을 뺀다. 바로 아래 달력이 같은 날을 격자로 보여 주는데,
               여기서 열린 시간 30개를 칩으로 다 깔면 폰에서 한 화면 반이 칩 벽이 됐다(모든 칸이 찬 공간 기준).
-              폼이 없는 화면(로그인 전·사장님 본인)에선 가까운 여섯 개만 보이고 나머지는 개수로 말한다. */}
+              폼이 없는 화면(사장님 본인 · 09-19부터 로그인 전엔 폼이 뜬다)에선 가까운 여섯 개만 보이고 나머지는 개수로 말한다. */}
           {!showForm && (
             <Section title="빌릴 수 있는 날" nav="날짜">
               {openDates.length === 0 ? (
@@ -578,20 +580,6 @@ export default async function SpaceDetailPage({
               <p className="text-[17px] leading-relaxed break-keep text-body">
                 사장님이 새 시간을 열어 두시면 여기서 신청할 수 있어요.
               </p>
-            ) : !uid ? (
-              <div>
-                <p className="text-[17px] leading-relaxed break-keep text-body">
-                  신청하시려면 먼저 로그인해 주세요.
-                </p>
-                {/* ⚠️복귀 파라미터 이름은 `redirect`다 — 로그인 화면이 읽는 키가 그것이고,
-                    `next`로 적으면 로그인 뒤 홈으로 떨어진다(화면은 멀쩡해서 아무도 못 알아챈다). */}
-                <Link
-                  href={`/login?redirect=${encodeURIComponent(`/rent/${sp.slug}`)}`}
-                  className={`${primaryBtnCls} mt-5 h-[48px]`}
-                >
-                  로그인하고 신청하기
-                </Link>
-              </div>
             ) : (
               <BookingForm
                 spaceId={sp.id}
@@ -611,6 +599,7 @@ export default async function SpaceDetailPage({
                 useType={sp.useType}
                 myBrands={myBrands}
                 initialPhone={myPhone}
+                signedIn={!!uid}
               />
             )}
           </Section>
@@ -672,12 +661,7 @@ export default async function SpaceDetailPage({
                 className="mt-5"
               />
             )}
-            {/* 로그인한 손님은 아래에 붙은 결제 바가 이 카드의 버튼 노릇을 한다. 바가 없는 로그인 전에만 길을 둔다. */}
-            {!isOwner && !uid && openDates.length > 0 && (
-              <a href="#apply" className={`${secondaryBtnCls} mt-6 w-full`}>
-                신청하러 가기
-              </a>
-            )}
+            {/* 🔑09-19 [G] 로그인 전에도 아래 결제 바가 뜬다. 바가 이 카드의 버튼 노릇을 해서 「신청하러 가기」 길은 뺐다. */}
           </div>
         </aside>
       </div>

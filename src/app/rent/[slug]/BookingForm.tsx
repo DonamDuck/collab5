@@ -119,6 +119,48 @@ function PayBar({
 }
 
 
+/** 🔑09-19 대표 [G] — 로그인 안 한 손님이 고른 값을 로그인 동안 맡겨 두는 자리. 공간마다 따로(`slug`) 둔다.
+ *  sessionStorage라 같은 탭에만 남는다. 카카오·구글을 다녀와도 같은 탭이면 그대로다(`lib/safe-redirect` 머리말과 같은 성질). */
+const resumeKeyOf = (slug: string) => `collab5:rent-resume:${slug}`;
+
+/** 맡겨 두는 폼 값. 소개서 고르기는 안 담는다 — 로그인 전엔 고를 소개서가 없다. */
+interface ResumeDraft {
+  product: RentProduct | "";
+  useDate: string;
+  startTime: string;
+  endTime: string;
+  headcount: string;
+  headUnsure: boolean;
+  plan: string;
+  withChat: boolean;
+  guestName: string;
+  phone: string;
+}
+
+/** 맡겨 둔 값을 꺼낸다. 모양이 틀린 칸은 빈 값으로 — 값 하나 때문에 폼이 안 뜨면 안 된다. */
+function readResume(raw: string | null): ResumeDraft | null {
+  if (!raw) return null;
+  try {
+    const o = JSON.parse(raw) as Record<string, unknown>;
+    if (!o || typeof o !== "object") return null;
+    const str = (v: unknown) => (typeof v === "string" ? v : "");
+    return {
+      product: o.product === "space" || o.product === "full" ? o.product : "",
+      useDate: /^\d{4}-\d{2}-\d{2}$/.test(str(o.useDate)) ? str(o.useDate) : "",
+      startTime: str(o.startTime),
+      endTime: str(o.endTime),
+      headcount: /^\d{1,4}$/.test(str(o.headcount)) ? str(o.headcount) : "",
+      headUnsure: o.headUnsure === true,
+      plan: str(o.plan).slice(0, PLAN_MAX),
+      withChat: o.withChat === true,
+      guestName: str(o.guestName).slice(0, 50),
+      phone: str(o.phone).slice(0, 20),
+    };
+  } catch {
+    return null;
+  }
+}
+
 /** 확인 팝업에 싣는 「무엇을」 앞부분. 40자에서 자르고 줄바꿈은 한 칸으로 편다. */
 function planPreview(plan: string): string {
   const flat = plan.trim().replace(/\s+/g, " ");
@@ -140,6 +182,7 @@ export function BookingForm({
   myBrands,
   spaceName,
   initialPhone,
+  signedIn,
 }: {
   spaceId: number;
   spaceSlug: string;
@@ -162,6 +205,8 @@ export function BookingForm({
   myBrands: { slug: string; name: string }[];
   /** 프로필에 적힌 번호. 있으면 칸을 미리 채운다(대표 09-17). */
   initialPhone: string;
+  /** 🔑09-19 대표 [G] — 로그인 안 한 사람에게도 폼과 결제 바를 보인다. 바 버튼은 고른 값을 맡기고 로그인으로 보낸다. */
+  signedIn: boolean;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -209,6 +254,8 @@ export function BookingForm({
    *  화면엔 아무 변화가 없어 「눌렀는데 아무 일도 안 난다」로 읽힌다(09-15에 같은 병을 한 번 고쳤다).
    *  ⭐그래서 팝업을 «응답 뒤에» 닫는다. 성공하면 어차피 다른 화면으로 떠나고, 실패하면 누른 자리에서 이유를 본다. */
   const [dialogErr, setDialogErr] = useState("");
+  /** 돌아와서 고른 값이 그새 못 쓰게 된 것. 조용히 비우면 손님은 자기가 안 고른 줄 안다(대표 [G] 「조용히 버리지 말고」). */
+  const [resumeNote, setResumeNote] = useState("");
   /** 🚨**못 넘어간 이유를 «그 칸 옆»에 둔다**(대표 09-15 [2][3]).
    *  전엔 오류 한 줄이 폼 맨 아래 결제 버튼 위에만 떴다. 그런데 버튼은 화면 아래 고정 바에 있어서
    *  **누른 자리에서 3,000px 떨어진 곳에 글자가 생겼다.** 화면에는 아무 변화도 없고 팝업도 안 열리니
@@ -244,6 +291,7 @@ export function BookingForm({
    *  시작을 한 번 더 누르면 풀린다. 시작만 고른 상태에서 끝이 될 수 없는 칩을 누르면 그 칩이 새 시작이다. */
   const tapMark = (t: string) => {
     setBadField((f) => (f === "time" ? "" : f));
+    setResumeNote("");
     if (activeStart && !endTime) {
       if (t === activeStart) { setStartTime(""); return; }
       if (ends.includes(t)) { setEndPick(t); return; }
@@ -292,6 +340,105 @@ export function BookingForm({
     if (!phoneOk) { stopAt("phone"); return; }
     setConfirming(true);
   };
+
+  // ─── 🔑09-19 대표 [G] 로그인 안 한 손님 ───
+  //   대표 원문: *「로그인 안 한 사람도 결제 바를 보여 주고 → 결제 클릭하면 로그인하게 하자 → 로그인이나 회원가입해서
+  //   로그인이 완료되면 → 결제 정보 기억하고 있다가 → 결제로 넘어가게 하고!」*
+  //   ⭐바를 누르면 고른 값을 이 탭에 맡기고 로그인으로 간다. 돌아오는 주소는 `/rent/<slug>?resume=1`이다.
+  //     로그인·가입·카카오·구글 넷 다 `?redirect=`를 이어 받는다(`lib/safe-redirect` · 09-18 밤 SC-05).
+  //   ⛔로그인 전엔 검사하지 않고 보낸다. 칸을 다 채워야 로그인할 수 있으면 「결제 클릭하면 로그인」이 아니게 된다.
+  //     빈 칸은 돌아온 뒤 바를 누른 것과 똑같이 그 칸으로 데려간다.
+  const resumeKey = resumeKeyOf(spaceSlug);
+  const goLogin = () => {
+    const draft: ResumeDraft = {
+      product, useDate, startTime: activeStart, endTime, headcount, headUnsure, plan, withChat, guestName, phone,
+    };
+    try {
+      sessionStorage.setItem(resumeKey, JSON.stringify(draft));
+    } catch {
+      // 저장소를 막아 둔 브라우저면 못 맡긴다. 로그인 뒤 폼이 비어 있을 뿐 신청은 그대로 할 수 있다.
+    }
+    router.push(`/login?redirect=${encodeURIComponent(`/rent/${spaceSlug}?resume=1`)}`);
+  };
+
+  const resumeTried = useRef(false);
+  // ⚠️여는 순간 한 번만 읽는다. useState 초기값에서 읽으면 서버 렌더와 모양이 달라 하이드레이션이 깨진다.
+  //   브라우저 저장소는 «바깥 시스템»이라 effect 안에서 값을 얹는다(`SpaceForm` 초안 되살리기와 같은 처리).
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    if (resumeTried.current) return;
+    resumeTried.current = true;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("resume") !== "1") return;
+    // 주소에서 표시를 걷는다. 새로 고침하거나 링크를 복사해도 되살리기가 다시 돌지 않게.
+    params.delete("resume");
+    const qs = params.toString();
+    window.history.replaceState(window.history.state, "", `${window.location.pathname}${qs ? `?${qs}` : ""}${window.location.hash}`);
+    let saved: ResumeDraft | null = null;
+    try {
+      saved = readResume(sessionStorage.getItem(resumeKey));
+      sessionStorage.removeItem(resumeKey); // 쓴 값은 지운다. 다음에 이 공간에 올 때 옛 값이 끼지 않게.
+    } catch {
+      saved = null;
+    }
+    if (!saved) return;
+
+    // 그새 바뀐 것을 가린다. 화면이 방금 서버에서 받은 열린 시간·찬 시간이 기준이다(서버 관문과 같은 함수).
+    const notes: string[] = [];
+    const p = saved.product && sellable.includes(saved.product) ? saved.product : "";
+    if (saved.product && !p) notes.push("고르신 방식은 이제 이 공간에서 빌릴 수 없어요. 방식을 다시 확인해 주세요.");
+    const pickedProduct = sellable.length === 1 ? sellable[0] : p;
+    let d = saved.useDate;
+    let st = saved.startTime;
+    let en = saved.endTime;
+    if (d && !openSlots.some((sl) => sl.date === d)) {
+      notes.push(`고르신 날짜 ${dateLabel(d)}에는 이제 열린 시간이 없어요. 다른 날을 골라 주세요.`);
+      d = st = en = "";
+    } else if (d && st) {
+      const ds = openSlots.filter((sl) => sl.date === d);
+      const tk = takenByDate[d] ?? [];
+      const cut = d === todayKst() ? toMinutes(nowHhmmKst()) : -1;
+      const startOk = startChoicesOf(ds, tk, minMinutes, cut).includes(st);
+      const endOk = startOk && (!en || endChoices(ds, tk, st, minMinutes).includes(en));
+      if (!endOk) {
+        notes.push(`${dateLabel(d)} ${en ? `${st}~${en}` : st}에는 그사이 다른 예약이 들어왔거나 시간이 닫혔어요. 시간을 다시 골라 주세요.`);
+        st = en = "";
+      }
+    }
+    setPickedProduct(p);
+    setUseDate(d);
+    setStartTime(st);
+    setEndPick(en);
+    setHeadcount(saved.headUnsure ? "" : saved.headcount);
+    setHeadUnsure(saved.headUnsure);
+    setPlan(saved.plan);
+    setWithChat(coffeeChat && coffeeChatPrice > 0 && saved.withChat);
+    setGuestName(saved.guestName);
+    // 번호는 적어 둔 것이 먼저, 비었으면 방금 로그인한 계정의 프로필 번호.
+    const ph = saved.phone.trim() ? saved.phone : initialPhone;
+    setPhone(ph);
+
+    if (notes.length > 0) {
+      setResumeNote(notes.join(" "));
+      document.getElementById("apply")?.scrollIntoView({ block: "start" });
+      return;
+    }
+    if (!signedIn) return;
+    // 다 맞으면 바를 누른 것과 똑같이 간다 — 빈 칸이 있으면 그 칸으로, 없으면 확인 팝업.
+    //   ⭐결제하러 가기는 손님이 누른다. 팝업 안에 약관·유의 사항 확인이 있어서 대신 넘기지 않는다.
+    //   팝업을 닫으면 신청 절 앞이도록 먼저 그리로 옮겨 둔다(로그인에서 돌아오면 화면 맨 위다).
+    if (!pickedProduct) return stopAt("product");
+    if (!d) return stopAt("date");
+    if (!en) return stopAt("time");
+    if (saved.plan.trim().length < 10) return stopAt("plan");
+    if (saved.guestName.trim().length < 2) return stopAt("name");
+    if (!/^0\d{8,10}$/.test(ph.replace(/\D/g, ""))) return stopAt("phone");
+    document.getElementById("apply")?.scrollIntoView({ block: "start" });
+    setConfirming(true);
+    // 여는 순간 한 번만. 의존성을 채우면 입력마다 되살리기가 다시 돈다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   /** 서버가 「그 시간은 이제 못 쓴다」고 답한 것인가. 그러면 화면이 든 «찬 시간»이 이미 낡았다. */
   const slotGone = (m: string) => m.includes("이미 찼") || m.includes("열어 두신 시간") || m.includes("이미 지난 시간");
@@ -347,6 +494,12 @@ export function BookingForm({
     // 📐09-17 디자인팀 — sm부터 폭 520. 데스크톱 왼쪽 기둥(676)을 다 쓰면 달력 칸이 75px로 벌어져
     //   날짜 줄이 한눈에 안 읽혔다. 폰(343)은 그대로 꽉 찬다.
     <div className="space-y-7 sm:max-w-[520px]">
+      {/* 🔑09-19 [G] 로그인하고 돌아왔는데 고른 것이 그새 못 쓰게 됐을 때. 폼 맨 위에 한 줄 — 무엇이 비었는지 먼저 읽힌다. */}
+      {resumeNote && (
+        <p role="alert" className="rounded-lg bg-lemon-pale px-4 py-3 text-[15px] leading-relaxed break-keep text-lemon-on">
+          {resumeNote}
+        </p>
+      )}
       {/* 🛍09-18 대표 — 날짜·시각 «위»에서 상품부터 고른다. 값이 상품마다 달라서 시간을 고르기 전에 무엇을 빌리는지 정해야
           하단 금액이 처음부터 맞게 선다. 둘이면 카드 라디오, 하나면 고르기 없이 한 줄. 설명은 상세 「빌릴 수 있는 것」과 같은 글이다. */}
       {sellable.length > 0 && (
@@ -428,6 +581,7 @@ export function BookingForm({
           value={useDate}
           onChange={(d) => {
             setUseDate(d);
+            setResumeNote("");
             // 날을 바꾸면 시각을 비운다 — 어제 고른 시각이 오늘도 열려 있으리란 보장이 없다.
             setStartTime("");
             setEndPick("");
@@ -723,9 +877,10 @@ export function BookingForm({
         amount={timePicked && product ? total : null}
         caption={timePicked ? durationLabel(minutes) : undefined}
         emptyText={!product ? "방식을 고르면 금액이 나와요" : activeStart ? "끝나는 시각을 고르면 금액이 나와요" : "시간을 고르면 금액이 나와요"}
-        label={pending ? "결제 화면으로 가는 중…" : "신청하기"}
+        // 🔑09-19 [G] 로그인 전엔 같은 바가 「로그인하고 신청하기」다. 누르면 고른 값을 맡기고 로그인으로 간다.
+        label={pending ? "결제 화면으로 가는 중…" : signedIn ? "신청하기" : "로그인하고 신청하기"}
         disabled={pending}
-        onClick={askConfirm}
+        onClick={signedIn ? askConfirm : goLogin}
       />
 
       <ConfirmDialog
