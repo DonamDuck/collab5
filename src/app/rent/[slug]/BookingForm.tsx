@@ -49,8 +49,11 @@ const chipCls = "h-[44px] rounded-md border text-[16px] tabular-nums transition-
 const chipOnCls = "border-transparent bg-primary-tint font-medium text-primary-on";
 /** 시작과 끝 사이 — 고른 구간이 한 덩어리로 읽히게 한 단 옅게. */
 const chipRangeCls = "border-transparent bg-primary-pale text-primary-on";
-/** 시작을 고른 뒤 «끝으로 고를 수 있는» 칩 — 테두리만 키위로 켜서 어디까지 갈 수 있는지 보인다. */
-const chipEndableCls = "border-primary-tint bg-surface text-ink hover:bg-primary-pale";
+/** 시작을 고른 뒤 «끝으로 고를 수 있는» 칩 — 진한 키위 테두리로 켜서 어디까지 갈 수 있는지 보인다.
+ *  📐375 실측(09-19) — 옅은 테두리(`primary-tint`)는 흰 칩과 거의 안 갈렸다. 한 단 진한 `primary-strong`에 글자도 키위로. */
+const chipEndableCls = "border-primary-strong bg-surface font-medium text-primary-on hover:bg-primary-pale";
+/** 시작을 고른 뒤, 끝은 못 되지만 «새 시작»으로는 누를 수 있는 칩. 끝 후보가 먼저 읽히게 한 단 물린다. */
+const chipDimCls = "border-hairline bg-surface text-mute hover:bg-surface-soft";
 const chipOffCls = "border-hairline bg-surface text-ink hover:bg-primary-pale";
 /** 못 고르는 칩(찬 시간·최소 시간을 못 채우는 꼬리·닫는 시각). 눈금은 남겨 두어 그날의 모양이 보이게 한다. */
 const chipDisabledCls = "border-transparent bg-surface-soft text-faint";
@@ -474,9 +477,11 @@ export function BookingForm({
                     ? chipRangeCls
                     : endable
                       ? chipEndableCls
-                      : enabled
-                        ? chipOffCls
-                        : chipDisabledCls;
+                      : !enabled
+                        ? chipDisabledCls
+                        : activeStart && !endTime
+                          ? chipDimCls
+                          : chipOffCls;
                 return (
                   <button
                     key={t}
