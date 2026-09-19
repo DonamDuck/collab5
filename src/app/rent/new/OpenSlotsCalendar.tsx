@@ -67,6 +67,13 @@ export function OpenSlotsCalendar({
   const [extra, setExtra] = useState<string[]>([]);
   /** 「+ 날짜 추가」를 눌러 날짜 고르개가 열려 있나. */
   const [adding, setAdding] = useState(false);
+  /** 🩸09-20 요일 시간을 «붙잡아 둔» 값(매주 반복을 끈 요일만). 전엔 요일 시간을 그 요일 날짜들의 시간에서 매번 셌다.
+   *  그래서 연 날이 하루뿐인 요일은 그날 시간을 「날짜별로 시간 바꾸기」로 바꾸면 요일 시간까지 같이 바뀌었다
+   *  (요일 줄도 12:00이 되고, 바꾼 날의 점도 안 찍히고, 다음에 여는 같은 요일도 그 시간으로 열렸다).
+   *  ⭐날짜를 열 때, 날짜 하나를 바꾸기 «직전», 요일 줄을 고치거나 매주 반복을 끌 때 붙잡는다. 붙잡기 전에는 전처럼 센다
+   *    (고치기 화면을 처음 열 때·임시 저장을 되살릴 때는 저장된 날짜들밖에 단서가 없다).
+   *  💾저장 모양(`openSlots`·`repeatWeekly`)은 그대로다. 이 값은 화면 안에서만 산다. */
+  const [dowBase, setDowBase] = useState<Record<number, { start: string; end: string }>>({});
 
   const firstDow = new Date(Date.UTC(view.y, view.m - 1, 1)).getUTCDay();
   const daysInMonth = new Date(Date.UTC(view.y, view.m, 0)).getUTCDate();
@@ -91,12 +98,14 @@ export function OpenSlotsCalendar({
 
   /** 고른 날들이 쓰는 요일 목록 — 여기 있는 요일만 아래에 줄로 나온다. 규칙을 켠 요일은 날이 다 쉬어도 남긴다. */
   const usedDows = Array.from(new Set([...all.map((sl) => dowOf(sl.date)), ...repeat.map((r) => r.dow)])).sort();
-  /** 그 요일의 «대표 시간». 규칙이 있으면 규칙 시각. 없으면 같은 요일에 섞인 시간 중 제일 많은 쪽. */
+  /** 그 요일의 «대표 시간». 규칙이 있으면 규칙 시각. 없으면 붙잡아 둔 시간(`dowBase`), 그것도 없으면 같은 요일에 섞인 시간 중 제일 많은 쪽.
+   *  그 요일에 연 날이 하나도 없으면 기본값이다. 다 닫았다가 다시 여는 요일은 처음 고르는 요일과 같게 본다. */
   const dowTime = (d: number) => {
     const r = ruleOf(d);
     if (r) return { start: r.start, end: r.end };
     const times = value.filter((sl) => dowOf(sl.date) === d).map((sl) => `${sl.start}~${sl.end}`);
     if (times.length === 0) return BASE;
+    if (dowBase[d]) return dowBase[d];
     const top = times.sort(
       (a, b) => times.filter((t) => t === b).length - times.filter((t) => t === a).length,
     )[0];
@@ -139,6 +148,8 @@ export function OpenSlotsCalendar({
       );
     }
     const add = isos.filter((iso) => !byRule.has(iso));
+    // 여는 순간의 요일 시간을 붙잡는다. 다 닫았다가 다시 연 요일은 기본값으로 새로 붙잡힌다(예전에 붙잡은 값이 남지 않게).
+    for (const d of new Set(add.map(dowOf))) if (!ruleOf(d)) pinDow(d, dowTime(d));
     if (add.length) {
       // 새로 고르는 날은 그 요일의 기준 시간을 따라간다. 처음 고르는 요일이면 기본값.
       onChange((cur) => {
@@ -151,12 +162,19 @@ export function OpenSlotsCalendar({
     }
   };
 
+  /** 요일 시간을 붙잡는다(`dowBase`). 매주 반복이 켜진 요일은 규칙 시각이 곧 요일 시간이라 안 쓴다. */
+  const pinDow = (d: number, t: { start: string; end: string }) =>
+    setDowBase((cur) => (cur[d]?.start === t.start && cur[d]?.end === t.end ? cur : { ...cur, [d]: { start: t.start, end: t.end } }));
+
   const toggle = (iso: string) => (picked(iso) ? closeDates([iso]) : openDates([iso]));
 
   /** 「매주 계속 열기」 켜기·끄기. 켜면 지금 그 요일 줄의 시각으로 규칙이 생긴다.
    *  ⭐끄면 규칙만 빠진다 — 직접 누른 날은 `value`에 그대로 있다. */
   const setRepeat = (d: number, on: boolean) => {
     const t = dowTime(d);
+    // 끌 때 규칙 시각을 요일 시간으로 붙잡는다. 안 그러면 남은 «직접 연 날»(따로 시간을 바꾼 날일 수 있다)에서 다시 세어,
+    //   바꾼 날 하나가 요일 시간이 되어 버린다(아래 `editDate`와 같은 버그).
+    if (!on) pinDow(d, t);
     onRepeatChange((cur) => (on ? [...cur.filter((r) => r.dow !== d), { dow: d, start: t.start, end: t.end }] : cur.filter((r) => r.dow !== d)));
   };
 
@@ -179,6 +197,7 @@ export function OpenSlotsCalendar({
     const before = dowTime(d);
     const after = { ...before, ...patch };
     if (ruleOf(d)) onRepeatChange((cur) => cur.map((r) => (r.dow === d ? { ...r, ...after } : r)));
+    else pinDow(d, after);
     onChange((cur) =>
       cur.map((sl) =>
         dowOf(sl.date) === d && sl.start === before.start && sl.end === before.end ? { ...sl, ...after } : sl,
@@ -189,6 +208,9 @@ export function OpenSlotsCalendar({
   /** 한 날짜만 시각 바꾸기. 규칙이 연 날이면 그날을 «직접 연 날»로 떼어 낸다(같은 날이면 직접 연 쪽이 이긴다). */
   const editDate = (iso: string, patch: Partial<OpenSlot>) => {
     const base = picked(iso);
+    // 🩸09-20 바꾸기 «전»의 요일 시간을 붙잡는다. 그 요일에 연 날이 이날 하나뿐이면, 안 붙잡은 요일 시간은 이날 시간을 따라온다.
+    const d = dowOf(iso);
+    if (!ruleOf(d)) pinDow(d, dowTime(d));
     onChange((cur) =>
       cur.some((sl) => sl.date === iso)
         ? cur.map((sl) => (sl.date === iso ? { ...sl, ...patch } : sl))
