@@ -3,7 +3,7 @@
 // 부르는 곳: 화면 미리보기 `app/dev/mail/[kind]/page.tsx`(코멘트 위젯이 붙는다) · 날것 `app/dev/rent-mail/[kind]/route.ts?raw=1`.
 import {
   buildAdminDaily, buildAdminRefund, buildBookingCancelled, buildBookingCancelledToGuest, buildBookingConfirmed,
-  buildBookingConfirmedToHost, buildBookingPaid, buildBookingPaidToGuest, buildBookingRejected,
+  buildBookingConfirmedToHost, buildBookingPaid, buildBookingPaidToGuest, buildBookingRejected, buildDealNotice,
   buildRefundRequestNotice, buildRemindGuest, buildRemindHost, buildSpacePublished, buildSpaceReviewNotice, type Mail,
 } from "@/lib/rent-notify";
 import { buildWorld, MOCK_IDS, type MockWorld } from "@/lib/rent-mock-data";
@@ -11,13 +11,18 @@ import { buildSignupNotice } from "@/lib/notify";
 import { buildSlackPayload, type AdminNotice, type SlackPayload } from "@/lib/admin-notify";
 import { summarizeDaily, type RemindRun } from "@/lib/rent-admin-daily";
 import { addDaysIso, todayKst } from "@/lib/rent-time";
+import { refundAmount } from "@/lib/rent-money";
 
-/** 미리보기 한 건. 대표 알림(09-19)은 슬랙 글(`slack`)이 같이 온다 — 슬랙이 있으면 그게 가고, 없으면 메일이 간다. */
-export type PreviewMail = Mail & { slack?: SlackPayload };
+/** 미리보기 한 건. 대표 알림(09-19)은 슬랙 글(`slack`)이 같이 온다 — 슬랙이 있으면 그게 가고, 없으면 메일이 간다.
+ *  `slackOnly`는 거래 알림(09-19 오후)이다. 메일로 물러서지 않아서 화면이 메일 칸을 안 그린다. */
+export type PreviewMail = Mail & { slack?: SlackPayload; slackOnly?: boolean };
 
 /** 대표 알림 → 미리보기. 메일 칸은 «슬랙이 없을 때» 대표 메일로 가는 글이다(받는 사람은 `ADMIN_EMAIL`이라 비워 둔다). */
 function admin(n: AdminNotice): PreviewMail {
-  return { to: "", subject: n.mail?.subject ?? n.title, html: n.mail?.html ?? "", text: n.mail?.text ?? "", slack: buildSlackPayload(n) };
+  return {
+    to: "", subject: n.mail?.subject ?? n.title, html: n.mail?.html ?? "", text: n.mail?.text ?? "",
+    slack: buildSlackPayload(n), slackOnly: !!n.slackOnly,
+  };
 }
 
 /** 🌅아침 요약 미리보기 — 목 세계 그대로 센다. 다만 목 결제는 전부 «이틀 전» 승인이라 「어제 결제」가 늘 0이 된다.
@@ -109,6 +114,14 @@ export function buildPreviewMail(kind: string): PreviewMail | null {
     case "admin-daily": return dailyPreview(full, { checked: 3, sent: 3, failed: 1, heldToday: 1, noMailKey: false });
     case "admin-daily-quiet": return dailyPreview(buildWorld("empty"), { checked: 0, sent: 0, failed: 0, heldToday: 0, noMailKey: false });
     case "admin-daily-trouble": return admin(buildAdminDaily(null, todayKst(), null));
+    // 💸09-19 오후 대표 — 거래 알림(슬랙 전용). 금액은 액션이 토스에 보낸 값과 같은 셈으로 넣는다.
+    case "admin-payment": { const x = pick(full, B.paid); return admin(buildDealNotice("paid", x.b, x.sp)); }
+    case "admin-cancel": { const x = pick(full, B.cancelledFuture); return admin(buildDealNotice("guest-cancel", x.b, x.sp, refundAmount(x.b.amountTotal, 70))); }
+    case "admin-cancel-full": { const x = pick(full, B.paid); return admin(buildDealNotice("guest-cancel", { ...x.b, status: "cancelled" }, x.sp, x.b.amountTotal)); }
+    case "admin-cancel-sameday": { const x = pick(full, B.cancelledPast); return admin(buildDealNotice("guest-cancel", x.b, x.sp, 0)); }
+    case "admin-reject": { const x = pick(full, B.refunded); return admin(buildDealNotice("host-reject", x.b, x.sp, x.b.amountTotal)); }
+    case "admin-reject-failed": { const x = pick(full, B.rejected); return admin(buildDealNotice("host-reject-failed", x.b, x.sp)); }
+    case "admin-refund-approved": { const x = pick(full, B.refundReq); return admin(buildDealNotice("admin-refund", { ...x.b, status: "refunded" }, x.sp, x.b.amountTotal)); }
     default: return null;
   }
 }

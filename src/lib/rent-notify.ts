@@ -92,6 +92,16 @@ const LABEL = {
   dailyReview: "검토 대기",
   dailyUse: "이용 예약",
   dailyRemind: "리마인드",
+  // ↓ 대표 슬랙 거래 알림에만 쓴다(09-19 오후). 사람을 가리키는 칸은 회원 번호뿐이다(`buildDealNotice`).
+  dealBooking: "예약 번호",
+  dealOrder: "주문번호",
+  dealPaid: "결제 금액",
+  dealRefund: "환불액",
+  dealSpace: "공간",
+  dealWhen: "이용 날짜",
+  dealProduct: "상품",
+  dealGuest: "손님 회원 번호",
+  dealHost: "사장님 회원 번호",
 } as const;
 
 /** 🪪사장님이 보는 손님 이름 칸(대표 09-18) — 신청 때 받은 성함(실명)이 먼저다. 이용 당일 신분을 맞춰 보는 이름이라서.
@@ -902,6 +912,59 @@ export function buildRefundRequestNotice(
 /** 보내는 쪽 — 대표 알림 한 곳(`notifyAdmin`)으로. */
 export async function notifyRefundRequest(booking: SpaceBooking, space: Space, host: Profile | null, note: string) {
   return notifyAdmin(buildRefundRequestNotice(booking, space, host, note));
+}
+
+/** 💸거래 알림의 갈래 — 돈이 들어오거나 나간 순간. 거절했는데 환불이 실패한 경우는 대표 손이 필요해서 따로 둔다. */
+export type DealKind = "paid" | "guest-cancel" | "host-reject" | "host-reject-failed" | "admin-refund";
+
+/** ⑪ 거래 알림 → 대표 슬랙 (09-19 오후).
+ *  대표 원문: *「결제 알림 — 슬랙에 그렇게 해줘. 식별 가능한 정보 예약 ID라든지 등과 금액, 회원 번호 등등」*.
+ *  🔒사람은 **회원 번호**로만 가리킨다. 이름·이메일·전화는 싣지 않는다(슬랙은 개인정보처리방침의 위탁 목록에 없다).
+ *    누구인지는 정산 화면에서 회원 번호·주문번호로 찾는다.
+ *  📮슬랙에만 간다(`slackOnly`). 슬랙 주소가 없으면 조용히 건너뛰고 메일로 물러서지 않는다(`admin-notify.ts` 머리말).
+ *  @param refund 실제로 돌려준 금액. 호출부가 토스에 보낸 값을 그대로 넘긴다(여기서 다시 계산하지 않는다). 결제 알림엔 없다. */
+export function buildDealNotice(kind: DealKind, booking: SpaceBooking, space: Space, refund = 0): AdminNotice {
+  const total = booking.amountTotal;
+  const back = Math.max(0, Math.floor(refund || 0));
+  const kept = Math.max(0, total - back);
+  const [title, lead] =
+    kind === "paid"
+      ? [`결제가 들어왔어요 · ${won(total)}`, "손님이 결제를 마쳤어요. 사장님이 수락하거나 거절하기를 기다리는 중이에요."]
+      : kind === "guest-cancel"
+        ? back === 0
+          ? ["손님이 예약을 취소했어요 · 환불 없음", "당일 취소라 돌려드린 돈은 없어요. 결제한 돈은 이용일이 지나면 사장님 정산으로 가요."]
+          : back >= total
+            ? [`손님이 예약을 취소했어요 · ${won(back)} 환불`, "손님이 예약을 취소해서 결제한 돈을 전액 돌려드렸어요."]
+            : [`손님이 예약을 취소했어요 · ${won(back)} 환불`, `취소 규정에 따라 ${won(back)}을 돌려드렸어요. 남은 ${won(kept)}은 이용일이 지나면 사장님 정산으로 가요.`]
+        : kind === "host-reject"
+          ? [`사장님이 거절했어요 · ${won(back)} 전액 환불`, "사장님이 신청을 거절해서 손님께 결제한 돈을 전부 돌려드렸어요."]
+          : kind === "host-reject-failed"
+            ? ["사장님이 거절했는데 환불이 안 됐어요", "토스 환불이 실패해서 손님 돈이 아직 그대로예요. 정산 화면의 손이 필요한 예약에서 확인해 주세요."]
+            : [`환불 승인을 마쳤어요 · ${won(back)}`, "관리자 승인으로 손님께 남은 돈을 돌려드렸어요. 이 예약은 사장님 정산에서 빠져요."];
+  const refundRow: [string, string][] =
+    kind === "paid" ? [] : [[LABEL.dealRefund, kind === "host-reject-failed" ? "아직 못 돌려드렸어요" : back === 0 ? "없어요" : won(back)]];
+  const rows: [string, string][] = [
+    [LABEL.dealBooking, String(booking.id)],
+    [LABEL.dealOrder, booking.orderId],
+    [LABEL.dealPaid, won(total)],
+    ...refundRow,
+    [LABEL.dealSpace, `${space.name} (공간 번호 ${space.id})`],
+    [LABEL.dealWhen, bookingWhen(booking)],
+    [LABEL.dealProduct, `${PRODUCT_LABEL[booking.product]}${boughtChat(booking) ? " · 커피챗" : ""}`],
+    [LABEL.dealGuest, String(booking.guestUserId)],
+    [LABEL.dealHost, String(space.ownerUserId)],
+  ];
+  return {
+    title, lead, rows,
+    link: { href: `${SITE_URL}/rent/payouts`, label: "정산 화면 열기" },
+    note: "거래 알림은 슬랙에만 와요. 이름과 연락처는 싣지 않아요.",
+    slackOnly: true,
+  };
+}
+
+/** 보내는 쪽 — 대표 알림 한 곳(`notifyAdmin`)으로. 슬랙이 없으면 건너뛴다. */
+export async function notifyDeal(kind: DealKind, booking: SpaceBooking, space: Space, refund = 0) {
+  return notifyAdmin(buildDealNotice(kind, booking, space, refund));
 }
 
 /** 「3시간」·「2일」 — 결제한 지 얼마나 됐나. 하루가 안 되면 시간, 넘으면 날로. */
