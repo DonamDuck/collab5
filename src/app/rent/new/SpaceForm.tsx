@@ -27,10 +27,11 @@ import { durationLabel, expandRepeat, minutesBetween, RENT_MIN_MINUTES, stripRep
 import { payoutAmount } from "@/lib/rent-money";
 import { coffeeChatFree } from "@/lib/rent-products";
 import { CONTACT_PHONE_MAX, storePhoneOk } from "@/lib/rent-limits";
+import { josaRo } from "@/lib/josa";
 import {
   addressMoved,
-  BIZ_CERT_MAX_BYTES, BIZ_CERT_TYPES, BIZ_MISMATCH_LINE, bizCertPathOk, bizDigits, bizNumberProblem, formatBizNumber, fromOpenDate,
-  hasAnyBiz, needsBizInfo, openDateProblem, postcodeSido, spaceListed, testBizHint, toOpenDate,
+  BIZ_CERT_MAX_BYTES, BIZ_CERT_TYPES, BIZ_MISMATCH_LINE, bizCertPathOk, bizDigits, bizNumberProblem, certFieldDiffers, certFieldShow,
+  type CertFieldKey, formatBizNumber, fromOpenDate, hasAnyBiz, needsBizInfo, openDateProblem, postcodeSido, spaceListed, testBizHint, toOpenDate,
 } from "@/lib/bizcheck";
 import { pausedChangeProblem, spaceSaveReview } from "@/lib/rent-review";
 import {
@@ -118,7 +119,7 @@ const pickCls = (on: boolean) =>
 type Photo = { url: string; uploading?: boolean };
 
 /** 🧾등록증 글자 읽기가 채우는 네 칸(09-20). 주소는 따로 — 자동으로 안 넣고 버튼으로만 쓴다. */
-const CERT_FILL_KEYS = ["bizName", "bizNumber", "bizOwnerName", "bizOpenDate"] as const;
+const CERT_FILL_KEYS = ["bizName", "bizNumber", "bizOwnerName", "bizOpenDate"] as const satisfies readonly CertFieldKey[];
 type CertFillKey = (typeof CERT_FILL_KEYS)[number];
 
 /** 등록증의 사업장 소재지 → 폼의 두 칸(도로명 · 층·호). 끝의 참고항목 「(성수동2가)」는 떼고, 쉼표 뒤는 상세 주소로.
@@ -259,6 +260,9 @@ export function SpaceForm({
   const [certRead, setCertRead] = useState<"" | "reading" | "filled" | "none">("");
   /** 등록증에서 읽은 사업장 주소. 공간 주소 칸이 비어 있을 때만 「등록증 주소로 채우기」로 제안한다. */
   const [certAddr, setCertAddr] = useState("");
+  /** 🧾등록증에서 읽은 네 칸(09-20). 적어 둔 값과 다른 칸은 덮지 않고 그 칸 밑에 한 줄로 알린다(`CertDiff`).
+   *  칸 값은 그릴 때마다 지금 값으로 견준다. 사장님이 칸을 고쳐 같아지면 줄이 스스로 내려간다. */
+  const [certVals, setCertVals] = useState<BizCertFields>({});
   /** 파일을 연달아 바꾸면 앞 파일의 답이 늦게 와서 뒤 파일의 칸을 채울 수 있다. 마지막 파일의 답만 받는다. */
   const certSeq = useRef(0);
   /** 서버가 사업자 칸에 돌려준 말(국세청 기록과 다름·휴업·폐업)과 «그때의 세 칸». 칸을 고치면 말이 내려간다.
@@ -330,7 +334,7 @@ export function SpaceForm({
     // 그새 소개서를 지웠으면 옛 slug를 붙들지 않는다.
     setBrandPick(myBrands.some((b) => b.slug === d.brandPick) ? d.brandPick : blank.brandPick);
     setBizNumber(d.bizNumber); setBizOwnerName(d.bizOwnerName); setBizOpenDate(d.bizOpenDate); setBizCertPath(d.bizCertPath);
-    setCertName(""); setCertErr(""); setCertRead(""); setCertAddr("");
+    setCertName(""); setCertErr(""); setCertRead(""); setCertAddr(""); setCertVals({});
   };
 
   // 열 때 한 번 읽는다. ⚠️useState 초기값에서 읽으면 서버 렌더와 모양이 달라 하이드레이션이 깨진다.
@@ -524,6 +528,7 @@ export function SpaceForm({
     const seq = ++certSeq.current;
     setCertRead("");
     setCertAddr("");
+    setCertVals({});
     const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
     const mime = file.type || ({ heic: "image/heic", heif: "image/heif", pdf: "application/pdf" } as Record<string, string>)[ext] || "";
     if (!BIZ_CERT_TYPES[mime]) return setCertErr("사진(JPG·PNG·HEIC)이나 PDF 파일로 올려 주세요.");
@@ -556,9 +561,16 @@ export function SpaceForm({
       setCertRead("none");
       return;
     }
+    // 적어 둔 값과 다른 칸이 있나 — 채우기 «전» 값으로 본다(채울 칸은 비어 있어서 다를 수가 없다).
+    const now = bizNow.current;
+    const differs = CERT_FILL_KEYS.some((k) => read.ok && certFieldDiffers(k, now[k], read.fields[k]));
     const filled = fillEmptyBiz(read.fields);
-    setCertRead(filled.length > 0 ? "filled" : "");
+    // 「맞는지 한 번 확인해 주세요」는 채운 칸이 있거나 다른 칸이 있을 때. 넷 다 적어 둔 값과 같으면 아무 말 안 한다.
+    setCertRead(filled.length > 0 || differs ? "filled" : "");
     setCertAddr(read.fields.bizAddress ?? "");
+    const vals: BizCertFields = {};
+    for (const k of CERT_FILL_KEYS) if (read.fields[k]) vals[k] = read.fields[k];
+    setCertVals(vals);
   };
 
   /** 격자 안에서 자리 바꾸기(끌기 · ← →). 첫 장이 대표 사진이라 순서가 곧 정보다. */
@@ -1367,6 +1379,7 @@ export function SpaceForm({
             onChange={(e) => setBizName(e.target.value)}
             placeholder="예) 느린오후 로스터리"
           />
+          <CertDiff field="bizName" written={bizName} read={certVals.bizName} what="상호를" onUse={(v) => setBizName(v.trim())} />
         </L>
         {/* 🧪09-19 저녁 대표 — 개발 서버에서만 테스트 번호 한 줄(`testBizHint`). 운영 빌드에선 빈 글자라 안내가 안 선다. */}
         <L label="사업자등록번호" htmlFor="sp-biz-no" anchor="bizNumber" error={fieldErr("bizNumber")} hint={testBizHint() || undefined}>
@@ -1379,6 +1392,13 @@ export function SpaceForm({
             onChange={(e) => setBizNumber(bizDigits(e.target.value).slice(0, 10))}
             placeholder="예) 123-45-67890"
           />
+          <CertDiff
+            field="bizNumber"
+            written={bizNumber}
+            read={certVals.bizNumber}
+            what="사업자등록번호를"
+            onUse={(v) => setBizNumber(bizDigits(v).slice(0, 10))}
+          />
         </L>
         <L label="대표자 이름" htmlFor="sp-biz-owner" anchor="bizOwner" error={fieldErr("bizOwner")} hint="사업자등록증에 적힌 이름 그대로 적어 주세요.">
           <input
@@ -1389,6 +1409,7 @@ export function SpaceForm({
             onChange={(e) => setBizOwnerName(e.target.value)}
             placeholder="예) 김하루"
           />
+          <CertDiff field="bizOwnerName" written={bizOwnerName} read={certVals.bizOwnerName} what="대표자 이름을" onUse={(v) => setBizOwnerName(v.trim())} />
         </L>
         <L label="개업일" htmlFor="sp-biz-open" anchor="bizOpenDate" error={fieldErr("bizOpenDate")}>
           <input
@@ -1399,6 +1420,7 @@ export function SpaceForm({
             value={bizOpenDate}
             onChange={(e) => setBizOpenDate(e.target.value)}
           />
+          <CertDiff field="bizOpenDate" written={bizOpenDate} read={certVals.bizOpenDate} what="개업일을" onUse={(v) => setBizOpenDate(fromOpenDate(v))} />
         </L>
         {/* 국세청 기록과 다를 때의 말 — 세 칸에 걸친 말이라 세 칸 바로 밑에 둔다. 칸을 고치면 내려간다. */}
         {bizServerMsg && (
@@ -1889,6 +1911,43 @@ function Group({
 /** 라벨 한 벌.
  *  ⚠️`@/components/Field`를 안 쓴 이유 — 그건 인증 4화면이 「같은 얼굴」이려고 공유하는 것이고,
  *    여기엔 안내문(hint) 자리가 더 필요하다. 공용 컴포넌트에 칸을 더하면 저쪽 4화면이 같이 흔들린다. */
+/** 🧾등록증에서 읽은 값이 칸에 적어 둔 값과 다를 때 그 칸 밑 한 줄(09-20 대표 「너 추천대로 고고」).
+ *  사장님이 적은 값은 덮지 않는다. 읽기 오류일 수도 있고 사장님이 맞을 수도 있어서, 등록증 글자를 보여 주고 고르게 한다.
+ *  같으면(번호의 하이픈·이름의 띄어쓰기만 다르면) 아무것도 안 그린다(`certFieldDiffers`). */
+function CertDiff({
+  field,
+  written,
+  read,
+  what,
+  onUse,
+}: {
+  field: CertFieldKey;
+  written: string;
+  read?: string;
+  /** 낭독기 이름 앞머리 — 「상호를」. 칸 넷에 같은 글자의 버튼이 서니 어느 칸 것인지 말한다. */
+  what: string;
+  onUse: (v: string) => void;
+}) {
+  if (!read || !certFieldDiffers(field, written, read)) return null;
+  const shown = certFieldShow(field, read);
+  return (
+    <div className="mt-1 flex flex-wrap items-center gap-x-3 text-[15px] leading-relaxed break-keep text-body">
+      <p className="min-w-0 py-2">
+        등록증에는 <span className="font-medium text-ink break-all">{shown}</span>
+        {josaRo(shown)} 적혀 있어요.
+      </p>
+      <button
+        type="button"
+        onClick={() => onUse(read)}
+        aria-label={`${what} 등록증에 적힌 값으로 바꾸기`}
+        className="inline-flex min-h-[44px] shrink-0 items-center font-medium text-primary-on underline underline-offset-4"
+      >
+        이 값으로 바꾸기
+      </button>
+    </div>
+  );
+}
+
 function L({
   label,
   htmlFor,

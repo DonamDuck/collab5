@@ -3,7 +3,7 @@
 // 🚨훅도 DB도 fetch도 없다. 등록 폼(클라이언트)과 서버 액션이 «같은 함수»로 검사한다.
 //   화면과 서버가 규칙을 따로 적으면 화면은 통과시키고 서버는 막는(또는 그 반대) 날이 온다.
 //   국세청 호출은 서버 전용 `nts-bizcheck.ts`에 따로 있다.
-import type { BizCheckDetail, BizCheckStatus } from "./types";
+import type { BizCertFields, BizCheckDetail, BizCheckStatus } from "./types";
 
 /** 숫자만 남긴다. 「123-45-67890」·「123 45 67890」 모두 같은 번호다. */
 export function bizDigits(v: string): string {
@@ -216,4 +216,32 @@ export function postcodeSido(addr: string): string {
   if (!m) return a;
   const short = POSTCODE_SIDO[m[1]];
   return short ? `${short}${m[2] ?? ""}` : a;
+}
+
+/** 🧾등록증 읽기가 견주는 네 칸(09-20). 주소는 따로다(자동으로 안 넣고 「등록증 주소로 채우기」로만). */
+export type CertFieldKey = Exclude<keyof BizCertFields, "bizAddress">;
+
+/** 견줄 모양. 번호는 숫자만, 이름(상호·대표자)은 띄어쓰기를 다 빼고, 개업일은 숫자만(`YYYY-MM-DD`든 `YYYYMMDD`든 `YYYYMMDD`가 된다). */
+function certNorm(key: CertFieldKey, v: string): string {
+  const s = (v ?? "").trim();
+  return key === "bizNumber" || key === "bizOpenDate" ? s.replace(/\D/g, "") : s.replace(/\s+/g, "");
+}
+
+/** 🧾등록증에서 읽은 값이 칸에 적어 둔 값과 «다른가» (09-20 대표 「너 추천대로 고고」).
+ *  폼은 빈 칸만 채우고(`fillEmptyBiz`) 적어 둔 칸은 덮지 않는다. 대신 다르면 그 칸 밑에 한 줄로 알린다.
+ *  칸이 비었거나 읽은 값이 없으면 «다르지 않다»(빈 칸은 채우기가 맡는다). 하이픈·띄어쓰기만 다르면 같은 값이다. */
+export function certFieldDiffers(key: CertFieldKey, written: string, read: string | undefined): boolean {
+  const a = certNorm(key, written);
+  const b = certNorm(key, read ?? "");
+  return a !== "" && b !== "" && a !== b;
+}
+
+/** 칸 밑 한 줄에 보여 줄 모양 — 번호는 「000-01-12347」, 개업일은 「2021년 3월 15일」, 이름은 읽은 그대로. */
+export function certFieldShow(key: CertFieldKey, read: string): string {
+  if (key === "bizNumber") return formatBizNumber(read);
+  if (key === "bizOpenDate") {
+    const d = certNorm(key, read);
+    return /^\d{8}$/.test(d) ? `${d.slice(0, 4)}년 ${Number(d.slice(4, 6))}월 ${Number(d.slice(6, 8))}일` : read.trim();
+  }
+  return read.trim();
 }

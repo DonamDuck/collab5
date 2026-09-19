@@ -17,3 +17,19 @@ export function josa(word: string, withBatchim: string, withoutBatchim: string):
   }
   return hasBatchim ? withBatchim : withoutBatchim;
 }
+
+/** 「로/으로」 (09-20 등록증 한 줄 「등록증에는 ○○○로 적혀 있어요」). 위 `josa`와 달리 ㄹ 받침은 「로」다(「서울로」·「15일로」).
+ *  끝의 괄호·마침표 같은 기호는 건너뛰고 마지막 글자를 본다. 숫자는 발음으로(0영·3삼·6육만 「으로」. 10·100처럼 0으로 끝나는 수도 십·백이라 「으로」).
+ *  영문 등 판별할 수 없는 글자는 「로」. */
+export function josaRo(word: string): string {
+  const w = (word ?? "").replace(/[^0-9A-Za-z\uac00-\ud7a3]+$/, "");
+  const last = w[w.length - 1];
+  if (!last) return "로";
+  const code = last.charCodeAt(0);
+  if (code >= 0xac00 && code <= 0xd7a3) {
+    const jong = (code - 0xac00) % 28;
+    return jong === 0 || jong === 8 ? "로" : "으로"; // 8 = ㄹ
+  }
+  if (/[0-9]/.test(last)) return "036".includes(last) ? "으로" : "로";
+  return "로";
+}
