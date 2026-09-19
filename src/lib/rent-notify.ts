@@ -13,7 +13,7 @@ import { rentMockOn } from "./rent-mock";
 import { KAKAO_CHAT_URL, SITE_URL } from "./site";
 import { bookingWhen, dateLabel } from "./rent-time";
 import {
-  accessMeetLine, hostContactLine, withJosa, CONTACT_RULE_GUEST, CONTACT_RULE_GUEST_CONFIRMED, CONTACT_RULE_HOST,
+  accessMeetLine, hostContactLine, withJosa, BROKER_NOTE, CONTACT_RULE_GUEST, CONTACT_RULE_GUEST_CONFIRMED, CONTACT_RULE_HOST,
   BOOKING_HEADLINE, COFFEE_CHAT_WHEN_GUEST, COFFEE_CHAT_WHEN_HOST, HOST_REQUEST_STEPS,
   PRODUCT_HINT_GUEST, PRODUCT_LABEL, REFUND_TIMING_LINE,
 } from "./rent-copy";
@@ -162,7 +162,14 @@ function tailText(tail: Tail): string {
   return typeof tail === "string" ? tail : `${tail.text} ${tail.label}: ${tail.href}`;
 }
 
-function layout(lead: string, rows: [string, string][], link: { href: string; label: string }, tail?: Tail): string {
+/** ⚖️맨 끝 작은 글씨 한 줄(09-19 통신판매중개자 고지). 본문과 선 하나로 갈라 «안내»가 아니라 «고지»로 읽히게 한다. */
+function noteHtml(note: string): string {
+  return `<p style="margin:24px 0 0;padding-top:14px;border-top:1px solid #EEEEF0;color:${MAIL.faint};font-size:12px;line-height:1.6;word-break:keep-all">${esc(note)}</p>`;
+}
+
+function layout(
+  lead: string, rows: [string, string][], link: { href: string; label: string }, tail?: Tail, note?: string,
+): string {
   const tr = rows
     .filter(([, v]) => v.trim().length > 0)
     .map(
@@ -182,6 +189,7 @@ function layout(lead: string, rows: [string, string][], link: { href: string; la
   </div>
   <p style="margin:24px 0 0"><a href="${esc(link.href)}" style="display:inline-block;padding:13px 22px;border-radius:12px;background:${MAIL.kiwi};color:#222;text-decoration:none;font-weight:600">${esc(link.label)}</a></p>
   ${tail ? tailHtml(tail) : ""}
+  ${note ? noteHtml(note) : ""}
 </div>`;
 }
 
@@ -189,7 +197,7 @@ function layout(lead: string, rows: [string, string][], link: { href: string; la
  *  🩸전엔 통마다 글자판을 따로 조립해서, 수락 → 손님 메일의 마지막 안내가 HTML에만 있고 글자판엔 빠져 있었다.
  *    버튼 이름도 글자판에선 「자세히 보기」·「예약 내역」처럼 HTML과 달랐다. 이제 같은 재료에서 둘이 같이 나온다. */
 function compose(
-  lead: string, rows: [string, string][], link: { href: string; label: string }, tail?: Tail,
+  lead: string, rows: [string, string][], link: { href: string; label: string }, tail?: Tail, note?: string,
 ): { html: string; text: string } {
   const text = [
     lead,
@@ -198,8 +206,9 @@ function compose(
     ``,
     `${link.label}: ${link.href}`,
     ...(tail ? [tailText(tail)] : []),
+    ...(note ? [``, note] : []),
   ].join("\n");
-  return { html: layout(lead, rows, link, tail), text };
+  return { html: layout(lead, rows, link, tail, note), text };
 }
 
 /** 한 통의 내용 — 보내기 전 모양. 🧪09-17 `build*` 함수가 이걸 만들고, `notify*`가 `sendMail`로 보낸다.
@@ -346,7 +355,8 @@ export function buildBookingPaid(
   // 🔁09-18 대표 #58 — 「연락처가 열려요」 → 「연락처를 보실 수 있어요」.
   const lead = `${BOOKING_HEADLINE.hostPaid}. 결제는 이미 끝났어요. 날짜와 손님이 적은 계획을 읽어 보시고 수락하거나 거절해 주세요. 수락하시면 손님 연락처를 보실 수 있어요.`;
   const tail = `거절은 이용 시작 전까지 할 수 있고, 손님께 전액 돌아가요. ${CONTACT_RULE_HOST}`;
-  return { to: host?.email ?? "", subject, ...compose(lead, rows, { href: link, label: "들어온 요청 보기" }, tail) };
+  // ⚖️09-19 대표 — 결제 메일 끝에 통신판매중개자 한 줄(`BROKER_NOTE`).
+  return { to: host?.email ?? "", subject, ...compose(lead, rows, { href: link, label: "들어온 요청 보기" }, tail, BROKER_NOTE) };
 }
 
 /** 보내는 쪽 — 문장은 `buildBookingPaid`가 만든다(09-17 메일 미리보기 `/dev/rent-mail`이 같은 함수를 부른다). */
@@ -382,7 +392,8 @@ export function buildBookingPaidToGuest(
     [LABEL.policy, CANCEL_POLICY_LINE],
   ];
   const tail = ASK("사장님과 연락이 잘 닿지 않으면 알려 주세요.");
-  return { to: guest?.email ?? "", subject, ...compose(lead, rows, { href: link, label: "예약 내역 보기" }, tail) };
+  // ⚖️09-19 대표 — 결제 메일 끝에 통신판매중개자 한 줄(`BROKER_NOTE`).
+  return { to: guest?.email ?? "", subject, ...compose(lead, rows, { href: link, label: "예약 내역 보기" }, tail, BROKER_NOTE) };
 }
 
 /** 보내는 쪽 — 문장은 `buildBookingPaidToGuest`가 만든다(09-17 메일 미리보기 `/dev/rent-mail`이 같은 함수를 부른다). */
