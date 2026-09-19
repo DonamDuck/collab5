@@ -27,8 +27,9 @@ import { durationLabel, expandRepeat, minHoursToMinutes, minutesBetween, stripRe
 import { payoutAmount } from "@/lib/rent-money";
 import { CONTACT_PHONE_MAX, storePhoneOk } from "@/lib/rent-limits";
 import {
+  addressCertProblem, addressMoved,
   BIZ_CERT_MAX_BYTES, BIZ_CERT_TYPES, BIZ_MISMATCH_LINE, bizCertPathOk, bizDigits, bizNumberProblem, formatBizNumber, fromOpenDate,
-  hasAnyBiz, openDateProblem, spaceListed, toOpenDate,
+  hasAnyBiz, needsBizInfo, openDateProblem, spaceListed, toOpenDate,
 } from "@/lib/bizcheck";
 import {
   COFFEE_CHAT_LABEL, COFFEE_CHAT_WHEN_HOST, PRODUCT_HINT_HOST, PRODUCT_LABEL, PRODUCT_NOTE_PLACEHOLDER, withJosa,
@@ -243,9 +244,13 @@ export function SpaceForm({
       : null,
   );
   const bizServerMsg = bizServer && bizServer.key === bizKey ? bizServer.msg : "";
-  /** 새 공간은 넷 다 필수. 고치기는 옛 공간(09-18 전)이 넷 다 비어 있으면 그대로 저장된다(서버와 같은 판정). */
-  const bizNeeded =
-    !initial || hasAnyBiz(initial) || hasAnyBiz({ bizNumber, bizOwnerName, bizOpenDate, bizCertPath });
+  /** 넷 다 필수인가 — 서버(`saveSpaceAction`)와 «같은 함수»(`needsBizInfo`)로 판정한다(대표 09-19 오후: 화면과 서버가 같은 규칙).
+   *  🩸09-19 오후까지 여기는 따로 적은 식이라 두 갈래가 빠져 있었다. 초안(서버는 필수)과 옛 공간이 이름·주소를 바꿀 때(서버는 필수)
+   *    화면은 통과시키고 서버가 막았다. 사장님은 다 적은 줄 알고 눌렀다가 서버 말을 보게 된다. */
+  const bizNeeded = needsBizInfo(initial ?? null, {
+    name, address: [addrBase.trim(), addrDetail.trim()].filter(Boolean).join(", "),
+    bizNumber, bizOwnerName, bizOpenDate, bizCertPath,
+  });
   /** 저장 뒤 사업자 칸만 남았을 때의 한 줄(나머지는 저장됐다는 것). */
   const [savedNote, setSavedNote] = useState("");
 
@@ -255,7 +260,10 @@ export function SpaceForm({
   //   ⚠️검토로 내려가는 조건은 `saveSpaceAction`이 정본이다. 여기 두 줄은 그 규칙을 화면에서 미리 비추는 것뿐이다.
   const addressNow = [addrBase.trim(), addrDetail.trim()].filter(Boolean).join(", ");
   const renamedNow = !!initial && initial.name.trim() !== name.trim();
-  const movedNow = !!initial && initial.address.trim() !== addressNow;
+  const movedNow = addressMoved(initial ?? null, addressNow);
+  /** 🏠09-19 오후 대표 — 주소를 바꾸면 사업자등록증을 새로 올려야 저장된다. 서버와 같은 함수(`addressCertProblem`)라 문장도 같다.
+   *  주소 칸 밑엔 바뀐 순간부터 옅게 알리고, 등록증 칸은 누른 뒤에 막는다(`blocker`). */
+  const addressCertLine = addressCertProblem(initial ?? null, { address: addressNow, bizCertPath });
   const reviewAgain = renamedNow || movedNow;
   /** 지금 손님에게 보이는 공간인가 — 그럴 때만 「목록에서 잠시 빠져요」가 참이다.
    *  🚪09-19 오후 — 사업자등록번호가 빈 공간은 공개 중이어도 목록에 없다(`spaceListed`). */
@@ -514,6 +522,7 @@ export function SpaceForm({
       if (dateProblem) return ["bizOpenDate", dateProblem];
       if (!bizCertPath) return ["bizCert", "사업자등록증 파일을 올려 주세요."];
     }
+    if (addressCertLine) return ["bizCert", addressCertLine];
     if (!termsOk) return ["terms", "공간 제공자 약관에 동의해 주세요."];
     return null;
   };
@@ -621,7 +630,7 @@ export function SpaceForm({
       // 💬09-17 QA — 말없이 목록으로 떨어져서 「된 건가?」 했다. `saved`로 무슨 일이 났는지 한 줄 띄운다.
       //   ⚠️검토로 내려가는 조건은 `saveSpaceAction`과 같은 규칙이다(이름·주소가 바뀌면). 거기를 바꾸면 여기도.
       const renamed = !!initial && initial.name.trim() !== name.trim();
-      const moved = !!initial && initial.address.trim() !== address;
+      const moved = addressMoved(initial ?? null, address);
       const saved = !initial
         ? "new"
         : initial.status === "pending"
@@ -744,7 +753,8 @@ export function SpaceForm({
           htmlFor="sp-address"
           anchor="address"
           error={fieldErr("address")}
-          hint="손님이 공간 화면에서 보고 찾아오실 수 있게 지도와 함께 보여드려요."
+          // 🏠09-19 오후 대표 — 「주소는 사업자등록증과 비교할 수 있는 주소를 작성해 달라고 등록 폼에 넣자!」
+          hint="사업자등록증에 적힌 사업장 주소와 같게 적어 주세요. 등록증과 대조해서 확인하고, 손님께는 지도와 함께 보여드려요."
         >
           <AddressField
             base={addrBase}
@@ -754,6 +764,15 @@ export function SpaceForm({
             onDetail={setAddrDetail}
           />
           {movedNow && <ReviewAgainNote what="주소" listed={listedNow} />}
+          {/* 🏠주소를 바꿨는데 등록증은 그대로일 때만. 새 등록증을 올리면 이 줄이 내려간다. 막는 말은 아니라 레몬(빨강은 누른 뒤 등록증 칸에). */}
+          {addressCertLine && (
+            <p className="mt-1 text-[15px] leading-relaxed break-keep text-lemon-on">
+              {addressCertLine}{" "}
+              <a href="#f-bizCert" className="-my-[13px] inline-block py-[13px] underline underline-offset-2">
+                등록증 올리러 가기
+              </a>
+            </p>
+          )}
         </L>
         {/* 🔻09-14 「동네」 칸 삭제 — 대표: *「주소를 필수로 하고, 동네 섹션 삭제해도 될 거 같아」*.
             ⭐주소를 받으면 동네는 «거기서 나온다». 같은 것을 두 번 묻는 칸이었고, 둘이 어긋나면
@@ -1151,8 +1170,10 @@ export function SpaceForm({
           </p>
         )}
         {editing && !!initial?.bizApprovedAt && (
+          // 🔁09-19 오후 대표 — 상호만 고치는 건 그대로 둔다(표시도 안 내려간다). 무엇을 바꾸면 내려가는지 칸 이름으로 말한다.
           <p className="text-[15px] leading-relaxed break-keep text-mute">
-            사업자 정보나 등록증을 바꾸시면 확인 표시가 잠시 내려가요. 저희가 다시 확인하고 붙여 드려요.
+            사업자등록번호·대표자 이름·개업일이나 등록증을 바꾸시면 확인 표시가 잠시 내려가요. 저희가 다시 확인하고 붙여
+            드려요. 상호만 고치시면 그대로예요.
           </p>
         )}
         {/* 🏷09-19 대표 [J] — 판매자 정보(상호·대표자·사업자번호·주소·가게 전화)를 손님이 결제 전에 보는 화면이 생겼다.
@@ -1222,7 +1243,8 @@ export function SpaceForm({
           //   10MB 초과·형식 불일치·올리기 실패 같은 **진짜 이유**(`certErr`)가 그 일반 문구에 가려졌다.
           //   사장님은 파일을 골랐는데 「올려 주세요」만 반복해서 보게 된다. 방금 일어난 일이 먼저다.
           error={certErr || fieldErr("bizCert")}
-          hint="사진이나 PDF로 올려 주세요. 10MB까지 돼요."
+          // 🏠09-19 오후 대표 — 등록증의 사업장 주소와 위 「전체 주소」를 대조한다. 같은 뜻을 이 칸에서도 한 줄.
+          hint="사업장 주소가 위에 적으신 주소와 같은 등록증으로 올려 주세요. 사진이나 PDF, 10MB까지 돼요."
         >
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
             <label className={`${secondaryBtnCls} cursor-pointer text-[15px] ${certUploading ? "pointer-events-none opacity-60" : ""}`}>
@@ -1289,6 +1311,8 @@ export function SpaceForm({
               `약관에는 사장님 소유이거나 임대인 동의를 받으셨다는 것, 수수료 ${Math.round(feeRate * 100)}%와 정산 방법, 환불 규정이 담겨 있어요.`,
               // 🔁09-19 대표 [J] — 판매자 정보 화면(상호·대표자·사업자번호·주소·가게 전화). 호스트 약관 제6조와 같은 말.
               "손님은 신청하기 전에 공간 화면의 판매자 정보에서 상호·대표자 이름·사업자등록번호·주소·가게 전화번호를 볼 수 있어요.",
+              // 🏠09-19 오후 대표 — 주소를 바꾸면 등록증을 다시 받는다. 호스트 약관 제2조와 같은 말.
+              "공간 이름이나 주소를 바꾸시면 저희가 다시 확인해요. 주소를 바꾸실 땐 새 주소가 적힌 사업자등록증을 다시 올려 주셔야 해요.",
               "손님이 결제를 마치면 사장님 연락처가 그 손님께 전달돼요. 손님 연락처는 사장님이 요청을 수락하신 뒤에 보실 수 있어요.",
             ].map((line) => (
               <li key={line} className="flex gap-2 text-[15px] leading-relaxed break-keep text-mute">

@@ -16,6 +16,7 @@ import {
 } from "./spaces";
 // 🧾🏪09-18 사업자 확인 · 네이버 상호 매칭(대표 09-17). 규칙은 순수 함수(`bizcheck`·`place-match`), 바깥 호출은 서버 전용 파일에.
 import {
+  addressCertProblem, addressMoved,
   BIZ_CERT_MAX_BYTES, BIZ_CERT_TYPES, BIZ_MISMATCH_LINE, bizCertPathOk, bizDigits, bizNumberProblem, bizOnFile,
   hasAnyBiz, needsBizInfo, openDateProblem,
 } from "./bizcheck";
@@ -169,6 +170,8 @@ export async function saveSpaceAction(input: SpaceFormInput): Promise<ActionResu
     return { ok: false, message: "유의 사항을 열 글자 넘게 담아 주세요. 이 칸이 사장님을 지켜 줘요." };
   }
   if (!input.name.trim()) return { ok: false, message: "공간 이름을 적어 주세요." };
+  // 🏠09-19 오후 — 주소는 판매자 정보에 그대로 나가고 사업자등록증의 사업장 주소와 대조하는 값이다. 폼도 막지만 관문은 여기다.
+  if (!input.address.trim()) return { ok: false, field: "address", message: "주소를 찾아 주세요." };
   if (!input.category) return { ok: false, message: "어떤 업종인지 골라 주세요." };
   // 🔁09-17 — 매주 계속 여는 요일이 있으면 그걸로 «하루 이상»이 찬다.
   const repeat = Array.isArray(input.repeatWeekly) ? input.repeatWeekly : [];
@@ -290,7 +293,8 @@ export async function saveSpaceAction(input: SpaceFormInput): Promise<ActionResu
 
   // 🔁09-16 대표 — **고쳐도 공개가 유지된다.** 다시 검토받는 건 «가게가 바뀌는» 둘뿐이다: 매장 이름과 주소.
   const renamed = !!prev && prev.name.trim() !== input.name.trim();
-  const moved = !!prev && prev.address.trim() !== input.address.trim();
+  // 🏠비교는 등록 폼과 같은 함수(`addressMoved`). 여기서 따로 적으면 화면은 「바뀌었어요」, 서버는 「그대로」인 날이 온다.
+  const moved = addressMoved(prev, input.address);
 
   // ⏸09-18 밤 QA(H-02·SC-04) — 쉬는 동안엔 이름·주소를 못 바꾼다(대표 판단용 추천안 중 «스키마를 안 건드리는» 쪽).
   //   바꾸면 검토 대기로 내려가는데, 관리자가 검토를 통과시키는 순간 «쉬는 중»이던 공간이 그대로 목록에 열린다.
@@ -368,6 +372,10 @@ export async function saveSpaceAction(input: SpaceFormInput): Promise<ActionResu
       return { ok: false, message: "사업자등록증 파일을 다시 올려 주세요.", field: "biz" };
     }
   }
+  // 🏠09-19 오후 대표 — 주소가 바뀌면 사업자등록증을 새로 올려야 저장된다(검토 대기로 내려가는 건 전과 같다).
+  //   판정은 등록 폼과 같은 순수 함수(`addressCertProblem`). 상호만 바꾸는 건 여기 안 걸린다.
+  const certProblem = addressCertProblem(prev, { address: input.address, bizCertPath: biz.bizCertPath });
+  if (certProblem) return { ok: false, field: "biz", message: certProblem };
 
   // 📍주소가 «바뀔 때만» 좌표를 다시 잰다(대표 09-14 지도 요청). 유료 호출이라 매번 부르지 않고,
   //   실패해도 저장은 그대로 간다 — 지도는 있으면 좋은 것이지 올리기를 막을 것이 아니다.
@@ -391,9 +399,10 @@ export async function saveSpaceAction(input: SpaceFormInput): Promise<ActionResu
   //   다시 부른다. 키가 생기기 전에 올린 공간이 영영 「조회 전」으로 남지 않게.
   const idChanged =
     !prev || prev.bizNumber !== biz.bizNumber || prev.bizOwnerName !== biz.bizOwnerName || prev.bizOpenDate !== biz.bizOpenDate;
-  // 🏷09-19 상호를 «바꾸면» 승인도 내린다(관리자는 등록증의 상호와 대조해 승인한다). 옛 공간이 처음 채우는 건 바꾼 게 아니라 그대로 둔다.
-  const bizNameChanged = !!prev?.bizName && prev.bizName !== bizName;
-  const bizChanged = idChanged || !prev || prev.bizCertPath !== biz.bizCertPath || bizNameChanged;
+  // 🔁09-19 오후 대표 — *「상호만 바꾸는 건 그냥 바꾸게 하고」*. 오전엔 상호를 바꾸면 승인(확인 표시)도 내렸는데 되돌렸다.
+  //   상호는 검토로도 안 내리고 표시도 그대로 둔다. 표시가 내려가는 건 번호·대표자·개업일·등록증이 바뀔 때뿐이다.
+  //   주소가 바뀌면 등록증이 새로 오니(`addressCertProblem`) 그 길로 표시가 내려간다.
+  const bizChanged = idChanged || !prev || prev.bizCertPath !== biz.bizCertPath;
   const needCheck = bizRequired && (idChanged || prev?.bizCheckStatus === "none" || prev?.bizCheckStatus === "error");
   // 🏪네이버 상호 — 이름·주소가 바뀌었거나 아직 매칭이 없을 때. 매칭이 있고 둘 다 그대로면 안 부른다.
   const placeStale = !prev || renamed || moved;

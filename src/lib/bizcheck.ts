@@ -108,6 +108,31 @@ export function needsBizInfo(
   return prev.name.trim() !== next.name.trim() || prev.address.trim() !== next.address.trim();
 }
 
+/** 🏠주소를 바꿨나 — 등록 폼과 서버(`saveSpaceAction`)가 같은 비교를 쓴다. 앞뒤 공백만 걷고 글자 그대로 본다(상세 주소의 층·호수까지).
+ *  바꾸면 검토 대기로 내려가고(대표 09-16), 등록증도 새로 받는다(아래 `addressCertProblem`). */
+export function addressMoved(prev: { address: string } | null, nextAddress: string): boolean {
+  return !!prev && prev.address.trim() !== (nextAddress ?? "").trim();
+}
+
+/** 주소를 바꿨는데 등록증은 그대로일 때 하는 말. 칸 밑 안내와 막힘이 같은 문장이다. */
+export const ADDRESS_CERT_LINE = "주소를 바꾸시면 새 주소가 적힌 사업자등록증을 다시 올려 주세요.";
+
+/** 🧾주소를 바꾸는 저장인데 등록증이 그대로인가 (대표 09-19 오후).
+ *  대표 원문: *「상호만 바꾸는 건 그냥 바꾸게 하고, 다만 주소가 바뀌는 경우는 사업자등록증 다시 등록으로 하자!!」*
+ *  관리자는 등록증의 사업장 주소와 공간 주소를 대조해 승인한다. 주소가 바뀌면 옛 등록증으로는 대조할 게 없다.
+ *  · 새 공간 · 초안은 해당 없다(아직 검토 전이라 검토가 새 주소와 등록증을 같이 본다)
+ *  · 등록증 «경로»가 이전과 다르면 새로 올린 것이다(서버가 발급한 경로는 올릴 때마다 새 uuid다, `signCertUpload`)
+ *  @returns 막는 말. 문제가 없으면 빈 문자열. */
+export function addressCertProblem(
+  prev: { status?: string; address: string; bizCertPath: string } | null,
+  next: { address: string; bizCertPath: string },
+): string {
+  if (!prev || prev.status === "draft") return "";
+  if (!addressMoved(prev, next.address)) return "";
+  const path = (next.bizCertPath ?? "").trim();
+  return path && path !== prev.bizCertPath.trim() ? "" : ADDRESS_CERT_LINE;
+}
+
 /** 🚪사업자등록번호가 적혀 있나 (대표 09-19 오후).
  *  대표 원문: *「사업자 정보가 빈 옛 공간이 뭐야..? 등록할 때 무조건 필수로 사업자등록번호 있어야 상품 등록하잖아!」*
  *  새 공간은 이미 넷 다 필수다(`needsBizInfo`). 번호가 빈 공간은 09-18 전에 만든 시험 공간뿐이라, 규칙으로 손님 앞에서 뺀다. */
