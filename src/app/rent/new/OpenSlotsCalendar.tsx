@@ -417,8 +417,9 @@ function TimeSelects({
   end: string;
   onEdit: (patch: { start?: string; end?: string }) => void;
 }) {
+  // 셋(여는 ~ 닫는)을 한 덩어리로 묶는다 — 좁은 화면에서 줄이 바뀔 때 「~」만 윗줄 끝에 남지 않게.
   return (
-    <>
+    <span className="flex shrink-0 items-center gap-2">
       <RentSelect aria-label={`${label} 여는 시각`} compact wrapClassName="w-[104px] shrink-0" value={start} onChange={(e) => onEdit({ start: e.target.value })}>
         {HOURS.map((x) => (
           <option key={x} value={x}>
@@ -434,7 +435,7 @@ function TimeSelects({
           </option>
         ))}
       </RentSelect>
-    </>
+    </span>
   );
 }
 

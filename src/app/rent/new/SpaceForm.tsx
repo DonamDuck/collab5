@@ -1583,7 +1583,7 @@ function ProductCard({
       >
         <span className="min-w-0 flex-1">
           <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <span className="text-[17px] font-bold text-ink">{title}</span>
+            <span className="text-[17px] font-bold break-keep text-ink">{title}</span>
             {addon && (
               <span className="rounded-pill bg-surface-soft px-2 py-0.5 text-[13px] text-mute">{addon}</span>
             )}
