@@ -463,7 +463,9 @@ function fullWorld(today: string, withAccount: boolean): MockWorld {
     done: booking({ id: 90009, spaceId: s1.id, guestUserId: U.guest, status: "done", useDate: d(-7), startTime: "10:00", endTime: "15:00", plan: "첫 팝업이었어요. 빵 스무 개를 가져갔어요.", withChat: true, headcount: 2, guestPhone: "010-3456-7890", guestName: "한서윤", guestBrandSlug: "mock-flour-diary", ...P1F }, today),
     rejected: booking({ id: 90010, spaceId: s1.id, guestUserId: U.guest, status: "rejected", useDate: d(6), startTime: "15:00", endTime: "19:00", plan: "필사 모임 여섯 명이 조용히 앉아 있다 가려고 해요.", headcount: 6, guestPhone: "010-3456-7890", guestName: "한서윤", hostMessage: "그날 원두 입고가 있어서 2층이 어수선해요. 다음 주 월요일은 어떠세요?", decidedAt: `${d(-1)}T06:00:00.000Z`, ...P1 }, today),
     refunded: booking({ id: 90011, spaceId: s1.id, guestUserId: U.guest, status: "refunded", useDate: d(8), startTime: "11:00", endTime: "14:00", plan: "사워도우 사진을 찍으려고 해요. 창가 자리만 쓰면 돼요.", guestPhone: "010-3456-7890", guestName: "한서윤", hostMessage: "그날 가족 행사가 생겼어요. 정말 미안해요.", decidedAt: `${d(-2)}T06:00:00.000Z`, ...P1 }, today),
-    cancelledFuture: booking({ id: 90012, spaceId: s1.id, guestUserId: U.guest, status: "cancelled", useDate: d(14), startTime: "10:00", endTime: "13:00", plan: "친구들과 빵 굽는 모임을 하려다 일정이 바뀌었어요.", headcount: 5, guestPhone: "010-3456-7890", guestName: "한서윤", ...P1 }, today),
+    // 💸09-19 — 이용일을 d(14) → d(4)로. 취소는 이틀 전(`booking`의 `at`)에 했으니 이용일 6일 전 취소 = 표의 70%다.
+    //   d(14)면 16일 전 취소라 규정상 전액인데 결제 줄은 70%만 돌려준 모양이었다(규칙과 목 데이터가 어긋나 있었다).
+    cancelledFuture: booking({ id: 90012, spaceId: s1.id, guestUserId: U.guest, status: "cancelled", useDate: d(4), startTime: "10:00", endTime: "13:00", plan: "친구들과 빵 굽는 모임을 하려다 일정이 바뀌었어요.", headcount: 5, guestPhone: "010-3456-7890", guestName: "한서윤", ...P1 }, today),
     cancelledPast: booking({ id: 90013, spaceId: s1.id, guestUserId: U.guest, status: "cancelled", useDate: d(-3), startTime: "13:00", endTime: "16:00", plan: "전날 취소한 예약이에요. 반만 돌려받았어요.", guestPhone: "010-3456-7890", guestName: "한서윤", ...P1 }, today),
     refundReq: booking({ id: 90014, spaceId: s1.id, guestUserId: U.guest2, status: "confirmed", useDate: d(4), startTime: "10:00", endTime: "18:00", plan: "작은 책 장터를 열어요. 셀러 다섯 팀이 와요.", headcount: 12, guestPhone: "010-5678-9012", guestName: "정다온", decidedAt: `${d(-3)}T06:00:00.000Z`, refundRequestedAt: `${d(-1)}T09:00:00.000Z`, refundRequestNote: "건물 누수 공사가 그 주로 잡혔어요. 2층 천장을 열어야 한대요.", ...P1F }, today),
     paidStarted: booking({ id: 90015, spaceId: s1.id, guestUserId: U.guest, status: "paid", useDate: d(-1), startTime: "10:00", endTime: "13:00", plan: "어제 쓴 예약인데 사장님이 수락을 안 누르셨어요.", guestPhone: "010-3456-7890", ...P1 }, today),
@@ -660,7 +662,7 @@ export const MOCK_MAIL_KINDS: { kind: string; label: string }[] = [
   { kind: "cancelled-host", label: "손님 취소 → 사장님" },
   { kind: "cancelled-guest", label: "손님 취소 → 손님 · 일부 환불" },
   { kind: "cancelled-guest-sameday", label: "손님 취소 → 손님 · 당일이라 환불 없음" },
-  { kind: "cancelled-guest-full", label: "손님 취소 → 손님 · 전액 돌려받음 (결제 한 시간 안이거나 7일 전까지)" },
+  { kind: "cancelled-guest-full", label: "손님 취소 → 손님 · 전액 돌려받음 (수락 뒤 한 시간 안이거나 7일 전까지)" },
   { kind: "admin-refund-guest", label: "관리자 승인 환불 → 손님" },
   { kind: "admin-refund-guest-partial", label: "관리자 승인 환불 → 손님 · 남은 돈이 낸 돈보다 적어 일부만 돌려줌" },
   { kind: "admin-refund-host", label: "관리자 승인 환불 → 사장님" },

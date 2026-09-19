@@ -10,7 +10,9 @@
 //   운영에서 키가 비어 있으면 결제는 **실패로 떨어진다** — 조용히 통과하는 것보다 낫다.
 
 import { createHash } from "node:crypto";
-import type { TossPayment } from "./types";
+import type { SpaceBooking, TossPayment } from "./types";
+import { kstDaysUntil } from "./rent-time";
+import { refundAmount } from "./rent-money";
 
 const TOSS_BASE = "https://api.tosspayments.com/v1/payments";
 
@@ -201,9 +203,13 @@ export async function cancelPayment(
   }
 }
 
-/** ⏳**막 눌렀다면 되돌릴 수 있다** — 결제 후 1시간 안의 취소는 언제나 전액 (대표 09-16, 09-17부터 결제 승인 시각 기준).
- *  스페이스클라우드가 「예약 직후 2시간 전액」을 두는 걸 보고 대표가 1시간으로 정했다.
- *  ⭐손 미끄러짐과 마음 바꿈은 다르다. 이 창이 없으면 잘못 누른 사람이 당일 예약에서 전액을 잃는다. */
+/** ⏳**수락 뒤 1시간은 되돌릴 수 있다** — 사장님이 수락(확정)한 뒤 1시간 안에 손님이 취소하면 남은 날과 상관없이 전액 (대표 09-19).
+ *
+ *  🔁09-16~09-18엔 «결제하고 1시간»이었다. 대표 09-19: *「결제하고 1시간을 애당초 잘못 넣은 거 같아. 당연히 사장님의
+ *    예약 확정 이후에 1시간 취소로 해야 할 거 같아. 결제만 하고 1시간 취소는 정책을 아예 그냥 빼자.」*
+ *    그래서 결제 기준 창은 없앴다. 확정 전(결제 완료·수락 대기)에 취소하면 아래 표대로다.
+ *  기준 시각은 수락을 누른 때(`decidedAt`)다. 거절한 예약엔 창이 없다. 거절이 곧 전액 환불이라서다.
+ *  경계는 «분»을 내림해서 센다. 수락하고 60분 59초까지가 창 안이다(09-17부터 쓰던 셈 그대로). */
 export const GRACE_MINUTES = 60;
 
 /** 취소 수수료 — 🚨**호스트가 아니라 우리가 정한다.**
@@ -215,10 +221,10 @@ export const GRACE_MINUTES = 60;
  *    소수 비율(0.7)을 금액에 바로 곱하면 90,000원의 70%가 62,999원이 됐다.
  *
  *  @param daysBefore 쓰기로 한 날까지 남은 일수
- *  @param minutesSinceBooked 신청한 지 지난 분. 넘기지 않으면 유예 창을 안 본다(옛 호출부 호환).
+ *  @param minutesSinceConfirmed 사장님이 수락한 지 지난 분(`minutesSinceConfirmed`). 확정 전이면 넘기지 않는다. 그러면 표만 본다.
  */
-export function guestCancelRefundPercent(daysBefore: number, minutesSinceBooked?: number): number {
-  if (typeof minutesSinceBooked === "number" && minutesSinceBooked <= GRACE_MINUTES) return 100;
+export function guestCancelRefundPercent(daysBefore: number, minutesSinceConfirmed?: number): number {
+  if (typeof minutesSinceConfirmed === "number" && minutesSinceConfirmed <= GRACE_MINUTES) return 100;
   if (daysBefore >= 7) return 100;    // 7일 전까지 전액
   if (daysBefore >= 3) return 70;
   if (daysBefore >= 1) return 50;
@@ -226,6 +232,30 @@ export function guestCancelRefundPercent(daysBefore: number, minutesSinceBooked?
 }
 
 /** 같은 표를 비율(1·0.7·0.5·0)로. 화면 문장(「70%」·「전액」)을 만드는 곳이 쓴다. ⚠️금액 계산엔 쓰지 않는다 — `refundAmount`에 퍼센트를 넘긴다. */
-export function guestCancelRefundRate(daysBefore: number, minutesSinceBooked?: number): number {
-  return guestCancelRefundPercent(daysBefore, minutesSinceBooked) / 100;
+export function guestCancelRefundRate(daysBefore: number, minutesSinceConfirmed?: number): number {
+  return guestCancelRefundPercent(daysBefore, minutesSinceConfirmed) / 100;
+}
+
+/** 사장님이 수락한 지 몇 분 됐나. 확정 예약이 아니거나 수락 시각이 없으면 undefined다(창이 없다).
+ *  ⚠️상태까지 같이 본다. `decidedAt`은 거절할 때도 찍히는 칸이라, 시각만 보면 거절된 예약에 창이 열린 것처럼 읽힌다. */
+export function minutesSinceConfirmed(b: Pick<SpaceBooking, "status" | "decidedAt">, now = Date.now()): number | undefined {
+  if (b.status !== "confirmed" || !b.decidedAt) return undefined;
+  const at = Date.parse(b.decidedAt);
+  if (!Number.isFinite(at)) return undefined;
+  return Math.floor((now - at) / 60_000);
+}
+
+/** 💸손님 취소 견적 — **취소 팝업(`quoteCancelAction`)과 실제 취소(`cancelBookingAction`)가 이 한 함수만 부른다.**
+ *  둘이 따로 계산하면 팝업엔 70%라 적고 50%만 돌려주는 날이 온다.
+ *  「이용일 N일 전」은 한국 달력의 날짜 차이다(`kstDaysUntil`, 09-16 UTC 자정 사고 뒤로).
+ *  `grace`는 팝업이 «왜 전액인지»를 말할 때만 쓴다. 비율은 `percent` 하나가 정한다.
+ *  순수 함수라 시각을 넘겨 경계값을 잴 수 있다(`now`·`today`). */
+export function guestCancelQuote(
+  b: Pick<SpaceBooking, "status" | "decidedAt" | "useDate" | "amountTotal">, now = Date.now(), today?: string,
+): { percent: number; rate: number; refund: number; daysBefore: number; grace: boolean } {
+  const daysBefore = kstDaysUntil(b.useDate, today);
+  const mins = minutesSinceConfirmed(b, now);
+  const grace = typeof mins === "number" && mins <= GRACE_MINUTES;
+  const percent = guestCancelRefundPercent(daysBefore, mins);
+  return { percent, rate: percent / 100, refund: refundAmount(b.amountTotal, percent), daysBefore, grace };
 }
