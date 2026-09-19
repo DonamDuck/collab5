@@ -19,8 +19,10 @@ begin
     execute format('select coalesce(jsonb_agg(t), ''[]''::jsonb) from (%s) t', rtrim(q, '; '))
       into r;
     return r;
-  elsif position(' returning ' in head) > 0 then
-    -- insert/update/delete ... returning  → 데이터 변경 CTE로 감싸 «되받은 행»을 그대로 돌려준다
+  elsif head ~ '\yreturning\y' then
+    -- 🩸09-20 실측: 공백으로 앞뒤를 감싸 찾던 옛 방식은 줄바꿈 앞의 절을 놓쳤다(여러 줄 SQL은
+    --   개행 다음에 그 절이 오지, 공백 다음이 아니다). 단어 경계(\y)로 교체해 개행·탭도 잡는다.
+    -- insert/update/delete에 RETURNING이 붙으면 → 데이터 변경 CTE로 감싸 «되받은 행»을 그대로 돌려준다
     execute format('with t as (%s) select coalesce(jsonb_agg(t), ''[]''::jsonb) from t', rtrim(q, '; '))
       into r;
     return r;
