@@ -177,7 +177,8 @@ export async function saveSpaceAction(input: SpaceFormInput): Promise<ActionResu
   if (!input.name.trim()) return { ok: false, message: "공간 이름을 적어 주세요." };
   // 🏠09-19 오후 — 주소는 판매자 정보에 그대로 나가고 사업자등록증의 사업장 주소와 대조하는 값이다. 폼도 막지만 관문은 여기다.
   if (!input.address.trim()) return { ok: false, field: "address", message: "주소를 찾아 주세요." };
-  if (!input.category) return { ok: false, message: "어떤 업종인지 골라 주세요." };
+  // 🔁09-19 대표 #74 — 화면 라벨이 「공간 타입」이 됐다. 같은 말로.
+  if (!input.category) return { ok: false, message: "공간 타입을 골라 주세요." };
   // 🔁09-17 — 매주 계속 여는 요일이 있으면 그걸로 «하루 이상»이 찬다.
   const repeat = Array.isArray(input.repeatWeekly) ? input.repeatWeekly : [];
   if (input.openSlots.length === 0 && repeat.length === 0) {

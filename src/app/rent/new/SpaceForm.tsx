@@ -33,7 +33,7 @@ import {
 } from "@/lib/bizcheck";
 import { pausedChangeProblem, spaceSaveReview } from "@/lib/rent-review";
 import {
-  COFFEE_CHAT_LABEL, COFFEE_CHAT_WHEN_HOST, PRODUCT_HINT_HOST, PRODUCT_LABEL, PRODUCT_NOTE_PLACEHOLDER, withJosa,
+  COFFEE_CHAT_LABEL, COFFEE_CHAT_WHEN_HOST, PRODUCT_HINT_HOST, PRODUCT_LABEL_HOST, PRODUCT_NOTE_PLACEHOLDER, withJosa,
 } from "@/lib/rent-copy";
 import { CATEGORY_OPTIONS, dateLabel, primaryBtnCls, RentSelect, rentInputCls, rentTextareaCls, secondaryBtnCls, won } from "../ui";
 import { AddressField } from "./AddressField";
@@ -55,13 +55,15 @@ import { OpenSlotsCalendar } from "./OpenSlotsCalendar";
 const ACCESS_OPTIONS: [AccessHow, string][] = [
   // 🔁09-18 대표 코멘트 — 「문자나 전화로 보내드릴게요」·「둘 다 진행할게요」. 값(`sms`)은 그대로, 말만 넓혔다.
   ["sms", "문자나 전화로 보내 드릴게요"],
-  ["onsite", "일정 전에 미리 만나서 알려드릴게요"],
+  // 🔁09-19 대표 코멘트 #77 — 만나야 한다는 걸 손님이 미리 알게 「(방문 필요)」를 붙였다(맞춤법: 「알려 드리고」).
+  ["onsite", "일정 전에 미리 만나서 알려 드리고 싶어요 (방문 필요)"],
   ["both", "둘 다 진행할게요"],
 ];
 
+/** 🔁09-19 대표 코멘트 #78·#79 — 싱크대를 둘째, 테이블·의자를 셋째로(자주 고르는 것이 앞). */
 const FACILITY_HINTS = [
-  "와이파이", "주차", "엘리베이터", "화장실", "냉난방", "테이블·의자",
-  "빔프로젝터", "음향", "조명", "싱크대", "창고", "작업대",
+  "와이파이", "싱크대", "테이블·의자", "주차", "엘리베이터", "화장실", "냉난방",
+  "빔프로젝터", "음향", "조명", "창고", "작업대",
 ];
 
 /** 규칙 칸 예시 — 설계가 「예시를 여러 개 보여 준다」를 명시한 자리다.
@@ -490,13 +492,13 @@ export function SpaceForm({
   // 📝09-18 밤 QA(H-14) — 막힘 검사도 «보낼 값»으로 한다. 칸에 적어만 두고 [담기]를 안 누른 유의 사항은
   //   제출 직전에 합쳐지는데(아래 `submit`), 검사가 합치기 «전» 값을 보면 다 적은 사장님에게 「열 글자 넘게 담아 주세요」가 뜬다.
   const blocker = (rulesV: string = rules): [string, string] | null => {
-    if (!name.trim()) return ["name", "공간 이름을 적어 주세요."];
-    if (!category) return ["category", "어떤 업종인지 골라 주세요."];
+    if (!name.trim()) return ["name", "검색에 노출할 공간명을 적어 주세요."];
+    if (!category) return ["category", "공간 타입을 골라 주세요."];
     if (readyPhotos.length === 0) return ["photos", "사진을 한 장 이상 올려 주세요. 사진 없는 공간은 아무도 안 빌려요."];
     if (!addrBase.trim()) return ["address", "주소를 찾아 주세요."];
-    if (!contactPhone.trim()) return ["phone", "가게 전화번호가 비어 있어요."];
+    if (!contactPhone.trim()) return ["phone", "전화번호가 비어 있어요."];
     // ✂️09-18 밤 QA(SEC-07) — 서버(`saveSpaceAction`)와 같은 함수. 숫자만 세어 전화번호 모양인지 본다.
-    if (!storePhoneOk(contactPhone)) return ["phone", "가게 전화번호를 다시 봐 주세요. 예) 02-1234-5678"];
+    if (!storePhoneOk(contactPhone)) return ["phone", "전화번호를 다시 봐 주세요. 예) 02-1234-5678"];
     if (rulesV.trim().length < 10) return ["rules", "유의 사항을 열 글자 넘게 담아 주셔야 올릴 수 있어요."];
     // 🛍09-18 — 공간 상품 하나 이상, 켠 상품은 값과 설명. 서버(`saveSpaceAction`)가 같은 규칙으로 다시 본다.
     if (!spaceOn && !fullOn) return ["products", "파실 상품을 하나는 켜 주세요. 대관만이나 공간 전체 중에서요."];
@@ -691,7 +693,8 @@ export function SpaceForm({
       )}
       {/* ── 어떤 공간인가 ── */}
       <Group title="어떤 공간인가요">
-        <L label="공간 이름" htmlFor="sp-name" anchor="name" error={fieldErr("name")}>
+        {/* 🔁09-19 대표 코멘트 #106(#73을 대체) — 이 이름이 목록·검색에 그대로 걸린다는 걸 라벨에서 말한다. */}
+        <L label="검색에 노출할 공간명을 작성해 주세요" htmlFor="sp-name" anchor="name" error={fieldErr("name")}>
           <input
             id="sp-name"
             className={rentInputCls}
@@ -706,10 +709,11 @@ export function SpaceForm({
               예쁜 식당을 라운지로… 를 한 목록으로 만들면 끝이 없는데, 업종 × 범위면 두 칸으로 끝난다.
             🔁09-18 범위 축은 아래 「무엇을 파실까요」의 상품 카드로 옮겼다. */}
         {/* 🔁09-17 QA — 빈 선택지가 「고르지 않음」이라 안 골라도 되는 칸처럼 보였다. 업종은 필수다(폼·서버 둘 다 막는다). */}
-        <L label="업종" htmlFor="sp-category" anchor="category" error={fieldErr("category")}>
+        {/* 🔁09-19 대표 코멘트 #74 — 「업종」 → 「공간 타입」. 값(`category`)과 목록 거르개는 그대로다. */}
+        <L label="공간 타입" htmlFor="sp-category" anchor="category" error={fieldErr("category")}>
           <RentSelect id="sp-category" value={category} onChange={(e) => setCategory(e.target.value as SpaceCategory)}>
             <option value="" disabled>
-              업종을 골라 주세요
+              공간 타입을 골라 주세요
             </option>
             {CATEGORY_OPTIONS.map(([v, t]) => (
               <option key={v} value={v}>
@@ -737,7 +741,8 @@ export function SpaceForm({
           label="사진"
           anchor="photos"
           error={fieldErr("photos")}
-          hint="전경, 작업할 자리, 화장실 순으로 올려 두시면 손님이 고르기 쉬워요. 첫 장이 대표 사진이 돼요."
+          // 🔁09-19 대표 코멘트 #75 — 몇 장부터인지 끝에 붙였다(검사는 전부터 한 장 이상).
+          hint="전경, 작업할 자리, 화장실 순으로 올려 두시면 손님이 고르기 쉬워요. 첫 장이 대표 사진이 돼요. (최소 1장)"
         >
           {/* 🔁09-16 소개서 사진 격자(`register/PhotoGrid`)를 그대로 쓴다 — 대표: *「전반적으로 AI가 빠르게 만든
               티가 남, 특히 입력폼」*에서 마지막까지 남아 있던 칸이 여기였다(브라우저 기본 「파일 선택」 버튼).
@@ -782,7 +787,8 @@ export function SpaceForm({
             중개자가 사업자 호스트의 성명·주소·전화번호를 확인해 **신청 «전»에** 손님에게 보여 주도록 한다.
             안 하면 제20조의2②로 우리가 연대 책임을 진다. 프로필 번호를 미리 채우고 여기서 고칠 수 있다. */}
         <L
-          label="가게 전화번호"
+          // 🔁09-19 대표 코멘트 #76 — 이 번호가 무엇에 쓰이는지를 라벨이 말한다.
+          label="예약자와의 소통을 위한 전화번호"
           htmlFor="sp-phone"
           anchor="phone"
           error={fieldErr("phone")}
@@ -837,7 +843,8 @@ export function SpaceForm({
       </Group>
 
       {/* ── 어떻게 쓰나 ── */}
-      <Group title="공간 안내">
+      {/* 🔁09-19 대표 코멘트 #81 — 「공간 안내」 → 묻는 말로(다른 절 제목들과 같은 결). */}
+      <Group title="공간에 대해 알려 주세요">
         {/* 🔻09-16 대표 — 「쓰임새」(원래 목적대로 / 대관) 칸 삭제. *「위에 대관, 대관+시설이 있는 거 같아
             이건 제거해도 될 듯, 중복처럼 보여」*. 맞다 — 09-16에 만든 «범위» 축이 같은 것을 더 정확히 말한다.
             ⚠️`useType`은 DB와 타입에 남아 있고 저장할 때 기존 값을 그대로 넘긴다(옛 데이터가 안 깨지게). */}
@@ -899,7 +906,8 @@ export function SpaceForm({
         </L>
 
         {/* 🔁09-17 QA — 「수용이 가능한가요」「숫자를 입력해주세요」가 이 폼에서 드문 행정어였고, 자리글은 폰에서 잘렸다. */}
-        <L label="몇 명까지 들어올 수 있나요" htmlFor="sp-cap" optional>
+        {/* 🔁09-19 대표 코멘트 #80 */}
+        <L label="공간에 몇 명까지 들어올 수 있나요?" htmlFor="sp-cap" optional>
           {/* 🔁09-14 대표 — *「숫자 input으로 바꾸고 input 옆에 「명」으로 default로 넣어주라」*.
               단위를 칸 «안»에 박는다. 밖에 두면 좁은 화면에서 줄이 바뀌어 떨어진다(신청 폼과 같은 처리). */}
           <div className="relative w-[200px]">
@@ -931,7 +939,13 @@ export function SpaceForm({
            🔁09-14 대표 — 제목 「우리 집 규칙」 → **「사용 유의 사항」**(중간에 「공간 사용 규칙」을 거쳐 확정),
              설명은 「공간 사용시 유의 사항을 적어주세요.」로.
            🔁09-17 QA — 설명이 제목을 그대로 되풀이했고 「사용시」 띄어쓰기도 틀렸다. 누구를 위한 칸인지를 말한다. */}
-      <Group title="사용 유의 사항" sub="손님이 지켜 줬으면 하는 것들이에요. 하나씩 담아 주세요." anchor="rules" error={fieldErr("rules")}>
+      {/* 🔁09-19 대표 코멘트 #82·#83·#85 — 제목을 묻는 말로, 설명은 「한 문장씩 추가」(담기 방식과 같은 말). */}
+      <Group
+        title="사용 시 유의 사항을 알려 주세요"
+        sub="손님이 지켜야 하는 규칙이나 지켜 줬으면 하는 내용을 한 문장씩 추가해 주세요."
+        anchor="rules"
+        error={fieldErr("rules")}
+      >
         {/* 🔁09-14 여러 줄 textarea → **한 줄 입력 + 담기**(대표: *「한 줄에 하나씩 말고 하나 쓰고 우측에
             입력 버튼, 추가하면 하단에 +규칙 추가 이런 식으로」*).
             ⭐줄바꿈으로 나누라는 건 «규칙»이 아니라 «약속»이었다 — 지키는 사람이 없으면 한 덩어리로 저장되고
@@ -1016,13 +1030,14 @@ export function SpaceForm({
              그래서 상품마다 «무엇을 쓰고 할 수 있는지» 설명 칸이 필수다. 이름과 값만으로는 둘의 차이가 안 읽힌다.
            🔁09-16 하루 값 → **시간당 값**(대표). 눈금은 1시간이고 «최소 대여 시간»이 30분의 필요를 덮는다(두 상품 공통 하나). */}
       <Group
-        title="무엇을 파실까요"
+        // 🔁09-19 대표 코멘트 #86 — 「무엇을 파실까요」 → 「대여 타입을 선택해 주세요」.
+        title="대여 타입을 선택해 주세요"
         sub="파실 것을 켜고 값을 정해 주세요. 손님은 켜 두신 것 중에서 골라 신청해요."
         anchor="products"
         error={fieldErr("products")}
       >
         <ProductCard
-          title={PRODUCT_LABEL.space}
+          title={PRODUCT_LABEL_HOST.space}
           hint={PRODUCT_HINT_HOST.space}
           on={spaceOn}
           onToggle={() => setSpaceOn((v) => !v)}
@@ -1045,7 +1060,8 @@ export function SpaceForm({
           />
         </ProductCard>
         <ProductCard
-          title={PRODUCT_LABEL.full}
+          // 🔁09-19 대표 코멘트 #87 — 사장님 폼에서만 「공간 전체(시설 및 공간)」. 손님 화면·메일의 이름은 그대로(`PRODUCT_LABEL`).
+          title={PRODUCT_LABEL_HOST.full}
           hint={PRODUCT_HINT_HOST.full}
           on={fullOn}
           onToggle={() => setFullOn((v) => !v)}
@@ -1409,14 +1425,14 @@ export function SpaceForm({
                   : reviewAgain
                     ? "고친 내용 올리고 다시 검토 받기"
                     : "고친 내용 올리기"
-                : "등록하기"}
+                : "등록 신청하기"}
         </button>
         <p className="mt-3 text-center text-[15px] leading-relaxed break-keep text-faint">
           {/* 🔁09-17 QA — 「승인이 완료되는 대로 노출이 시작돼요」 명사화 둘, 고치기 쪽은 머리글과 같은 말 + 「반영됩니다」 피동.
               검토 기한은 아직 대표가 안 정해서 적지 않는다. */}
           {/* 🔁09-18 밤 QA(H-09) — 이름·주소를 «이미 바꾼» 사장님에겐 위 칸 옆 안내가 말했으니 여기선 되풀이하지 않는다. */}
           {!editing
-            ? "올리시면 저희가 읽어 보고 목록에 열어 드려요."
+            ? "등록 요청 시 관리자 승인 후 하루 가게에 노출됩니다."
             : fixing
               ? "보내 주시면 부탁드린 부분을 확인하고 목록에 열어 드려요."
               : initial?.status === "pending"
@@ -1618,10 +1634,11 @@ function draftFromV1(d: Partial<SpaceDraft> & DraftV1Extra): Partial<SpaceDraft>
 const FORM_STEPS = [
   "어떤 공간인가요",
   "어디에 있나요",
-  "공간 안내",
-  "사용 유의 사항",
+  // 🔁09-19 대표 코멘트 #81·#82·#86
+  "공간에 대해 알려 주세요",
+  "사용 시 유의 사항을 알려 주세요",
   // 🔁09-18 「얼마에 빌려주실까요」 → 상품 셋(대표).
-  "무엇을 파실까요",
+  "대여 타입을 선택해 주세요",
   "언제 빌려주실까요",
   // 🧾09-18 대표 — 공간 등록에 사업자 확인 필수.
   "사업자 정보",

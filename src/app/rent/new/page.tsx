@@ -54,11 +54,11 @@ export default async function NewSpacePage({
     return (
       <main className="mx-auto w-full max-w-[560px] px-4 pb-14 pt-6 sm:px-6">
         <h1 className="text-[28px] font-bold leading-[1.25] tracking-[-0.02em] break-keep text-ink">
-          {/* 🔁09-18 대표 코멘트 — 최종 확정(「공간을 안 쓰는 날, 필요한 누군가에게 빌려주세요」에서 한 번 더) */}
-          공간이 노는 날, 빌려주세요
+          {/* 🔁09-19 대표 코멘트 #65 — 「공간이 노는 날, 빌려주세요」에서 한 번 더(맞춤법: 「빌려 줄」→「빌려줄」, 끝 마침표는 제목이라 뺐다). */}
+          공간이 쉬는 날, 필요한 분에게 빌려줄 수 있어요
         </h1>
         <p className="mt-3 text-[17px] leading-relaxed break-keep text-mute">
-          쉬는 날이나 비는 몇 시간만 내주셔도 돼요. 먼저 로그인해 주세요.
+          비어 있는 공간, 필요한 분에게 빌려주고 부가 수익도 만들어보세요. 먼저 로그인해 주세요.
         </p>
         {/* ⚠️복귀 키는 `redirect`다 — 로그인 화면이 읽는 이름이 그것이라 `next`로 적으면 홈으로 떨어진다. */}
         <Link href={`/login?redirect=${encodeURIComponent("/rent/new")}`} className={`${primaryBtnCls} mt-8 h-[48px]`}>
@@ -87,11 +87,12 @@ export default async function NewSpacePage({
           ← 하루 가게
         </Link>
         <h1 className="mt-3 text-[28px] font-bold leading-[1.25] tracking-[-0.02em] break-keep text-ink">
-          {/* 🔁09-18 대표 코멘트 — 최종 확정(「공간을 안 쓰는 날, 필요한 누군가에게 빌려주세요」에서 한 번 더) */}
-          공간이 노는 날, 빌려주세요
+          {/* 🔁09-19 대표 코멘트 #65 — 「공간이 노는 날, 빌려주세요」에서 한 번 더(맞춤법: 「빌려 줄」→「빌려줄」, 끝 마침표는 제목이라 뺐다). */}
+          공간이 쉬는 날, 필요한 분에게 빌려줄 수 있어요
         </h1>
         <p className="mt-3 text-[17px] leading-relaxed break-keep text-mute">
-          쉬는 날이나 비는 몇 시간만 내주셔도 돼요. 어떻게 써야 하는지는 사장님이 정하세요.
+          {/* 🔁09-19 대표 코멘트 #66 */}
+          비어 있는 공간, 필요한 분에게 빌려주고 부가 수익도 만들어보세요.
         </p>
       </header>
 
