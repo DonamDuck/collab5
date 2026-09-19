@@ -64,7 +64,7 @@ export const MOCK_CASES: MockCaseDef[] = [
   { id: "guest-full", label: "손님 · 모든 상태의 신청이 있는 계정", viewer: { userId: MOCK_USER.guest, admin: false }, world: "full" },
   { id: "guest-empty", label: "손님 · 신청 0건, 공간도 0곳", viewer: { userId: MOCK_USER.guest, admin: false }, world: "empty" },
   { id: "anon", label: "로그인 안 한 사람", viewer: { userId: null, admin: false }, world: "full" },
-  { id: "host-full", label: "사장님 · 공간 다섯(30분 단위 하나), 요청 모든 상태, 계좌 있음", viewer: { userId: MOCK_USER.host, admin: false }, world: "full" },
+  { id: "host-full", label: "사장님 · 공간 여섯(30분 단위 하나, 사업자등록번호 빈 곳 하나), 요청 모든 상태, 계좌 있음", viewer: { userId: MOCK_USER.host, admin: false }, world: "full" },
   { id: "host-noaccount", label: "사장님 · 같은 데이터인데 정산 계좌 없음", viewer: { userId: MOCK_USER.host, admin: false }, world: "full-noaccount" },
   { id: "host-admin", label: "사장님이면서 관리자 · 정산하기 링크와 공개하기 버튼이 보임", viewer: { userId: MOCK_USER.host, admin: true }, world: "full" },
   { id: "host-empty", label: "사장님 · 아직 올린 공간 없음", viewer: { userId: MOCK_USER.host, admin: false }, world: "empty" },
