@@ -5,6 +5,8 @@ import { listSpacesForReview } from "@/lib/spaces";
 import { getProfileById, type Profile } from "@/lib/profiles";
 import { isRentAdmin } from "@/lib/rent-actions";
 import { BIZ_CHECK_LABEL, formatBizNumber, fromOpenDate } from "@/lib/bizcheck";
+import { holderDiffersFromOwner, listPayoutAccounts, toMasked, type PayoutAccount } from "@/lib/payout-accounts";
+import { HOLDER_TYPE_LABEL } from "@/lib/banks";
 import type { BizCheckStatus, Space } from "@/lib/types";
 import { InfoList, InfoRow, SpaceBadge } from "../ui";
 import { PublishButton } from "../my/Actions";
@@ -64,7 +66,35 @@ function blockReason(sp: Space): string {
 const contactLine = (p: Profile | null) =>
   [p?.brandName?.trim(), p?.phone?.trim(), p?.email?.trim()].filter(Boolean).join(" · ") || "연락처가 없어요";
 
-function ReviewItem({ sp, owner, approveOnly }: { sp: Space; owner: Profile | null; approveOnly: boolean }) {
+/** 🏦정산 계좌 칸(대표 09-19). 🔒계좌번호 원문은 싣지 않는다 — 은행과 끝 네 자리만(`toMasked`).
+ *  예금주가 사업자 대표자와 다르면 한 줄로 알린다. 개인 명의 계좌도 받기로 해서 막지는 않는다(`holderDiffersFromOwner`). */
+function AccountValue({ account, ownerName }: { account: PayoutAccount | null; ownerName: string }) {
+  if (!account) return <span className="text-faint">아직 등록 전이에요</span>;
+  const m = toMasked(account);
+  const differs = holderDiffersFromOwner(account, ownerName);
+  return (
+    <>
+      <span className="block">
+        {m.bankName} <span className="tabular-nums">끝자리 {m.accountMasked.slice(-4)}</span>
+        <span className="text-mute"> · {HOLDER_TYPE_LABEL[m.holderType]}</span>
+      </span>
+      {differs ? (
+        <span className="mt-0.5 block text-[15px] font-medium text-lemon-on">
+          계좌 예금주가 대표자와 달라요 <span className="whitespace-nowrap">(예금주 {m.holderName})</span>
+        </span>
+      ) : (
+        <span className="mt-0.5 block text-[15px] text-mute">
+          예금주 {m.holderName}
+          {differs === null && m.holderType === "corporation" ? " · 법인 계좌라 대표자와 견주지 않았어요" : ""}
+        </span>
+      )}
+    </>
+  );
+}
+
+function ReviewItem({ sp, owner, approveOnly, account }: {
+  sp: Space; owner: Profile | null; approveOnly: boolean; account: PayoutAccount | null;
+}) {
   const blocked = blockReason(sp);
   return (
     <li className="border-b border-hairline py-6 first:pt-2 last:border-b-0">
@@ -98,6 +128,7 @@ function ReviewItem({ sp, owner, approveOnly }: { sp: Space; owner: Profile | nu
             </>
           }
         />
+        <InfoRow label="정산 계좌" value={<AccountValue account={account} ownerName={sp.bizOwnerName} />} />
         <InfoRow
           label="등록증"
           value={
@@ -150,13 +181,12 @@ export default async function RentReviewPage() {
   if (!(await isRentAdmin())) notFound();
 
   const { pending, approveOnly } = await listSpacesForReview();
-  const owners = new Map<number, Profile | null>(
-    await Promise.all(
-      Array.from(new Set([...pending, ...approveOnly].map((sp) => sp.ownerUserId))).map(
-        async (id) => [id, await getProfileById(id)] as [number, Profile | null],
-      ),
-    ),
-  );
+  const ownerIds = Array.from(new Set([...pending, ...approveOnly].map((sp) => sp.ownerUserId)));
+  const [owners, accounts] = await Promise.all([
+    Promise.all(ownerIds.map(async (id) => [id, await getProfileById(id)] as [number, Profile | null])).then((xs) => new Map(xs)),
+    // 🏦09-19 — 예금주와 대표자를 견주려고 계좌를 같이 읽는다. 🔒원문이 오지만 화면엔 끝 네 자리만 싣는다(`AccountValue`).
+    listPayoutAccounts(ownerIds),
+  ]);
 
   return (
     <main className="mx-auto w-full max-w-[720px] px-4 pt-8 pb-16 sm:px-6 sm:pt-12">
@@ -180,7 +210,7 @@ export default async function RentReviewPage() {
         ) : (
           <ul className="mt-3">
             {pending.map((sp) => (
-              <ReviewItem key={sp.id} sp={sp} owner={owners.get(sp.ownerUserId) ?? null} approveOnly={false} />
+              <ReviewItem key={sp.id} sp={sp} owner={owners.get(sp.ownerUserId) ?? null} approveOnly={false} account={accounts.get(sp.ownerUserId) ?? null} />
             ))}
           </ul>
         )}
@@ -194,7 +224,7 @@ export default async function RentReviewPage() {
           </p>
           <ul className="mt-3">
             {approveOnly.map((sp) => (
-              <ReviewItem key={sp.id} sp={sp} owner={owners.get(sp.ownerUserId) ?? null} approveOnly />
+              <ReviewItem key={sp.id} sp={sp} owner={owners.get(sp.ownerUserId) ?? null} approveOnly account={accounts.get(sp.ownerUserId) ?? null} />
             ))}
           </ul>
         </section>

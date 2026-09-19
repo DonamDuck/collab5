@@ -72,6 +72,22 @@ export function toMasked(a: PayoutAccount): PayoutAccountMasked {
   };
 }
 
+/** 🪪예금주가 사업자 대표자와 다른가 (대표 09-19). 정산 계좌는 개인 명의도 받되, 다르면 검토 화면(`/rent/review`)에 한 줄로 표시만 한다. 막지 않는다.
+ *  띄어쓰기는 빼고 본다. 개인사업자 통장은 예금주가 「상호(대표자)」나 「상호 대표자」처럼 찍히는 일이 많아서,
+ *  대표자 이름이 예금주 안에 통째로 들어 있으면 같은 사람으로 본다.
+ *  ⚠️법인 계좌는 예금주가 법인 이름이라 대표자와 늘 다르다. 그래서 법인은 비교하지 않고 null을 준다. 한쪽 이름이 비어도 null.
+ *  순수 함수라 DB 없이 셀 수 있다. */
+export function holderDiffersFromOwner(
+  a: Pick<PayoutAccount, "holderType" | "holderName">, ownerName: string,
+): boolean | null {
+  if (a.holderType === "corporation") return null;
+  const norm = (s: string) => (s ?? "").replace(/\s+/g, "");
+  const holder = norm(a.holderName);
+  const owner = norm(ownerName);
+  if (!holder || !owner) return null;
+  return !holder.includes(owner);
+}
+
 /** 입력 검사 — 서버 액션이 부른다. 통과하면 저장할 모양(숫자만 남긴 값)을, 아니면 사장님께 할 말을 돌려준다.
  *  순수 함수라 DB 없이 검사할 수 있다. */
 export function validatePayoutInput(

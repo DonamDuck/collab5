@@ -51,6 +51,8 @@ export const MOCK_USER = {
   stressHost: 9005, stressGuest: 9006, guest2: 9007, minHost: 9008, minGuest: 9009,
   /** 09-18 사이트 지도 — 가입만 하고 브랜드명을 비워 둔 새 회원(09-17부터 가입 브랜드명이 선택이다). */
   newbie: 9010,
+  /** 🪪09-19 검토 화면 — 정산 계좌 예금주가 사업자 대표자와 다른 사장님. */
+  host3: 9011,
 } as const;
 
 /** 목 사용자 번호의 하한. 이보다 작으면 실제 DB로 보낸다(`profiles.ts`·`repo.ts`). */
@@ -271,6 +273,7 @@ function fullWorld(today: string, withAccount: boolean): MockWorld {
     profile(U.admin, "하루 가게 운영", "010-0000-0000", "admin@example.com"),
     profile(U.host2, "바늘숲 공방", "010-4567-8901", "needle.forest@example.com"),
     profile(U.guest2, "낮은책상", "010-5678-9012", "low.desk@example.com"),
+    profile(U.host3, "새벽반죽", "010-6789-0123", "dawn.dough@example.com"),
   ];
 
   const makers = [
@@ -442,7 +445,23 @@ function fullWorld(today: string, withAccount: boolean): MockWorld {
     direct: [{ date: d(8), start: "09:00", end: "13:00" }],
   }, today);
 
-  const spaces = [s1, s2, s3, s4, s5, s6, s7];
+  // 🪪S8 — 검토 대기 ③ 정산 계좌 예금주(이하늘)가 사업자 대표자(이새벽)와 다르다(대표 09-19). 개인 명의 계좌도 받으니
+  //   막지 않고 검토 화면에 한 줄로만 뜬다. 국세청은 맞고 네이버는 못 찾았다 — 다른 칸이 조용해야 그 한 줄이 보인다.
+  const s8 = space({
+    id: 9110, slug: "mock-dawn-dough-kitchen", ownerUserId: U.host3, status: "pending",
+    name: "새벽반죽 부엌", category: "restaurant",
+    body: "새벽에 빵을 굽고 오후엔 비어 있는 부엌이에요. 오븐 두 대와 반죽 테이블을 같이 쓸 수 있어요.",
+    photos: [photo("새벽반죽 부엌", 20)], area: "망원", address: "서울 마포구 포은로 000, 1층", lat: 37.5560, lng: 126.9060,
+    facilities: ["데크 오븐 2", "반죽 테이블", "냉장고"], capacity: 4, rules: "오븐은 쓰고 나서 꼭 꺼 주세요",
+    minHours: 3, accessHow: "onsite", contactPhone: "02-333-0000",
+    rentFullOn: true, rentFullPrice: 25000, rentFullNote: "오후 두 시부터 부엌 전체를 써요. 오븐과 반죽 테이블을 같이 써요.",
+    ...bizOf(U.host3, "0007123454", "이새벽", "20220510", "jpg", "000000009110"),
+    bizCheckStatus: "valid", bizCheckedAt: `${d(-1)}T03:00:00.000Z`,
+    bizCheckDetail: { valid: "01", bSttCd: "01", bStt: "계속사업자", taxType: "부가가치세 간이과세자" },
+    direct: [{ date: d(9), start: "14:00", end: "20:00" }],
+  }, today);
+
+  const spaces = [s1, s2, s3, s4, s5, s6, s7, s8];
   // 🛍s1은 두 상품을 섞어 판다 — 공간 전체로 산 예약이 줄마다 섞여 보이게.
   const P1 = { sp: s1 };
   const P1F = { sp: s1, product: "full" as const };
@@ -502,13 +521,19 @@ function fullWorld(today: string, withAccount: boolean): MockWorld {
     payment(b.hostAsGuest, U.host2, { status: "DONE" }),
   ];
 
+  // 🪪09-19 — S8 사장님은 개인 명의(가족) 계좌다. 예금주가 대표자와 달라 검토 화면에 한 줄이 뜬다. 「계좌 없음」 세계에서도 둔다(그 세계는 느린오후 쪽만 뺀다).
+  const host3Account = {
+    userId: U.host3, holderType: "individual", holderName: "이하늘", businessNumber: "",
+    bankCode: "88", accountNumber: "110123456789", tossSellerId: "", tossSellerStatus: "",
+    updatedAt: `${d(-1)}T00:00:00.000Z`,
+  } satisfies PayoutAccount;
   const payoutAccounts: PayoutAccount[] = withAccount
     ? [{
       userId: U.host, holderType: "sole_proprietor", holderName: "김느린", businessNumber: "1234567890",
       bankCode: "90", accountNumber: "3333012345678", tossSellerId: "", tossSellerStatus: "",
       updatedAt: `${d(-10)}T00:00:00.000Z`,
-    } satisfies PayoutAccount]
-    : [];
+    } satisfies PayoutAccount, host3Account]
+    : [host3Account];
 
   return { spaces, bookings, payments, profiles, makers, payoutAccounts };
 }

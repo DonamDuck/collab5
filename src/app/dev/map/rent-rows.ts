@@ -194,7 +194,7 @@ export const RENT_GROUPS: Group[] = [
         path: "/rent/review",
         note: "검토 대기 둘은 국세청 기록과 다름(공개 버튼 대신 빨간 이유 줄)과 국세청 조회 전(공개하기 버튼)이에요. 아래 「열려 있는 공간 · 확인 표시 전」엔 조회가 실패한 쉬는 중 공간이 있어요. 목 모드라 버튼을 누르면 「저장하지 않았어요」가, 「등록증 보기」는 새 탭에 안내 문구가 떠요.",
         rows: [
-          { desc: "검토 대기 둘 · 확인 표시 전 하나 · 네이버 일치와 못 찾음", c: "admin-full", to: "/rent/review" },
+          { desc: "검토 대기 셋 · 확인 표시 전 하나 · 네이버 일치와 못 찾음 · 계좌 예금주가 대표자와 다른 곳 하나", c: "admin-full", to: "/rent/review" },
           { desc: "검토할 것이 없을 때", c: "admin-empty", to: "/rent/review" },
           { desc: "등록증 보기 (목 모드 안내 문구)", c: "admin-full", to: `/rent/review/cert/${S.pendingNoKey}` },
           { desc: "검토 대기 공간을 관리자가 열면 보여요", c: "admin-full", to: `/rent/${S.pendingNoKey}` },
