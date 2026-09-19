@@ -88,7 +88,9 @@ const LABEL = {
   refundHost: "신청한 사장님",
   refundNote: "신청 사유",
   guestPaid: "손님이 낸 돈",
+  dailyStuck: "붙잡힌 돈",
   dailyPaid: "어제 결제",
+  dailyBack: "어제 취소·환불",
   dailyWaiting: "수락 대기",
   dailyRefund: "환불 신청",
   dailyReview: "검토 대기",
@@ -1007,6 +1009,18 @@ function remindLine(r: RemindRun | null): string {
   return `${r.sent}통 보냈어요.${r.failed > 0 ? ` ${r.failed}통은 실패했어요.` : ""}${held}`;
 }
 
+/** 어제 돈이 돌아간 일 한 칸 — 건수가 있는 갈래만 한 줄씩. 다 0이면 「없었어요」. */
+function moneyBackLine(m: AdminDailySummary["moneyBack"]): string {
+  const refundOf = (r: number) => (r > 0 ? `환불 ${won(r)}` : "환불 없음");
+  const lines = [
+    m.guestCancel.count > 0 ? `손님 취소 ${m.guestCancel.count}건 · ${refundOf(m.guestCancel.refund)}` : "",
+    m.hostReject.count > 0 ? `사장님 거절 ${m.hostReject.count}건 · ${refundOf(m.hostReject.refund)}` : "",
+    m.adminRefund.count > 0 ? `관리자 환불 ${m.adminRefund.count}건 · ${won(m.adminRefund.refund)}` : "",
+    m.autoRefund.count > 0 ? `결제 직후 자동 환불 ${m.autoRefund.count}건 · ${won(m.autoRefund.refund)}` : "",
+  ].filter(Boolean);
+  return lines.length > 0 ? lines.join("\n") : "없었어요";
+}
+
 /** ⑩ 아침 요약 → 대표 (09-19). 리마인드 크론이 끝나면 한 통(`sendAdminDaily`).
  *  대표 09-19 — 거래마다 가던 참조 메일을 끊고, 대신 하루치를 한 번에 본다. 숫자가 다 0이어도 간다(크론이 돌았다는 표시).
  *  @param s 못 셌으면 null(DB 읽기 실패). 그땐 0이라고 하지 않고 못 셌다고 말한다.
@@ -1019,14 +1033,21 @@ export function buildAdminDaily(
   if (s?.waiting.count) todo.push(`수락을 기다리는 요청 ${s.waiting.count}건`);
   if (s?.refundRequests) todo.push(`환불 신청 ${s.refundRequests}건`);
   if (s?.reviewPending) todo.push(`검토 대기 공간 ${s.reviewPending}곳`);
+  // 🚨09-19 저녁 대표 [4] — 환불이 실패해 손님 돈이 붙잡힌 예약이 있으면 그 말이 맨 먼저 선다. 다른 할 일은 그 뒤에 붙인다.
+  const stuck = s?.stuck.count ? s.stuck : null;
   const lead = !s
     ? "오늘은 숫자를 못 셌어요. 예약을 읽어 오다 실패했어요. 리마인드가 한 일은 아래에 있어요."
-    : todo.length > 0
-      ? `오늘 봐 주실 게 있어요. ${todo.join(", ")}이에요.`
-      : "오늘은 따로 처리하실 일이 없어요.";
+    : stuck
+      ? `손님 돈이 붙잡혀 있어요. 환불이 실패한 예약 ${stuck.count}건, ${won(stuck.amount)}이에요. 토스에서 직접 돌려드려야 해요.${todo.length > 0 ? ` 그 밖에 ${todo.join(", ")}이 있어요.` : ""}`
+      : todo.length > 0
+        ? `오늘 봐 주실 게 있어요. ${todo.join(", ")}이에요.`
+        : "오늘은 따로 처리하실 일이 없어요.";
   const rows: [string, string][] = s
     ? [
+      // 값이 빈 칸은 슬랙·메일이 둘 다 뺀다. 붙잡힌 돈이 없는 날엔 이 줄이 아예 안 선다.
+      [LABEL.dailyStuck, stuck ? `${stuck.count}건 · ${won(stuck.amount)}\n${SITE_URL}/rent/payouts` : ""],
       [LABEL.dailyPaid, s.paidYesterday.count > 0 ? `${s.paidYesterday.count}건 · ${won(s.paidYesterday.amount)}` : "없었어요"],
+      [LABEL.dailyBack, moneyBackLine(s.moneyBack)],
       [LABEL.dailyWaiting, s.waiting.count > 0 && s.waiting.oldest
         ? `${s.waiting.count}건\n가장 오래 기다린 건 ${s.waiting.oldest.spaceName} ${dateLabel(s.waiting.oldest.useDate)} 예약이에요. 결제한 지 ${agoLabel(s.waiting.oldest.paidAt, now)} 됐어요.`
         : "없어요"],

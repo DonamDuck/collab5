@@ -10,14 +10,23 @@ import "server-only"; // 🔒서비스 롤 키로 DB를 읽는 파일이다. 클
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { notifyAdmin, type AdminNotifyResult } from "./admin-notify";
 import { buildAdminDaily } from "./rent-notify";
+import { isAutoCancelReason } from "./rent-payment";
 import { addDaysIso, todayKst } from "./rent-time";
 import { listSpacesForReview } from "./spaces";
 import type { Payment, SpaceBooking } from "./types";
 
-/** 요약이 읽는 예약 칸. 목 세계의 `SpaceBooking`이 그대로 들어온다. */
-export type DailyBooking = Pick<SpaceBooking, "id" | "spaceId" | "status" | "useDate" | "orderId" | "refundRequestedAt" | "createdAt">;
-/** 요약이 읽는 결제 칸. */
-export type DailyPayment = Pick<Payment, "orderId" | "amount" | "approvedAt">;
+/** 요약이 읽는 예약 칸. 목 세계의 `SpaceBooking`이 그대로 들어온다.
+ *  🆕09-19 저녁 `updatedAt` — 취소·환불된 예약이 «언제» 그 상태가 됐나. 예약 행은 상태가 바뀔 때 말고는 거의 안 고쳐진다(트리거가 적는다). */
+export type DailyBooking = Pick<SpaceBooking, "id" | "spaceId" | "status" | "useDate" | "orderId" | "refundRequestedAt" | "createdAt" | "updatedAt">;
+/** 요약이 읽는 결제 칸. 🆕09-19 저녁 남은 돈(환불액 = 낸 돈 − 남은 돈)과 «우리가 자동으로 되돌린 취소인가». */
+export type DailyPayment = Pick<Payment, "orderId" | "amount" | "approvedAt"> & {
+  balanceAmount?: number;
+  /** 토스 취소 내역에 자동 취소 사유(`AUTO_REFUND_REASON` 등)가 있나. 손님 취소와 자동 환불이 둘 다 예약 `cancelled`라 이걸로 가른다. */
+  autoCancel?: boolean;
+};
+
+/** 건수와 돌려준 돈. */
+export interface CountRefund { count: number; refund: number }
 
 /** 리마인드 크론이 이번에 한 일. 크론이 도중에 멈췄으면 null. */
 export interface RemindRun {
@@ -45,6 +54,11 @@ export interface AdminDailySummary {
   /** 오늘·내일 쓰는 살아 있는 예약(결제 완료·확정). */
   useToday: number;
   useTomorrow: number;
+  /** 🆕09-19 저녁 대표 [4] — 어제(KST) 돈이 돌아간 일. 예약 행이 그 상태로 바뀐 날로 센다.
+   *  손님 취소(`cancelled`) · 사장님 거절(`refunded`, 환불 신청 없음) · 관리자 환불(`refunded`, 환불 신청 있음) · 자동 환불(`cancelled` + 자동 취소 사유). */
+  moneyBack: { guestCancel: CountRefund; hostReject: CountRefund; adminRefund: CountRefund; autoRefund: CountRefund };
+  /** 🚨환불이 실패해 손님 돈이 붙잡혀 있는 예약(`rejected`) — 날짜와 상관없이 지금 남은 것 전부. 금액은 결제 줄의 남은 돈. 있으면 요약 맨 위에 선다. */
+  stuck: { count: number; amount: number };
   remind: RemindRun | null;
 }
 
@@ -83,6 +97,32 @@ export function summarizeDaily(input: {
   const paidAtOf = (b: DailyBooking) => payByOrder.get(b.orderId)?.approvedAt || b.createdAt;
   const oldest = waitingList.slice().sort((a, b) => (paidAtOf(a) < paidAtOf(b) ? -1 : 1))[0];
 
+  // 💸어제 돈이 돌아간 일 — 예약이 그 상태가 된 날(`updatedAt`)이 어제인 것만. 환불액은 결제 줄의 «낸 돈 − 남은 돈».
+  const zero = (): CountRefund => ({ count: 0, refund: 0 });
+  const moneyBack = { guestCancel: zero(), hostReject: zero(), adminRefund: zero(), autoRefund: zero() };
+  for (const b of input.bookings) {
+    if (b.status !== "cancelled" && b.status !== "refunded") continue;
+    const at = Date.parse(b.updatedAt);
+    if (!(Number.isFinite(at) && at >= yStart && at < tStart)) continue;
+    const pay = payByOrder.get(b.orderId);
+    const back = pay ? Math.max(0, pay.amount - (pay.balanceAmount ?? pay.amount)) : 0;
+    const box = b.status === "cancelled"
+      ? pay?.autoCancel ? moneyBack.autoRefund : moneyBack.guestCancel
+      // 관리자 환불은 사장님의 «환불 신청»을 거친다. 거절 환불은 수락 전(`paid`)에만 나서 신청이 붙을 수 없다(`requestRefundAction`).
+      : b.refundRequestedAt ? moneyBack.adminRefund : moneyBack.hostReject;
+    box.count += 1;
+    box.refund += back;
+  }
+  // 🚨붙잡힌 돈 — 거절 환불이 실패했거나 결제 직후 자동 환불이 실패한 예약. 정산 화면 「손이 필요한 예약」과 같은 줄이다(`listStuckBookings`).
+  const stuckList = input.bookings.filter((b) => b.status === "rejected");
+  const stuck = {
+    count: stuckList.length,
+    amount: stuckList.reduce((sum, b) => {
+      const pay = payByOrder.get(b.orderId);
+      return sum + (pay ? pay.balanceAmount ?? pay.amount : 0);
+    }, 0),
+  };
+
   return {
     today,
     paidYesterday: { count: paidCount, amount: paidAmount },
@@ -97,6 +137,8 @@ export function summarizeDaily(input: {
     reviewApproveOnly: input.reviewApproveOnly,
     useToday: live.filter((b) => b.useDate === today).length,
     useTomorrow: live.filter((b) => b.useDate === tomorrow).length,
+    moneyBack,
+    stuck,
     remind: input.remind,
   };
 }
@@ -113,6 +155,20 @@ type Row = Record<string, unknown>;
 const s = (v: unknown) => (typeof v === "string" ? v : "");
 const n = (v: unknown) => (typeof v === "number" ? v : Number(v ?? 0) || 0);
 
+/** 결제 줄 → 요약 모양. 취소 내역(`toss_raw->cancels`)에 자동 취소 사유가 있으면 표시한다. */
+function toDailyPayment(r: Row): DailyPayment {
+  const cancels = Array.isArray(r.cancels) ? (r.cancels as Row[]) : [];
+  return {
+    orderId: s(r.order_id), amount: n(r.amount), approvedAt: r.approved_at ? s(r.approved_at) : undefined,
+    balanceAmount: r.balance_amount === null || r.balance_amount === undefined ? undefined : n(r.balance_amount),
+    autoCancel: cancels.some((c) => isAutoCancelReason(typeof c?.cancelReason === "string" ? c.cancelReason : "")),
+  };
+}
+
+/** 요약이 읽는 결제 칸. 🔎취소 내역은 `toss_raw` 통째가 아니라 `cancels`만 꺼낸다(PostgREST JSON 경로). */
+const PAY_COLS = "order_id,amount,balance_amount,approved_at,cancels:toss_raw->cancels";
+const BOOKING_COLS = "id,space_id,status,use_date,order_id,refund_requested_at,created_at,updated_at";
+
 /** 운영 DB에서 요약에 필요한 줄만 읽는다. 읽기가 실패하면 null — 요약은 「못 셌다」고 말한다(0이라고 하지 않는다). */
 async function loadDailyRows(today: string): Promise<{
   bookings: DailyBooking[]; payments: DailyPayment[]; spaceNames: Map<number, string>;
@@ -120,31 +176,33 @@ async function loadDailyRows(today: string): Promise<{
   const c = db();
   if (!c) return null;
   const since = new Date(kstMidnightMs(addDaysIso(today, -1))).toISOString();
-  const [bk, py] = await Promise.all([
-    c.from("space_bookings")
-      .select("id,space_id,status,use_date,order_id,refund_requested_at,created_at")
-      .in("status", ["paid", "confirmed"]),
-    c.from("payments").select("order_id,amount,approved_at").eq("purpose", "rent_booking").gte("approved_at", since),
+  const until = new Date(kstMidnightMs(today)).toISOString();
+  const [bk, py, back, stuck] = await Promise.all([
+    c.from("space_bookings").select(BOOKING_COLS).in("status", ["paid", "confirmed"]),
+    c.from("payments").select(PAY_COLS).eq("purpose", "rent_booking").gte("approved_at", since),
+    // 🆕09-19 저녁 — 어제 취소·환불된 예약(상태가 바뀐 날로)과, 환불이 실패해 붙잡힌 예약(날짜 상관없이 전부).
+    c.from("space_bookings").select(BOOKING_COLS).in("status", ["cancelled", "refunded"]).gte("updated_at", since).lt("updated_at", until),
+    c.from("space_bookings").select(BOOKING_COLS).eq("status", "rejected"),
   ]);
-  if (bk.error || py.error) {
-    console.error(`[rent-admin-daily] 읽기 실패: ${bk.error?.message ?? ""} ${py.error?.message ?? ""}`);
+  if (bk.error || py.error || back.error || stuck.error) {
+    console.error(`[rent-admin-daily] 읽기 실패: ${[bk, py, back, stuck].map((x) => x.error?.message ?? "").filter(Boolean).join(" · ")}`);
     return null;
   }
-  const bookings: DailyBooking[] = (bk.data ?? []).map((r: Row) => ({
+  const bookings: DailyBooking[] = [...(bk.data ?? []), ...(back.data ?? []), ...(stuck.data ?? [])].map((r: Row) => ({
     id: n(r.id), spaceId: n(r.space_id), status: s(r.status) as SpaceBooking["status"], useDate: s(r.use_date),
-    orderId: s(r.order_id), refundRequestedAt: r.refund_requested_at ? s(r.refund_requested_at) : undefined, createdAt: s(r.created_at),
+    orderId: s(r.order_id), refundRequestedAt: r.refund_requested_at ? s(r.refund_requested_at) : undefined,
+    createdAt: s(r.created_at), updatedAt: s(r.updated_at),
   }));
-  const payments: DailyPayment[] = (py.data ?? []).map((r: Row) => ({
-    orderId: s(r.order_id), amount: n(r.amount), approvedAt: r.approved_at ? s(r.approved_at) : undefined,
-  }));
-  // 기다리는 요청의 승인 시각은 어제보다 이를 수 있다. 그 줄들만 한 번 더 읽는다(가장 오래 기다린 것을 고르려고).
-  const waitingOrders = bookings.filter((b) => b.status === "paid").map((b) => b.orderId).filter((o) => !payments.some((p) => p.orderId === o));
-  if (waitingOrders.length > 0) {
-    const more = await c.from("payments").select("order_id,amount,approved_at").in("order_id", waitingOrders);
+  const payments: DailyPayment[] = ((py.data ?? []) as Row[]).map(toDailyPayment);
+  // 기다리는 요청의 승인 시각은 어제보다 이를 수 있다. 취소·환불·붙잡힌 예약의 결제도 마찬가지다. 그 줄들만 한 번 더 읽는다.
+  const needOrders = bookings
+    .filter((b) => b.status !== "confirmed")
+    .map((b) => b.orderId)
+    .filter((o, i, all) => !!o && all.indexOf(o) === i && !payments.some((p) => p.orderId === o));
+  if (needOrders.length > 0) {
+    const more = await c.from("payments").select(PAY_COLS).in("order_id", needOrders);
     // 여기서 가져온 줄은 어제 결제 수에 안 섞인다. 승인 시각으로 거르는 게 `summarizeDaily`다.
-    for (const r of (more.data ?? []) as Row[]) {
-      payments.push({ orderId: s(r.order_id), amount: n(r.amount), approvedAt: r.approved_at ? s(r.approved_at) : undefined });
-    }
+    for (const r of (more.data ?? []) as Row[]) payments.push(toDailyPayment(r));
   }
   const ids = Array.from(new Set(bookings.map((b) => b.spaceId)));
   const spaceNames = new Map<number, string>();

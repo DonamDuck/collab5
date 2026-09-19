@@ -32,8 +32,10 @@ function dailyPreview(w: MockWorld, remind: RemindRun | null): PreviewMail {
   const yesterday10 = `${addDaysIso(today, -1)}T01:00:00.000Z`;
   const live = new Set(w.bookings.filter((b) => b.status === "paid" || b.status === "confirmed").map((b) => b.orderId));
   const payments = w.payments.map((p) => (live.has(p.orderId) && p.approvedAt ? { ...p, approvedAt: yesterday10 } : p));
+  // 🆕09-19 저녁 — 취소·환불된 예약도 «어제» 그 상태가 된 것으로 옮긴다(목 예약은 한 달 전 시각이라 「어제 취소·환불」이 늘 0이 된다).
+  const bookings = w.bookings.map((b) => (b.status === "cancelled" || b.status === "refunded" ? { ...b, updatedAt: yesterday10 } : b));
   const summary = summarizeDaily({
-    bookings: w.bookings, payments,
+    bookings, payments,
     spaceNames: new Map(w.spaces.map((sp) => [sp.id, sp.name])),
     reviewPending: w.spaces.filter((sp) => sp.status === "pending").length,
     reviewApproveOnly: w.spaces.filter((sp) => (sp.status === "open" || sp.status === "paused") && !!sp.bizCertPath && !sp.bizApprovedAt).length,
