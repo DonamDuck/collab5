@@ -117,7 +117,7 @@ const SPACE_BASE = {
   coffeeChat: false, coffeeChatMinutes: 0, coffeeChatPrice: 0, coffeeChatTopics: "",
   accessHow: "sms" as Space["accessHow"], contactPhone: "", hostTermsAt: undefined,
   // 🧾🏪09-18 기본은 «아무것도 없음» — 사업자 확인 전 · 네이버 매칭 없음(옛 공간과 같은 모습).
-  bizNumber: "", bizOwnerName: "", bizOpenDate: "", bizCertPath: "",
+  bizName: "", bizNumber: "", bizOwnerName: "", bizOpenDate: "", bizCertPath: "",
   bizCheckStatus: "none" as Space["bizCheckStatus"], bizCheckDetail: undefined, bizCheckedAt: undefined, bizApprovedAt: undefined,
   placeName: "", placeAddress: "", placeLat: undefined, placeLng: undefined, placeMatchedAt: undefined,
 } satisfies Omit<Space, "id" | "slug" | "ownerUserId" | "name" | "status" | "createdAt" | "updatedAt">;
@@ -338,6 +338,7 @@ function fullWorld(today: string, withAccount: boolean): MockWorld {
     accessHow: "both", contactPhone: "02-123-4567", hostTermsAt: `${d(-30)}T01:00:00.000Z`,
     // 🧾🏪신뢰 표시 둘 다 — 국세청 일치 + 관리자 승인 + 네이버 상호 일치.
     ...bizOf(U.host, "0000112347", "김느린", "20210315", "jpg", "000000009101"),
+    bizName: "느린오후 로스터리",
     bizCheckStatus: "valid", bizCheckedAt: `${d(-30)}T01:00:00.000Z`, bizApprovedAt: `${d(-29)}T02:00:00.000Z`,
     bizCheckDetail: { valid: "01", bSttCd: "01", bStt: "계속사업자", taxType: "부가가치세 일반과세자" },
     placeName: "느린오후 로스터리", placeAddress: "서울특별시 성동구 연무장길 00",
@@ -478,6 +479,7 @@ function fullWorld(today: string, withAccount: boolean): MockWorld {
     rules: "영업 중인 매장이라 큰 소리는 삼가 주세요\n쓰신 자리는 닦아 주세요",
     minHours: 1.5, accessHow: "onsite", contactPhone: "02-123-4567",
     ...bizOf(U.host, "0000112347", "김느린", "20210315", "jpg", "000000009111"),
+    bizName: "느린오후 로스터리",
     bizCheckStatus: "valid", bizCheckedAt: `${d(-10)}T01:00:00.000Z`, bizApprovedAt: `${d(-10)}T02:00:00.000Z`,
     bizCheckDetail: { valid: "01", bSttCd: "01", bStt: "계속사업자", taxType: "부가가치세 일반과세자" },
     rentSpaceOn: true, rentSpacePrice: 15500,
@@ -638,6 +640,7 @@ function stressWorld(today: string): MockWorld {
     accessHow: "both", contactPhone: "02-0000-0000 (내선 3번, 점심시간엔 안 받아요)",
     // 🧾🏪긴 상호가 지도 라벨·신뢰 표시 줄에서 어떻게 접히는지.
     ...bizOf(U.stressHost, "0001234560", "남궁오래된골목끝집", "20150101", "pdf", "000000009107"),
+    bizName: "오래된 골목 끝집 부엌 겸 작업실 협동조합 (Old Alley Kitchen Workshop Cooperative)",
     bizCheckStatus: "valid", bizCheckedAt: `${d(-50)}T01:00:00.000Z`, bizApprovedAt: `${d(-50)}T02:00:00.000Z`,
     bizCheckDetail: { valid: "01", bSttCd: "01", bStt: "계속사업자" },
     placeName: "오래된 골목 끝집 부엌 겸 작업실", placeAddress: "서울특별시 마포구 포은로 000-00 파란 대문 집",

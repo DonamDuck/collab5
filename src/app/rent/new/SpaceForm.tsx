@@ -223,6 +223,10 @@ export function SpaceForm({
   // ─── 🧾사업자 정보 (09-18 대표: 공간 등록에 사업자 확인 필수) ───
   //   규칙은 서버와 같은 함수(`lib/bizcheck`)다. 화면이 먼저 막는 건 왕복을 아끼려는 것이고 관문은 `saveSpaceAction`이다.
   const [bizNumber, setBizNumber] = useState(initial?.bizNumber ?? "");
+  /** 🏷09-19 대표 [J] 상호 — 판매자 정보 화면에 그대로 나간다. 새 공간(초안 포함)은 필수, 옛 공간은 선택(서버와 같은 판정).
+   *  임시 저장엔 안 담는다. 사업자 칸 셋과 같이 매번 새로 적는다(H-34와 같은 칸 묶음). */
+  const [bizName, setBizName] = useState(initial?.bizName ?? "");
+  const bizNameNeeded = !initial || initial.status === "draft";
   const [bizOwnerName, setBizOwnerName] = useState(initial?.bizOwnerName ?? "");
   /** 날짜 칸 모양 `YYYY-MM-DD`. 보낼 때 국세청 모양 `YYYYMMDD`로 바꾼다. */
   const [bizOpenDate, setBizOpenDate] = useState(fromOpenDate(initial?.bizOpenDate ?? ""));
@@ -500,6 +504,7 @@ export function SpaceForm({
     const badSlot = expanded.find((sl) => minutesBetween(sl.start, sl.end) < minM);
     if (badSlot) return ["slots", `${dateLabel(badSlot.date)}은 최소 ${durationLabel(minM)}을 못 채워요. 시간을 늘리거나 그날을 빼 주세요.`];
     // 🧾09-18 사업자 정보 — 폼 순서대로(번호 → 대표자 → 개업일 → 등록증). 서버(`saveSpaceAction`)가 같은 함수로 다시 본다.
+    if (bizNameNeeded && !bizName.trim()) return ["bizName", "상호를 사업자등록증에 적힌 그대로 적어 주세요."];
     if (bizNeeded) {
       const numberProblem = bizNumberProblem(bizNumber);
       if (numberProblem) return ["bizNumber", numberProblem];
@@ -578,6 +583,7 @@ export function SpaceForm({
         contactPhone,
         hostTermsOk: termsOk,
         brandSlug,
+        bizName: bizName.trim(),
         bizNumber: bizDigits(bizNumber),
         bizOwnerName: bizOwnerName.trim(),
         bizOpenDate: toOpenDate(bizOpenDate),
@@ -764,7 +770,8 @@ export function SpaceForm({
           //   「사장님 휴대폰 번호는 결제를 마친 손님께만」이라고 했다. 지금 칸에 들어 있는 그 번호가 공개된다는 뜻이라
           //   사실과 반대로 읽힌다. ⭐«이 칸에 적은 것»은 공개, «프로필 번호»는 결제 뒤 — 둘을 갈라 말한다.
           //   (미리 채우기를 뺄지는 대표 판단이라 그대로 둔다.)
-          hint="여기 적으신 번호는 신청 전에 누구나 볼 수 있어요. 프로필의 휴대폰 번호는 결제를 마친 손님께만 따로 열려요."
+          // 🔁09-19 대표 [J] — 공간 화면 본문에서 빼고 «판매자 정보» 화면으로 옮겼다. 여전히 결제 전에 누구나 볼 수 있다.
+          hint="여기 적으신 번호는 공간 화면의 판매자 정보에서 누구나 볼 수 있어요. 프로필의 휴대폰 번호는 결제를 마친 손님께만 따로 열려요."
         >
           <input
             id="sp-phone"
@@ -1130,7 +1137,7 @@ export function SpaceForm({
            사업자등록증 + 국세청 자동 조회 + 저희 검토. 왜 받는지를 먼저 말하고(손님이 믿고 빌리게), 파일을 누가 보는지 같이 말한다. */}
       <Group
         title="사업자 정보"
-        sub="손님이 믿고 빌릴 수 있게 사업자등록증으로 가게를 확인해요. 확인되면 공간 화면에 「사업자 확인된 가게」가 붙어요. 올려 주신 파일은 검토하는 사람만 봐요."
+        sub="손님이 믿고 빌릴 수 있게 사업자등록증으로 가게를 확인해요. 확인되면 공간 화면에 「사업자 확인된 가게」가 붙어요. 상호·대표자 이름·사업자등록번호는 손님이 결제 전에 보는 판매자 정보에 나가고, 올려 주신 파일은 검토하는 사람만 봐요."
         anchor="biz"
       >
         {editing && !hasAnyBiz(initial) && (
@@ -1144,6 +1151,29 @@ export function SpaceForm({
             사업자 정보나 등록증을 바꾸시면 확인 표시가 잠시 내려가요. 저희가 다시 확인하고 붙여 드려요.
           </p>
         )}
+        {/* 🏷09-19 대표 [J] — 판매자 정보(상호·대표자·사업자번호·주소·가게 전화)를 손님이 결제 전에 보는 화면이 생겼다.
+            상호 칸이 없어서 새로 받는다. 국세청 조회엔 안 넣는다(번호·대표자·개업일만 묻는 조회라서). */}
+        <L
+          label="상호(사업자등록증에 적힌 이름)"
+          htmlFor="sp-biz-name"
+          anchor="bizName"
+          error={fieldErr("bizName")}
+          hint={
+            editing && !initial?.bizName && !bizName.trim()
+              ? "비워 두시면 손님이 보는 판매자 정보에 공간 이름이 대신 나가요. 등록증의 상호로 채워 주세요."
+              : "손님이 결제 전에 보는 판매자 정보에 이 이름이 나가요."
+          }
+        >
+          <input
+            id="sp-biz-name"
+            autoComplete="organization"
+            maxLength={100}
+            className={`${rentInputCls} sm:max-w-[360px]`}
+            value={bizName}
+            onChange={(e) => setBizName(e.target.value)}
+            placeholder="예) 느린오후 로스터리"
+          />
+        </L>
         <L label="사업자등록번호" htmlFor="sp-biz-no" anchor="bizNumber" error={fieldErr("bizNumber")}>
           <input
             id="sp-biz-no"
@@ -1253,7 +1283,8 @@ export function SpaceForm({
             {[
               // ✍️09-18 밤 QA(H-30) — 이 줄만 1인칭(「내 소유」)이라 옆 줄들과 화자가 달랐다. 사장님께 말하는 결로 맞춘다.
               `약관에는 사장님 소유이거나 임대인 동의를 받으셨다는 것, 수수료 ${Math.round(feeRate * 100)}%와 정산 방법, 환불 규정이 담겨 있어요.`,
-              "손님은 신청하기 전에 브랜드 이름·주소·가게 전화번호를 볼 수 있어요.",
+              // 🔁09-19 대표 [J] — 판매자 정보 화면(상호·대표자·사업자번호·주소·가게 전화). 호스트 약관 제6조와 같은 말.
+              "손님은 신청하기 전에 공간 화면의 판매자 정보에서 상호·대표자 이름·사업자등록번호·주소·가게 전화번호를 볼 수 있어요.",
               "손님이 결제를 마치면 사장님 연락처가 그 손님께 전달돼요. 손님 연락처는 사장님이 요청을 수락하신 뒤에 보실 수 있어요.",
             ].map((line) => (
               <li key={line} className="flex gap-2 text-[15px] leading-relaxed break-keep text-mute">

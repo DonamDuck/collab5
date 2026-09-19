@@ -129,6 +129,8 @@ function toSpace(r: Row): Space {
     // 🧾09-18 사업자 확인 · 🏪네이버 상호. ⚠️SQL 전 DB엔 칸이 없어 전부 빈 값·`none`으로 읽힌다(화면은 «확인 전»으로 그린다).
     bizNumber: s(r.biz_number), bizOwnerName: s(r.biz_owner_name), bizOpenDate: s(r.biz_open_date),
     bizCertPath: s(r.biz_cert_path),
+    // 🏷09-19 상호. SQL 전 DB엔 칸이 없어 빈 값 — 판매자 정보 화면이 공간 이름으로 물러선다.
+    bizName: s(r.biz_name),
     bizCheckStatus: bizStatus(r.biz_check_status),
     bizCheckDetail: r.biz_check_detail && typeof r.biz_check_detail === "object" ? (r.biz_check_detail as BizCheckDetail) : undefined,
     bizCheckedAt: s(r.biz_checked_at) || undefined,
@@ -400,6 +402,7 @@ export async function saveSpace(input: SpaceSaveInput, opts: { isNew: boolean })
     biz_cert_path: input.bizCertPath, biz_check_status: input.bizCheckStatus,
     biz_check_detail: input.bizCheckDetail ? JSON.parse(JSON.stringify(input.bizCheckDetail)) : null,
     biz_checked_at: input.bizCheckedAt ?? null, biz_approved_at: input.bizApprovedAt ?? null,
+    biz_name: input.bizName,
     place_name: input.placeName, place_address: input.placeAddress,
     place_lat: input.placeLat ?? null, place_lng: input.placeLng ?? null, place_matched_at: input.placeMatchedAt ?? null,
   };
@@ -413,9 +416,15 @@ export async function saveSpace(input: SpaceSaveInput, opts: { isNew: boolean })
   //   · 규칙(`repeat_weekly`) — 규칙이 없을 때만 뺀다. 규칙이 있는데 빼면 사장님은 켰다고 믿는데 아무 날도 안 열린다.
   //   · 분 칸(`min_minutes`, 09-19) — 최소 시간이 정시일 때만 뺀다(옛 `min_hours`에 그대로 담긴다).
   //     1시간 30분 같은 반 시간은 옛 칸에 못 담아서, 빼면 2시간으로 조용히 바뀐다. 그땐 실패시킨다 — `2026-09-19-rent-half-hour.sql`이 먼저다.
-  //   PostgREST는 없는 칸을 한 번에 하나씩 말하므로 두 번까지 돈다.
-  for (let i = 0; i < 2 && error; i++) {
-    if (repeatWeekly.length === 0 && "repeat_weekly" in sent && /repeat_weekly/.test(error.message)) {
+  //   · 상호(`biz_name`, 09-19) — 칸이 없으면 뺀다. 판매자 정보 화면이 공간 이름으로 물러서서 화면이 비지 않는다.
+  //     SQL(`2026-09-19-rent-biz-name.sql`)을 돌리면 다음 저장부터 들어간다. 그 사이 적은 상호는 다시 적어야 한다.
+  //   PostgREST는 없는 칸을 한 번에 하나씩 말하므로 세 번까지 돈다.
+  for (let i = 0; i < 3 && error; i++) {
+    if ("biz_name" in sent && /biz_name/.test(error.message)) {
+      const { biz_name: _bn, ...rest } = sent;
+      void _bn;
+      sent = rest;
+    } else if (repeatWeekly.length === 0 && "repeat_weekly" in sent && /repeat_weekly/.test(error.message)) {
       const { repeat_weekly: _r, ...rest } = sent;
       void _r;
       sent = rest;

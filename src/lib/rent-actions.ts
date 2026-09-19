@@ -150,6 +150,8 @@ export interface SpaceFormInput {
   bizOwnerName: string;
   bizOpenDate: string;
   bizCertPath: string;
+  /** 🏷09-19 상호(사업자등록증에 적힌 이름). 새 공간은 필수, 옛 공간 고치기는 선택. 국세청 조회엔 안 넣는다. */
+  bizName?: string;
 }
 
 /** 공간 등록·수정. 저장하면 `pending`(검토 대기)로 들어간다. */
@@ -337,6 +339,9 @@ export async function saveSpaceAction(input: SpaceFormInput): Promise<ActionResu
     bizOpenDate: (input.bizOpenDate ?? "").trim(),
     bizCertPath: (input.bizCertPath ?? "").trim(),
   };
+  // 🏷09-19 상호. 앞뒤 공백을 걷고, 길면 막는다(등록증 상호가 100자를 넘는 일은 없다).
+  const bizName = (input.bizName ?? "").trim().replace(/\s+/g, " ");
+  if (bizName.length > 100) return { ok: false, field: "biz", message: "상호가 너무 길어요. 사업자등록증 그대로 적어 주세요." };
   // 🧾09-18 밤 QA(H-03) — 판정은 순수 함수 한 벌(`needsBizInfo`). 화면(`SpaceForm`)이 같은 함수로 먼저 막는다.
   const bizRequired = needsBizInfo(prev, { name: input.name, address: input.address, ...biz });
   if (bizRequired) {
@@ -353,6 +358,10 @@ export async function saveSpaceAction(input: SpaceFormInput): Promise<ActionResu
         ok: false, field: "biz",
         message: firstTime ? `이름이나 주소를 바꾸시려면 사업자 정보가 필요해요. ${problem}` : problem,
       };
+    }
+    // 🏷09-19 대표 [J] — 상호는 새 공간(초안 포함)만 필수. 옛 공간은 비워도 저장된다(판매자 정보가 공간 이름으로 물러선다).
+    if (!bizName && (!prev || prev.status === "draft")) {
+      return { ok: false, field: "biz", message: "상호를 사업자등록증에 적힌 그대로 적어 주세요." };
     }
     // 🔒새로 올린 경로면 «이 사람 폴더»의 모양인지. 남의 등록증 경로를 끼워 넣어 확인 표시를 받는 길을 막는다.
     if (biz.bizCertPath !== (prev?.bizCertPath ?? "") && !bizCertPathOk(biz.bizCertPath, uid)) {
@@ -382,7 +391,9 @@ export async function saveSpaceAction(input: SpaceFormInput): Promise<ActionResu
   //   다시 부른다. 키가 생기기 전에 올린 공간이 영영 「조회 전」으로 남지 않게.
   const idChanged =
     !prev || prev.bizNumber !== biz.bizNumber || prev.bizOwnerName !== biz.bizOwnerName || prev.bizOpenDate !== biz.bizOpenDate;
-  const bizChanged = idChanged || !prev || prev.bizCertPath !== biz.bizCertPath;
+  // 🏷09-19 상호를 «바꾸면» 승인도 내린다(관리자는 등록증의 상호와 대조해 승인한다). 옛 공간이 처음 채우는 건 바꾼 게 아니라 그대로 둔다.
+  const bizNameChanged = !!prev?.bizName && prev.bizName !== bizName;
+  const bizChanged = idChanged || !prev || prev.bizCertPath !== biz.bizCertPath || bizNameChanged;
   const needCheck = bizRequired && (idChanged || prev?.bizCheckStatus === "none" || prev?.bizCheckStatus === "error");
   // 🏪네이버 상호 — 이름·주소가 바뀌었거나 아직 매칭이 없을 때. 매칭이 있고 둘 다 그대로면 안 부른다.
   const placeStale = !prev || renamed || moved;
@@ -456,6 +467,7 @@ export async function saveSpaceAction(input: SpaceFormInput): Promise<ActionResu
     accessHow: input.accessHow, contactPhone: input.contactPhone.trim(),
     hostTermsAt: prev?.hostTermsAt ?? new Date().toISOString(),
     ...biz,
+    bizName,
     bizCheckStatus, bizCheckDetail, bizCheckedAt, bizApprovedAt,
     ...place,
     status,

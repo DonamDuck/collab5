@@ -545,6 +545,10 @@ export interface Space {
   // ─── 🧾09-18 사업자 확인(대표 09-17: 공간 등록에 사업자 확인 필수) ───
   //   «공간마다» 둔다. 사장님 한 분이 가게 둘을 올릴 수 있다. 규칙 = `lib/bizcheck.ts`, 국세청 조회 = `lib/nts-bizcheck.ts`.
   //   🔒번호·대표자·개업일·등록증 경로는 공개 투영(`SpacePublic`)에서 뺀다. 공개 화면이 쓰는 건 «확인됐나» 하나뿐이다.
+  /** 🏷09-19 상호 — 사업자등록증에 적힌 이름. 판매자 정보 화면(`/rent/[slug]/seller`)에 그대로 나간다(공개 칸).
+   *  새 공간은 필수, 옛 공간(09-19 전)은 빈 문자열이다. 빈 칸이면 그 화면이 공간 이름을 「(공간 이름)」 표시와 함께 대신 쓴다.
+   *  ⚠️SQL(`2026-09-19-rent-biz-name.sql`) 전 DB엔 칸이 없어 빈 값으로 읽히고, 저장은 이 칸만 빼고 간다(`saveSpace`). */
+  bizName: string;
   /** 숫자 10자리. 옛 공간(09-18 전)은 빈 문자열이다. */
   bizNumber: string;
   /** 대표자 이름 — 사업자등록증 그대로 */
@@ -589,7 +593,8 @@ export interface Space {
 export type SpacePublic = Omit<Space, "accessNote" | "hostTermsAt" | SpaceBizPrivateKey>;
 
 /** 🔒09-18 공개 화면에 안 나가는 사업자 칸. 상세가 쓰는 건 `bizCheckStatus`·`bizApprovedAt`(확인 표시)뿐이다.
- *  ⚖️전자상거래법 제20조②가 사업자 호스트의 성명·사업자번호 표시를 요구하는지는 대표 판단으로 남겼다(보고서). */
+ *  ⚖️09-19 대표 [J] — 상호·대표자·사업자번호·주소·가게 전화는 «판매자 정보» 화면 한 곳에서만 보인다(`/rent/[slug]/seller`).
+ *    그 화면은 원본(`getSpaceFull`)을 읽어 필요한 칸만 꺼낸다. 목록·상세로 나가는 이 투영에서는 여전히 뺀다. */
 export type SpaceBizPrivateKey = "bizNumber" | "bizOwnerName" | "bizOpenDate" | "bizCertPath" | "bizCheckDetail";
 
 /** 국세청 조회 상태. none = 아직 못 물어봄(키 없음 등) · valid · mismatch(기록과 다름) · closed(휴업·폐업) · error(조회 실패). */

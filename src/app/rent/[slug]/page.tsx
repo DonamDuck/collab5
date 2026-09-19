@@ -6,7 +6,7 @@ import { getSpacePublic, listBookingsForGuest, listLiveBookingsIn } from "@/lib/
 import { getProfileById, getSessionUserId } from "@/lib/profiles";
 import { isRentAdmin } from "@/lib/rent-actions";
 import { repo } from "@/lib/repo";
-import { accessHowLine, COFFEE_CHAT_WHEN_GUEST, CONTACT_RULE_GUEST, PRODUCT_HINT_GUEST, PRODUCT_LABEL, telHref } from "@/lib/rent-copy";
+import { accessHowLine, COFFEE_CHAT_WHEN_GUEST, CONTACT_RULE_GUEST, PRODUCT_HINT_GUEST, PRODUCT_LABEL } from "@/lib/rent-copy";
 import { lowestPrice, productNote, productPrice, sellableProducts } from "@/lib/rent-products";
 import { durationLabel, futureSlots, minHoursToMinutes, rangeLabel } from "@/lib/rent-time";
 import { bizVerified } from "@/lib/bizcheck";
@@ -26,6 +26,7 @@ import { SectionNav } from "./SectionNav";
 //     호스트 주소·전화를 청약 전에 보이라고 한다. `AreaMap` 머리말).
 //   ✅09-17 대표 — 사장님이 「내 소개서 보여주기」를 켠 공간이면 소개서 링크도 연다(`/m/{slug}?back=…`).
 //   📌이탈을 막는 건 이제 가리기가 아니라 **결제가 먼저라는 순서**다(`BookingForm` 머리말).
+//   🔁09-19 대표 [J] — 가게 전화는 이 화면 본문에서 뺐다. 법이 청약 전에 주라는 값은 한 단계 안쪽 「판매자 정보」(`./seller`)가 든다.
 // 🚨그래도 `getSpaceFull`은 부르지 않는다. `getSpacePublic`이 「들어오는 법」(옛 `accessNote`)을 런타임에서 지운다.
 //
 // 🎨09-13 재작업 — 소개서(`/m`)와 같은 옷. 위에 흰 카드 하나(이름 22 · 한 줄 17 · 동네 15 · 칩),
@@ -386,32 +387,16 @@ export default async function SpaceDetailPage({
             ) : (
               <p className="text-[17px] leading-relaxed break-keep text-body">{sp.address}</p>
             )}
-            {/* ☎️**신청 «전»에 보여야 하는 값이다** (2026-09-16).
-                전자상거래법 제20조②는 중개자가 호스트의 상호·주소·전화번호를 확인해 청약 전에 소비자에게
-                제공하라고 한다. 안 하면 제20조의2②로 호스트 과실 손해에 회사가 연대 책임을 진다.
-                우리 호스트 약관 제6조도 「신청하기 전에 공간 상세 화면에 표시한다」고 약속했고,
-                등록 폼도 사장님께 *「법에 따라 신청 전에 손님께 보여드려요」*라고 적어 두었다.
-                🩸그런데 09-16까지 이 화면 어디에도 그 번호가 없었다. 폼은 받고 있었는데 꺼내는 곳이 없었다.
-                ⭐**개인 휴대폰은 여전히 확정 뒤에만 열린다**(`ContactBlock`). 여기 나가는 건 가게 번호다. */}
-            {/* 🏷상호 — 가입할 때 받는 «브랜드 이름»이다(08-15 「상호」 → 「브랜드 이름」). 09-16 대표: 상호는 보이고
-                사장님 실명은 안 보인다. 공간 이름은 사장님이 「을지로 2층 작업실」처럼 바꿀 수 있어서,
-                그것만으론 상호가 안 남는다 — 법이 청약 전에 보이라고 한 값이라 따로 한 줄 둔다. */}
+            {/* ☎️09-16엔 여기 가게 전화를 걸었다(전자상거래법 제20조② — 호스트의 상호·주소·전화를 청약 전에).
+                🔁09-19 대표 [J] — *「매장 전화번호는 공개 상세에서 빼자! 미리 노출하는 건 최대한 빼는 게 맞을 거 같아.」*
+                  법이 요구하는 값(상호·대표자·주소·전화·사업자번호)은 별도 화면 「판매자 정보」(`./seller`)로 옮겼다.
+                  여기어때·스마트스토어처럼 한 단계 안쪽이다. 들어가는 길은 아래 환불 규정 끝의 작은 링크와 결제 직전 팝업.
+                ⭐결제를 마친 손님은 예약 화면·확정 메일에서 가게 전화를 그대로 본다(`ContactBlock`·`hostContactLine`). */}
+            {/* 🏷운영 = 가입할 때 받는 «브랜드 이름»이다(08-15 「상호」 → 「브랜드 이름」). 09-16 대표: 상호는 보이고
+                사장님 실명은 안 보인다. 공간 이름은 사장님이 「을지로 2층 작업실」처럼 바꿀 수 있어서 따로 한 줄 둔다. */}
             {operatorName && (
               <p className="mt-3 text-[15px] leading-relaxed break-keep text-mute">
                 운영 <span className="text-body">{operatorName}</span>
-              </p>
-            )}
-            {sp.contactPhone.trim() && (
-              <p className="mt-1 text-[15px] leading-relaxed break-keep text-mute">
-                가게 전화{" "}
-                {/* ☎️09-18 밤 QA(G-19) — 메모가 섞인 번호 칸에서 `tel:`이 틀어졌다. 번호 뽑기는 한 벌(`telHref`). */}
-                {telHref(sp.contactPhone) ? (
-                  <a href={`tel:${telHref(sp.contactPhone)}`} className="text-body underline underline-offset-2">
-                    {sp.contactPhone}
-                  </a>
-                ) : (
-                  <span className="text-body">{sp.contactPhone}</span>
-                )}
               </p>
             )}
           </Section>
@@ -555,6 +540,12 @@ export default async function SpaceDetailPage({
                 이용약관
               </Link>
               에 있어요.
+            </p>
+            {/* ⚖️09-19 대표 [J] 판매자 정보 — 결제 전에 볼 수 있어야 하지만 «약간은 찾기 힘들게». 절 끝에 흐린 작은 링크 하나. */}
+            <p className="mt-2 text-[14px] text-faint">
+              <Link href={`/rent/${sp.slug}/seller`} className="underline underline-offset-2">
+                판매자 정보
+              </Link>
             </p>
           </Section>
 

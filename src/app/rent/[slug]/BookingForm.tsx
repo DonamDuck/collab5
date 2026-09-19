@@ -968,6 +968,12 @@ export function BookingForm({
               </li>
             ))}
           </ul>
+          {/* ⚖️09-19 대표 [J] — 청약 확인 자리에서도 판매자 정보로 가는 길 한 줄. 새 탭 — 이 팝업과 고른 값이 그대로 남는다. */}
+          <p className="mt-3 text-[14px] text-faint">
+            <a href={`/rent/${spaceSlug}/seller`} target="_blank" rel="noopener" className="underline underline-offset-2">
+              판매자 정보 보기
+            </a>
+          </p>
         </div>
       </ConfirmDialog>
     </div>

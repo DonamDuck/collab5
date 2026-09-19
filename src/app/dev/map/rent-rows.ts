@@ -70,6 +70,20 @@ export const RENT_GROUPS: Group[] = [
         ],
       },
       {
+        // ⚖️09-19 대표 [J] — 가게 전화를 공간 상세에서 빼고 판매자 정보 화면으로. 공간 상세 「환불 규정」 끝 작은 링크와
+        //   결제 직전 확인 팝업의 「판매자 정보 보기」(새 탭)로 들어가요. 검색엔 안 올라가요.
+        title: "판매자 정보",
+        path: "/rent/[slug]/seller",
+        rows: [
+          { desc: "상호·대표자·사업자번호·주소·가게 전화가 다 있는 공간", c: "guest-full", to: `/rent/${S.full}/seller` },
+          { desc: "상호 칸이 생기기 전에 올린 공간 · 상호 자리에 「공간 이름 (공간 이름)」", c: "guest-full", to: `/rent/${S.noSlots}/seller` },
+          { desc: "사업자 정보가 아예 없는 옛 공간 · 빈 칸은 「아직 등록 전이에요」", c: "guest-full", to: `/rent/${S.other}/seller` },
+          { desc: "긴 상호 · 메모가 섞인 가게 전화", c: "stress-guest", to: `/rent/${S.stress}/seller` },
+          { desc: "로그인 안 한 사람도 볼 수 있어요", c: "anon", to: `/rent/${S.full}/seller` },
+          { desc: "검토 대기 공간은 404", c: "guest-full", to: `/rent/${S.pending}/seller` },
+        ],
+      },
+      {
         title: "결제",
         path: "/rent/pay/[orderId]",
         note: "결제창은 이 컴퓨터에 넣어 둔 토스 키로 떠요. 끝까지 눌러도 돈을 확정하는 단계(승인)를 막아 두어서 실패 화면으로 가요.",
@@ -190,7 +204,7 @@ export const RENT_GROUPS: Group[] = [
           { desc: "공개 중인 공간 · 상품 셋 다 켬 · 사업자 확인 승인됨 (바꾸면 표시가 내려간다는 안내)", c: "host-full", to: `/rent/${S.full}/edit` },
           { desc: "30분 단위 공간 · 최소 1시간 30분 · 09:30~12:00 자투리 날 · 매주 목요일 11:30~20:30", c: "host-full", to: `/rent/${S.halfHour}/edit` },
           { desc: "검토 중인 공간 · 공간 전체만 켬 · 국세청 기록과 달라 사업자 칸 밑에 빨간 줄", c: "host-full", to: `/rent/${S.pending}/edit` },
-          { desc: "쉬는 중인 공간 · 대관만 켬 · 사업자 정보 채움, 확인 전", c: "host-full", to: `/rent/${S.paused}/edit` },
+          { desc: "쉬는 중인 공간 · 대관만 켬 · 사업자 정보 채움, 확인 전 · 상호가 빈 옛 공간이라 「비워 두시면 공간 이름이 대신 나가요」 안내", c: "host-full", to: `/rent/${S.paused}/edit` },
           { desc: "초안 · 사업자 정보가 비어 있다는 안내 (옛 공간과 같은 모습)", c: "host-full", to: `/rent/${S.draft}/edit` },
           { desc: "긴 글", c: "stress-host", to: `/rent/${S.stress}/edit` },
           { desc: "최소 입력", c: "minimal-host", to: `/rent/${S.minimal}/edit` },
@@ -257,7 +271,8 @@ export const RENT_GROUPS: Group[] = [
 ];
 
 export const RENT_POPUPS: Popup[] = [
-  { where: { desc: "공간 상세", c: "guest-full", to: `/rent/${S.full}` }, button: "상품·날짜·시간을 고르고 「신청하기」", title: "이대로 신청할까요?" },
+  { where: { desc: "공간 상세", c: "guest-full", to: `/rent/${S.full}` }, button: "상품·날짜·시간을 고르고 「신청하기」", title: "이대로 신청할까요? (맨 아래 「판매자 정보 보기」는 새 탭)" },
+  // 🔑09-19 [G] 로그인 안 한 사람은 바 버튼이 「로그인하고 신청하기」라 팝업 대신 로그인 화면으로 가요. 돌아오면 이 팝업이 떠요.
   { where: { desc: "예약 한 건", c: "guest-full", to: `/rent/done/${B.confirmed}` }, button: "「예약 취소하기」", title: "예약을 취소할까요?" },
   // 사장님 버튼은 「빌려준 공간」 칸에 있다. `tab=host` 없이 열면 빌린 공간 칸이 떠서 누를 버튼이 안 보인다(09-18 밤 QA SC-15).
   { where: { desc: "내 하루 가게", c: "host-full", to: "/rent/my?tab=host" }, button: "새 요청 줄의 「거절」", title: "이 요청을 거절할까요" },
