@@ -26,13 +26,14 @@
 //   달의 첫 요일이 기기마다 어긋날 수 있다. 오늘만 KST로 받고 나머지는 글자 비교로 한다.
 import { useState } from "react";
 import type { OpenSlot, RepeatRule } from "@/lib/types";
-import { addDaysIso, expandRepeat, hoursBetween, REPEAT_WEEKS } from "@/lib/rent-time";
+import { addDaysIso, DAY_MARKS, durationLabel, expandRepeat, minHoursToMinutes, minutesBetween, REPEAT_WEEKS } from "@/lib/rent-time";
 import { dateLabel, todayKst, RentSelect } from "../ui";
 
 const DOW = ["일", "월", "화", "수", "목", "금", "토"];
 const pad = (n: number) => String(n).padStart(2, "0");
-/** 정시만. 30분 눈금을 안 쓰기로 했다(대표 09-16 — 가게가 그렇게 생각하지 않는다). */
-const HOURS = Array.from({ length: 25 }, (_, i) => `${pad(i)}:00`);
+/** 여는·닫는 시각 목록 — 30분 눈금, 00:00~24:00(대표 09-19: 「9시 30분 ~ 12시의 자투리도 가능」).
+ *  🔁09-16엔 정시 25개였다. 서버(`saveSpaceAction`)가 같은 눈금(`isTimeMark`)으로 다시 본다. */
+const HOURS = DAY_MARKS;
 const BASE = { start: "10:00", end: "18:00" };
 
 /** 그 날짜의 요일 번호. `Date.UTC`로 만들어 기기 시간대를 안 탄다. */
@@ -284,7 +285,7 @@ export function OpenSlotsCalendar({
           <div className="mt-3 space-y-2.5">
             {usedDows.map((d) => {
               const t = dowTime(d);
-              const h = hoursBetween(t.start, t.end);
+              const h = minutesBetween(t.start, t.end);
               const n = all.filter((sl) => dowOf(sl.date) === d).length;
               const on = !!ruleOf(d);
               return (
@@ -333,8 +334,8 @@ export function OpenSlotsCalendar({
                   >
                     {on ? "매주 여는 중" : "매주 계속 열기"}
                   </button>
-                  {h < minHours && (
-                    <span className="basis-full text-[14px] text-danger">최소 {minHours}시간을 못 채워요</span>
+                  {h < minHoursToMinutes(minHours) && (
+                    <span className="basis-full text-[14px] text-danger">최소 {durationLabel(minHoursToMinutes(minHours))}을 못 채워요</span>
                   )}
                 </div>
               );
@@ -426,8 +427,9 @@ function SlotRow({
   onEdit: (patch: Partial<OpenSlot>) => void;
   onRemove: () => void;
 }) {
-  const h = hoursBetween(sl.start, sl.end);
-  const bad = h <= 0 ? "끝나는 시각이 더 늦어야 해요." : h < minHours ? `최소 ${minHours}시간을 못 채워요.` : "";
+  const m = minutesBetween(sl.start, sl.end);
+  const minM = minHoursToMinutes(minHours);
+  const bad = m <= 0 ? "끝나는 시각이 더 늦어야 해요." : m < minM ? `최소 ${durationLabel(minM)}을 못 채워요.` : "";
   return (
     <div className="rounded-md border border-hairline bg-surface p-3">
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">

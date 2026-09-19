@@ -4,7 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import { getBookingByOrderId, getSpaceFull, listLiveBookings, listSpacesByIds } from "@/lib/spaces";
 import { getSessionUserId } from "@/lib/profiles";
 import { GRACE_MINUTES, guestCancelRefundRate } from "@/lib/rent-payment";
-import { kstDaysUntil } from "@/lib/rent-time";
+import { bookingMinutes, durationLabel, kstDaysUntil } from "@/lib/rent-time";
 import { payWindowLeftMs, pendingBookingProblem } from "@/lib/rent-booking-rules";
 import { bookingWhen, dateLabel, secondaryBtnCls, won } from "../../ui";
 import { COFFEE_CHAT_LABEL, PRODUCT_LABEL } from "@/lib/rent-copy";
@@ -108,10 +108,11 @@ export default async function RentPayPage({ params }: { params: Promise<{ orderI
   //   (예약 행엔 분이 안 남는다). ☕`amountMentor`는 옛 칸 — 둘 다 본다.
   const chat = b.amountChat || b.amountMentor;
   const chatMinutes = chat > 0 ? space?.coffeeChatMinutes ?? 0 : 0;
-  const hours = b.hoursCount % 1 === 0 ? b.hoursCount : b.hoursCount.toFixed(1);
+  // ⏱09-19 길이는 「2시간 30분」 한 벌(`durationLabel`). 옛 `hoursCount`는 반 시간을 못 담아 안 읽는다.
+  const lengthLabel = durationLabel(bookingMinutes(b));
   const breakdown = [
     // 🛍09-18 「대여」 → 고른 상품 이름. 확인 팝업 내역과 같은 말이다.
-    b.amountSpace > 0 ? `${PRODUCT_LABEL[b.product]} ${b.hoursCount > 0 ? `${hours}시간 ` : ""}${won(b.amountSpace)}` : "",
+    b.amountSpace > 0 ? `${PRODUCT_LABEL[b.product]} ${lengthLabel ? `${lengthLabel} ` : ""}${won(b.amountSpace)}` : "",
     chat > 0 ? `${COFFEE_CHAT_LABEL} ${chatMinutes > 0 ? `${chatMinutes}분 ` : ""}${won(chat)}` : "",
   ].filter(Boolean).join(" + ");
 

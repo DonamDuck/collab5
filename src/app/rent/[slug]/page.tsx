@@ -8,7 +8,7 @@ import { isRentAdmin } from "@/lib/rent-actions";
 import { repo } from "@/lib/repo";
 import { accessHowLine, COFFEE_CHAT_WHEN_GUEST, CONTACT_RULE_GUEST, PRODUCT_HINT_GUEST, PRODUCT_LABEL, telHref } from "@/lib/rent-copy";
 import { lowestPrice, productNote, productPrice, sellableProducts } from "@/lib/rent-products";
-import { futureSlots } from "@/lib/rent-time";
+import { durationLabel, futureSlots, minHoursToMinutes, rangeLabel } from "@/lib/rent-time";
 import { bizVerified } from "@/lib/bizcheck";
 import { OG_IMAGE } from "@/lib/site";
 import { PhotoSlider } from "@/components/PhotoSlider";
@@ -112,7 +112,7 @@ export async function generateMetadata({
  *  태그는 읽고 지나가는 것이라 설비 칩(`Chip`)보다 한 단 작은 회색 pill로 둔다. 값 옆에 같은 크기 칩이 서면 값이 묻힌다. */
 /*  🛍09-18 상품 셋 — 값이 둘이면 낮은 값에 「부터」를 붙인다(대표 결정의 「가격도 각각」). 하나면 그 값 그대로. */
 function PriceLine({ priceHour, from, minHours, capacity }: { priceHour: number; from?: boolean; minHours: number; capacity?: number }) {
-  const tags = [`최소 ${minHours}시간`, capacity ? `최대 ${capacity}명` : ""].filter(Boolean);
+  const tags = [`최소 ${durationLabel(minHoursToMinutes(minHours))}`, capacity ? `최대 ${capacity}명` : ""].filter(Boolean);
   return (
     <div className="flex flex-wrap items-center gap-x-2 gap-y-2">
       <p className="text-ink">
@@ -363,7 +363,7 @@ export default async function SpaceDetailPage({
               ))}
             </div>
             <p className="mt-3 text-[15px] text-mute">
-              {products.length > 1 ? "신청할 때 둘 중 하나를 골라요. " : ""}최소 {sp.minHours}시간부터 빌릴 수 있어요.
+              {products.length > 1 ? "신청할 때 둘 중 하나를 골라요. " : ""}최소 {durationLabel(minHoursToMinutes(sp.minHours))}부터 빌릴 수 있어요.
             </p>
             {sp.coffeeChat && sp.coffeeChatPrice > 0 && (
               // 🔁09-18 밤 QA(G-17) — 「어느 쪽에든」은 상품이 둘일 때만 맞는 말이다. 하나뿐인 공간에선 고를 쪽이 없다.
@@ -646,7 +646,8 @@ export default async function SpaceDetailPage({
                 value={
                   nextSlot ? (
                     <>
-                      {dateLabel(nextSlot.date)} {nextSlot.start}~{nextSlot.end}
+                      {/* ⏱09-19 30분 단위 — 자투리(09:30~12:00)가 몇 시간인지 셈하지 않게 길이를 붙인다(`rangeLabel`). */}
+                      {dateLabel(nextSlot.date)} {rangeLabel(nextSlot.start, nextSlot.end)}
                       {openSlots.length > 1 && (
                         <span className="block text-[15px] text-mute">그 밖에 {openSlots.length - 1}번 더</span>
                       )}

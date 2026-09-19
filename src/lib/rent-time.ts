@@ -2,8 +2,9 @@
 //
 // ⭐**순수 함수만 둔다.** DB도 React도 안 부른다 — 그래야 서버 액션과 화면이 «같은 코드»로 계산한다.
 //   화면과 서버가 각자 계산하면 언젠가 두 값이 갈라지고, 그때 손님이 보는 쪽이 틀린다.
-// ⏱눈금은 1시간이다(대표 09-16). 30분은 가게가 그렇게 생각하지 않고 달력·요금·겹침이 두 배로 복잡해진다.
-//   대신 호스트가 정하는 «최소 대여 시간»이 그 필요를 덮는다.
+// ⏱눈금은 30분이다(대표 09-19: 「9시 30분 ~ 12시의 자투리도 가능」 · 「고객은 30분 단위로」).
+//   🔁09-16엔 1시간이었다. 그때는 「가게가 30분으로 생각하지 않는다」고 봤는데, 사장님이 여는 시각부터 반 시간에 걸쳐 있었다.
+//   ⭐시각은 전부 이 파일의 함수로 읽고 센다. 길이는 «분»(정수)으로 세고, 사람에게 보일 땐 `durationLabel` 하나로 적는다.
 import type { OpenSlot, RepeatRule } from "./types";
 
 /** "HH:MM" → 분. 모양이 아니면 -1 — 호출부가 「못 읽었다」와 「0시」를 가를 수 있어야 한다.
@@ -18,10 +19,14 @@ export function toMinutes(hhmm: string): number {
   return h * 60 + mi;
 }
 
-/** 정시 모양(`HH:00`, 00시~24시)인가. 눈금이 1시간이라(대표 09-16) 서버가 새로 받는 시각은 이 모양이어야 한다.
- *  화면 고르개(`OpenSlotsCalendar`의 `HOURS`, 신청 폼의 `hourMarks`)도 이 모양만 만든다(09-18 밤 QA SEC-08). */
-export function isHourMark(hhmm: string): boolean {
-  return /^([01]\d|2[0-4]):00$/.test(hhmm ?? "");
+/** ⏱눈금 한 칸(분). 사장님이 여는·닫는 시각, 손님이 고르는 시작·끝 시각이 모두 이 간격이다(대표 09-19). */
+export const TIME_STEP_MIN = 30;
+
+/** 눈금 모양(`HH:00`·`HH:30`, 00:00~24:00)인가. 서버가 새로 받는 시각은 이 모양이어야 한다.
+ *  🔁09-18 밤 QA(SEC-08)에 정시만 받게 막았던 자리다. 대표 09-19 결정으로 30분까지 연다.
+ *  ⚠️24시는 «끝나는 시각» 자리의 `24:00` 하나뿐이다. `24:30`은 여기서도 `toMinutes`에서도 걸린다. */
+export function isTimeMark(hhmm: string): boolean {
+  return /^(([01]\d|2[0-3]):[03]0|24:00)$/.test(hhmm ?? "");
 }
 
 /** 분 → "HH:MM". */
@@ -31,12 +36,41 @@ export function toHHMM(min: number): string {
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 }
 
-/** 두 시각 사이의 «시간» 수. 못 읽거나 거꾸로면 0. */
-export function hoursBetween(start: string, end: string): number {
+/** 하루의 눈금 전부 — `00:00`, `00:30` … `24:00`(49개). 사장님이 여는·닫는 시각을 고르는 목록이다. */
+export const DAY_MARKS: readonly string[] = Array.from({ length: (24 * 60) / TIME_STEP_MIN + 1 }, (_, i) => toHHMM(i * TIME_STEP_MIN));
+
+/** 두 시각 사이의 «분». 못 읽거나 거꾸로면 0.
+ *  ⭐길이는 이 정수로 센다. 09-18까지는 «시간»(소수)으로 셌고, 반 시간이 들어오면 `2.5`를 화면마다 따로 자르게 된다. */
+export function minutesBetween(start: string, end: string): number {
   const a = toMinutes(start);
   const b = toMinutes(end);
   if (a < 0 || b < 0 || b <= a) return 0;
-  return (b - a) / 60;
+  return b - a;
+}
+
+/** 길이 한 줄 — 150 → `2시간 30분`, 180 → `3시간`, 30 → `30분`. 0 이하면 빈 글.
+ *  ⭐사람에게 보이는 길이는 전부 이 함수다(신청 폼·확인 팝업·결제 화면·내 하루 가게·메일의 `bookingWhen`).
+ *    🩸09-18까지는 자리마다 `h % 1 === 0 ? h : h.toFixed(1)`을 따로 적어 반 시간이 `2.5시간`으로 나올 참이었다. */
+export function durationLabel(minutes: number): string {
+  if (!(minutes > 0)) return "";
+  const h = Math.floor(minutes / 60);
+  const m = Math.round(minutes % 60);
+  if (!h) return `${m}분`;
+  return m ? `${h}시간 ${m}분` : `${h}시간`;
+}
+
+/** 예약 한 건의 길이(분). 시작·끝 시각이 있으면 그 차이가 답이다(값의 근거와 같은 칸).
+ *  ⚠️시각이 없는 옛 예약만 저장된 분(`minutesCount`), 그다음 옛 시간 수(`hoursCount`)로 물러선다. */
+export function bookingMinutes(b: { startTime?: string; endTime?: string; minutesCount?: number; hoursCount?: number }): number {
+  const byTime = b.startTime && b.endTime ? minutesBetween(b.startTime, b.endTime) : 0;
+  if (byTime > 0) return byTime;
+  if (b.minutesCount && b.minutesCount > 0) return b.minutesCount;
+  return b.hoursCount && b.hoursCount > 0 ? Math.round(b.hoursCount * 60) : 0;
+}
+
+/** 최소 대여 시간(시간 단위, 0.5 눈금)을 분으로. 저장값은 정수가 아니어도 되지만 비교는 분(정수)으로 한다. */
+export function minHoursToMinutes(minHours: number): number {
+  return Math.round((minHours > 0 ? minHours : 1) * 60);
 }
 
 /** 그 날짜에 호스트가 열어 둔 시간대. 같은 날 여러 칸이 있을 수 있다. */
@@ -57,16 +91,59 @@ export function fitsOpenSlot(slots: OpenSlot[], date: string, start: string, end
   });
 }
 
-/** 그 시간대를 1시간 눈금으로 쪼갠 «시작 가능 시각» 목록.
- *  ⭐끝나는 시각은 따로 계산한다 — 시작을 고르면 그때부터 남은 시간이 정해지기 때문이다. */
-export function hourMarks(slot: OpenSlot): string[] {
+/** 그 시간대를 30분 눈금으로 쪼갠 시각 목록(여는 시각부터 닫는 시각까지, 둘 다 포함).
+ *  신청 폼은 이 눈금을 한 줄로 깔고, 시작과 끝을 같은 줄에서 고른다(대표 09-19).
+ *  ⚠️눈금에서 벗어난 옛 칸(`10:15` 같은 것)은 눈금으로 «올려서» 시작한다. 여는 시각보다 앞을 팔지 않는다. */
+export function timeMarks(slot: OpenSlot): string[] {
   const a = toMinutes(slot.start);
   const b = toMinutes(slot.end);
   if (a < 0 || b < 0 || b <= a) return [];
   const out: string[] = [];
-  // 정시로 올려서 시작한다. 10:30에 연 가게는 11시부터 팔린다 — 30분 조각을 만들지 않기로 했다.
-  for (let t = Math.ceil(a / 60) * 60; t <= b; t += 60) out.push(toHHMM(t));
+  for (let t = Math.ceil(a / TIME_STEP_MIN) * TIME_STEP_MIN; t <= b; t += TIME_STEP_MIN) out.push(toHHMM(t));
   return out;
+}
+
+// ─── 🧭신청 폼의 시작·끝 고르기 (대표 09-19: 「시작 시간과 종료 시간을 골라 주세요」) ───
+//
+// ⭐폼은 그날의 눈금을 한 줄로 깔고, 시작을 누르면 그 시작에서 갈 수 있는 끝만 켠다. 아래 셋이 그 계산이다.
+//   서버의 관문(`validateBookingRequest`)과 같은 규칙을 쓴다 — 열린 칸 «하나» 안에 통째로 · 최소 시간 이상 ·
+//   이미 팔린 칸과 안 겹침 · 오늘이면 지금보다 뒤. 화면이 켠 칸은 서버도 받고, 화면이 끈 칸은 서버도 막는다.
+
+type TakenRange = { start: string; end: string };
+
+/** 그날 깔 눈금 — 열린 칸마다 30분 눈금을 펴고(`timeMarks`) 시각순으로 합친다. 같은 날 칸이 둘이면(오전·오후) 사이 시각은 안 깐다. */
+export function dayMarks(daySlots: OpenSlot[]): string[] {
+  return Array.from(new Set(daySlots.flatMap((sl) => timeMarks(sl)))).sort();
+}
+
+/** 한 시작에서 고를 수 있는 끝 눈금들(시각순). 없으면 빈 목록 — 그 시각은 시작으로도 못 고른다.
+ *  · 끝은 «시작을 품은 열린 칸»의 닫는 시각을 못 넘는다. 칸이 여럿 품으면 가장 늦게 닫는 칸까지.
+ *  · 시작 뒤에 이미 팔린 칸이 있으면 그 칸이 시작하는 시각까지만(맞닿는 건 된다 — 12~14 뒤에 14~16).
+ *  · 시작 자체가 팔린 칸 안이면 끝이 없다. */
+export function endChoices(daySlots: OpenSlot[], taken: TakenRange[], start: string, minMinutes: number): string[] {
+  const a = toMinutes(start);
+  if (a < 0 || a % TIME_STEP_MIN !== 0) return [];
+  let limit = -1;
+  for (const sl of daySlots) {
+    const sa = toMinutes(sl.start), sb = toMinutes(sl.end);
+    if (sa >= 0 && sb >= 0 && sa <= a && a < sb) limit = Math.max(limit, sb);
+  }
+  if (limit < 0) return [];
+  for (const b of taken) {
+    const bs = toMinutes(b.start), be = toMinutes(b.end);
+    if (bs < 0 || be < 0) continue;
+    if (bs <= a && a < be) return [];
+    if (bs > a && bs < limit) limit = bs;
+  }
+  const out: string[] = [];
+  for (let t = a + Math.max(minMinutes, TIME_STEP_MIN); t <= limit; t += TIME_STEP_MIN) out.push(toHHMM(t));
+  return out;
+}
+
+/** 시작으로 고를 수 있는 눈금들(시각순) — 끝이 하나라도 있는 시각만. `cutoff`(분)보다 이른 시각은 뺀다(오늘이면 지금).
+ *  ⚠️서버는 `시작 <= 지금`을 막는다. 그래서 같은 시각(`cutoff`와 같음)도 뺀다. */
+export function startChoices(daySlots: OpenSlot[], taken: TakenRange[], minMinutes: number, cutoff = -1): string[] {
+  return dayMarks(daySlots).filter((t) => toMinutes(t) > cutoff && endChoices(daySlots, taken, t, minMinutes).length > 0);
 }
 
 /** 두 구간이 겹치는가. 끝과 시작이 맞닿는 건 «안 겹침»이다(10~12와 12~14는 나란히 쓸 수 있다). */
@@ -77,10 +154,10 @@ export function overlaps(aStart: string, aEnd: string, bStart: string, bEnd: str
   return a1 < b2 && b1 < a2;
 }
 
-/** 화면에 쓰는 한 줄. "10:00~14:00 (4시간)" */
+/** 화면에 쓰는 한 줄. "10:00~14:00 (4시간)" · "10:30~13:00 (2시간 30분)" */
 export function rangeLabel(start: string, end: string): string {
-  const h = hoursBetween(start, end);
-  return h > 0 ? `${start}~${end} (${h % 1 === 0 ? h : h.toFixed(1)}시간)` : `${start}~${end}`;
+  const m = minutesBetween(start, end);
+  return m > 0 ? `${start}~${end} (${durationLabel(m)})` : `${start}~${end}`;
 }
 
 /** `2026-10-05` → `10월 5일 (월)`.
@@ -98,7 +175,7 @@ export function dateLabel(iso: string): string {
   return `${Number(m[2])}월 ${Number(m[3])}일 (${dow})`;
 }
 
-/** 예약 한 건의 「언제」 한 줄 — `10월 6일 (화) 13:00~15:00 (2시간)`.
+/** 예약 한 건의 「언제」 한 줄 — `10월 6일 (화) 13:00~15:30 (2시간 30분)`.
  *
  *  🩸**09-16까지 이 자리가 날짜만 말했다.** 시간 단위로 판매를 바꿔 놓고, 정작 사장님이 받는
  *    신청 목록과 메일에는 몇 시에 오는지가 없었다. 옛 `hours` 칸(자유 글)을 보고 있었는데

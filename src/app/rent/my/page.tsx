@@ -10,7 +10,7 @@ import { HostDecide, PauseToggle, PublishButton, RefundRequest } from "./Actions
 import { PayoutAccount } from "./PayoutAccount";
 import { getPayoutAccount, toMasked } from "@/lib/payout-accounts";
 import { ContactBlock } from "../ContactBlock";
-import { bookingFinished, bookingStarted, dateLabel, hoursBetween, kstDaysUntil } from "@/lib/rent-time";
+import { bookingFinished, bookingStarted, dateLabel, durationLabel, minutesBetween, kstDaysUntil } from "@/lib/rent-time";
 import type { SpaceBooking } from "@/lib/types";
 import { ClearQuery } from "./ClearQuery";
 import { PlanQuote } from "./PlanQuote";
@@ -762,7 +762,8 @@ function RequestHead({
   refundPending: boolean;
 }) {
   const day = dayTag(b, tone);
-  const hours = b.startTime && b.endTime ? hoursBetween(b.startTime, b.endTime) : 0;
+  // ⏱09-19 길이는 분으로 세고 「2시간 30분」으로 적는다(30분 단위, `durationLabel` 한 벌).
+  const minutes = b.startTime && b.endTime ? minutesBetween(b.startTime, b.endTime) : 0;
   // ☕🩸09-16까지 사장님 쪽엔 커피챗 표시가 없었다. 손님 화면 네 곳엔 「커피챗 포함」이 뜨는데
   //   정작 커피챗을 해 줄 사람이 모르는 상태였다. 옛 예약은 옛 칸에만 값이 있어 둘 다 본다.
   const chat = b.amountChat > 0 || b.amountMentor > 0;
@@ -798,9 +799,9 @@ function RequestHead({
               <span className="whitespace-nowrap">
                 {b.startTime}~{b.endTime}
               </span>
-              {hours > 0 && (
+              {minutes > 0 && (
                 <span className="ml-1.5 whitespace-nowrap text-[15px] font-normal text-mute">
-                  {hours % 1 === 0 ? hours : hours.toFixed(1)}시간
+                  {durationLabel(minutes)}
                 </span>
               )}
             </>

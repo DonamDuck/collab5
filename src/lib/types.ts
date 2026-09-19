@@ -502,9 +502,10 @@ export interface Space {
    *  공간 전체만 켜졌으면 `with_gear`, 아니면 `space_only`(`rent-products`의 `compatScopePrice`). */
   scope: SpaceScope;
 
-  /** ⏱시간당 값. 눈금은 1시간이다 — 30분은 가게가 그렇게 생각하지 않고 달력·요금·겹침이 두 배가 된다.
-   *  ⭐그 대신 `minHours`가 있어서 「두 시간부터」 같은 규칙이 30분의 필요를 덮는다. */
+  /** ⏱시간당 값. 🔁09-19 눈금이 30분이 됐다(대표) — 값은 시간당으로 적고 30분 단위로 나눠 받는다(`priceForMinutes`). */
   priceHour: number;
+  /** 최소 대여 시간(시간). 🔁09-19부터 30분 눈금이라 `1.5`가 올 수 있다. 비교는 분으로 한다(`minHoursToMinutes`),
+   *  보일 땐 `durationLabel`로 적는다(「1시간 30분」). DB는 `min_minutes`(09-19 SQL)가 있으면 그걸, 없으면 옛 `min_hours`를 읽는다. */
   minHours: number;
 
   /** 🛍사장님이 파는 공간 상품 둘(대표 09-18: 「대관만, 공간 전체(대관·시설), 커피챗 이렇게 3개 상품」).
@@ -639,9 +640,13 @@ export interface SpaceBooking {
   /** `HH:MM`. 시간 단위 전환(09-16)으로 생긴 칸 — 하루 통째가 아니라 「오후 세 시간」을 판다. */
   startTime: string;
   endTime: string;
-  /** 끝 − 시작(시간). ⭐**금액의 근거를 행에 박아 둔다** — 나중에 공간의 시간당 값이 바뀌어도
-   *  이 거래가 얼마짜리였는지는 이 숫자와 `amountSpace`로 되짚을 수 있다(`feeRate`를 박아 두는 것과 같은 이유). */
+  /** ⚠️옛 칸 — 끝 − 시작(«꽉 찬» 시간, 정수). 09-19에 30분 단위가 되면서 반 시간을 못 담아 `minutesCount`로 넘어갔다.
+   *  DB 칸(`hours_count integer`)이 남아 있어 저장 때 내림 값을 같이 적는다. 새 코드는 읽지 않는다. */
   hoursCount: number;
+  /** 끝 − 시작(분). ⭐**금액의 근거를 행에 박아 둔다** — 나중에 공간의 시간당 값이 바뀌어도
+   *  이 거래가 얼마짜리였는지는 이 숫자와 `amountSpace`로 되짚을 수 있다(`feeRate`를 박아 두는 것과 같은 이유).
+   *  🔁09-19 신설(`2026-09-19-rent-half-hour.sql`). 칸이 없는 DB에선 시작·끝 시각의 차이로 채워 읽는다. */
+  minutesCount: number;
   /** 🛍고른 공간 상품(09-18). 옛 예약은 SQL이 그 공간의 옛 범위로 채웠다. `amountSpace`는 이 상품 값 × 시간이다. */
   product: RentProduct;
   /** ⭐게스트가 쓴 「그날 무엇을 할 건지」. 호스트가 수락을 결정하는 근거이자,

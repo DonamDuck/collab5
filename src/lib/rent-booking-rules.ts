@@ -7,7 +7,7 @@
 //   이용 시각이 이미 지났어도 승인이 그대로 나갔다. 이틀 전 신청이 결제되는 화면을 QA가 실제로 열었다(G-01).
 // ⭐그래서 승인은 «부르기 전에» 공간을 다시 읽어 이 함수를 돌린다. 걸리면 토스를 아예 안 부른다 — 돈이 안 움직인다.
 import type { RentProduct, Space, SpaceBooking } from "./types";
-import { bookingStarted, fitsOpenSlot, hoursBetween, isHourMark, overlaps, toMinutes } from "./rent-time";
+import { bookingStarted, durationLabel, fitsOpenSlot, isTimeMark, minHoursToMinutes, minutesBetween, overlaps, toMinutes } from "./rent-time";
 import { isRentProduct, productPrice } from "./rent-products";
 import { CAPACITY_MAX } from "./rent-limits";
 
@@ -27,7 +27,8 @@ export type BookingRuleCode =
   | "headcount";    // 인원이 1명~정원 밖이다
 
 export type BookingRuleResult =
-  | { ok: true; hours: number }
+  /** 🔁09-19 길이는 «분»으로 돌려준다(30분 단위). 금액(`bookingAmount`)도 분을 받는다. */
+  | { ok: true; minutes: number }
   | { ok: false; code: BookingRuleCode; message: string };
 
 /** 검사에 필요한 만큼의 신청서. 신청 폼이 보낸 값과 이미 저장된 예약 행이 같은 모양으로 들어온다. */
@@ -84,18 +85,20 @@ export function validateBookingRequest(
   }
   // ⏳지난 «날». 화면도 거르지만(`futureSlots`) 관문은 여기다 — 열어 둔 날이 지나도 주소를 그대로 들고 오는 길이 있다.
   if (req.useDate < today) return { ok: false, code: "started", message: "지난 날짜는 신청할 수 없어요." };
-  // ⏱정시만(눈금 1시간, 대표 09-16). 액션을 직접 부르면 10:30~12:00처럼 한 시간 반이 팔렸다(09-18 밤 QA SEC-08).
-  if (!isHourMark(req.startTime) || !isHourMark(req.endTime)) {
-    return { ok: false, code: "bad-time", message: "시작과 끝 시각은 정시로만 고를 수 있어요. 새로고침하고 다시 골라 주세요." };
+  // ⏱30분 눈금(대표 09-19). 🔁09-18 밤 QA(SEC-08)엔 정시만 받게 막았다가 대표 결정으로 되돌렸다.
+  //   24시 넘김(`24:30`)과 눈금 밖(`10:15`)은 여전히 여기서 걸린다.
+  if (!isTimeMark(req.startTime) || !isTimeMark(req.endTime)) {
+    return { ok: false, code: "bad-time", message: "시작과 끝 시각은 30분 단위로 골라 주세요. 새로고침하고 다시 골라 주세요." };
   }
-  const hours = hoursBetween(req.startTime, req.endTime);
-  if (hours <= 0) return { ok: false, code: "bad-time", message: "끝나는 시각이 시작보다 늦어야 해요." };
+  const minutes = minutesBetween(req.startTime, req.endTime);
+  if (minutes <= 0) return { ok: false, code: "bad-time", message: "끝나는 시각이 시작보다 늦어야 해요." };
   // ⚠️지난 «시각» 검사는 모양 검사 «뒤»다. 앞에 두면 못 읽은 시각(`-1`)이 「이미 지났다」로 잡힌다.
   if (req.useDate === today && toMinutes(req.startTime) <= toMinutes(hhmm)) {
     return { ok: false, code: "started", message: "이미 지난 시간이에요. 다른 시간을 골라 주세요." };
   }
-  if (hours < space.minHours) {
-    return { ok: false, code: "too-short", message: `이 공간은 최소 ${space.minHours}시간부터 빌릴 수 있어요.` };
+  const minMinutes = minHoursToMinutes(space.minHours);
+  if (minutes < minMinutes) {
+    return { ok: false, code: "too-short", message: `이 공간은 최소 ${durationLabel(minMinutes)}부터 빌릴 수 있어요.` };
   }
   if (!fitsOpenSlot(space.openSlots, req.useDate, req.startTime, req.endTime)) {
     return { ok: false, code: "outside-slot", message: "사장님이 열어 두신 시간 안에서 골라 주세요." };
@@ -112,7 +115,7 @@ export function validateBookingRequest(
   if (taken.some((b) => overlaps(b.startTime, b.endTime, req.startTime, req.endTime))) {
     return { ok: false, code: "taken", message: "그 시간은 이미 찼어요. 다른 시간을 골라 주세요." };
   }
-  return { ok: true, hours };
+  return { ok: true, minutes };
 }
 
 /** 결제 시간이 얼마나 남았나(밀리초). 음수면 지났다. 기준은 신청을 시작한 시각(`createdAt`)이다. */
