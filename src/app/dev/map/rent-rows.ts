@@ -36,7 +36,7 @@ export const RENT_GROUPS: Group[] = [
           // 🔑09-19 대표 [G] — 로그인 전에도 폼과 결제 바가 떠요. 바 버튼은 「로그인하고 신청하기」.
           { desc: "같은 공간을 로그인 안 하고 볼 때 · 폼을 고를 수 있고 바 버튼은 「로그인하고 신청하기」", c: "anon", to: `/rent/${S.full}` },
           { desc: "로그인하고 돌아온 자리(`?resume=1`) · 같은 탭에서 위 줄로 고르고 바를 누른 다음 이 줄을 열면 고른 값이 되살아나고 확인 팝업이 떠요. 맡긴 값이 없으면 빈 폼이에요", c: "guest-full", to: `/rent/${S.full}?resume=1` },
-          { desc: "30분 단위 공간 · 최소 1시간 30분 · 모레는 09:30~12:00 자투리, 사흘 뒤는 13:00~15:30과 16:30~18:00이 찼어요 (시작을 누르면 끝으로 고를 수 있는 칸만 켜져요)", c: "guest-full", to: `/rent/${S.halfHour}` },
+          { desc: "30분 단위 공간 · 최소 1시간 30분 · 모레는 09:30~12:00 자투리, 사흘 뒤는 13:00~15:30과 16:30~18:00이 찼어요 (시작을 누르면 끝으로 고를 수 있는 칸만 켜져요) · 무료 커피챗 30분 (확인 팝업에 「무료」)", c: "guest-full", to: `/rent/${S.halfHour}` },
           { desc: "열린 시간이 없는 공간 · 공간 전체 하나만 팜", c: "guest-full", to: `/rent/${S.noSlots}` },
           { desc: "커피챗·소개서 없는 공간 · 대관만 하나만 팜 (신청 폼에 고르기 없이 한 줄)", c: "guest-full", to: `/rent/${S.other}` },
           { desc: "긴 글 (사진 10장 · 폼 최대, 유의 사항 12줄, 주제 8줄)", c: "stress-guest", to: `/rent/${S.stress}` },
@@ -111,7 +111,7 @@ export const RENT_GROUPS: Group[] = [
           { desc: "결제 완료, 공간 전체, 이용일 전, 커피챗 담음, 사장님 연락처 열림", c: "guest-full", to: `/rent/done/${B.paid}` },
           { desc: "확정된 예약, 이용일 전, 사장님 말씀 있음", c: "guest-full", to: `/rent/done/${B.confirmed}` },
           { desc: "확정된 예약, 커피챗·소개서 없는 공간", c: "guest-full", to: `/rent/done/${B.confirmedOther}` },
-          { desc: "30분 단위 · 결제 완료 13:00~15:30 (2시간 30분)", c: "guest-full", to: `/rent/done/${B.halfPaid}` },
+          { desc: "30분 단위 · 결제 완료 13:00~15:30 (2시간 30분) · 무료 커피챗 담음", c: "guest-full", to: `/rent/done/${B.halfPaid}` },
           { desc: "다녀온 예약 (연락처 가림)", c: "guest-full", to: `/rent/done/${B.done}` },
           { desc: "사장님 거절, 환불이 아직 안 끝남", c: "guest-full", to: `/rent/done/${B.rejected}` },
           { desc: "사장님 거절 뒤 환불 완료", c: "guest-full", to: `/rent/done/${B.refunded}` },

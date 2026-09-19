@@ -8,7 +8,7 @@
 // ⭐그래서 승인은 «부르기 전에» 공간을 다시 읽어 이 함수를 돌린다. 걸리면 토스를 아예 안 부른다 — 돈이 안 움직인다.
 import type { RentProduct, Space, SpaceBooking } from "./types";
 import { bookingStarted, durationLabel, fitsOpenSlot, isTimeMark, minHoursToMinutes, minutesBetween, overlaps, toMinutes } from "./rent-time";
-import { isRentProduct, productPrice } from "./rent-products";
+import { bookingHasChat, isRentProduct, productPrice } from "./rent-products";
 import { CAPACITY_MAX } from "./rent-limits";
 import { bizOnFile } from "./bizcheck";
 
@@ -51,11 +51,12 @@ export type BookingRuleSpace = Pick<
 >;
 
 /** 이미 저장된 예약 행을 신청서 모양으로. 승인·결제 화면이 쓴다. */
-export function bookingRequestOf(b: Pick<SpaceBooking, "useDate" | "startTime" | "endTime" | "product" | "amountChat" | "amountMentor" | "headcount">): BookingRequest {
+export function bookingRequestOf(b: Pick<SpaceBooking, "useDate" | "startTime" | "endTime" | "product" | "withChat" | "amountChat" | "amountMentor" | "headcount">): BookingRequest {
   return {
     useDate: b.useDate, startTime: b.startTime, endTime: b.endTime, product: b.product,
     // ☕옛 칸(`amountMentor`)도 커피챗으로 읽는다. 값이 붙어 있으면 산 것이다.
-    withChat: (b.amountChat || b.amountMentor) > 0,
+    //   🔁09-19 무료 커피챗은 값이 0이라 `withChat`을 같이 본다(`bookingHasChat`).
+    withChat: bookingHasChat(b),
     headcount: b.headcount,
   };
 }
@@ -87,7 +88,8 @@ export function validateBookingRequest(
   if (!isRentProduct(req.product) || productPrice(space, req.product) <= 0) {
     return { ok: false, code: "product-off", message: "이 공간에서 팔지 않는 상품이에요. 새로고침하고 다시 골라 주세요." };
   }
-  if (req.withChat && !(space.coffeeChat && space.coffeeChatPrice > 0)) {
+  // 🔁09-19 대표 #93 — 무료 커피챗(값 0)도 켜진 커피챗이다. 값이 아니라 켜짐으로 본다.
+  if (req.withChat && !space.coffeeChat) {
     return { ok: false, code: "chat-off", message: "지금은 커피챗을 받지 않는 공간이에요. 새로고침하고 다시 골라 주세요." };
   }
   // ⏳지난 «날». 화면도 거르지만(`futureSlots`) 관문은 여기다 — 열어 둔 날이 지나도 주소를 그대로 들고 오는 길이 있다.
@@ -144,7 +146,7 @@ export function payWindowOver(createdAt: string, now: Date = new Date()): boolea
 export type PendingProblem = { code: "expired" | BookingRuleCode; message: string };
 
 export function pendingBookingProblem(
-  booking: Pick<SpaceBooking, "useDate" | "startTime" | "endTime" | "product" | "amountChat" | "amountMentor" | "headcount" | "createdAt">,
+  booking: Pick<SpaceBooking, "useDate" | "startTime" | "endTime" | "product" | "withChat" | "amountChat" | "amountMentor" | "headcount" | "createdAt">,
   space: BookingRuleSpace | null,
   taken: Pick<SpaceBooking, "startTime" | "endTime">[],
   now: Date = new Date(),

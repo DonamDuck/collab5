@@ -146,6 +146,8 @@ export interface SpaceFormInput {
   /** 🔁매주 계속 여는 요일(09-17). `openSlots`에 펼친 날짜가 섞여 와도 된다 — 저장(`saveSpace`)이 도로 뺀다. */
   repeatWeekly: Space["repeatWeekly"];
   coffeeChat: boolean; coffeeChatMinutes: number; coffeeChatPrice: number; coffeeChatTopics: string;
+  /** ☕무료 커피챗(대표 09-19 #93). 켜면 값은 0으로 저장된다(칸을 따로 두지 않고 «켜짐 + 0원» = 무료). */
+  coffeeChatFree?: boolean;
   accessHow: AccessHow; contactPhone: string;
   /** 📜호스트 약관 동의. 화면의 체크 하나지만 계약의 근거라 서버가 다시 본다. */
   hostTermsOk: boolean;
@@ -211,8 +213,10 @@ export async function saveSpaceAction(input: SpaceFormInput): Promise<ActionResu
   const minMinutes = minHoursToMinutes(input.minHours);
   const minLabel = durationLabel(minMinutes);
   // ☕09-18 밤 QA(H-36) — 켠 커피챗은 값과 길이가 있어야 한다. 값 0원짜리 커피챗이 상품으로 서 있었다.
+  //   🔁09-19 대표 #93 — 「무료로 제공할게요」를 고른 커피챗만 0원을 받는다. 무료를 안 골랐는데 0원이면 여전히 막는다(값을 빠뜨린 것).
+  const chatFree = input.coffeeChat && input.coffeeChatFree === true;
   if (input.coffeeChat) {
-    if (!(input.coffeeChatPrice > 0)) return { ok: false, message: "커피챗을 켜셨으면 얼마인지 적어 주세요." };
+    if (!chatFree && !(input.coffeeChatPrice > 0)) return { ok: false, message: "커피챗을 켜셨으면 얼마인지 적어 주세요. 무료로 하시려면 「무료로 제공할게요」를 눌러 주세요." };
     if (input.coffeeChatPrice > COFFEE_CHAT_PRICE_MAX) {
       return { ok: false, message: `커피챗 값은 ${COFFEE_CHAT_PRICE_MAX.toLocaleString()}원까지 받을 수 있어요.` };
     }
@@ -480,7 +484,8 @@ export async function saveSpaceAction(input: SpaceFormInput): Promise<ActionResu
     repeatWeekly: repeat.map((r) => ({ dow: r.dow, start: r.start, end: r.end, ...(r.skip?.length ? { skip: r.skip } : {}) })),
     coffeeChat: input.coffeeChat,
     coffeeChatMinutes: input.coffeeChat ? input.coffeeChatMinutes : 0,
-    coffeeChatPrice: input.coffeeChat ? input.coffeeChatPrice : 0,
+    // ☕무료면 화면이 무엇을 보내 왔든 0원(09-19 #93).
+    coffeeChatPrice: input.coffeeChat && !chatFree ? input.coffeeChatPrice : 0,
     coffeeChatTopics: input.coffeeChat ? input.coffeeChatTopics.trim() : "",
     accessHow: input.accessHow, contactPhone: input.contactPhone.trim(),
     hostTermsAt: prev?.hostTermsAt ?? new Date().toISOString(),
@@ -781,7 +786,9 @@ export async function startBookingAction(input: BookingFormInput): Promise<Start
     spaceId: sp.id, guestUserId: uid, guestBrandSlug, guestPhone: input.guestPhone.trim(), guestName,
     useDate: input.useDate, hours: `${input.startTime}~${input.endTime}`, plan: input.plan.trim(),
     startTime: input.startTime, endTime: input.endTime, minutesCount: minutes, product: input.product,
-    headcount: input.headcount, withChat: amountChat > 0, amountChat,
+    // ☕🔁09-19 대표 #93 — 무료 커피챗은 값이 0이라 «금액 > 0»으로 가르면 안 산 것이 된다. 사장님이 켠 커피챗을 손님이 골랐는가로 본다.
+    //   (`validateBookingRequest`가 위에서 «꺼진 커피챗을 골랐다»를 이미 막았다.)
+    headcount: input.headcount, withChat: !!input.withChat && sp.coffeeChat, amountChat,
     withMentor: false, amountMentor: 0,
     amountSpace, amountTotal,
     paymentKey: "", orderId,

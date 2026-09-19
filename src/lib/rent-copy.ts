@@ -154,6 +154,8 @@ export const PRODUCT_LABEL = { space: "대관만", full: "공간 전체" } as co
  *  ⚠️손님 화면·메일·정산은 위 `PRODUCT_LABEL`을 그대로 쓴다. 거기도 바꿀지는 대표 판단이라 따로 뒀다. */
 export const PRODUCT_LABEL_HOST = { space: PRODUCT_LABEL.space, full: "공간 전체(시설 및 공간)" } as const;
 export const COFFEE_CHAT_LABEL = "커피챗";
+/** ☕무료 커피챗의 값 자리 글자(대표 09-19 #93). 「0원」 대신 이 말로 적는다 — 0원은 값을 안 적은 것처럼 읽힌다. */
+export const COFFEE_CHAT_FREE = "무료";
 
 /** 이름 밑에 붙는 짧은 한 줄. 손님은 «내가 무엇을 쓰나», 사장님은 «내가 무엇을 내주나»로 읽는다. */
 export const PRODUCT_HINT_GUEST = {

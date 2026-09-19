@@ -20,11 +20,12 @@ import { KAKAO_CHAT_URL, SITE_URL } from "./site";
 import { bookingWhen, dateLabel } from "./rent-time";
 import {
   accessMeetLine, hostContactLine, withJosa, BROKER_NOTE, CONTACT_RULE_GUEST, CONTACT_RULE_GUEST_CONFIRMED, CONTACT_RULE_HOST,
-  BOOKING_HEADLINE, COFFEE_CHAT_WHEN_GUEST, COFFEE_CHAT_WHEN_HOST, HOST_REQUEST_STEPS,
+  BOOKING_HEADLINE, COFFEE_CHAT_FREE, COFFEE_CHAT_WHEN_GUEST, COFFEE_CHAT_WHEN_HOST, HOST_REQUEST_STEPS,
   PRODUCT_HINT_GUEST, PRODUCT_LABEL, REFUND_TIMING_LINE,
 } from "./rent-copy";
 import type { Space, SpaceBooking } from "./types";
 import { bizOnFile } from "./bizcheck";
+import { bookingHasChat } from "./rent-products";
 import type { ReviewWhy } from "./rent-review";
 import type { Profile } from "./profiles";
 
@@ -307,9 +308,10 @@ function sendMail(m: Mail): Promise<MailResult> {
   return send(m.to, m.subject, m.html, m.text);
 }
 
-/** 커피챗을 같이 샀는가. 새 칸(`amountChat`)과 옛 칸(`amountMentor`) 둘 중 하나라도 돈이 있으면 샀다. */
+/** 커피챗을 같이 샀는가. 새 칸(`amountChat`)과 옛 칸(`amountMentor`) 둘 중 하나라도 돈이 있으면 샀다.
+ *  🔁09-19 무료 커피챗은 값이 0이라 `withChat`까지 보는 한 벌(`bookingHasChat`)로 옮겼다. */
 function boughtChat(b: SpaceBooking): boolean {
-  return b.amountChat > 0 || b.amountMentor > 0;
+  return bookingHasChat(b);
 }
 
 /** ☕커피챗 칸 — 손님 메일 셋(결제·확정·전날)과 사장님 메일 셋(요청·수락·전날)이 같은 모양이다.
@@ -317,7 +319,9 @@ function boughtChat(b: SpaceBooking): boolean {
  *  🩸09-18 전엔 확정 메일(손님)에 이 칸이 없었고, 전날 메일 둘은 «샀다»는 말 없이 시간 문장만 있었다. */
 function chatRow(b: SpaceBooking, forHost: boolean): [string, string] {
   if (!boughtChat(b)) return [LABEL.chat, ""];
-  return [LABEL.chat, forHost ? `손님이 커피챗도 함께 골랐어요. ${COFFEE_CHAT_WHEN_HOST}` : `커피챗도 함께 예약하셨어요. ${COFFEE_CHAT_WHEN_GUEST}`];
+  // ☕09-19 무료 커피챗 — 값이 0이면 「무료」를 붙인다. 사장님은 돈을 안 받는 약속인지 여기서 알아야 하고, 손님은 결제액에 커피챗이 없는 이유를 안다.
+  const free = !(b.amountChat > 0 || b.amountMentor > 0) ? `${COFFEE_CHAT_FREE} ` : "";
+  return [LABEL.chat, forHost ? `손님이 ${free}커피챗도 함께 골랐어요. ${COFFEE_CHAT_WHEN_HOST}` : `${free}커피챗도 함께 예약하셨어요. ${COFFEE_CHAT_WHEN_GUEST}`];
 }
 
 /** 🛍고른 상품 한 줄(09-18) — 「공간 전체 · 자리에 시설과 장비까지 같이 써요」.

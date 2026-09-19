@@ -8,6 +8,7 @@ import { ContactBlock } from "../../ContactBlock";
 import { KAKAO_CHAT_URL } from "@/lib/site";
 import { bookingFinished, bookingStarted } from "@/lib/rent-time";
 import { BOOKING_HEADLINE, COFFEE_CHAT_WHEN_GUEST, CONTACT_RULE_GUEST, CONTACT_RULE_GUEST_DONE, PRODUCT_LABEL, REFUND_TIMING_LINE } from "@/lib/rent-copy";
+import { bookingHasChat } from "@/lib/rent-products";
 import type { BookingStatus } from "@/lib/types";
 import { GuestCancel } from "../../my/Actions";
 import { bookingWhen, InfoPanel, InfoRow, primaryBtnCls, secondaryBtnCls, won } from "../../ui";
@@ -73,7 +74,8 @@ export default async function RentDonePage({ params }: { params: Promise<{ booki
   const title = TITLE[b.status];
   const emoji = b.status === "paid" ? "✨" : b.status === "confirmed" ? "🎉" : "";
   const spaceName = brief?.name ?? "공간";
-  const withChat = b.amountChat > 0 || b.amountMentor > 0;
+  // ☕09-19 무료 커피챗(값 0)까지 보는 한 벌.
+  const withChat = bookingHasChat(b);
   // 💸09-17 QA — 만료된 신청에도 「결제 금액 80,000원」이 서서 「내가 8만원을 냈나?」로 읽혔다.
   //   돈 줄은 상태가 정한다: 안 냈으면 «낸 돈 없음», 돌려준 게 있으면 «돌려드린 돈». 돌려준 돈은 토스가 알려 준
   //   남은 돈(`balanceAmount`)에서 거꾸로 낸다 — 우리가 비율로 다시 계산하지 않는다.

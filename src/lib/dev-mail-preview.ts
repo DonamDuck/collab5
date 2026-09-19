@@ -126,6 +126,8 @@ export function buildPreviewMail(kind: string): PreviewMail | null {
     case "stress-paid-host": { const x = pick(buildWorld("stress"), B.stressPaid); return buildBookingPaid(x.b, x.sp, x.host, x.guest, x.brand); }
     // ⏱09-19 30분 단위 예약 — 메일의 「언제」 줄(`bookingWhen`)이 「2시간 30분」으로 서는지 본다.
     case "paid-host-halfhour": { const x = pick(full, B.halfPaid); return buildBookingPaid(x.b, x.sp, x.host, x.guest, x.brand); }
+    // ☕09-19 무료 커피챗(대표 #93) — 같은 예약을 손님 쪽 메일로. 커피챗 칸이 「무료 커피챗도 함께 예약하셨어요」로 서는지 본다.
+    case "paid-guest-freechat": { const x = pick(full, B.halfPaid); return buildBookingPaidToGuest(x.b, x.sp, x.host, x.guest); }
     case "confirmed-guest-halfhour": { const x = pick(full, B.halfConfirmed); return buildBookingConfirmed(x.b, x.sp, x.host, x.guest); }
     // 가입 알림은 받는 사람이 운영자 한 명이라 `to`를 비워 둔다(실제로는 슬랙, 없으면 `ADMIN_EMAIL`).
     case "signup-email": return admin(buildSignupNotice({ userId: 9001, brandName: "느린오후", email: "slow.afternoon@example.com", origin: "email" }));

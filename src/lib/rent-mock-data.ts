@@ -494,6 +494,9 @@ function fullWorld(today: string, withAccount: boolean): MockWorld {
     bizCheckDetail: { valid: "01", bSttCd: "01", bStt: "계속사업자", taxType: "부가가치세 일반과세자" },
     rentSpaceOn: true, rentSpacePrice: 15500,
     rentSpaceNote: "노트북 작업·작은 스터디·사진 촬영 자리로 써요. 긴 테이블과 의자 여섯 개를 써요.",
+    // ☕09-19 무료 커피챗(대표 #93) — 켜져 있고 값이 0이다. 상세·신청 폼·결제·메일이 「무료」로 서는지 이 공간으로 본다.
+    coffeeChat: true, coffeeChatMinutes: 30, coffeeChatPrice: 0,
+    coffeeChatTopics: "손님이 몰리는 시간과 한가한 시간\n1층 창가를 빌려주면서 생긴 일",
     repeatWeekly: [{ dow: 4, start: "11:30", end: "20:30" }],
     direct: [
       { date: d(2), start: "09:30", end: "12:00" },
@@ -571,7 +574,8 @@ function fullWorld(today: string, withAccount: boolean): MockWorld {
     payoutFailed: booking({ id: 90018, spaceId: s6.id, guestUserId: U.guest2, status: "done", useDate: d(-15), startTime: "18:00", endTime: "22:00", plan: "동네 모임을 했어요.", headcount: 10, guestPhone: "010-5678-9012", guestName: "정다온", ...P6 }, today),
     payoutWaiting2: booking({ id: 90019, spaceId: s6.id, guestUserId: U.guest, status: "done", useDate: d(-9), startTime: "17:00", endTime: "19:00", plan: "두 시간 짧게 촬영했어요.", ...P6 }, today),
     // ⏱09-19 30분 단위 예약 둘 — 2시간 30분(결제 완료)과 최소 1시간 30분(확정).
-    halfPaid: booking({ id: 90021, spaceId: s9.id, guestUserId: U.guest, status: "paid", useDate: d(3), startTime: "13:00", endTime: "15:30", plan: "스터디 모임 다섯 명이 두 시간 반 동안 발표 연습을 해요.", headcount: 5, guestPhone: "010-3456-7890", guestName: "한서윤", guestBrandSlug: "mock-flour-diary", ...P9 }, today),
+    // ☕무료 커피챗을 담은 예약(09-19) — 값은 공간 값뿐이고 `withChat`만 켜져 있다.
+    halfPaid: booking({ id: 90021, spaceId: s9.id, guestUserId: U.guest, status: "paid", useDate: d(3), startTime: "13:00", endTime: "15:30", plan: "스터디 모임 다섯 명이 두 시간 반 동안 발표 연습을 해요.", withChat: true, headcount: 5, guestPhone: "010-3456-7890", guestName: "한서윤", guestBrandSlug: "mock-flour-diary", ...P9 }, today),
     halfConfirmed: booking({ id: 90022, spaceId: s9.id, guestUserId: U.guest, status: "confirmed", useDate: d(3), startTime: "16:30", endTime: "18:00", plan: "새로 구운 빵 사진을 창가 빛에서 찍으려고 해요.", headcount: 2, guestPhone: "010-3456-7890", guestName: "한서윤", decidedAt: `${d(-1)}T05:00:00.000Z`, ...P9 }, today),
     // 🚪사업자 번호가 빈 공간(S10)에 잡아 둔 확정 예약 — 이 손님에겐 상세가 계속 열려 있어야 한다.
     noBizConfirmed: booking({ id: 90023, spaceId: s10.id, guestUserId: U.guest, status: "confirmed", useDate: d(5), startTime: "14:00", endTime: "16:00", plan: "필름 카메라 모임 사진을 찍으려고 해요. 두 시간이면 돼요.", headcount: 4, guestPhone: "010-3456-7890", guestName: "한서윤", decidedAt: `${d(-1)}T05:00:00.000Z`, ...P10 }, today),
@@ -818,6 +822,7 @@ export const MOCK_MAIL_KINDS: { kind: string; label: string }[] = [
   { kind: "remind-host", label: "이용 전날 → 사장님 · 수락한 예약" },
   { kind: "remind-host-unaccepted", label: "이용 전날 → 사장님 · 아직 수락 전" },
   { kind: "stress-paid-host", label: "긴 글 · 결제 완료 → 사장님" },
-  { kind: "paid-host-halfhour", label: "30분 단위 · 결제 완료 → 사장님 (13:00~15:30, 2시간 30분)" },
+  { kind: "paid-host-halfhour", label: "30분 단위 · 결제 완료 → 사장님 (13:00~15:30, 2시간 30분, 무료 커피챗)" },
+  { kind: "paid-guest-freechat", label: "무료 커피챗 · 결제 완료 → 손님 (결제액은 공간 값뿐)" },
   { kind: "confirmed-guest-halfhour", label: "30분 단위 · 수락 → 손님 (16:30~18:00, 1시간 30분)" },
 ];

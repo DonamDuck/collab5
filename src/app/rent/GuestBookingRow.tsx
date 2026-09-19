@@ -15,6 +15,7 @@ import { repo } from "@/lib/repo";
 import type { Space, SpaceBooking } from "@/lib/types";
 import { bookingFinished, bookingStarted, dateLabel, rangeLabel } from "@/lib/rent-time";
 import { PRODUCT_LABEL, telHref } from "@/lib/rent-copy";
+import { bookingHasChat } from "@/lib/rent-products";
 import { GuestCancel } from "./my/Actions";
 import { BookingBadge, CoverPlaceholder, InfoList, InfoRow, ListRow, bookingWhen, won } from "./ui";
 
@@ -176,7 +177,8 @@ export function GuestBookingRow({ view }: { view: GuestBookingView }) {
             <p className="mt-1 text-[15px] text-ink">
               {/* 📐09-18 밤 QA(G-27) — 375에서 「150,000 / 원」처럼 «원»만 다음 줄로 떨어졌다. 금액은 한 덩어리다. */}
               <span className="whitespace-nowrap font-semibold tabular-nums">{won(b.amountTotal)}</span>
-              {(b.amountChat > 0 || b.amountMentor > 0) && <span className="whitespace-nowrap text-mute"> · 커피챗 포함</span>}
+              {/* ☕09-19 무료 커피챗(값 0)도 「포함」이다 — `bookingHasChat` 한 벌로 본다. */}
+              {bookingHasChat(b) && <span className="whitespace-nowrap text-mute"> · 커피챗 포함</span>}
             </p>
           </div>
         </div>

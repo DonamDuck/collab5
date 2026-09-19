@@ -8,7 +8,8 @@ import { bookingMinutes, durationLabel, kstDaysUntil } from "@/lib/rent-time";
 import { payWindowLeftMs, pendingBookingProblem } from "@/lib/rent-booking-rules";
 import { spaceListed } from "@/lib/bizcheck";
 import { bookingWhen, dateLabel, secondaryBtnCls, won } from "../../ui";
-import { COFFEE_CHAT_LABEL, PRODUCT_LABEL } from "@/lib/rent-copy";
+import { COFFEE_CHAT_FREE, COFFEE_CHAT_LABEL, PRODUCT_LABEL } from "@/lib/rent-copy";
+import { bookingHasChat } from "@/lib/rent-products";
 import { PayPanel } from "./PayPanel";
 
 // 하루 가게 — 결제 화면 (2026-09-15)
@@ -112,13 +113,15 @@ export default async function RentPayPage({ params }: { params: Promise<{ orderI
   // 💸09-17 QA — 금액 내역. 합계만 있으면 「왜 이 값인가」를 손님이 셈한다. 커피챗 분은 공간의 지금 값이다
   //   (예약 행엔 분이 안 남는다). ☕`amountMentor`는 옛 칸 — 둘 다 본다.
   const chat = b.amountChat || b.amountMentor;
-  const chatMinutes = chat > 0 ? space?.coffeeChatMinutes ?? 0 : 0;
+  // ☕09-19 무료 커피챗 — 값이 0이어도 고른 커피챗이다(`bookingHasChat`). 내역에 「무료」로 싣는다.
+  const hasChat = bookingHasChat(b);
+  const chatMinutes = hasChat ? space?.coffeeChatMinutes ?? 0 : 0;
   // ⏱09-19 길이는 「2시간 30분」 한 벌(`durationLabel`). 옛 `hoursCount`는 반 시간을 못 담아 안 읽는다.
   const lengthLabel = durationLabel(bookingMinutes(b));
   const breakdown = [
     // 🛍09-18 「대여」 → 고른 상품 이름. 확인 팝업 내역과 같은 말이다.
     b.amountSpace > 0 ? `${PRODUCT_LABEL[b.product]} ${lengthLabel ? `${lengthLabel} ` : ""}${won(b.amountSpace)}` : "",
-    chat > 0 ? `${COFFEE_CHAT_LABEL} ${chatMinutes > 0 ? `${chatMinutes}분 ` : ""}${won(chat)}` : "",
+    hasChat ? `${COFFEE_CHAT_LABEL} ${chatMinutes > 0 ? `${chatMinutes}분 ` : ""}${chat > 0 ? won(chat) : COFFEE_CHAT_FREE}` : "",
   ].filter(Boolean).join(" + ");
 
   // 📐09-15 위 여백을 줄였다(대표: 「결제 위에 마진이 너무 넓다」). 겸사겸사 **결제창이 화면에 들어올

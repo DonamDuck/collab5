@@ -20,7 +20,7 @@ import { BookingBadge, ListRow as Row, SpaceBadge, primaryBtnCls, secondaryBtnCl
 import { PRODUCT_LABEL } from "@/lib/rent-copy";
 import { bizMissingLine, bizOnFile, spaceListed } from "@/lib/bizcheck";
 import { needsFix } from "@/lib/rent-review";
-import { productPrice, sellableProducts } from "@/lib/rent-products";
+import { bookingHasChat, productPrice, sellableProducts } from "@/lib/rent-products";
 import { groupGuestBookings, groupHostBookings, hostBookingGroup, type HostBookingGroup } from "@/lib/rent-groups";
 
 // 하루 가게 — 내 공간 · 들어온 요청 · 내가 빌린 공간 (2026-09-13)
@@ -801,7 +801,8 @@ function RequestHead({
   const minutes = b.startTime && b.endTime ? minutesBetween(b.startTime, b.endTime) : 0;
   // ☕🩸09-16까지 사장님 쪽엔 커피챗 표시가 없었다. 손님 화면 네 곳엔 「커피챗 포함」이 뜨는데
   //   정작 커피챗을 해 줄 사람이 모르는 상태였다. 옛 예약은 옛 칸에만 값이 있어 둘 다 본다.
-  const chat = b.amountChat > 0 || b.amountMentor > 0;
+  //   🔁09-19 무료 커피챗(값 0)도 사장님이 준비할 일이라 `withChat`까지 본다(`bookingHasChat`).
+  const chat = bookingHasChat(b);
   // 🏷칩 = 사장님이 «준비할 것»(상품·인원·커피챗). 한 카드 안의 알약은 이 한 종류뿐이다(디자인-시스템 §형태가 의미를 만든다).
   //   🛍09-18 공간 전체면 사장님이 시설까지 준비해야 해서 첫 칩이다.
   const chips = [PRODUCT_LABEL[b.product], b.headcount ? `${b.headcount}명` : "", chat ? "커피챗 신청" : ""].filter(Boolean);

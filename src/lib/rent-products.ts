@@ -6,7 +6,7 @@
 //   화면과 서버가 따로 곱하면 둘이 어긋나는 날 손님이 본 값과 결제 값이 달라진다.
 // 🚨훅도 DB도 안 부른다. 클라이언트·서버 어디서든 불린다.
 // 📌해석(09-18): 손님은 공간 상품 둘 중 «하나를 반드시» 고르고, 커피챗은 거기에 더하는 선택이다.
-import type { RentProduct, Space, SpaceScope } from "./types";
+import type { RentProduct, Space, SpaceBooking, SpaceScope } from "./types";
 
 export const RENT_PRODUCTS: readonly RentProduct[] = ["space", "full"];
 
@@ -73,6 +73,18 @@ export function bookingAmount(
   const space = priceForMinutes(price, minutes);
   const chat = withChat && sp.coffeeChat && sp.coffeeChatPrice > 0 ? sp.coffeeChatPrice : 0;
   return { space, chat, total: space + chat };
+}
+
+/** ☕무료 커피챗인가(대표 09-19 #93 「무료로 제공할게요」). 저장 칸을 따로 두지 않고 «켜져 있고 값이 0»을 무료로 읽는다(SQL 없이).
+ *  ⚠️09-18 밤(H-36) 전엔 값 0원 커피챗이 «잘못 저장된 것»이었다. 그때 남은 행이 있으면 이제 무료로 보인다. */
+export function coffeeChatFree(sp: Pick<Space, "coffeeChat" | "coffeeChatPrice">): boolean {
+  return sp.coffeeChat && !(sp.coffeeChatPrice > 0);
+}
+
+/** ☕이 예약에 커피챗이 들어 있나. 무료 커피챗(09-19)은 값이 0이라 금액으로는 못 가른다 — `withChat`이 정본이고,
+ *  칸이 생기기 전 옛 행은 금액(새 칸 `amountChat`·옛 칸 `amountMentor`)으로 본다. 화면·메일·결제 규칙이 전부 이 한 벌을 쓴다. */
+export function bookingHasChat(b: Pick<SpaceBooking, "withChat" | "amountChat" | "amountMentor">): boolean {
+  return !!b.withChat || b.amountChat > 0 || b.amountMentor > 0;
 }
 
 /** 옛 칸 둘의 호환 값(09-18). 옛 칸은 읽는 곳이 많아 아직 남긴다.

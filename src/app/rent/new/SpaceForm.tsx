@@ -25,6 +25,7 @@ import { PhotoGrid } from "@/app/register/PhotoGrid";
 import type { Space, SpaceUseType, SpaceCategory, OpenSlot, AccessHow, RepeatRule } from "@/lib/types";
 import { durationLabel, expandRepeat, minHoursToMinutes, minutesBetween, stripRepeat, todayKst } from "@/lib/rent-time";
 import { payoutAmount } from "@/lib/rent-money";
+import { coffeeChatFree } from "@/lib/rent-products";
 import { CONTACT_PHONE_MAX, storePhoneOk } from "@/lib/rent-limits";
 import {
   addressMoved,
@@ -33,7 +34,7 @@ import {
 } from "@/lib/bizcheck";
 import { pausedChangeProblem, spaceSaveReview } from "@/lib/rent-review";
 import {
-  COFFEE_CHAT_LABEL, COFFEE_CHAT_WHEN_HOST, HOST_REQUEST_STEPS, hostFeeLine, PRODUCT_HINT_HOST, PRODUCT_LABEL_HOST, PRODUCT_NOTE_PLACEHOLDER, withJosa,
+  COFFEE_CHAT_FREE, COFFEE_CHAT_WHEN_HOST, HOST_REQUEST_STEPS, hostFeeLine, PRODUCT_HINT_HOST, PRODUCT_LABEL_HOST, PRODUCT_NOTE_PLACEHOLDER, withJosa,
 } from "@/lib/rent-copy";
 import { CATEGORY_OPTIONS, dateLabel, primaryBtnCls, RentSelect, rentInputCls, rentTextareaCls, secondaryBtnCls, won } from "../ui";
 import { AddressField } from "./AddressField";
@@ -135,6 +136,8 @@ interface SpaceDraft {
   fullOn: boolean; fullPrice: number; fullNote: string;
   minHours: string;
   chatOn: boolean; chatMin: string; chatPrice: number; chatTopics: string;
+  /** ☕무료 커피챗(09-19 #93). 옛 초안엔 없는 칸이라 빈 모습(`false`)으로 메워진다. */
+  chatFree: boolean;
   openSlots: OpenSlot[]; repeatWeekly: RepeatRule[];
   brandOn: boolean; brandPick: string;
   /** 🧾09-18 사업자 정보. 개업일은 날짜 칸 모양(`YYYY-MM-DD`)으로 담는다. 등록증은 올린 경로(파일 자체가 아니다). */
@@ -211,6 +214,9 @@ export function SpaceForm({
   /** 🔁09-14 한 시간 «고정»에서 **30분 단위 고르기**로(대표). 기본은 60분 — 제일 흔한 답을 미리 얹어 둔다. */
   const [chatMin, setChatMin] = useState(String(initial?.coffeeChatMinutes || 60));
   const [chatPrice, setChatPrice] = useState<number>(initial?.coffeeChatPrice ?? 0);
+  /** ☕「무료로 제공할게요」(대표 09-19 #93). 저장 칸을 따로 두지 않는다 — 켜진 커피챗의 값 0이 곧 무료다(`coffeeChatFree`).
+   *  켜 두는 동안 적어 둔 값(`chatPrice`)은 그대로 둔다. 끄면 원래 값이 돌아온다. 보낼 때만 0으로 보낸다. */
+  const [chatFree, setChatFree] = useState(initial ? coffeeChatFree(initial) : false);
   const [chatTopics, setChatTopics] = useState(initial?.coffeeChatTopics ?? "");
   // 🔁09-17 — `initial.openSlots`는 규칙을 펼친 값이다(`toSpace`). 폼은 «직접 연 날»만 들고 규칙은 따로 든다.
   //   펼친 날을 직접 연 날로 받아 두면, 규칙을 꺼도 그 날들이 직접 연 날로 남아 저장된다.
@@ -285,7 +291,7 @@ export function SpaceForm({
     facilities: [], facilitiesNote: "", capacity: "", rules: "",
     spaceOn: false, spacePrice: 0, spaceNote: "", fullOn: false, fullPrice: 0, fullNote: "",
     minHours: "2",
-    chatOn: false, chatMin: "60", chatPrice: 0, chatTopics: "",
+    chatOn: false, chatMin: "60", chatPrice: 0, chatTopics: "", chatFree: false,
     openSlots: [], repeatWeekly: [],
     brandOn: !!defaultBrandSlug, brandPick: defaultBrandSlug || myBrands[0]?.slug || "",
     bizNumber: "", bizOwnerName: "", bizOpenDate: "", bizCertPath: "",
@@ -303,7 +309,7 @@ export function SpaceForm({
     setSpaceOn(!!d.spaceOn); setSpacePrice(Number(d.spacePrice) || 0); setSpaceNote(d.spaceNote ?? "");
     setFullOn(!!d.fullOn); setFullPrice(Number(d.fullPrice) || 0); setFullNote(d.fullNote ?? "");
     setMinHours(d.minHours);
-    setChatOn(d.chatOn); setChatMin(d.chatMin); setChatPrice(d.chatPrice); setChatTopics(d.chatTopics);
+    setChatOn(d.chatOn); setChatMin(d.chatMin); setChatPrice(d.chatPrice); setChatTopics(d.chatTopics); setChatFree(!!d.chatFree);
     setOpenSlots(d.openSlots); setRepeatWeekly(d.repeatWeekly);
     setBrandOn(d.brandOn);
     // 그새 소개서를 지웠으면 옛 slug를 붙들지 않는다.
@@ -353,7 +359,7 @@ export function SpaceForm({
     facilities, facilitiesNote, capacity, rules,
     spaceOn, spacePrice, spaceNote, fullOn, fullPrice, fullNote,
     minHours,
-    chatOn, chatMin, chatPrice, chatTopics,
+    chatOn, chatMin, chatPrice, chatTopics, chatFree,
     openSlots, repeatWeekly,
     brandOn, brandPick,
     // 🔒09-18 밤 QA(H-34) — 사업자등록번호·대표자 이름·개업일을 브라우저 저장소에 남기지 않는다.
@@ -510,7 +516,8 @@ export function SpaceForm({
     if (fullOn && fullNote.trim().length < 10) return ["fullNote", "어떤 시설까지 쓰는지 조금 더 적어 주세요. 열 글자면 돼요."];
     // 🔁09-18 밤 QA(H-21) — 커피챗 값 검사가 달력 «뒤»에 있었다. 화면에선 커피챗이 「무엇을 파실까요」 절 안이고
     //   달력은 그다음 절이라, 둘 다 비면 화면을 지나쳐 내려갔다가 다시 올라오게 된다. 막는 순서는 화면 순서여야 한다.
-    if (chatOn && chatPrice <= 0) return ["chatPrice", "커피챗 값이 비어 있어요."];
+    // ☕09-19 대표 #93 — 「무료로 제공할게요」를 고르면 값이 없어도 된다(서버도 같은 규칙).
+    if (chatOn && !chatFree && chatPrice <= 0) return ["chatPrice", "커피챗 값이 비어 있어요. 무료로 하시려면 「무료로 제공할게요」를 눌러 주세요."];
     // 🔁09-17 — 매주 계속 여는 요일이 있으면 그걸로 하루 이상이 찬다. 시간 검사도 규칙이 연 날까지 본다.
     if (openSlots.length === 0 && repeatWeekly.length === 0) return ["slots", "빌려줄 날을 달력에서 하루 이상 골라 주세요."];
     const expanded = expandRepeat(openSlots, repeatWeekly);
@@ -595,7 +602,8 @@ export function SpaceForm({
         repeatWeekly,
         coffeeChat: chatOn,
         coffeeChatMinutes: chatOn ? Number(chatMin) : 0,
-        coffeeChatPrice: chatOn ? chatPrice : 0,
+        coffeeChatPrice: chatOn && !chatFree ? chatPrice : 0,
+        coffeeChatFree: chatOn && chatFree,
         coffeeChatTopics: chatOn ? chatTopics : "",
         accessHow,
         contactPhone,
@@ -1102,12 +1110,14 @@ export function SpaceForm({
             🔻설비 사용법 같은 «필수» 안내는 여기 없다. 그건 상품이 아니라 인수인계라 위 「안내 방식」이 맡는다.
             🔁09-17 QA — 「현업에서의」「제공하실」 행정어를 카페 사장님이 쓰는 말(「가게를 열려는 분」)로 풀었다.
             🔁09-18 아니요/예 두 알약 → 위 두 상품과 같은 켜기 카드(세 상품이 한 얼굴). 커피챗은 공간 예약에 «더하는» 상품이다. */}
+        {/* 🔁09-19 대표 코멘트 #89~#97 — 카드 제목 하나를 묻는 말로(「업계 선배님으로서…」), 알약은 「부가 유료 서비스」
+            (무료로 고르면 「부가 서비스」), 설명·라벨·도움말·자리표시는 대표 문안(맞춤법만). 값 칸 밑에 「무료로 제공할게요」. */}
         <ProductCard
-          title={COFFEE_CHAT_LABEL}
-          hint="가게를 열어 보려는 분께 하루가 어떻게 돌아가는지 들려주세요. 레시피는 안 알려 주셔도 돼요. 재료를 어디서 떼는지, 언제 몰리고 언제 비는지 같은 이야기면 충분해요."
+          title="업계 선배님으로서 가게에 관한 커피챗을 제공하실 수 있나요?"
+          hint="가게를 열고 싶은 분에게 실제 가게의 하루가 어떻게 돌아가는지 들려주세요. 레시피나 거래처처럼 영업에 직접 연결되는 정보를 공유하는 것이 아니라, 가게를 운영하며 쌓은 업계의 경험과 시설 이용, 운영, 영업 등에 대한 노하우를 나눠 주시면 됩니다. 가게를 먼저 열어 본 선배로서, 후배들에게 도움이 될 만한 이야기를 편하게 들려주세요."
           on={chatOn}
           onToggle={() => setChatOn((v) => !v)}
-          addon
+          addon={chatFree ? "부가 서비스" : "부가 유료 서비스"}
         >
           {/* ☕「언제」는 `rent-copy` 한 줄만 쓴다(대표 09-17 결정 1). 손님 쪽 화면·메일이 같은 말을 한다. */}
           <p className="text-[15px] leading-relaxed break-keep text-body">{COFFEE_CHAT_WHEN_HOST}</p>
@@ -1126,26 +1136,45 @@ export function SpaceForm({
             </RentSelect>
           </L>
           <L label="커피챗 비용" htmlFor="sp-cp" anchor="chatPrice" error={fieldErr("chatPrice")}>
-            <WonInput id="sp-cp" value={chatPrice} onChange={setChatPrice} placeholder="예) 20,000" />
-            {chatPrice > 0 && (
-              <p className="mt-2 text-[15px] text-mute">
+            {/* 무료면 칸을 잠그고 「무료」를 보인다. 적어 둔 값은 지우지 않는다(다시 끄면 돌아온다). */}
+            <WonInput
+              id="sp-cp"
+              value={chatFree ? 0 : chatPrice}
+              onChange={setChatPrice}
+              placeholder={chatFree ? COFFEE_CHAT_FREE : "예) 20,000"}
+              disabled={chatFree}
+            />
+            {/* 👆44px 줄(약관 체크와 같은 처리) — 체크 상자 18px만 누름 자리면 손끝이 빗나간다. */}
+            <label className="mt-2 flex min-h-[44px] cursor-pointer items-center gap-3">
+              <input
+                type="checkbox"
+                className="size-[18px] shrink-0 accent-primary"
+                checked={chatFree}
+                onChange={(e) => setChatFree(e.target.checked)}
+              />
+              <span className="text-[16px] text-body">무료로 제공할게요</span>
+            </label>
+            {!chatFree && chatPrice > 0 && (
+              <p className="mt-1 text-[15px] text-mute">
                 수수료를 빼고 <span className="font-medium text-ink">{won(payoutOf(chatPrice))}</span>이 사장님께 가요.
               </p>
             )}
           </L>
           <L
-            label="어떤 이야기를 들려주실 수 있나요"
+            label="커피챗에서 어떤 이야기를 들려주실 수 있을까요?"
             htmlFor="sp-ct"
             optional
-            hint="적어 두시면 손님이 무슨 이야기를 듣게 될지 알고 골라요."
+            hint="예약하시는 분이 내용을 확인한 뒤 커피챗을 진행할지 결정하게 돼요."
           >
+            {/* 🔁09-19 대표 코멘트 #96·#97 — 옛 예시(「재료를 어디서 얼마에 떼는지」)가 대표 말로 「좀 별로」였다.
+                몰리는 시간·업계 이야기·연차별로 한 일·질문 받기 — 레시피·거래처가 아닌 쪽으로 넷. */}
             <textarea
               id="sp-ct"
               rows={4}
               className={`${rentTextareaCls} resize-y`}
               value={chatTopics}
               onChange={(e) => setChatTopics(e.target.value)}
-              placeholder={"예) 재료를 어디서 얼마에 떼는지\n손님이 몰리는 시간과 비는 시간\n처음 1년에 제일 크게 틀렸던 것"}
+              placeholder={"예) 손님이 몰리는 시간과 한가한 시간\n업계에서 요즘 오가는 이야기\n연차별로 했던 일\n궁금하신 점이 있으면 편하게 들어 드려요"}
             />
           </L>
         </ProductCard>
@@ -1488,32 +1517,39 @@ function WonInput({
   value,
   onChange,
   placeholder,
+  disabled,
 }: {
   id: string;
   value: number;
   onChange: (n: number) => void;
   placeholder?: string;
+  /** 무료 커피챗처럼 값을 안 받는 때(09-19). 잠근 칸은 옅은 면으로 보인다. */
+  disabled?: boolean;
 }) {
   return (
     <div className="relative sm:max-w-[260px]">
       <input
         id={id}
         inputMode="numeric"
-        className={`${rentInputCls} pr-11`}
+        disabled={disabled}
+        className={`${rentInputCls} pr-11 disabled:bg-surface-soft disabled:placeholder:text-body`}
         value={value > 0 ? value.toLocaleString("ko-KR") : ""}
         onChange={(e) => onChange(Number(e.target.value.replace(/\D/g, "")) || 0)}
         placeholder={placeholder}
       />
-      <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-[16px] text-mute">
-        원
-      </span>
+      {/* 잠근 칸(무료)엔 「원」을 안 붙인다 — 「무료 원」으로 읽힌다. */}
+      {!disabled && (
+        <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-[16px] text-mute">
+          원
+        </span>
+      )}
     </div>
   );
 }
 
 /** 🛍상품 카드 한 장(09-18) — 이름·한 줄 설명·켜기 스위치. 켜면 그 상품의 칸이 열린다.
  *  ⭐카드 머리 전체가 스위치다. 폰에서 작은 토글만 누르게 하면 손가락이 빗나간다.
- *  `addon` = 공간 예약에 «더하는» 상품(커피챗). 머리에 작게 표시한다. */
+ *  `addon` = 공간 예약에 «더하는» 상품(커피챗)의 알약 글자. 머리에 작게 표시한다(09-19 #90: 「부가 유료 서비스」). */
 function ProductCard({
   title,
   hint,
@@ -1526,7 +1562,7 @@ function ProductCard({
   hint: string;
   on: boolean;
   onToggle: () => void;
-  addon?: boolean;
+  addon?: string;
   children: React.ReactNode;
 }) {
   return (
@@ -1544,7 +1580,7 @@ function ProductCard({
           <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <span className="text-[17px] font-bold text-ink">{title}</span>
             {addon && (
-              <span className="rounded-pill bg-surface-soft px-2 py-0.5 text-[13px] text-mute">공간 예약에 더하는 상품</span>
+              <span className="rounded-pill bg-surface-soft px-2 py-0.5 text-[13px] text-mute">{addon}</span>
             )}
           </span>
           <span className="mt-1 block text-[15px] leading-relaxed break-keep text-mute">{hint}</span>

@@ -6,8 +6,8 @@ import { getSpacePublic, listBookingsForGuest, listLiveBookingsIn } from "@/lib/
 import { getProfileById, getSessionUserId } from "@/lib/profiles";
 import { isRentAdmin } from "@/lib/rent-actions";
 import { repo } from "@/lib/repo";
-import { accessHowLine, COFFEE_CHAT_WHEN_GUEST, CONTACT_RULE_GUEST, PRODUCT_HINT_GUEST, PRODUCT_LABEL } from "@/lib/rent-copy";
-import { lowestPrice, productNote, productPrice, sellableProducts } from "@/lib/rent-products";
+import { accessHowLine, COFFEE_CHAT_FREE, COFFEE_CHAT_WHEN_GUEST, CONTACT_RULE_GUEST, PRODUCT_HINT_GUEST, PRODUCT_LABEL } from "@/lib/rent-copy";
+import { coffeeChatFree, lowestPrice, productNote, productPrice, sellableProducts } from "@/lib/rent-products";
 import { durationLabel, futureSlots, minHoursToMinutes, rangeLabel } from "@/lib/rent-time";
 import { bizMissingLine, bizVerified, spaceListed } from "@/lib/bizcheck";
 import { OG_IMAGE } from "@/lib/site";
@@ -382,10 +382,11 @@ export default async function SpaceDetailPage({
             <p className="mt-3 text-[15px] text-mute">
               {products.length > 1 ? "신청할 때 둘 중 하나를 골라요. " : ""}최소 {durationLabel(minHoursToMinutes(sp.minHours))}부터 빌릴 수 있어요.
             </p>
-            {sp.coffeeChat && sp.coffeeChatPrice > 0 && (
+            {sp.coffeeChat && sp.coffeeChatMinutes > 0 && (
               // 🔁09-18 밤 QA(G-17) — 「어느 쪽에든」은 상품이 둘일 때만 맞는 말이다. 하나뿐인 공간에선 고를 쪽이 없다.
+              // ☕09-19 무료 커피챗(대표 #93)도 같은 줄에 선다. 값 자리에 「무료」.
               <p className="mt-1.5 text-[15px] text-mute">
-                커피챗 {sp.coffeeChatMinutes}분({won(sp.coffeeChatPrice)})은{" "}
+                커피챗 {sp.coffeeChatMinutes}분({coffeeChatFree(sp) ? COFFEE_CHAT_FREE : won(sp.coffeeChatPrice)})은{" "}
                 {products.length > 1 ? "어느 쪽에든 더할 수 있어요." : "신청하실 때 같이 담을 수 있어요."}
               </p>
             )}
@@ -473,7 +474,7 @@ export default async function SpaceDetailPage({
               )}
               {/* ✍️「고르시면 돼요」와 「(선택 사항)」이 같은 말 두 번이라 하나로. */}
               <p className="mt-3 text-[15px] text-mute">
-                <span className="font-medium text-ink">+{won(sp.coffeeChatPrice)}</span> · 신청할 때 담을 수 있어요
+                <span className="font-medium text-ink">{coffeeChatFree(sp) ? COFFEE_CHAT_FREE : `+${won(sp.coffeeChatPrice)}`}</span> · 신청할 때 담을 수 있어요
               </p>
             </Section>
           )}
@@ -654,7 +655,7 @@ export default async function SpaceDetailPage({
                 }
               />
               {sp.coffeeChat && sp.coffeeChatMinutes > 0 && (
-                <InfoRow label="커피챗" value={`${sp.coffeeChatMinutes}분 +${won(sp.coffeeChatPrice)}`} />
+                <InfoRow label="커피챗" value={`${sp.coffeeChatMinutes}분 ${coffeeChatFree(sp) ? COFFEE_CHAT_FREE : `+${won(sp.coffeeChatPrice)}`}`} />
               )}
               {operatorName && <InfoRow label="운영" value={operatorName} />}
             </InfoList>

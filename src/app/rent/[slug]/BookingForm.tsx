@@ -34,7 +34,7 @@ import { dayMarks, durationLabel, endChoices, minHoursToMinutes, minutesBetween,
 import { PLAN_MAX } from "@/lib/rent-limits";
 import { dateLabel, InfoList, InfoRow, primaryBtnCls, RentSelect, rentInputCls, rentTextareaCls, won } from "../ui";
 import Link from "next/link";
-import { COFFEE_CHAT_LABEL, CONTACT_RULE_GUEST, isTestPayment, PRODUCT_HINT_GUEST, PRODUCT_LABEL } from "@/lib/rent-copy";
+import { COFFEE_CHAT_FREE, COFFEE_CHAT_LABEL, CONTACT_RULE_GUEST, isTestPayment, PRODUCT_HINT_GUEST, PRODUCT_LABEL } from "@/lib/rent-copy";
 import { ConfirmDialog } from "../ConfirmDialog";
 import { PickDateCalendar } from "./PickDateCalendar";
 import { MentorOptions } from "./MentorOption";
@@ -412,7 +412,8 @@ export function BookingForm({
     setHeadcount(saved.headUnsure ? "" : saved.headcount);
     setHeadUnsure(saved.headUnsure);
     setPlan(saved.plan);
-    setWithChat(coffeeChat && coffeeChatPrice > 0 && saved.withChat);
+    // ☕09-19 무료 커피챗(값 0)도 고를 수 있는 커피챗이다 — 켜짐으로만 본다.
+    setWithChat(coffeeChat && saved.withChat);
     setGuestName(saved.guestName);
     // 번호는 적어 둔 것이 먼저, 비었으면 방금 로그인한 계정의 프로필 번호.
     const ph = saved.phone.trim() ? saved.phone : initialPhone;
@@ -897,7 +898,7 @@ export function BookingForm({
       >
         {/* 🔁09-15 `sm:hidden` 제거 — 어느 폭에서나 여기서 고른다(대표 「데스크탑도 동일 UX」).
             바에서 옵션을 뺐으니 고르개가 둘로 보일 걱정도 없다. */}
-        {coffeeChat && coffeeChatPrice > 0 && (
+        {coffeeChat && (
           <MentorOptions
             minutes={coffeeChatMinutes}
             price={coffeeChatPrice}
@@ -936,7 +937,8 @@ export function BookingForm({
                 {/* 💸09-17 QA — 합계만 있으면 「왜 10만원인가」를 손님이 셈한다. 내역을 한 줄로. */}
                 <span className="block text-[15px] text-mute">
                   {product ? PRODUCT_LABEL[product] : "대여"} {durationLabel(minutes)} {won(spaceAmount)}
-                  {chatAmount > 0 && ` + ${COFFEE_CHAT_LABEL} ${coffeeChatMinutes}분 ${won(chatAmount)}`}
+                  {/* ☕09-19 무료 커피챗은 값이 0이라 금액으로 가르지 않는다. 고른 것이면 「무료」로 한 줄에 싣는다. */}
+                  {withChat && coffeeChat && ` + ${COFFEE_CHAT_LABEL} ${coffeeChatMinutes}분 ${chatAmount > 0 ? won(chatAmount) : COFFEE_CHAT_FREE}`}
                 </span>
               </>
             }
