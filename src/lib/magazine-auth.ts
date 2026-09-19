@@ -30,10 +30,14 @@ function editorEmails(): string[] {
 export async function isMagazineEditor(): Promise<boolean> {
   const user = await getSessionUser();
   if (!user) return false;
-  // 세션의 이메일을 그대로 믿지 않고 DB(`users`)에서 다시 읽는다 —
-  // 프로필이 지워졌거나 계정이 바뀐 경우를 세션만으로는 알 수 없다.
+  // 🔒09-18 밤 — 판정은 «로그인 수단이 확인해 준 이메일»로 한다.
+  //   `users.email`만 보던 때는 구멍이 있었다. 카카오가 이메일을 안 주면 /welcome에서 손님이 이메일을 «직접» 치는데,
+  //   그 값이 중복 검사 없이 프로필에 굳어서 대표 이메일을 적으면 누구나 편집자가 됐다.
+  //   세션 이메일이 확인됐고 명단에 있을 때만 통과시킨다.
+  const authEmail = user.email?.trim().toLowerCase();
+  if (!authEmail || !user.email_confirmed_at) return false;
+  if (!editorEmails().includes(authEmail)) return false;
+  // 세션만 믿지 않고 DB(`users`)도 다시 읽는다 — 프로필이 지워졌거나 계정이 바뀐 경우를 세션만으로는 알 수 없다.
   const profile = await getProfile(user.id);
-  const email = profile?.email?.trim().toLowerCase();
-  if (!email) return false;
-  return editorEmails().includes(email);
+  return profile?.email?.trim().toLowerCase() === authEmail;
 }
