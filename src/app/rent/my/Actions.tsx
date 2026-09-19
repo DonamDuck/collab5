@@ -155,8 +155,10 @@ export function HostDecide({
 /** 내가 보낸 신청 취소. 환불률은 우리 규정표가 정한다 — 그래서 **여기 숫자를 적지 않는다.**
  *  화면에 「전액 환불」이라고 박아 두면 당일 취소에도 그 말이 남아 거짓이 된다.
  *  실제 금액은 액션이 계산해서 메시지로 돌려준다. */
-/** 취소 팝업의 이유 한 줄. 전액이면 «왜 전액인지», 깎이면 «며칠 남아서인지», 0원이면 당일이라서. */
-function cancelReason(q: { refund: number; rate: number; daysBefore: number; grace: boolean }): string {
+/** 취소 팝업의 이유 한 줄. 전액이면 «왜 전액인지», 깎이면 «며칠 남아서인지», 0원이면 당일이라서.
+ *  🆕09-19 오후 대표 — 수락 전 취소는 전액이다. 이유도 날짜보다 그게 먼저라 첫 갈래로 둔다. */
+function cancelReason(q: { refund: number; rate: number; daysBefore: number; beforeAccept: boolean; grace: boolean }): string {
+  if (q.beforeAccept && q.rate >= 1) return "사장님이 아직 수락하기 전이라 전액 돌아와요.";
   if (q.refund === 0) return "당일 취소라 돌려드릴 수 없어요.";
   if (q.rate >= 1) {
     return q.grace
@@ -172,7 +174,7 @@ export function GuestCancel({ bookingId }: { bookingId: number }) {
   const router = useRouter();
   const [pending, start] = useTransition();
   /** 서버가 계산해 준 환불 견적. 있으면 팝업이 열려 있다는 뜻. */
-  const [quote, setQuote] = useState<{ total: number; refund: number; rate: number; daysBefore: number; grace: boolean } | null>(null);
+  const [quote, setQuote] = useState<{ total: number; refund: number; rate: number; daysBefore: number; beforeAccept: boolean; grace: boolean } | null>(null);
   const [err, setErr] = useState("");
   const [done, setDone] = useState("");
 
@@ -185,7 +187,7 @@ export function GuestCancel({ bookingId }: { bookingId: number }) {
         setErr(q.message);
         return;
       }
-      setQuote({ total: q.total, refund: q.refund, rate: q.rate, daysBefore: q.daysBefore, grace: q.grace });
+      setQuote({ total: q.total, refund: q.refund, rate: q.rate, daysBefore: q.daysBefore, beforeAccept: q.beforeAccept, grace: q.grace });
     });
 
   const run = () =>
@@ -253,7 +255,7 @@ export function GuestCancel({ bookingId }: { bookingId: number }) {
           </InfoList>
         )}
         {/* 💬09-17 QA — 「왜 그 %인지」 한 줄. 수수료 0%만 보면 서둘러야 하는지 알 수 없다.
-            ⚠️숫자는 서버가 준 `rate`·`daysBefore`·`grace`로만 말한다. 구간표를 화면에 다시 적지 않는다. */}
+            ⚠️숫자는 서버가 준 `rate`·`daysBefore`·`beforeAccept`·`grace`로만 말한다. 구간표를 화면에 다시 적지 않는다. */}
         {quote && <p className="text-[15px] leading-relaxed break-keep text-mute">{cancelReason(quote)}</p>}
       </ConfirmDialog>
     </div>

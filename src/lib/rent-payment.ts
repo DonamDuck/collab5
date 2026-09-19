@@ -207,24 +207,35 @@ export async function cancelPayment(
  *
  *  🔁09-16~09-18엔 «결제하고 1시간»이었다. 대표 09-19: *「결제하고 1시간을 애당초 잘못 넣은 거 같아. 당연히 사장님의
  *    예약 확정 이후에 1시간 취소로 해야 할 거 같아. 결제만 하고 1시간 취소는 정책을 아예 그냥 빼자.」*
- *    그래서 결제 기준 창은 없앴다. 확정 전(결제 완료·수락 대기)에 취소하면 아래 표대로다.
+ *    그래서 결제 기준 창은 없앴다.
  *  기준 시각은 수락을 누른 때(`decidedAt`)다. 거절한 예약엔 창이 없다. 거절이 곧 전액 환불이라서다.
  *  경계는 «분»을 내림해서 센다. 수락하고 60분 59초까지가 창 안이다(09-17부터 쓰던 셈 그대로). */
 export const GRACE_MINUTES = 60;
+
+/** 취소하는 때가 «수락 전»인가 «수락 뒤»인가. 환불률이 여기서 먼저 갈린다.
+ *  · `{ accepted: false }` 결제는 끝났고 사장님이 아직 수락하지 않았다(`paid`) → 날짜와 상관없이 전액
+ *  · `{ accepted: true, minutesSinceConfirmed }` 수락한 뒤(`confirmed`) → 1시간 안이면 전액, 그 뒤는 표
+ *  ⚠️넘기지 않으면 **표만** 본다. 결제 화면이 「날짜별로 몇 %인가」를 물을 때 쓰는 길이다. 예약 한 건의 환불액은
+ *    늘 `guestCancelQuote`로 구한다(상태를 보고 이 값을 채운다). */
+export type CancelStage = { accepted: false } | { accepted: true; minutesSinceConfirmed?: number };
 
 /** 취소 수수료 — 🚨**호스트가 아니라 우리가 정한다.**
  *  소비자분쟁해결기준에 공간 대여 항목이 없어서 우리가 규정을 만들어야 하는데,
  *  호스트 자율로 두면 전자상거래법 제35조로 무효가 될 수 있다(09-13 법규 조사).
  *  값은 공정위 지침 Ⅲ.1 라가 허용하는 **숙박업 공제율을 상한으로** 잡았다.
  *
+ *  🆕09-19 대표 — *「수락 전 취소는 당연히 전액 취소」*. 사장님이 아직 받겠다고 하지 않은 예약이라 깎을 근거가 없다.
+ *    09-19 오전 판(수락 전엔 표대로)은 결제 기준 창을 뺄 때 수락 전 취소까지 표로 떨어뜨렸다. 그 칸을 전액으로 되돌렸다.
+ *
  *  🔢09-18 밤 QA(SEC-03) — 표는 «정수 퍼센트»로 둔다. 돈 계산(`refundAmount`)이 이 정수를 받는다.
  *    소수 비율(0.7)을 금액에 바로 곱하면 90,000원의 70%가 62,999원이 됐다.
  *
  *  @param daysBefore 쓰기로 한 날까지 남은 일수
- *  @param minutesSinceConfirmed 사장님이 수락한 지 지난 분(`minutesSinceConfirmed`). 확정 전이면 넘기지 않는다. 그러면 표만 본다.
+ *  @param stage 수락 전인지 뒤인지(`CancelStage`). 안 넘기면 표만 본다.
  */
-export function guestCancelRefundPercent(daysBefore: number, minutesSinceConfirmed?: number): number {
-  if (typeof minutesSinceConfirmed === "number" && minutesSinceConfirmed <= GRACE_MINUTES) return 100;
+export function guestCancelRefundPercent(daysBefore: number, stage?: CancelStage): number {
+  if (stage && !stage.accepted) return 100;   // 수락 전 취소는 전액
+  if (stage?.accepted && typeof stage.minutesSinceConfirmed === "number" && stage.minutesSinceConfirmed <= GRACE_MINUTES) return 100;
   if (daysBefore >= 7) return 100;    // 7일 전까지 전액
   if (daysBefore >= 3) return 70;
   if (daysBefore >= 1) return 50;
@@ -232,8 +243,8 @@ export function guestCancelRefundPercent(daysBefore: number, minutesSinceConfirm
 }
 
 /** 같은 표를 비율(1·0.7·0.5·0)로. 화면 문장(「70%」·「전액」)을 만드는 곳이 쓴다. ⚠️금액 계산엔 쓰지 않는다 — `refundAmount`에 퍼센트를 넘긴다. */
-export function guestCancelRefundRate(daysBefore: number, minutesSinceConfirmed?: number): number {
-  return guestCancelRefundPercent(daysBefore, minutesSinceConfirmed) / 100;
+export function guestCancelRefundRate(daysBefore: number, stage?: CancelStage): number {
+  return guestCancelRefundPercent(daysBefore, stage) / 100;
 }
 
 /** 사장님이 수락한 지 몇 분 됐나. 확정 예약이 아니거나 수락 시각이 없으면 undefined다(창이 없다).
@@ -248,14 +259,18 @@ export function minutesSinceConfirmed(b: Pick<SpaceBooking, "status" | "decidedA
 /** 💸손님 취소 견적 — **취소 팝업(`quoteCancelAction`)과 실제 취소(`cancelBookingAction`)가 이 한 함수만 부른다.**
  *  둘이 따로 계산하면 팝업엔 70%라 적고 50%만 돌려주는 날이 온다.
  *  「이용일 N일 전」은 한국 달력의 날짜 차이다(`kstDaysUntil`, 09-16 UTC 자정 사고 뒤로).
- *  `grace`는 팝업이 «왜 전액인지»를 말할 때만 쓴다. 비율은 `percent` 하나가 정한다.
+ *  `beforeAccept`·`grace`는 팝업이 «왜 전액인지»를 말할 때만 쓴다. 비율은 `percent` 하나가 정한다.
+ *   · `beforeAccept` 결제 완료·수락 전(`paid`)이라 전액
+ *   · `grace` 수락하고 1시간 안이라 전액
  *  순수 함수라 시각을 넘겨 경계값을 잴 수 있다(`now`·`today`). */
 export function guestCancelQuote(
   b: Pick<SpaceBooking, "status" | "decidedAt" | "useDate" | "amountTotal">, now = Date.now(), today?: string,
-): { percent: number; rate: number; refund: number; daysBefore: number; grace: boolean } {
+): { percent: number; rate: number; refund: number; daysBefore: number; beforeAccept: boolean; grace: boolean } {
   const daysBefore = kstDaysUntil(b.useDate, today);
+  const beforeAccept = b.status === "paid";
   const mins = minutesSinceConfirmed(b, now);
-  const grace = typeof mins === "number" && mins <= GRACE_MINUTES;
-  const percent = guestCancelRefundPercent(daysBefore, mins);
-  return { percent, rate: percent / 100, refund: refundAmount(b.amountTotal, percent), daysBefore, grace };
+  const grace = !beforeAccept && typeof mins === "number" && mins <= GRACE_MINUTES;
+  const stage: CancelStage = beforeAccept ? { accepted: false } : { accepted: true, minutesSinceConfirmed: mins };
+  const percent = guestCancelRefundPercent(daysBefore, stage);
+  return { percent, rate: percent / 100, refund: refundAmount(b.amountTotal, percent), daysBefore, beforeAccept, grace };
 }
