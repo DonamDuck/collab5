@@ -7,7 +7,7 @@
 //   이용 시각이 이미 지났어도 승인이 그대로 나갔다. 이틀 전 신청이 결제되는 화면을 QA가 실제로 열었다(G-01).
 // ⭐그래서 승인은 «부르기 전에» 공간을 다시 읽어 이 함수를 돌린다. 걸리면 토스를 아예 안 부른다 — 돈이 안 움직인다.
 import type { RentProduct, Space, SpaceBooking } from "./types";
-import { bookingStarted, durationLabel, fitsOpenSlot, isTimeMark, minHoursToMinutes, minutesBetween, overlaps, toMinutes } from "./rent-time";
+import { bookingStarted, durationLabel, fitsOpenSlot, isTimeMark, minutesBetween, overlaps, RENT_MIN_MINUTES, toMinutes } from "./rent-time";
 import { bookingHasChat, isRentProduct, productPrice } from "./rent-products";
 import { CAPACITY_MAX } from "./rent-limits";
 import { bizOnFile } from "./bizcheck";
@@ -46,7 +46,7 @@ export interface BookingRequest {
 /** 검사에 필요한 만큼의 공간. `Space` 전체를 받지 않는 이유 = 이 파일이 타입 하나에 묶이지 않게. */
 export type BookingRuleSpace = Pick<
   Space,
-  "status" | "bizNumber" | "minHours" | "openSlots" | "capacity" | "coffeeChat" | "coffeeChatPrice"
+  "status" | "bizNumber" | "openSlots" | "capacity" | "coffeeChat" | "coffeeChatPrice"
   | "rentSpaceOn" | "rentSpacePrice" | "rentSpaceNote" | "rentFullOn" | "rentFullPrice" | "rentFullNote"
 >;
 
@@ -105,9 +105,9 @@ export function validateBookingRequest(
   if (req.useDate === today && toMinutes(req.startTime) <= toMinutes(hhmm)) {
     return { ok: false, code: "started", message: "이미 지난 시간이에요. 다른 시간을 골라 주세요." };
   }
-  const minMinutes = minHoursToMinutes(space.minHours);
-  if (minutes < minMinutes) {
-    return { ok: false, code: "too-short", message: `이 공간은 최소 ${durationLabel(minMinutes)}부터 빌릴 수 있어요.` };
+  // ⏱🔒09-19 대표 #88 — 최소 대여 시간은 모든 공간 1시간. 공간 행의 옛 값(2·3시간)은 안 본다.
+  if (minutes < RENT_MIN_MINUTES) {
+    return { ok: false, code: "too-short", message: `최소 ${durationLabel(RENT_MIN_MINUTES)}부터 빌릴 수 있어요.` };
   }
   if (!fitsOpenSlot(space.openSlots, req.useDate, req.startTime, req.endTime)) {
     return { ok: false, code: "outside-slot", message: "사장님이 열어 두신 시간 안에서 골라 주세요." };

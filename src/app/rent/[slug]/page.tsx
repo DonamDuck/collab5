@@ -8,7 +8,7 @@ import { isRentAdmin } from "@/lib/rent-actions";
 import { repo } from "@/lib/repo";
 import { accessHowLine, COFFEE_CHAT_FREE, COFFEE_CHAT_WHEN_GUEST, CONTACT_RULE_GUEST, PRODUCT_HINT_GUEST, PRODUCT_LABEL } from "@/lib/rent-copy";
 import { coffeeChatFree, lowestPrice, productNote, productPrice, sellableProducts } from "@/lib/rent-products";
-import { durationLabel, futureSlots, minHoursToMinutes, rangeLabel } from "@/lib/rent-time";
+import { durationLabel, futureSlots, rangeLabel, RENT_MIN_MINUTES } from "@/lib/rent-time";
 import { bizMissingLine, bizVerified, spaceListed } from "@/lib/bizcheck";
 import { OG_IMAGE } from "@/lib/site";
 import { PhotoSlider } from "@/components/PhotoSlider";
@@ -113,8 +113,9 @@ export async function generateMetadata({
 /** 💸값 한 줄 — 굵은 시간당 값 + 「최소 N시간」·「최대 N명」 태그. 폰 헤더와 데스크톱 요약 카드가 같은 얼굴이다(09-18 대표).
  *  태그는 읽고 지나가는 것이라 설비 칩(`Chip`)보다 한 단 작은 회색 pill로 둔다. 값 옆에 같은 크기 칩이 서면 값이 묻힌다. */
 /*  🛍09-18 상품 셋 — 값이 둘이면 낮은 값에 「부터」를 붙인다(대표 결정의 「가격도 각각」). 하나면 그 값 그대로. */
-function PriceLine({ priceHour, from, minHours, capacity }: { priceHour: number; from?: boolean; minHours: number; capacity?: number }) {
-  const tags = [`최소 ${durationLabel(minHoursToMinutes(minHours))}`, capacity ? `최대 ${capacity}명` : ""].filter(Boolean);
+// ⏱🔒최소 시간은 모든 공간 1시간(대표 09-19 #88) — 공간 행의 값이 아니라 상수를 적는다.
+function PriceLine({ priceHour, from, capacity }: { priceHour: number; from?: boolean; capacity?: number }) {
+  const tags = [`최소 ${durationLabel(RENT_MIN_MINUTES)}`, capacity ? `최대 ${capacity}명` : ""].filter(Boolean);
   return (
     <div className="flex flex-wrap items-center gap-x-2 gap-y-2">
       <p className="text-ink">
@@ -280,7 +281,7 @@ export default async function SpaceDetailPage({
                 그땐 흐린 메타 줄 끝의 글자였다. 이제 제목 아래 굵은 값 + 최소 시간·인원 태그로 세운다(아워플레이스 상세).
                 lg에선 오른쪽 요약 카드가 같은 줄을 들어서 여기선 숨긴다. 세부(커피챗 값 등)는 아래 「비용」 절이 맡는다. */}
             <div className="mt-4 lg:hidden">
-              <PriceLine priceHour={fromPrice} from={priceVaries} minHours={sp.minHours} capacity={sp.capacity} />
+              <PriceLine priceHour={fromPrice} from={priceVaries} capacity={sp.capacity} />
             </div>
             {/* 칩 줄 — 쓰임새 하나 + 설비 몇 개, 전부 같은 pill. 설비 전체는 아래 섹션에서 본다. */}
             <div className="mt-4 flex flex-wrap gap-2">
@@ -380,7 +381,7 @@ export default async function SpaceDetailPage({
               ))}
             </div>
             <p className="mt-3 text-[15px] text-mute">
-              {products.length > 1 ? "신청할 때 둘 중 하나를 골라요. " : ""}최소 {durationLabel(minHoursToMinutes(sp.minHours))}부터 빌릴 수 있어요.
+              {products.length > 1 ? "신청할 때 둘 중 하나를 골라요. " : ""}최소 {durationLabel(RENT_MIN_MINUTES)}부터 빌릴 수 있어요.
             </p>
             {sp.coffeeChat && sp.coffeeChatMinutes > 0 && (
               // 🔁09-18 밤 QA(G-17) — 「어느 쪽에든」은 상품이 둘일 때만 맞는 말이다. 하나뿐인 공간에선 고를 쪽이 없다.
@@ -599,7 +600,6 @@ export default async function SpaceDetailPage({
                   rentSpaceOn: sp.rentSpaceOn, rentSpacePrice: sp.rentSpacePrice, rentSpaceNote: sp.rentSpaceNote,
                   rentFullOn: sp.rentFullOn, rentFullPrice: sp.rentFullPrice, rentFullNote: sp.rentFullNote,
                 }}
-                minHours={sp.minHours}
                 coffeeChat={sp.coffeeChat}
                 coffeeChatMinutes={sp.coffeeChatMinutes}
                 coffeeChatPrice={sp.coffeeChatPrice}
@@ -619,7 +619,7 @@ export default async function SpaceDetailPage({
         <aside className="hidden lg:sticky lg:top-24 lg:block">
           {/* 메타 줄·소개서 줄은 lg에서 위 헤더에서 숨기고 여기로 모인다. 같은 값이 한 화면에 두 번 서지 않게. */}
           <div className="rounded-lg border border-hairline bg-surface p-6 shadow-e1">
-            <PriceLine priceHour={fromPrice} from={priceVaries} minHours={sp.minHours} capacity={sp.capacity} />
+            <PriceLine priceHour={fromPrice} from={priceVaries} capacity={sp.capacity} />
             <TrustMarks biz={bizOk} naver={onNaver} className="mt-4 flex-col" />
             <InfoList className="mt-5 border-t border-hairline pt-5">
               {/* 🛍09-18 켜진 상품 이름 — 「부터」가 무엇 중 낮은 값인지 요약 카드에서도 읽히게. */}

@@ -12,7 +12,7 @@ import type {
   Space, SpacePublic, SpaceBooking, SpaceStatus, BookingStatus, OpenSlot,
   Payment, PaymentStatus, PayoutStatus, TossPayment, RepeatRule, BizCheckStatus, BizCheckDetail,
 } from "./types";
-import { bookingFinished, todayKst, expandRepeat, stripRepeat, pruneRepeat, minutesBetween } from "./rent-time";
+import { bookingFinished, todayKst, expandRepeat, stripRepeat, pruneRepeat, minutesBetween, RENT_MIN_MINUTES } from "./rent-time";
 import { productsFromLegacy } from "./rent-products";
 import { payoutAmount } from "./rent-money";
 // 🚪09-19 오후 — 손님 앞에 세울지는 순수 규칙 한 벌(`bizcheck`). 목록·소개서 카드·공개 투영이 같이 쓴다.
@@ -75,16 +75,9 @@ function repeatRules(v: unknown): RepeatRule[] {
   });
 }
 
-/** ⏱최소 대여 시간(시간, 0.5 눈금)을 행에서 읽는다(09-19 30분 단위).
- *  ⭐`min_minutes`가 있고 옛 `min_hours`와 말이 맞으면(올림한 시간이 같으면) 분 칸을 믿는다.
- *  ⚠️말이 안 맞으면 옛 칸을 믿는다 — SQL을 먼저 돌린 뒤 옛 코드가 `min_hours`만 고쳐 쓴 행이다(분 칸은 채우기 값에 멈춰 있다).
- *  칸이 없는 DB(SQL 전)에선 `undefined`라 옛 칸으로 읽힌다. */
-function minHoursOf(r: Row): number {
-  const hours = n(r.min_hours) || 1;
-  const mins = r.min_minutes;
-  if (typeof mins === "number" && mins > 0 && Math.ceil(mins / 60) === hours) return mins / 60;
-  return hours;
-}
+/** ⏱최소 대여 시간 — 🔒09-19 대표 #88부터 모든 공간 1시간(`RENT_MIN_MINUTES`). 행에 2·3시간이 남아 있어도 1로 읽는다.
+ *  🔁09-19 오전까지는 `min_minutes`(30분 눈금)와 옛 `min_hours`를 견줘 읽었다(`minHoursOf`, 지웠다). 칸은 DB에 남는다. */
+const MIN_HOURS_FIXED = RENT_MIN_MINUTES / 60;
 
 const BIZ_STATUSES: BizCheckStatus[] = ["none", "valid", "mismatch", "closed", "error"];
 const bizStatus = (v: unknown): BizCheckStatus => (BIZ_STATUSES.includes(v as BizCheckStatus) ? (v as BizCheckStatus) : "none");
@@ -118,7 +111,7 @@ function toSpace(r: Row): Space {
 
     category: (s(r.category) || "") as Space["category"],
     scope,
-    priceHour: n(r.price_hour), minHours: minHoursOf(r),
+    priceHour: n(r.price_hour), minHours: MIN_HOURS_FIXED,
     ...products,
     openSlots: expandRepeat(slots(r.open_slots), repeatWeekly),
     repeatWeekly,

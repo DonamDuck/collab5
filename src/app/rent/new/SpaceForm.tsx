@@ -23,7 +23,7 @@ import { saveSpaceAction } from "@/lib/rent-actions";
 import { uploadBizCert, uploadPhoto } from "@/lib/upload";
 import { PhotoGrid } from "@/app/register/PhotoGrid";
 import type { Space, SpaceUseType, SpaceCategory, OpenSlot, AccessHow, RepeatRule } from "@/lib/types";
-import { durationLabel, expandRepeat, minHoursToMinutes, minutesBetween, stripRepeat, todayKst } from "@/lib/rent-time";
+import { durationLabel, expandRepeat, minutesBetween, RENT_MIN_MINUTES, stripRepeat, todayKst } from "@/lib/rent-time";
 import { payoutAmount } from "@/lib/rent-money";
 import { coffeeChatFree } from "@/lib/rent-products";
 import { CONTACT_PHONE_MAX, storePhoneOk } from "@/lib/rent-limits";
@@ -91,10 +91,9 @@ const MENTOR_CHOICES = [30, 60, 90, 120];
  *  🔁09-19 길이 표시는 `rent-time`의 `durationLabel` 한 벌로 합쳤다(신청 폼·메일과 같은 글). */
 const minutesLabel = durationLabel;
 
-/** ⏱최소 대여 시간 고르개 — 30분 눈금(대표 09-19). 1시간 30분·2시간 30분까지만 반 시간을 두고, 그 뒤는 정시로 띄엄띄엄.
- *  ⚠️목록에 없는 옛 값(예: 7시간·10시간)은 `minChoices`가 덧붙여 보여 준다. 없으면 select가 첫 값을 보여 줘서
- *    안 고쳤는데 고친 것처럼 저장된다(커피챗 길이의 `chatChoices`와 같은 이유). */
-const MIN_HOUR_CHOICES = [1, 1.5, 2, 2.5, 3, 4, 5, 6, 8];
+/** 🔻09-19 대표 코멘트 #88 — 「최소 몇 시간부터 빌려드릴까요」 고르개(`MIN_HOUR_CHOICES`, 30분 눈금 1~8시간)를 지웠다.
+ *  대표: 「하단 달력 하위에 대여 시간을 선택할 거니까 그걸로 대체하되 대여 시간의 최소 범위는 1시간 이상으로」.
+ *  모든 공간이 1시간이다(`RENT_MIN_MINUTES`). 달력의 요일·날짜별 시간이 그 대신이다. */
 
 /** 🔻09-14 폐기 — 한 시간 고정이 30분 단위 고르기로 바뀌었다. 아래 설명은 그때의 판단 기록.
  *  「알려드려요」 토글은 한 시간으로 고정한다. 분 단위 칸이 있던 09-13 폼에서 그 칸을 채운 값이
@@ -134,7 +133,6 @@ interface SpaceDraft {
   facilities: string[]; facilitiesNote: string; capacity: string; rules: string;
   spaceOn: boolean; spacePrice: number; spaceNote: string;
   fullOn: boolean; fullPrice: number; fullNote: string;
-  minHours: string;
   chatOn: boolean; chatMin: string; chatPrice: number; chatTopics: string;
   /** ☕무료 커피챗(09-19 #93). 옛 초안엔 없는 칸이라 빈 모습(`false`)으로 메워진다. */
   chatFree: boolean;
@@ -209,7 +207,6 @@ export function SpaceForm({
   const [fullOn, setFullOn] = useState(initial?.rentFullOn ?? false);
   const [fullPrice, setFullPrice] = useState<number>(initial?.rentFullPrice ?? 0);
   const [fullNote, setFullNote] = useState(initial?.rentFullNote ?? "");
-  const [minHours, setMinHours] = useState(String(initial?.minHours || 2));
   const [chatOn, setChatOn] = useState(initial?.coffeeChat ?? false);
   /** 🔁09-14 한 시간 «고정»에서 **30분 단위 고르기**로(대표). 기본은 60분 — 제일 흔한 답을 미리 얹어 둔다. */
   const [chatMin, setChatMin] = useState(String(initial?.coffeeChatMinutes || 60));
@@ -290,7 +287,6 @@ export function SpaceForm({
     addrBase: "", addrDetail: "", contactPhone: defaultPhone, accessHow: "sms",
     facilities: [], facilitiesNote: "", capacity: "", rules: "",
     spaceOn: false, spacePrice: 0, spaceNote: "", fullOn: false, fullPrice: 0, fullNote: "",
-    minHours: "2",
     chatOn: false, chatMin: "60", chatPrice: 0, chatTopics: "", chatFree: false,
     openSlots: [], repeatWeekly: [],
     brandOn: !!defaultBrandSlug, brandPick: defaultBrandSlug || myBrands[0]?.slug || "",
@@ -308,7 +304,6 @@ export function SpaceForm({
     setFacilities(d.facilities); setFacilitiesNote(d.facilitiesNote); setCapacity(d.capacity); setRules(d.rules);
     setSpaceOn(!!d.spaceOn); setSpacePrice(Number(d.spacePrice) || 0); setSpaceNote(d.spaceNote ?? "");
     setFullOn(!!d.fullOn); setFullPrice(Number(d.fullPrice) || 0); setFullNote(d.fullNote ?? "");
-    setMinHours(d.minHours);
     setChatOn(d.chatOn); setChatMin(d.chatMin); setChatPrice(d.chatPrice); setChatTopics(d.chatTopics); setChatFree(!!d.chatFree);
     setOpenSlots(d.openSlots); setRepeatWeekly(d.repeatWeekly);
     setBrandOn(d.brandOn);
@@ -358,7 +353,6 @@ export function SpaceForm({
     addrBase, addrDetail, contactPhone, accessHow,
     facilities, facilitiesNote, capacity, rules,
     spaceOn, spacePrice, spaceNote, fullOn, fullPrice, fullNote,
-    minHours,
     chatOn, chatMin, chatPrice, chatTopics, chatFree,
     openSlots, repeatWeekly,
     brandOn, brandPick,
@@ -525,9 +519,9 @@ export function SpaceForm({
     //   늘릴 데가 없다(거꾸로라 길이가 음수다). 서버(`saveSpaceAction`)는 이미 「거꾸로예요」라고 말한다 — 화면도 같은 말로.
     const reversed = expanded.find((sl) => minutesBetween(sl.start, sl.end) <= 0);
     if (reversed) return ["slots", `${dateLabel(reversed.date)}은 끝나는 시각이 여는 시각보다 앞이에요. 두 시각을 바꿔 주세요.`];
-    const minM = minHoursToMinutes(Number(minHours));
-    const badSlot = expanded.find((sl) => minutesBetween(sl.start, sl.end) < minM);
-    if (badSlot) return ["slots", `${dateLabel(badSlot.date)}은 최소 ${durationLabel(minM)}을 못 채워요. 시간을 늘리거나 그날을 빼 주세요.`];
+    // ⏱🔒모든 공간 1시간(09-19 #88). 서버(`saveSpaceAction`)와 같은 상수.
+    const badSlot = expanded.find((sl) => minutesBetween(sl.start, sl.end) < RENT_MIN_MINUTES);
+    if (badSlot) return ["slots", `${dateLabel(badSlot.date)}은 최소 ${durationLabel(RENT_MIN_MINUTES)}을 못 채워요. 시간을 늘리거나 그날을 빼 주세요.`];
     // 🧾09-18 사업자 정보 — 폼 순서대로(번호 → 대표자 → 개업일 → 등록증). 서버(`saveSpaceAction`)가 같은 함수로 다시 본다.
     if (bizNameNeeded && !bizName.trim()) return ["bizName", "상호를 사업자등록증에 적힌 그대로 적어 주세요."];
     if (bizNeeded) {
@@ -597,7 +591,6 @@ export function SpaceForm({
         rentFullOn: fullOn,
         rentFullPrice: fullOn ? fullPrice : 0,
         rentFullNote: fullOn ? fullNote : "",
-        minHours: Number(minHours) || 1,
         openSlots,
         repeatWeekly,
         coffeeChat: chatOn,
@@ -1034,7 +1027,8 @@ export function SpaceForm({
             가격도 각각 설정하게 하고, 고객은 신청할 때 이걸 선택할 수 있게 하자.」
            ⭐앞선 코멘트: 「카페를 일일카페로 하고 싶은 사람도, 카페가 예뻐서 대관만 하고 싶은 사람도 딱 보고 알 수 있게」.
              그래서 상품마다 «무엇을 쓰고 할 수 있는지» 설명 칸이 필수다. 이름과 값만으로는 둘의 차이가 안 읽힌다.
-           🔁09-16 하루 값 → **시간당 값**(대표). 눈금은 1시간이고 «최소 대여 시간»이 30분의 필요를 덮는다(두 상품 공통 하나). */}
+           🔁09-16 하루 값 → **시간당 값**(대표). 눈금은 1시간이고 «최소 대여 시간»이 30분의 필요를 덮는다(두 상품 공통 하나).
+           🔻09-19 #88 — 그 «최소 대여 시간» 칸은 지웠다. 모든 공간 1시간(`RENT_MIN_MINUTES`). */}
       <Group
         // 🔁09-19 대표 코멘트 #86 — 「무엇을 파실까요」 → 「대여 타입을 선택해 주세요」.
         title="대여 타입을 선택해 주세요"
@@ -1089,19 +1083,6 @@ export function SpaceForm({
             noteAnchor="fullNote"
           />
         </ProductCard>
-
-        <L label="최소 몇 시간부터 빌려드릴까요" htmlFor="sp-minh" hint="두 상품에 똑같이 걸려요. 이보다 짧게는 신청이 안 들어와요.">
-          <RentSelect id="sp-minh" wrapClassName="w-full sm:max-w-[240px]" value={minHours} onChange={(e) => setMinHours(e.target.value)}>
-            {(MIN_HOUR_CHOICES.includes(Number(minHours))
-              ? MIN_HOUR_CHOICES
-              : [...MIN_HOUR_CHOICES, Number(minHours)].filter((h) => h > 0).sort((a, b) => a - b)
-            ).map((h) => (
-              <option key={h} value={String(h)}>
-                {durationLabel(minHoursToMinutes(h))}부터
-              </option>
-            ))}
-          </RentSelect>
-        </L>
 
         {/* ☕09-16 「알려주기 여부」 → **커피챗**(대표). 이름이 무슨 말인지 안 통했고, 파는 물건도 애매했다.
             ⭐대표 정리: *「선배한테 현업 이야기 듣기, 현업을 들여다보기 같은 자리를 부가 상품으로」*.
@@ -1182,9 +1163,9 @@ export function SpaceForm({
 
       {/* ── 여는 날·시간 ── 실사에서 이 데이터를 가진 곳이 23곳 중 0곳이었다(설계 §조사 ②). */}
       <Group
-        title="언제 빌려주실까요"
-        // 🔁09-17 QA — 「노출됩니다」(피동·행정)가 아래 결과 줄의 「보입니다」와 같은 말 두 번이었다. 여기 한 번만.
-        sub="달력에서 날짜를 누르고, 요일마다 여는 시간을 정해 주세요. 고른 날이 손님에게 보여요."
+        // 🔁09-19 대표 코멘트 #98·#99 — 제목·설명을 대표 문안으로(맞춤법만: 「정해주세요」→「정해 주세요」).
+        title="대여할 날짜와 시간을 정해 주세요"
+        sub="날짜와 요일별 대여 가능 시간을 정해 주세요. 설정한 시간에 맞춰 손님이 대여를 신청할 수 있어요."
         anchor="slots"
         error={fieldErr("slots")}
       >
@@ -1193,7 +1174,6 @@ export function SpaceForm({
           onChange={setOpenSlots}
           repeat={repeatWeekly}
           onRepeatChange={setRepeatWeekly}
-          minHours={Number(minHours) || 1}
         />
       </Group>
 
@@ -1699,7 +1679,8 @@ const FORM_STEPS = [
   "사용 시 유의 사항을 알려 주세요",
   // 🔁09-18 「얼마에 빌려주실까요」 → 상품 셋(대표).
   "대여 타입을 선택해 주세요",
-  "언제 빌려주실까요",
+  // 🔁09-19 대표 코멘트 #98
+  "대여할 날짜와 시간을 정해 주세요",
   // 🧾09-18 대표 — 공간 등록에 사업자 확인 필수.
   "사업자 정보",
   "마지막으로 확인해 주세요",

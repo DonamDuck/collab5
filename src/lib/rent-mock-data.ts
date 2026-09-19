@@ -328,7 +328,6 @@ function fullWorld(today: string, withAccount: boolean): MockWorld {
     capacity: 14,
     rules:
       "쓰신 컵과 도구는 설거지해서 제자리에 둬 주세요\n벽에 테이프·못은 안 돼요. 이젤은 빌려 드려요\n밤 9시 이후엔 1층 이웃을 위해 음악을 줄여 주세요\n음식은 포장해 온 것만 드실 수 있어요\n나가실 때 창문과 머신 전원을 꺼 주세요",
-    minHours: 3,
     // 🛍둘 다 켠 공간 — 값과 설명이 다르다(09-18).
     rentSpaceOn: true, rentSpacePrice: 18000,
     rentSpaceNote: "촬영·모임·작은 전시에 좋아요. 원목 테이블과 의자 열두 개, 창가 자리를 써요. 머신과 그라인더는 못 써요.",
@@ -367,7 +366,7 @@ function fullWorld(today: string, withAccount: boolean): MockWorld {
     area: "성수동", address: "서울 성동구 연무장길 00, 지하 1층", lat: 37.5436, lng: 127.0559,
     facilities: ["진열대 4", "조명 레일", "와이파이"], facilitiesNote: "환기창이 없어서 향초는 피해 주세요.",
     capacity: 20, rules: "진열대는 옮기지 말아 주세요\n쓰레기는 가져가 주세요",
-    minHours: 4, accessHow: "sms", contactPhone: "02-123-4567",
+    accessHow: "sms", contactPhone: "02-123-4567",
     // 🧾검토 대기 ① 국세청 기록과 다름 — 공개하기를 누르면 막힌다. 네이버 매칭 없음(이름이 안 맞는다).
     ...bizOf(U.host, "0000212344", "김느린", "20230901", "pdf", "000000009102"),
     bizCheckStatus: "mismatch", bizCheckedAt: `${d(-1)}T03:00:00.000Z`,
@@ -385,7 +384,7 @@ function fullWorld(today: string, withAccount: boolean): MockWorld {
     body: "날 좋은 계절에만 여는 옥상이에요. 겨울 동안은 잠시 쉬어요.",
     photos: [photo("옥상", 190)], area: "성수동", address: "서울 성동구 연무장길 00, 옥상",
     facilities: ["파라솔 2", "캠핑 의자 8"], capacity: 10, rules: "난간에 기대지 말아 주세요",
-    minHours: 2, accessHow: "onsite", contactPhone: "02-123-4567",
+    accessHow: "onsite", contactPhone: "02-123-4567",
     // 🧾쉬는 중인데 사업자 정보를 새로 채움 → 관리자 검토의 「확인 표시만」 줄. 국세청 조회는 실패(네트워크).
     ...bizOf(U.host, "0000312341", "김느린", "20210315", "png", "000000009103"),
     bizCheckStatus: "error", bizCheckedAt: `${d(-2)}T03:00:00.000Z`, bizCheckDetail: { reason: "network" },
@@ -409,7 +408,7 @@ function fullWorld(today: string, withAccount: boolean): MockWorld {
     area: "을지로", address: "서울 중구 을지로 000, 3층", lat: 37.5660, lng: 126.9910,
     facilities: ["재봉틀 4", "다리미", "재단 테이블"], capacity: 6,
     rules: "재봉틀 바늘이 부러지면 말씀해 주세요\n원단 자투리는 가져가셔도 돼요",
-    minHours: 2, accessHow: "sms", contactPhone: "02-765-4321",
+    accessHow: "sms", contactPhone: "02-765-4321",
     // 🧾신뢰 표시 하나(사업자 확인만). 네이버엔 못 찾았다.
     ...bizOf(U.host2, "0000456782", "박바늘", "20190402", "jpg", "000000009105"),
     bizCheckStatus: "valid", bizCheckedAt: `${d(-40)}T01:00:00.000Z`, bizApprovedAt: `${d(-40)}T05:00:00.000Z`,
@@ -426,7 +425,7 @@ function fullWorld(today: string, withAccount: boolean): MockWorld {
     photos: [photo("백반집 저녁", 8)], area: "을지로", address: "서울 중구 수표로 00, 1층",
     lat: 37.5657, lng: 126.9890, facilities: ["4인 테이블 5", "냉장고"], capacity: 20,
     rules: "주방 화구는 쓸 수 없어요\n가게 앞 입간판은 치우지 말아 주세요",
-    minHours: 2, accessHow: "onsite", contactPhone: "02-777-0000",
+    accessHow: "onsite", contactPhone: "02-777-0000",
     // 🏪신뢰 표시 하나(네이버만). 사업자 정보는 채웠는데 아직 관리자 승인 전이라 「사업자 확인된 가게」는 안 붙는다.
     //   🔁09-19 오후 — 전엔 «사업자 정보가 빈 옛 공간»이었다. 번호가 빈 공간은 이제 손님 앞에서 빠져서(`spaceListed`)
     //   이 공간이 맡던 상세·신청 폼 줄이 다 404가 됐다. 번호를 채우고, 빈 공간은 S10이 따로 맡는다.
@@ -447,7 +446,7 @@ function fullWorld(today: string, withAccount: boolean): MockWorld {
     body: "수업이 없는 평일 오전에 2층 교실을 빌려드려요. 재봉틀은 없고 큰 재단 테이블 두 개가 있어요.",
     photos: [photo("2층 교실", 310)], area: "을지로", address: "서울 중구 을지로 000, 2층", lat: 37.5660, lng: 126.9910,
     facilities: ["재단 테이블 2", "와이파이"], capacity: 10, rules: "테이블 위에서 칼질할 땐 매트를 깔아 주세요",
-    minHours: 2, accessHow: "sms", contactPhone: "02-765-4321",
+    accessHow: "sms", contactPhone: "02-765-4321",
     rentSpaceOn: true, rentSpacePrice: 12000, rentSpaceNote: "모임이나 작은 수업 자리로 써요. 재단 테이블 두 개를 같이 써요.",
     ...bizOf(U.host2, "0008155668", "박바늘", "20190402", "png", "000000009109"),
     bizCheckStatus: "none", bizCheckedAt: `${d(-1)}T02:00:00.000Z`, bizCheckDetail: { reason: "no-key" },
@@ -466,7 +465,7 @@ function fullWorld(today: string, withAccount: boolean): MockWorld {
     body: "새벽에 빵을 굽고 오후엔 비어 있는 부엌이에요. 오븐 두 대와 반죽 테이블을 같이 쓸 수 있어요.",
     photos: [photo("새벽반죽 부엌", 20)], area: "망원", address: "서울 마포구 포은로 000, 1층", lat: 37.5560, lng: 126.9060,
     facilities: ["데크 오븐 2", "반죽 테이블", "냉장고"], capacity: 4, rules: "오븐은 쓰고 나서 꼭 꺼 주세요",
-    minHours: 3, accessHow: "onsite", contactPhone: "02-333-0000",
+    accessHow: "onsite", contactPhone: "02-333-0000",
     rentFullOn: true, rentFullPrice: 25000, rentFullNote: "오후 두 시부터 부엌 전체를 써요. 오븐과 반죽 테이블을 같이 써요.",
     ...bizOf(U.host3, "0007123454", "이새벽", "20220510", "jpg", "000000009110"),
     bizCheckStatus: "valid", bizCheckedAt: `${d(-1)}T03:00:00.000Z`,
@@ -474,9 +473,10 @@ function fullWorld(today: string, withAccount: boolean): MockWorld {
     direct: [{ date: d(9), start: "14:00", end: "20:00" }],
   }, today);
 
-  // ⏱S9 — 30분 단위 공간(대표 09-19: 「9시 30분 ~ 12시의 자투리도 가능」). 최소 1시간 30분.
-  //   · d(2) 09:30~12:00 — 아침 자투리 두 시간 반. 시작은 09:30·10:00·10:30까지만 켜진다(최소 시간 때문에).
-  //   · d(3) 10:30~18:00 — 13:00~15:30(2시간 30분)이 이미 팔렸다. 12:00 시작은 끝이 13:00까지라 1시간뿐이라 못 고른다.
+  // ⏱S9 — 30분 단위 공간(대표 09-19: 「9시 30분 ~ 12시의 자투리도 가능」).
+  //   · d(2) 09:30~12:00 — 아침 자투리 두 시간 반. 시작은 09:30~11:00까지만 켜진다(최소 1시간 때문에).
+  //   · d(3) 10:30~18:00 — 13:00~15:30(2시간 30분)이 이미 팔렸다. 12:00 시작은 끝이 13:00까지라 딱 1시간이다.
+  //   🔁09-19 #88 — 이 공간만 최소 1시간 30분이었는데 모든 공간이 1시간이 됐다(`RENT_MIN_MINUTES`). 목 공간들의 `minHours`도 지웠다.
   //   · 매주 목요일 11:30~20:30 — 요일 규칙에도 반 시간이 들어간다.
   //   · 한 시간 값이 홀수(15,500원)라 반 시간 값이 원 단위로 떨어진다(1시간 30분 = 23,250원).
   const s9 = space({
@@ -487,7 +487,7 @@ function fullWorld(today: string, withAccount: boolean): MockWorld {
     area: "성수동", address: "서울 성동구 연무장길 00, 1층", lat: 37.5436, lng: 127.0559,
     facilities: ["긴 테이블 1", "의자 6", "와이파이"], capacity: 6,
     rules: "영업 중인 매장이라 큰 소리는 삼가 주세요\n쓰신 자리는 닦아 주세요",
-    minHours: 1.5, accessHow: "onsite", contactPhone: "02-123-4567",
+    accessHow: "onsite", contactPhone: "02-123-4567",
     ...bizOf(U.host, "0000112347", "김느린", "20210315", "jpg", "000000009111"),
     bizName: "느린오후 로스터리",
     bizCheckStatus: "valid", bizCheckedAt: `${d(-10)}T01:00:00.000Z`, bizApprovedAt: `${d(-10)}T02:00:00.000Z`,
@@ -514,7 +514,7 @@ function fullWorld(today: string, withAccount: boolean): MockWorld {
     photos: [photo("뒷마당 평상", 95)], area: "성수동", address: "서울 성동구 연무장길 00, 뒷마당", lat: 37.5436, lng: 127.0559,
     facilities: ["평상 2", "파라솔"], capacity: 10,
     rules: "해가 지면 조명을 꼭 꺼 주세요\n평상 위엔 신발을 벗고 올라가 주세요",
-    minHours: 2, accessHow: "sms", contactPhone: "02-123-4567",
+    accessHow: "sms", contactPhone: "02-123-4567",
     rentSpaceOn: true, rentSpacePrice: 12000, rentSpaceNote: "작은 모임이나 촬영 자리로 써요. 평상 두 개와 파라솔을 같이 써요.",
     direct: [{ date: d(5), start: "13:00", end: "19:00" }, { date: d(6), start: "13:00", end: "19:00" }],
   }, today);
@@ -527,7 +527,7 @@ function fullWorld(today: string, withAccount: boolean): MockWorld {
     body: "로스팅 교육을 하던 3층 작업실이에요. 큰 테이블 하나와 개수대가 있어요.",
     photos: [photo("3층 작업실", 150)], area: "성수동", address: "서울 성동구 연무장길 00, 3층", lat: 37.5436, lng: 127.0559,
     facilities: ["큰 테이블 1", "개수대"], capacity: 8, rules: "개수대 물은 쓰고 나서 꼭 잠가 주세요",
-    minHours: 2, accessHow: "sms", contactPhone: "02-123-4567",
+    accessHow: "sms", contactPhone: "02-123-4567",
     rentSpaceOn: true, rentSpacePrice: 14000, rentSpaceNote: "작은 수업이나 모임 자리로 써요. 큰 테이블과 개수대를 같이 써요.",
     ...bizOf(U.host, "0000112347", "김느린", "20210315", "jpg", "000000009113"),
     bizName: "느린오후 로스터리",
@@ -573,7 +573,7 @@ function fullWorld(today: string, withAccount: boolean): MockWorld {
     payoutRequested: booking({ id: 90017, spaceId: s6.id, guestUserId: U.guest2, status: "done", useDate: d(-12), startTime: "17:00", endTime: "20:00", plan: "북토크를 했어요.", headcount: 20, guestPhone: "010-5678-9012", guestName: "정다온", ...P6 }, today),
     payoutFailed: booking({ id: 90018, spaceId: s6.id, guestUserId: U.guest2, status: "done", useDate: d(-15), startTime: "18:00", endTime: "22:00", plan: "동네 모임을 했어요.", headcount: 10, guestPhone: "010-5678-9012", guestName: "정다온", ...P6 }, today),
     payoutWaiting2: booking({ id: 90019, spaceId: s6.id, guestUserId: U.guest, status: "done", useDate: d(-9), startTime: "17:00", endTime: "19:00", plan: "두 시간 짧게 촬영했어요.", ...P6 }, today),
-    // ⏱09-19 30분 단위 예약 둘 — 2시간 30분(결제 완료)과 최소 1시간 30분(확정).
+    // ⏱09-19 30분 단위 예약 둘 — 2시간 30분(결제 완료)과 1시간 30분(확정).
     // ☕무료 커피챗을 담은 예약(09-19) — 값은 공간 값뿐이고 `withChat`만 켜져 있다.
     halfPaid: booking({ id: 90021, spaceId: s9.id, guestUserId: U.guest, status: "paid", useDate: d(3), startTime: "13:00", endTime: "15:30", plan: "스터디 모임 다섯 명이 두 시간 반 동안 발표 연습을 해요.", withChat: true, headcount: 5, guestPhone: "010-3456-7890", guestName: "한서윤", guestBrandSlug: "mock-flour-diary", ...P9 }, today),
     halfConfirmed: booking({ id: 90022, spaceId: s9.id, guestUserId: U.guest, status: "confirmed", useDate: d(3), startTime: "16:30", endTime: "18:00", plan: "새로 구운 빵 사진을 창가 빛에서 찍으려고 해요.", headcount: 2, guestPhone: "010-3456-7890", guestName: "한서윤", decidedAt: `${d(-1)}T05:00:00.000Z`, ...P9 }, today),
@@ -686,7 +686,6 @@ function stressWorld(today: string): MockWorld {
       "끝나면 창문 일곱 개를 다 닫았는지 한 번 더 봐 주세요",
       "문제가 생기면 시간과 상관없이 전화 주세요",
     ].join("\n"),
-    minHours: 8,
     rentSpaceOn: true, rentSpacePrice: 950000, rentSpaceNote: [para, para].join("\n"),
     rentFullOn: true, rentFullPrice: 1000000, rentFullNote: [para, para, para].join("\n"),
     coffeeChat: true, coffeeChatMinutes: 120, coffeeChatPrice: 150000,
@@ -732,7 +731,7 @@ function minimalWorld(today: string): MockWorld {
   const s = space({
     id: 9108, slug: "mock-minimal-room", ownerUserId: U.minHost, status: "open",
     name: "작업실", address: "서울 종로구 창신길 00", rules: "깨끗이 써 주세요",
-    minHours: 1, direct: [{ date: d(4), start: "13:00", end: "15:00" }],
+    direct: [{ date: d(4), start: "13:00", end: "15:00" }],
     // 🛍최소 세계는 대관만 하나(09-18).
     rentSpaceOn: true, rentSpacePrice: 10000, rentSpaceNote: "책상 두 개를 쓸 수 있어요.",
     // 🔁09-19 오후 — 사업자 정보는 «필수 칸»이다(번호가 비면 손님 앞에서 빠진다). 최소 세계도 넷을 채운다. 상호는 비워 둔다(옛 공간 모양).

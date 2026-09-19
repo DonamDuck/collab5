@@ -30,7 +30,7 @@ import { useRouter } from "next/navigation";
 import { startBookingAction, confirmBookingAction } from "@/lib/rent-actions";
 import type { SpaceUseType, OpenSlot, RentProduct, Space } from "@/lib/types";
 import { bookingAmount, productNote, productPrice, sellableProducts } from "@/lib/rent-products";
-import { dayMarks, durationLabel, endChoices, minHoursToMinutes, minutesBetween, nowHhmmKst, rangeLabel, startChoices as startChoicesOf, toMinutes, todayKst } from "@/lib/rent-time";
+import { dayMarks, durationLabel, endChoices, minutesBetween, nowHhmmKst, rangeLabel, RENT_MIN_MINUTES, startChoices as startChoicesOf, toMinutes, todayKst } from "@/lib/rent-time";
 import { PLAN_MAX } from "@/lib/rent-limits";
 import { dateLabel, InfoList, InfoRow, primaryBtnCls, RentSelect, rentInputCls, rentTextareaCls, won } from "../ui";
 import Link from "next/link";
@@ -173,7 +173,6 @@ export function BookingForm({
   openSlots,
   takenByDate,
   products,
-  minHours,
   coffeeChat,
   coffeeChatMinutes,
   coffeeChatPrice,
@@ -195,7 +194,6 @@ export function BookingForm({
   takenByDate: Record<string, { start: string; end: string }[]>;
   /** 🛍09-18 사장님이 켠 공간 상품(대관만·공간 전체)의 값·설명. 금액 계산은 서버와 같은 `bookingAmount`로 한다. */
   products: Pick<Space, "rentSpaceOn" | "rentSpacePrice" | "rentSpaceNote" | "rentFullOn" | "rentFullPrice" | "rentFullNote">;
-  minHours: number;
   coffeeChat: boolean;
   coffeeChatMinutes: number;
   coffeeChatPrice: number;
@@ -275,7 +273,8 @@ export function BookingForm({
   //   ⚠️**한 날에 시간대가 둘 이상일 수 있다**(오전만 열고 오후에 또 여는 가게). 눈금은 시각순으로 합치고, 구간은 칸 하나를 못 넘는다.
   const daySlots = openSlots.filter((sl) => sl.date === useDate);
   const taken = takenByDate[useDate] ?? [];
-  const minMinutes = minHoursToMinutes(minHours);
+  // ⏱🔒모든 공간 1시간(대표 09-19 #88). 서버(`validateBookingRequest`)와 같은 상수.
+  const minMinutes = RENT_MIN_MINUTES;
   // ⏳오늘을 고른 경우엔 이미 지나간 시각도 뺀다. 서버도 같은 검사를 한다(`startBookingAction`).
   const cutoff = useDate === todayKst() ? toMinutes(nowHhmmKst()) : -1;
   const marks = dayMarks(daySlots);

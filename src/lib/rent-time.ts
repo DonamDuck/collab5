@@ -68,10 +68,12 @@ export function bookingMinutes(b: { startTime?: string; endTime?: string; minute
   return b.hoursCount && b.hoursCount > 0 ? Math.round(b.hoursCount * 60) : 0;
 }
 
-/** 최소 대여 시간(시간 단위, 0.5 눈금)을 분으로. 저장값은 정수가 아니어도 되지만 비교는 분(정수)으로 한다. */
-export function minHoursToMinutes(minHours: number): number {
-  return Math.round((minHours > 0 ? minHours : 1) * 60);
-}
+/** ⏱최소 대여 시간 — **모든 공간이 1시간**(대표 09-19 코멘트 #88).
+ *  대표: 「(최소 몇 시간 칸) 삭제하자. 하단 달력 하위에 대여 시간을 선택할 거니까 그걸로 대체하되 대여 시간의 최소 범위는 1시간 이상으로」.
+ *  ⭐사장님이 고르던 칸이 없어졌다. 저장된 값(`min_hours`·`min_minutes`)이 2·3시간이어도 읽을 때 이 값으로 읽고(`toSpace`),
+ *    등록 폼·신청 폼·서버 관문(`validateBookingRequest`·`saveSpaceAction`)이 전부 이 상수 하나를 본다.
+ *  🔁09-19 오전엔 사장님이 30분 눈금(1~8시간)으로 골랐다(`minHoursToMinutes`, 지웠다). */
+export const RENT_MIN_MINUTES = 60;
 
 /** 그 날짜에 호스트가 열어 둔 시간대. 같은 날 여러 칸이 있을 수 있다. */
 export function slotsOn(slots: OpenSlot[], date: string): OpenSlot[] {

@@ -11,7 +11,7 @@
 //   달력에서 날짜를 누르면 기본 시간(10~18)으로 열리고, **고른 요일만** 아래에 한 줄씩 나온다.
 //   월요일을 하나도 안 골랐으면 월요일 줄은 아예 없다 — 화면에 있는 줄은 전부 내가 만든 것이다.
 //   📌요일 머리글(일·월·화…)을 누르면 그 달의 그 요일이 통째로 담긴다. 대표가 말한 「일괄 적용」이 이 자리다.
-//   📌시간이 기본과 다른 날은 달력에 점이 찍히고, 그 날만 아래 「따로 정한 날」로 줄이 생긴다.
+//   📌시간이 기본과 다른 날은 달력에 점이 찍히고, 그 날만 아래 「날짜별로 시간 바꾸기」 카드에 줄이 생긴다(09-19 #104 — 전엔 접힌 「따로 정한 날」).
 //
 // 💾저장은 날짜마다 시각 한 벌(`openSlots`)이다.
 // 🔁09-17 대표 「오늘 다 구현」 — **요일 줄마다 「매주 계속 열기」가 붙었다.** 그 전엔 요일 규칙을 저장하지 않았고,
@@ -26,7 +26,7 @@
 //   달의 첫 요일이 기기마다 어긋날 수 있다. 오늘만 KST로 받고 나머지는 글자 비교로 한다.
 import { useState } from "react";
 import type { OpenSlot, RepeatRule } from "@/lib/types";
-import { addDaysIso, DAY_MARKS, durationLabel, expandRepeat, minHoursToMinutes, minutesBetween, REPEAT_WEEKS } from "@/lib/rent-time";
+import { addDaysIso, DAY_MARKS, durationLabel, expandRepeat, minutesBetween, RENT_MIN_MINUTES, REPEAT_WEEKS } from "@/lib/rent-time";
 import { dateLabel, todayKst, RentSelect } from "../ui";
 
 const DOW = ["일", "월", "화", "수", "목", "금", "토"];
@@ -47,7 +47,6 @@ export function OpenSlotsCalendar({
   onChange,
   repeat,
   onRepeatChange,
-  minHours,
 }: {
   /** ⭐**직접 연 날만.** 규칙이 연 날은 여기 안 들어온다(위 머리말). */
   value: OpenSlot[];
@@ -58,14 +57,16 @@ export function OpenSlotsCalendar({
   /** 🔁매주 계속 여는 요일(09-17). 갱신 함수를 받는 이유는 `onChange`와 같다. */
   repeat: RepeatRule[];
   onRepeatChange: (next: RepeatRule[] | ((cur: RepeatRule[]) => RepeatRule[])) => void;
-  /** 최소 대여 시간 — 이보다 짧게 연 날은 아무도 못 빌리므로 그 자리에서 알려 준다. */
-  minHours: number;
+  // 🔻09-19 #88 `minHours` 받기를 뺐다. 최소 대여 시간은 모든 공간 1시간(`RENT_MIN_MINUTES`)이라 이 화면이 직접 안다.
 }) {
   const today = todayKst();
   const [ty, tm] = today.split("-").map(Number);
   const [view, setView] = useState({ y: ty, m: tm });
-  /** 「이 날만 따로」로 펼쳐 둔 날짜. */
-  const [editing, setEditing] = useState<string | null>(null);
+  /** 「날짜별로 시간 바꾸기」에 «+ 날짜 추가»로 올려 둔 날짜들(09-19 #104). 시간을 아직 안 바꿔도 줄이 남아 있게 따로 든다.
+   *  시간을 바꾸면 그날은 «따로 정한 날»(`isOdd`)이 되고, 되돌리면 이 목록에서도 빠진다. */
+  const [extra, setExtra] = useState<string[]>([]);
+  /** 「+ 날짜 추가」를 눌러 날짜 고르개가 열려 있나. */
+  const [adding, setAdding] = useState(false);
 
   const firstDow = new Date(Date.UTC(view.y, view.m - 1, 1)).getUTCDay();
   const daysInMonth = new Date(Date.UTC(view.y, view.m, 0)).getUTCDate();
@@ -107,7 +108,10 @@ export function OpenSlotsCalendar({
     const t = dowTime(dowOf(sl.date));
     return sl.start !== t.start || sl.end !== t.end;
   };
-  const odds = sorted.filter(isOdd);
+  /** 「날짜별로 시간 바꾸기」에 서는 줄 = 따로 정한 날 + «+ 날짜 추가»로 올려 둔 날(아직 열려 있는 것만), 날짜순. */
+  const changedRows = sorted.filter((sl) => isOdd(sl) || extra.includes(sl.date));
+  /** «+ 날짜 추가»가 고르게 하는 날 = 열린 날 중 오늘 이후이고 아직 줄이 없는 날. */
+  const addable = sorted.filter((sl) => sl.date >= today && !isOdd(sl) && !extra.includes(sl.date));
 
   /** 날짜들을 닫는다 — 직접 연 칸은 지우고, 규칙이 맡는 날이면 그날을 쉬는 날로 적는다. */
   const closeDates = (isos: string[]) => {
@@ -123,7 +127,7 @@ export function OpenSlotsCalendar({
         }),
       );
     }
-    if (editing && set.has(editing)) setEditing(null);
+    setExtra((cur) => cur.filter((x) => !set.has(x)));
   };
 
   /** 날짜들을 연다 — 규칙이 맡는 날이면 쉬는 날에서 지우고, 아니면 그 요일 기준 시간으로 직접 연다. */
@@ -194,17 +198,26 @@ export function OpenSlotsCalendar({
     );
   };
 
+  /** 「날짜별로 시간 바꾸기」 줄 하나를 요일 시간으로 되돌린다(09-19 #104). 날짜는 그대로 열려 있다 — 닫는 건 달력이 한다.
+   *  · 규칙(매주 반복)이 맡는 날 → 떼어 낸 «직접 연 칸»을 지운다. 규칙이 다시 그날을 연다.
+   *  · 직접 연 날 → 그 요일의 기준 시간으로 맞춘다. */
+  const revertDate = (iso: string) => {
+    setExtra((cur) => cur.filter((x) => x !== iso));
+    if (ruleCovers(iso)) {
+      onChange((cur) => cur.filter((sl) => sl.date !== iso));
+      return;
+    }
+    const t = dowTime(dowOf(iso));
+    onChange((cur) => cur.map((sl) => (sl.date === iso ? { ...sl, ...t } : sl)));
+  };
+
   const navCls =
     "inline-flex h-[44px] w-[44px] items-center justify-center rounded-md text-[18px] text-body transition-colors hover:bg-surface-soft disabled:opacity-30 disabled:hover:bg-transparent";
-  /** 한 줄에 서야 하는 시간 칸. ⚠️폭·높이는 `wrapClassName`/`size`로 준다 — `className`으로는 안 먹는다. */
-  const timeWrap = "w-[104px] shrink-0";
 
   return (
     <div className="space-y-4">
-      {/* 👆🔁09-17 QA — 이 안내가 달력 «아래»에 있어서 다 누른 뒤에야 읽혔다. 머리글이 버튼이라는 걸 누르기 전에 안다. */}
-      <p className="text-[15px] leading-relaxed break-keep text-mute">
-        요일(일·월·화…)을 누르면 이 달의 그 요일이 한 번에 담겨요.
-      </p>
+      {/* 🔻09-19 대표 코멘트 #100 — 「요일(일·월·화…)을 누르면 이 달의 그 요일이 한 번에 담겨요」 안내를 지웠다.
+          머리글 알약(누를 수 있는 얼굴)과 낭독기 이름(「월요일 전부 담기」)은 그대로다. */}
       {/* ── ① 달력 ── */}
       <div className="rounded-md border border-border-strong bg-surface p-3">
         <div className="flex items-center justify-between">
@@ -271,206 +284,189 @@ export function OpenSlotsCalendar({
         </div>
       </div>
 
-      {/* ── ② 고른 요일의 시간 ── 달력 «아래», 고른 요일만(대표 09-16). */}
+      {/* ── ② 요일별 시간 + ③ 날짜별로 시간 바꾸기 ── 달력 «아래», 고른 요일만(대표 09-16).
+          🔁09-19 대표 코멘트 #101~#104 — ②와 ③을 같은 카드 모양으로 붙여 한 덩어리로 읽히게 했다.
+            대표: 「(이 날만 시간을 다르게) 이거 진짜 중요한데 잘 안 보이거든. 상단의 시간과 좀 더 잘 어울려 볼 수 있게」.
+            ⭐전엔 ③이 접힌 `details` 한 줄(「이 날만 시간을 다르게 하고 싶어요」)이었다. 이제 늘 펼친 카드이고, 바꾼 날은 줄로 늘 보인다.
+            🔻「N일을 여셨어요」(#103) 줄은 뺐다. 요일 줄마다 날 수가 이미 있다. */}
       {usedDows.length === 0 ? (
         <p className="text-[15px] leading-relaxed break-keep text-faint">
           날짜를 눌러 주세요. 하루도 없으면 아무도 신청할 수 없어요.
         </p>
       ) : (
-        <div className="rounded-md border border-border-strong bg-surface p-3">
-          <p className="text-[16px] font-medium text-ink">몇 시에 여시나요</p>
-          <p className="mt-1 text-[15px] leading-relaxed break-keep text-mute">
-            고르신 요일만 나와요. 여기서 바꾸면 그 요일로 고른 날이 같이 바뀌어요.
-          </p>
-          <div className="mt-3 space-y-2.5">
-            {usedDows.map((d) => {
-              const t = dowTime(d);
-              const h = minutesBetween(t.start, t.end);
-              const n = all.filter((sl) => dowOf(sl.date) === d).length;
-              const on = !!ruleOf(d);
-              return (
-                <div key={d} className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
-                  <span className="inline-flex h-[40px] w-[44px] shrink-0 items-center justify-center rounded-md bg-primary-tint text-[15px] font-medium text-primary-on">
-                    {DOW[d]}
-                  </span>
-                  <RentSelect
-                    aria-label={`${DOW[d]}요일 여는 시각`}
-                    compact
-                    wrapClassName={timeWrap}
-                    value={t.start}
-                    onChange={(e) => editDow(d, { start: e.target.value })}
-                  >
-                    {HOURS.map((x) => (
-                      <option key={x} value={x}>
-                        {x}
-                      </option>
-                    ))}
-                  </RentSelect>
-                  <span className="text-mute">~</span>
-                  <RentSelect
-                    aria-label={`${DOW[d]}요일 닫는 시각`}
-                    compact
-                    wrapClassName={timeWrap}
-                    value={t.end}
-                    onChange={(e) => editDow(d, { end: e.target.value })}
-                  >
-                    {HOURS.map((x) => (
-                      <option key={x} value={x}>
-                        {x}
-                      </option>
-                    ))}
-                  </RentSelect>
-                  <span className="text-[14px] text-faint">{n}일</span>
-                  {/* 🔁09-17 — 이 폼의 알약 모양(고르면 키위 틴트, 아니면 흰 면)을 그대로 쓴다. 한 개짜리라 눌림 상태로 말한다. */}
-                  <button
-                    type="button"
-                    aria-pressed={on}
-                    onClick={() => setRepeat(d, !on)}
-                    className={`ml-auto inline-flex h-[40px] shrink-0 items-center rounded-pill px-4 text-[15px] font-medium transition-colors ${
-                      on
-                        ? "bg-primary-tint text-primary-on"
-                        : "border-[0.5px] border-[#DFDFE3] bg-surface text-body hover:bg-surface-soft"
-                    }`}
-                  >
-                    {on ? "매주 여는 중" : "매주 계속 열기"}
-                  </button>
-                  {h < minHoursToMinutes(minHours) && (
-                    <span className="basis-full text-[14px] text-danger">최소 {durationLabel(minHoursToMinutes(minHours))}을 못 채워요</span>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-          {/* 🔁09-17 — 켜기 전에 무엇이 일어나는지 먼저 읽히게 줄들 바로 밑에 둔다. 쉬는 날은 `skip`으로 실제로 빠진다. */}
-          <p className="mt-3 text-[15px] leading-relaxed break-keep text-mute">
-            매주 계속 열어 두시면 늘 앞으로 12주치 그 요일이 열려 있어요. 하루만 쉬고 싶은 날은 달력에서 그날을 눌러 빼면 돼요.
-          </p>
-        </div>
-      )}
-
-      {/* ── ③ 결과 한 줄 + 따로 정한 날 ── */}
-      {sorted.length > 0 && (
-        <div>
-          <p className="text-[15px] leading-relaxed break-keep text-body">
-            {/* 🔻「대여하시는 분에게 이 날짜가 보입니다」 삭제 — 절 설명과 같은 말이 두 번이었다(09-17 QA). */}
-            <span className="font-medium text-ink">{sorted.length}일</span>을 여셨어요.
-          </p>
-
-          {odds.length > 0 && (
-            <div className="mt-3 space-y-2">
-              <p className="text-[15px] text-mute">시간을 따로 정한 날</p>
-              {odds.map((sl) => (
-                <SlotRow
-                  key={sl.date}
-                  sl={sl}
-                  minHours={minHours}
-                  onEdit={(patch) => editDate(sl.date, patch)}
-                  onRemove={() => toggle(sl.date)}
-                />
-              ))}
-            </div>
-          )}
-
-          {sorted.length > odds.length && (
-            <details className="mt-3">
-              <summary className="cursor-pointer list-none py-[10px] text-[15px] text-mute underline underline-offset-2">
-                이 날만 시간을 다르게 하고 싶어요
-              </summary>
-              <div className="mt-2 space-y-2">
-                {sorted
-                  .filter((sl) => !isOdd(sl))
-                  .map((sl) =>
-                    editing === sl.date ? (
-                      <SlotRow
-                        key={sl.date}
-                        sl={sl}
-                        minHours={minHours}
-                        onEdit={(patch) => editDate(sl.date, patch)}
-                        onRemove={() => toggle(sl.date)}
-                      />
-                    ) : (
-                      <div
-                        key={sl.date}
-                        className="flex items-center gap-2 rounded-md border border-hairline px-3 py-2"
+        <div className="space-y-2">
+          <div className="rounded-md border border-border-strong bg-surface p-3">
+            {/* 🔁09-19 #102 「몇 시에 여시나요」 → 대표 문안(맞춤법만). */}
+            <p className="text-[16px] font-medium text-ink">요일별 대여 가능 시간을 정해 주세요</p>
+            <p className="mt-1 text-[15px] leading-relaxed break-keep text-mute">
+              고르신 요일만 나와요. 여기서 바꾸면 그 요일로 고른 날이 같이 바뀌어요.
+            </p>
+            <div className="mt-3 space-y-2.5">
+              {usedDows.map((d) => {
+                const t = dowTime(d);
+                const h = minutesBetween(t.start, t.end);
+                const n = all.filter((sl) => dowOf(sl.date) === d).length;
+                const on = !!ruleOf(d);
+                return (
+                  <div key={d} className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
+                    <span className="inline-flex h-[40px] w-[44px] shrink-0 items-center justify-center rounded-md bg-primary-tint text-[15px] font-medium text-primary-on">
+                      {DOW[d]}
+                    </span>
+                    <TimeSelects
+                      label={`${DOW[d]}요일`}
+                      start={t.start}
+                      end={t.end}
+                      onEdit={(patch) => editDow(d, patch)}
+                    />
+                    <span className="text-[14px] text-faint">{n}일</span>
+                    {/* 🔁09-19 대표 코멘트 #101 — 「매주 계속 열기」 알약 → 「매주 반복」 스위치(네/아니오가 한눈에).
+                        모양은 상품 카드의 켜기 스위치와 같다. 글자까지 누름 자리라 40px 줄 전체를 누르면 된다. */}
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={on}
+                      aria-label={`${DOW[d]}요일 매주 반복`}
+                      onClick={() => setRepeat(d, !on)}
+                      className="ml-auto inline-flex h-[40px] shrink-0 items-center gap-2 pl-2 text-[15px] text-body"
+                    >
+                      매주 반복
+                      <span
+                        aria-hidden="true"
+                        className={`flex h-[26px] w-11 items-center rounded-pill p-[2px] transition-colors ${on ? "bg-primary" : "bg-border-strong"}`}
                       >
-                        <p className="min-w-0 flex-1 text-[15px] text-body">
-                          {dateLabel(sl.date)} · {sl.start}~{sl.end}
-                        </p>
-                        <button
-                          type="button"
-                          onClick={() => setEditing(sl.date)}
-                          className="h-[40px] shrink-0 px-2 text-[15px] text-mute underline underline-offset-2"
-                        >
-                          시간 바꾸기
-                        </button>
-                      </div>
-                    ),
-                  )}
+                        <span className={`h-[22px] w-[22px] rounded-pill bg-white transition-transform ${on ? "translate-x-[18px]" : "translate-x-0"}`} />
+                      </span>
+                    </button>
+                    {h < RENT_MIN_MINUTES && (
+                      <span className="basis-full text-[14px] text-danger">최소 {durationLabel(RENT_MIN_MINUTES)}을 못 채워요</span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            {/* 🔁09-17 — 켜기 전에 무엇이 일어나는지 먼저 읽히게 줄들 바로 밑에 둔다. 쉬는 날은 `skip`으로 실제로 빠진다. */}
+            <p className="mt-3 text-[15px] leading-relaxed break-keep text-mute">
+              매주 반복을 켜 두시면 늘 앞으로 12주치 그 요일이 열려 있어요. 하루만 쉬고 싶은 날은 달력에서 그날을 눌러 빼면 돼요.
+            </p>
+          </div>
+
+          {/* ③ 날짜별로 시간 바꾸기 — 요일 시간과 다른 날. 바꾼 날은 달력에도 점이 찍힌다. */}
+          <div className="rounded-md border border-border-strong bg-surface p-3">
+            <p className="text-[16px] font-medium text-ink">날짜별로 시간 바꾸기</p>
+            <p className="mt-1 text-[15px] leading-relaxed break-keep text-mute">
+              특정한 날만 시간이 다르면 여기서 바꿔 주세요. 바꾼 날은 달력에 점으로 표시돼요.
+            </p>
+            {changedRows.length > 0 && (
+              <div className="mt-3 space-y-2.5">
+                {changedRows.map((sl) => (
+                  <DateRow key={sl.date} sl={sl} onEdit={(patch) => editDate(sl.date, patch)} onRevert={() => revertDate(sl.date)} />
+                ))}
               </div>
-            </details>
-          )}
+            )}
+            {addable.length > 0 &&
+              (adding ? (
+                <div className="mt-3">
+                  <RentSelect
+                    aria-label="시간을 바꿀 날짜"
+                    autoFocus
+                    value=""
+                    onChange={(e) => {
+                      const iso = e.target.value;
+                      if (iso) setExtra((cur) => (cur.includes(iso) ? cur : [...cur, iso]));
+                      setAdding(false);
+                    }}
+                    onBlur={() => setAdding(false)}
+                  >
+                    <option value="" disabled>
+                      날짜를 골라 주세요
+                    </option>
+                    {addable.map((sl) => (
+                      <option key={sl.date} value={sl.date}>
+                        {dateLabel(sl.date)} · {sl.start}~{sl.end}
+                      </option>
+                    ))}
+                  </RentSelect>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setAdding(true)}
+                  className="mt-3 inline-flex h-[44px] items-center rounded-pill border border-border-strong bg-surface px-4 text-[15px] font-medium text-body transition-colors hover:bg-surface-soft"
+                >
+                  + 날짜 추가
+                </button>
+              ))}
+          </div>
         </div>
       )}
     </div>
   );
 }
 
-/** 한 날짜의 시각을 고치는 줄. 「따로 정한 날」과 펼친 줄이 같은 모양을 쓴다. */
-function SlotRow({
-  sl,
-  minHours,
+/** 여는·닫는 시각 한 쌍(30분 눈금). 요일 줄과 날짜 줄이 같이 쓴다.
+ *  ⚠️폭은 `wrapClassName`으로 준다 — `className`으로는 안 먹는다(`RentSelect`). */
+function TimeSelects({
+  label,
+  start,
+  end,
   onEdit,
-  onRemove,
+}: {
+  /** 낭독기 이름 앞머리 — 「월요일」·「9월 21일 (일)」. */
+  label: string;
+  start: string;
+  end: string;
+  onEdit: (patch: { start?: string; end?: string }) => void;
+}) {
+  return (
+    <>
+      <RentSelect aria-label={`${label} 여는 시각`} compact wrapClassName="w-[104px] shrink-0" value={start} onChange={(e) => onEdit({ start: e.target.value })}>
+        {HOURS.map((x) => (
+          <option key={x} value={x}>
+            {x}
+          </option>
+        ))}
+      </RentSelect>
+      <span className="text-mute">~</span>
+      <RentSelect aria-label={`${label} 닫는 시각`} compact wrapClassName="w-[104px] shrink-0" value={end} onChange={(e) => onEdit({ end: e.target.value })}>
+        {HOURS.map((x) => (
+          <option key={x} value={x}>
+            {x}
+          </option>
+        ))}
+      </RentSelect>
+    </>
+  );
+}
+
+/** 「날짜별로 시간 바꾸기」의 줄 하나(09-19 #104) — 요일 줄과 같은 모양이다(날짜 칩 → 시각 둘 → 오른쪽 끝에 되돌리기).
+ *  폰(375)에선 날짜 칩 뒤로 시각이 다음 줄로 내려간다. 넓은 화면에선 한 줄. */
+function DateRow({
+  sl,
+  onEdit,
+  onRevert,
 }: {
   sl: OpenSlot;
-  minHours: number;
   onEdit: (patch: Partial<OpenSlot>) => void;
-  onRemove: () => void;
+  onRevert: () => void;
 }) {
   const m = minutesBetween(sl.start, sl.end);
-  const minM = minHoursToMinutes(minHours);
-  const bad = m <= 0 ? "끝나는 시각이 더 늦어야 해요." : m < minM ? `최소 ${durationLabel(minM)}을 못 채워요.` : "";
+  const bad = m <= 0 ? "끝나는 시각이 더 늦어야 해요." : m < RENT_MIN_MINUTES ? `최소 ${durationLabel(RENT_MIN_MINUTES)}을 못 채워요.` : "";
+  const label = dateLabel(sl.date);
   return (
-    <div className="rounded-md border border-hairline bg-surface p-3">
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
-        <p className="min-w-[92px] shrink-0 text-[15px] font-medium text-ink">{dateLabel(sl.date)}</p>
-        <RentSelect
-          aria-label={`${dateLabel(sl.date)} 여는 시각`}
-          compact
-          wrapClassName="w-[104px] shrink-0"
-          value={sl.start}
-          onChange={(e) => onEdit({ start: e.target.value })}
-        >
-          {HOURS.map((t) => (
-            <option key={t} value={t}>
-              {t}
-            </option>
-          ))}
-        </RentSelect>
-        <span className="text-mute">~</span>
-        <RentSelect
-          aria-label={`${dateLabel(sl.date)} 닫는 시각`}
-          compact
-          wrapClassName="w-[104px] shrink-0"
-          value={sl.end}
-          onChange={(e) => onEdit({ end: e.target.value })}
-        >
-          {HOURS.map((t) => (
-            <option key={t} value={t}>
-              {t}
-            </option>
-          ))}
-        </RentSelect>
-        <button
-          type="button"
-          onClick={onRemove}
-          aria-label={`${dateLabel(sl.date)} 빼기`}
-          className="ml-auto h-[40px] shrink-0 px-2 text-[15px] text-mute underline underline-offset-2"
-        >
-          빼기
-        </button>
-      </div>
-      {bad && <p className="mt-2 text-[15px] leading-relaxed break-keep text-danger">{bad}</p>}
+    <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
+      <span className="inline-flex h-[40px] shrink-0 items-center rounded-md bg-primary-tint px-3 text-[15px] font-medium text-primary-on">
+        {label}
+      </span>
+      <TimeSelects label={label} start={sl.start} end={sl.end} onEdit={onEdit} />
+      <button
+        type="button"
+        onClick={onRevert}
+        aria-label={`${label} 요일 시간으로 되돌리기`}
+        className="ml-auto h-[40px] shrink-0 px-2 text-[15px] text-mute underline underline-offset-2"
+      >
+        되돌리기
+      </button>
+      {bad && <p className="basis-full text-[14px] text-danger">{bad}</p>}
     </div>
   );
 }

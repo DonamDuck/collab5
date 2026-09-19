@@ -28,9 +28,6 @@ export const COFFEE_CHAT_MINUTES_MIN = 30;
 export const COFFEE_CHAT_MINUTES_MAX = 480;
 export const COFFEE_CHAT_MINUTES_STEP = 30;
 
-/** ⏱최소 대여 시간 — 하루 안에서 고르는 값이라 24시간을 넘을 수 없다. */
-export const MIN_HOURS_MAX = 24;
-
 /** 🙋공간 정원과 신청 인원의 상한 (09-18 밤 QA G-08·H-25).
  *  정원을 적지 않은 공간에도 이 값까지만 받는다. 칸이 `integer`라 큰 수는 「저장에 실패했어요」로만 떨어졌고,
  *  음수·0·소수는 그대로 들어갔다. ⭐1,000명은 하루 가게에서 나올 수 있는 값의 바깥 울타리다(가장 큰 목 데이터가 120명). */

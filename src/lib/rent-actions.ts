@@ -38,7 +38,7 @@ import {
 } from "./rent-review";
 import {
   CAPACITY_MAX, COFFEE_CHAT_MINUTES_MAX, COFFEE_CHAT_MINUTES_MIN, COFFEE_CHAT_MINUTES_STEP, COFFEE_CHAT_PRICE_MAX,
-  CONTACT_PHONE_MAX, HOST_MESSAGE_MAX, MIN_HOURS_MAX, PHOTOS_MAX, PLAN_MAX, PRICE_HOUR_MAX, storePhoneOk,
+  CONTACT_PHONE_MAX, HOST_MESSAGE_MAX, PHOTOS_MAX, PLAN_MAX, PRICE_HOUR_MAX, storePhoneOk,
 } from "./rent-limits";
 import { geocode } from "./geocode";
 import { repo } from "./repo";
@@ -47,7 +47,7 @@ import {
   notifyBookingPaidToGuest, notifyBookingConfirmedToHost, notifyBookingCancelledToGuest, notifyAdminRefund,
   notifySpacePublished, notifySpaceReview, notifyRefundRequest, notifyDeal, notifySpaceFixRequest, type DealKind,
 } from "./rent-notify";
-import { bookingStarted, dateLabel, kstDaysUntil, durationLabel, isTimeMark, minHoursToMinutes, minutesBetween, toMinutes, todayKst } from "./rent-time";
+import { bookingStarted, dateLabel, kstDaysUntil, durationLabel, isTimeMark, minutesBetween, RENT_MIN_MINUTES, toMinutes, todayKst } from "./rent-time";
 import type { Space, SpaceBooking, SpaceUseType, SpaceCategory, OpenSlot, AccessHow, RentProduct, BizCheckStatus } from "./types";
 import { bookingAmount, compatScopePrice } from "./rent-products";
 import { PRODUCT_LABEL, withJosa } from "./rent-copy";
@@ -142,7 +142,8 @@ export interface SpaceFormInput {
   /** 🛍상품 셋(09-18). 옛 `scope`·`priceHour`는 화면이 안 보낸다 — 서버가 이 값에서 호환 값을 만든다. */
   rentSpaceOn: boolean; rentSpacePrice: number; rentSpaceNote: string;
   rentFullOn: boolean; rentFullPrice: number; rentFullNote: string;
-  minHours: number; openSlots: OpenSlot[];
+  /** 🔻09-19 대표 #88 — `minHours`(최소 대여 시간)는 화면이 더 안 보낸다. 모든 공간이 1시간이다(`RENT_MIN_MINUTES`). */
+  openSlots: OpenSlot[];
   /** 🔁매주 계속 여는 요일(09-17). `openSlots`에 펼친 날짜가 섞여 와도 된다 — 저장(`saveSpace`)이 도로 뺀다. */
   repeatWeekly: Space["repeatWeekly"];
   coffeeChat: boolean; coffeeChatMinutes: number; coffeeChatPrice: number; coffeeChatTopics: string;
@@ -205,12 +206,9 @@ export async function saveSpaceAction(input: SpaceFormInput): Promise<ActionResu
       return { ok: false, message: `${label} 설명이 짧아요. 손님이 무엇을 쓰고 할 수 있는지 열 글자 넘게 담아 주세요.` };
     }
   }
-  // ⏱09-18 밤 QA(H-36) — 최소 대여 시간은 «하루 안»이다. 전엔 소수·25시간·빈 값이 그대로 저장됐다.
-  //   🔁09-19 30분 눈금(대표) — 1시간 30분 같은 반 시간을 받는다. 그 밖의 소수(1.2시간)는 여전히 막는다.
-  if (!Number.isInteger(input.minHours * 2) || input.minHours < 1 || input.minHours > MIN_HOURS_MAX) {
-    return { ok: false, message: `최소 대여 시간은 한 시간부터 ${MIN_HOURS_MAX}시간까지 30분 단위로 고를 수 있어요.` };
-  }
-  const minMinutes = minHoursToMinutes(input.minHours);
+  // ⏱🔒09-19 대표 #88 — 최소 대여 시간은 모든 공간 1시간이다. 사장님이 고르던 칸(09-18 밤 H-36 검사)이 없어졌다.
+  //   열어 둔 시간대가 한 시간보다 짧으면 아무도 못 빌리니 아래에서 막는다.
+  const minMinutes = RENT_MIN_MINUTES;
   const minLabel = durationLabel(minMinutes);
   // ☕09-18 밤 QA(H-36) — 켠 커피챗은 값과 길이가 있어야 한다. 값 0원짜리 커피챗이 상품으로 서 있었다.
   //   🔁09-19 대표 #93 — 「무료로 제공할게요」를 고른 커피챗만 0원을 받는다. 무료를 안 골랐는데 0원이면 여전히 막는다(값을 빠뜨린 것).
@@ -480,7 +478,8 @@ export async function saveSpaceAction(input: SpaceFormInput): Promise<ActionResu
       rentSpaceOn: input.rentSpaceOn, rentSpacePrice: input.rentSpaceOn ? input.rentSpacePrice : 0, rentSpaceNote: "",
       rentFullOn: input.rentFullOn, rentFullPrice: input.rentFullOn ? input.rentFullPrice : 0, rentFullNote: "",
     }),
-    minHours: input.minHours, openSlots: input.openSlots,
+    // 🔒1시간 고정(09-19 #88). 옛 칸 `min_hours`·`min_minutes`에도 1시간이 적힌다(`saveSpace`).
+    minHours: RENT_MIN_MINUTES / 60, openSlots: input.openSlots,
     repeatWeekly: repeat.map((r) => ({ dow: r.dow, start: r.start, end: r.end, ...(r.skip?.length ? { skip: r.skip } : {}) })),
     coffeeChat: input.coffeeChat,
     coffeeChatMinutes: input.coffeeChat ? input.coffeeChatMinutes : 0,

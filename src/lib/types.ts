@@ -504,8 +504,9 @@ export interface Space {
 
   /** ⏱시간당 값. 🔁09-19 눈금이 30분이 됐다(대표) — 값은 시간당으로 적고 30분 단위로 나눠 받는다(`priceForMinutes`). */
   priceHour: number;
-  /** 최소 대여 시간(시간). 🔁09-19부터 30분 눈금이라 `1.5`가 올 수 있다. 비교는 분으로 한다(`minHoursToMinutes`),
-   *  보일 땐 `durationLabel`로 적는다(「1시간 30분」). DB는 `min_minutes`(09-19 SQL)가 있으면 그걸, 없으면 옛 `min_hours`를 읽는다. */
+  /** 최소 대여 시간(시간). 🔒09-19 대표 #88부터 **모든 공간 1시간 고정**이다(`rent-time`의 `RENT_MIN_MINUTES`).
+   *  읽을 때(`toSpace`) 저장값과 상관없이 1로 읽고, 저장할 때도 1로 쓴다. 칸은 DB(`min_hours`·`min_minutes`)와 호환 때문에 남겼다.
+   *  ⚠️규칙은 이 칸을 안 본다 — 비교는 늘 상수로 한다. */
   minHours: number;
 
   /** 🛍사장님이 파는 공간 상품 둘(대표 09-18: 「대관만, 공간 전체(대관·시설), 커피챗 이렇게 3개 상품」).
