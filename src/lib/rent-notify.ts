@@ -17,7 +17,7 @@ import type { AdminNotice } from "./admin-notify";
 import { notifyAdmin } from "./admin-notify";
 import type { AdminDailySummary, RemindRun } from "./rent-admin-daily";
 import { KAKAO_CHAT_URL, SITE_URL } from "./site";
-import { addDaysIso, bookingWhen, dateLabel } from "./rent-time";
+import { bookingWhen, dateLabel } from "./rent-time";
 import {
   accessMeetLine, hostContactLine, withJosa, BROKER_NOTE, CONTACT_RULE_GUEST, CONTACT_RULE_GUEST_CONFIRMED, CONTACT_RULE_HOST,
   BOOKING_HEADLINE, COFFEE_CHAT_WHEN_GUEST, COFFEE_CHAT_WHEN_HOST, HOST_REQUEST_STEPS,
@@ -948,7 +948,7 @@ export function buildAdminDaily(
       [LABEL.dailyReview, s.reviewPending + s.reviewApproveOnly > 0
         ? `${[s.reviewPending > 0 ? `공개 전 ${s.reviewPending}곳` : "", s.reviewApproveOnly > 0 ? `확인 표시 전 ${s.reviewApproveOnly}곳` : ""].filter(Boolean).join(" · ")}\n${SITE_URL}/rent/review`
         : "없어요"],
-      [LABEL.dailyUse, `오늘 ${s.useToday}건 · 내일(${dateLabel(addDaysIso(today, 1))}) ${s.useTomorrow}건`],
+      [LABEL.dailyUse, `오늘 ${s.useToday}건 · 내일 ${s.useTomorrow}건`],
       [LABEL.dailyRemind, remindLine(remind)],
     ]
     : [[LABEL.dailyRemind, remindLine(remind)]];
