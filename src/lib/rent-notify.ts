@@ -927,8 +927,11 @@ export async function notifyRefundRequest(booking: SpaceBooking, space: Space, h
   return notifyAdmin(buildRefundRequestNotice(booking, space, host, note));
 }
 
-/** 💸거래 알림의 갈래 — 돈이 들어오거나 나간 순간. 거절했는데 환불이 실패한 경우는 대표 손이 필요해서 따로 둔다. */
-export type DealKind = "paid" | "guest-cancel" | "host-reject" | "host-reject-failed" | "admin-refund";
+/** 💸거래 알림의 갈래 — 돈이 들어오거나 나간 순간. 거절했는데 환불이 실패한 경우는 대표 손이 필요해서 따로 둔다.
+ *  🆕09-19 저녁 — 결제 승인 직후 그 시간이 차서 자동 환불한 때(`auto-refund`)와 그 환불마저 실패한 때(`auto-refund-failed`). */
+export type DealKind =
+  | "paid" | "guest-cancel" | "host-reject" | "host-reject-failed" | "admin-refund"
+  | "auto-refund" | "auto-refund-failed";
 
 /** ⑪ 거래 알림 → 대표 슬랙 (09-19 오후).
  *  대표 원문: *「결제 알림 — 슬랙에 그렇게 해줘. 식별 가능한 정보 예약 ID라든지 등과 금액, 회원 번호 등등」*.
@@ -953,9 +956,15 @@ export function buildDealNotice(kind: DealKind, booking: SpaceBooking, space: Sp
           ? [`사장님이 거절했어요 · ${won(back)} 전액 환불`, "사장님이 신청을 거절해서 손님께 결제한 돈을 전부 돌려드렸어요."]
           : kind === "host-reject-failed"
             ? ["사장님이 거절했는데 환불이 안 됐어요", "토스 환불이 실패해서 손님 돈이 아직 그대로예요. 정산 화면의 손이 필요한 예약에서 확인해 주세요."]
-            : [`환불 승인을 마쳤어요 · ${won(back)}`, "관리자 승인으로 손님께 남은 돈을 돌려드렸어요. 이 예약은 사장님 정산에서 빠져요."];
+            : kind === "auto-refund"
+              ? [`시간이 차서 자동 환불했어요 · ${won(back)}`, "손님이 결제를 마친 사이에 다른 분이 같은 시간을 먼저 잡았어요. 예약은 안 생겼고, 결제한 돈은 바로 전액 돌려드렸어요."]
+              : kind === "auto-refund-failed"
+                // 🚨한눈에 보이게 머리부터 그 말로 선다. 손님은 결제를 마쳤는데 예약도 환불도 없는 상태다.
+                ? [`손님 돈이 붙잡혀 있어요 · ${won(total)}`, "결제는 됐는데 그 사이 시간이 차서 예약을 못 만들었고, 자동 환불까지 실패했어요. 토스 관리자 화면에서 직접 환불해 주세요. 정산 화면의 손이 필요한 예약에도 떠 있어요."]
+                : [`환불 승인을 마쳤어요 · ${won(back)}`, "관리자 승인으로 손님께 남은 돈을 돌려드렸어요. 이 예약은 사장님 정산에서 빠져요."];
+  const notBack = kind === "host-reject-failed" || kind === "auto-refund-failed";
   const refundRow: [string, string][] =
-    kind === "paid" ? [] : [[LABEL.dealRefund, kind === "host-reject-failed" ? "아직 못 돌려드렸어요" : back === 0 ? "없어요" : won(back)]];
+    kind === "paid" ? [] : [[LABEL.dealRefund, notBack ? "아직 못 돌려드렸어요" : back === 0 ? "없어요" : won(back)]];
   const rows: [string, string][] = [
     [LABEL.dealBooking, String(booking.id)],
     [LABEL.dealOrder, booking.orderId],

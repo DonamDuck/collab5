@@ -131,6 +131,9 @@ export function buildPreviewMail(kind: string): PreviewMail | null {
     case "admin-cancel-sameday": { const x = pick(full, B.cancelledPast); return admin(buildDealNotice("guest-cancel", x.b, x.sp, 0)); }
     case "admin-reject": { const x = pick(full, B.refunded); return admin(buildDealNotice("host-reject", x.b, x.sp, x.b.amountTotal)); }
     case "admin-reject-failed": { const x = pick(full, B.rejected); return admin(buildDealNotice("host-reject-failed", x.b, x.sp)); }
+    // 🆕09-19 저녁 — 결제 승인 직후 시간이 차서 자동 환불 · 그 환불마저 실패(손님 돈이 붙잡힘). 결제 직전의 신청(pending)을 쓴다.
+    case "admin-auto-refund": { const x = pick(full, B.pending); return admin(buildDealNotice("auto-refund", { ...x.b, status: "cancelled" }, x.sp, x.b.amountTotal)); }
+    case "admin-auto-refund-failed": { const x = pick(full, B.pending); return admin(buildDealNotice("auto-refund-failed", { ...x.b, status: "rejected" }, x.sp)); }
     case "admin-refund-approved": { const x = pick(full, B.refundReq); return admin(buildDealNotice("admin-refund", { ...x.b, status: "refunded" }, x.sp, x.b.amountTotal)); }
     default: return null;
   }

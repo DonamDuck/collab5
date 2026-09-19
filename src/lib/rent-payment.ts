@@ -86,6 +86,14 @@ export const PAY_FAIL_NOT_AVAILABLE = "RENT_NOT_AVAILABLE";
 /** 🆕09-18 밤 QA(SC-12) — 승인은 됐는데 «아직 받지 않은» 결제(입금 대기 가상계좌 등). 그 자리에서 취소하고 돌려보낸다. */
 export const PAY_FAIL_METHOD_UNSUPPORTED = "RENT_METHOD_UNSUPPORTED";
 
+/** 🤖사람 손 없이 우리가 되돌리는 취소의 사유 둘(`confirmBookingAction`). 토스 취소 내역(`cancels[].cancelReason`)에 이 글자
+ *  그대로 남는다. 아침 요약이 이 글자로 «자동 환불»을 손님 취소와 가른다(둘 다 예약은 `cancelled`라서). ⚠️글자를 바꾸면 옛 줄은 손님 취소로 세진다. */
+export const AUTO_REFUND_REASON = "예약 확정 실패 — 자동 환불";
+export const AUTO_CANCEL_WAITING_REASON = "입금 전 결제 수단이라 자동 취소";
+export function isAutoCancelReason(reason: string | undefined | null): boolean {
+  return reason === AUTO_REFUND_REASON || reason === AUTO_CANCEL_WAITING_REASON;
+}
+
 /** 🆕09-18 밤 QA(G-05) — 취소 팝업이 본 금액보다 실제 환불액이 «적어졌다». 돌려주지 않고 다시 확인받는다. */
 export const PAY_FAIL_REFUND_CHANGED = "RENT_REFUND_CHANGED";
 

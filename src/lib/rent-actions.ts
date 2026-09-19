@@ -25,7 +25,7 @@ import { matchPlace } from "./naver-local";
 import { signCertUpload } from "./host-docs";
 import { hasPayoutAccount, savePayoutAccount, toMasked, validatePayoutInput, type PayoutAccountInput, type PayoutAccountMasked } from "./payout-accounts";
 import {
-  approvePayment, cancelPayment, guestCancelQuote,
+  approvePayment, cancelPayment, guestCancelQuote, AUTO_CANCEL_WAITING_REASON, AUTO_REFUND_REASON,
   PAY_EXPIRED_LINE, PAY_FAIL_METHOD_UNSUPPORTED, PAY_FAIL_NOT_AVAILABLE, PAY_FAIL_REFUND_CHANGED, PAY_FAIL_SLOT_TAKEN,
   PAY_FAIL_SLOT_TAKEN_REFUNDED, PAY_FAIL_SLOT_TAKEN_REFUND_PENDING, PAY_FAIL_USE_STARTED, PAY_FAIL_WINDOW_OVER,
 } from "./rent-payment";
@@ -787,6 +787,7 @@ async function notifyLater(run: () => Promise<unknown>): Promise<void> {
 }
 
 /** 💸대표 슬랙 거래 알림(대표 09-19 오후) — 결제 승인·손님 취소·사장님 거절·관리자 환불 승인 때 한 건.
+ *  🆕09-19 저녁 — 결제 승인 직후 시간이 차서 자동 환불한 때와, 그 자동 환불마저 실패한 때도(`auto-refund`·`auto-refund-failed`).
  *  ⭐메일 알림과 따로 `after`에 건다. 메일 한 통이 늦거나 던져도 이 알림은 제 길로 간다.
  *  공간은 호출부가 이미 읽은 걸 넘기고, 없으면 예약의 공간 id로 한 번 읽는다(이름과 주인 회원 번호가 필요하다).
  *  목 모드면 `notifyLater`가 먼저 멈춘다. 슬랙 주소가 없으면 `notifyAdmin`이 조용히 건너뛴다(메일로 안 물러선다). */
@@ -876,7 +877,7 @@ export async function confirmBookingAction(
   if (approved.payment.status !== "DONE") {
     const waitKey = approved.payment.paymentKey || paymentKey;
     const undo = await cancelPayment(
-      waitKey, "입금 전 결제 수단이라 자동 취소", undefined, approved.payment.balanceAmount ?? pay.amount,
+      waitKey, AUTO_CANCEL_WAITING_REASON, undefined, approved.payment.balanceAmount ?? pay.amount,
     );
     // 취소가 됐으면 그 응답을, 실패했으면 승인 응답을 적는다 — 어느 쪽이든 결제 줄이 지금 상태를 말해야 한다.
     await rentSync(orderId, { toss: undo.ok && undo.payment ? undo.payment : approved.payment });
@@ -899,14 +900,19 @@ export async function confirmBookingAction(
     await rentSync(orderId, { toss: approved.payment });
     const key = approved.payment.paymentKey || paymentKey;
     // 💸막 승인된 돈이라 잔액 = 방금 승인한 금액이다. 토스가 준 값이 있으면 그걸 먼저 쓴다(09-18 밤 QA SC-01의 잔액 검증).
-    const refund = await cancelPayment(key, "예약 확정 실패 — 자동 환불", undefined, approved.payment.balanceAmount ?? pay.amount);
+    const due = approved.payment.balanceAmount ?? pay.amount;
+    const refund = await cancelPayment(key, AUTO_REFUND_REASON, undefined, due);
+    // 💸대표 슬랙(09-19 저녁 대표 [3]) — 돈이 들어왔다가 나간 순간이라 거래 알림에 남긴다. 금액은 토스에 보낸 값 그대로.
+    //   실패 갈래는 손님 돈이 붙잡혀 있는 상태다. 알림 머리가 그 말로 선다(`buildDealNotice`의 auto-refund-failed).
     if (refund.ok) {
       await rentSync(orderId, { bookingStatus: "cancelled", toss: refund.payment });
+      await dealLater("auto-refund", { ...b, status: "cancelled" }, space, due);
       return { ok: false, message: "그 사이 그 시간이 찼어요. 결제는 바로 취소해 드렸어요.", code: PAY_FAIL_SLOT_TAKEN_REFUNDED };
     }
     // 환불까지 실패하면 손님 돈이 붙잡혀 있다. 정산 화면 「손이 필요한 예약」에 뜨게 rejected로 둔다.
     console.error(`[rent-actions] 🚨승인 뒤 예약 실패 + 자동 환불 실패 — 수동 환불 필요 order=${orderId}`);
     await rentSync(orderId, { bookingStatus: "rejected" });
+    await dealLater("auto-refund-failed", { ...b, status: "rejected" }, space, 0);
     return { ok: false, message: "그 사이 그 시간이 찼어요. 환불을 처리하고 있으니 곧 연락드릴게요.", code: PAY_FAIL_SLOT_TAKEN_REFUND_PENDING };
   }
   const paid = (await getBookingByOrderId(orderId)) ?? { ...b, status: "paid" as const };

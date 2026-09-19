@@ -782,6 +782,8 @@ export const MOCK_MAIL_KINDS: { kind: string; label: string }[] = [
   { kind: "admin-reject", label: "거래 → 대표 슬랙 · 사장님 거절, 전액 환불" },
   { kind: "admin-reject-failed", label: "거래 → 대표 슬랙 · 사장님 거절, 환불 실패 (손이 필요)" },
   { kind: "admin-refund-approved", label: "거래 → 대표 슬랙 · 관리자 환불 승인" },
+  { kind: "admin-auto-refund", label: "거래 → 대표 슬랙 · 결제 직후 시간이 차서 자동 환불" },
+  { kind: "admin-auto-refund-failed", label: "거래 → 대표 슬랙 · 자동 환불도 실패, 손님 돈이 붙잡힘 (손이 필요)" },
   { kind: "remind-guest", label: "이용 전날 → 손님" },
   { kind: "remind-host", label: "이용 전날 → 사장님 · 수락한 예약" },
   { kind: "remind-host-unaccepted", label: "이용 전날 → 사장님 · 아직 수락 전" },
