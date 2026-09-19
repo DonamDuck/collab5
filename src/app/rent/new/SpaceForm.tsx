@@ -117,6 +117,9 @@ const pickCls = (on: boolean) =>
 
 type Photo = { url: string; uploading?: boolean };
 
+/** 🔜등록증에서 읽은 사업자 칸(09-19 #110 OCR 자리). 못 읽은 칸은 비워 온다. 개업일은 국세청 모양 `YYYYMMDD`. */
+export type BizPrefill = Partial<Record<"bizName" | "bizNumber" | "bizOwnerName" | "bizOpenDate", string>>;
+
 // 💾새로 올리기 임시 저장 (2026-09-17 대표 「오늘 다 구현」)
 //   칸이 스무 개 가까이라 한 번에 못 끝내는 사장님이 많다. 나갔다 오면 처음부터였다.
 //   ⭐새로 올리기에서만 한다. 고치기는 이미 DB에 있고, 낡은 초안을 얹으면 저장된 값을 되돌린다.
@@ -152,6 +155,7 @@ export function SpaceForm({
   userId,
   noEmail = false,
   mySpaceCount = 0,
+  certPrefill,
 }: {
   myBrands: { slug: string; name: string }[];
   feeRate: number;
@@ -169,6 +173,9 @@ export function SpaceForm({
   noEmail?: boolean;
   /** 🏠이미 올린 공간 수(09-18 밤 QA H-16). 새로 올리기 폼에서만 쓴다. */
   mySpaceCount?: number;
+  /** 🔜등록증을 읽어 사업자 칸 값을 돌려주는 함수(09-19 대표 #110 OCR 자리 — 결정 대기라 아직 아무도 안 넘긴다).
+   *  넘기면 등록증을 올린 직후 부르고, 돌려준 값으로 «비어 있는 칸만» 채운다(`fillEmptyBiz`). 서버 액션을 그대로 넘기면 된다. */
+  certPrefill?: (file: File) => Promise<BizPrefill | null>;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -456,6 +463,16 @@ export function SpaceForm({
     }
   };
 
+  /** 🔜등록증에서 읽은 값으로 «빈 칸만» 채운다(09-19 #110 자리). 사장님이 이미 적은 값을 덮으면
+   *  읽기 오류가 그대로 국세청 조회로 가고, 사장님은 자기가 적은 값이 바뀐 줄 모른다. 개업일은 `YYYYMMDD`로 받는다. */
+  const fillEmptyBiz = (v: BizPrefill | null) => {
+    if (!v) return;
+    if (v.bizName?.trim()) setBizName((cur) => cur.trim() ? cur : v.bizName!.trim());
+    if (v.bizNumber) setBizNumber((cur) => bizDigits(cur) ? cur : bizDigits(v.bizNumber!).slice(0, 10));
+    if (v.bizOwnerName?.trim()) setBizOwnerName((cur) => cur.trim() ? cur : v.bizOwnerName!.trim());
+    if (v.bizOpenDate) setBizOpenDate((cur) => cur || fromOpenDate(v.bizOpenDate!));
+  };
+
   /** 🧾사업자등록증 한 장. 형식은 파일의 MIME으로 보고, 비어 오면(일부 브라우저의 HEIC) 확장자로 보충한다. */
   const pickCert = async (input: HTMLInputElement) => {
     const file = input.files?.[0];
@@ -471,6 +488,14 @@ export function SpaceForm({
       const path = await uploadBizCert(file, mime);
       setBizCertPath(path);
       setCertName(file.name);
+      // 🔜등록증 → 사업자 칸 미리 채우기(09-19 #110, 대표 결정 대기). 넘겨받은 게 있을 때만 부르고, 실패해도 올리기는 끝난 것이다.
+      if (certPrefill) {
+        try {
+          fillEmptyBiz(await certPrefill(file));
+        } catch {
+          /* 못 읽었으면 사장님이 적으시면 된다 — 올린 파일은 그대로 */
+        }
+      }
     } catch (e) {
       setCertErr(e instanceof Error && e.message ? e.message : "파일을 올리지 못했어요. 다시 골라 주세요.");
     } finally {
@@ -522,7 +547,9 @@ export function SpaceForm({
     // ⏱🔒모든 공간 1시간(09-19 #88). 서버(`saveSpaceAction`)와 같은 상수.
     const badSlot = expanded.find((sl) => minutesBetween(sl.start, sl.end) < RENT_MIN_MINUTES);
     if (badSlot) return ["slots", `${dateLabel(badSlot.date)}은 최소 ${durationLabel(RENT_MIN_MINUTES)}을 못 채워요. 시간을 늘리거나 그날을 빼 주세요.`];
-    // 🧾09-18 사업자 정보 — 폼 순서대로(번호 → 대표자 → 개업일 → 등록증). 서버(`saveSpaceAction`)가 같은 함수로 다시 본다.
+    // 🧾09-18 사업자 정보 — 폼 순서대로. 서버(`saveSpaceAction`)가 같은 함수로 다시 본다.
+    //   🔁09-19 #110 등록증이 절 맨 위로 올라가서 막는 순서도 등록증 → 상호 → 번호 → 대표자 → 개업일(화면 순서, H-21과 같은 이유).
+    if (bizNeeded && !bizCertPath) return ["bizCert", "사업자등록증 파일을 올려 주세요."];
     if (bizNameNeeded && !bizName.trim()) return ["bizName", "상호를 사업자등록증에 적힌 그대로 적어 주세요."];
     if (bizNeeded) {
       const numberProblem = bizNumberProblem(bizNumber);
@@ -530,7 +557,6 @@ export function SpaceForm({
       if (!bizOwnerName.trim()) return ["bizOwner", "대표자 이름을 사업자등록증 그대로 적어 주세요."];
       const dateProblem = openDateProblem(toOpenDate(bizOpenDate), todayKst());
       if (dateProblem) return ["bizOpenDate", dateProblem];
-      if (!bizCertPath) return ["bizCert", "사업자등록증 파일을 올려 주세요."];
     }
     if (pausedLine) return [pausedLine.field === "biz" ? "bizNumber" : pausedLine.field, pausedLine.message];
     if (!termsOk) return ["terms", "공간 제공자 약관에 동의해 주세요."];
@@ -1180,8 +1206,9 @@ export function SpaceForm({
       {/* ── 🧾사업자 정보 ── 09-18 대표: 「개인까지 받으면 너무 무방비 범죄가 일어날 것 같다. 개인 수요는 추후 검증 과정을 거쳐서」.
            사업자등록증 + 국세청 자동 조회 + 저희 검토. 왜 받는지를 먼저 말하고(손님이 믿고 빌리게), 파일을 누가 보는지 같이 말한다. */}
       <Group
-        title="사업자 정보"
-        sub="손님이 믿고 빌릴 수 있게 사업자등록증으로 가게를 확인해요. 확인되면 공간 화면에 「사업자 확인된 가게」가 붙어요. 상호·대표자 이름·사업자등록번호는 손님이 결제 전에 보는 판매자 정보에 나가고, 올려 주신 파일은 검토하는 사람만 봐요."
+        // 🔁09-19 대표 코멘트 #105·#107 — 제목은 「등록해 주세요」로 부드럽게, 설명은 대표 문안(맞춤법만).
+        title="사업자 정보를 등록해 주세요"
+        sub="사업자등록증과 사업자 정보를 확인한 뒤 collab5에 노출돼요. 검토를 위해 정확한 사업자 정보를 입력해 주세요."
         anchor="biz"
       >
         {editing && !hasAnyBiz(initial) && (
@@ -1200,6 +1227,38 @@ export function SpaceForm({
             드려요. 상호만 고치시면 그대로예요.
           </p>
         )}
+        {/* 🔝09-19 대표 코멘트 #110 — 사업자등록증 올리기를 절 맨 위로(상태 안내 줄 바로 밑). 등록증을 먼저 올리고
+            그걸 보며 아래 칸을 채우는 순서다. 대표는 올린 등록증을 읽어(OCR) 아래 칸을 미리 채우길 바랐고, 그건 결정 대기라
+            자리만 깔아 뒀다(`certPrefill`, `pickCert`). */}
+        <L
+          label="사업자등록증"
+          anchor="bizCert"
+          // 🩸09-18 밤 QA(H-04) — 한 번 제출한 뒤엔 `fieldErr`가 늘 「사업자등록증 파일을 올려 주세요」를 들고 있어서,
+          //   10MB 초과·형식 불일치·올리기 실패 같은 **진짜 이유**(`certErr`)가 그 일반 문구에 가려졌다.
+          //   사장님은 파일을 골랐는데 「올려 주세요」만 반복해서 보게 된다. 방금 일어난 일이 먼저다.
+          error={certErr || fieldErr("bizCert")}
+          // 🏠09-19 오후 대표 — 등록증의 사업장 주소와 위 「전체 주소」를 대조한다. 같은 뜻을 이 칸에서도 한 줄.
+          hint="사업장 주소가 위에 적으신 주소와 같은 등록증으로 올려 주세요. 사진이나 PDF, 10MB까지 돼요."
+        >
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+            <label className={`${secondaryBtnCls} cursor-pointer text-[15px] ${certUploading ? "pointer-events-none opacity-60" : ""}`}>
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/heic,image/heif,application/pdf,.heic,.heif,.pdf"
+                className="sr-only"
+                disabled={certUploading}
+                onChange={(e) => void pickCert(e.currentTarget)}
+              />
+              {certUploading ? "올리는 중이에요…" : bizCertPath ? "다른 파일로 바꾸기" : "파일 고르기"}
+            </label>
+            {bizCertPath && !certUploading && (
+              <p className="flex min-w-0 items-center gap-1.5 text-[15px] break-all text-body">
+                <CheckIcon />
+                {certName || "올려 두신 파일이 있어요"}
+              </p>
+            )}
+          </div>
+        </L>
         {/* 🏷09-19 대표 [J] — 판매자 정보(상호·대표자·사업자번호·주소·가게 전화)를 손님이 결제 전에 보는 화면이 생겼다.
             상호 칸이 없어서 새로 받는다. 국세청 조회엔 안 넣는다(번호·대표자·개업일만 묻는 조회라서). */}
         <L
@@ -1207,10 +1266,12 @@ export function SpaceForm({
           htmlFor="sp-biz-name"
           anchor="bizName"
           error={fieldErr("bizName")}
+          // 🔻09-19 대표 코멘트 #108 — 「손님이 결제 전에 보는 판매자 정보에 이 이름이 나가요」는 뺐다(대표: 불필요).
+          //   상호가 빈 옛 공간을 고칠 때의 안내 한 줄만 남긴다(비우면 공간 이름이 대신 나간다는 사실).
           hint={
             editing && !initial?.bizName && !bizName.trim()
               ? "비워 두시면 손님이 보는 판매자 정보에 공간 이름이 대신 나가요. 등록증의 상호로 채워 주세요."
-              : "손님이 결제 전에 보는 판매자 정보에 이 이름이 나가요."
+              : undefined
           }
         >
           <input
@@ -1261,35 +1322,6 @@ export function SpaceForm({
             {bizServerMsg}
           </p>
         )}
-        <L
-          label="사업자등록증"
-          anchor="bizCert"
-          // 🩸09-18 밤 QA(H-04) — 한 번 제출한 뒤엔 `fieldErr`가 늘 「사업자등록증 파일을 올려 주세요」를 들고 있어서,
-          //   10MB 초과·형식 불일치·올리기 실패 같은 **진짜 이유**(`certErr`)가 그 일반 문구에 가려졌다.
-          //   사장님은 파일을 골랐는데 「올려 주세요」만 반복해서 보게 된다. 방금 일어난 일이 먼저다.
-          error={certErr || fieldErr("bizCert")}
-          // 🏠09-19 오후 대표 — 등록증의 사업장 주소와 위 「전체 주소」를 대조한다. 같은 뜻을 이 칸에서도 한 줄.
-          hint="사업장 주소가 위에 적으신 주소와 같은 등록증으로 올려 주세요. 사진이나 PDF, 10MB까지 돼요."
-        >
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-            <label className={`${secondaryBtnCls} cursor-pointer text-[15px] ${certUploading ? "pointer-events-none opacity-60" : ""}`}>
-              <input
-                type="file"
-                accept="image/jpeg,image/png,image/webp,image/heic,image/heif,application/pdf,.heic,.heif,.pdf"
-                className="sr-only"
-                disabled={certUploading}
-                onChange={(e) => void pickCert(e.currentTarget)}
-              />
-              {certUploading ? "올리는 중이에요…" : bizCertPath ? "다른 파일로 바꾸기" : "파일 고르기"}
-            </label>
-            {bizCertPath && !certUploading && (
-              <p className="flex min-w-0 items-center gap-1.5 text-[15px] break-all text-body">
-                <CheckIcon />
-                {certName || "올려 두신 파일이 있어요"}
-              </p>
-            )}
-          </div>
-        </L>
       </Group>
 
       {/* ── 확인 ── */}
@@ -1681,8 +1713,8 @@ const FORM_STEPS = [
   "대여 타입을 선택해 주세요",
   // 🔁09-19 대표 코멘트 #98
   "대여할 날짜와 시간을 정해 주세요",
-  // 🧾09-18 대표 — 공간 등록에 사업자 확인 필수.
-  "사업자 정보",
+  // 🧾09-18 대표 — 공간 등록에 사업자 확인 필수. 🔁09-19 #105
+  "사업자 정보를 등록해 주세요",
   "마지막으로 확인해 주세요",
 ];
 
