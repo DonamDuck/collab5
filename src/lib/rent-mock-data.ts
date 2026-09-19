@@ -64,7 +64,7 @@ export const MOCK_CASES: MockCaseDef[] = [
   { id: "guest-full", label: "손님 · 모든 상태의 신청이 있는 계정", viewer: { userId: MOCK_USER.guest, admin: false }, world: "full" },
   { id: "guest-empty", label: "손님 · 신청 0건, 공간도 0곳", viewer: { userId: MOCK_USER.guest, admin: false }, world: "empty" },
   { id: "anon", label: "로그인 안 한 사람", viewer: { userId: null, admin: false }, world: "full" },
-  { id: "host-full", label: "사장님 · 공간 여섯(30분 단위 하나, 사업자등록번호 빈 곳 하나), 요청 모든 상태, 계좌 있음", viewer: { userId: MOCK_USER.host, admin: false }, world: "full" },
+  { id: "host-full", label: "사장님 · 공간 일곱(30분 단위 하나, 사업자등록번호 빈 곳 하나, 보완 필요 하나), 요청 모든 상태, 계좌 있음", viewer: { userId: MOCK_USER.host, admin: false }, world: "full" },
   { id: "host-noaccount", label: "사장님 · 같은 데이터인데 정산 계좌 없음", viewer: { userId: MOCK_USER.host, admin: false }, world: "full-noaccount" },
   { id: "host-admin", label: "사장님이면서 관리자 · 정산하기 링크와 공개하기 버튼이 보임", viewer: { userId: MOCK_USER.host, admin: true }, world: "full" },
   { id: "host-empty", label: "사장님 · 아직 올린 공간 없음", viewer: { userId: MOCK_USER.host, admin: false }, world: "empty" },
@@ -120,6 +120,8 @@ const SPACE_BASE = {
   bizName: "", bizNumber: "", bizOwnerName: "", bizOpenDate: "", bizCertPath: "",
   bizCheckStatus: "none" as Space["bizCheckStatus"], bizCheckDetail: undefined, bizCheckedAt: undefined, bizApprovedAt: undefined,
   placeName: "", placeAddress: "", placeLat: undefined, placeLng: undefined, placeMatchedAt: undefined,
+  // 🔁09-19 저녁 보완 요청 · 바뀌기 전 이름·주소. 목 세계는 «SQL을 돌린 DB»처럼 칸이 있다(`reviewReady`) — 검토 화면의 [보완 요청]이 열린다.
+  reviewNote: "", reviewRejectedAt: undefined, reviewPrevName: "", reviewPrevAddress: "", reviewReady: true,
 } satisfies Omit<Space, "id" | "slug" | "ownerUserId" | "name" | "status" | "createdAt" | "updatedAt">;
 
 /** 🧾09-18 목 사업자 정보. ⛔실제 사업자와 겹치지 않게 번호는 전부 «000»으로 시작한다(세무서 코드 000은 없다).
@@ -370,6 +372,8 @@ function fullWorld(today: string, withAccount: boolean): MockWorld {
     ...bizOf(U.host, "0000212344", "김느린", "20230901", "pdf", "000000009102"),
     bizCheckStatus: "mismatch", bizCheckedAt: `${d(-1)}T03:00:00.000Z`,
     bizCheckDetail: { valid: "02", validMsg: "확인할 수 없습니다" },
+    // 🔁09-19 저녁 — 보완 요청을 받았다가 고쳐 다시 보낸 공간. 사유는 남고 반려 시각은 지워졌다(검토 화면 「보완해서 다시 보냈어요」).
+    reviewNote: "대표자 이름이 등록증과 달라요.",
     rentFullOn: true, rentFullPrice: 18000, rentFullNote: "팝업 매장을 통째로 꾸려요. 진열대 네 개와 조명 레일을 마음대로 쓰세요.",
     direct: [{ date: d(9), start: "11:00", end: "19:00" }],
   }, today);
@@ -447,6 +451,8 @@ function fullWorld(today: string, withAccount: boolean): MockWorld {
     rentSpaceOn: true, rentSpacePrice: 12000, rentSpaceNote: "모임이나 작은 수업 자리로 써요. 재단 테이블 두 개를 같이 써요.",
     ...bizOf(U.host2, "0008155668", "박바늘", "20190402", "png", "000000009109"),
     bizCheckStatus: "none", bizCheckedAt: `${d(-1)}T02:00:00.000Z`, bizCheckDetail: { reason: "no-key" },
+    // 🏠09-19 저녁 — 공개 중이던 공간이 3층 → 2층으로 주소를 바꿔 검토로 내려왔다. 네이버는 여전히 3층을 가리킨다(주소 대조 칸에서 보인다).
+    reviewPrevAddress: "서울 중구 을지로 000, 3층",
     placeName: "바늘숲 공방", placeAddress: "서울특별시 중구 을지로 000 3층",
     placeLat: 37.5661, placeLng: 126.9911, placeMatchedAt: `${d(-1)}T02:00:00.000Z`,
     direct: [{ date: d(8), start: "09:00", end: "13:00" }],
@@ -510,7 +516,26 @@ function fullWorld(today: string, withAccount: boolean): MockWorld {
     direct: [{ date: d(5), start: "13:00", end: "19:00" }, { date: d(6), start: "13:00", end: "19:00" }],
   }, today);
 
-  const spaces = [s1, s2, s3, s4, s5, s6, s7, s8, s9, s10];
+  // 🔁S11 — 보완 필요(대표 09-19 저녁). 공개 중이던 공간을 관리자가 반려했다: 등록증 주소(2층)와 공간 주소(3층)가 다르다.
+  //   목록에서 내려갔고(검토 대기 + 반려 시각), 내 하루 가게 줄과 고치기 화면 맨 위에 사유가 선다. 검토 화면 「보완을 기다리는 공간」.
+  const s11 = space({
+    id: 9113, slug: "mock-slow-afternoon-studio", ownerUserId: U.host, status: "pending",
+    name: "느린오후 3층 작업실", category: "workshop",
+    body: "로스팅 교육을 하던 3층 작업실이에요. 큰 테이블 하나와 개수대가 있어요.",
+    photos: [photo("3층 작업실", 150)], area: "성수동", address: "서울 성동구 연무장길 00, 3층", lat: 37.5436, lng: 127.0559,
+    facilities: ["큰 테이블 1", "개수대"], capacity: 8, rules: "개수대 물은 쓰고 나서 꼭 잠가 주세요",
+    minHours: 2, accessHow: "sms", contactPhone: "02-123-4567",
+    rentSpaceOn: true, rentSpacePrice: 14000, rentSpaceNote: "작은 수업이나 모임 자리로 써요. 큰 테이블과 개수대를 같이 써요.",
+    ...bizOf(U.host, "0000112347", "김느린", "20210315", "jpg", "000000009113"),
+    bizName: "느린오후 로스터리",
+    bizCheckStatus: "valid", bizCheckedAt: `${d(-3)}T01:00:00.000Z`,
+    bizCheckDetail: { valid: "01", bSttCd: "01", bStt: "계속사업자", taxType: "부가가치세 일반과세자" },
+    reviewNote: "사업자등록증의 주소와 공간 주소가 달라요.\n등록증엔 2층으로 적혀 있는데 공간 주소는 3층이에요. 3층도 같은 사업장이면 그걸 알 수 있는 서류를 같이 올려 주세요.",
+    reviewRejectedAt: `${d(-1)}T09:00:00.000Z`,
+    direct: [{ date: d(7), start: "10:00", end: "16:00" }],
+  }, today);
+
+  const spaces = [s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11];
   // 🛍s1은 두 상품을 섞어 판다 — 공간 전체로 산 예약이 줄마다 섞여 보이게.
   const P1 = { sp: s1 };
   const P1F = { sp: s1, product: "full" as const };
@@ -731,6 +756,8 @@ export const MOCK_IDS = {
     halfHour: "mock-slow-afternoon-window",
     /** 🚪09-19 오후 공개 중인데 사업자등록번호가 빈 공간 · 확정 예약 하나(`noBizConfirmed`) */
     noBiz: "mock-slow-afternoon-yard",
+    /** 🔁09-19 저녁 보완 필요(관리자가 반려) · 사유 두 줄 */
+    needsFix: "mock-slow-afternoon-studio",
   },
   maker: { host: "mock-slow-afternoon", guest: "mock-flour-diary", stress: "mock-long-kitchen" },
   booking: {
@@ -770,6 +797,9 @@ export const MOCK_MAIL_KINDS: { kind: string; label: string }[] = [
   { kind: "space-review-mismatch", label: "공간 검토 대기 → 대표 슬랙 · 새 공간, 국세청 기록과 다름" },
   { kind: "space-review-changed", label: "공간 검토 대기 → 대표 슬랙 · 공개 중이던 공간의 이름·주소가 바뀜" },
   { kind: "space-review-bizfirst", label: "공간 검토 대기 → 대표 슬랙 · 사업자 정보가 비어 있던 공간이 처음 채움" },
+  { kind: "space-review-resubmit", label: "공간 검토 대기 → 대표 슬랙 · 보완 요청을 받은 공간을 고쳐 다시 보냄 (부탁드린 내용 포함)" },
+  { kind: "space-fix-request", label: "보완 요청 → 사장님 · 공개 중이던 공간 (목록에서 내려감, 예약은 그대로)" },
+  { kind: "space-fix-request-pending", label: "보완 요청 → 사장님 · 검토 대기 중이던 공간" },
   { kind: "admin-refund-request", label: "사장님 환불 신청 → 대표 슬랙" },
   { kind: "admin-daily", label: "아침 요약 → 대표 슬랙 · 처리할 일이 있는 날" },
   { kind: "admin-daily-quiet", label: "아침 요약 → 대표 슬랙 · 숫자가 다 0인 날" },

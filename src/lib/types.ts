@@ -570,6 +570,19 @@ export interface Space {
   placeLng?: number;
   placeMatchedAt?: string;
 
+  // ─── 🔁09-19 저녁 검토 «보완 요청»(반려) · 바뀌기 전 이름·주소 — SQL `2026-09-19-rent-review-reject.sql` ───
+  //   «보완 필요» = `status: "pending"` + `reviewRejectedAt`. 상태 칸엔 값을 더하지 않았다(그 SQL 머리말). 판정은 `rent-review`의 `needsFix`.
+  //   ⚠️넷 다 선택 칸이다. 저장(`saveSpace`)은 값이 «있을 때만» 이 칸들을 쓴다 — 안 준 칸은 DB 값을 그대로 둔다.
+  /** 관리자가 사장님께 남긴 보완 사유. 다시 보내도 남는다(검토 화면 「지난 요청」). 공개하면 지운다. */
+  reviewNote?: string;
+  /** 보완을 요청한 시각. 사장님이 고쳐 저장하면 지운다. 저장 때 빈 문자열을 주면 «지운다»는 뜻이다(`saveSpace`). */
+  reviewRejectedAt?: string;
+  /** 이름·주소가 바뀌어 검토로 내려오기 «전» 값(관리자가 마지막으로 본 값). 공개하면 지운다(`rent-review`의 `reviewPrevFor`). */
+  reviewPrevName?: string;
+  reviewPrevAddress?: string;
+  /** 위 칸이 있는 DB인가(SQL을 돌렸나). 읽을 때 채우고 저장하지 않는다. 검토 화면이 [보완 요청]을 열지 이걸로 정한다. */
+  reviewReady?: boolean;
+
   status: SpaceStatus;
   createdAt: string;
   updatedAt: string;
@@ -590,7 +603,7 @@ export interface Space {
  *  도어락 번호 같은 건 애초에 담지 않기로 했고(09-16 `accessHow`), 남아 있는 옛 값도 내보내지 않는다.
  *  호스트 «개인 휴대폰»은 여기 실리지 않는다(프로필에 있고 확정 후에만 열린다).
  *  📌이탈을 막는 건 이제 주소가 아니라 **결제가 먼저라는 순서**다. 그 설계는 그대로다. */
-export type SpacePublic = Omit<Space, "accessNote" | "hostTermsAt" | SpaceBizPrivateKey> & {
+export type SpacePublic = Omit<Space, "accessNote" | "hostTermsAt" | SpaceBizPrivateKey | SpaceReviewPrivateKey> & {
   /** 🚪사업자등록번호가 적혀 있나(09-19 오후). 번호는 빼고 이 참거짓만 싣는다(`toPublic`). 상세가 `spaceListed`로 문을 가른다. */
   bizOnFile: boolean;
 };
@@ -599,6 +612,9 @@ export type SpacePublic = Omit<Space, "accessNote" | "hostTermsAt" | SpaceBizPri
  *  ⚖️09-19 대표 [J] — 상호·대표자·사업자번호·주소·가게 전화는 «판매자 정보» 화면 한 곳에서만 보인다(`/rent/[slug]/seller`).
  *    그 화면은 원본(`getSpaceFull`)을 읽어 필요한 칸만 꺼낸다. 목록·상세로 나가는 이 투영에서는 여전히 뺀다. */
 export type SpaceBizPrivateKey = "bizNumber" | "bizOwnerName" | "bizOpenDate" | "bizCertPath" | "bizCheckDetail";
+
+/** 🔒09-19 저녁 공개 화면에 안 나가는 검토 칸 — 보완 사유는 관리자와 그 사장님 사이의 말이다. */
+export type SpaceReviewPrivateKey = "reviewNote" | "reviewRejectedAt" | "reviewPrevName" | "reviewPrevAddress" | "reviewReady";
 
 /** 국세청 조회 상태. none = 아직 못 물어봄(키 없음 등) · valid · mismatch(기록과 다름) · closed(휴업·폐업) · error(조회 실패). */
 export type BizCheckStatus = "none" | "valid" | "mismatch" | "closed" | "error";

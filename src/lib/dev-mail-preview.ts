@@ -4,7 +4,7 @@
 import {
   buildAdminDaily, buildAdminRefund, buildBookingCancelled, buildBookingCancelledToGuest, buildBookingConfirmed,
   buildBookingConfirmedToHost, buildBookingPaid, buildBookingPaidToGuest, buildBookingRejected, buildDealNotice,
-  buildRefundRequestNotice, buildRemindGuest, buildRemindHost, buildSpacePublished, buildSpaceReviewNotice, type Mail,
+  buildRefundRequestNotice, buildRemindGuest, buildRemindHost, buildSpaceFixRequest, buildSpacePublished, buildSpaceReviewNotice, type Mail,
 } from "@/lib/rent-notify";
 import { buildWorld, MOCK_IDS, type MockWorld } from "@/lib/rent-mock-data";
 import { buildSignupNotice } from "@/lib/notify";
@@ -37,7 +37,8 @@ function dailyPreview(w: MockWorld, remind: RemindRun | null): PreviewMail {
   const summary = summarizeDaily({
     bookings, payments,
     spaceNames: new Map(w.spaces.map((sp) => [sp.id, sp.name])),
-    reviewPending: w.spaces.filter((sp) => sp.status === "pending").length,
+    // 🔁09-19 저녁 보완을 기다리는 곳(반려 시각 있음)은 검토 대기로 안 센다(`listSpacesForReview`와 같다).
+    reviewPending: w.spaces.filter((sp) => sp.status === "pending" && !sp.reviewRejectedAt).length,
     reviewApproveOnly: w.spaces.filter((sp) => (sp.status === "open" || sp.status === "paused") && !!sp.bizCertPath && !sp.bizApprovedAt).length,
     remind,
   }, today);
@@ -109,6 +110,15 @@ export function buildPreviewMail(kind: string): PreviewMail | null {
         bizCheckStatus: "valid" as const, bizCheckDetail: { valid: "01", bSttCd: "01", bStt: "계속사업자", taxType: "부가가치세 일반과세자" },
       };
       return admin(buildSpaceReviewNotice(now, x.owner, { name: x.sp.name, address: x.sp.address, status: x.sp.status, why: "biz-first" }));
+    }
+    // 🔁09-19 저녁 보완 요청 → 사장님 메일. 공개 중이던 공간(목록에서 내려감 + 예약 그대로) / 검토 대기 중이던 공간.
+    case "space-fix-request": { const x = pickSpace(full, MOCK_IDS.space.needsFix); return buildSpaceFixRequest(x.sp, x.owner, x.sp.reviewNote ?? "", true); }
+    case "space-fix-request-pending": { const x = pickSpace(full, MOCK_IDS.space.pendingNoKey); return buildSpaceFixRequest(x.sp, x.owner, "사업자등록증이 잘 안 보여요.\n휴대폰으로 밝은 곳에서 다시 찍어 올려 주세요.", false); }
+    // 🔁보완해서 다시 보냄 → 대표 슬랙. 사유(부탁드린 내용)가 칸에 실린다.
+    case "space-review-resubmit": {
+      const x = pickSpace(full, MOCK_IDS.space.needsFix);
+      const now = { ...x.sp, reviewRejectedAt: undefined, address: "서울 성동구 연무장길 00, 2층" };
+      return admin(buildSpaceReviewNotice(now, x.owner, { name: x.sp.name, address: x.sp.address, status: "pending", why: "resubmit", fixNote: x.sp.reviewNote }));
     }
     case "remind-guest": { const x = pick(full, B.confirmed); return buildRemindGuest(x.b, x.sp, x.host, x.guest); }
     case "remind-host": { const x = pick(full, B.confirmed); return buildRemindHost(x.b, x.sp, x.host, x.guest); }

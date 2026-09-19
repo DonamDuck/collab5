@@ -5,6 +5,7 @@ import { getProfileById, getSessionUserId } from "@/lib/profiles";
 import { repo } from "@/lib/repo";
 import { FEE_RATE, getSpaceFull } from "@/lib/spaces";
 import { bizMissingLine, bizOnFile } from "@/lib/bizcheck";
+import { needsFix } from "@/lib/rent-review";
 import { SpaceForm } from "../../new/SpaceForm";
 
 // 하루 가게 — 공간 고치기 (2026-09-14)
@@ -52,7 +53,17 @@ export default async function EditSpacePage({ params }: { params: Promise<{ slug
             목록에서 사라진다고 읽히면 아예 안 고친다. */}
         {/* 🔁09-17 QA — 검토 대기 공간에도 「공간은 그대로 보여요」라고 했다. 아직 아무에게도 안 보이는데.
             상태로 가른다. 이름·주소를 바꾸면 검토로 간다는 말은 버튼 아래 한 곳에만 둔다(위아래 같은 말이 두 번이었다). */}
-        {missingBiz ? (
+        {/* 🔁09-19 저녁 대표 — 보완 요청을 받은 공간은 사유 박스가 맨 위에 선다(관리자가 적은 글 그대로). 고쳐 저장하면 다시 검토로 간다. */}
+        {needsFix(sp) && (
+          <div className="mt-4 rounded-md bg-lemon-pale px-4 py-3 text-[16px] leading-relaxed break-keep">
+            <p className="font-medium text-lemon-on">한 번 더 확인해 주세요</p>
+            <p className="mt-1 whitespace-pre-line text-body">{sp.reviewNote}</p>
+            <p className="mt-2 text-[15px] text-mute">
+              고치신 뒤 맨 아래 「고쳐서 다시 보내기」를 눌러 주시면 이어서 볼게요. 그동안 공간은 목록에 보이지 않아요.
+            </p>
+          </div>
+        )}
+        {needsFix(sp) ? null : missingBiz ? (
           <p className="mt-3 rounded-md bg-lemon-pale px-4 py-3 text-[16px] leading-relaxed break-keep text-lemon-on">
             {bizMissingLine(sp.status)}{" "}
             {/* 같은 화면 아래 「사업자 정보」 절(`f-biz`)로. 누를 자리를 44px로(내 하루 가게 줄과 같은 모양). */}

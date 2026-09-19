@@ -84,6 +84,10 @@ const LABEL = {
   reviewPrevAddress: "원래 주소",
   reviewBiz: "사업자 확인",
   reviewPlace: "네이버 가게",
+  // ↓ 보완 요청(09-19 저녁). 사장님 메일과 대표 알림(다시 보냄)이 같이 쓴다.
+  fixWhat: "확인할 부분",
+  fixAsked: "부탁드린 내용",
+  fixNow: "지금 공간은",
   // ↓ 대표에게 가는 환불 신청 알림·아침 요약에만 쓴다(09-19).
   refundHost: "신청한 사장님",
   refundNote: "신청 사유",
@@ -790,6 +794,8 @@ export async function notifyRemindHost(
 export type SpaceReviewPrev = Pick<Space, "name" | "address" | "status"> & {
   /** 🧾09-19 저녁 이번 저장이 검토로 간 이유(`spaceSaveReview`). 없으면 이름·주소를 비교해 가른다(옛 호출부·미리보기). */
   why?: ReviewWhy;
+  /** 🔁보완해서 다시 보냈을 때 — 관리자가 남겼던 사유. 알림에 「부탁드린 내용」으로 싣는다. */
+  fixNote?: string;
 };
 
 /** 🚫공개가 막힌 공간인가 — `publishSpaceAction`의 세 관문과 같다(빈 사업자 정보 · 기록과 다름 · 휴업·폐업). */
@@ -839,11 +845,16 @@ export function buildSpaceReviewNotice(space: Space, owner: Profile | null, prev
   const renamed = !!prev && prev.name.trim() !== space.name.trim();
   const moved = !!prev && prev.address.trim() !== space.address.trim();
   const again = !!prev && (renamed || moved);
+  // 🔁09-19 저녁 — 보완을 부탁드린 공간을 사장님이 고쳐 다시 보냈다. 이름·주소를 바꿨어도 이 말이 먼저다(관리자가 기다리던 답이라서).
+  const resubmit = prev?.why === "resubmit";
   // 🧾09-19 저녁 — 번호가 비어 있던 공간이 처음 채웠다. 이름·주소는 그대로라 「새로 올라와」도 「바뀌어」도 아니다.
   const bizFirst = !again && prev?.why === "biz-first";
   const what = renamed && moved ? "이름과 주소가" : renamed ? "이름이" : "주소가";
   const whatObj = renamed && moved ? "이름과 주소를" : renamed ? "이름을" : "주소를";
-  const subject = again
+  const whatBare = renamed && moved ? "이름과 주소" : renamed ? "이름" : "주소";
+  const subject = resubmit
+    ? `[collab5] ${space.name}, 보완해서 다시 보냈어요`
+    : again
     ? `[collab5] ${space.name}, ${what} 바뀌어 다시 검토를 기다려요`
     : bizFirst
       ? `[collab5] ${space.name}, 사업자 정보를 채워 검토를 기다려요`
@@ -851,7 +862,9 @@ export function buildSpaceReviewNotice(space: Space, owner: Profile | null, prev
   const link = `${SITE_URL}/rent/review`;
   // 공개 중이던 공간은 검토 대기로 내려가는 순간 목록에서 빠진다(목록은 `open`만 읽는다). 대표가 서두를 이유라 첫 문장 뒤에 말한다.
   const wasListed = prev?.status === "open";
-  const lead = again
+  const lead = resubmit
+    ? `보완을 부탁드린 공간을 사장님이 고쳐서 다시 보내셨어요. 부탁드린 부분이 맞게 고쳐졌는지 봐 주세요.${again ? ` 매장 ${whatBare}도 바꾸셨어요.` : ""}`
+    : again
     ? `공간이 다시 검토를 기다려요. 사장님이 매장 ${whatObj} 바꾸셨어요.${wasListed ? " 다시 열 때까지 목록에서 빠져 있어요." : ""}`
     : bizFirst
       // 번호가 없던 공간은 원래 목록에 없었다(`spaceListed`). 「목록에서 빠져요」는 거짓이라 안 붙인다.
@@ -866,6 +879,7 @@ export function buildSpaceReviewNotice(space: Space, owner: Profile | null, prev
   const rows: [string, string][] = [
     // 바뀐 공간은 새 값 바로 밑에 «전» 값을 둔다(한 칸에 화살표로 몰았더니 폰에서 네 줄로 꺾였다).
     [LABEL.reviewSpace, `${space.name}\n${spaceLink(space)}`],
+    [LABEL.fixAsked, resubmit ? (prev?.fixNote ?? "").trim() : ""],
     [LABEL.reviewPrevName, renamed ? prev!.name : ""],
     [LABEL.address, space.address],
     [LABEL.reviewPrevAddress, moved ? prev!.address : ""],
@@ -883,6 +897,30 @@ export function buildSpaceReviewNotice(space: Space, owner: Profile | null, prev
     note: "검토 대기로 들어온 그때 한 번만 알려요. 그 뒤에 사장님이 더 고치신 내용은 검토 화면에 있어요.",
     mail: { subject, ...compose(lead, rows, go, tail) },
   };
+}
+
+/** ⑫ 보완 요청 → 사장님 (09-19 저녁 대표).
+ *  대표 원문: *「보완해 달라는 이메일과, 사장님 입장에서 보완해서 재제출할 수 있는 환경을 만들어 주자!」*
+ *  ✍️관리자 말투(「반려되었습니다」·「요건 미충족」)를 쓰지 않는다. 무엇을 봐 달라는지, 고치면 어떻게 되는지, 어디서 고치는지.
+ *  사유는 관리자가 적은 글 그대로 싣는다(칩 문장도 해요체로 적어 두었다, `FIX_REASON_CHIPS`).
+ *  @param wasListed 공개 중이라 손님 목록에 서 있던 공간인가. 그랬으면 «잠시 내려 두었다»와 «예약은 그대로»를 같이 말한다. */
+export function buildSpaceFixRequest(space: Space, host: Profile | null, note: string, wasListed: boolean): Mail {
+  const subject = `[collab5] ${space.name}, 한 번 더 확인해 주세요`;
+  const lead = `${withJosa(space.name, "을/를")} 읽어 보다가 확인이 필요한 부분이 생겼어요. 아래 내용을 고쳐서 다시 보내 주시면 이어서 볼게요.`;
+  const rows: [string, string][] = [
+    [LABEL.fixWhat, note.trim()],
+    [LABEL.fixNow, wasListed
+      ? "고쳐 주실 때까지 목록에서 잠시 내려 두었어요. 이미 받은 예약은 그대로예요."
+      : "고쳐 주실 때까지 검토를 잠시 멈춰 두었어요."],
+  ];
+  const link = `${SITE_URL}/rent/${encodeURIComponent(space.slug)}/edit`;
+  const tail = ASK("어떻게 고치면 될지 헷갈리시면 편하게 물어봐 주세요.");
+  return { to: host?.email ?? "", subject, ...compose(lead, rows, { href: link, label: "고치고 다시 보내기" }, tail) };
+}
+
+/** 보내는 쪽 — 문장은 `buildSpaceFixRequest`가 만든다(미리보기 `/dev/mail/space-fix-request`가 같은 함수를 부른다). */
+export async function notifySpaceFixRequest(space: Space, host: Profile | null, note: string, wasListed: boolean): Promise<MailResult> {
+  return sendMail(buildSpaceFixRequest(space, host, note, wasListed));
 }
 
 /** 메일로 보면 이 모양이다(슬랙이 없을 때 대표가 받는 글 · 미리보기 `/dev/mail/space-review-*`). */

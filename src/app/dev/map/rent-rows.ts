@@ -151,7 +151,7 @@ export const RENT_GROUPS: Group[] = [
         path: "/rent/my?tab=host",
         note: "위 칸 둘 중 「빌려준 공간」으로 열려요. 공간은 공개 중 둘·검토 대기·쉬는 중·초안, 그리고 사업자등록번호가 빈 공간(「사업자 정보 필요」와 「고치러 가기」 줄)이에요. 들어온 요청은 새 요청(수락 전 손님 정보), 이용 시간이 시작된 결제 완료, 확정(연락처 열림), 환불 신청 중, 다녀감(가림), 거절, 환불, 손님 취소 둘이에요. 「알림」 줄은 맨 위에 한 번 뜨고 주소에서 지워지는데 칸은 그대로 남아요. 다시 보려면 링크를 한 번 더 누르면 돼요.",
         rows: [
-          { desc: "모든 상태, 정산 계좌 있음 (요청 줄 첫머리에 대관만·공간 전체 · 검토 대기 공간에 국세청 기록과 다르다는 줄)", c: "host-full", to: "/rent/my?tab=host" },
+          { desc: "모든 상태, 정산 계좌 있음 (요청 줄 첫머리에 대관만·공간 전체 · 검토 대기 공간에 국세청 기록과 다르다는 줄 · 보완 필요 공간에 사유와 「고치고 다시 보내기」)", c: "host-full", to: "/rent/my?tab=host" },
           { desc: "같은 화면, 정산 계좌 없음 (확정 줄마다 계좌 등록 한 줄)", c: "host-noaccount", to: "/rent/my?tab=host" },
           { desc: "관리자이기도 한 사장님 (정산하기·검토하기 링크, 검토 대기 공간에 공개하기 버튼)", c: "host-admin", to: "/rent/my?tab=host" },
           { desc: "올린 공간이 없을 때", c: "host-empty", to: "/rent/my?tab=host" },
@@ -159,6 +159,7 @@ export const RENT_GROUPS: Group[] = [
           { desc: "알림 · 처음 올린 뒤", c: "host-full", to: "/rent/my?tab=host&saved=new" },
           { desc: "알림 · 이름이나 주소를 바꿔 검토로 다시 갈 때", c: "host-full", to: "/rent/my?tab=host&saved=review" },
           { desc: "알림 · 사업자 정보를 처음 채워 검토로 갈 때", c: "host-full", to: "/rent/my?tab=host&saved=biz" },
+          { desc: "알림 · 보완 요청을 받은 공간을 고쳐 다시 보냄", c: "host-full", to: "/rent/my?tab=host&saved=fixed" },
           { desc: "알림 · 검토 중에 고침", c: "host-full", to: "/rent/my?tab=host&saved=pending" },
           { desc: "알림 · 공개 중에 고침", c: "host-full", to: "/rent/my?tab=host&saved=ok" },
           { desc: "알림 · 쉬는 동안 고친 경우", c: "host-full", to: "/rent/my?tab=host&saved=kept" },
@@ -204,7 +205,7 @@ export const RENT_GROUPS: Group[] = [
       {
         title: "공간 고치기",
         path: "/rent/[slug]/edit",
-        note: "사업자 칸 오류 보는 법 · 공개 중인 공간을 열고 「사업자 정보」에서 번호를 1234567890으로 바꿔 「고친 내용 올리기」를 누르면 번호 오류가, 대표자 이름을 지우면 빈칸 오류가, 개업일을 지우면 날짜 오류가 그 칸 밑에 떠요. 국세청 기록과 다를 때의 빨간 줄은 검토 중인 공간을 열면 처음부터 서 있고, 번호·이름·개업일 중 하나를 고치면 내려가요. 🏠주소를 바꾸면 주소 칸 밑에 「새 주소가 적힌 사업자등록증을 다시 올려 주세요 · 등록증 올리러 가기」가 뜨고, 등록증을 안 바꾸고 누르면 등록증 칸 밑에 같은 말이 빨갛게 떠요(목 모드라 파일은 못 올려요). 상호만 바꾸면 검토로 안 내려가고 확인 표시도 그대로예요.",
+        note: "사업자 칸 오류 보는 법 · 공개 중인 공간을 열고 「사업자 정보」에서 번호를 1234567890으로 바꿔 「고친 내용 올리기」를 누르면 번호 오류가, 대표자 이름을 지우면 빈칸 오류가, 개업일을 지우면 날짜 오류가 그 칸 밑에 떠요. 국세청 기록과 다를 때의 빨간 줄은 검토 중인 공간을 열면 처음부터 서 있고, 번호·이름·개업일 중 하나를 고치면 내려가요. 🏠주소를 바꾸면 주소 칸 밑에 「한 번 더 읽어 봐요」 줄만 떠요(09-19 저녁부터 등록증을 새로 받지 않아요. 등록증과 주소는 관리자가 검토 화면에서 견줘요). 상호만 바꾸면 검토로 안 내려가고 확인 표시도 그대로예요. 개발 서버에선 사업자등록번호 칸 밑에 「로컬 테스트: 000-00-00000」 한 줄이 떠요.",
         rows: [
           { desc: "공개 중인 공간 · 상품 셋 다 켬 · 사업자 확인 승인됨 (바꾸면 표시가 내려간다는 안내)", c: "host-full", to: `/rent/${S.full}/edit` },
           { desc: "30분 단위 공간 · 최소 1시간 30분 · 09:30~12:00 자투리 날 · 매주 목요일 11:30~20:30", c: "host-full", to: `/rent/${S.halfHour}/edit` },
@@ -212,6 +213,7 @@ export const RENT_GROUPS: Group[] = [
           { desc: "쉬는 중인 공간 · 대관만 켬 · 사업자 정보 채움, 확인 전 · 상호가 빈 옛 공간이라 「비워 두시면 공간 이름이 대신 나가요」 안내", c: "host-full", to: `/rent/${S.paused}/edit` },
           { desc: "초안 · 사업자 정보가 비어 있어 넷 다 채워야 올릴 수 있다는 안내", c: "host-full", to: `/rent/${S.draft}/edit` },
           { desc: "사업자등록번호가 빈 공개 공간 · 머리에 「사업자 정보를 채워 주셔야 다시 열 수 있어요 · 고치러 가기」", c: "host-full", to: `/rent/${S.noBiz}/edit` },
+          { desc: "보완 요청을 받은 공간 · 맨 위에 「한 번 더 확인해 주세요」 사유 박스 · 버튼이 「고쳐서 다시 보내기」", c: "host-full", to: `/rent/${S.needsFix}/edit` },
           { desc: "긴 글", c: "stress-host", to: `/rent/${S.stress}/edit` },
           { desc: "최소 입력", c: "minimal-host", to: `/rent/${S.minimal}/edit` },
           { desc: "남의 공간 고치기 주소를 열면 그 공간 화면으로 넘어가요", c: "host-full", to: `/rent/${S.other}/edit` },
@@ -228,9 +230,9 @@ export const RENT_GROUPS: Group[] = [
         // 🧾09-18 대표 — 공간 등록에 사업자 확인 필수. 관리자가 남이 올린 공간을 공개하는 유일한 화면.
         title: "공간 검토",
         path: "/rent/review",
-        note: "검토 대기 둘은 국세청 기록과 다름(공개 버튼 대신 빨간 이유 줄)과 국세청 조회 전(공개하기 버튼)이에요. 아래 「열려 있는 공간 · 확인 표시 전」엔 조회가 실패한 쉬는 중 공간이 있어요. 목 모드라 버튼을 누르면 「저장하지 않았어요」가, 「등록증 보기」는 새 탭에 안내 문구가 떠요.",
+        note: "줄마다 맨 위에 「이 부분을 확인해 보세요」(국세청·주소 바뀜·네이버·예금주 신호)와 「주소 대조」(바뀐 주소 이전 → 새 · 네이버 · 등록증 보기)가 서요. 검토 대기 셋은 보완해서 다시 보냄 + 국세청 기록과 다름(공개 버튼 대신 빨간 이유 줄), 주소가 3층 → 2층으로 바뀜 + 국세청 조회 전, 계좌 예금주가 대표자와 다름이에요. 줄마다 [보완 요청]이 있고 누르면 사유 팝업(칩 넷 + 직접 쓰기)이 떠요. 아래 「열려 있는 공간 · 확인 표시 전」엔 조회가 실패한 쉬는 중 공간, 맨 아래 「보완을 기다리는 공간」엔 부탁한 날과 내용이 있어요. 목 모드라 버튼을 누르면 「저장하지 않았어요」가, 「등록증 보기」는 새 탭에 안내 문구가 떠요.",
         rows: [
-          { desc: "검토 대기 셋 · 확인 표시 전 하나 · 네이버 일치와 못 찾음 · 계좌 예금주가 대표자와 다른 곳 하나", c: "admin-full", to: "/rent/review" },
+          { desc: "검토 대기 셋 · 확인 표시 전 하나 · 보완을 기다리는 곳 하나 · 주소 바뀜 · 보완해서 다시 보냄 · 네이버 일치와 못 찾음 · 계좌 예금주가 대표자와 다른 곳 하나", c: "admin-full", to: "/rent/review" },
           { desc: "검토할 것이 없을 때", c: "admin-empty", to: "/rent/review" },
           { desc: "등록증 보기 (목 모드 안내 문구)", c: "admin-full", to: `/rent/review/cert/${S.pendingNoKey}` },
           { desc: "검토 대기 공간을 관리자가 열면 보여요", c: "admin-full", to: `/rent/${S.pendingNoKey}` },
@@ -284,6 +286,7 @@ export const RENT_POPUPS: Popup[] = [
   { where: { desc: "내 하루 가게", c: "host-full", to: "/rent/my?tab=host" }, button: "새 요청 줄의 「거절」", title: "이 요청을 거절할까요" },
   { where: { desc: "내 하루 가게", c: "host-full", to: "/rent/my?tab=host" }, button: "이용 시간이 시작된 줄의 「관리자에게 환불 신청하기」", title: "관리자에게 환불을 신청할까요" },
   { where: { desc: "내 하루 가게", c: "host-full", to: "/rent/my?tab=host" }, button: "공개 중인 공간 줄의 「잠시 쉬기」", title: "잠시 쉴까요?" },
+  { where: { desc: "공간 검토", c: "admin-full", to: "/rent/review" }, button: "검토 대기 줄의 「보완 요청」", title: "○○, 무엇을 고쳐 주시면 될까요 (칩 넷 + 사장님께 보낼 말)" },
   { where: { desc: "정산", c: "admin-full", to: "/rent/payouts" }, button: "환불 신청 줄의 「승인하고 환불」", title: "환불을 승인할까요" },
   { where: { desc: "정산", c: "admin-full", to: "/rent/payouts" }, button: "환불 신청 줄의 「신청 닫기」", title: "환불 신청을 닫을까요" },
 ];

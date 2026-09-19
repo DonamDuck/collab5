@@ -141,6 +141,13 @@ function toSpace(r: Row): Space {
     placeLat: typeof r.place_lat === "number" ? r.place_lat : undefined,
     placeLng: typeof r.place_lng === "number" ? r.place_lng : undefined,
     placeMatchedAt: s(r.place_matched_at) || undefined,
+    // 🔁09-19 저녁 보완 요청 · 바뀌기 전 이름·주소. ⚠️SQL(`2026-09-19-rent-review-reject.sql`) 전 DB엔 칸이 없어 빈 값이다.
+    //   칸이 «있는지»를 따로 적어 둔다(`reviewReady`). 검토 화면이 [보완 요청]을 열지, 공개가 이 칸을 지울지 이걸로 정한다.
+    reviewNote: s(r.review_note),
+    reviewRejectedAt: s(r.review_rejected_at) || undefined,
+    reviewPrevName: s(r.review_prev_name),
+    reviewPrevAddress: s(r.review_prev_address),
+    reviewReady: "review_note" in r,
     status: (s(r.status) || "draft") as SpaceStatus,
     createdAt: s(r.created_at), updatedAt: s(r.updated_at),
   };
@@ -157,12 +164,15 @@ function toSpace(r: Row): Space {
  *  📌목록·상세는 여전히 **반드시 이 함수를 거친 값**을 쓴다. 나중에 또 감출 것이 생기면 그 자리가 여기다. */
 export function toPublic(sp: Space): SpacePublic {
   // 🔒09-18 사업자 번호·대표자 이름·개업일·등록증 경로·조회 원문도 여기서 지운다. 확인 표시는 상태·승인 시각 둘로 충분하다.
+  // 🔒09-19 저녁 보완 사유·바뀌기 전 이름·주소도 지운다. 관리자와 그 사장님 사이의 말이다.
   const {
     accessNote: _n, hostTermsAt: _t,
     bizNumber: _b1, bizOwnerName: _b2, bizOpenDate: _b3, bizCertPath: _b4, bizCheckDetail: _b5,
+    reviewNote: _r1, reviewRejectedAt: _r2, reviewPrevName: _r3, reviewPrevAddress: _r4, reviewReady: _r5,
     ...rest
   } = sp;
   void _n; void _t; void _b1; void _b2; void _b3; void _b4; void _b5;
+  void _r1; void _r2; void _r3; void _r4; void _r5;
   // 🚪09-19 오후 — 번호는 지우고 «있나»만 남긴다. 상세가 이 값으로 남에게 보일지 가른다(`spaceListed`).
   return { ...rest, bizOnFile: bizOnFile(sp) };
 }
@@ -415,6 +425,12 @@ export async function saveSpace(input: SpaceSaveInput, opts: { isNew: boolean })
     biz_name: input.bizName,
     place_name: input.placeName, place_address: input.placeAddress,
     place_lat: input.placeLat ?? null, place_lng: input.placeLng ?? null, place_matched_at: input.placeMatchedAt ?? null,
+    // 🔁09-19 저녁 보완 요청 · 바뀌기 전 이름·주소 — «값을 준 칸만» 쓴다. 안 준 칸(undefined)은 upsert가 DB 값을 그대로 둔다.
+    //   `reviewRejectedAt`의 빈 문자열은 «지운다»(null)는 뜻이다(사장님이 고쳐 다시 보낼 때).
+    ...(input.reviewNote !== undefined ? { review_note: input.reviewNote } : {}),
+    ...(input.reviewRejectedAt !== undefined ? { review_rejected_at: input.reviewRejectedAt || null } : {}),
+    ...(input.reviewPrevName !== undefined ? { review_prev_name: input.reviewPrevName } : {}),
+    ...(input.reviewPrevAddress !== undefined ? { review_prev_address: input.reviewPrevAddress } : {}),
   };
   const write = (r: Partial<typeof row>) =>
     opts.isNew
@@ -428,9 +444,16 @@ export async function saveSpace(input: SpaceSaveInput, opts: { isNew: boolean })
   //     1시간 30분 같은 반 시간은 옛 칸에 못 담아서, 빼면 2시간으로 조용히 바뀐다. 그땐 실패시킨다 — `2026-09-19-rent-half-hour.sql`이 먼저다.
   //   · 상호(`biz_name`, 09-19) — 칸이 없으면 뺀다. 판매자 정보 화면이 공간 이름으로 물러서서 화면이 비지 않는다.
   //     SQL(`2026-09-19-rent-biz-name.sql`)을 돌리면 다음 저장부터 들어간다. 그 사이 적은 상호는 다시 적어야 한다.
-  //   PostgREST는 없는 칸을 한 번에 하나씩 말하므로 세 번까지 돈다.
-  for (let i = 0; i < 3 && error; i++) {
-    if ("biz_name" in sent && /biz_name/.test(error.message)) {
+  //   · 🔁검토 칸 넷(`review_*`, 09-19 저녁) — 칸이 없으면 넷을 한꺼번에 뺀다. SQL 전엔 보완 요청이 생길 수 없어(버튼이 잠긴다)
+  //     지울 반려 표시도 없다. 잃는 건 「바뀌기 전 주소」 한 줄뿐이다(검토 화면이 그 줄을 못 그린다).
+  //   PostgREST는 없는 칸을 한 번에 하나씩 말하므로 네 번까지 돈다.
+  const REVIEW_KEYS = ["review_note", "review_rejected_at", "review_prev_name", "review_prev_address"] as const;
+  for (let i = 0; i < 4 && error; i++) {
+    if (REVIEW_KEYS.some((k) => k in sent) && /review_/.test(error.message)) {
+      const rest: Record<string, unknown> = { ...sent };
+      for (const k of REVIEW_KEYS) delete rest[k];
+      sent = rest as Partial<typeof row>;
+    } else if ("biz_name" in sent && /biz_name/.test(error.message)) {
       const { biz_name: _bn, ...rest } = sent;
       void _bn;
       sent = rest;
@@ -473,14 +496,19 @@ export async function setSpaceStatus(slug: string, from: SpaceStatus, to: SpaceS
  *  참 = 이번에 바뀌었다. 권한은 호출부가 확인한다. */
 export async function approveSpace(
   slug: string,
-  seen: { status: SpaceStatus; bizNumber: string; bizCertPath: string },
+  seen: { status: SpaceStatus; bizNumber: string; bizCertPath: string; reviewReady?: boolean },
 ): Promise<Space | null> {
   if (await rentMockOn()) return null;
   const c = db();
   if (!c) return null;
   const next = seen.status === "pending" || seen.status === "draft" ? "open" : seen.status;
+  // 🔁09-19 저녁 — 검토를 마치면 보완 사유와 바뀌기 전 이름·주소를 지운다(다음 검토에 옛 말이 따라오지 않게).
+  //   칸이 있는 DB에서만(`reviewReady`). SQL 전 DB에 이 칸을 보내면 승인이 통째로 실패한다.
+  const clearReview = seen.reviewReady
+    ? { review_note: "", review_rejected_at: null, review_prev_name: "", review_prev_address: "" }
+    : {};
   const { data, error } = await c.from("spaces")
-    .update({ status: next, biz_approved_at: new Date().toISOString() })
+    .update({ status: next, biz_approved_at: new Date().toISOString(), ...clearReview })
     .eq("slug", slug).eq("status", seen.status)
     .eq("biz_number", seen.bizNumber).eq("biz_cert_path", seen.bizCertPath)
     .select().maybeSingle();
@@ -488,24 +516,51 @@ export async function approveSpace(
   return data ? toSpace(data as Row) : null;
 }
 
-/** 🧾관리자 검토 목록(09-18) — 둘을 한 번에.
- *  ① 검토 대기(`pending`) 전부 — 공개 여부를 정한다
- *  ② 이미 열려 있거나 쉬는 공간 중 «등록증은 있는데 승인이 없는» 곳 — 사장님이 사업자 정보를 새로 채우거나 바꾼 곳이다.
+/** 🔁09-19 저녁 보완 요청(반려) — 관리자만. 상태를 `pending`으로 내리고 사유와 시각을 적는다(«보완 필요»).
+ *  ⭐행 전체를 다시 쓰지 않는다(`approveSpace`와 같은 이유). 🔒«읽었을 때의 상태»일 때만 바꾼다 — 관리자가 사유를 적는 사이
+ *    다른 관리자가 공개했거나 사장님이 쉬게 했으면 이 요청은 안 먹는다.
+ *  공개 중이던 공간은 이 순간 목록에서 내려간다(목록은 `open`만 읽는다). 이미 잡힌 예약은 예약 행이라 그대로다.
+ *  @returns 바뀐 행 · 칸이 없는 DB(SQL 전)면 `REVIEW_COLUMNS_MISSING` · 조건이 안 맞거나 실패면 null. 권한은 호출부가 본다. */
+export const REVIEW_COLUMNS_MISSING = "review-columns-missing" as const;
+export async function rejectSpace(
+  slug: string, seen: { status: SpaceStatus }, note: string,
+): Promise<Space | typeof REVIEW_COLUMNS_MISSING | null> {
+  if (await rentMockOn()) return null;
+  const c = db();
+  if (!c) return null;
+  const { data, error } = await c.from("spaces")
+    .update({ status: "pending", review_note: note, review_rejected_at: new Date().toISOString() })
+    .eq("slug", slug).eq("status", seen.status)
+    .select().maybeSingle();
+  if (error) {
+    if (/review_/.test(error.message)) return REVIEW_COLUMNS_MISSING;
+    console.error(`[spaces] rejectSpace failed slug=${slug}: ${error.message}`);
+    return null;
+  }
+  return data ? toSpace(data as Row) : null;
+}
+
+/** 🧾관리자 검토 목록(09-18) — 셋을 한 번에.
+ *  ① 검토 대기(`pending`) — 공개 여부를 정한다. 🔁09-19 저녁 보완을 요청해 둔 곳은 뺀다(③)
+ *  ② 이미 열려 있거나 쉬는 공간 중 «등록증은 있는데 승인이 없는» 곳 — 사장님이 사업자 정보를 바꾼 곳이다.
  *     공개는 그대로 두고 확인 표시만 정한다. 이게 없으면 옛 공간은 확인 표시를 받을 길이 없다.
+ *  ③ 🆕보완을 기다리는 곳(`pending` + 보완 요청 시각) — 사장님이 고쳐 다시 보내면 ①로 돌아온다.
  *  오래 기다린 것부터. */
-export async function listSpacesForReview(): Promise<{ pending: Space[]; approveOnly: Space[] }> {
+export async function listSpacesForReview(): Promise<{ pending: Space[]; approveOnly: Space[]; waitingFix: Space[] }> {
   const byUpdated = (a: Space, b: Space) => (a.updatedAt < b.updatedAt ? -1 : a.updatedAt > b.updatedAt ? 1 : 0);
   const m = await getRentMock();
   if (m) {
+    const pendingAll = m.data.spaces.filter((sp) => sp.status === "pending").sort(byUpdated);
     return {
-      pending: m.data.spaces.filter((sp) => sp.status === "pending").sort(byUpdated),
+      pending: pendingAll.filter((sp) => !sp.reviewRejectedAt),
       approveOnly: m.data.spaces
         .filter((sp) => (sp.status === "open" || sp.status === "paused") && !!sp.bizCertPath && !sp.bizApprovedAt)
         .sort(byUpdated),
+      waitingFix: pendingAll.filter((sp) => !!sp.reviewRejectedAt),
     };
   }
   const c = db();
-  if (!c) return { pending: [], approveOnly: [] };
+  if (!c) return { pending: [], approveOnly: [], waitingFix: [] };
   const [a, b] = await Promise.all([
     c.from("spaces").select("*").eq("status", "pending").order("updated_at", { ascending: true }),
     c.from("spaces").select("*").in("status", ["open", "paused"]).neq("biz_cert_path", "").is("biz_approved_at", null)
@@ -514,9 +569,11 @@ export async function listSpacesForReview(): Promise<{ pending: Space[]; approve
   if (a.error) console.error(`[spaces] listSpacesForReview pending failed: ${a.error.message}`);
   // ⚠️SQL 전 DB엔 `biz_cert_path` 칸이 없어 ②가 실패한다. ①은 살린다.
   if (b.error) console.error(`[spaces] listSpacesForReview approveOnly failed: ${b.error.message}`);
+  const pendingAll = (a.data ?? []).map((r) => toSpace(r as Row));
   return {
-    pending: (a.data ?? []).map((r) => toSpace(r as Row)),
+    pending: pendingAll.filter((sp) => !sp.reviewRejectedAt),
     approveOnly: (b.data ?? []).map((r) => toSpace(r as Row)),
+    waitingFix: pendingAll.filter((sp) => !!sp.reviewRejectedAt),
   };
 }
 

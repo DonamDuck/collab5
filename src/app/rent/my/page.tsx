@@ -19,6 +19,7 @@ import { StickyTabs } from "@/components/StickyTabs";
 import { BookingBadge, ListRow as Row, SpaceBadge, primaryBtnCls, secondaryBtnCls, won } from "../ui";
 import { PRODUCT_LABEL } from "@/lib/rent-copy";
 import { bizMissingLine, bizOnFile, spaceListed } from "@/lib/bizcheck";
+import { needsFix } from "@/lib/rent-review";
 import { productPrice, sellableProducts } from "@/lib/rent-products";
 import { groupGuestBookings, groupHostBookings, hostBookingGroup, type HostBookingGroup } from "@/lib/rent-groups";
 
@@ -84,6 +85,8 @@ const SAVED_LINE: Record<string, string> = {
   pending: "고치신 것까지 같이 읽어 볼게요. 끝나면 목록에 열어 드려요.",
   // 🧾09-19 저녁 — 사업자등록번호가 비어 있던 공간이 처음 채우면 검토로 간다(`spaceSaveReview`의 biz-first).
   biz: "사업자 정보를 채워 주셨어요. 저희가 한 번 읽어 보고 목록에 열어 드릴게요.",
+  // 🔁09-19 저녁 — 보완 요청을 받은 공간을 고쳐 저장했다(`spaceSaveReview`의 resubmit).
+  fixed: "고쳐서 다시 보내 주셨어요. 부탁드린 부분을 확인하고 목록에 열어 드릴게요.",
   ok: "고친 내용이 공간 화면에 바로 보여요.",
   kept: "저장해 뒀어요.",
 };
@@ -540,7 +543,8 @@ export default async function MyRentPage({
                 status={
                   <div className="flex shrink-0 items-center gap-3">
                     {/* 🚪09-19 오후 — 번호가 빈 공간은 공개 중·검토 대기여도 손님 앞에 안 선다. 「공개 중」이라 적으면 거짓이다. */}
-                    <SpaceBadge status={sp.status !== "draft" && !bizOnFile(sp) ? "nobiz" : sp.status} />
+                    {/* 🔁09-19 저녁 — 보완을 요청받은 공간은 「검토 기다리는 중」이 아니다. 사장님 차례라 그 말로 선다. */}
+                    <SpaceBadge status={needsFix(sp) ? "fix" : sp.status !== "draft" && !bizOnFile(sp) ? "nobiz" : sp.status} />
                     {/* 고치기는 글자 링크로 — 이 줄에서 누르는 것은 이름(보기)과 이것뿐이라 버튼 얼굴이 필요 없다. */}
                     <Link
                       href={`/rent/${sp.slug}/edit`}
@@ -551,8 +555,21 @@ export default async function MyRentPage({
                   </div>
                 }
               >
+                {/* 🔁09-19 저녁 대표 — 보완 요청을 받은 공간. 무엇을 고치면 되는지(관리자가 적은 사유 그대로)와 고치러 가는 길. */}
+                {needsFix(sp) && (
+                  <div className="mt-2 rounded-md bg-lemon-pale px-3 py-2.5 text-[15px] leading-relaxed break-keep text-lemon-on">
+                    <p className="font-medium">보완이 필요해요</p>
+                    <p className="mt-0.5 whitespace-pre-line text-body">{sp.reviewNote}</p>
+                    <Link
+                      href={`/rent/${sp.slug}/edit`}
+                      className="-my-[11px] inline-block py-[11px] font-medium underline underline-offset-2"
+                    >
+                      고치고 다시 보내기
+                    </Link>
+                  </div>
+                )}
                 {/* 🧾09-18 국세청 기록과 달라 공개가 막힌 공간 — 사장님이 떠난 뒤에도 알 수 있게 그 줄에 한 번 더. */}
-                {sp.bizCheckStatus === "mismatch" && (
+                {sp.bizCheckStatus === "mismatch" && !needsFix(sp) && (
                   <p className="mt-2 text-[15px] leading-relaxed break-keep text-lemon-on">
                     사업자 정보가 국세청 기록과 달라 열어 드리지 못하고 있어요.{" "}
                     {/* 👆09-18 밤 QA(H-28) — 문장 안 링크라 누를 자리가 글자 높이(18px)뿐이었다.
@@ -582,7 +599,7 @@ export default async function MyRentPage({
                     🧾09-18 밤 QA(H-32) — 국세청 기록과 다른 공간에도 [공개하기]가 떴다. 서버(`publishSpaceAction`)는
                     막으니 새는 건 없지만, 누르면 거절 한 줄이 돌아올 뿐인 버튼이라 «되는 일»처럼 보였다.
                     바로 위 줄이 이미 「고치러 가기」로 할 일을 말한다. */}
-                {admin && sp.status === "pending" && sp.bizCheckStatus !== "mismatch" && bizOnFile(sp) && <PublishButton slug={sp.slug} />}
+                {admin && sp.status === "pending" && !needsFix(sp) && sp.bizCheckStatus !== "mismatch" && bizOnFile(sp) && <PublishButton slug={sp.slug} />}
                 {/* ⏸잠시 쉬기 / 다시 열기(09-17). 검토 대기·작성 중엔 안 뜬다 — 서버도 open↔paused만 받는다. */}
                 {(sp.status === "open" || sp.status === "paused") && (
                   <PauseToggle slug={sp.slug} paused={sp.status === "paused"} />

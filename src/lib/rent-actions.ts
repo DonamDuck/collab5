@@ -13,10 +13,11 @@ import {
   createPayment, getPaymentByOrderId, rentSync,
   type SpaceSaveInput,
   listLiveBookings, setSpaceStatus, approveSpace, markReminded, SLUG_TAKEN,
+  rejectSpace, REVIEW_COLUMNS_MISSING,
 } from "./spaces";
 // 🧾🏪09-18 사업자 확인 · 네이버 상호 매칭(대표 09-17). 규칙은 순수 함수(`bizcheck`·`place-match`), 바깥 호출은 서버 전용 파일에.
 import {
-  addressCertProblem, addressMoved,
+  addressMoved,
   BIZ_CERT_MAX_BYTES, BIZ_CERT_TYPES, BIZ_MISMATCH_LINE, bizCertPathOk, bizDigits, bizNumberProblem, bizOnFile,
   hasAnyBiz, localTestCheck, needsBizInfo, openDateProblem,
 } from "./bizcheck";
@@ -32,7 +33,9 @@ import {
 // ⭐신청이 «지금도» 말이 되나 — 신청 시작·결제 승인·결제 화면이 같이 쓰는 순수 규칙(09-18 밤 QA G-01).
 import { pendingBookingProblem, validateBookingRequest } from "./rent-booking-rules";
 // 🧾09-19 저녁 저장하면 어느 상태로 가나 — 등록 폼과 같은 순수 함수.
-import { pausedChangeProblem, spaceSaveReview } from "./rent-review";
+import {
+  fixNoteProblem, needsFix, pausedChangeProblem, REVIEW_SQL_LINE, reviewPrevFor, spaceSaveReview,
+} from "./rent-review";
 import {
   CAPACITY_MAX, COFFEE_CHAT_MINUTES_MAX, COFFEE_CHAT_MINUTES_MIN, COFFEE_CHAT_MINUTES_STEP, COFFEE_CHAT_PRICE_MAX,
   CONTACT_PHONE_MAX, HOST_MESSAGE_MAX, MIN_HOURS_MAX, PHOTOS_MAX, PLAN_MAX, PRICE_HOUR_MAX, storePhoneOk,
@@ -42,7 +45,7 @@ import { repo } from "./repo";
 import {
   notifyBookingPaid, notifyBookingConfirmed, notifyBookingRejected, notifyBookingCancelled,
   notifyBookingPaidToGuest, notifyBookingConfirmedToHost, notifyBookingCancelledToGuest, notifyAdminRefund,
-  notifySpacePublished, notifySpaceReview, notifyRefundRequest, notifyDeal, type DealKind,
+  notifySpacePublished, notifySpaceReview, notifyRefundRequest, notifyDeal, notifySpaceFixRequest, type DealKind,
 } from "./rent-notify";
 import { bookingStarted, dateLabel, kstDaysUntil, durationLabel, isTimeMark, minHoursToMinutes, minutesBetween, toMinutes, todayKst } from "./rent-time";
 import type { Space, SpaceBooking, SpaceUseType, SpaceCategory, OpenSlot, AccessHow, RentProduct, BizCheckStatus } from "./types";
@@ -372,10 +375,9 @@ export async function saveSpaceAction(input: SpaceFormInput): Promise<ActionResu
       return { ok: false, message: "사업자등록증 파일을 다시 올려 주세요.", field: "biz" };
     }
   }
-  // 🏠09-19 오후 대표 — 주소가 바뀌면 사업자등록증을 새로 올려야 저장된다(검토 대기로 내려가는 건 전과 같다).
-  //   판정은 등록 폼과 같은 순수 함수(`addressCertProblem`). 상호만 바꾸는 건 여기 안 걸린다.
-  const certProblem = addressCertProblem(prev, { address: input.address, bizCertPath: biz.bizCertPath });
-  if (certProblem) return { ok: false, field: "biz", message: certProblem };
+  // 🔻09-19 저녁 대표 — 「주소가 바뀌면 등록증을 새로 올려야 저장」(09-19 오후)을 뺐다. 글자 그대로 비교해서 층·호수 오타만 고쳐도 막혔다.
+  //   주소·이름이 바뀌면 검토 대기로 가는 건 그대로고, 등록증과 주소가 맞는지는 관리자가 검토 화면에서 눈으로 본다
+  //   (「주소 바뀜: 이전 → 새」 · 등록증 보기 · 네이버 결과를 한 줄에, `/rent/review`).
 
   // 📍주소가 «바뀔 때만» 좌표를 다시 잰다(대표 09-14 지도 요청). 유료 호출이라 매번 부르지 않고,
   //   실패해도 저장은 그대로 간다 — 지도는 있으면 좋은 것이지 올리기를 막을 것이 아니다.
@@ -403,8 +405,9 @@ export async function saveSpaceAction(input: SpaceFormInput): Promise<ActionResu
     !prev || prev.bizNumber !== biz.bizNumber || prev.bizOwnerName !== biz.bizOwnerName || prev.bizOpenDate !== biz.bizOpenDate;
   // 🔁09-19 오후 대표 — *「상호만 바꾸는 건 그냥 바꾸게 하고」*. 오전엔 상호를 바꾸면 승인(확인 표시)도 내렸는데 되돌렸다.
   //   상호는 검토로도 안 내리고 표시도 그대로 둔다. 표시가 내려가는 건 번호·대표자·개업일·등록증이 바뀔 때뿐이다.
-  //   주소가 바뀌면 등록증이 새로 오니(`addressCertProblem`) 그 길로 표시가 내려간다.
-  const bizChanged = idChanged || !prev || prev.bizCertPath !== biz.bizCertPath;
+  //   🔁09-19 저녁 — 주소가 바뀌어도 내린다. 승인은 «그 등록증을 그 주소와 견줘 본 것»이라, 주소가 바뀌면 다시 견줘야 한다
+  //   (검토 대기로 내려가니 목록엔 어차피 안 서고, 관리자가 공개하면 승인이 새로 붙는다).
+  const bizChanged = idChanged || !prev || prev.bizCertPath !== biz.bizCertPath || moved;
   const needCheck = bizRequired && (idChanged || prev?.bizCheckStatus === "none" || prev?.bizCheckStatus === "error");
   // 🏪네이버 상호 — 이름·주소가 바뀌었거나 아직 매칭이 없을 때. 매칭이 있고 둘 다 그대로면 안 부른다.
   const placeStale = !prev || renamed || moved;
@@ -484,6 +487,10 @@ export async function saveSpaceAction(input: SpaceFormInput): Promise<ActionResu
     bizName,
     bizCheckStatus, bizCheckDetail, bizCheckedAt, bizApprovedAt,
     ...place,
+    // 🔁09-19 저녁 — 바뀌기 전 이름·주소(관리자가 마지막으로 본 값). 바꿀 게 없으면 칸을 아예 안 보낸다(`reviewPrevFor`).
+    ...(reviewPrevFor(prev, { name: input.name, address: input.address }) ?? {}),
+    // 🔁보완 요청을 받은 공간을 고쳐 저장하면 반려 표시를 지운다(빈 문자열 = 지움, `saveSpace`). 사유는 남긴다(검토 화면 「지난 요청」).
+    ...(review.why === "resubmit" ? { reviewRejectedAt: "" } : {}),
     status,
   };
   // 🔒09-18 밤 QA(SEC-02) — 새 공간은 insert로만 넣는다. slug가 이미 있으면(남의 공간일 수 있다) 그 행은 그대로 두고 꼬리를 다시 뽑는다.
@@ -510,12 +517,13 @@ export async function saveSpaceAction(input: SpaceFormInput): Promise<ActionResu
   //     그래서 «이번 저장으로 처음 검토 대기가 됐을 때만» 보낸다 = 새 공간이거나, 전엔 검토 대기가 아니었는데 이름·주소가 바뀌었거나
   //     🆕사업자등록번호를 처음 채웠을 때(09-19 저녁).
   //   메일이 실패해도 저장은 그대로 성공이다(`safeNotify`). 목 모드는 이 함수 첫 줄에서 이미 멈췄다.
-  if (status === "pending" && prev?.status !== "pending") {
+  //   🔁보완해서 다시 보낸 때도 한 번 더 간다(09-19 저녁) — 검토 대기였지만 관리자는 사장님의 답을 기다리고 있었다.
+  if (status === "pending" && (prev?.status !== "pending" || review.why === "resubmit")) {
     await safeNotify(async () => {
       const owner = await getProfileById(uid);
       // 초안이 처음 올라온 건 «새 공간»과 같다 — 이름이 바뀌었어도 「바뀌어 다시 검토」가 아니라 「새로 올라와 검토」다.
       const before = prev && prev.status !== "draft"
-        ? { name: prev.name, address: prev.address, status: prev.status, why: review.why }
+        ? { name: prev.name, address: prev.address, status: prev.status, why: review.why, fixNote: prev.reviewNote }
         : null;
       await notifySpaceReview(saved, owner, before);
     });
@@ -567,7 +575,12 @@ export async function publishSpaceAction(slug: string): Promise<ActionResult> {
   if (sp.bizCheckStatus === "closed") {
     return { ok: false, message: "휴업이나 폐업으로 나오는 사업자라 열 수 없어요." };
   }
-  const saved = await approveSpace(slug, { status: sp.status, bizNumber: sp.bizNumber, bizCertPath: sp.bizCertPath });
+  // 🔁09-19 저녁 — 보완을 요청해 둔 공간은 사장님이 고쳐 다시 보내야 검토 대기로 돌아온다. 그 전엔 열지 않는다.
+  if (needsFix(sp)) {
+    return { ok: false, message: "보완을 기다리는 공간이에요. 사장님이 고쳐서 다시 보내시면 검토 대기로 돌아와요." };
+  }
+  // 검토를 마치면 보완 사유·바뀌기 전 이름·주소를 지운다(칸이 있는 DB에서만, `reviewReady`).
+  const saved = await approveSpace(slug, { status: sp.status, bizNumber: sp.bizNumber, bizCertPath: sp.bizCertPath, reviewReady: sp.reviewReady });
   revalidatePath("/rent");
   revalidatePath(`/rent/${slug}`);
   revalidatePath("/rent/review");
@@ -591,6 +604,51 @@ export async function publishSpaceAction(slug: string): Promise<ActionResult> {
       ? badge ? "공개했어요. 사업자 확인 표시도 붙었어요." : `공개했어요. ${why} 확인 표시는 아직 안 붙어요.`
       : badge ? "확인 표시를 붙였어요." : `승인해 뒀어요. ${why} 확인 표시는 국세청 기록과 맞춰 본 뒤에 붙어요.`,
     slug,
+  };
+}
+
+/** 🔁보완 요청(반려) — 대표만 (대표 09-19 저녁).
+ *  대표 원문: *「사업자 거절(사람이 하되 너랑 같이 할 거야)되면 반려 처리되고, 보완해 달라는 이메일과,
+ *    사장님 입장에서 보완해서 재제출할 수 있는 환경을 만들어 주자!」*
+ *  공간을 «보완 필요»(`pending` + 반려 시각)로 두고 사장님께 사유와 고치기 링크를 메일로 보낸다.
+ *  · 공개 중이던 공간은 이 순간 목록에서 내려간다. 이미 잡힌 예약은 예약 행이라 그대로 살아 있다.
+ *  · 사장님이 고쳐 저장하면(`saveSpaceAction`) 반려 표시가 지워지고 검토 대기로 돌아오며 대표 알림이 다시 간다.
+ *  ⚠️SQL(`2026-09-19-rent-review-reject.sql`) 전 DB엔 사유를 적을 칸이 없다. 그땐 아무것도 안 바꾸고 관리자에게 그 말을 돌려준다. */
+export async function requestSpaceFixAction(slug: string, note: string): Promise<ActionResult> {
+  if (await rentMockOn()) return { ...RENT_MOCK_BLOCKED };
+  if (!(await isRentAdmin())) return { ok: false, message: "권한이 없어요." };
+  const text = (note ?? "").replace(/\r\n/g, "\n").trim();
+  const problem = fixNoteProblem(text);
+  if (problem) return { ok: false, message: problem };
+  const sp = await getSpaceFull(slug);
+  if (!sp) return { ok: false, message: "그 공간을 찾지 못했어요." };
+  if (sp.status === "draft") return { ok: false, message: "아직 올리지 않은 초안이에요." };
+  if (needsFix(sp)) return { ok: true, message: "이미 보완을 요청해 둔 공간이에요. 사장님이 고쳐 보내시면 다시 올라와요.", slug };
+  if (!sp.reviewReady) return { ok: false, message: REVIEW_SQL_LINE };
+  const saved = await rejectSpace(slug, { status: sp.status }, text);
+  if (saved === REVIEW_COLUMNS_MISSING) return { ok: false, message: REVIEW_SQL_LINE };
+  if (!saved) return { ok: false, message: "그 사이 공간 상태가 바뀌었어요. 새로고침하고 다시 봐 주세요." };
+  revalidatePath("/rent");
+  revalidatePath(`/rent/${slug}`);
+  revalidatePath("/rent/review");
+  revalidatePath("/rent/my");
+  // 📨사장님께 한 통. 메일이 실패해도 보완 요청은 그대로다(`safeNotify`). 이메일이 없는 계정이면 관리자에게 그 사실을 돌려준다.
+  const wasListed = sp.status === "open" && bizOnFile(sp);
+  let mailed: "sent" | "no-recipient" | "not-sent" = "not-sent";
+  await safeNotify(async () => {
+    const host = await getProfileById(sp.ownerUserId);
+    const mail = await notifySpaceFixRequest(saved, host, text, wasListed);
+    mailed = mail.sent ? "sent" : mail.skipped === "no-recipient" ? "no-recipient" : "not-sent";
+  });
+  // 메일이 나갔는지를 그대로 말한다. 안 나갔어도 사장님 화면(내 하루 가게·고치기)엔 사유가 떠 있다.
+  const mailLine = {
+    "sent": "사장님께 사유를 메일로 보냈어요.",
+    "no-recipient": "사장님 계정에 이메일이 없어 메일은 못 보냈어요. 전화로 알려 주세요.",
+    "not-sent": "메일은 못 보냈어요. 사장님 화면엔 사유가 떠 있어요.",
+  }[mailed as "sent" | "no-recipient" | "not-sent"];
+  return {
+    ok: true, slug,
+    message: ["보완을 요청했어요.", wasListed ? "공간은 목록에서 내렸고, 이미 잡힌 예약은 그대로예요." : "", mailLine].filter(Boolean).join(" "),
   };
 }
 

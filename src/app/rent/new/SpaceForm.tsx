@@ -27,7 +27,7 @@ import { durationLabel, expandRepeat, minHoursToMinutes, minutesBetween, stripRe
 import { payoutAmount } from "@/lib/rent-money";
 import { CONTACT_PHONE_MAX, storePhoneOk } from "@/lib/rent-limits";
 import {
-  addressCertProblem, addressMoved,
+  addressMoved,
   BIZ_CERT_MAX_BYTES, BIZ_CERT_TYPES, BIZ_MISMATCH_LINE, bizCertPathOk, bizDigits, bizNumberProblem, formatBizNumber, fromOpenDate,
   hasAnyBiz, needsBizInfo, openDateProblem, spaceListed, testBizHint, toOpenDate,
 } from "@/lib/bizcheck";
@@ -262,13 +262,12 @@ export function SpaceForm({
   const addressNow = [addrBase.trim(), addrDetail.trim()].filter(Boolean).join(", ");
   const renamedNow = !!initial && initial.name.trim() !== name.trim();
   const movedNow = addressMoved(initial ?? null, addressNow);
-  /** 🏠09-19 오후 대표 — 주소를 바꾸면 사업자등록증을 새로 올려야 저장된다. 서버와 같은 함수(`addressCertProblem`)라 문장도 같다.
-   *  주소 칸 밑엔 바뀐 순간부터 옅게 알리고, 등록증 칸은 누른 뒤에 막는다(`blocker`). */
-  const addressCertLine = addressCertProblem(initial ?? null, { address: addressNow, bizCertPath });
   /** 🧾09-19 저녁 — 저장하면 어느 상태로 가나. 서버(`saveSpaceAction`)와 같은 함수(`spaceSaveReview`)다.
    *  번호가 비어 있던 공간이 처음 채우면 이름·주소가 그대로여도 한 번 더 읽는다(`biz-first`). */
   const reviewNow = spaceSaveReview(initial ?? null, { name, address: addressNow, bizNumber: bizDigits(bizNumber) });
   const reviewAgain = renamedNow || movedNow || (!!initial && initial.status !== "draft" && reviewNow.why === "biz-first");
+  /** 🔁09-19 저녁 보완 요청을 받은 공간을 고치는 중인가 — 버튼 이름이 「고쳐서 다시 보내기」가 된다. */
+  const fixing = reviewNow.why === "resubmit";
   /** ⏸쉬는 중엔 못 하는 저장(이름·주소 바꾸기, 번호 처음 채우기). 서버와 같은 함수라 문장도 같다. */
   const pausedLine = pausedChangeProblem(initial ?? null, { name, address: addressNow, bizNumber: bizDigits(bizNumber) });
   /** 지금 손님에게 보이는 공간인가 — 그럴 때만 「목록에서 잠시 빠져요」가 참이다.
@@ -528,7 +527,6 @@ export function SpaceForm({
       if (dateProblem) return ["bizOpenDate", dateProblem];
       if (!bizCertPath) return ["bizCert", "사업자등록증 파일을 올려 주세요."];
     }
-    if (addressCertLine) return ["bizCert", addressCertLine];
     if (pausedLine) return [pausedLine.field === "biz" ? "bizNumber" : pausedLine.field, pausedLine.message];
     if (!termsOk) return ["terms", "공간 제공자 약관에 동의해 주세요."];
     return null;
@@ -640,7 +638,9 @@ export function SpaceForm({
       const rv = spaceSaveReview(initial ?? null, { name, address, bizNumber: bizDigits(bizNumber) });
       const saved = !initial || rv.why === "draft"
         ? "new"
-        : initial.status === "pending"
+        : rv.why === "resubmit"
+          ? "fixed"
+          : initial.status === "pending"
           ? "pending"
           : rv.why === "renamed" || rv.why === "moved"
             ? "review"
@@ -772,16 +772,8 @@ export function SpaceForm({
             onBase={setAddrBase}
             onDetail={setAddrDetail}
           />
+          {/* 🔻09-19 저녁 대표 — 「주소를 바꾸면 등록증을 새로」 줄을 뺐다. 주소와 등록증은 관리자가 검토 화면에서 눈으로 견준다. */}
           {movedNow && <ReviewAgainNote what="주소" listed={listedNow} />}
-          {/* 🏠주소를 바꿨는데 등록증은 그대로일 때만. 새 등록증을 올리면 이 줄이 내려간다. 막는 말은 아니라 레몬(빨강은 누른 뒤 등록증 칸에). */}
-          {addressCertLine && (
-            <p className="mt-1 text-[15px] leading-relaxed break-keep text-lemon-on">
-              {addressCertLine}{" "}
-              <a href="#f-bizCert" className="-my-[13px] inline-block py-[13px] underline underline-offset-2">
-                등록증 올리러 가기
-              </a>
-            </p>
-          )}
         </L>
         {/* 🔻09-14 「동네」 칸 삭제 — 대표: *「주소를 필수로 하고, 동네 섹션 삭제해도 될 거 같아」*.
             ⭐주소를 받으면 동네는 «거기서 나온다». 같은 것을 두 번 묻는 칸이었고, 둘이 어긋나면
@@ -1321,8 +1313,8 @@ export function SpaceForm({
               `약관에는 사장님 소유이거나 임대인 동의를 받으셨다는 것, 수수료 ${Math.round(feeRate * 100)}%와 정산 방법, 환불 규정이 담겨 있어요.`,
               // 🔁09-19 대표 [J] — 판매자 정보 화면(상호·대표자·사업자번호·주소·가게 전화). 호스트 약관 제6조와 같은 말.
               "손님은 신청하기 전에 공간 화면의 판매자 정보에서 상호·대표자 이름·사업자등록번호·주소·가게 전화번호를 볼 수 있어요.",
-              // 🏠09-19 오후 대표 — 주소를 바꾸면 등록증을 다시 받는다. 호스트 약관 제2조와 같은 말.
-              "공간 이름이나 주소를 바꾸시면 저희가 다시 확인해요. 주소를 바꾸실 땐 새 주소가 적힌 사업자등록증을 다시 올려 주셔야 해요.",
+              // 🔁09-19 저녁 대표 — 주소를 바꿔도 등록증을 새로 받지 않는다. 저희가 등록증과 견줘 보고 맞지 않으면 보완을 부탁드린다(호스트 약관 제2조와 같은 말).
+              "공간 이름이나 주소를 바꾸시면 저희가 사업자등록증과 한 번 더 견줘 봐요. 맞지 않는 부분이 있으면 보완을 부탁드릴 수 있어요.",
               "손님이 결제를 마치면 사장님 연락처가 그 손님께 전달돼요. 손님 연락처는 사장님이 요청을 수락하신 뒤에 보실 수 있어요.",
             ].map((line) => (
               <li key={line} className="flex gap-2 text-[15px] leading-relaxed break-keep text-mute">
@@ -1412,9 +1404,11 @@ export function SpaceForm({
             : uploading
               ? certUploading ? "파일을 올리는 중이에요…" : "사진을 올리는 중이에요…"
               : editing
-                ? reviewAgain
-                  ? "고친 내용 올리고 다시 검토 받기"
-                  : "고친 내용 올리기"
+                ? fixing
+                  ? "고쳐서 다시 보내기"
+                  : reviewAgain
+                    ? "고친 내용 올리고 다시 검토 받기"
+                    : "고친 내용 올리기"
                 : "등록하기"}
         </button>
         <p className="mt-3 text-center text-[15px] leading-relaxed break-keep text-faint">
@@ -1423,7 +1417,9 @@ export function SpaceForm({
           {/* 🔁09-18 밤 QA(H-09) — 이름·주소를 «이미 바꾼» 사장님에겐 위 칸 옆 안내가 말했으니 여기선 되풀이하지 않는다. */}
           {!editing
             ? "올리시면 저희가 읽어 보고 목록에 열어 드려요."
-            : initial?.status === "pending"
+            : fixing
+              ? "보내 주시면 부탁드린 부분을 확인하고 목록에 열어 드려요."
+              : initial?.status === "pending"
               ? "고친 내용은 지금 하는 검토에 같이 담겨요."
               : reviewAgain
                 ? "고친 내용을 읽어 보고 다시 열어 드릴게요."
