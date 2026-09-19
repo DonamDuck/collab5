@@ -2,7 +2,7 @@
 // 대표: 「대관만, 공간 전체(대관·시설), 커피챗 이렇게 3개 상품을 설정할 수 있게 하고 가격도 각각 설정하게 하고,
 //        고객은 신청할 때 이걸 선택할 수 있게 하자.」
 //
-// ⭐계산을 한 벌로 둔다. 신청 폼(하단 금액)·서버(`startBookingAction`, 진짜 금액)·목 데이터가 같은 함수를 부른다.
+// ⭐계산을 한 벌로 둔다(09-19부터 길이는 «분»). 신청 폼(하단 금액)·서버(`startBookingAction`, 진짜 금액)·목 데이터가 같은 함수를 부른다.
 //   화면과 서버가 따로 곱하면 둘이 어긋나는 날 손님이 본 값과 결제 값이 달라진다.
 // 🚨훅도 DB도 안 부른다. 클라이언트·서버 어디서든 불린다.
 // 📌해석(09-18): 손님은 공간 상품 둘 중 «하나를 반드시» 고르고, 커피챗은 거기에 더하는 선택이다.
@@ -50,17 +50,27 @@ export interface BookingAmount {
   total: number;
 }
 
-/** 금액 = 고른 상품 시간당 값 × 시간 (+ 커피챗). 팔지 않는 상품이면 null.
- *  ⚠️커피챗은 사장님이 켰을 때만 더한다 — 화면이 `withChat`을 보내 와도 공간이 안 팔면 0이다. */
+/** 💰시간당 값 × 분 ÷ 60 — 공간 값의 «반올림 규칙»은 여기 한 곳이다(대표 09-19: 30분 단위).
+ *  · 정수로만 센다(분 × 시간당 값을 먼저 곱하고 60으로 나눈다). 1시간 30분 = 1.5배.
+ *  · 원 미만은 버린다(손님 쪽으로). 30분 눈금에선 시간당 값이 홀수일 때만 0.5원이 생긴다 — 15,001원 × 1시간 30분 = 22,501원.
+ *  ⚠️화면(신청 폼 금액)·서버(`startBookingAction`의 청구액)·목 데이터가 전부 이 함수를 지난다. */
+export function priceForMinutes(pricePerHour: number, minutes: number): number {
+  if (!(pricePerHour > 0) || !(minutes > 0)) return 0;
+  return Math.floor((Math.round(pricePerHour) * Math.round(minutes)) / 60);
+}
+
+/** 금액 = 고른 상품 시간당 값 × 길이(분) (+ 커피챗). 팔지 않는 상품이면 null.
+ *  🔁09-19 셋째 인자가 «시간»에서 «분»으로 바뀌었다(30분 단위). 반 시간을 소수 시간으로 곱하지 않는다.
+ *  ⚠️커피챗은 사장님이 켰을 때만 더한다 — 화면이 `withChat`을 보내 와도 공간이 안 팔면 0이다. 커피챗 값은 길이와 상관없이 그대로다. */
 export function bookingAmount(
   sp: ProductFields & Pick<Space, "coffeeChat" | "coffeeChatPrice">,
   product: RentProduct,
-  hours: number,
+  minutes: number,
   withChat: boolean,
 ): BookingAmount | null {
   const price = productPrice(sp, product);
-  if (price <= 0 || !(hours > 0)) return null;
-  const space = Math.round(price * hours);
+  if (price <= 0 || !(minutes > 0)) return null;
+  const space = priceForMinutes(price, minutes);
   const chat = withChat && sp.coffeeChat && sp.coffeeChatPrice > 0 ? sp.coffeeChatPrice : 0;
   return { space, chat, total: space + chat };
 }

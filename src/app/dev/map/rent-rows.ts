@@ -33,6 +33,7 @@ export const RENT_GROUPS: Group[] = [
         rows: [
           { desc: "모든 칸이 찬 공간 · 상품 둘(대관만·공간 전체, 값과 설명이 다름) · 신청 폼 상품 고르기 · 커피챗 · 소개서 카드 · 내리면 뜨는 알약 줄", c: "guest-full", to: `/rent/${S.full}` },
           { desc: "같은 공간을 로그인 안 하고 볼 때", c: "anon", to: `/rent/${S.full}` },
+          { desc: "30분 단위 공간 · 최소 1시간 30분 · 모레는 09:30~12:00 자투리, 사흘 뒤는 13:00~15:30과 16:30~18:00이 찼어요 (시작을 누르면 끝으로 고를 수 있는 칸만 켜져요)", c: "guest-full", to: `/rent/${S.halfHour}` },
           { desc: "열린 시간이 없는 공간 · 공간 전체 하나만 팜", c: "guest-full", to: `/rent/${S.noSlots}` },
           { desc: "커피챗·소개서 없는 공간 · 대관만 하나만 팜 (신청 폼에 고르기 없이 한 줄)", c: "guest-full", to: `/rent/${S.other}` },
           { desc: "긴 글 (사진 10장 · 폼 최대, 유의 사항 12줄, 주제 8줄)", c: "stress-guest", to: `/rent/${S.stress}` },
@@ -80,6 +81,7 @@ export const RENT_GROUPS: Group[] = [
           { desc: "결제 완료, 공간 전체, 이용일 전, 커피챗 담음, 사장님 연락처 열림", c: "guest-full", to: `/rent/done/${B.paid}` },
           { desc: "확정된 예약, 이용일 전, 사장님 말씀 있음", c: "guest-full", to: `/rent/done/${B.confirmed}` },
           { desc: "확정된 예약, 커피챗·소개서 없는 공간", c: "guest-full", to: `/rent/done/${B.confirmedOther}` },
+          { desc: "30분 단위 · 결제 완료 13:00~15:30 (2시간 30분)", c: "guest-full", to: `/rent/done/${B.halfPaid}` },
           { desc: "다녀온 예약 (연락처 가림)", c: "guest-full", to: `/rent/done/${B.done}` },
           { desc: "사장님 거절, 환불이 아직 안 끝남", c: "guest-full", to: `/rent/done/${B.rejected}` },
           { desc: "사장님 거절 뒤 환불 완료", c: "guest-full", to: `/rent/done/${B.refunded}` },
@@ -173,6 +175,7 @@ export const RENT_GROUPS: Group[] = [
         note: "사업자 칸 오류 보는 법 · 공개 중인 공간을 열고 「사업자 정보」에서 번호를 1234567890으로 바꿔 「고친 내용 올리기」를 누르면 번호 오류가, 대표자 이름을 지우면 빈칸 오류가, 개업일을 지우면 날짜 오류가 그 칸 밑에 떠요. 국세청 기록과 다를 때의 빨간 줄은 검토 중인 공간을 열면 처음부터 서 있고, 번호·이름·개업일 중 하나를 고치면 내려가요.",
         rows: [
           { desc: "공개 중인 공간 · 상품 셋 다 켬 · 사업자 확인 승인됨 (바꾸면 표시가 내려간다는 안내)", c: "host-full", to: `/rent/${S.full}/edit` },
+          { desc: "30분 단위 공간 · 최소 1시간 30분 · 09:30~12:00 자투리 날 · 매주 목요일 11:30~20:30", c: "host-full", to: `/rent/${S.halfHour}/edit` },
           { desc: "검토 중인 공간 · 공간 전체만 켬 · 국세청 기록과 달라 사업자 칸 밑에 빨간 줄", c: "host-full", to: `/rent/${S.pending}/edit` },
           { desc: "쉬는 중인 공간 · 대관만 켬 · 사업자 정보 채움, 확인 전", c: "host-full", to: `/rent/${S.paused}/edit` },
           { desc: "초안 · 사업자 정보가 비어 있다는 안내 (옛 공간과 같은 모습)", c: "host-full", to: `/rent/${S.draft}/edit` },

@@ -12,7 +12,7 @@ import type {
   Space, SpacePublic, SpaceBooking, SpaceStatus, BookingStatus, OpenSlot,
   Payment, PaymentStatus, PayoutStatus, TossPayment, RepeatRule, BizCheckStatus, BizCheckDetail,
 } from "./types";
-import { bookingFinished, todayKst, expandRepeat, stripRepeat, pruneRepeat } from "./rent-time";
+import { bookingFinished, todayKst, expandRepeat, stripRepeat, pruneRepeat, minutesBetween } from "./rent-time";
 import { productsFromLegacy } from "./rent-products";
 import { payoutAmount } from "./rent-money";
 // 🧪09-17 목 데이터 — 읽기 함수는 첫 줄에서 목 세계를 돌려주고, 쓰기 함수는 첫 줄에서 멈춘다. 개발 빌드 전용(`rent-mock.ts` 머리말).
@@ -73,6 +73,17 @@ function repeatRules(v: unknown): RepeatRule[] {
   });
 }
 
+/** ⏱최소 대여 시간(시간, 0.5 눈금)을 행에서 읽는다(09-19 30분 단위).
+ *  ⭐`min_minutes`가 있고 옛 `min_hours`와 말이 맞으면(올림한 시간이 같으면) 분 칸을 믿는다.
+ *  ⚠️말이 안 맞으면 옛 칸을 믿는다 — SQL을 먼저 돌린 뒤 옛 코드가 `min_hours`만 고쳐 쓴 행이다(분 칸은 채우기 값에 멈춰 있다).
+ *  칸이 없는 DB(SQL 전)에선 `undefined`라 옛 칸으로 읽힌다. */
+function minHoursOf(r: Row): number {
+  const hours = n(r.min_hours) || 1;
+  const mins = r.min_minutes;
+  if (typeof mins === "number" && mins > 0 && Math.ceil(mins / 60) === hours) return mins / 60;
+  return hours;
+}
+
 const BIZ_STATUSES: BizCheckStatus[] = ["none", "valid", "mismatch", "closed", "error"];
 const bizStatus = (v: unknown): BizCheckStatus => (BIZ_STATUSES.includes(v as BizCheckStatus) ? (v as BizCheckStatus) : "none");
 
@@ -105,7 +116,7 @@ function toSpace(r: Row): Space {
 
     category: (s(r.category) || "") as Space["category"],
     scope,
-    priceHour: n(r.price_hour), minHours: n(r.min_hours) || 1,
+    priceHour: n(r.price_hour), minHours: minHoursOf(r),
     ...products,
     openSlots: expandRepeat(slots(r.open_slots), repeatWeekly),
     repeatWeekly,
@@ -162,6 +173,10 @@ function toBooking(r: Row): SpaceBooking {
     //   한 곳에서 안 자르면 "10:00:00"과 "10:00" 비교가 조용히 어긋난다.
     startTime: s(r.start_time).slice(0, 5), endTime: s(r.end_time).slice(0, 5),
     hoursCount: n(r.hours_count),
+    // ⏱09-19 분 칸. ⚠️SQL 전 DB엔 칸이 없고, SQL 뒤에도 옛 코드가 만든 행은 0이다. 그땐 시각 차이로, 그것도 없으면 옛 시간 수로.
+    minutesCount: n(r.minutes_count) > 0
+      ? n(r.minutes_count)
+      : minutesBetween(s(r.start_time).slice(0, 5), s(r.end_time).slice(0, 5)) || n(r.hours_count) * 60,
     // 🛍09-18. SQL 전엔 칸이 없어 «대관만»으로 읽힌다(SQL이 옛 예약을 공간의 옛 범위로 채운다).
     product: s(r.product) === "full" ? "full" : "space",
     withChat: r.with_chat === true, amountChat: n(r.amount_chat),
@@ -347,7 +362,10 @@ export async function saveSpace(input: SpaceSaveInput, opts: { isNew: boolean })
     serves_food: input.servesFood, sublease_ok: input.subleaseOk, status: input.status,
 
     category: input.category, scope: input.scope,
-    price_hour: input.priceHour, min_hours: input.minHours, open_slots: openSlots, repeat_weekly: repeatWeekly,
+    // ⏱09-19 30분 단위 — 최소 시간은 분 칸(`min_minutes`)이 정본이다. 옛 칸 `min_hours`(integer)엔 «올림»한 시간을 같이 적는다.
+    //   올림인 이유: 옛 코드로 되돌아가도 사장님이 정한 최소보다 짧은 예약은 안 받게(1시간 30분 → 2시간, 더 엄격한 쪽).
+    price_hour: input.priceHour, min_hours: Math.ceil(input.minHours), min_minutes: Math.round(input.minHours * 60),
+    open_slots: openSlots, repeat_weekly: repeatWeekly,
     // 🛍09-18 상품 셋. ⚠️이 칸들이 없는 DB(SQL 전)에선 저장이 통째로 실패한다 — `2026-09-18-rent-products.sql`이 먼저다.
     //   조용히 빼고 저장하는 길은 두지 않았다. 사장님이 적은 상품 설명이 말없이 사라진다.
     rent_space_on: input.rentSpaceOn, rent_space_price: input.rentSpacePrice, rent_space_note: input.rentSpaceNote,
@@ -369,13 +387,24 @@ export async function saveSpace(input: SpaceSaveInput, opts: { isNew: boolean })
     opts.isNew
       ? c.from("spaces").insert(r).select().maybeSingle()
       : c.from("spaces").upsert(r, { onConflict: "slug" }).select().maybeSingle();
-  let { data, error } = await write(row);
-  // 🧯SQL을 돌리기 전에 코드가 먼저 나가도 «규칙 없는» 저장은 살린다. 규칙이 있는데 칸이 없으면 그대로 실패시킨다 —
-  //   조용히 빼고 저장하면 사장님은 켰다고 믿는데 아무 날도 안 열린다.
-  if (error && repeatWeekly.length === 0 && /repeat_weekly/.test(error.message)) {
-    const { repeat_weekly: _r, ...rest } = row;
-    void _r;
-    ({ data, error } = await write(rest));
+  let sent: Partial<typeof row> = row;
+  let { data, error } = await write(sent);
+  // 🧯SQL을 돌리기 전에 코드가 먼저 나가도 «빼도 잃는 게 없는» 저장은 살린다. 빼면 뜻이 사라지는 값이면 그대로 실패시킨다.
+  //   · 규칙(`repeat_weekly`) — 규칙이 없을 때만 뺀다. 규칙이 있는데 빼면 사장님은 켰다고 믿는데 아무 날도 안 열린다.
+  //   · 분 칸(`min_minutes`, 09-19) — 최소 시간이 정시일 때만 뺀다(옛 `min_hours`에 그대로 담긴다).
+  //     1시간 30분 같은 반 시간은 옛 칸에 못 담아서, 빼면 2시간으로 조용히 바뀐다. 그땐 실패시킨다 — `2026-09-19-rent-half-hour.sql`이 먼저다.
+  //   PostgREST는 없는 칸을 한 번에 하나씩 말하므로 두 번까지 돈다.
+  for (let i = 0; i < 2 && error; i++) {
+    if (repeatWeekly.length === 0 && "repeat_weekly" in sent && /repeat_weekly/.test(error.message)) {
+      const { repeat_weekly: _r, ...rest } = sent;
+      void _r;
+      sent = rest;
+    } else if (Number.isInteger(input.minHours) && "min_minutes" in sent && /min_minutes/.test(error.message)) {
+      const { min_minutes: _m, ...rest } = sent;
+      void _m;
+      sent = rest;
+    } else break;
+    ({ data, error } = await write(sent));
   }
   // 🔒새 공간인데 slug가 겹쳤다(유일 제약 23505). 아무 행도 안 바뀌었다 — 호출부가 다른 slug로 다시 부른다.
   //   spaces의 유일 제약은 slug 하나지만, 나중에 다른 유일 제약이 생겨도 그걸 slug 충돌로 착각하지 않게 글자까지 본다.
@@ -462,7 +491,7 @@ export async function listSpacesForReview(): Promise<{ pending: Space[]; approve
 export type BookingCreateInput = Omit<
   SpaceBooking,
   "id" | "status" | "hostMessage" | "decidedAt" | "createdAt" | "updatedAt" | "amountPayout" | "feeRate"
-  | "refundRequestedAt" | "refundRequestNote"
+  | "refundRequestedAt" | "refundRequestNote" | "hoursCount"
 >;
 
 /** 결제창으로 보내기 «직전»에 자리를 잡아 둔다.
@@ -483,7 +512,9 @@ export async function createPendingBooking(input: BookingCreateInput): Promise<S
     // 🪪09-18 성함(실명). ⚠️칸이 없는 DB(SQL 전)에선 이 insert가 실패해 신청이 막힌다 — `2026-09-18-rent-guest-name.sql`이 먼저다.
     guest_name: input.guestName,
     use_date: input.useDate, hours: input.hours, plan: input.plan, headcount: input.headcount ?? null,
-    start_time: input.startTime, end_time: input.endTime, hours_count: input.hoursCount,
+    // ⏱09-19 길이의 정본은 분 칸(`minutes_count`)이다. 옛 칸 `hours_count`(integer)는 반 시간을 못 담아 «꽉 찬 시간»(내림)을 적는다.
+    start_time: input.startTime, end_time: input.endTime,
+    hours_count: Math.floor(input.minutesCount / 60), minutes_count: input.minutesCount,
     // 🛍09-18. ⚠️칸이 없는 DB(SQL 전)에선 이 insert가 실패해 신청이 막힌다 — SQL이 먼저다.
     product: input.product,
     with_chat: input.withChat, amount_chat: input.amountChat,
@@ -492,7 +523,14 @@ export async function createPendingBooking(input: BookingCreateInput): Promise<S
     fee_rate: FEE_RATE, amount_payout: payout(input.amountTotal),
     payment_key: "", order_id: input.orderId, status: "pending" as const,
   };
-  const { data, error } = await c.from("space_bookings").insert(row).select().maybeSingle();
+  let { data, error } = await c.from("space_bookings").insert(row).select().maybeSingle();
+  // 🧯09-19 분 칸이 없는 DB(SQL 전)면 그 칸만 빼고 다시 넣는다. 잃는 건 없다 — 길이는 시작·끝 시각에 그대로 있고,
+  //   읽을 때(`toBooking`) 그 차이로 채운다. 값의 근거인 `amount_space`도 이미 행에 있다.
+  if (error && /minutes_count/.test(error.message)) {
+    const { minutes_count: _m, ...rest } = row;
+    void _m;
+    ({ data, error } = await c.from("space_bookings").insert(rest).select().maybeSingle());
+  }
   if (error) { console.error(`[spaces] pending insert failed order=${input.orderId}: ${error.message}`); return null; }
   return data ? toBooking(data as Row) : null;
 }

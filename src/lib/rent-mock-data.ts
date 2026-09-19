@@ -11,7 +11,7 @@
 import type { Maker, Payment, PaymentStatus, PayoutStatus, RepeatRule, Space, SpaceBooking, OpenSlot } from "./types";
 import type { Profile } from "./profiles";
 import type { PayoutAccount } from "./payout-accounts";
-import { addDaysIso, expandRepeat, hoursBetween, todayKst } from "./rent-time";
+import { addDaysIso, expandRepeat, minutesBetween, todayKst } from "./rent-time";
 import { bookingAmount, compatScopePrice, productsFromLegacy } from "./rent-products";
 // 🔢정산액은 서버(`payout`)와 같은 정수 계산 함수로(09-18 밤 QA SEC-03). 이 파일은 import가 없어 고리가 안 생긴다.
 import { payoutAmount } from "./rent-money";
@@ -64,7 +64,7 @@ export const MOCK_CASES: MockCaseDef[] = [
   { id: "guest-full", label: "손님 · 모든 상태의 신청이 있는 계정", viewer: { userId: MOCK_USER.guest, admin: false }, world: "full" },
   { id: "guest-empty", label: "손님 · 신청 0건, 공간도 0곳", viewer: { userId: MOCK_USER.guest, admin: false }, world: "empty" },
   { id: "anon", label: "로그인 안 한 사람", viewer: { userId: null, admin: false }, world: "full" },
-  { id: "host-full", label: "사장님 · 공간 넷, 요청 모든 상태, 계좌 있음", viewer: { userId: MOCK_USER.host, admin: false }, world: "full" },
+  { id: "host-full", label: "사장님 · 공간 다섯(30분 단위 하나), 요청 모든 상태, 계좌 있음", viewer: { userId: MOCK_USER.host, admin: false }, world: "full" },
   { id: "host-noaccount", label: "사장님 · 같은 데이터인데 정산 계좌 없음", viewer: { userId: MOCK_USER.host, admin: false }, world: "full-noaccount" },
   { id: "host-admin", label: "사장님이면서 관리자 · 정산하기 링크와 공개하기 버튼이 보임", viewer: { userId: MOCK_USER.host, admin: true }, world: "full" },
   { id: "host-empty", label: "사장님 · 아직 올린 공간 없음", viewer: { userId: MOCK_USER.host, admin: false }, world: "empty" },
@@ -172,11 +172,13 @@ type BookingSeed = Pick<SpaceBooking, "id" | "spaceId" | "guestUserId" | "status
 
 function booking(p: BookingSeed, today: string): SpaceBooking {
   const { sp, ...rest } = p;
-  const hoursCount = hoursBetween(p.startTime, p.endTime);
+  // ⏱09-19 길이는 분(30분 단위). 옛 칸 `hoursCount`는 서버 저장(`createPendingBooking`)과 같은 내림 값이다.
+  const minutesCount = minutesBetween(p.startTime, p.endTime);
+  const hoursCount = Math.floor(minutesCount / 60);
   // 사장님이 안 파는 상품을 적은 시드면 켜진 쪽으로 물러선다(목 데이터가 조용히 0원을 만들지 않게).
   const product = p.product ?? (sp.rentSpaceOn ? "space" : "full");
-  const amt = bookingAmount(sp, product, hoursCount, !!p.withChat)
-    ?? bookingAmount(sp, product === "space" ? "full" : "space", hoursCount, !!p.withChat);
+  const amt = bookingAmount(sp, product, minutesCount, !!p.withChat)
+    ?? bookingAmount(sp, product === "space" ? "full" : "space", minutesCount, !!p.withChat);
   const amountSpace = amt?.space ?? 0;
   const amountChat = amt?.chat ?? 0;
   const amountTotal = amountSpace + amountChat;
@@ -194,7 +196,7 @@ function booking(p: BookingSeed, today: string): SpaceBooking {
     refundRequestedAt: undefined, refundRequestNote: "", hostMessage: "", decidedAt: undefined, remindedAt: undefined,
     createdAt: at, updatedAt: at,
     ...rest,
-    product, hoursCount, amountSpace, amountChat, amountTotal,
+    product, hoursCount, minutesCount, amountSpace, amountChat, amountTotal,
     amountPayout: payoutAmount(amountTotal, MOCK_FEE_RATE),
   } satisfies SpaceBooking;
 }
@@ -461,11 +463,38 @@ function fullWorld(today: string, withAccount: boolean): MockWorld {
     direct: [{ date: d(9), start: "14:00", end: "20:00" }],
   }, today);
 
-  const spaces = [s1, s2, s3, s4, s5, s6, s7, s8];
+  // ⏱S9 — 30분 단위 공간(대표 09-19: 「9시 30분 ~ 12시의 자투리도 가능」). 최소 1시간 30분.
+  //   · d(2) 09:30~12:00 — 아침 자투리 두 시간 반. 시작은 09:30·10:00·10:30까지만 켜진다(최소 시간 때문에).
+  //   · d(3) 10:30~18:00 — 13:00~15:30(2시간 30분)이 이미 팔렸다. 12:00 시작은 끝이 13:00까지라 1시간뿐이라 못 고른다.
+  //   · 매주 목요일 11:30~20:30 — 요일 규칙에도 반 시간이 들어간다.
+  //   · 한 시간 값이 홀수(15,500원)라 반 시간 값이 원 단위로 떨어진다(1시간 30분 = 23,250원).
+  const s9 = space({
+    id: 9111, slug: "mock-slow-afternoon-window", ownerUserId: U.host, status: "open",
+    name: "느린오후 1층 창가 자리", brandSlug: "mock-slow-afternoon", category: "cafe", useType: "both",
+    body: "1층 로스터리 창가의 긴 테이블이에요. 아침 개점 전 자투리 시간과 평일 낮에 빌려드려요.",
+    photos: [photo("1층 창가 테이블", 36), photo("아침 햇빛", 50, 1080, 1350)],
+    area: "성수동", address: "서울 성동구 연무장길 00, 1층", lat: 37.5436, lng: 127.0559,
+    facilities: ["긴 테이블 1", "의자 6", "와이파이"], capacity: 6,
+    rules: "영업 중인 매장이라 큰 소리는 삼가 주세요\n쓰신 자리는 닦아 주세요",
+    minHours: 1.5, accessHow: "onsite", contactPhone: "02-123-4567",
+    ...bizOf(U.host, "0000112347", "김느린", "20210315", "jpg", "000000009111"),
+    bizCheckStatus: "valid", bizCheckedAt: `${d(-10)}T01:00:00.000Z`, bizApprovedAt: `${d(-10)}T02:00:00.000Z`,
+    bizCheckDetail: { valid: "01", bSttCd: "01", bStt: "계속사업자", taxType: "부가가치세 일반과세자" },
+    rentSpaceOn: true, rentSpacePrice: 15500,
+    rentSpaceNote: "노트북 작업·작은 스터디·사진 촬영 자리로 써요. 긴 테이블과 의자 여섯 개를 써요.",
+    repeatWeekly: [{ dow: 4, start: "11:30", end: "20:30" }],
+    direct: [
+      { date: d(2), start: "09:30", end: "12:00" },
+      { date: d(3), start: "10:30", end: "18:00" },
+    ],
+  }, today);
+
+  const spaces = [s1, s2, s3, s4, s5, s6, s7, s8, s9];
   // 🛍s1은 두 상품을 섞어 판다 — 공간 전체로 산 예약이 줄마다 섞여 보이게.
   const P1 = { sp: s1 };
   const P1F = { sp: s1, product: "full" as const };
   const P6 = { sp: s6 };
+  const P9 = { sp: s9 };
   const plan =
     "주말 이틀 동안 사워도우 팝업을 열어 보려고 해요. 오전에 집에서 구워 가져가고, 2층에서는 커피와 같이 팔 생각이에요. " +
     "머신은 아메리카노 정도만 쓸게요. 인스타에 미리 알린 분들이 열 명 남짓 오실 것 같아요.";
@@ -492,6 +521,9 @@ function fullWorld(today: string, withAccount: boolean): MockWorld {
     payoutRequested: booking({ id: 90017, spaceId: s6.id, guestUserId: U.guest2, status: "done", useDate: d(-12), startTime: "17:00", endTime: "20:00", plan: "북토크를 했어요.", headcount: 20, guestPhone: "010-5678-9012", guestName: "정다온", ...P6 }, today),
     payoutFailed: booking({ id: 90018, spaceId: s6.id, guestUserId: U.guest2, status: "done", useDate: d(-15), startTime: "18:00", endTime: "22:00", plan: "동네 모임을 했어요.", headcount: 10, guestPhone: "010-5678-9012", guestName: "정다온", ...P6 }, today),
     payoutWaiting2: booking({ id: 90019, spaceId: s6.id, guestUserId: U.guest, status: "done", useDate: d(-9), startTime: "17:00", endTime: "19:00", plan: "두 시간 짧게 촬영했어요.", ...P6 }, today),
+    // ⏱09-19 30분 단위 예약 둘 — 2시간 30분(결제 완료)과 최소 1시간 30분(확정).
+    halfPaid: booking({ id: 90021, spaceId: s9.id, guestUserId: U.guest, status: "paid", useDate: d(3), startTime: "13:00", endTime: "15:30", plan: "스터디 모임 다섯 명이 두 시간 반 동안 발표 연습을 해요.", headcount: 5, guestPhone: "010-3456-7890", guestName: "한서윤", guestBrandSlug: "mock-flour-diary", ...P9 }, today),
+    halfConfirmed: booking({ id: 90022, spaceId: s9.id, guestUserId: U.guest, status: "confirmed", useDate: d(3), startTime: "16:30", endTime: "18:00", plan: "새로 구운 빵 사진을 창가 빛에서 찍으려고 해요.", headcount: 2, guestPhone: "010-3456-7890", guestName: "한서윤", decidedAt: `${d(-1)}T05:00:00.000Z`, ...P9 }, today),
     hostAsGuest: booking({ id: 90020, spaceId: s6.id, guestUserId: U.host, status: "confirmed", useDate: d(4), startTime: "17:00", endTime: "20:00", plan: "원두 시음회를 다른 동네에서 열어 보려고 해요.", headcount: 10, guestPhone: "010-2345-6789", guestName: "문하람", guestBrandSlug: "mock-slow-afternoon", decidedAt: `${d(-1)}T05:00:00.000Z`, ...P6 }, today),
   };
   const bookings = Object.values(b);
@@ -519,6 +551,8 @@ function fullWorld(today: string, withAccount: boolean): MockWorld {
     payment(b.payoutFailed, U.host2, { status: "DONE", payoutStatus: "FAILED" }),
     payment(b.payoutWaiting2, U.host2, { status: "DONE", payoutStatus: "WAITING" }),
     payment(b.hostAsGuest, U.host2, { status: "DONE" }),
+    payment(b.halfPaid, U.host, { status: "DONE" }),
+    payment(b.halfConfirmed, U.host, { status: "DONE", method: "간편결제" }),
   ];
 
   // 🪪09-19 — S8 사장님은 개인 명의(가족) 계좌다. 예금주가 대표자와 달라 검토 화면에 한 줄이 뜬다. 「계좌 없음」 세계에서도 둔다(그 세계는 느린오후 쪽만 뺀다).
@@ -663,6 +697,8 @@ export const MOCK_IDS = {
     stress: "mock-long-kitchen-space", minimal: "mock-minimal-room",
     /** 🧾09-18 검토 대기 · 국세청 조회 전(키 없음) · 네이버 매칭됨 */
     pendingNoKey: "mock-needle-forest-class",
+    /** ⏱09-19 30분 단위 공간 · 09:30~12:00 자투리 날 · 최소 1시간 30분 · 13:00~15:30 찬 날 */
+    halfHour: "mock-slow-afternoon-window",
   },
   maker: { host: "mock-slow-afternoon", guest: "mock-flour-diary", stress: "mock-long-kitchen" },
   booking: {
@@ -671,6 +707,8 @@ export const MOCK_IDS = {
     refundReq: 90014, paidStarted: 90015,
     stressPaid: 90101, stressConfirmed: 90102, stressDone: 90103, stressPending: 90104,
     minimalPaid: 90201, minimalConfirmed: 90202,
+    /** ⏱09-19 30분 단위 — 2시간 30분 결제 완료 · 1시간 30분 확정 */
+    halfPaid: 90021, halfConfirmed: 90022,
   },
 } as const;
 
@@ -705,4 +743,6 @@ export const MOCK_MAIL_KINDS: { kind: string; label: string }[] = [
   { kind: "remind-host", label: "이용 전날 → 사장님 · 수락한 예약" },
   { kind: "remind-host-unaccepted", label: "이용 전날 → 사장님 · 아직 수락 전" },
   { kind: "stress-paid-host", label: "긴 글 · 결제 완료 → 사장님" },
+  { kind: "paid-host-halfhour", label: "30분 단위 · 결제 완료 → 사장님 (13:00~15:30, 2시간 30분)" },
+  { kind: "confirmed-guest-halfhour", label: "30분 단위 · 수락 → 손님 (16:30~18:00, 1시간 30분)" },
 ];

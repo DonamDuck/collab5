@@ -23,7 +23,7 @@ import { saveSpaceAction } from "@/lib/rent-actions";
 import { uploadBizCert, uploadPhoto } from "@/lib/upload";
 import { PhotoGrid } from "@/app/register/PhotoGrid";
 import type { Space, SpaceUseType, SpaceCategory, OpenSlot, AccessHow, RepeatRule } from "@/lib/types";
-import { expandRepeat, hoursBetween, stripRepeat, todayKst } from "@/lib/rent-time";
+import { durationLabel, expandRepeat, minHoursToMinutes, minutesBetween, stripRepeat, todayKst } from "@/lib/rent-time";
 import { payoutAmount } from "@/lib/rent-money";
 import { CONTACT_PHONE_MAX, storePhoneOk } from "@/lib/rent-limits";
 import {
@@ -82,13 +82,14 @@ const RULE_EXAMPLES = [
  *    목록에 없으면 select가 첫 값(30분)을 보여 줘서, 안 고쳤는데 고친 것처럼 저장된다. */
 const MENTOR_CHOICES = [30, 60, 90, 120];
 
-/** 90 → 「1시간 30분」. 분만 남으면 「30분」, 딱 떨어지면 「2시간」. */
-function minutesLabel(m: number): string {
-  const h = Math.floor(m / 60);
-  const r = m % 60;
-  if (!h) return `${r}분`;
-  return r ? `${h}시간 ${r}분` : `${h}시간`;
-}
+/** 90 → 「1시간 30분」. 분만 남으면 「30분」, 딱 떨어지면 「2시간」.
+ *  🔁09-19 길이 표시는 `rent-time`의 `durationLabel` 한 벌로 합쳤다(신청 폼·메일과 같은 글). */
+const minutesLabel = durationLabel;
+
+/** ⏱최소 대여 시간 고르개 — 30분 눈금(대표 09-19). 1시간 30분·2시간 30분까지만 반 시간을 두고, 그 뒤는 정시로 띄엄띄엄.
+ *  ⚠️목록에 없는 옛 값(예: 7시간·10시간)은 `minChoices`가 덧붙여 보여 준다. 없으면 select가 첫 값을 보여 줘서
+ *    안 고쳤는데 고친 것처럼 저장된다(커피챗 길이의 `chatChoices`와 같은 이유). */
+const MIN_HOUR_CHOICES = [1, 1.5, 2, 2.5, 3, 4, 5, 6, 8];
 
 /** 🔻09-14 폐기 — 한 시간 고정이 30분 단위 고르기로 바뀌었다. 아래 설명은 그때의 판단 기록.
  *  「알려드려요」 토글은 한 시간으로 고정한다. 분 단위 칸이 있던 09-13 폼에서 그 칸을 채운 값이
@@ -493,10 +494,11 @@ export function SpaceForm({
     const expanded = expandRepeat(openSlots, repeatWeekly);
     // 🩸09-18 밤 QA(H-20) — 닫는 시각을 여는 시각보다 앞에 두면 「최소 2시간을 못 채워요」가 떴다. 시간을 늘리라는 말인데
     //   늘릴 데가 없다(거꾸로라 길이가 음수다). 서버(`saveSpaceAction`)는 이미 「거꾸로예요」라고 말한다 — 화면도 같은 말로.
-    const reversed = expanded.find((sl) => hoursBetween(sl.start, sl.end) <= 0);
+    const reversed = expanded.find((sl) => minutesBetween(sl.start, sl.end) <= 0);
     if (reversed) return ["slots", `${dateLabel(reversed.date)}은 끝나는 시각이 여는 시각보다 앞이에요. 두 시각을 바꿔 주세요.`];
-    const badSlot = expanded.find((sl) => hoursBetween(sl.start, sl.end) < Number(minHours));
-    if (badSlot) return ["slots", `${dateLabel(badSlot.date)}은 최소 ${minHours}시간을 못 채워요. 시간을 늘리거나 그날을 빼 주세요.`];
+    const minM = minHoursToMinutes(Number(minHours));
+    const badSlot = expanded.find((sl) => minutesBetween(sl.start, sl.end) < minM);
+    if (badSlot) return ["slots", `${dateLabel(badSlot.date)}은 최소 ${durationLabel(minM)}을 못 채워요. 시간을 늘리거나 그날을 빼 주세요.`];
     // 🧾09-18 사업자 정보 — 폼 순서대로(번호 → 대표자 → 개업일 → 등록증). 서버(`saveSpaceAction`)가 같은 함수로 다시 본다.
     if (bizNeeded) {
       const numberProblem = bizNumberProblem(bizNumber);
@@ -1040,9 +1042,12 @@ export function SpaceForm({
 
         <L label="최소 몇 시간부터 빌려드릴까요" htmlFor="sp-minh" hint="두 상품에 똑같이 걸려요. 이보다 짧게는 신청이 안 들어와요.">
           <RentSelect id="sp-minh" wrapClassName="w-full sm:max-w-[240px]" value={minHours} onChange={(e) => setMinHours(e.target.value)}>
-            {[1, 2, 3, 4, 5, 6, 8].map((h) => (
+            {(MIN_HOUR_CHOICES.includes(Number(minHours))
+              ? MIN_HOUR_CHOICES
+              : [...MIN_HOUR_CHOICES, Number(minHours)].filter((h) => h > 0).sort((a, b) => a - b)
+            ).map((h) => (
               <option key={h} value={String(h)}>
-                {h}시간부터
+                {durationLabel(minHoursToMinutes(h))}부터
               </option>
             ))}
           </RentSelect>

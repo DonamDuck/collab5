@@ -30,7 +30,7 @@ import { useRouter } from "next/navigation";
 import { startBookingAction, confirmBookingAction } from "@/lib/rent-actions";
 import type { SpaceUseType, OpenSlot, RentProduct, Space } from "@/lib/types";
 import { bookingAmount, productNote, productPrice, sellableProducts } from "@/lib/rent-products";
-import { hourMarks, hoursBetween, nowHhmmKst, overlaps, toHHMM, toMinutes, rangeLabel, todayKst } from "@/lib/rent-time";
+import { dayMarks, durationLabel, endChoices, minHoursToMinutes, minutesBetween, nowHhmmKst, rangeLabel, startChoices as startChoicesOf, toMinutes, todayKst } from "@/lib/rent-time";
 import { PLAN_MAX } from "@/lib/rent-limits";
 import { dateLabel, InfoList, InfoRow, primaryBtnCls, RentSelect, rentInputCls, rentTextareaCls, won } from "../ui";
 import Link from "next/link";
@@ -43,15 +43,26 @@ const labelCls = "mb-2 block text-[16px] font-medium text-body";
 const hintCls = "mt-2 text-[15px] leading-relaxed break-keep text-faint";
 /** 못 넘어간 칸 바로 아래에 붙는 한 줄. 힌트와 같은 자리에 같은 크기로 서고 색만 다르다. */
 const errCls = "mt-2 text-[15px] leading-relaxed break-keep text-danger";
-/** 시각·길이 칩. 44px = 손가락 하한. 폭은 격자가 4등분해 준다. */
+/** 시각 칩. 44px = 손가락 하한. 폭은 격자가 4등분해 준다(sm부터 6등분). */
 const chipCls = "h-[44px] rounded-md border text-[16px] tabular-nums transition-colors";
+/** 고른 시작·끝 — 달력의 고른 날과 같은 키위 tint(한 폼 안에서 «고른 것»의 얼굴은 하나). */
 const chipOnCls = "border-transparent bg-primary-tint font-medium text-primary-on";
+/** 시작과 끝 사이 — 고른 구간이 한 덩어리로 읽히게 한 단 옅게. */
+const chipRangeCls = "border-transparent bg-primary-pale text-primary-on";
+/** 시작을 고른 뒤 «끝으로 고를 수 있는» 칩 — 진한 키위 테두리로 켜서 어디까지 갈 수 있는지 보인다.
+ *  📐375 실측(09-19) — 옅은 테두리(`primary-tint`)는 흰 칩과 거의 안 갈렸다. 한 단 진한 `primary-strong`에 글자도 키위로. */
+const chipEndableCls = "border-primary-strong bg-surface font-medium text-primary-on hover:bg-primary-pale";
+/** 시작을 고른 뒤, 끝은 못 되지만 «새 시작»으로는 누를 수 있는 칩. 끝 후보가 먼저 읽히게 한 단 물린다. */
+const chipDimCls = "border-hairline bg-surface text-mute hover:bg-surface-soft";
 const chipOffCls = "border-hairline bg-surface text-ink hover:bg-primary-pale";
+/** 못 고르는 칩(찬 시간·최소 시간을 못 채우는 꼬리·닫는 시각). 눈금은 남겨 두어 그날의 모양이 보이게 한다. */
+const chipDisabledCls = "border-transparent bg-surface-soft text-faint";
 
 /** 화면 아래 고정 바 — 금액 + 이 화면의 키위 버튼. 어느 폭에서나 이 하나가 유일한 결제 버튼이다.
  *  하단 여백은 `max()`다(MakerActionBar 08-09 실측): 홈 인디케이터가 있는 기기는 안전영역만, 없는 기기는 12px. */
 function PayBar({
   amount,
+  caption,
   emptyText,
   label,
   disabled,
@@ -59,6 +70,8 @@ function PayBar({
 }: {
   /** null = 아직 시간을 안 골랐다. 그땐 금액 대신 안내를 든다. */
   amount: number | null;
+  /** 금액 위 작은 줄에 붙는 길이(「2시간 30분」). 무엇에 대한 값인지 바에서 바로 읽힌다(09-19 30분 단위). */
+  caption?: string;
   /** 금액 자리에 대신 서는 말. 무엇을 골라야 금액이 나오는지(09-18: 상품 → 시간 순). */
   emptyText: string;
   label: string;
@@ -85,7 +98,7 @@ function PayBar({
               <p className="text-[15px] leading-snug break-keep text-mute">{emptyText}</p>
             ) : (
               <>
-                <p className="text-[13px] text-faint">대여 비용</p>
+                <p className="text-[13px] text-faint">대여 비용{caption ? ` · ${caption}` : ""}</p>
                 <p className="truncate text-[17px] font-medium text-ink">{won(amount)}</p>
               </>
             )}
@@ -169,7 +182,8 @@ export function BookingForm({
   const [useDate, setUseDate] = useState("");
   /** 고른 날의 시작 시각. 날을 바꾸면 비운다 — 어제 고른 시각이 오늘 안 열려 있을 수 있다. */
   const [startTime, setStartTime] = useState("");
-  const [useHours, setUseHours] = useState(0);
+  /** ⏱09-19 대표 — 「몇 시간 빌리실까요」 칸을 없애고 끝나는 시각을 같은 줄에서 고른다. 시작을 바꾸면 비운다. */
+  const [endPick, setEndPick] = useState("");
   const [headcount, setHeadcount] = useState("");
   const [plan, setPlan] = useState("");
   const [withChat, setWithChat] = useState(false);
@@ -209,44 +223,38 @@ export function BookingForm({
   const phoneRef = useRef<HTMLInputElement>(null);
 
   // ⏱고른 날의 시간대와 이미 팔린 칸에서 «지금 고를 수 있는 것»을 만든다.
+  //   🔁09-19 대표 — 30분 눈금, 시작과 끝을 «한 줄»에서 고른다. 계산은 `rent-time`의 순수 함수 셋이다
+  //   (`dayMarks`·`startChoices`·`endChoices`). 서버 관문(`validateBookingRequest`)과 같은 규칙이라 화면이 켠 칸은 서버도 받는다.
+  //   ⚠️**한 날에 시간대가 둘 이상일 수 있다**(오전만 열고 오후에 또 여는 가게). 눈금은 시각순으로 합치고, 구간은 칸 하나를 못 넘는다.
   const daySlots = openSlots.filter((sl) => sl.date === useDate);
   const taken = takenByDate[useDate] ?? [];
-  /** 시작 가능 시각 — 열린 시간대를 정시로 쪼개고, 최소 시간을 못 채우는 꼬리와 이미 팔린 칸은 뺀다.
-   *  ⚠️**한 날에 시간대가 둘 이상일 수 있다**(오전만 열고 오후에 또 여는 가게). 그래서 이어 붙인 뒤
-   *    시각 순으로 세우고 겹치는 칸에서 나온 같은 시각은 하나로 줄인다. 저장된 순서를 그대로 쓰면
-   *    오후를 먼저 적어 둔 가게에서 고르개가 「15:00, 16:00, 10:00, 11:00」로 선다. */
+  const minMinutes = minHoursToMinutes(minHours);
   // ⏳오늘을 고른 경우엔 이미 지나간 시각도 뺀다. 서버도 같은 검사를 한다(`startBookingAction`).
   const cutoff = useDate === todayKst() ? toMinutes(nowHhmmKst()) : -1;
-  const startChoices = Array.from(
-    new Set(
-      daySlots.flatMap((sl) =>
-        hourMarks(sl)
-          .filter((t) => hoursBetween(t, sl.end) >= minHours)
-          .filter((t) => toMinutes(t) > cutoff)
-          .filter((t) => !taken.some((b) => overlaps(t, toHHMM(toMinutes(t) + minHours * 60), b.start, b.end))),
-      ),
-    ),
-  ).sort();
+  const marks = dayMarks(daySlots);
+  const startChoices = startChoicesOf(daySlots, taken, minMinutes, cutoff);
   // 🔁09-17 — 첫 시각을 대신 고르지 않는다(날짜와 같은 이유). 고른 시각이 목록에서 사라졌으면 빈 값으로 돌아간다.
   const activeStart = startChoices.includes(startTime) ? startTime : "";
-  /** 그 시작에서 «몇 시간까지» 가능한가. 문 닫는 시각과 다음 예약 중 먼저 오는 쪽이 한계다. */
-  const maxHours = (() => {
-    const sl = daySlots.find((x) => activeStart >= x.start && activeStart < x.end);
-    if (!sl) return 0;
-    let limit = toMinutes(sl.end);
-    for (const b of taken) {
-      const bs = toMinutes(b.start);
-      if (bs >= toMinutes(activeStart) && bs < limit) limit = bs;
-    }
-    return Math.floor((limit - toMinutes(activeStart)) / 60);
-  })();
-  const hourChoices = Array.from({ length: Math.max(0, maxHours - minHours + 1) }, (_, i) => minHours + i);
-  const activeHours = useHours && hourChoices.includes(useHours) ? useHours : hourChoices[0] ?? 0;
-  const endTime = activeStart && activeHours ? toHHMM(toMinutes(activeStart) + activeHours * 60) : "";
+  /** 고른 시작에서 갈 수 있는 끝 — 최소 시간부터, 닫는 시각과 다음 예약 중 먼저 오는 쪽까지. */
+  const ends = activeStart ? endChoices(daySlots, taken, activeStart, minMinutes) : [];
+  const endTime = ends.includes(endPick) ? endPick : "";
+  const minutes = activeStart && endTime ? minutesBetween(activeStart, endTime) : 0;
 
-  // 💸금액 = 고른 상품 값 × 시간 (+ 커피챗). 서버(`startBookingAction`)가 같은 함수로 다시 계산한다 — 여기는 보여주기용.
-  const amount = product && activeHours > 0
-    ? bookingAmount({ ...products, coffeeChat, coffeeChatPrice }, product, activeHours, withChat)
+  /** 칩 하나를 눌렀을 때. 시작 → 끝 순서로 고르고, 다 고른 뒤 다른 칩을 누르면 그 칩을 새 시작으로 처음부터 고른다.
+   *  시작을 한 번 더 누르면 풀린다. 시작만 고른 상태에서 끝이 될 수 없는 칩을 누르면 그 칩이 새 시작이다. */
+  const tapMark = (t: string) => {
+    setBadField((f) => (f === "time" ? "" : f));
+    if (activeStart && !endTime) {
+      if (t === activeStart) { setStartTime(""); return; }
+      if (ends.includes(t)) { setEndPick(t); return; }
+    }
+    if (activeStart && endTime && t === endTime && !startChoices.includes(t)) { setEndPick(""); return; }
+    if (startChoices.includes(t)) { setStartTime(t); setEndPick(""); }
+  };
+
+  // 💸금액 = 고른 상품 값 × 길이(분) (+ 커피챗). 서버(`startBookingAction`)가 같은 함수로 다시 계산한다 — 여기는 보여주기용.
+  const amount = product && minutes > 0
+    ? bookingAmount({ ...products, coffeeChat, coffeeChatPrice }, product, minutes, withChat)
     : null;
   const chatAmount = amount?.chat ?? 0;
   const spaceAmount = amount?.space ?? 0;
@@ -422,77 +430,90 @@ export function BookingForm({
             setUseDate(d);
             // 날을 바꾸면 시각을 비운다 — 어제 고른 시각이 오늘도 열려 있으리란 보장이 없다.
             setStartTime("");
-            setUseHours(0);
+            setEndPick("");
             setBadField((f) => (f === "date" ? "" : f));
           }}
         />
         {badField === "date" && <p className={errCls}>날짜부터 골라 주세요.</p>}
         {daySlots.length > 0 && (
           <p className={hintCls}>
-            {daySlots.map((sl) => `${sl.start}~${sl.end}`).join(", ")} 열려 있어요 · 최소 {minHours}시간부터
+            {daySlots.map((sl) => `${sl.start}~${sl.end}`).join(", ")} 열려 있어요 · 최소 {durationLabel(minMinutes)}부터
           </p>
         )}
       </div>
 
       {/* ⏱09-16 신설 — 시간 단위로 바뀌면서 「몇 시부터 몇 시간」이 신청의 핵심이 됐다.
-          ⭐**시작을 먼저, 길이를 그다음.** 끝나는 시각을 직접 고르게 하면 열린 시간·최소 시간·이미 팔린 칸
-            셋을 손님이 머리로 맞춰야 한다. 시작을 고르면 가능한 길이만 남겨 주는 쪽이 고를 것이 적다. */}
+          🔁09-19 대표 — 「몇 시간 빌리실까요?」 칸을 없애고 시작과 끝을 «한 줄»에서 고른다(30분 눈금).
+          ⭐그날 열린 눈금을 다 깔고, 시작을 누르면 그 시작에서 갈 수 있는 끝만 테두리가 켜진다. 열린 시간·최소 시간·
+            이미 팔린 칸 셋은 칩이 먼저 걸러 주므로 손님이 머리로 맞출 일이 없다. 고른 구간은 칩 색이 한 덩어리로 이어지고,
+            그 아래 한 줄(「10:30~13:00 · 2시간 30분」)이 요약한다. 아워플레이스의 시간 고르기처럼 누르는 순서가 곧 답이다. */}
       <div ref={timeRef}>
-        <p className={labelCls}>몇 시부터 빌리실까요?</p>
+        <p className={labelCls}>시작과 끝 시각을 골라 주세요</p>
         {!useDate ? (
           <p className={hintCls}>날짜를 고르면 열린 시각이 나와요.</p>
         ) : startChoices.length === 0 ? (
           <p className={hintCls}>이 날은 빌릴 수 있는 시간이 남아 있지 않아요. 다른 날을 골라 주세요.</p>
         ) : (
-          // 🎨09-17 디자인팀 — 드롭다운 둘(시작 · 길이) → **칩 두 줄**.
-          //   드롭다운은 열기 전엔 무엇이 남았는지 안 보이고, 폰에선 휠을 두 번 돌려야 했다.
-          //   칩으로 깔면 「이 날은 오후만 남았구나」가 누르기 전에 읽힌다(아워플레이스 시간 고르기와 같은 문법).
-          //   선택 색은 달력의 고른 날과 같은 키위 tint다 — 한 폼 안에서 «고른 것»의 얼굴은 하나.
           <div>
-            <div className="grid grid-cols-4 gap-2" role="group" aria-label="시작 시각">
-              {startChoices.map((t) => (
-                <button
-                  key={t}
-                  type="button"
-                  data-start-chip
-                  aria-pressed={t === activeStart}
-                  onClick={() => {
-                    setStartTime(t);
-                    setUseHours(0);
-                    setBadField((f) => (f === "time" ? "" : f));
-                  }}
-                  className={`${chipCls} ${t === activeStart ? chipOnCls : chipOffCls}`}
-                >
-                  {t}
-                </button>
-              ))}
+            {/* 지금 무엇을 누를 차례인지 칩 «위»에 한 줄. 누르는 손가락이 가리는 자리를 피한다. */}
+            <p className="-mt-1 mb-3 text-[15px] leading-relaxed break-keep text-mute" aria-live="polite">
+              {!activeStart
+                ? "시작 시각을 먼저 눌러 주세요."
+                : !endTime
+                  ? `${activeStart}부터예요. 끝나는 시각을 눌러 주세요.`
+                  : "다른 시각을 누르면 처음부터 다시 골라요."}
+            </p>
+            <div className="grid grid-cols-4 gap-2 sm:grid-cols-6" role="group" aria-label="시작과 끝 시각">
+              {marks.map((t) => {
+                const isStart = t === activeStart;
+                const isEnd = t === endTime;
+                const inRange = !!endTime && t > activeStart && t < endTime;
+                const endable = !!activeStart && !endTime && ends.includes(t);
+                const startable = startChoices.includes(t);
+                const enabled = isStart || isEnd || endable || startable;
+                const cls = isStart || isEnd
+                  ? chipOnCls
+                  : inRange
+                    ? chipRangeCls
+                    : endable
+                      ? chipEndableCls
+                      : !enabled
+                        ? chipDisabledCls
+                        : activeStart && !endTime
+                          ? chipDimCls
+                          : chipOffCls;
+                return (
+                  <button
+                    key={t}
+                    type="button"
+                    data-time-chip={t}
+                    disabled={!enabled}
+                    aria-pressed={isStart || isEnd}
+                    aria-label={isStart ? `${t} 시작` : isEnd ? `${t} 끝` : endable ? `${t}까지` : t}
+                    onClick={() => tapMark(t)}
+                    className={`${chipCls} ${cls}`}
+                  >
+                    {t}
+                  </button>
+                );
+              })}
             </div>
-            {activeStart && (
-              <>
-                <p className="mb-2 mt-5 text-[15px] text-mute">몇 시간 쓰실까요?</p>
-                <div className="grid grid-cols-4 gap-2" role="group" aria-label="몇 시간">
-                  {hourChoices.map((h) => (
-                    <button
-                      key={h}
-                      type="button"
-                      aria-pressed={h === activeHours}
-                      onClick={() => setUseHours(h)}
-                      className={`${chipCls} ${h === activeHours ? chipOnCls : chipOffCls}`}
-                    >
-                      {h}시간
-                    </button>
-                  ))}
-                </div>
-                {endTime && (
-                  <p className="mt-3 text-[15px] text-body">
-                    <span className="font-medium text-ink">{rangeLabel(activeStart, endTime)}</span>
-                  </p>
-                )}
-              </>
+            {endTime && (
+              <p className="mt-3 text-[16px] text-body" data-time-summary>
+                <span className="font-medium text-ink tabular-nums">
+                  {activeStart}~{endTime}
+                </span>
+                <span className="text-mute"> · {durationLabel(minutes)}</span>
+              </p>
+            )}
+            {activeStart && !endTime && (
+              <p className={hintCls}>최소 {durationLabel(minMinutes)}부터 빌릴 수 있어요.</p>
             )}
           </div>
         )}
-        {badField === "time" && <p className={errCls}>몇 시부터 쓰실지 골라 주세요.</p>}
+        {badField === "time" && (
+          <p className={errCls}>{activeStart ? "끝나는 시각도 골라 주세요." : "시작 시각부터 골라 주세요."}</p>
+        )}
       </div>
 
       {useType !== "as_is" && (
@@ -700,7 +721,8 @@ export function BookingForm({
           결제 화면은 돈을 내는 버튼이라 「N원 결제하기」. 버튼 이름이 그 버튼이 여는 다음 화면을 말한다. */}
       <PayBar
         amount={timePicked && product ? total : null}
-        emptyText={!product ? "방식을 고르면 금액이 나와요" : "시간을 고르면 금액이 나와요"}
+        caption={timePicked ? durationLabel(minutes) : undefined}
+        emptyText={!product ? "방식을 고르면 금액이 나와요" : activeStart ? "끝나는 시각을 고르면 금액이 나와요" : "시간을 고르면 금액이 나와요"}
         label={pending ? "결제 화면으로 가는 중…" : "신청하기"}
         disabled={pending}
         onClick={askConfirm}
@@ -758,7 +780,7 @@ export function BookingForm({
                 <span className="font-medium text-ink">{won(total)}</span>
                 {/* 💸09-17 QA — 합계만 있으면 「왜 10만원인가」를 손님이 셈한다. 내역을 한 줄로. */}
                 <span className="block text-[15px] text-mute">
-                  {product ? PRODUCT_LABEL[product] : "대여"} {activeHours}시간 {won(spaceAmount)}
+                  {product ? PRODUCT_LABEL[product] : "대여"} {durationLabel(minutes)} {won(spaceAmount)}
                   {chatAmount > 0 && ` + ${COFFEE_CHAT_LABEL} ${coffeeChatMinutes}분 ${won(chatAmount)}`}
                 </span>
               </>

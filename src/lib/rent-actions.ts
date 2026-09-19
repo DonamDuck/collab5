@@ -41,7 +41,7 @@ import {
   notifyBookingPaidToGuest, notifyBookingConfirmedToHost, notifyBookingCancelledToGuest, notifyAdminRefund,
   notifySpacePublished, notifySpaceReview, notifyRefundRequest,
 } from "./rent-notify";
-import { bookingStarted, dateLabel, kstDaysUntil, hoursBetween, isHourMark, toMinutes, todayKst } from "./rent-time";
+import { bookingStarted, dateLabel, kstDaysUntil, durationLabel, isTimeMark, minHoursToMinutes, minutesBetween, toMinutes, todayKst } from "./rent-time";
 import type { Space, SpaceBooking, SpaceUseType, SpaceCategory, OpenSlot, AccessHow, RentProduct, BizCheckStatus } from "./types";
 import { bookingAmount, compatScopePrice } from "./rent-products";
 import { PRODUCT_LABEL, withJosa } from "./rent-copy";
@@ -192,10 +192,13 @@ export async function saveSpaceAction(input: SpaceFormInput): Promise<ActionResu
       return { ok: false, message: `${label} 설명이 짧아요. 손님이 무엇을 쓰고 할 수 있는지 열 글자 넘게 담아 주세요.` };
     }
   }
-  // ⏱09-18 밤 QA(H-36) — 최소 대여 시간은 «하루 안»의 정수다. 전엔 소수·25시간·빈 값이 그대로 저장됐다.
-  if (!Number.isInteger(input.minHours) || input.minHours < 1 || input.minHours > MIN_HOURS_MAX) {
-    return { ok: false, message: `최소 대여 시간은 한 시간부터 ${MIN_HOURS_MAX}시간까지 고를 수 있어요.` };
+  // ⏱09-18 밤 QA(H-36) — 최소 대여 시간은 «하루 안»이다. 전엔 소수·25시간·빈 값이 그대로 저장됐다.
+  //   🔁09-19 30분 눈금(대표) — 1시간 30분 같은 반 시간을 받는다. 그 밖의 소수(1.2시간)는 여전히 막는다.
+  if (!Number.isInteger(input.minHours * 2) || input.minHours < 1 || input.minHours > MIN_HOURS_MAX) {
+    return { ok: false, message: `최소 대여 시간은 한 시간부터 ${MIN_HOURS_MAX}시간까지 30분 단위로 고를 수 있어요.` };
   }
+  const minMinutes = minHoursToMinutes(input.minHours);
+  const minLabel = durationLabel(minMinutes);
   // ☕09-18 밤 QA(H-36) — 켠 커피챗은 값과 길이가 있어야 한다. 값 0원짜리 커피챗이 상품으로 서 있었다.
   if (input.coffeeChat) {
     if (!(input.coffeeChatPrice > 0)) return { ok: false, message: "커피챗을 켜셨으면 얼마인지 적어 주세요." };
@@ -239,10 +242,10 @@ export async function saveSpaceAction(input: SpaceFormInput): Promise<ActionResu
     if (toMinutes(sl.start ?? "") < 0 || toMinutes(sl.end ?? "") < 0) {
       return { ok: false, message: `${dateLabel(sl.date)}의 시각을 알아보지 못했어요. 시작과 끝 시각을 다시 골라 주세요.` };
     }
-    const h = hoursBetween(sl.start, sl.end);
-    if (h <= 0) return { ok: false, message: `${dateLabel(sl.date)}의 시간이 거꾸로예요. 끝나는 시각이 더 늦어야 해요.` };
-    if (h < input.minHours) {
-      return { ok: false, message: `${dateLabel(sl.date)}은 ${h}시간만 열려 있어서 최소 ${input.minHours}시간을 못 채워요.` };
+    const m = minutesBetween(sl.start, sl.end);
+    if (m <= 0) return { ok: false, message: `${dateLabel(sl.date)}의 시간이 거꾸로예요. 끝나는 시각이 더 늦어야 해요.` };
+    if (m < minMinutes) {
+      return { ok: false, message: `${dateLabel(sl.date)}은 ${durationLabel(m)}만 열려 있어서 최소 ${minLabel}을 못 채워요.` };
     }
   }
 
@@ -256,9 +259,9 @@ export async function saveSpaceAction(input: SpaceFormInput): Promise<ActionResu
     if (!/^\d{2}:\d{2}$/.test(r.start ?? "") || !/^\d{2}:\d{2}$/.test(r.end ?? "") || toMinutes(r.start) < 0 || toMinutes(r.end) < 0) {
       return { ok: false, message: `${dayName} 여는 시각이 비어 있어요.` };
     }
-    const h = hoursBetween(r.start, r.end);
-    if (h <= 0) return { ok: false, message: `${dayName}의 시간이 거꾸로예요. 끝나는 시각이 더 늦어야 해요.` };
-    if (h < input.minHours) return { ok: false, message: `${dayName}은 ${h}시간만 열려 있어서 최소 ${input.minHours}시간을 못 채워요.` };
+    const m = minutesBetween(r.start, r.end);
+    if (m <= 0) return { ok: false, message: `${dayName}의 시간이 거꾸로예요. 끝나는 시각이 더 늦어야 해요.` };
+    if (m < minMinutes) return { ok: false, message: `${dayName}은 ${durationLabel(m)}만 열려 있어서 최소 ${minLabel}을 못 채워요.` };
     if (r.skip !== undefined && (!Array.isArray(r.skip) || r.skip.length > 200 || r.skip.some((d) => !/^\d{4}-\d{2}-\d{2}$/.test(d)))) {
       return { ok: false, message: `${dayName} 쉬는 날 목록이 깨져 있어요. 새로고침하고 한 번 더 올려 주세요.` };
     }
@@ -308,21 +311,20 @@ export async function saveSpaceAction(input: SpaceFormInput): Promise<ActionResu
     }
   }
 
-  // ⏱09-18 밤 QA(SEC-08) — 여는 시각은 정시만(눈금 1시간, 대표 09-16). 고르개는 정시만 주지만 액션을 직접 부르면
-  //   10:30 시작·24:30 끝 같은 칸이 저장됐다.
-  //   ⚠️09-16 전에 30분으로 열어 둔 칸이 운영에 남아 있다(09-18 읽기: 공간 한 곳, 10:30 시작 두 날). 그 칸을 «그대로» 다시 보내면 받는다.
-  //   안 받으면 그 사장님은 다른 곳을 고치려다 저장이 막히고, 고르개엔 10:30이 없어 고칠 방법도 안 보인다. 새로 넣거나 바꾼 칸만 막는다.
+  // ⏱여는 시각은 30분 눈금만(대표 09-19: 「9시 30분 ~ 12시의 자투리도 가능」). 고르개는 눈금만 주지만 액션을 직접 부르면
+  //   10:15 시작·24:30 끝 같은 칸이 저장될 수 있다(09-18 밤 QA SEC-08 — 그땐 정시만 받게 막았고, 09-19에 30분으로 되돌렸다).
+  //   ⚠️이미 저장돼 있던 칸을 «그대로» 다시 보내면 받는다. 눈금 밖 옛 칸 때문에 다른 곳을 고치려다 저장이 막히면 안 된다.
   const keptSlots = new Set((prev?.openSlots ?? []).map((sl) => `${sl.date} ${sl.start}~${sl.end}`));
   for (const sl of futureSlotsIn) {
-    if (isHourMark(sl.start) && isHourMark(sl.end)) continue;
+    if (isTimeMark(sl.start) && isTimeMark(sl.end)) continue;
     if (keptSlots.has(`${sl.date} ${sl.start}~${sl.end}`) && toMinutes(sl.start) >= 0 && toMinutes(sl.end) >= 0) continue;
-    return { ok: false, message: `${dateLabel(sl.date)}은 정시로만 열 수 있어요. 시작과 끝 시각을 다시 골라 주세요.` };
+    return { ok: false, message: `${dateLabel(sl.date)}은 30분 단위로만 열 수 있어요. 시작과 끝 시각을 다시 골라 주세요.` };
   }
   const keptRules = new Set((prev?.repeatWeekly ?? []).map((r) => `${r.dow} ${r.start}~${r.end}`));
   for (const r of repeat) {
-    if (isHourMark(r.start) && isHourMark(r.end)) continue;
+    if (isTimeMark(r.start) && isTimeMark(r.end)) continue;
     if (keptRules.has(`${r.dow} ${r.start}~${r.end}`) && toMinutes(r.start) >= 0 && toMinutes(r.end) >= 0) continue;
-    return { ok: false, message: `매주 ${"일월화수목금토"[r.dow]}요일은 정시로만 열 수 있어요. 시작과 끝 시각을 다시 골라 주세요.` };
+    return { ok: false, message: `매주 ${"일월화수목금토"[r.dow]}요일은 30분 단위로만 열 수 있어요. 시작과 끝 시각을 다시 골라 주세요.` };
   }
 
   // 🧾사업자 정보(대표 09-17: 「개인까지 받으면 너무 무방비」). 바깥 호출(좌표·국세청·네이버) «전에» 모양부터 본다.
@@ -672,10 +674,11 @@ export async function startBookingAction(input: BookingFormInput): Promise<Start
   const taken = await listLiveBookings(sp.id, input.useDate);
   const rule = validateBookingRequest(sp, input, new Date(), taken);
   if (!rule.ok) return { ok: false, message: rule.message };
-  const hours = rule.hours;
+  const minutes = rule.minutes;
 
   // ⭐금액은 공간 행의 «고른 상품 값»으로 다시 계산한다(09-18). 화면이 본 값과 같은 함수(`bookingAmount`)다.
-  const amt = bookingAmount(sp, input.product, hours, input.withChat);
+  //   🔁09-19 길이는 분으로 넘긴다(30분 단위). 반올림 규칙은 `priceForMinutes` 한 곳이다.
+  const amt = bookingAmount(sp, input.product, minutes, input.withChat);
   if (!amt || amt.total <= 0) return { ok: false, message: "아직 값이 안 정해진 공간이라 신청할 수 없어요." };
   const { space: amountSpace, chat: amountChat, total: amountTotal } = amt;
 
@@ -685,7 +688,7 @@ export async function startBookingAction(input: BookingFormInput): Promise<Start
   const booking = await createPendingBooking({
     spaceId: sp.id, guestUserId: uid, guestBrandSlug, guestPhone: input.guestPhone.trim(), guestName,
     useDate: input.useDate, hours: `${input.startTime}~${input.endTime}`, plan: input.plan.trim(),
-    startTime: input.startTime, endTime: input.endTime, hoursCount: hours, product: input.product,
+    startTime: input.startTime, endTime: input.endTime, minutesCount: minutes, product: input.product,
     headcount: input.headcount, withChat: amountChat > 0, amountChat,
     withMentor: false, amountMentor: 0,
     amountSpace, amountTotal,
