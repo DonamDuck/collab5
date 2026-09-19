@@ -497,7 +497,7 @@ const BRIEF_FLOUR = `밀가루 일기 님의 요약 리포트예요. 주인이 �
 
 /** 📨사이트 메일 미리보기 종류 — `/dev/rent-mail/[kind]`가 하루 가게 메일과 같은 틀로 띄운다. */
 export const SITE_MAIL_KINDS: { kind: string; label: string }[] = [
-  { kind: "signup-email", label: "새 가입 알림 → 운영자 · 이메일 가입" },
-  { kind: "signup-kakao-noname", label: "새 가입 알림 → 운영자 · 카카오 로그인, 브랜드명 비움" },
-  { kind: "signup-google-long", label: "새 가입 알림 → 운영자 · 구글 로그인, 긴 브랜드명·이메일" },
+  { kind: "signup-email", label: "새 가입 알림 → 대표 슬랙 · 이메일 가입" },
+  { kind: "signup-kakao-noname", label: "새 가입 알림 → 대표 슬랙 · 카카오 로그인, 브랜드명 비움" },
+  { kind: "signup-google-long", label: "새 가입 알림 → 대표 슬랙 · 구글 로그인, 긴 브랜드명·이메일" },
 ];

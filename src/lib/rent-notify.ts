@@ -9,9 +9,15 @@
 //
 // 🔗링크 base는 `SITE_URL`이다. 로컬에서 찍히는 링크가 운영 주소인 건 의도한 것 — 메일은 어디서 보내든
 //   받는 사람이 여는 곳은 하나다.
+//
+// 📣09-19 대표 — 대표에게 가는 알림(검토 대기·환불 신청·하루 요약)은 `admin-notify.ts`로 모았다(슬랙, 없으면 메일).
+//   손님·사장님 메일에 붙던 대표 참조(cc)는 뺐다.
 import { rentMockOn } from "./rent-mock";
+import type { AdminNotice } from "./admin-notify";
+import { notifyAdmin } from "./admin-notify";
+import type { AdminDailySummary, RemindRun } from "./rent-admin-daily";
 import { KAKAO_CHAT_URL, SITE_URL } from "./site";
-import { bookingWhen, dateLabel } from "./rent-time";
+import { addDaysIso, bookingWhen, dateLabel } from "./rent-time";
 import {
   accessMeetLine, hostContactLine, withJosa, BROKER_NOTE, CONTACT_RULE_GUEST, CONTACT_RULE_GUEST_CONFIRMED, CONTACT_RULE_HOST,
   BOOKING_HEADLINE, COFFEE_CHAT_WHEN_GUEST, COFFEE_CHAT_WHEN_HOST, HOST_REQUEST_STEPS,
@@ -76,6 +82,16 @@ const LABEL = {
   reviewPrevAddress: "원래 주소",
   reviewBiz: "사업자 확인",
   reviewPlace: "네이버 가게",
+  // ↓ 대표에게 가는 환불 신청 알림·아침 요약에만 쓴다(09-19).
+  refundHost: "신청한 사장님",
+  refundNote: "신청 사유",
+  guestPaid: "손님이 낸 돈",
+  dailyPaid: "어제 결제",
+  dailyWaiting: "수락 대기",
+  dailyRefund: "환불 신청",
+  dailyReview: "검토 대기",
+  dailyUse: "이용 예약",
+  dailyRemind: "리마인드",
 } as const;
 
 /** 🪪사장님이 보는 손님 이름 칸(대표 09-18) — 신청 때 받은 성함(실명)이 먼저다. 이용 당일 신분을 맞춰 보는 이름이라서.
@@ -223,36 +239,37 @@ export interface Mail {
 export interface MailResult {
   /** 실제로 나갔는가. 키 없음·수신자 없음·전송 실패 전부 false — 호출부는 무시해도 된다. */
   sent: boolean;
+  /** 🧮09-19 — 일부러 건너뛴 이유. 비어 있는데 `sent`가 false면 «보내려다 실패»다. 아침 요약이 실패만 센다. */
+  skipped?: "mock" | "no-key" | "no-recipient";
   subject: string;
   html: string;
   text: string;
 }
 
-/** 한 통 보내기. 대표(`ADMIN_EMAIL`)에게 같은 내용을 cc로 한 통 더 — 초기엔 대표가 모든 거래를 봐야 한다.
- *  ⚠️수신자가 비어 있으면(카카오 가입은 이메일이 없을 수 있다) 보낼 곳이 없으니 스킵. 에러가 아니다. */
+/** 한 통 보내기. ⚠️수신자가 비어 있으면(카카오 가입은 이메일이 없을 수 있다) 보낼 곳이 없으니 스킵. 에러가 아니다.
+ *  🔻09-19 대표 — 대표(`ADMIN_EMAIL`) 참조(cc)를 뺐다. 「이메일 말고 slack이나 채널톡 같은 서비스로 우회해서 무료로」.
+ *    거래마다 대표 메일이 한 통씩 더 나가 무료 한도를 먹었다. 대표가 봐야 하는 흐름은 슬랙 하루 요약(`buildAdminDaily`)이 맡는다. */
 async function send(to: string, subject: string, html: string, text: string): Promise<MailResult> {
   const out: MailResult = { sent: false, subject, html, text };
   // 🧪09-18 목 데이터 보기 중(개발 빌드 전용)엔 보내지 않는다. 첫 울타리는 `rent-actions.ts` 액션 첫 줄.
   if (await rentMockOn()) {
     console.info(`[rent-notify] 스킵(목 데이터 보기 중) · ${subject}`);
-    return out;
+    return { ...out, skipped: "mock" };
   }
   const apiKey = process.env.RESEND_API_KEY;
-  const admin = (process.env.ADMIN_EMAIL ?? "").trim();
   if (!apiKey) {
     console.info(`[rent-notify] 스킵(RESEND_API_KEY 없음) → ${to || "(수신자 없음)"} · ${subject}`);
-    return out;
+    return { ...out, skipped: "no-key" };
   }
   if (!to) {
     console.info(`[rent-notify] 스킵(수신자 이메일 없음) · ${subject}`);
-    return out;
+    return { ...out, skipped: "no-recipient" };
   }
-  const cc = admin && admin.toLowerCase() !== to.toLowerCase() ? [admin] : undefined;
   try {
     const res = await fetch(RESEND_ENDPOINT, {
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ from: FROM, to: [to], ...(cc ? { cc } : {}), subject, text, html }),
+      body: JSON.stringify({ from: FROM, to: [to], subject, text, html }),
       // 메일 서버가 느려도 결제 응답을 오래 붙잡지 않는다.
       signal: AbortSignal.timeout(8000),
     });
@@ -799,7 +816,7 @@ function placeLine(sp: Space): string {
  *  ⚠️호출부(`saveSpaceAction`)가 «처음 검토 대기로 들어올 때만» 부른다 — 새 공간이거나, 검토 대기가 아니던 공간의 이름·주소가 바뀌었을 때.
  *    검토 대기 중에 사장님이 여러 번 고쳐 저장해도 더 안 간다. 그래서 메일 뒤에 바뀐 것은 검토 화면이 맞다고 끝에 적는다.
  *  받는 사람은 운영자 한 명이라 `to`를 비워 두고 보내는 쪽이 `ADMIN_EMAIL`로 채운다(가입 알림과 같은 방식). */
-export function buildSpaceReview(space: Space, owner: Profile | null, prev: SpaceReviewPrev | null): Mail {
+export function buildSpaceReviewNotice(space: Space, owner: Profile | null, prev: SpaceReviewPrev | null): AdminNotice {
   const renamed = !!prev && prev.name.trim() !== space.name.trim();
   const moved = !!prev && prev.address.trim() !== space.address.trim();
   const again = !!prev && (renamed || moved);
@@ -818,6 +835,8 @@ export function buildSpaceReview(space: Space, owner: Profile | null, prev: Spac
       ? `새 공간이 검토를 기다려요. 다만 지금은 열 수 없는 상태라, 아래 사업자 확인 칸을 먼저 봐 주세요.`
       : `새 공간이 검토를 기다려요. 사업자등록증과 국세청 조회 결과를 보고 공개할지 정해 주세요.`;
   const ownerLine = [owner?.brandName?.trim(), owner?.email?.trim()].filter(Boolean).join(" · ") || "프로필을 못 읽었어요";
+  // 🔒슬랙 칸엔 사장님 이메일을 안 싣는다(`admin-notify.ts` 머리말). 누구인지는 검토 화면이 보여 준다.
+  const ownerBrand = owner ? owner.brandName?.trim() || "브랜드 이름을 비워 두셨어요" : "프로필을 못 읽었어요";
   const rows: [string, string][] = [
     // 바뀐 공간은 새 값 바로 밑에 «전» 값을 둔다(한 칸에 화살표로 몰았더니 폰에서 네 줄로 꺾였다).
     [LABEL.reviewSpace, `${space.name}\n${spaceLink(space)}`],
@@ -829,13 +848,115 @@ export function buildSpaceReview(space: Space, owner: Profile | null, prev: Spac
     [LABEL.reviewPlace, placeLine(space)],
   ];
   const tail = "이 메일은 검토 대기로 들어온 그때 한 번만 가요. 그 뒤에 사장님이 더 고치신 내용은 검토 화면에 있어요.";
-  return { to: "", subject, ...compose(lead, rows, { href: link, label: "검토하러 가기" }, tail) };
+  const go = { href: link, label: "검토하러 가기" };
+  return {
+    title: subject.replace(/^\[collab5\] /, ""),
+    lead,
+    rows: rows.map(([k, v]): [string, string] => (k === LABEL.reviewOwner ? [k, ownerBrand] : [k, v])),
+    link: go,
+    note: "검토 대기로 들어온 그때 한 번만 알려요. 그 뒤에 사장님이 더 고치신 내용은 검토 화면에 있어요.",
+    mail: { subject, ...compose(lead, rows, go, tail) },
+  };
 }
 
-/** 보내는 쪽 — 받는 사람은 `ADMIN_EMAIL` 한 명. 키나 주소가 없으면 조용히 건너뛴다(`send`가 스킵한다). */
+/** 메일로 보면 이 모양이다(슬랙이 없을 때 대표가 받는 글 · 미리보기 `/dev/mail/space-review-*`). */
+export function buildSpaceReview(space: Space, owner: Profile | null, prev: SpaceReviewPrev | null): Mail {
+  const n = buildSpaceReviewNotice(space, owner, prev);
+  return { to: "", subject: n.mail!.subject, html: n.mail!.html, text: n.mail!.text };
+}
+
+/** 보내는 쪽 — 대표 알림 한 곳(`notifyAdmin`)으로. 슬랙이 있으면 슬랙, 없으면 `ADMIN_EMAIL` 메일. 둘 다 없으면 조용히 건너뛴다. */
 export async function notifySpaceReview(
   space: Space, owner: Profile | null, prev: SpaceReviewPrev | null,
-): Promise<MailResult> {
-  const m = buildSpaceReview(space, owner, prev);
-  return send((process.env.ADMIN_EMAIL ?? "").trim(), m.subject, m.html, m.text);
+) {
+  return notifyAdmin(buildSpaceReviewNotice(space, owner, prev));
+}
+
+/** ⑨ 사장님의 «관리자에게 환불 신청» → 대표 (09-19).
+ *  🩸그 전엔 신청이 들어와도 아무 알림이 없었다. 대표가 정산 화면을 열어야 보였는데, 처리할 사람은 대표 한 명뿐이다.
+ *  🔒손님·사장님 연락처는 싣지 않는다(`admin-notify.ts` 머리말). 전화할 번호는 정산 화면의 그 줄에 있다.
+ *  ⚠️호출부(`requestRefundAction`)가 «이번에 처음 적었을 때만» 부른다. 이미 신청된 예약을 또 눌러도 안 간다. */
+export function buildRefundRequestNotice(
+  booking: SpaceBooking, space: Space, host: Profile | null, note: string,
+): AdminNotice {
+  const subject = `[collab5] ${subjectDate(booking.useDate)}, 사장님이 환불을 신청했어요`;
+  const lead = "사장님 사정으로 이 예약을 무르고 싶다고 하셨어요. 사장님과 손님께 전화로 확인하신 뒤 정산 화면에서 승인하거나 닫아 주세요.";
+  const rows: [string, string][] = [
+    [LABEL.when, bookingWhen(booking)],
+    [LABEL.space, space.name],
+    [LABEL.product, PRODUCT_LABEL[booking.product]],
+    [LABEL.refundHost, displayName(host, "브랜드 이름을 비워 두셨어요")],
+    [LABEL.guestPaid, won(booking.amountTotal)],
+    [LABEL.refundNote, note.trim() || "적지 않으셨어요"],
+  ];
+  const go = { href: `${SITE_URL}/rent/payouts`, label: "정산 화면에서 처리하기" };
+  const tail = "두 분 연락처는 정산 화면의 이 신청 줄에 있어요. 승인하시면 손님께 남은 돈 전액이 돌아가요.";
+  return {
+    title: subject.replace(/^\[collab5\] /, ""),
+    lead, rows, link: go, note: tail,
+    mail: { subject, ...compose(lead, rows, go, tail) },
+  };
+}
+
+/** 보내는 쪽 — 대표 알림 한 곳(`notifyAdmin`)으로. */
+export async function notifyRefundRequest(booking: SpaceBooking, space: Space, host: Profile | null, note: string) {
+  return notifyAdmin(buildRefundRequestNotice(booking, space, host, note));
+}
+
+/** 「3시간」·「2일」 — 결제한 지 얼마나 됐나. 하루가 안 되면 시간, 넘으면 날로. */
+function agoLabel(iso: string, now: number): string {
+  const mins = Math.max(0, Math.floor((now - Date.parse(iso)) / 60_000));
+  if (!Number.isFinite(mins)) return "얼마쯤";
+  if (mins < 60) return `${mins}분`;
+  if (mins < 24 * 60) return `${Math.floor(mins / 60)}시간`;
+  return `${Math.floor(mins / (24 * 60))}일`;
+}
+
+/** 리마인드 한 줄. 요약이 «크론이 돌았다»는 표시라, 무엇을 했는지를 숫자로 말한다. */
+function remindLine(r: RemindRun | null): string {
+  if (!r) return "도중에 멈췄어요. Vercel 로그에서 rent-remind를 봐 주세요.";
+  const held = r.heldToday > 0 ? `\n오늘 쓰는 예약 ${r.heldToday}건은 오늘용 문안이 아직 없어 건너뛰었어요.` : "";
+  if (r.noMailKey) return `메일 키(RESEND_API_KEY)가 없어 보내지 않았어요.${held}`;
+  if (r.sent === 0 && r.failed === 0) return `보낼 내일 예약이 없었어요.${held}`;
+  return `${r.sent}통 보냈어요.${r.failed > 0 ? ` ${r.failed}통은 실패했어요.` : ""}${held}`;
+}
+
+/** ⑩ 아침 요약 → 대표 (09-19). 리마인드 크론이 끝나면 한 통(`sendAdminDaily`).
+ *  대표 09-19 — 거래마다 가던 참조 메일을 끊고, 대신 하루치를 한 번에 본다. 숫자가 다 0이어도 간다(크론이 돌았다는 표시).
+ *  @param s 못 셌으면 null(DB 읽기 실패). 그땐 0이라고 하지 않고 못 셌다고 말한다.
+ *  @param now 「결제한 지 N시간」을 셀 기준. 미리보기가 고정값을 넘긴다. */
+export function buildAdminDaily(
+  s: AdminDailySummary | null, today: string, remind: RemindRun | null, now = Date.now(),
+): AdminNotice {
+  const subject = `[collab5] ${subjectDate(today)} 하루 가게 아침 요약`;
+  const todo: string[] = [];
+  if (s?.waiting.count) todo.push(`수락을 기다리는 요청 ${s.waiting.count}건`);
+  if (s?.refundRequests) todo.push(`환불 신청 ${s.refundRequests}건`);
+  if (s?.reviewPending) todo.push(`검토 대기 공간 ${s.reviewPending}곳`);
+  const lead = !s
+    ? "오늘은 숫자를 못 셌어요. 예약을 읽어 오다 실패했어요. 리마인드가 한 일은 아래에 있어요."
+    : todo.length > 0
+      ? `오늘 봐 주실 게 있어요. ${todo.join(", ")}이에요.`
+      : "오늘은 따로 처리하실 일이 없어요.";
+  const rows: [string, string][] = s
+    ? [
+      [LABEL.dailyPaid, s.paidYesterday.count > 0 ? `${s.paidYesterday.count}건 · ${won(s.paidYesterday.amount)}` : "없었어요"],
+      [LABEL.dailyWaiting, s.waiting.count > 0 && s.waiting.oldest
+        ? `${s.waiting.count}건\n가장 오래 기다린 건 ${s.waiting.oldest.spaceName} ${dateLabel(s.waiting.oldest.useDate)} 예약이에요. 결제한 지 ${agoLabel(s.waiting.oldest.paidAt, now)} 됐어요.`
+        : "없어요"],
+      [LABEL.dailyRefund, s.refundRequests > 0 ? `${s.refundRequests}건\n${SITE_URL}/rent/payouts` : "없어요"],
+      [LABEL.dailyReview, s.reviewPending + s.reviewApproveOnly > 0
+        ? `${[s.reviewPending > 0 ? `공개 전 ${s.reviewPending}곳` : "", s.reviewApproveOnly > 0 ? `확인 표시 전 ${s.reviewApproveOnly}곳` : ""].filter(Boolean).join(" · ")}\n${SITE_URL}/rent/review`
+        : "없어요"],
+      [LABEL.dailyUse, `오늘 ${s.useToday}건 · 내일(${dateLabel(addDaysIso(today, 1))}) ${s.useTomorrow}건`],
+      [LABEL.dailyRemind, remindLine(remind)],
+    ]
+    : [[LABEL.dailyRemind, remindLine(remind)]];
+  const go = { href: `${SITE_URL}/rent/payouts`, label: "정산 화면 열기" };
+  const tail = "매일 아침 9시 리마인드가 끝나면 와요. 숫자가 다 0이어도 와요. 안 온 날은 크론이 멈춘 거예요.";
+  return {
+    title: subject.replace(/^\[collab5\] /, ""),
+    lead, rows, link: go, note: tail,
+    mail: { subject, ...compose(lead, rows, go, tail) },
+  };
 }

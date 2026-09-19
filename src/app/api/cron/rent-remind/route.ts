@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { runRentRemind } from "@/lib/rent-remind";
+import { sendAdminDaily, type RemindRun } from "@/lib/rent-admin-daily";
 
 // GET /api/cron/rent-remind — 하루 가게 이용 전날 리마인드 (2026-09-17)
 //
@@ -18,6 +19,15 @@ export async function GET(req: Request) {
   if (!secret || req.headers.get("authorization") !== `Bearer ${secret}`) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
-  const { checked, sent, heldToday } = await runRentRemind();
-  return NextResponse.json({ checked, sent, heldToday });
+  // 📣09-19 대표 — 리마인드가 끝나면 대표에게 아침 요약 한 통(슬랙, 없으면 메일). 리마인드가 도중에 던져도 요약은 간다.
+  //   그 한 통이 «크론이 돌았다»는 표시라서, 리마인드 실패도 요약 안에서 말한다(`remind: null`).
+  let remind: RemindRun | null = null;
+  try {
+    const r = await runRentRemind();
+    remind = { checked: r.checked, sent: r.sent, failed: r.failed, heldToday: r.heldToday, noMailKey: r.noMailKey };
+  } catch (e) {
+    console.error("[cron/rent-remind] 리마인드 실패 — 요약만 보낸다", e);
+  }
+  const daily = await sendAdminDaily(remind);
+  return NextResponse.json({ ...(remind ?? { remind: "failed" }), daily: daily.channel, counted: daily.counted });
 }

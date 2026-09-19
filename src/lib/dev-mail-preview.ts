@@ -2,12 +2,40 @@
 // ⭐`rent-notify.ts`·`notify.ts`의 `build*`를 그대로 부른다. 보내지 않는다. 실제 발송도 같은 `build*`를 거친다.
 // 부르는 곳: 화면 미리보기 `app/dev/mail/[kind]/page.tsx`(코멘트 위젯이 붙는다) · 날것 `app/dev/rent-mail/[kind]/route.ts?raw=1`.
 import {
-  buildAdminRefund, buildBookingCancelled, buildBookingCancelledToGuest, buildBookingConfirmed,
+  buildAdminDaily, buildAdminRefund, buildBookingCancelled, buildBookingCancelledToGuest, buildBookingConfirmed,
   buildBookingConfirmedToHost, buildBookingPaid, buildBookingPaidToGuest, buildBookingRejected,
-  buildRemindGuest, buildRemindHost, buildSpacePublished, buildSpaceReview, type Mail,
+  buildRefundRequestNotice, buildRemindGuest, buildRemindHost, buildSpacePublished, buildSpaceReviewNotice, type Mail,
 } from "@/lib/rent-notify";
 import { buildWorld, MOCK_IDS, type MockWorld } from "@/lib/rent-mock-data";
-import { buildSignupMail } from "@/lib/notify";
+import { buildSignupNotice } from "@/lib/notify";
+import { buildSlackPayload, type AdminNotice, type SlackPayload } from "@/lib/admin-notify";
+import { summarizeDaily, type RemindRun } from "@/lib/rent-admin-daily";
+import { addDaysIso, todayKst } from "@/lib/rent-time";
+
+/** 미리보기 한 건. 대표 알림(09-19)은 슬랙 글(`slack`)이 같이 온다 — 슬랙이 있으면 그게 가고, 없으면 메일이 간다. */
+export type PreviewMail = Mail & { slack?: SlackPayload };
+
+/** 대표 알림 → 미리보기. 메일 칸은 «슬랙이 없을 때» 대표 메일로 가는 글이다(받는 사람은 `ADMIN_EMAIL`이라 비워 둔다). */
+function admin(n: AdminNotice): PreviewMail {
+  return { to: "", subject: n.mail?.subject ?? n.title, html: n.mail?.html ?? "", text: n.mail?.text ?? "", slack: buildSlackPayload(n) };
+}
+
+/** 🌅아침 요약 미리보기 — 목 세계 그대로 센다. 다만 목 결제는 전부 «이틀 전» 승인이라 「어제 결제」가 늘 0이 된다.
+ *  그래서 살아 있는 예약(결제 완료·확정)의 결제만 승인 시각을 어제 오전 10시(KST)로 옮겨서 센다. 목 세계 자체는 안 고친다(캐시에 묶여 있다). */
+function dailyPreview(w: MockWorld, remind: RemindRun | null): PreviewMail {
+  const today = todayKst();
+  const yesterday10 = `${addDaysIso(today, -1)}T01:00:00.000Z`;
+  const live = new Set(w.bookings.filter((b) => b.status === "paid" || b.status === "confirmed").map((b) => b.orderId));
+  const payments = w.payments.map((p) => (live.has(p.orderId) && p.approvedAt ? { ...p, approvedAt: yesterday10 } : p));
+  const summary = summarizeDaily({
+    bookings: w.bookings, payments,
+    spaceNames: new Map(w.spaces.map((sp) => [sp.id, sp.name])),
+    reviewPending: w.spaces.filter((sp) => sp.status === "pending").length,
+    reviewApproveOnly: w.spaces.filter((sp) => (sp.status === "open" || sp.status === "paused") && !!sp.bizCertPath && !sp.bizApprovedAt).length,
+    remind,
+  }, today);
+  return admin(buildAdminDaily(summary, today, remind));
+}
 
 
 /** 공간 하나와 그 주인 — 검토 알림(대표에게 가는 메일) 미리보기용. */
@@ -26,7 +54,7 @@ function pick(w: MockWorld, bookingId: number) {
   return { b, sp, host, guest, brand: brand ? { name: brand.name, slug: brand.slug } : undefined };
 }
 
-export function buildPreviewMail(kind: string): Mail | null {
+export function buildPreviewMail(kind: string): PreviewMail | null {
   const full = buildWorld("full");
   const B = MOCK_IDS.booking;
   switch (kind) {
@@ -53,8 +81,9 @@ export function buildPreviewMail(kind: string): Mail | null {
     case "published-account": { const x = pick(full, B.paid); return buildSpacePublished(x.sp, x.host, true); }
     // 🧾09-18 공간 검토 알림 → 대표. 받는 사람은 `ADMIN_EMAIL` 한 명이라 `to`가 비어 있다(가입 알림과 같다).
     //   ⚠️목 세계 객체는 캐시에 묶여 있어 고치지 않고 펼쳐서 새로 만든다.
-    case "space-review-new": { const x = pickSpace(full, MOCK_IDS.space.pendingNoKey); return buildSpaceReview(x.sp, x.owner, null); }
-    case "space-review-mismatch": { const x = pickSpace(full, MOCK_IDS.space.pending); return buildSpaceReview(x.sp, x.owner, null); }
+    //   📣09-19부터 대표 알림은 슬랙이 먼저다. 미리보기에 슬랙 글과 «슬랙이 없을 때» 메일을 같이 띄운다.
+    case "space-review-new": { const x = pickSpace(full, MOCK_IDS.space.pendingNoKey); return admin(buildSpaceReviewNotice(x.sp, x.owner, null)); }
+    case "space-review-mismatch": { const x = pickSpace(full, MOCK_IDS.space.pending); return admin(buildSpaceReviewNotice(x.sp, x.owner, null)); }
     case "space-review-changed": {
       const x = pickSpace(full, MOCK_IDS.space.full);
       const now = {
@@ -62,16 +91,21 @@ export function buildPreviewMail(kind: string): Mail | null {
         // 이름·주소가 바뀌면 옛 네이버 매칭은 지운다(`saveSpaceAction`). 네이버 키가 없는 경우의 모양이다.
         placeName: "", placeAddress: "", placeLat: undefined, placeLng: undefined, placeMatchedAt: undefined,
       };
-      return buildSpaceReview(now, x.owner, { name: x.sp.name, address: x.sp.address, status: x.sp.status });
+      return admin(buildSpaceReviewNotice(now, x.owner, { name: x.sp.name, address: x.sp.address, status: x.sp.status }));
     }
     case "remind-guest": { const x = pick(full, B.confirmed); return buildRemindGuest(x.b, x.sp, x.host, x.guest); }
     case "remind-host": { const x = pick(full, B.confirmed); return buildRemindHost(x.b, x.sp, x.host, x.guest); }
     case "remind-host-unaccepted": { const x = pick(full, B.paid); return buildRemindHost(x.b, x.sp, x.host, x.guest); }
     case "stress-paid-host": { const x = pick(buildWorld("stress"), B.stressPaid); return buildBookingPaid(x.b, x.sp, x.host, x.guest, x.brand); }
-    // 가입 알림은 받는 사람이 운영자 한 명이라 `to`를 비워 둔다(실제로는 `ADMIN_EMAIL`).
-    case "signup-email": return { to: "", ...buildSignupMail({ userId: 9001, brandName: "느린오후", email: "slow.afternoon@example.com", origin: "email" }) };
-    case "signup-kakao-noname": return { to: "", ...buildSignupMail({ userId: 9010, brandName: "", email: "new.member@example.com", origin: "kakao" }) };
-    case "signup-google-long": return { to: "", ...buildSignupMail({ userId: null, brandName: "오래된 골목 끝집에서 매일 아침 여섯 시에 문을 여는 동네 사람들의 부엌 겸 작업실", email: "a.very.long.mailbox.name.for.layout.testing@subdomain.example.com", origin: "google" }) };
+    // 가입 알림은 받는 사람이 운영자 한 명이라 `to`를 비워 둔다(실제로는 슬랙, 없으면 `ADMIN_EMAIL`).
+    case "signup-email": return admin(buildSignupNotice({ userId: 9001, brandName: "느린오후", email: "slow.afternoon@example.com", origin: "email" }));
+    case "signup-kakao-noname": return admin(buildSignupNotice({ userId: 9010, brandName: "", email: "new.member@example.com", origin: "kakao" }));
+    case "signup-google-long": return admin(buildSignupNotice({ userId: null, brandName: "오래된 골목 끝집에서 매일 아침 여섯 시에 문을 여는 동네 사람들의 부엌 겸 작업실", email: "a.very.long.mailbox.name.for.layout.testing@subdomain.example.com", origin: "google" }));
+    // 📣09-19 대표 알림 새 셋 — 사장님 환불 신청 · 아침 요약(할 일 있음 / 조용한 날 / 크론이 넘어진 날).
+    case "admin-refund-request": { const x = pick(full, B.refundReq); return admin(buildRefundRequestNotice(x.b, x.sp, x.host, x.b.refundRequestNote)); }
+    case "admin-daily": return dailyPreview(full, { checked: 3, sent: 3, failed: 1, heldToday: 1, noMailKey: false });
+    case "admin-daily-quiet": return dailyPreview(buildWorld("empty"), { checked: 0, sent: 0, failed: 0, heldToday: 0, noMailKey: false });
+    case "admin-daily-trouble": return admin(buildAdminDaily(null, todayKst(), null));
     default: return null;
   }
 }

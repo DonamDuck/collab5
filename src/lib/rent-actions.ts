@@ -39,7 +39,7 @@ import { repo } from "./repo";
 import {
   notifyBookingPaid, notifyBookingConfirmed, notifyBookingRejected, notifyBookingCancelled,
   notifyBookingPaidToGuest, notifyBookingConfirmedToHost, notifyBookingCancelledToGuest, notifyAdminRefund,
-  notifySpacePublished, notifySpaceReview,
+  notifySpacePublished, notifySpaceReview, notifyRefundRequest,
 } from "./rent-notify";
 import { bookingStarted, dateLabel, kstDaysUntil, hoursBetween, isHourMark, toMinutes, todayKst } from "./rent-time";
 import type { Space, SpaceBooking, SpaceUseType, SpaceCategory, OpenSlot, AccessHow, RentProduct, BizCheckStatus } from "./types";
@@ -1079,6 +1079,12 @@ export async function requestRefundAction(bookingId: number, note: string): Prom
   if (!saved) return { ok: false, message: "신청을 받지 못했어요. 잠시 뒤 다시 시도해 주세요." };
   revalidatePath("/rent/my");
   revalidatePath("/rent/payouts");
+  // 📣09-19 — 처리할 사람은 대표 한 명인데 신청이 와도 알림이 없었다. 슬랙(없으면 대표 메일)으로 한 건.
+  //   `requestRefund`가 «이번에 처음 적었을 때만» 참이라, 겹쳐 눌려도 한 번만 간다.
+  await notifyLater(async () => {
+    const p = await notifyParties(b);
+    if (p) await notifyRefundRequest(b, p.space, p.host, note);
+  });
   return { ok: true, message: "환불 신청을 받았어요. 사장님과 손님께 전화로 확인한 뒤 처리해 드릴게요." };
 }
 

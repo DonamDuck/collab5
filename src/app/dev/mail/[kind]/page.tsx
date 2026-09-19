@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { buildPreviewMail } from "@/lib/dev-mail-preview";
+import { SlackPreview } from "./SlackPreview";
 
 // 📨메일 미리보기 화면 (2026-09-18) · 개발 빌드 전용
 // 대표 코멘트: 「여기 내부 들어가서 상세 컨텐츠는 코멘트를 못 남기는 게 아쉬워. 거기도 코멘트 날릴 수 있게」.
@@ -22,8 +23,11 @@ export default async function MailPreviewPage({ params }: { params: Promise<{ ki
         <Link href="/dev/map#mail" className="underline underline-offset-2">
           ← 지도로
         </Link>{" "}
-        · 받는 사람 {mail.to || "(없음)"} · 보내지 않은 미리보기
+        · {mail.slack ? "대표 알림(슬랙이 있으면 슬랙, 없으면 대표 메일)" : `받는 사람 ${mail.to || "(없음)"}`} · 보내지 않은 미리보기
       </p>
+      {/* 📣09-19 대표 알림은 슬랙이 먼저다. 슬랙 글을 위에, «슬랙이 없을 때» 가는 메일을 아래에 둔다. */}
+      {mail.slack && <SlackPreview payload={mail.slack} />}
+      {mail.slack && <p className="mt-6 text-[13px] text-mute">슬랙 주소가 없거나 슬랙이 실패했을 때 대표 메일로 가는 모양</p>}
       <p className="mt-1 text-[16px] font-semibold break-keep text-ink">{mail.subject}</p>
       <div className="mt-3 rounded-xl bg-[#f4f4f5] p-3 sm:p-4">
         <div className="rounded-lg bg-white p-4 sm:p-5" dangerouslySetInnerHTML={{ __html: mail.html }} />

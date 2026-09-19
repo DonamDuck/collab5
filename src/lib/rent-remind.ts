@@ -37,6 +37,10 @@ export function remindTargets(
 
 export async function runRentRemind(today = todayKst()): Promise<{
   date: string; checked: number; sent: number; heldToday: number;
+  /** 🧮09-19 보내려다 실패한 통수(아침 요약이 대표에게 알린다). 받는 사람이 없거나 키가 없어 건너뛴 건 안 센다. */
+  failed: number;
+  /** `RESEND_API_KEY`가 없어 한 통도 못 보내는 날인가. */
+  noMailKey: boolean;
 }> {
   const tomorrow = addDaysIso(today, 1);
   const list = await listBookingsToRemind([today, tomorrow]);
@@ -54,37 +58,48 @@ export async function runRentRemind(today = todayKst()): Promise<{
     return p;
   };
 
-  async function one(b: SpaceBooking): Promise<number> {
+  async function one(b: SpaceBooking): Promise<{ sent: number; failed: number }> {
+    const none = { sent: 0, failed: 0 };
     // 🔒표시를 «먼저» 한다(조건부: `reminded_at is null`인 행만). 작업이 겹쳐 두 번 돌아도
     //   먼저 적은 쪽만 참을 받아 보내고, 나머지는 여기서 건너뛴다. 보낸 뒤에 적으면 둘 다 보낸다.
     // ⚠️그래서 메일이 둘 다 실패해도 표시는 남는다. 의도한 것이다 — 실패를 이유로 표시를 안 하면
     //   메일 서버가 죽은 날 매 실행마다 같은 예약을 다시 잡아 재시도가 쌓인다. 리마인드는 «있으면 좋은» 알림이고
     //   예약·연락처는 결제 메일과 화면에 이미 있다. 실패는 로그로 남기고 다음으로 간다.
-    if (!(await markReminded(b.id))) return 0;
+    if (!(await markReminded(b.id))) return none;
     try {
       const brief = briefs.get(b.spaceId);
-      if (!brief) return 0;
+      if (!brief) return none;
       const space = await full(brief.slug);
-      if (!space) return 0;
+      if (!space) return none;
       const [host, guest] = await Promise.all([getProfileById(space.ownerUserId), getProfileById(b.guestUserId)]);
-      const [g, h] = await Promise.all([
+      const both = await Promise.all([
         notifyRemindGuest(b, space, host, guest),
         notifyRemindHost(b, space, host, guest),
       ]);
-      return (g.sent ? 1 : 0) + (h.sent ? 1 : 0);
+      return {
+        sent: both.filter((m) => m.sent).length,
+        // 건너뛴 것(`skipped`)은 실패가 아니다. 이메일 없는 카카오 가입 손님이 있다.
+        failed: both.filter((m) => !m.sent && !m.skipped).length,
+      };
     } catch (e) {
       console.error(`[rent-remind] 예약 ${b.id} 리마인드 실패(표시는 남김)`, e);
-      return 0;
+      // 조회 단계에서 던졌다 — 두 통 다 못 나갔다.
+      return { sent: 0, failed: 2 };
     }
   }
 
   let sent = 0;
+  let failed = 0;
   for (let i = 0; i < send.length; i += BATCH) {
     const done = await Promise.all(send.slice(i, i + BATCH).map(one));
-    sent += done.reduce((a, n) => a + n, 0);
+    sent += done.reduce((a, r) => a + r.sent, 0);
+    failed += done.reduce((a, r) => a + r.failed, 0);
   }
   if (!TODAY_READY && targets.today.length > 0) {
     console.warn(`[rent-remind] 오늘(${today}) 쓰는 예약 ${targets.today.length}건은 「오늘」 문안이 준비되면 보낸다`);
   }
-  return { date: tomorrow, checked: list.length, sent, heldToday: TODAY_READY ? 0 : targets.today.length };
+  return {
+    date: tomorrow, checked: list.length, sent, heldToday: TODAY_READY ? 0 : targets.today.length,
+    failed, noMailKey: !process.env.RESEND_API_KEY,
+  };
 }

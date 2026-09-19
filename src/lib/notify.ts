@@ -1,4 +1,7 @@
-// 관리자 알림 메일 — 대표에게 "누가 가입했다"를 알린다. 서버 전용.
+// 관리자 알림 — 대표에게 "누가 가입했다"를 알린다. 서버 전용.
+//
+// 📣09-19 대표 — 대표 알림은 슬랙으로 모았다(`admin-notify.ts`). 슬랙이 없으면 전처럼 `ADMIN_EMAIL` 메일로 간다.
+//   메일 글은 `buildSignupMail`이 그대로 만들고, 슬랙 글은 `buildSignupNotice`가 같은 재료에서 만든다.
 //
 // ⭐ 설계 원칙 하나: **알림이 본래 작업을 절대 막지 않는다.**
 //    가입은 성공했는데 메일 발송이 실패해서 사용자에게 에러가 뜨는 건 최악이다.
@@ -8,16 +11,10 @@
 // ⚠️ 환경변수가 없으면 **조용히 스킵**한다(에러 아님). authEnabled()와 같은 패턴 —
 //    로컬·미설정 환경에서 가입 테스트가 막히면 안 되기 때문이다.
 //
-// 발송은 Resend REST API를 fetch로 직접 친다. `resend` 패키지를 안 쓰는 이유:
+// 보내는 일(슬랙 웹훅·Resend REST API를 fetch로 직접)은 `admin-notify.ts`가 한다. 패키지를 안 쓰는 이유는 같다 —
 // 요청이 POST 한 방이라 의존성을 늘릴 이유가 없고, 번들도 안 커진다.
 import { kstIso } from "./time";
-import { rentMockOn } from "./rent-mock";
-
-const RESEND_ENDPOINT = "https://api.resend.com/emails";
-
-/** 발신 주소 — 도메인 인증 전에는 Resend가 주는 onboarding@resend.dev만 쓸 수 있다.
- *  collab5.co.kr을 인증하고 나면 NOTIFY_FROM을 alert@collab5.co.kr 같은 값으로 바꾼다. */
-const FROM = process.env.NOTIFY_FROM || "collab5 <onboarding@resend.dev>";
+import { notifyAdmin, type AdminNotice } from "./admin-notify";
 
 /** 가입 경로 — 이메일 폼과 구글 로그인이 서로 다른 함수를 타서, 어디로 들어왔는지 구분해 담는다. */
 export type SignupOrigin = "email" | "google" | "kakao";
@@ -88,40 +85,31 @@ export function buildSignupMail(n: SignupNotice): { subject: string; text: strin
   return { subject, text, html };
 }
 
+/** 슬랙 글 — 메일과 같은 칸에서 이메일만 뺐다. 🔒슬랙은 개인정보 위탁 목록 밖이라 연락처를 안 싣는다(`admin-notify.ts` 머리말).
+ *  브랜드명이 비어 있으면 제목을 회원 번호로 부른다(메일 제목은 이메일로 부른다). */
+export function buildSignupNotice(n: SignupNotice): AdminNotice {
+  const brand = n.brandName?.trim() ?? "";
+  const who = brand || (n.userId === null ? "새 회원" : `회원 #${n.userId}`);
+  return {
+    title: `${who} 님이 새로 가입했어요`,
+    lead: "새로운 브랜드가 collab5에 가입했어요.",
+    rows: [
+      ["회원 번호", n.userId === null ? "번호를 못 읽어 왔어요" : `#${n.userId}`],
+      ["브랜드 이름", brand || "비워 두셨어요"],
+      ["가입한 방법", ORIGIN_LABEL[n.origin]],
+      ["가입한 때", `${kstReadable()} (한국 시간)`],
+    ],
+    mail: buildSignupMail(n),
+  };
+}
+
 /**
- * 새 가입 알림을 대표에게 보낸다. 글은 `buildSignupMail`이 만든다.
+ * 새 가입 알림을 대표에게 보낸다. 슬랙이 있으면 슬랙, 없으면 `ADMIN_EMAIL` 메일(`notifyAdmin`).
  *
  * 성공/실패 여부를 boolean으로 돌려주지만 **호출부가 무시해도 된다** — 로깅용이다.
- * RESEND_API_KEY나 ADMIN_EMAIL이 없으면 아무것도 안 하고 false를 준다(정상 상황).
+ * 슬랙 주소도 메일 키·주소도 없으면 아무것도 안 하고 false를 준다(정상 상황).
+ * 🧪목 데이터 보기 중(개발 빌드 전용)엔 보내지 않는다(`notifyAdmin` 첫 줄). 첫 울타리는 가입 액션 첫 줄.
  */
 export async function notifySignup(n: SignupNotice): Promise<boolean> {
-  // 🧪09-18 목 데이터 보기 중(개발 빌드 전용)엔 보내지 않는다. 첫 울타리는 가입 액션 첫 줄.
-  if (await rentMockOn()) return false;
-  const apiKey = process.env.RESEND_API_KEY;
-  const to = process.env.ADMIN_EMAIL;
-  // 키 미설정 = 아직 안 켰다는 뜻. 에러로 취급하지 않는다.
-  if (!apiKey || !to) return false;
-  const { subject, text, html } = buildSignupMail(n);
-
-  try {
-    const res = await fetch(RESEND_ENDPOINT, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ from: FROM, to: [to], subject, text, html }),
-      // 메일 서버가 느려도 가입 응답을 오래 붙잡지 않는다.
-      signal: AbortSignal.timeout(8000),
-    });
-    if (!res.ok) {
-      console.error("[notify] 가입 알림 실패", res.status, await res.text().catch(() => ""));
-      return false;
-    }
-    return true;
-  } catch (e) {
-    // 네트워크 오류·타임아웃 — 알림은 포기하고 가입 흐름은 그대로 진행시킨다.
-    console.error("[notify] 가입 알림 예외", e);
-    return false;
-  }
+  return (await notifyAdmin(buildSignupNotice(n))).sent;
 }
