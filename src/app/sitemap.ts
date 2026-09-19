@@ -32,6 +32,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${SITE_URL}/magazine`, changeFrequency: "weekly", priority: 0.7 },
     // 하루 가게 목록 — 빈 시간이 예약될 때마다 바뀌는 화면이라 daily(09-18 밤 QA SC-18).
     { url: `${SITE_URL}/rent`, changeFrequency: "daily", priority: 0.7 },
+    // 🔓09-19 대표 [L1] — 공간 올리기 화면을 검색에 연다. 「내 가게 빌려주기」를 찾는 사장님이 들어오는 문이다.
+    //   로그인 전엔 제목·소개와 로그인 버튼만 보이는 화면이라 검색에 걸려도 새는 것이 없다. noindex도 없다.
+    { url: `${SITE_URL}/rent/new`, changeFrequency: "monthly", priority: 0.6 },
     { url: `${SITE_URL}/terms`, changeFrequency: "yearly", priority: 0.2 },
     { url: `${SITE_URL}/privacy`, changeFrequency: "yearly", priority: 0.2 },
   ];
@@ -60,7 +63,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   // 하루 가게 공간 — **공개 중인 것만**(09-18 밤 QA SC-18). 검토 대기·쉬는 중·초안은 남에게 404라 넣으면 죽은 주소가 된다.
   //   `listOpenSpaces`가 공개 목록과 같은 조건(`status = open`)으로 읽는다. 고치면 lastModified가 따라 올라간다.
-  // ⚠️`/rent/new`는 싣지 않는다. 검색에 열지는 대표 판단으로 남겨 두어서, 지금 상태(사이트맵에도 robots에도 없음) 그대로다.
+  // 🔓`/rent/new`는 09-19 대표 결정으로 위 고정 페이지에 넣었다. 판매자 정보(`/rent/[slug]/seller`)는 싣지 않는다(noindex).
   const rentPages: MetadataRoute.Sitemap = spaces.map((sp) => ({
     url: `${SITE_URL}/rent/${sp.slug}`,
     lastModified: new Date(sp.updatedAt),
