@@ -258,6 +258,26 @@ export async function listOpenSpaces(f: SpaceFilter = {}): Promise<SpacePublic[]
   return out.slice(0, limit).map(toPublic);
 }
 
+/** 🎫09-19 대표 [H] — 소개서(`/m/[slug]`)에 붙는 「○○가 빌려주는 공간」 카드의 재료. 공개 중인 것만, 한 번 읽는다.
+ *  `brand_slug`는 사장님이 공간을 올릴 때 «내 소개서 보여주기»를 켠 경우에만 채워진다(저장 때 소개서 주인인지 본다).
+ *  🔒그래도 공간 주인과 소개서 주인이 같은 것만 돌려준다. 소개서 소유권이 옮겨 가면 옛 주인의 공간이 새 주인 소개서에 붙어 남는다. */
+export async function listOpenSpacesByBrand(brandSlug: string, ownerUserId: number | null | undefined): Promise<SpacePublic[]> {
+  if (!brandSlug || !ownerUserId) return [];
+  const m = await getRentMock();
+  if (m) {
+    return m.data.spaces
+      .filter((sp) => sp.status === "open" && sp.brandSlug === brandSlug && sp.ownerUserId === ownerUserId)
+      .map(toPublic);
+  }
+  const c = db();
+  if (!c) return [];
+  const { data, error } = await c.from("spaces").select("*")
+    .eq("brand_slug", brandSlug).eq("owner_user_id", ownerUserId).eq("status", "open")
+    .order("created_at", { ascending: false }).limit(12);
+  if (error) { console.error(`[spaces] listByBrand failed: ${error.message}`); return []; }
+  return (data ?? []).map((r) => toPublic(toSpace(r as Row)));
+}
+
 /** 상세(공개). 09-16부터 주소·좌표는 공개다(대표: 공간 이름이 이미 보여 감추는 게 무의미). 빠지는 건 옛 「들어오는 법」과 약관 동의 시각뿐. */
 export async function getSpacePublic(slug: string): Promise<SpacePublic | null> {
   const sp = await getSpaceFull(slug);

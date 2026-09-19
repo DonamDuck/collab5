@@ -17,7 +17,8 @@ export const RENT_GROUPS: Group[] = [
         title: "목록",
         path: "/rent",
         rows: [
-          { desc: "공간 여럿 (공개 중인 곳만 카드로)", c: "guest-full", to: "/rent" },
+          { desc: "공간 여럿 (공개 중인 곳만 카드로) · 로그인해서 위 메뉴 바에 「내 예약」 칸이 있어요", c: "guest-full", to: "/rent" },
+          { desc: "로그인 안 한 사람 · 메뉴 바가 두 칸(하루 빌리기 · 내 공간 등록)", c: "anon", to: "/rent" },
           { desc: "업종으로 거른 결과", c: "guest-full", to: "/rent?category=cafe" },
           { desc: "거르기 결과 0건", c: "guest-full", to: "/rent?area=제주" },
           { desc: "설비 낱말로 찾기 (와이파이)", c: "guest-full", to: "/rent?area=와이파이" },
@@ -56,6 +57,16 @@ export const RENT_GROUPS: Group[] = [
           { desc: "네이버 지도만 (사업자 정보가 없는 옛 공간) · 지도에 상호 라벨", c: "guest-full", to: `/rent/${S.other}` },
           { desc: "둘 다 없음 · 줄이 안 그려져요", c: "minimal-guest", to: `/rent/${S.minimal}` },
           { desc: "긴 상호 · 라벨 말줄임과 줄 접힘", c: "stress-guest", to: `/rent/${S.stress}` },
+        ],
+      },
+      {
+        // 🎫09-19 대표 [H] — 공간을 빌려주는 브랜드의 소개서 끝에 공개 중인 공간 카드. 공간이 없으면 절이 안 그려져요.
+        title: "소개서 · 이 브랜드가 빌려주는 공간",
+        path: "/m/[slug]",
+        rows: [
+          { desc: "공개 공간 둘 (검토 대기·쉬는 중인 공간은 안 붙어요)", c: "guest-full", to: `/m/${M.host}` },
+          { desc: "빌려주는 공간이 없는 소개서 (절 없음)", c: "guest-full", to: `/m/${M.guest}` },
+          { desc: "긴 이름 소개서 · 긴 공간 이름 카드", c: "stress-guest", to: `/m/${M.stress}` },
         ],
       },
       {

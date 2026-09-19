@@ -1,6 +1,6 @@
 "use client";
 
-// 하루 가게 상단 메뉴바 — 헤더 밑에 붙어 따라오는 **2칸** 바 (대표 지시 09-14).
+// 하루 가게 상단 메뉴바 — 헤더 밑에 붙어 따라오는 **2칸** 바 (대표 지시 09-14). 09-19부터 로그인하면 「내 예약」이 셋째 칸(대표 [H]).
 //
 // 대표 원문(코멘트 위젯 1호): *「버튼을 제거하고, 차라리 우리 홈화면에 있는 플로팅 헤더를 띄우고 메뉴를
 // 하루 빌리기 | 내 공간 등록 이렇게 표현해주면 어떨까. 현재화면이 하루 빌리기이니깐 색이나 언더바나,
@@ -27,14 +27,20 @@ const TABS = [
   { href: "/rent/new", label: "내 공간 등록" },
 ] as const;
 
+/** 🎫09-19 대표 [H] — 로그인한 사람에게만 셋째 칸. 손님이 결제한 뒤 자기 예약으로 돌아올 길이 메뉴에 없었다.
+ *  ⚠️이 칸은 켜지지 않는다. 가는 곳(`/rent/my`)은 바를 안 그리는 화면이라(아래 `activeIndex < 0`) 「지금 여기」가 될 일이 없다.
+ *    누르는 순간 알약이 옮겨 갔다가 화면이 바뀌며 바가 사라진다. 두 칸의 규칙(「지금 여기」는 늘 한 칸)은 그대로다. */
+const MY_TAB = { href: "/rent/my?tab=guest", label: "내 예약" } as const;
+
 // 📏크기·높이는 `HomeMenuBar`의 `ITEM`과 **같은 값**이다(15px·h-44px·rounded-pill).
 //   두 바가 같은 사이트의 같은 층이라 여기서 값을 새로 만들면 어휘가 갈린다.
 // ⚠️`relative z-[1]` — 글자가 미끄러지는 알약 «위»에 있어야 한다. 안 그러면 알약이 글자를 덮는다.
 const BASE =
   "relative z-[1] flex h-[44px] shrink-0 items-center whitespace-nowrap rounded-pill px-4 text-[15px] font-medium transition-colors sm:px-6";
 
-export function RentMenuBar() {
+export function RentMenuBar({ signedIn }: { signedIn: boolean }) {
   const pathname = usePathname();
+  const tabs = signedIn ? [...TABS, MY_TAB] : TABS;
   const navRef = useRef<HTMLElement>(null);
   const [pill, setPill] = useState<{ left: number; top: number; width: number; height: number } | null>(null);
 
@@ -43,11 +49,12 @@ export function RentMenuBar() {
    *  개발 빌드는 그 화면을 그때 처음 컴파일하느라 특히 길었다(운영에선 훨씬 짧지만 0은 아니다).
    *  ⭐**누른 곳을 먼저 믿고 옮긴 다음, 주소가 따라오면 그때 놓는다.** 손가락이 먼저고 서버가 나중이다.
    *  ⚠️이동이 실패하면 잠깐 어긋나는데, 그땐 주소가 안 바뀌므로 다음 클릭에서 제자리를 찾는다. */
-  const [clicked, setClicked] = useState<string | null>(null);
-  useEffect(() => setClicked(null), [pathname]);
-  const current = clicked ?? pathname;
+  //   🔧09-19 — 「주소가 바뀌면 놓는다」를 effect의 setState로 하던 것을 «누른 때의 주소»를 같이 적는 것으로 바꿨다.
+  //     주소가 그때와 달라지면 누른 값은 저절로 안 쓰인다(린트 `set-state-in-effect` · 렌더 한 번 덜 돈다). 동작은 같다.
+  const [clicked, setClicked] = useState<{ at: string; href: string } | null>(null);
+  const current = clicked && clicked.at === pathname ? clicked.href : pathname;
 
-  const activeIndex = TABS.findIndex((t) => t.href === current);
+  const activeIndex = tabs.findIndex((t) => t.href === current);
 
   /** 켜진 칸을 재서 알약을 그 자리에 놓는다. 좌표는 `nav` 기준(그래서 `nav`가 `relative`여야 한다). */
   const measure = useCallback(() => {
@@ -124,7 +131,7 @@ export function RentMenuBar() {
           />
         )}
 
-        {TABS.map((t, i) => {
+        {tabs.map((t, i) => {
           const on = i === activeIndex;
           return (
             <Link
@@ -133,7 +140,7 @@ export function RentMenuBar() {
               data-on={on ? "1" : "0"}
               // 탭을 누르면 숨김을 푼다 — 목록에서 숨은 채로 폼에 갔다 돌아오면 맨 위에서도 바가 안 보일 수 있다.
               onClick={() => {
-                setClicked(t.href);
+                setClicked({ at: pathname, href: t.href });
                 setHidden(false);
               }}
               aria-current={on ? "page" : undefined}

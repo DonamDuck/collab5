@@ -13,6 +13,9 @@ import { MakerArticle } from "./MakerArticle";
 import { ConnectProfileButton } from "./ConnectProfileButton";
 import { MakerActionBar } from "./MakerActionBar";
 import { EnrichBanner, type BannerVariant } from "./EnrichBanner";
+// 🎫09-19 하루 가게(3팀) — 이 브랜드가 빌려주는 공개 공간 카드. 공간이 없으면 아무것도 안 그린다.
+import { listOpenSpacesByBrand } from "@/lib/spaces";
+import { BrandSpaces } from "@/app/rent/BrandSpaces";
 import type { CollabReportData, Maker } from "@/lib/types";
 
 // 사진 보강 배너 게이트 — 사진이 이 수 **미만**일 때만 뜬다(대표 확정 08-02).
@@ -181,10 +184,11 @@ export default async function MakerPage({
   // 소유권·찜은 정수 profiles.user_id 기준(07-25 전환) — 세션 프로필을 먼저 풀고 나머지를 병렬 조회.
   const viewerProfile = user ? await getProfile(user.id) : null;
   const viewerUserId = viewerProfile?.id;
-  const [ownerProfile, initialSaved, viewerMakers] = await Promise.all([
+  const [ownerProfile, initialSaved, viewerMakers, brandSpaces] = await Promise.all([
     maker.ownerUserId ? getProfileById(maker.ownerUserId) : Promise.resolve(null),
     viewerUserId ? repo.isMakerSaved(viewerUserId, maker.id) : Promise.resolve(false),
     viewerUserId ? repo.listMakersByOwner(viewerUserId) : Promise.resolve([]),
+    film ? Promise.resolve([]) : listOpenSpacesByBrand(slug, maker.ownerUserId),
   ]);
   const isOwner = !!viewerUserId && maker.ownerUserId === viewerUserId;
   const logoUrl = ownerProfile?.profileImage || undefined;
@@ -243,6 +247,7 @@ export default async function MakerPage({
 
       {/* 소개서 본문 — /preview와 공유하는 단일 렌더 */}
       <MakerArticle maker={maker} isOwner={isOwner} logoUrl={logoUrl} readOnly={film} />
+      <BrandSpaces brandName={maker.name} spaces={brandSpaces} />
 
       {/* 인쇄 전용 푸터 — 화면엔 안 보이고 지류에만 URL 노출 */}
       <div className="hidden print:mt-8 print:block print:border-t print:border-hairline print:pt-4 print:text-center print:text-[12px] print:text-mute">
