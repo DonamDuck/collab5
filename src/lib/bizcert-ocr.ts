@@ -7,6 +7,7 @@ import "server-only"; // 🔒Gemini 키를 쓰는 파일이다. 클라이언트 
 // ⭐결과는 저장하지 않는다. 폼의 «빈 칸만» 채우고(`SpaceForm`의 `fillEmptyBiz`), 사장님이 보고 고친 값이 저장된다.
 // 🔒로그에 등록증 내용을 남기지 않는다. 남기는 건 원가 계량(`[cost] bizcert …`)과 몇 칸을 읽었는지뿐이다.
 // 💸모델 = 가벼운 모델(`gemini-2.5-flash-lite`, 입력 $0.10·출력 $0.40 / 1M 토큰). 한 장 1원 아래가 목표다(대표 조건).
+//   09-20 실측(가짜 등록증 PNG·사진 JPEG·PDF 세 장): 세 장 다 입력 486·출력 96 토큰 = 장당 약 0.1원, 다섯 칸 다 읽음(시간은 사진 3.5초·PDF 5.1초).
 //   enrich의 폴백 사슬에 이미 있는 모델이고 이미지·PDF를 받는다. 바꿀 땐 `BIZCERT_OCR_MODEL` env로(배포 없이 되돌릴 수 있다).
 // 🧪목 모드면 Gemini를 부르지 않는다. 액션이 먼저 `mockBizCertRead`로 돌려보내고, 여기서도 한 번 더 막는다(`throwIfMock`).
 import { GoogleGenAI, Type, ThinkingLevel } from "@google/genai";
@@ -60,7 +61,8 @@ export type BizCertGenerate = (req: {
   signal: AbortSignal;
 }) => Promise<{ text: string; usage?: GeminiUsage }>;
 
-const geminiGenerate: BizCertGenerate = async ({ model, mime, base64, signal }) => {
+/** 실제 Gemini 호출. 내보내는 건 하네스가 원문을 같이 보려고(실측 3회) — 화면 경로는 `readBizCertFile`만 부른다. */
+export const geminiGenerate: BizCertGenerate = async ({ model, mime, base64, signal }) => {
   const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
   const is3x = model.startsWith("gemini-3");
   // 사고는 끈다. 글자 옮기기라 생각할 거리가 없고, 사고 토큰은 출력 단가로 과금된다(`ai-cost.ts`).
@@ -135,7 +137,7 @@ export function parseBizCertJson(raw: string, today: string): BizCertRead {
   const open = normalizeOpenDate(r.openDate);
   if (open && openDateProblem(open, today) === "") fields.bizOpenDate = open;
   const addr = oneLine(r.address, 200);
-  // 주소는 글자 하나라도 한글이어야 주소다(모델이 「N/A」 같은 걸 적어 오는 일이 있다).
+  // 주소는 한글이 한 글자라도 있어야 주소로 본다. 「N/A」·「-」 같은 자리 채움 글자는 여기서 걸러진다.
   if (addr && /[가-힣]/.test(addr) && addr.length >= 5) fields.bizAddress = addr;
 
   return Object.keys(fields).length > 0 ? { ok: true, fields } : { ok: false, reason: "unreadable" };

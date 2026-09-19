@@ -1335,7 +1335,7 @@ export function SpaceForm({
         {/* 🏠사업장 주소는 자동으로 안 넣는다. 공간 주소 칸이 비어 있을 때만 제안하고, 누르면 위 주소 칸에 들어간다(대표 09-20). */}
         {certAddr && !addrBase.trim() && (
           <div className="rounded-md bg-surface-soft px-4 py-3">
-            <p className="text-[15px] leading-relaxed break-keep text-mute">위 공간 주소가 비어 있어요. 등록증에 적힌 사업장 주소는 이래요.</p>
+            <p className="text-[15px] leading-relaxed break-keep text-mute">위 공간 주소가 비어 있어요. 등록증에 적힌 사업장 주소로 채울 수 있어요.</p>
             <p className="mt-1 text-[15px] leading-relaxed break-keep text-ink">{certAddr}</p>
             <button type="button" onClick={fillCertAddress} className={`${secondaryBtnCls} mt-3`}>
               등록증 주소로 채우기
