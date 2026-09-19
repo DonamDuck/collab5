@@ -39,7 +39,7 @@ import { repo } from "./repo";
 import {
   notifyBookingPaid, notifyBookingConfirmed, notifyBookingRejected, notifyBookingCancelled,
   notifyBookingPaidToGuest, notifyBookingConfirmedToHost, notifyBookingCancelledToGuest, notifyAdminRefund,
-  notifySpacePublished, notifySpaceReview, notifyRefundRequest,
+  notifySpacePublished, notifySpaceReview, notifyRefundRequest, notifyDeal, type DealKind,
 } from "./rent-notify";
 import { bookingStarted, dateLabel, kstDaysUntil, durationLabel, isTimeMark, minHoursToMinutes, minutesBetween, toMinutes, todayKst } from "./rent-time";
 import type { Space, SpaceBooking, SpaceUseType, SpaceCategory, OpenSlot, AccessHow, RentProduct, BizCheckStatus } from "./types";
@@ -765,6 +765,17 @@ async function notifyLater(run: () => Promise<unknown>): Promise<void> {
   after(() => safeNotify(run));
 }
 
+/** 💸대표 슬랙 거래 알림(대표 09-19 오후) — 결제 승인·손님 취소·사장님 거절·관리자 환불 승인 때 한 건.
+ *  ⭐메일 알림과 따로 `after`에 건다. 메일 한 통이 늦거나 던져도 이 알림은 제 길로 간다.
+ *  공간은 호출부가 이미 읽은 걸 넘기고, 없으면 예약의 공간 id로 한 번 읽는다(이름과 주인 회원 번호가 필요하다).
+ *  목 모드면 `notifyLater`가 먼저 멈춘다. 슬랙 주소가 없으면 `notifyAdmin`이 조용히 건너뛴다(메일로 안 물러선다). */
+async function dealLater(kind: DealKind, b: SpaceBooking, space: Space | null, refund = 0): Promise<void> {
+  await notifyLater(async () => {
+    const sp = space ?? (await notifyParties(b))?.space;
+    if (sp) await notifyDeal(kind, b, sp, refund);
+  });
+}
+
 /** 알림 한 통 — 🚨**결과에 영향을 주면 안 된다.** `rent-notify.ts`가 스스로 삼키지만, 조회 단계(`notifyParties`)가
  *  던질 수도 있어 한 겹 더 감싼다. 결제는 끝났는데 메일 때문에 「실패」가 뜨는 일은 없어야 한다. */
 async function safeNotify(run: () => Promise<unknown>): Promise<void> {
@@ -896,6 +907,8 @@ export async function confirmBookingAction(
     await notifyBookingPaid(paid, p.space, p.host, p.guest, guestBrand);
     await notifyBookingPaidToGuest(paid, p.space, p.host, p.guest);
   });
+  // 💸대표 슬랙 — 돈이 들어온 순간. 공간은 승인 전에 다시 읽은 그 행이다.
+  await dealLater("paid", paid, space);
   return { ok: true, message: "예약을 완료했어요.", bookingId: paid.id }; // 👀09-16 대표 phase 1 — 결제를 마치면 곧 예약 완료, 기다리게 하지 않는다
 }
 
@@ -945,8 +958,10 @@ export async function decideBookingAction(
       revalidatePath("/rent/my");
       return { ok: true, message: "거절했어요. 그 사이 손님께 이미 돌아간 돈이라 따로 환불하지 않았어요." };
     }
+    // 돌려줄 돈은 «취소 전» 잔액이다. 거래 알림(`dealLater`)도 이 값을 싣는다.
+    const due = pay?.balanceAmount ?? 0;
     const refund = pay
-      ? await cancelPayment(pay.paymentKey || b.paymentKey, "사장님 거절 — 전액 환불", undefined, pay.balanceAmount)
+      ? await cancelPayment(pay.paymentKey || b.paymentKey, "사장님 거절 — 전액 환불", undefined, due)
       : { ok: false as const };
     const refunded = refund.ok && !!(await rentSync(b.orderId, { bookingStatus: "refunded", toss: refund.payment })).ok;
     if (!refunded) console.error(`[rent-actions] 거절 환불 실패 order=${b.orderId} (결제 줄 ${pay ? "있음" : "없음"})`);
@@ -957,6 +972,11 @@ export async function decideBookingAction(
       const p = await notifyParties(decided);
       if (p) await notifyBookingRejected(decided, p.space, p.host, p.guest);
     });
+    // 💸대표 슬랙 — 돌려준 금액(토스에 보낸 잔액 그대로). 환불이 실패했으면 그 사실을 따로 알린다(손이 필요한 예약).
+    await dealLater(
+      refunded ? "host-reject" : "host-reject-failed",
+      { ...decided, status: refunded ? "refunded" : "rejected" }, null, refunded ? due : 0,
+    );
     return refunded
       ? { ok: true, message: "거절했어요. 손님께 전액 돌려드렸어요." }
       : { ok: true, message: "거절했어요. 환불이 늦어지고 있어 저희가 확인하고 있어요." };
@@ -1066,6 +1086,8 @@ export async function cancelBookingAction(bookingId: number, quotedRefund?: numb
     await notifyBookingCancelled({ ...b, status: "cancelled" }, p.space, p.host, p.guest);
     await notifyBookingCancelledToGuest({ ...b, status: "cancelled" }, p.space, p.host, p.guest, refund);
   });
+  // 💸대표 슬랙 — 실제로 돌려준 금액(0원이면 당일 취소).
+  await dealLater("guest-cancel", { ...b, status: "cancelled" }, null, refund);
   // ✍️09-17 — 「환불됩니다」·「없습니다」 피동·합니다체를 걷었다. 누가 돌려주는지 주어가 보이게.
   return { ok: true, message: refund > 0 ? `취소했어요. ${refund.toLocaleString()}원을 돌려드릴게요.` : "취소했어요. 당일 취소라 돌려드릴 돈은 없어요." };
 }
@@ -1129,6 +1151,8 @@ export async function approveRefundAction(bookingId: number): Promise<ActionResu
     const p = await notifyParties(b);
     if (p) await notifyAdminRefund({ ...b, status: "refunded" }, p.space, p.host, p.guest, refundAmount);
   });
+  // 💸대표 슬랙 — 승인한 사람이 대표 자신이지만, 거래 기록이 한 채널에 이어지게 같이 남긴다.
+  await dealLater("admin-refund", { ...b, status: "refunded" }, null, refundAmount);
   return { ok: true, message: `${refundAmount.toLocaleString()}원을 손님께 돌려드렸어요.` };
 }
 

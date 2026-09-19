@@ -7,6 +7,9 @@
 // 📮**갈래는 둘이다.**
 //   ① `SLACK_WEBHOOK_URL`이 있으면 슬랙 Incoming Webhook으로 보낸다. 🔒서버 전용 값이다(`NEXT_PUBLIC_`을 붙이면 주소가 화면으로 샌다).
 //   ② 없으면 지금까지처럼 `ADMIN_EMAIL`로 메일을 보낸다. 슬랙이 실패해도 메일로 한 번 더 간다. 대표 알림이 조용히 빠지면 안 되는 일이라서다.
+//   ⚠️단 **거래 알림(`slackOnly`)은 슬랙에만 간다** (대표 09-19 오후). 결제·취소·거절·환불 승인은 하루에 여러 건이라
+//     메일로 물러서면 무료 한도(Resend)를 먹는다. 손님·사장님 메일에서 대표 참조를 뺀 이유와 같다.
+//     슬랙 주소가 없거나 슬랙이 실패하면 조용히 건너뛴다. 결제 합계는 아침 요약에서 다시 본다.
 //
 // ⭐`notify.ts`·`rent-notify.ts`와 같은 규율 하나: **알림이 본작업을 막지 않는다.** throw하지 않고 실패는 콘솔에만 남긴다.
 //   값이 없으면 스킵이고 에러가 아니다. 목 데이터 보기 중(개발 빌드 전용)엔 보내지 않는다.
@@ -37,6 +40,8 @@ export interface AdminNotice {
   note?: string;
   /** 슬랙이 없을 때 대신 보낼 메일. 없으면 위 재료로 글자만 있는 메일을 만든다. */
   mail?: { subject: string; html: string; text: string };
+  /** 💸슬랙에만 보낸다(거래 알림, 09-19 오후). 슬랙 주소가 없거나 실패해도 메일로 물러서지 않는다(머리말). */
+  slackOnly?: boolean;
 }
 
 // ─── 슬랙 글 ───
@@ -171,13 +176,22 @@ export interface AdminNotifyResult {
   channel: "slack" | "email" | "none";
 }
 
-/** 대표에게 한 건 보낸다. 슬랙이 있으면 슬랙, 없거나 실패하면 메일. 호출부는 결과를 무시해도 된다. */
+/** 대표에게 한 건 보낸다. 슬랙이 있으면 슬랙, 없거나 실패하면 메일(거래 알림은 슬랙만). 호출부는 결과를 무시해도 된다. */
 export async function notifyAdmin(n: AdminNotice): Promise<AdminNotifyResult> {
   if (await rentMockOn()) {
     console.info(`[admin-notify] 스킵(목 데이터 보기 중) · ${n.title}`);
     return { sent: false, channel: "none" };
   }
   const hook = (process.env.SLACK_WEBHOOK_URL ?? "").trim();
+  if (n.slackOnly) {
+    if (!hook) {
+      console.info(`[admin-notify] 스킵(SLACK_WEBHOOK_URL 없음 · 슬랙 전용 거래 알림) · ${n.title}`);
+      return { sent: false, channel: "none" };
+    }
+    // 실패는 `postSlack`이 콘솔에 남긴다. 메일로 한 번 더 보내지 않는다(머리말 ⚠️).
+    const ok = await postSlack(hook, buildSlackPayload(n), n.title);
+    return { sent: ok, channel: ok ? "slack" : "none" };
+  }
   if (hook) {
     if (await postSlack(hook, buildSlackPayload(n), n.title)) return { sent: true, channel: "slack" };
     console.warn(`[admin-notify] 슬랙이 실패해 메일로 한 번 더 보낸다 · ${n.title}`);
