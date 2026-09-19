@@ -30,7 +30,7 @@ import { CONTACT_PHONE_MAX, storePhoneOk } from "@/lib/rent-limits";
 import {
   addressMoved,
   BIZ_CERT_MAX_BYTES, BIZ_CERT_TYPES, BIZ_MISMATCH_LINE, bizCertPathOk, bizDigits, bizNumberProblem, formatBizNumber, fromOpenDate,
-  hasAnyBiz, needsBizInfo, openDateProblem, spaceListed, testBizHint, toOpenDate,
+  hasAnyBiz, needsBizInfo, openDateProblem, postcodeSido, spaceListed, testBizHint, toOpenDate,
 } from "@/lib/bizcheck";
 import { pausedChangeProblem, spaceSaveReview } from "@/lib/rent-review";
 import {
@@ -121,9 +121,10 @@ type Photo = { url: string; uploading?: boolean };
 const CERT_FILL_KEYS = ["bizName", "bizNumber", "bizOwnerName", "bizOpenDate"] as const;
 type CertFillKey = (typeof CERT_FILL_KEYS)[number];
 
-/** 등록증의 사업장 소재지 → 폼의 두 칸(도로명 · 층·호). 끝의 참고항목 「(성수동2가)」는 떼고, 쉼표 뒤는 상세 주소로. */
+/** 등록증의 사업장 소재지 → 폼의 두 칸(도로명 · 층·호). 끝의 참고항목 「(성수동2가)」는 떼고, 쉼표 뒤는 상세 주소로.
+ *  🏠09-20 시도 이름은 주소 찾기 표기로 바꾼다(「서울특별시」→「서울」, `postcodeSido`). 주소 찾기로 고른 공간과 같은 표기로 저장되게. */
 function certAddressParts(addr: string): [string, string] {
-  return splitAddress(addr.replace(/\s*\([^()]*\)\s*$/, "").trim());
+  return splitAddress(postcodeSido(addr.replace(/\s*\([^()]*\)\s*$/, "").trim()));
 }
 
 // 💾새로 올리기 임시 저장 (2026-09-17 대표 「오늘 다 구현」)
