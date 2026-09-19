@@ -328,6 +328,8 @@ rows=[sum(px[x,y] for x in xs)/len(xs) > 15 for y in range(h)]   # 콘텐츠 행
 **「로그인 때문」**이라고 좁혔다 — **브라우저도 달랐다.** 1팀이 «같은 브라우저·같은 로그인·포그라운드»로 재보고 갈랐다.
 🔗memory `verify-the-control-case` · `self-inflicted-symptom-attribution`
 
+🆕📜**그리드 «무한 스크롤»도 같은 병이다**(09-19 395빵집). 대표가 창을 앞으로 못 꺼내면 스크롤 루프가 2,044px에서 멈춘다 — `screenshot(scale 0.1)`+3초를 배치로 묶으면 **한 장마다 12건**씩 온다(437건 ≈ 40장). 스토리 뷰어는 이걸로도 안 넘어간다. 정본 = memory `browser-automation-collab5`.
+
 🪤**`find`·`read_page`는 `document_idle`을 기다린다** — 페이지에 도는 애니메이션(스피너)이 있으면 45초 타임아웃이 난다.
 **`javascript_tool`은 그 상태에서도 동작한다.** 도구가 막히면 「페이지가 죽었다」가 아니라 **「idle이 아니다」**를 먼저 의심하라.
 
