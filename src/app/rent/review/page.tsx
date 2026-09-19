@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { listSpacesForReview } from "@/lib/spaces";
 import { getProfileById, type Profile } from "@/lib/profiles";
 import { isRentAdmin } from "@/lib/rent-actions";
-import { BIZ_CHECK_LABEL, formatBizNumber, fromOpenDate } from "@/lib/bizcheck";
+import { BIZ_CHECK_LABEL, bizOnFile, formatBizNumber, fromOpenDate, isTestBizNumber, testBizAllowed } from "@/lib/bizcheck";
 import { holderDiffersFromOwner, listPayoutAccounts, toMasked, type PayoutAccount } from "@/lib/payout-accounts";
 import { HOLDER_TYPE_LABEL } from "@/lib/banks";
 import type { BizCheckStatus, Space } from "@/lib/types";
@@ -43,7 +43,11 @@ const CHECK_TONE: Record<BizCheckStatus, string> = {
 /** 칩 옆 한 줄 — 왜 그 상태인지. 코드를 사람 말로. */
 function checkReason(sp: Space): string {
   const d = sp.bizCheckDetail;
-  if (sp.bizCheckStatus === "valid") return [d?.bStt, d?.taxType].filter(Boolean).join(" · ");
+  if (sp.bizCheckStatus === "valid") {
+    // 🧪개발 서버의 테스트 번호 — 국세청에 묻지 않았다는 걸 그대로 말한다.
+    if (d?.reason === "local-test") return isTestBizNumber(sp.bizNumber) && !testBizAllowed() ? "로컬 테스트 번호예요. 운영에선 빈 번호로 봐요." : "로컬 테스트 번호라 국세청에 묻지 않았어요.";
+    return [d?.bStt, d?.taxType].filter(Boolean).join(" · ");
+  }
   if (sp.bizCheckStatus === "mismatch") return "번호·대표자 이름·개업일 중 하나가 국세청 기록과 달라요.";
   if (sp.bizCheckStatus === "closed") return `${d?.bStt || "휴업·폐업"}${d?.endDt ? ` · 폐업일 ${fromOpenDate(d.endDt)}` : ""}`;
   if (sp.bizCheckStatus === "error") {
@@ -55,7 +59,8 @@ function checkReason(sp: Space): string {
 
 /** 공개(또는 표시)를 막는 이유. 없으면 빈 문자열. 판정은 `publishSpaceAction`과 같다 — 버튼을 숨기는 건 헛걸음을 줄이려는 것이고 관문은 서버다. */
 function blockReason(sp: Space): string {
-  if (!sp.bizCertPath || !sp.bizNumber || !sp.bizOwnerName || !sp.bizOpenDate) {
+  // 🧪`bizOnFile` — 운영에선 로컬 테스트 번호도 빈 번호로 본다(`publishSpaceAction`과 같은 판정).
+  if (!sp.bizCertPath || !bizOnFile(sp) || !sp.bizOwnerName || !sp.bizOpenDate) {
     return "사업자등록증이나 사업자 정보가 비어 있어요. 사장님께 채워 달라고 연락해 주세요.";
   }
   if (sp.bizCheckStatus === "mismatch") return "국세청 기록과 달라 열 수 없어요. 사장님이 고치시면 다시 조회돼요.";

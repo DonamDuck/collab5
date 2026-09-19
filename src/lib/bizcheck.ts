@@ -3,7 +3,7 @@
 // 🚨훅도 DB도 fetch도 없다. 등록 폼(클라이언트)과 서버 액션이 «같은 함수»로 검사한다.
 //   화면과 서버가 규칙을 따로 적으면 화면은 통과시키고 서버는 막는(또는 그 반대) 날이 온다.
 //   국세청 호출은 서버 전용 `nts-bizcheck.ts`에 따로 있다.
-import type { BizCheckStatus } from "./types";
+import type { BizCheckDetail, BizCheckStatus } from "./types";
 
 /** 숫자만 남긴다. 「123-45-67890」·「123 45 67890」 모두 같은 번호다. */
 export function bizDigits(v: string): string {
@@ -32,11 +32,49 @@ export function bizChecksumOk(v: string): boolean {
   return (10 - (sum % 10)) % 10 === Number(d[9]);
 }
 
+// ─── 🧪로컬 테스트 번호 (대표 09-19 저녁) ───
+// 대표 원문: *「로컬은 임의 통과 가능한 사업자등록번호 넣고 다 통과하게 하구.」*
+//   로컬(3003)은 운영 DB를 쓴다. 09-18 전에 만든 시험 공간 셋(id 1·2·3)은 번호가 비어 목록에서 빠지는데(`spaceListed`),
+//   대표가 고치기 화면으로 채워 계속 시험하려면 국세청에 없는 번호로도 통과하는 길이 있어야 한다.
+// 🚨**개발 서버(`next dev`)에서만 통과한다.** 운영 빌드(`next build`·Vercel 미리보기 포함)에선 세 겹으로 막는다.
+//   ① 저장 — `bizNumberProblem`이 형식 오류로 돌려보낸다(화면과 서버가 같은 함수)
+//   ② 이미 저장된 행 — `bizOnFile`이 「번호 없음」과 같게 읽는다. 로컬에서 운영 DB에 들어간 번호가 운영 목록·신청에 새지 않는다
+//   ③ 목록 질의 — `listOpenSpaces`가 DB 단계에서 이 번호를 거른다(코드에서만 거르면 60개로 자른 뒤에 빠진다)
+// ⚠️`000-00-00000`은 검증번호 규칙(`bizChecksumOk`)을 «통과한다»(가중합이 0이라 검증번호도 0). 그래서 번호 모양만으로는 못 막고
+//   위 세 곳이 이 상수를 직접 본다.
+
+/** 로컬 테스트 사업자등록번호(숫자만). 화면엔 `000-00-00000`으로 보인다. 누가 봐도 시험 번호인 모양으로 골랐다. */
+export const TEST_BIZ_NUMBER = "0000000000";
+
+/** 지금 테스트 번호를 받아 주는 판인가 = 개발 서버. 클라이언트 번들에서도 Next가 `NODE_ENV`를 빌드 때 박아 넣는다. */
+export function testBizAllowed(): boolean {
+  return process.env.NODE_ENV === "development";
+}
+
+/** 테스트 번호인가(하이픈·공백은 걷고 본다). 판이 어디든 모양만 본다. */
+export function isTestBizNumber(v: string): boolean {
+  return bizDigits(v) === TEST_BIZ_NUMBER;
+}
+
+/** 🧪개발 서버에서 테스트 번호면 국세청에 묻지 않고 「일치」로 적는다. 조회 원문엔 `reason: "local-test"`가 남는다(검토 화면이 그 말을 띄운다).
+ *  그 밖엔 null — 호출부(`saveSpaceAction`)가 원래대로 국세청에 묻는다. */
+export function localTestCheck(number: string): { status: "valid"; detail: BizCheckDetail } | null {
+  if (!testBizAllowed() || !isTestBizNumber(number)) return null;
+  return { status: "valid", detail: { reason: "local-test", valid: "01", bSttCd: "01", bStt: "로컬 테스트 번호" } };
+}
+
+/** 개발 서버의 사업자 칸 밑 한 줄. 운영 빌드에선 빈 문자열(그 줄이 안 그려진다). */
+export function testBizHint(): string {
+  return testBizAllowed() ? `로컬 테스트: ${formatBizNumber(TEST_BIZ_NUMBER)} 번호를 넣으면 통과해요. 등록증은 아무 이미지나 올려도 돼요.` : "";
+}
+
 /** 번호 칸의 문제 한 줄. 문제가 없으면 빈 문자열. */
 export function bizNumberProblem(v: string): string {
   const d = bizDigits(v);
   if (!d) return "사업자등록번호를 적어 주세요.";
   if (d.length !== 10) return "사업자등록번호는 숫자 열 자리예요.";
+  // 🧪테스트 번호 — 개발 서버면 검증번호 검사를 건너뛰고 통과, 운영이면 오타와 같은 말로 막는다(시험 번호가 있다는 것도 안 알린다).
+  if (isTestBizNumber(d)) return testBizAllowed() ? "" : "번호가 맞지 않아요. 사업자등록증의 열 자리를 다시 봐 주세요.";
   if (!bizChecksumOk(d)) return "번호가 맞지 않아요. 사업자등록증의 열 자리를 다시 봐 주세요.";
   return "";
 }
@@ -137,7 +175,9 @@ export function addressCertProblem(
  *  대표 원문: *「사업자 정보가 빈 옛 공간이 뭐야..? 등록할 때 무조건 필수로 사업자등록번호 있어야 상품 등록하잖아!」*
  *  새 공간은 이미 넷 다 필수다(`needsBizInfo`). 번호가 빈 공간은 09-18 전에 만든 시험 공간뿐이라, 규칙으로 손님 앞에서 뺀다. */
 export function bizOnFile(sp: { bizNumber: string }): boolean {
-  return bizDigits(sp.bizNumber).length > 0;
+  const d = bizDigits(sp.bizNumber);
+  // 🧪로컬 테스트 번호는 개발 서버에서만 «있는» 번호다. 운영에선 빈 번호와 같다(위 테스트 번호 머리말 ②).
+  return d.length > 0 && (testBizAllowed() || d !== TEST_BIZ_NUMBER);
 }
 
 /** 🚪손님 앞에 서는 공간인가 = 공개 중(`open`) + 사업자등록번호 있음.

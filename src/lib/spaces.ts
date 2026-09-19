@@ -16,7 +16,7 @@ import { bookingFinished, todayKst, expandRepeat, stripRepeat, pruneRepeat, minu
 import { productsFromLegacy } from "./rent-products";
 import { payoutAmount } from "./rent-money";
 // 🚪09-19 오후 — 손님 앞에 세울지는 순수 규칙 한 벌(`bizcheck`). 목록·소개서 카드·공개 투영이 같이 쓴다.
-import { bizOnFile, spaceListed } from "./bizcheck";
+import { bizOnFile, spaceListed, TEST_BIZ_NUMBER, testBizAllowed } from "./bizcheck";
 // 🧪09-17 목 데이터 — 읽기 함수는 첫 줄에서 목 세계를 돌려주고, 쓰기 함수는 첫 줄에서 멈춘다. 개발 빌드 전용(`rent-mock.ts` 머리말).
 import { getRentMock, rentMockOn } from "./rent-mock";
 
@@ -242,6 +242,8 @@ export async function listOpenSpaces(f: SpaceFilter = {}): Promise<SpacePublic[]
   if (!c) return [];
   // 🚪번호가 빈 공간은 DB에서 거른다(`neq`는 NULL도 뺀다). 코드에서만 거르면 60개로 자른 «뒤»에 빠져 목록이 모자라진다.
   let q = c.from("spaces").select("*").eq("status", "open").neq("biz_number", "").order("created_at", { ascending: false });
+  // 🧪운영 빌드에선 로컬 테스트 번호도 DB에서 거른다(`bizOnFile`과 같은 뜻). 로컬 3003이 운영 DB에 적은 번호가 운영 목록에 새지 않게.
+  if (!testBizAllowed()) q = q.neq("biz_number", TEST_BIZ_NUMBER);
   // 🔎09-18 찾기 낱말은 **DB에서 거르지 않고 코드에서 네 칸을 한 번에 본다.**
   //   설비(`facilities`)가 jsonb 배열이라 PostgREST `or`에 부분일치로 못 넣는다. `cs`(포함)는 원소가 정확히 같아야 해서
   //   「에스프레소」로 「에스프레소 머신」을 못 찾고, jsonb를 글자로 바꿔 ilike 하는 필터는 PostgREST에 없다.
@@ -279,9 +281,10 @@ export async function listOpenSpacesByBrand(brandSlug: string, ownerUserId: numb
   }
   const c = db();
   if (!c) return [];
-  const { data, error } = await c.from("spaces").select("*")
-    .eq("brand_slug", brandSlug).eq("owner_user_id", ownerUserId).eq("status", "open").neq("biz_number", "")
-    .order("created_at", { ascending: false }).limit(12);
+  let q = c.from("spaces").select("*")
+    .eq("brand_slug", brandSlug).eq("owner_user_id", ownerUserId).eq("status", "open").neq("biz_number", "");
+  if (!testBizAllowed()) q = q.neq("biz_number", TEST_BIZ_NUMBER);
+  const { data, error } = await q.order("created_at", { ascending: false }).limit(12);
   if (error) { console.error(`[spaces] listByBrand failed: ${error.message}`); return []; }
   // 🚪09-19 오후 — 번호가 빈 공간은 소개서 카드에도 안 붙인다(목록과 같은 규칙).
   return (data ?? []).map((r) => toSpace(r as Row)).filter((sp) => spaceListed(sp)).map(toPublic);

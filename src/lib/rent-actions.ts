@@ -18,7 +18,7 @@ import {
 import {
   addressCertProblem, addressMoved,
   BIZ_CERT_MAX_BYTES, BIZ_CERT_TYPES, BIZ_MISMATCH_LINE, bizCertPathOk, bizDigits, bizNumberProblem, bizOnFile,
-  hasAnyBiz, needsBizInfo, openDateProblem,
+  hasAnyBiz, localTestCheck, needsBizInfo, openDateProblem,
 } from "./bizcheck";
 import { checkBusiness } from "./nts-bizcheck";
 import { matchPlace } from "./naver-local";
@@ -408,7 +408,10 @@ export async function saveSpaceAction(input: SpaceFormInput): Promise<ActionResu
   const placeStale = !prev || renamed || moved;
   const needPlace = placeStale || !prev?.placeMatchedAt;
   const [checked, placeHit] = await Promise.all([
-    needCheck ? checkBusiness({ number: biz.bizNumber, ownerName: biz.bizOwnerName, openDate: biz.bizOpenDate }) : null,
+    // 🧪개발 서버의 테스트 번호는 국세청에 묻지 않고 「일치」로 적는다(`localTestCheck`). 운영에선 늘 null이라 원래 길로 간다.
+    needCheck
+      ? localTestCheck(biz.bizNumber) ?? checkBusiness({ number: biz.bizNumber, ownerName: biz.bizOwnerName, openDate: biz.bizOpenDate })
+      : null,
     needPlace ? matchPlace({ name: input.name.trim(), address: input.address.trim(), lat, lng }) : null,
   ]);
   // 🚫휴업·폐업은 올릴 수 없다(대표 설계). 저장하지 않고 그 칸에 말한다.
@@ -549,7 +552,8 @@ export async function publishSpaceAction(slug: string): Promise<ActionResult> {
   if (!(await isRentAdmin())) return { ok: false, message: "권한이 없어요." };
   const sp = await getSpaceFull(slug);
   if (!sp) return { ok: false, message: "그 공간을 찾지 못했어요." };
-  if (!sp.bizCertPath || !sp.bizNumber || !sp.bizOwnerName || !sp.bizOpenDate) {
+  // 🧪`bizOnFile` — 운영에선 로컬 테스트 번호도 «빈 번호»로 읽는다. 로컬에서 운영 DB에 적힌 시험 번호로 운영 관리자가 열지 못하게.
+  if (!sp.bizCertPath || !bizOnFile(sp) || !sp.bizOwnerName || !sp.bizOpenDate) {
     return { ok: false, message: "사업자등록증이나 사업자 정보가 비어 있어 열 수 없어요. 사장님께 채워 달라고 연락해 주세요." };
   }
   if (sp.bizCheckStatus === "mismatch") {

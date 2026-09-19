@@ -29,7 +29,7 @@ import { CONTACT_PHONE_MAX, storePhoneOk } from "@/lib/rent-limits";
 import {
   addressCertProblem, addressMoved,
   BIZ_CERT_MAX_BYTES, BIZ_CERT_TYPES, BIZ_MISMATCH_LINE, bizCertPathOk, bizDigits, bizNumberProblem, formatBizNumber, fromOpenDate,
-  hasAnyBiz, needsBizInfo, openDateProblem, spaceListed, toOpenDate,
+  hasAnyBiz, needsBizInfo, openDateProblem, spaceListed, testBizHint, toOpenDate,
 } from "@/lib/bizcheck";
 import {
   COFFEE_CHAT_LABEL, COFFEE_CHAT_WHEN_HOST, PRODUCT_HINT_HOST, PRODUCT_LABEL, PRODUCT_NOTE_PLACEHOLDER, withJosa,
@@ -1199,7 +1199,8 @@ export function SpaceForm({
             placeholder="예) 느린오후 로스터리"
           />
         </L>
-        <L label="사업자등록번호" htmlFor="sp-biz-no" anchor="bizNumber" error={fieldErr("bizNumber")}>
+        {/* 🧪09-19 저녁 대표 — 개발 서버에서만 테스트 번호 한 줄(`testBizHint`). 운영 빌드에선 빈 글자라 안내가 안 선다. */}
+        <L label="사업자등록번호" htmlFor="sp-biz-no" anchor="bizNumber" error={fieldErr("bizNumber")} hint={testBizHint() || undefined}>
           <input
             id="sp-biz-no"
             inputMode="numeric"

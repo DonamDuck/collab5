@@ -605,7 +605,8 @@ export type BizCheckStatus = "none" | "valid" | "mismatch" | "closed" | "error";
 
 /** 조회 결과 요약. 국세청 응답 통째가 아니라 판단에 쓴 코드만 남긴다. */
 export interface BizCheckDetail {
-  /** none·error의 사유 — no-key · mock · network · http-4xx · bad-response · unknown-status */
+  /** none·error의 사유 — no-key · mock · network · http-4xx · bad-response · unknown-status.
+   *  🧪valid인데 `local-test`면 개발 서버의 테스트 번호라 국세청에 묻지 않은 것이다(`bizcheck` `localTestCheck`). */
   reason?: string;
   /** 진위확인 "01" 일치 / "02" 불일치 */
   valid?: string;
