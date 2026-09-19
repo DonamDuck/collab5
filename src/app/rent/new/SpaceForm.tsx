@@ -28,7 +28,7 @@ import { payoutAmount } from "@/lib/rent-money";
 import { CONTACT_PHONE_MAX, storePhoneOk } from "@/lib/rent-limits";
 import {
   BIZ_CERT_MAX_BYTES, BIZ_CERT_TYPES, BIZ_MISMATCH_LINE, bizCertPathOk, bizDigits, bizNumberProblem, formatBizNumber, fromOpenDate,
-  hasAnyBiz, openDateProblem, toOpenDate,
+  hasAnyBiz, openDateProblem, spaceListed, toOpenDate,
 } from "@/lib/bizcheck";
 import {
   COFFEE_CHAT_LABEL, COFFEE_CHAT_WHEN_HOST, PRODUCT_HINT_HOST, PRODUCT_LABEL, PRODUCT_NOTE_PLACEHOLDER, withJosa,
@@ -257,8 +257,9 @@ export function SpaceForm({
   const renamedNow = !!initial && initial.name.trim() !== name.trim();
   const movedNow = !!initial && initial.address.trim() !== addressNow;
   const reviewAgain = renamedNow || movedNow;
-  /** 지금 손님에게 보이는 공간인가 — 그럴 때만 「목록에서 잠시 빠져요」가 참이다. */
-  const listedNow = initial?.status === "open";
+  /** 지금 손님에게 보이는 공간인가 — 그럴 때만 「목록에서 잠시 빠져요」가 참이다.
+   *  🚪09-19 오후 — 사업자등록번호가 빈 공간은 공개 중이어도 목록에 없다(`spaceListed`). */
+  const listedNow = !!initial && spaceListed(initial);
 
   // ─── 💾임시 저장 (새로 올리기만) ───
   const draftKey = !initial && userId ? draftKeyOf(userId) : null;
@@ -1141,9 +1142,12 @@ export function SpaceForm({
         anchor="biz"
       >
         {editing && !hasAnyBiz(initial) && (
-          // 09-18 전에 올린 공간 — 비워 둬도 저장은 되지만 확인 표시를 받을 길이 이것뿐이다.
+          // 09-18 전에 올린 공간(초안 포함). 🔁09-19 오후 대표 — 번호가 빈 공간은 손님 목록·상세에서 빠진다(`spaceListed`).
+          //   그래서 «표시를 붙여 드려요»(있으면 좋은 것)가 아니라 «채우셔야 보여요»(할 일)로 말한다.
           <p className="rounded-md bg-surface-soft px-4 py-3 text-[15px] leading-relaxed break-keep text-body">
-            아직 사업자 정보가 없어요. 채워 주시면 저희가 확인한 뒤 표시를 붙여 드려요.
+            {initial?.status === "draft"
+              ? "아직 사업자 정보가 없어요. 넷 다 채워 주셔야 올릴 수 있어요."
+              : "아직 사업자 정보가 없어요. 채워 주셔야 손님께 다시 보여요."}
           </p>
         )}
         {editing && !!initial?.bizApprovedAt && (

@@ -590,7 +590,10 @@ export interface Space {
  *  도어락 번호 같은 건 애초에 담지 않기로 했고(09-16 `accessHow`), 남아 있는 옛 값도 내보내지 않는다.
  *  호스트 «개인 휴대폰»은 여기 실리지 않는다(프로필에 있고 확정 후에만 열린다).
  *  📌이탈을 막는 건 이제 주소가 아니라 **결제가 먼저라는 순서**다. 그 설계는 그대로다. */
-export type SpacePublic = Omit<Space, "accessNote" | "hostTermsAt" | SpaceBizPrivateKey>;
+export type SpacePublic = Omit<Space, "accessNote" | "hostTermsAt" | SpaceBizPrivateKey> & {
+  /** 🚪사업자등록번호가 적혀 있나(09-19 오후). 번호는 빼고 이 참거짓만 싣는다(`toPublic`). 상세가 `spaceListed`로 문을 가른다. */
+  bizOnFile: boolean;
+};
 
 /** 🔒09-18 공개 화면에 안 나가는 사업자 칸. 상세가 쓰는 건 `bizCheckStatus`·`bizApprovedAt`(확인 표시)뿐이다.
  *  ⚖️09-19 대표 [J] — 상호·대표자·사업자번호·주소·가게 전화는 «판매자 정보» 화면 한 곳에서만 보인다(`/rent/[slug]/seller`).

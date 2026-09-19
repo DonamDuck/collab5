@@ -15,6 +15,8 @@ import type {
 import { bookingFinished, todayKst, expandRepeat, stripRepeat, pruneRepeat, minutesBetween } from "./rent-time";
 import { productsFromLegacy } from "./rent-products";
 import { payoutAmount } from "./rent-money";
+// 🚪09-19 오후 — 손님 앞에 세울지는 순수 규칙 한 벌(`bizcheck`). 목록·소개서 카드·공개 투영이 같이 쓴다.
+import { bizOnFile, spaceListed } from "./bizcheck";
 // 🧪09-17 목 데이터 — 읽기 함수는 첫 줄에서 목 세계를 돌려주고, 쓰기 함수는 첫 줄에서 멈춘다. 개발 빌드 전용(`rent-mock.ts` 머리말).
 import { getRentMock, rentMockOn } from "./rent-mock";
 
@@ -161,7 +163,8 @@ export function toPublic(sp: Space): SpacePublic {
     ...rest
   } = sp;
   void _n; void _t; void _b1; void _b2; void _b3; void _b4; void _b5;
-  return rest;
+  // 🚪09-19 오후 — 번호는 지우고 «있나»만 남긴다. 상세가 이 값으로 남에게 보일지 가른다(`spaceListed`).
+  return { ...rest, bizOnFile: bizOnFile(sp) };
 }
 
 function toBooking(r: Row): SpaceBooking {
@@ -219,7 +222,8 @@ function matchesKeyword(sp: Pick<Space, "area" | "name" | "address" | "facilitie
   return [sp.area, sp.name, sp.address, ...sp.facilities].some((v) => v.toLowerCase().includes(k));
 }
 
-/** 목록 — 공개된 것만. ⭐돌려주는 값에 주소가 없다(`toPublic`). */
+/** 목록 — 공개된 것만. ⭐돌려주는 값에 주소가 없다(`toPublic`).
+ *  🚪09-19 오후 대표 — 사업자등록번호가 빈 공간은 공개 중이어도 뺀다(`spaceListed`). 사이트맵도 이 함수를 읽는다. */
 export async function listOpenSpaces(f: SpaceFilter = {}): Promise<SpacePublic[]> {
   const kw = f.area?.trim() ?? "";
   const limit = f.limit ?? 60;
@@ -227,7 +231,7 @@ export async function listOpenSpaces(f: SpaceFilter = {}): Promise<SpacePublic[]
   if (m) {
     // 아래 DB 질의와 같은 거르기를 코드로 한다. 목 화면의 「0건」도 실제 조건과 같은 이유로 나와야 한다.
     const out = m.data.spaces
-      .filter((sp) => sp.status === "open")
+      .filter((sp) => spaceListed(sp))
       .filter((sp) => !kw || matchesKeyword(sp, kw))
       .filter((sp) => !f.category || sp.category === f.category)
       .filter((sp) => !f.useType || f.useType === "both" || sp.useType === f.useType || sp.useType === "both")
@@ -236,7 +240,8 @@ export async function listOpenSpaces(f: SpaceFilter = {}): Promise<SpacePublic[]
   }
   const c = db();
   if (!c) return [];
-  let q = c.from("spaces").select("*").eq("status", "open").order("created_at", { ascending: false });
+  // 🚪번호가 빈 공간은 DB에서 거른다(`neq`는 NULL도 뺀다). 코드에서만 거르면 60개로 자른 «뒤»에 빠져 목록이 모자라진다.
+  let q = c.from("spaces").select("*").eq("status", "open").neq("biz_number", "").order("created_at", { ascending: false });
   // 🔎09-18 찾기 낱말은 **DB에서 거르지 않고 코드에서 네 칸을 한 번에 본다.**
   //   설비(`facilities`)가 jsonb 배열이라 PostgREST `or`에 부분일치로 못 넣는다. `cs`(포함)는 원소가 정확히 같아야 해서
   //   「에스프레소」로 「에스프레소 머신」을 못 찾고, jsonb를 글자로 바꿔 ilike 하는 필터는 PostgREST에 없다.
@@ -251,7 +256,8 @@ export async function listOpenSpaces(f: SpaceFilter = {}): Promise<SpacePublic[]
   if (!filterInCode) q = q.limit(limit);
   const { data, error } = await q;
   if (error) { console.error(`[spaces] list failed: ${error.message}`); return []; }
-  let out = (data ?? []).map((r) => toSpace(r as Row));
+  // 같은 규칙을 코드에서 한 번 더(공백·하이픈만 든 번호처럼 DB의 «빈 글자» 비교를 빠져나오는 값).
+  let out = (data ?? []).map((r) => toSpace(r as Row)).filter((sp) => spaceListed(sp));
   if (kw) out = out.filter((sp) => matchesKeyword(sp, kw));
   // 날짜 거르기는 jsonb 안을 봐야 해서 코드에서 한다 — 공간 수가 수백 단위일 동안은 이게 싸다.
   // 🩸09-16까지 여기가 옛 `open_dates`를 보고 있었다. 시간 단위로 바뀌면서 새 등록은 그 칸을 안 채우니
@@ -268,16 +274,17 @@ export async function listOpenSpacesByBrand(brandSlug: string, ownerUserId: numb
   const m = await getRentMock();
   if (m) {
     return m.data.spaces
-      .filter((sp) => sp.status === "open" && sp.brandSlug === brandSlug && sp.ownerUserId === ownerUserId)
+      .filter((sp) => spaceListed(sp) && sp.brandSlug === brandSlug && sp.ownerUserId === ownerUserId)
       .map(toPublic);
   }
   const c = db();
   if (!c) return [];
   const { data, error } = await c.from("spaces").select("*")
-    .eq("brand_slug", brandSlug).eq("owner_user_id", ownerUserId).eq("status", "open")
+    .eq("brand_slug", brandSlug).eq("owner_user_id", ownerUserId).eq("status", "open").neq("biz_number", "")
     .order("created_at", { ascending: false }).limit(12);
   if (error) { console.error(`[spaces] listByBrand failed: ${error.message}`); return []; }
-  return (data ?? []).map((r) => toPublic(toSpace(r as Row)));
+  // 🚪09-19 오후 — 번호가 빈 공간은 소개서 카드에도 안 붙인다(목록과 같은 규칙).
+  return (data ?? []).map((r) => toSpace(r as Row)).filter((sp) => spaceListed(sp)).map(toPublic);
 }
 
 /** 상세(공개). 09-16부터 주소·좌표는 공개다(대표: 공간 이름이 이미 보여 감추는 게 무의미). 빠지는 건 옛 「들어오는 법」과 약관 동의 시각뿐. */

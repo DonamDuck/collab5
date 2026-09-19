@@ -17,7 +17,7 @@ export const RENT_GROUPS: Group[] = [
         title: "목록",
         path: "/rent",
         rows: [
-          { desc: "공간 여럿 (공개 중인 곳만 카드로) · 로그인해서 위 메뉴 바에 「내 예약」 칸이 있어요", c: "guest-full", to: "/rent" },
+          { desc: "공간 여럿 (공개 중이고 사업자등록번호가 있는 곳만 카드로. 번호가 빈 「느린오후 뒷마당」은 안 보여요) · 로그인해서 위 메뉴 바에 「내 예약」 칸이 있어요", c: "guest-full", to: "/rent" },
           { desc: "로그인 안 한 사람 · 메뉴 바가 두 칸(하루 빌리기 · 내 공간 등록)", c: "anon", to: "/rent" },
           { desc: "업종으로 거른 결과", c: "guest-full", to: "/rent?category=cafe" },
           { desc: "거르기 결과 0건", c: "guest-full", to: "/rent?area=제주" },
@@ -43,6 +43,9 @@ export const RENT_GROUPS: Group[] = [
           { desc: "최소 입력 (사진·소개·설비·전화 없음), 번호 없는 손님", c: "minimal-guest", to: `/rent/${S.minimal}` },
           { desc: "검토 대기 공간을 남이 열면 404", c: "guest-full", to: `/rent/${S.pending}` },
           { desc: "쉬는 중인 공간을 남이 열면 404", c: "guest-full", to: `/rent/${S.paused}` },
+          // 🚪09-19 오후 대표 — 사업자등록번호가 빈 공간은 공개 중이어도 손님 앞에서 빠져요. 예약을 잡아 둔 손님과 주인·관리자만 봐요.
+          { desc: "사업자등록번호가 빈 공개 공간을 남이 열면 404", c: "anon", to: `/rent/${S.noBiz}` },
+          { desc: "같은 공간을 예약해 둔 손님이 열면 보여요 (신청 자리에 「새 신청을 받지 않는 공간」)", c: "guest-full", to: `/rent/${S.noBiz}` },
           { desc: "없는 공간 주소 (404)", c: "guest-full", to: "/rent/mock-no-such-space" },
         ],
       },
@@ -54,7 +57,7 @@ export const RENT_GROUPS: Group[] = [
         rows: [
           { desc: "둘 다 (사업자 확인 · 네이버 지도) · 지도에 상호 라벨", c: "guest-full", to: `/rent/${S.full}` },
           { desc: "사업자 확인만 · 지도는 주소 핀만", c: "guest-full", to: `/rent/${S.noSlots}` },
-          { desc: "네이버 지도만 (사업자 정보가 없는 옛 공간) · 지도에 상호 라벨", c: "guest-full", to: `/rent/${S.other}` },
+          { desc: "네이버 지도만 (사업자 정보는 있고 관리자 승인 전) · 지도에 상호 라벨", c: "guest-full", to: `/rent/${S.other}` },
           { desc: "둘 다 없음 · 줄이 안 그려져요", c: "minimal-guest", to: `/rent/${S.minimal}` },
           { desc: "긴 상호 · 라벨 말줄임과 줄 접힘", c: "stress-guest", to: `/rent/${S.stress}` },
         ],
@@ -77,7 +80,7 @@ export const RENT_GROUPS: Group[] = [
         rows: [
           { desc: "상호·대표자·사업자번호·주소·가게 전화가 다 있는 공간", c: "guest-full", to: `/rent/${S.full}/seller` },
           { desc: "상호 칸이 생기기 전에 올린 공간 · 상호 자리에 「공간 이름 (공간 이름)」", c: "guest-full", to: `/rent/${S.noSlots}/seller` },
-          { desc: "사업자 정보가 아예 없는 옛 공간 · 빈 칸은 「아직 등록 전이에요」", c: "guest-full", to: `/rent/${S.other}/seller` },
+          { desc: "사업자등록번호가 빈 공간은 404 (예약해 둔 손님에게도)", c: "guest-full", to: `/rent/${S.noBiz}/seller` },
           { desc: "긴 상호 · 메모가 섞인 가게 전화", c: "stress-guest", to: `/rent/${S.stress}/seller` },
           { desc: "로그인 안 한 사람도 볼 수 있어요", c: "anon", to: `/rent/${S.full}/seller` },
           { desc: "검토 대기 공간은 404", c: "guest-full", to: `/rent/${S.pending}/seller` },
@@ -146,7 +149,7 @@ export const RENT_GROUPS: Group[] = [
         //   사장님 줄 열다섯이 전부 빌린 공간 칸으로 열렸다. 사장님 줄은 `tab=host`, 빌린 공간은 아래 따로.
         title: "내 하루 가게 · 빌려준 공간 칸",
         path: "/rent/my?tab=host",
-        note: "위 칸 둘 중 「빌려준 공간」으로 열려요. 공간 넷은 공개 중·검토 대기·쉬는 중·초안이에요. 들어온 요청은 새 요청(수락 전 손님 정보), 이용 시간이 시작된 결제 완료, 확정(연락처 열림), 환불 신청 중, 다녀감(가림), 거절, 환불, 손님 취소 둘이에요. 「알림」 줄은 맨 위에 한 번 뜨고 주소에서 지워지는데 칸은 그대로 남아요. 다시 보려면 링크를 한 번 더 누르면 돼요.",
+        note: "위 칸 둘 중 「빌려준 공간」으로 열려요. 공간은 공개 중 둘·검토 대기·쉬는 중·초안, 그리고 사업자등록번호가 빈 공간(「사업자 정보 필요」와 「고치러 가기」 줄)이에요. 들어온 요청은 새 요청(수락 전 손님 정보), 이용 시간이 시작된 결제 완료, 확정(연락처 열림), 환불 신청 중, 다녀감(가림), 거절, 환불, 손님 취소 둘이에요. 「알림」 줄은 맨 위에 한 번 뜨고 주소에서 지워지는데 칸은 그대로 남아요. 다시 보려면 링크를 한 번 더 누르면 돼요.",
         rows: [
           { desc: "모든 상태, 정산 계좌 있음 (요청 줄 첫머리에 대관만·공간 전체 · 검토 대기 공간에 국세청 기록과 다르다는 줄)", c: "host-full", to: "/rent/my?tab=host" },
           { desc: "같은 화면, 정산 계좌 없음 (확정 줄마다 계좌 등록 한 줄)", c: "host-noaccount", to: "/rent/my?tab=host" },
@@ -183,6 +186,7 @@ export const RENT_GROUPS: Group[] = [
           { desc: "검토 대기 중인 내 공간", c: "host-full", to: `/rent/${S.pending}` },
           { desc: "쉬는 중인 내 공간", c: "host-full", to: `/rent/${S.paused}` },
           { desc: "작성 중(초안)인 내 공간", c: "host-full", to: `/rent/${S.draft}` },
+          { desc: "사업자등록번호가 빈 내 공간 (주인은 볼 수 있어요)", c: "host-full", to: `/rent/${S.noBiz}` },
         ],
       },
       {
@@ -205,7 +209,8 @@ export const RENT_GROUPS: Group[] = [
           { desc: "30분 단위 공간 · 최소 1시간 30분 · 09:30~12:00 자투리 날 · 매주 목요일 11:30~20:30", c: "host-full", to: `/rent/${S.halfHour}/edit` },
           { desc: "검토 중인 공간 · 공간 전체만 켬 · 국세청 기록과 달라 사업자 칸 밑에 빨간 줄", c: "host-full", to: `/rent/${S.pending}/edit` },
           { desc: "쉬는 중인 공간 · 대관만 켬 · 사업자 정보 채움, 확인 전 · 상호가 빈 옛 공간이라 「비워 두시면 공간 이름이 대신 나가요」 안내", c: "host-full", to: `/rent/${S.paused}/edit` },
-          { desc: "초안 · 사업자 정보가 비어 있다는 안내 (옛 공간과 같은 모습)", c: "host-full", to: `/rent/${S.draft}/edit` },
+          { desc: "초안 · 사업자 정보가 비어 있어 넷 다 채워야 올릴 수 있다는 안내", c: "host-full", to: `/rent/${S.draft}/edit` },
+          { desc: "사업자등록번호가 빈 공개 공간 · 머리에 「사업자 정보를 채워 주셔야 다시 열 수 있어요 · 고치러 가기」", c: "host-full", to: `/rent/${S.noBiz}/edit` },
           { desc: "긴 글", c: "stress-host", to: `/rent/${S.stress}/edit` },
           { desc: "최소 입력", c: "minimal-host", to: `/rent/${S.minimal}/edit` },
           { desc: "남의 공간 고치기 주소를 열면 그 공간 화면으로 넘어가요", c: "host-full", to: `/rent/${S.other}/edit` },

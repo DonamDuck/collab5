@@ -108,6 +108,28 @@ export function needsBizInfo(
   return prev.name.trim() !== next.name.trim() || prev.address.trim() !== next.address.trim();
 }
 
+/** 🚪사업자등록번호가 적혀 있나 (대표 09-19 오후).
+ *  대표 원문: *「사업자 정보가 빈 옛 공간이 뭐야..? 등록할 때 무조건 필수로 사업자등록번호 있어야 상품 등록하잖아!」*
+ *  새 공간은 이미 넷 다 필수다(`needsBizInfo`). 번호가 빈 공간은 09-18 전에 만든 시험 공간뿐이라, 규칙으로 손님 앞에서 뺀다. */
+export function bizOnFile(sp: { bizNumber: string }): boolean {
+  return bizDigits(sp.bizNumber).length > 0;
+}
+
+/** 🚪손님 앞에 서는 공간인가 = 공개 중(`open`) + 사업자등록번호 있음.
+ *  목록·검색·사이트맵·소개서 카드·공간 상세·판매자 정보가 «이 한 벌»로 가른다. 신청·결제 승인은 `validateBookingRequest`가 같은 뜻으로 막는다.
+ *  공개 투영(`SpacePublic`)엔 번호가 없어서 대신 `bizOnFile`(참거짓)을 받는다(`toPublic`이 채운다). */
+export function spaceListed(sp: { status: string } & ({ bizNumber: string } | { bizOnFile: boolean })): boolean {
+  if (sp.status !== "open") return false;
+  return "bizOnFile" in sp ? sp.bizOnFile : bizOnFile(sp);
+}
+
+/** 사장님께 하는 말 — 번호가 빈 공간의 내 하루 가게 줄과 고치기 화면이 같이 쓴다. 검토 대기면 «다시»가 거짓이라 뺀다. */
+export function bizMissingLine(status: string): string {
+  return status === "pending"
+    ? "사업자 정보를 채워 주셔야 열어 드릴 수 있어요."
+    : "사업자 정보를 채워 주셔야 다시 열 수 있어요.";
+}
+
 /** 🏷공간 상세의 「사업자 확인된 가게」 — 관리자가 등록증을 보고 승인했고 «그리고» 국세청 기록과 맞을 때만.
  *  ⚠️키가 없던 때(none)·조회 실패(error)로 관리자가 눈으로 보고 공개한 공간엔 안 붙는다(대표 09-17 설계). */
 export function bizVerified(sp: { bizApprovedAt?: string; bizCheckStatus: BizCheckStatus }): boolean {

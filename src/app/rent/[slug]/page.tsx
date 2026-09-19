@@ -9,7 +9,7 @@ import { repo } from "@/lib/repo";
 import { accessHowLine, COFFEE_CHAT_WHEN_GUEST, CONTACT_RULE_GUEST, PRODUCT_HINT_GUEST, PRODUCT_LABEL } from "@/lib/rent-copy";
 import { lowestPrice, productNote, productPrice, sellableProducts } from "@/lib/rent-products";
 import { durationLabel, futureSlots, minHoursToMinutes, rangeLabel } from "@/lib/rent-time";
-import { bizVerified } from "@/lib/bizcheck";
+import { bizMissingLine, bizVerified, spaceListed } from "@/lib/bizcheck";
 import { OG_IMAGE } from "@/lib/site";
 import { PhotoSlider } from "@/components/PhotoSlider";
 import { BookingForm } from "./BookingForm";
@@ -79,7 +79,8 @@ export async function generateMetadata({
   // 🔒09-18 밤 QA(SEC-05) — 공개 전 공간은 본문이 주인·관리자 말고는 404다. 메타도 같은 규칙으로 가린다.
   //   전엔 제목에 공간 이름, 설명에 동네, 정본 주소에 slug가 실려서 «있지만 못 보는 공간»과 «없는 공간»이 갈렸다.
   //   주소를 훑어 아직 안 열린 공간 목록을 만들 수 있었다는 뜻이다. 이제 남에게는 없는 공간과 똑같은 메타가 간다.
-  const listed = sp.status === "open";
+  // 🚪09-19 오후 대표 — 사업자등록번호가 빈 공간도 «공개 전»과 같다(`spaceListed`). 본문과 같은 판정이다.
+  const listed = spaceListed(sp);
   if (!listed) {
     const who = await loadViewerId();
     // 🎫예약을 잡아 둔 손님에게도 연다(G-03). 본문과 메타가 갈리면 화면은 열리는데 탭 제목만 「찾을 수 없어요」가 된다.
@@ -179,8 +180,10 @@ export default async function SpaceDetailPage({
   // 🧾09-18 관리자도 연다 — 검토 화면(`/rent/review`)에서 공개 전 공간을 눈으로 봐야 한다. 판정은 `isRentAdmin` 한 벌.
   //   메타(`generateMetadata`)도 같은 함수(`maySeeUnlisted`)로 가린다.
   // 🎫예약을 잡아 둔 손님은 통과시킨다(09-18 밤 QA G-03). 폼은 아래에서 따로 닫는다.
-  const keptBooking = sp.status !== "open" && !isOwner ? await hasKeptBooking(sp.id, uid) : false;
-  if (sp.status !== "open" && !keptBooking && !(await maySeeUnlisted(sp.ownerUserId, uid))) notFound();
+  // 🚪09-19 오후 대표 — 사업자등록번호가 빈 공간은 공개 중이어도 남에겐 없는 공간이다(`spaceListed`). 문은 위 셋 그대로.
+  const listed = spaceListed(sp);
+  const keptBooking = !listed && !isOwner ? await hasKeptBooking(sp.id, uid) : false;
+  if (!listed && !keptBooking && !(await maySeeUnlisted(sp.ownerUserId, uid))) notFound();
 
   // 🔁09-16 하루 단위 → 시간 단위. 날짜는 시간대 목록에서 뽑고, 그 날 이미 팔린 시간도 같이 읽는다.
   // ⏳지난 시간대는 여기서 걸러 낸다. 사장님이 열어 둔 날이 지나가도 목록에는 그대로 남아 있어서,
@@ -223,7 +226,7 @@ export default async function SpaceDetailPage({
   // 🔒쉬는 중·검토 중인 공간엔 폼을 안 그린다(G-03). 서버(`startBookingAction`)도 `status !== "open"`을 막는다.
   // 🔑09-19 대표 [G] — 로그인 안 한 사람에게도 폼과 결제 바를 보인다. 바 버튼이 「로그인하고 신청하기」가 되어
   //   고른 값을 맡기고 로그인으로 보낸다(`BookingForm`의 `goLogin`). 서버 관문(`startBookingAction`의 로그인 검사)은 그대로다.
-  const showForm = !isOwner && sp.status === "open" && openDates.length > 0;
+  const showForm = !isOwner && listed && openDates.length > 0;
 
   // 🧭09-17 디자인팀 — 데스크톱 오른쪽 기둥에 싣는 «가장 가까운 열린 시간».
   const nextSlot = openSlots[0];
@@ -300,14 +303,25 @@ export default async function SpaceDetailPage({
                 className="mt-5 lg:hidden"
               />
             )}
-            {isOwner && sp.status !== "open" && (
+            {isOwner && !listed && sp.status !== "draft" && !sp.bizOnFile ? (
+              // 🚪09-19 오후 대표 — 사업자등록번호가 빈 공간. 공개 중이어도 손님에겐 404다. 왜인지와 할 일을 같이.
+              <p className="mt-4 text-[15px] leading-relaxed break-keep text-lemon-on">
+                {bizMissingLine(sp.status)} 그동안 손님에겐 안 보여요.{" "}
+                <Link
+                  href={`/rent/${sp.slug}/edit#f-biz`}
+                  className="-my-[13px] inline-block py-[13px] underline underline-offset-2"
+                >
+                  고치러 가기
+                </Link>
+              </p>
+            ) : isOwner && !listed ? (
               // ⏸09-17 잠시 쉬기 — 쉬는 공간에 「저희가 확인하고 열어 드릴게요」가 뜨면 검토에 걸린 줄 안다.
               <p className="mt-4 text-[15px] leading-relaxed break-keep text-mute">
                 {sp.status === "paused"
                   ? "쉬는 중이라 손님에겐 안 보여요. 내 하루 가게에서 다시 열 수 있어요."
                   : "아직 공개 전이라 사장님에게만 보이는 화면이에요. 저희가 확인하고 열어 드릴게요."}
               </p>
-            )}
+            ) : null}
           </header>
 
           {sp.body && (
@@ -561,7 +575,7 @@ export default async function SpaceDetailPage({
                 </Link>
                 에서 보실 수 있어요.
               </p>
-            ) : sp.status !== "open" ? (
+            ) : !listed ? (
               // 🎫09-18 밤 QA(G-03) — 쉬는 중·검토 중인 공간. 잡아 둔 예약이 있어 여기까지 온 손님에게
               //   「없는 공간」 대신 사실을 말한다. 쉬기 팝업이 사장님께 약속한 문장과 같은 뜻이다.
               <p className="text-[17px] leading-relaxed break-keep text-body">

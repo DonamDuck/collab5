@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { getProfileById, getSessionUserId } from "@/lib/profiles";
 import { repo } from "@/lib/repo";
 import { FEE_RATE, getSpaceFull } from "@/lib/spaces";
+import { bizMissingLine, bizOnFile } from "@/lib/bizcheck";
 import { SpaceForm } from "../../new/SpaceForm";
 
 // 하루 가게 — 공간 고치기 (2026-09-14)
@@ -31,6 +32,9 @@ export default async function EditSpacePage({ params }: { params: Promise<{ slug
   const myBrands = (await repo.listMakersByOwner(uid)).map((m) => ({ slug: m.slug, name: m.name }));
   // 📮09-18 밤 QA(H-11) — 이메일이 없는 계정은 요청 알림을 못 받는다. 고치기 화면에서도 같은 한 줄을 띄운다.
   const me = await getProfileById(uid);
+  // 🚪09-19 오후 대표 — 사업자등록번호가 빈 공간은 공개 중이어도 손님 앞에 안 선다(`spaceListed`).
+  //   그땐 「공간은 그대로 보여요」가 거짓이라, 머리 한 줄을 할 일로 바꾸고 사업자 칸으로 가는 길을 붙인다.
+  const missingBiz = sp.status !== "draft" && !bizOnFile(sp);
 
   return (
     <main className="mx-auto w-full max-w-[560px] px-4 pt-8 pb-16 sm:px-6 sm:pt-12">
@@ -48,13 +52,23 @@ export default async function EditSpacePage({ params }: { params: Promise<{ slug
             목록에서 사라진다고 읽히면 아예 안 고친다. */}
         {/* 🔁09-17 QA — 검토 대기 공간에도 「공간은 그대로 보여요」라고 했다. 아직 아무에게도 안 보이는데.
             상태로 가른다. 이름·주소를 바꾸면 검토로 간다는 말은 버튼 아래 한 곳에만 둔다(위아래 같은 말이 두 번이었다). */}
-        <p className="mt-3 text-[17px] leading-relaxed break-keep text-mute">
-          {sp.status === "open"
-            ? "고치시는 동안에도 공간은 그대로 보여요."
-            : sp.status === "pending"
-              ? "아직 저희가 읽어 보는 중인 공간이에요. 고치셔도 검토는 이어서 해요."
-              : "고친 내용은 저장해 두고, 공간을 다시 열 때 그대로 보여요."}
-        </p>
+        {missingBiz ? (
+          <p className="mt-3 rounded-md bg-lemon-pale px-4 py-3 text-[16px] leading-relaxed break-keep text-lemon-on">
+            {bizMissingLine(sp.status)}{" "}
+            {/* 같은 화면 아래 「사업자 정보」 절(`f-biz`)로. 누를 자리를 44px로(내 하루 가게 줄과 같은 모양). */}
+            <a href="#f-biz" className="-my-[13px] inline-block py-[13px] underline underline-offset-2">
+              고치러 가기
+            </a>
+          </p>
+        ) : (
+          <p className="mt-3 text-[17px] leading-relaxed break-keep text-mute">
+            {sp.status === "open"
+              ? "고치시는 동안에도 공간은 그대로 보여요."
+              : sp.status === "pending"
+                ? "아직 저희가 읽어 보는 중인 공간이에요. 고치셔도 검토는 이어서 해요."
+                : "고친 내용은 저장해 두고, 공간을 다시 열 때 그대로 보여요."}
+          </p>
+        )}
       </header>
 
       <SpaceForm myBrands={myBrands} feeRate={FEE_RATE} initial={sp} noEmail={!me?.email?.trim()} />

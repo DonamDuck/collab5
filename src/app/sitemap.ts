@@ -62,7 +62,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   }));
 
   // 하루 가게 공간 — **공개 중인 것만**(09-18 밤 QA SC-18). 검토 대기·쉬는 중·초안은 남에게 404라 넣으면 죽은 주소가 된다.
-  //   `listOpenSpaces`가 공개 목록과 같은 조건(`status = open`)으로 읽는다. 고치면 lastModified가 따라 올라간다.
+  //   `listOpenSpaces`가 공개 목록과 같은 조건(`status = open` + 사업자등록번호 있음, 09-19 오후 `spaceListed`)으로 읽는다. 고치면 lastModified가 따라 올라간다.
   // 🔓`/rent/new`는 09-19 대표 결정으로 위 고정 페이지에 넣었다. 판매자 정보(`/rent/[slug]/seller`)는 싣지 않는다(noindex).
   const rentPages: MetadataRoute.Sitemap = spaces.map((sp) => ({
     url: `${SITE_URL}/rent/${sp.slug}`,

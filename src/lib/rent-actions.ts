@@ -16,8 +16,8 @@ import {
 } from "./spaces";
 // 🧾🏪09-18 사업자 확인 · 네이버 상호 매칭(대표 09-17). 규칙은 순수 함수(`bizcheck`·`place-match`), 바깥 호출은 서버 전용 파일에.
 import {
-  BIZ_CERT_MAX_BYTES, BIZ_CERT_TYPES, BIZ_MISMATCH_LINE, bizCertPathOk, bizDigits, bizNumberProblem, hasAnyBiz,
-  needsBizInfo, openDateProblem,
+  BIZ_CERT_MAX_BYTES, BIZ_CERT_TYPES, BIZ_MISMATCH_LINE, bizCertPathOk, bizDigits, bizNumberProblem, bizOnFile,
+  hasAnyBiz, needsBizInfo, openDateProblem,
 } from "./bizcheck";
 import { checkBusiness } from "./nts-bizcheck";
 import { matchPlace } from "./naver-local";
@@ -600,7 +600,10 @@ export async function setSpacePausedAction(slug: string, paused: boolean): Promi
   // ⭐쉬어도 이미 결제된 예약은 살아 있다. 사장님이 「쉬면 예약도 사라지나」를 걱정하지 않게 결과에서 말한다.
   return paused
     ? { ok: true, message: "잠시 쉬게 해 뒀어요. 목록에서만 빠지고, 이미 받은 예약은 그대로 살아 있어요.", slug }
-    : { ok: true, message: "다시 열었어요. 목록에 바로 보여요.", slug };
+    // 🚪09-19 오후 — 사업자등록번호가 빈 공간은 열어도 목록에 안 선다(`spaceListed`). 「바로 보여요」가 거짓이 된다.
+    : bizOnFile(sp)
+      ? { ok: true, message: "다시 열었어요. 목록에 바로 보여요.", slug }
+      : { ok: true, message: "다시 열었어요. 사업자 정보를 채워 주셔야 손님께 보여요.", slug };
 }
 
 /** 🏦정산 받을 계좌 저장 — 로그인 + 공간을 하나 이상 올린 사람만(09-17).

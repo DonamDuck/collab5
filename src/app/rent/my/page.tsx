@@ -18,6 +18,7 @@ import { GuestBookingRow, loadGuestBookings } from "../GuestBookingRow";
 import { StickyTabs } from "@/components/StickyTabs";
 import { BookingBadge, ListRow as Row, SpaceBadge, primaryBtnCls, secondaryBtnCls, won } from "../ui";
 import { PRODUCT_LABEL } from "@/lib/rent-copy";
+import { bizMissingLine, bizOnFile, spaceListed } from "@/lib/bizcheck";
 import { productPrice, sellableProducts } from "@/lib/rent-products";
 import { groupGuestBookings, groupHostBookings, hostBookingGroup, type HostBookingGroup } from "@/lib/rent-groups";
 
@@ -192,7 +193,8 @@ export default async function MyRentPage({
         : did === "reject" && didTarget.status === "rejected"
           ? "거절했어요. 환불이 늦어지고 있어 저희가 확인하고 있어요."
           : "";
-  const openSpaces = mySpaces.filter((sp) => sp.status === "open").length;
+  // 🚪09-19 오후 — 「공개 중」은 손님 목록에 실제로 서 있는 것만 센다(사업자등록번호가 빈 공간은 빠진다, `spaceListed`).
+  const openSpaces = mySpaces.filter((sp) => spaceListed(sp)).length;
 
   // 🃏09-18 대표 코멘트 #63 — 「여기 영역도 UI 조정이 필요한데 지금 그냥 텍스트 나열처럼만 보인다」.
   //   한 줄에 공간 이름·상품·날짜·인원·커피챗이 같은 크기로 이어지고, 계획·소개서·손님·돈이 같은 15px 줄로 쌓여서
@@ -535,7 +537,8 @@ export default async function MyRentPage({
                 }
                 status={
                   <div className="flex shrink-0 items-center gap-3">
-                    <SpaceBadge status={sp.status} />
+                    {/* 🚪09-19 오후 — 번호가 빈 공간은 공개 중·검토 대기여도 손님 앞에 안 선다. 「공개 중」이라 적으면 거짓이다. */}
+                    <SpaceBadge status={sp.status !== "draft" && !bizOnFile(sp) ? "nobiz" : sp.status} />
                     {/* 고치기는 글자 링크로 — 이 줄에서 누르는 것은 이름(보기)과 이것뿐이라 버튼 얼굴이 필요 없다. */}
                     <Link
                       href={`/rent/${sp.slug}/edit`}
@@ -560,11 +563,24 @@ export default async function MyRentPage({
                     </Link>
                   </p>
                 )}
+                {/* 🚪09-19 오후 대표 — 사업자등록번호가 빈 공간(09-18 전에 만든 시험 공간)은 목록·상세에서 빠진다.
+                    사장님이 떠난 뒤에도 왜 안 보이는지 알 수 있게 그 줄에 한 번. 초안은 올리기 전이라 폼이 말한다. */}
+                {sp.status !== "draft" && !bizOnFile(sp) && (
+                  <p className="mt-2 text-[15px] leading-relaxed break-keep text-lemon-on">
+                    {bizMissingLine(sp.status)}{" "}
+                    <Link
+                      href={`/rent/${sp.slug}/edit#f-biz`}
+                      className="-my-[13px] inline-block py-[13px] underline underline-offset-2"
+                    >
+                      고치러 가기
+                    </Link>
+                  </p>
+                )}
                 {/* 대표에게만 보이는 손잡이. 남의 등록을 세상에 내보내는 판정이라 화면에도 문을 둔다.
                     🧾09-18 밤 QA(H-32) — 국세청 기록과 다른 공간에도 [공개하기]가 떴다. 서버(`publishSpaceAction`)는
                     막으니 새는 건 없지만, 누르면 거절 한 줄이 돌아올 뿐인 버튼이라 «되는 일»처럼 보였다.
                     바로 위 줄이 이미 「고치러 가기」로 할 일을 말한다. */}
-                {admin && sp.status === "pending" && sp.bizCheckStatus !== "mismatch" && <PublishButton slug={sp.slug} />}
+                {admin && sp.status === "pending" && sp.bizCheckStatus !== "mismatch" && bizOnFile(sp) && <PublishButton slug={sp.slug} />}
                 {/* ⏸잠시 쉬기 / 다시 열기(09-17). 검토 대기·작성 중엔 안 뜬다 — 서버도 open↔paused만 받는다. */}
                 {(sp.status === "open" || sp.status === "paused") && (
                   <PauseToggle slug={sp.slug} paused={sp.status === "paused"} />

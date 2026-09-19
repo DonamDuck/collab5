@@ -6,6 +6,7 @@ import { getSessionUserId } from "@/lib/profiles";
 import { GRACE_MINUTES, guestCancelRefundRate } from "@/lib/rent-payment";
 import { bookingMinutes, durationLabel, kstDaysUntil } from "@/lib/rent-time";
 import { payWindowLeftMs, pendingBookingProblem } from "@/lib/rent-booking-rules";
+import { spaceListed } from "@/lib/bizcheck";
 import { bookingWhen, dateLabel, secondaryBtnCls, won } from "../../ui";
 import { COFFEE_CHAT_LABEL, PRODUCT_LABEL } from "@/lib/rent-copy";
 import { PayPanel } from "./PayPanel";
@@ -85,7 +86,8 @@ export default async function RentPayPage({ params }: { params: Promise<{ orderI
   const problem = pendingBookingProblem(b, space, taken);
   if (problem) {
     // 🔒쉬는 중·검토 대기 공간의 상세는 손님에게 404라(`/rent/[slug]`), 그때는 목록으로 보낸다.
-    const backToSpace = space?.status === "open";
+    //   🚪09-19 오후 — 사업자등록번호가 빈 공간도 같다(`spaceListed`).
+    const backToSpace = !!space && spaceListed(space);
     return (
       <main className="mx-auto w-full max-w-[560px] px-4 pt-6 pb-14 sm:px-6">
         <h1 className="text-[22px] font-bold leading-tight tracking-tight text-ink">결제를 이어갈 수 없어요</h1>

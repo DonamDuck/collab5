@@ -423,7 +423,11 @@ function fullWorld(today: string, withAccount: boolean): MockWorld {
     lat: 37.5657, lng: 126.9890, facilities: ["4인 테이블 5", "냉장고"], capacity: 20,
     rules: "주방 화구는 쓸 수 없어요\n가게 앞 입간판은 치우지 말아 주세요",
     minHours: 2, accessHow: "onsite", contactPhone: "02-777-0000",
-    // 🏪신뢰 표시 하나(네이버만) — 09-18 전에 올린 옛 공간이라 사업자 정보가 비어 있다.
+    // 🏪신뢰 표시 하나(네이버만). 사업자 정보는 채웠는데 아직 관리자 승인 전이라 「사업자 확인된 가게」는 안 붙는다.
+    //   🔁09-19 오후 — 전엔 «사업자 정보가 빈 옛 공간»이었다. 번호가 빈 공간은 이제 손님 앞에서 빠져서(`spaceListed`)
+    //   이 공간이 맡던 상세·신청 폼 줄이 다 404가 됐다. 번호를 채우고, 빈 공간은 S10이 따로 맡는다.
+    ...bizOf(U.host2, "0000617779", "박을지", "20180301", "jpg", "000000009106"),
+    bizName: "을지로 저녁", bizCheckStatus: "none", bizCheckedAt: `${d(-20)}T01:00:00.000Z`, bizCheckDetail: { reason: "no-key" },
     placeName: "을지로 저녁", placeAddress: "서울특별시 중구 수표로 00 1층",
     placeLat: 37.5657, placeLng: 126.9890, placeMatchedAt: `${d(-20)}T01:00:00.000Z`,
     // 🛍하나만 켠 공간 ② — 대관만. 신청 폼에 고르기 없이 한 줄로 보인다.
@@ -491,12 +495,28 @@ function fullWorld(today: string, withAccount: boolean): MockWorld {
     ],
   }, today);
 
-  const spaces = [s1, s2, s3, s4, s5, s6, s7, s8, s9];
+  // 🚪S10 — 공개 중인데 사업자등록번호가 빈 공간(대표 09-19 오후: 「등록할 때 무조건 필수로 사업자등록번호 있어야 상품 등록하잖아!」).
+  //   운영에선 09-18 전에 만든 시험 공간만 이 모양이다. 목록·검색·소개서 카드·판매자 정보에서 빠지고, 상세는 주인·관리자와
+  //   예약을 잡아 둔 손님(아래 `noBizConfirmed`)만 본다. 신청·결제 승인도 막힌다(`validateBookingRequest`의 `no-biz`).
+  const s10 = space({
+    id: 9112, slug: "mock-slow-afternoon-yard", ownerUserId: U.host, status: "open",
+    name: "느린오후 뒷마당", category: "cafe",
+    body: "가게 뒤 작은 마당이에요. 평상 두 개와 파라솔이 있어요.",
+    photos: [photo("뒷마당 평상", 95)], area: "성수동", address: "서울 성동구 연무장길 00, 뒷마당", lat: 37.5436, lng: 127.0559,
+    facilities: ["평상 2", "파라솔"], capacity: 10,
+    rules: "해가 지면 조명을 꼭 꺼 주세요\n평상 위엔 신발을 벗고 올라가 주세요",
+    minHours: 2, accessHow: "sms", contactPhone: "02-123-4567",
+    rentSpaceOn: true, rentSpacePrice: 12000, rentSpaceNote: "작은 모임이나 촬영 자리로 써요. 평상 두 개와 파라솔을 같이 써요.",
+    direct: [{ date: d(5), start: "13:00", end: "19:00" }, { date: d(6), start: "13:00", end: "19:00" }],
+  }, today);
+
+  const spaces = [s1, s2, s3, s4, s5, s6, s7, s8, s9, s10];
   // 🛍s1은 두 상품을 섞어 판다 — 공간 전체로 산 예약이 줄마다 섞여 보이게.
   const P1 = { sp: s1 };
   const P1F = { sp: s1, product: "full" as const };
   const P6 = { sp: s6 };
   const P9 = { sp: s9 };
+  const P10 = { sp: s10 };
   const plan =
     "주말 이틀 동안 사워도우 팝업을 열어 보려고 해요. 오전에 집에서 구워 가져가고, 2층에서는 커피와 같이 팔 생각이에요. " +
     "머신은 아메리카노 정도만 쓸게요. 인스타에 미리 알린 분들이 열 명 남짓 오실 것 같아요.";
@@ -528,6 +548,8 @@ function fullWorld(today: string, withAccount: boolean): MockWorld {
     // ⏱09-19 30분 단위 예약 둘 — 2시간 30분(결제 완료)과 최소 1시간 30분(확정).
     halfPaid: booking({ id: 90021, spaceId: s9.id, guestUserId: U.guest, status: "paid", useDate: d(3), startTime: "13:00", endTime: "15:30", plan: "스터디 모임 다섯 명이 두 시간 반 동안 발표 연습을 해요.", headcount: 5, guestPhone: "010-3456-7890", guestName: "한서윤", guestBrandSlug: "mock-flour-diary", ...P9 }, today),
     halfConfirmed: booking({ id: 90022, spaceId: s9.id, guestUserId: U.guest, status: "confirmed", useDate: d(3), startTime: "16:30", endTime: "18:00", plan: "새로 구운 빵 사진을 창가 빛에서 찍으려고 해요.", headcount: 2, guestPhone: "010-3456-7890", guestName: "한서윤", decidedAt: `${d(-1)}T05:00:00.000Z`, ...P9 }, today),
+    // 🚪사업자 번호가 빈 공간(S10)에 잡아 둔 확정 예약 — 이 손님에겐 상세가 계속 열려 있어야 한다.
+    noBizConfirmed: booking({ id: 90023, spaceId: s10.id, guestUserId: U.guest, status: "confirmed", useDate: d(5), startTime: "14:00", endTime: "16:00", plan: "필름 카메라 모임 사진을 찍으려고 해요. 두 시간이면 돼요.", headcount: 4, guestPhone: "010-3456-7890", guestName: "한서윤", decidedAt: `${d(-1)}T05:00:00.000Z`, ...P10 }, today),
     hostAsGuest: booking({ id: 90020, spaceId: s6.id, guestUserId: U.host, status: "confirmed", useDate: d(4), startTime: "17:00", endTime: "20:00", plan: "원두 시음회를 다른 동네에서 열어 보려고 해요.", headcount: 10, guestPhone: "010-2345-6789", guestName: "문하람", guestBrandSlug: "mock-slow-afternoon", decidedAt: `${d(-1)}T05:00:00.000Z`, ...P6 }, today),
   };
   const bookings = Object.values(b);
@@ -557,6 +579,7 @@ function fullWorld(today: string, withAccount: boolean): MockWorld {
     payment(b.hostAsGuest, U.host2, { status: "DONE" }),
     payment(b.halfPaid, U.host, { status: "DONE" }),
     payment(b.halfConfirmed, U.host, { status: "DONE", method: "간편결제" }),
+    payment(b.noBizConfirmed, U.host, { status: "DONE" }),
   ];
 
   // 🪪09-19 — S8 사장님은 개인 명의(가족) 계좌다. 예금주가 대표자와 달라 검토 화면에 한 줄이 뜬다. 「계좌 없음」 세계에서도 둔다(그 세계는 느린오후 쪽만 뺀다).
@@ -683,6 +706,8 @@ function minimalWorld(today: string): MockWorld {
     minHours: 1, direct: [{ date: d(4), start: "13:00", end: "15:00" }],
     // 🛍최소 세계는 대관만 하나(09-18).
     rentSpaceOn: true, rentSpacePrice: 10000, rentSpaceNote: "책상 두 개를 쓸 수 있어요.",
+    // 🔁09-19 오후 — 사업자 정보는 «필수 칸»이다(번호가 비면 손님 앞에서 빠진다). 최소 세계도 넷을 채운다. 상호는 비워 둔다(옛 공간 모양).
+    ...bizOf(U.minHost, "0000910888", "최작업", "20240102", "jpg", "000000009108"),
   }, today);
   const P = { sp: s };
   const bookings = [
@@ -704,6 +729,8 @@ export const MOCK_IDS = {
     pendingNoKey: "mock-needle-forest-class",
     /** ⏱09-19 30분 단위 공간 · 09:30~12:00 자투리 날 · 최소 1시간 30분 · 13:00~15:30 찬 날 */
     halfHour: "mock-slow-afternoon-window",
+    /** 🚪09-19 오후 공개 중인데 사업자등록번호가 빈 공간 · 확정 예약 하나(`noBizConfirmed`) */
+    noBiz: "mock-slow-afternoon-yard",
   },
   maker: { host: "mock-slow-afternoon", guest: "mock-flour-diary", stress: "mock-long-kitchen" },
   booking: {
@@ -714,6 +741,8 @@ export const MOCK_IDS = {
     minimalPaid: 90201, minimalConfirmed: 90202,
     /** ⏱09-19 30분 단위 — 2시간 30분 결제 완료 · 1시간 30분 확정 */
     halfPaid: 90021, halfConfirmed: 90022,
+    /** 🚪09-19 오후 번호가 빈 공간(S10)의 확정 예약 */
+    noBizConfirmed: 90023,
   },
 } as const;
 

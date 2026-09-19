@@ -10,6 +10,7 @@ import type { RentProduct, Space, SpaceBooking } from "./types";
 import { bookingStarted, durationLabel, fitsOpenSlot, isTimeMark, minHoursToMinutes, minutesBetween, overlaps, toMinutes } from "./rent-time";
 import { isRentProduct, productPrice } from "./rent-products";
 import { CAPACITY_MAX } from "./rent-limits";
+import { bizOnFile } from "./bizcheck";
 
 /** ⏳토스 결제창이 살아 있는 시간. 정리 작업(`sweepBookings`)이 신청을 만료로 옮기는 기준과 같은 값이다. */
 export const PAY_WINDOW_MINUTES = 30;
@@ -17,6 +18,7 @@ export const PAY_WINDOW_MINUTES = 30;
 /** 걸린 이유. 화면·승인이 이 코드로 「돈을 되돌릴 일인가 · 만료로 옮길 일인가」를 가른다. */
 export type BookingRuleCode =
   | "closed"        // 공간이 쉬는 중이거나 아직 공개 전
+  | "no-biz"        // 사업자등록번호가 빈 공간(09-19 오후 대표 — 손님 앞에 안 세운다)
   | "product-off"   // 사장님이 그 상품을 껐다
   | "chat-off"      // 커피챗을 껐다
   | "started"       // 이용 시각이 이미 시작했다(지난 날짜 포함)
@@ -44,7 +46,7 @@ export interface BookingRequest {
 /** 검사에 필요한 만큼의 공간. `Space` 전체를 받지 않는 이유 = 이 파일이 타입 하나에 묶이지 않게. */
 export type BookingRuleSpace = Pick<
   Space,
-  "status" | "minHours" | "openSlots" | "capacity" | "coffeeChat" | "coffeeChatPrice"
+  "status" | "bizNumber" | "minHours" | "openSlots" | "capacity" | "coffeeChat" | "coffeeChatPrice"
   | "rentSpaceOn" | "rentSpacePrice" | "rentSpaceNote" | "rentFullOn" | "rentFullPrice" | "rentFullNote"
 >;
 
@@ -77,6 +79,11 @@ export function validateBookingRequest(
   const { today, hhmm } = kstNow(now);
 
   if (space.status !== "open") return { ok: false, code: "closed", message: "지금은 신청할 수 없는 공간이에요." };
+  // 🚪09-19 오후 대표 — 사업자등록번호가 빈 공간은 목록·상세에서 빠진다(`spaceListed`). 주소를 들고 오거나 결제창에 다녀오는
+  //   사이에도 돈이 움직이지 않게 여기서 막는다. 결제 승인은 이 코드를 «되돌릴 일 없는 막힘»으로 읽는다(토스를 안 부른다).
+  if (!bizOnFile(space)) {
+    return { ok: false, code: "no-biz", message: "이 공간은 아직 사장님 사업자 정보를 확인하는 중이에요." };
+  }
   if (!isRentProduct(req.product) || productPrice(space, req.product) <= 0) {
     return { ok: false, code: "product-off", message: "이 공간에서 팔지 않는 상품이에요. 새로고침하고 다시 골라 주세요." };
   }

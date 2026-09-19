@@ -123,6 +123,8 @@ const SPACE_TONE: Record<string, { label: string; cls: string }> = {
   pending: { label: "검토 기다리는 중", cls: "text-lemon-on" },
   open: { label: "공개 중", cls: "text-mint-on" },
   paused: { label: "쉬는 중", cls: "text-faint" },
+  // 🚪09-19 오후 — 사업자등록번호가 빈 공간(`bizOnFile` 거짓). 상태 칸의 값이 아니라 화면이 얹는 표지다.
+  nobiz: { label: "사업자 정보 필요", cls: "text-lemon-on" },
 };
 
 export function SpaceBadge({ status }: { status: string }) {

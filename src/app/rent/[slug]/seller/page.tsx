@@ -3,7 +3,7 @@ import { cache } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getSpaceFull } from "@/lib/spaces";
-import { formatBizNumber } from "@/lib/bizcheck";
+import { formatBizNumber, spaceListed } from "@/lib/bizcheck";
 import { telHref } from "@/lib/rent-copy";
 
 // 하루 가게 — 판매자 정보 (2026-09-19 대표 [J])
@@ -18,6 +18,8 @@ import { telHref } from "@/lib/rent-copy";
 //   「들어오는 법」·등록증 경로·개업일·국세청 조회 원문은 읽기만 하고 그리지 않는다.
 // 🙈검색엔 안 올린다(`noindex`, 사이트맵에도 없음). 사람이 공간을 보다가 찾아 들어오는 화면이다.
 // 🚪공개 중인 공간만 연다. 검토 대기·쉬는 중·초안이면 없는 공간과 똑같이 404(상세 `SEC-05`와 같은 이유).
+//   🔁09-19 오후 대표 — 사업자등록번호가 빈 공간도 404다(`spaceListed`). 그래서 「아직 등록 전이에요」 갈래를 걷었다.
+//   번호가 있으면 대표자·개업일·등록증도 같이 있다(저장이 넷을 한꺼번에 요구한다, `needsBizInfo`). 주소·가게 전화는 등록 폼이 필수로 받는다.
 export const dynamic = "force-dynamic";
 
 const loadSpace = cache((slug: string) => getSpaceFull(slug));
@@ -28,7 +30,7 @@ const NOT_FOUND_META: Metadata = { title: "공간을 찾을 수 없어요 — co
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params;
   const sp = await loadSpace(slug);
-  if (!sp || sp.status !== "open") return NOT_FOUND_META;
+  if (!sp || !spaceListed(sp)) return NOT_FOUND_META;
   return {
     title: `판매자 정보 · ${sp.name} — 하루 가게`,
     robots: { index: false, follow: false },
@@ -47,13 +49,10 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
   );
 }
 
-/** 아직 채우지 않은 칸(09-18 전에 올린 옛 공간). 빈칸으로 두면 화면이 깨진 것처럼 읽힌다. */
-const Missing = () => <span className="text-faint">아직 등록 전이에요</span>;
-
 export default async function SellerInfoPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const sp = await loadSpace(slug);
-  if (!sp || sp.status !== "open") notFound();
+  if (!sp || !spaceListed(sp)) notFound();
 
   const bizName = sp.bizName.trim();
   const phone = sp.contactPhone.trim();
@@ -76,15 +75,13 @@ export default async function SellerInfoPage({ params }: { params: Promise<{ slu
             </>
           )}
         </Row>
-        <Row label="대표자">{sp.bizOwnerName.trim() || <Missing />}</Row>
+        <Row label="대표자">{sp.bizOwnerName.trim()}</Row>
         <Row label="사업자등록번호">
-          {sp.bizNumber ? <span className="tabular-nums">{formatBizNumber(sp.bizNumber)}</span> : <Missing />}
+          <span className="tabular-nums">{formatBizNumber(sp.bizNumber)}</span>
         </Row>
-        <Row label="사업장 주소">{sp.address.trim() || <Missing />}</Row>
+        <Row label="사업장 주소">{sp.address.trim()}</Row>
         <Row label="가게 전화">
-          {!phone ? (
-            <Missing />
-          ) : tel ? (
+          {tel ? (
             // ☎️메모가 섞인 번호 칸에서 `tel:`이 틀어지지 않게 번호 뽑기는 한 벌(`telHref`)을 쓴다(09-18 밤 QA G-19).
             <a href={`tel:${tel}`} className="underline underline-offset-2">
               {phone}
