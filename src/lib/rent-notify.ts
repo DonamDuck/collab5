@@ -24,6 +24,8 @@ import {
   PRODUCT_HINT_GUEST, PRODUCT_LABEL, REFUND_TIMING_LINE,
 } from "./rent-copy";
 import type { Space, SpaceBooking } from "./types";
+import { bizOnFile } from "./bizcheck";
+import type { ReviewWhy } from "./rent-review";
 import type { Profile } from "./profiles";
 
 const RESEND_ENDPOINT = "https://api.resend.com/emails";
@@ -783,11 +785,15 @@ export async function notifyRemindHost(
 }
 
 /** 검토로 내려가기 «전» 공간의 모양 — 새 공간이면 null. */
-export type SpaceReviewPrev = Pick<Space, "name" | "address" | "status">;
+export type SpaceReviewPrev = Pick<Space, "name" | "address" | "status"> & {
+  /** 🧾09-19 저녁 이번 저장이 검토로 간 이유(`spaceSaveReview`). 없으면 이름·주소를 비교해 가른다(옛 호출부·미리보기). */
+  why?: ReviewWhy;
+};
 
 /** 🚫공개가 막힌 공간인가 — `publishSpaceAction`의 세 관문과 같다(빈 사업자 정보 · 기록과 다름 · 휴업·폐업). */
 function bizBlocked(sp: Space): boolean {
-  return !sp.bizNumber || !sp.bizOwnerName || !sp.bizOpenDate || !sp.bizCertPath
+  // 🧪`bizOnFile` — 운영에선 로컬 테스트 번호도 빈 번호다(`publishSpaceAction`과 같은 판정).
+  return !bizOnFile(sp) || !sp.bizOwnerName || !sp.bizOpenDate || !sp.bizCertPath
     || sp.bizCheckStatus === "mismatch" || sp.bizCheckStatus === "closed";
 }
 
@@ -831,17 +837,24 @@ export function buildSpaceReviewNotice(space: Space, owner: Profile | null, prev
   const renamed = !!prev && prev.name.trim() !== space.name.trim();
   const moved = !!prev && prev.address.trim() !== space.address.trim();
   const again = !!prev && (renamed || moved);
+  // 🧾09-19 저녁 — 번호가 비어 있던 공간이 처음 채웠다. 이름·주소는 그대로라 「새로 올라와」도 「바뀌어」도 아니다.
+  const bizFirst = !again && prev?.why === "biz-first";
   const what = renamed && moved ? "이름과 주소가" : renamed ? "이름이" : "주소가";
   const whatObj = renamed && moved ? "이름과 주소를" : renamed ? "이름을" : "주소를";
   const subject = again
     ? `[collab5] ${space.name}, ${what} 바뀌어 다시 검토를 기다려요`
-    : `[collab5] ${space.name}, 새로 올라와 검토를 기다려요`;
+    : bizFirst
+      ? `[collab5] ${space.name}, 사업자 정보를 채워 검토를 기다려요`
+      : `[collab5] ${space.name}, 새로 올라와 검토를 기다려요`;
   const link = `${SITE_URL}/rent/review`;
   // 공개 중이던 공간은 검토 대기로 내려가는 순간 목록에서 빠진다(목록은 `open`만 읽는다). 대표가 서두를 이유라 첫 문장 뒤에 말한다.
   const wasListed = prev?.status === "open";
   const lead = again
     ? `공간이 다시 검토를 기다려요. 사장님이 매장 ${whatObj} 바꾸셨어요.${wasListed ? " 다시 열 때까지 목록에서 빠져 있어요." : ""}`
-    : bizBlocked(space)
+    : bizFirst
+      // 번호가 없던 공간은 원래 목록에 없었다(`spaceListed`). 「목록에서 빠져요」는 거짓이라 안 붙인다.
+      ? `사업자 정보가 비어 있던 공간에 사장님이 처음 채우셨어요. ${bizBlocked(space) ? "다만 지금은 열 수 없는 상태라, 아래 사업자 확인 칸을 먼저 봐 주세요." : "등록증과 국세청 조회 결과를 보고 공개할지 정해 주세요."}`
+      : bizBlocked(space)
       // 열 수 없는 상태면 «정해 주세요»가 헛걸음이다. 막힌 이유는 표의 사업자 확인 칸이 말한다(`publishSpaceAction`과 같은 판정).
       ? `새 공간이 검토를 기다려요. 다만 지금은 열 수 없는 상태라, 아래 사업자 확인 칸을 먼저 봐 주세요.`
       : `새 공간이 검토를 기다려요. 사업자등록증과 국세청 조회 결과를 보고 공개할지 정해 주세요.`;

@@ -158,6 +158,7 @@ export const RENT_GROUPS: Group[] = [
           { desc: "로그인 안 했을 때", c: "anon", to: "/rent/my?tab=host" },
           { desc: "알림 · 처음 올린 뒤", c: "host-full", to: "/rent/my?tab=host&saved=new" },
           { desc: "알림 · 이름이나 주소를 바꿔 검토로 다시 갈 때", c: "host-full", to: "/rent/my?tab=host&saved=review" },
+          { desc: "알림 · 사업자 정보를 처음 채워 검토로 갈 때", c: "host-full", to: "/rent/my?tab=host&saved=biz" },
           { desc: "알림 · 검토 중에 고침", c: "host-full", to: "/rent/my?tab=host&saved=pending" },
           { desc: "알림 · 공개 중에 고침", c: "host-full", to: "/rent/my?tab=host&saved=ok" },
           { desc: "알림 · 쉬는 동안 고친 경우", c: "host-full", to: "/rent/my?tab=host&saved=kept" },

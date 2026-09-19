@@ -31,6 +31,8 @@ import {
 } from "./rent-payment";
 // ⭐신청이 «지금도» 말이 되나 — 신청 시작·결제 승인·결제 화면이 같이 쓰는 순수 규칙(09-18 밤 QA G-01).
 import { pendingBookingProblem, validateBookingRequest } from "./rent-booking-rules";
+// 🧾09-19 저녁 저장하면 어느 상태로 가나 — 등록 폼과 같은 순수 함수.
+import { pausedChangeProblem, spaceSaveReview } from "./rent-review";
 import {
   CAPACITY_MAX, COFFEE_CHAT_MINUTES_MAX, COFFEE_CHAT_MINUTES_MIN, COFFEE_CHAT_MINUTES_STEP, COFFEE_CHAT_PRICE_MAX,
   CONTACT_PHONE_MAX, HOST_MESSAGE_MAX, MIN_HOURS_MAX, PHOTOS_MAX, PLAN_MAX, PRICE_HOUR_MAX, storePhoneOk,
@@ -299,12 +301,10 @@ export async function saveSpaceAction(input: SpaceFormInput): Promise<ActionResu
   // ⏸09-18 밤 QA(H-02·SC-04) — 쉬는 동안엔 이름·주소를 못 바꾼다(대표 판단용 추천안 중 «스키마를 안 건드리는» 쪽).
   //   바꾸면 검토 대기로 내려가는데, 관리자가 검토를 통과시키는 순간 «쉬는 중»이던 공간이 그대로 목록에 열린다.
   //   사장님이 본 고치기 화면은 그때도 「다시 열 때 그대로 보여요」라고 말하고 있었다.
-  if (prev?.status === "paused" && (renamed || moved)) {
-    return {
-      ok: false, field: renamed ? "name" : "address",
-      message: "쉬는 동안엔 이름과 주소를 못 바꿔요. 다시 여신 뒤에 바꿔 주세요.",
-    };
-  }
+  //   🆕09-19 저녁 — 사업자등록번호를 «처음» 채우는 것도 검토로 가는 저장이라 같은 이유로 막는다. 판정은 폼과 같은 함수.
+  const reviewNext = { name: input.name, address: input.address, bizNumber: bizDigits(input.bizNumber ?? "") };
+  const pausedProblem = pausedChangeProblem(prev, reviewNext);
+  if (pausedProblem) return { ok: false, field: pausedProblem.field, message: pausedProblem.message };
 
   // 🪪09-18 밤 QA(G-04·H-01) — 붙이는 소개서가 «내 것»인지 서버가 본다. 전엔 남의 소개서 주소를 그대로 붙일 수 있었고,
   //   공개된 공간이 남의 브랜드를 달고 목록에 서도 검토를 거치지 않았다.
@@ -393,7 +393,9 @@ export async function saveSpaceAction(input: SpaceFormInput): Promise<ActionResu
   // 🔁09-16 대표 — 전엔 글자 하나만 바꿔도 검토 대기로 내려가 목록에서 사라졌다. 이제 이름·주소가 바뀔 때만 내려간다.
   // 📤09-18 밤 QA(H-10) — **초안은 저장하면 검토 대기로 올라간다.** 전엔 초안에 머물러서 관리자 검토 목록
   //   (`pending`만 읽는다)에 영영 안 떴다. 사장님은 올린 줄 알고 기다렸다. 새 공간과 같은 검토 흐름으로 보낸다.
-  const status: Space["status"] = !prev || prev.status === "draft" || renamed || moved ? "pending" : prev.status;
+  // 🧾09-19 저녁 대표 — 사업자등록번호가 비어 있던 공간이 처음 채워도 검토 대기로 간다. 판정은 순수 함수 한 벌(`spaceSaveReview`).
+  const review = spaceSaveReview(prev, reviewNext);
+  const status: Space["status"] = review.status;
 
   // 🧾국세청 조회 — 번호·대표자·개업일이 «바뀌었을 때»만 부른다(대표 설계). 🔁그리고 지난번에 못 물어본 경우(`none`·`error`)도
   //   다시 부른다. 키가 생기기 전에 올린 공간이 영영 「조회 전」으로 남지 않게.
@@ -505,13 +507,16 @@ export async function saveSpaceAction(input: SpaceFormInput): Promise<ActionResu
   revalidatePath("/rent/review");
   // 📨09-18 대표 — 「나한테도 메일 오나? 내가 등록 처리해 줘야 하는데 어떻게 확인하지?」 검토 대기가 생기면 대표에게 한 통.
   //   🪤이 액션은 사장님이 «저장»을 누를 때마다 불린다. 검토 대기 중에 고쳐 저장해도, 기록과 다름을 고쳐 다시 올려도 또 불린다.
-  //     그래서 «이번 저장으로 처음 검토 대기가 됐을 때만» 보낸다 = 새 공간이거나, 전엔 검토 대기가 아니었는데 이름·주소가 바뀌었을 때.
+  //     그래서 «이번 저장으로 처음 검토 대기가 됐을 때만» 보낸다 = 새 공간이거나, 전엔 검토 대기가 아니었는데 이름·주소가 바뀌었거나
+  //     🆕사업자등록번호를 처음 채웠을 때(09-19 저녁).
   //   메일이 실패해도 저장은 그대로 성공이다(`safeNotify`). 목 모드는 이 함수 첫 줄에서 이미 멈췄다.
   if (status === "pending" && prev?.status !== "pending") {
     await safeNotify(async () => {
       const owner = await getProfileById(uid);
       // 초안이 처음 올라온 건 «새 공간»과 같다 — 이름이 바뀌었어도 「바뀌어 다시 검토」가 아니라 「새로 올라와 검토」다.
-      const before = prev && prev.status !== "draft" ? { name: prev.name, address: prev.address, status: prev.status } : null;
+      const before = prev && prev.status !== "draft"
+        ? { name: prev.name, address: prev.address, status: prev.status, why: review.why }
+        : null;
       await notifySpaceReview(saved, owner, before);
     });
   }

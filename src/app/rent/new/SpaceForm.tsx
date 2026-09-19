@@ -31,6 +31,7 @@ import {
   BIZ_CERT_MAX_BYTES, BIZ_CERT_TYPES, BIZ_MISMATCH_LINE, bizCertPathOk, bizDigits, bizNumberProblem, formatBizNumber, fromOpenDate,
   hasAnyBiz, needsBizInfo, openDateProblem, spaceListed, testBizHint, toOpenDate,
 } from "@/lib/bizcheck";
+import { pausedChangeProblem, spaceSaveReview } from "@/lib/rent-review";
 import {
   COFFEE_CHAT_LABEL, COFFEE_CHAT_WHEN_HOST, PRODUCT_HINT_HOST, PRODUCT_LABEL, PRODUCT_NOTE_PLACEHOLDER, withJosa,
 } from "@/lib/rent-copy";
@@ -264,7 +265,12 @@ export function SpaceForm({
   /** 🏠09-19 오후 대표 — 주소를 바꾸면 사업자등록증을 새로 올려야 저장된다. 서버와 같은 함수(`addressCertProblem`)라 문장도 같다.
    *  주소 칸 밑엔 바뀐 순간부터 옅게 알리고, 등록증 칸은 누른 뒤에 막는다(`blocker`). */
   const addressCertLine = addressCertProblem(initial ?? null, { address: addressNow, bizCertPath });
-  const reviewAgain = renamedNow || movedNow;
+  /** 🧾09-19 저녁 — 저장하면 어느 상태로 가나. 서버(`saveSpaceAction`)와 같은 함수(`spaceSaveReview`)다.
+   *  번호가 비어 있던 공간이 처음 채우면 이름·주소가 그대로여도 한 번 더 읽는다(`biz-first`). */
+  const reviewNow = spaceSaveReview(initial ?? null, { name, address: addressNow, bizNumber: bizDigits(bizNumber) });
+  const reviewAgain = renamedNow || movedNow || (!!initial && initial.status !== "draft" && reviewNow.why === "biz-first");
+  /** ⏸쉬는 중엔 못 하는 저장(이름·주소 바꾸기, 번호 처음 채우기). 서버와 같은 함수라 문장도 같다. */
+  const pausedLine = pausedChangeProblem(initial ?? null, { name, address: addressNow, bizNumber: bizDigits(bizNumber) });
   /** 지금 손님에게 보이는 공간인가 — 그럴 때만 「목록에서 잠시 빠져요」가 참이다.
    *  🚪09-19 오후 — 사업자등록번호가 빈 공간은 공개 중이어도 목록에 없다(`spaceListed`). */
   const listedNow = !!initial && spaceListed(initial);
@@ -523,6 +529,7 @@ export function SpaceForm({
       if (!bizCertPath) return ["bizCert", "사업자등록증 파일을 올려 주세요."];
     }
     if (addressCertLine) return ["bizCert", addressCertLine];
+    if (pausedLine) return [pausedLine.field === "biz" ? "bizNumber" : pausedLine.field, pausedLine.message];
     if (!termsOk) return ["terms", "공간 제공자 약관에 동의해 주세요."];
     return null;
   };
@@ -629,17 +636,19 @@ export function SpaceForm({
       // 검토 대기라 `/rent/{slug}`는 아직 남에게 안 보인다. 자기 것이 어디 있는지 보이는 화면으로 보낸다.
       // 💬09-17 QA — 말없이 목록으로 떨어져서 「된 건가?」 했다. `saved`로 무슨 일이 났는지 한 줄 띄운다.
       //   ⚠️검토로 내려가는 조건은 `saveSpaceAction`과 같은 규칙이다(이름·주소가 바뀌면). 거기를 바꾸면 여기도.
-      const renamed = !!initial && initial.name.trim() !== name.trim();
-      const moved = addressMoved(initial ?? null, address);
-      const saved = !initial
+      // 🧾09-19 저녁 — 서버와 같은 함수(`spaceSaveReview`)로 가른다. 초안은 올리면 검토로 가니 「올리셨어요」다.
+      const rv = spaceSaveReview(initial ?? null, { name, address, bizNumber: bizDigits(bizNumber) });
+      const saved = !initial || rv.why === "draft"
         ? "new"
         : initial.status === "pending"
           ? "pending"
-          : renamed || moved
+          : rv.why === "renamed" || rv.why === "moved"
             ? "review"
-            : initial.status === "open"
-              ? "ok"
-              : "kept";
+            : rv.why === "biz-first"
+              ? "biz"
+              : initial.status === "open"
+                ? "ok"
+                : "kept";
       router.push(`/rent/my?tab=host&saved=${saved}`);
       router.refresh();
     });

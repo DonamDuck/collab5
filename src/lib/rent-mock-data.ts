@@ -769,6 +769,7 @@ export const MOCK_MAIL_KINDS: { kind: string; label: string }[] = [
   { kind: "space-review-new", label: "공간 검토 대기 → 대표 슬랙 · 새 공간, 국세청 조회 전" },
   { kind: "space-review-mismatch", label: "공간 검토 대기 → 대표 슬랙 · 새 공간, 국세청 기록과 다름" },
   { kind: "space-review-changed", label: "공간 검토 대기 → 대표 슬랙 · 공개 중이던 공간의 이름·주소가 바뀜" },
+  { kind: "space-review-bizfirst", label: "공간 검토 대기 → 대표 슬랙 · 사업자 정보가 비어 있던 공간이 처음 채움" },
   { kind: "admin-refund-request", label: "사장님 환불 신청 → 대표 슬랙" },
   { kind: "admin-daily", label: "아침 요약 → 대표 슬랙 · 처리할 일이 있는 날" },
   { kind: "admin-daily-quiet", label: "아침 요약 → 대표 슬랙 · 숫자가 다 0인 날" },

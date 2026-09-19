@@ -98,6 +98,16 @@ export function buildPreviewMail(kind: string): PreviewMail | null {
       };
       return admin(buildSpaceReviewNotice(now, x.owner, { name: x.sp.name, address: x.sp.address, status: x.sp.status }));
     }
+    // 🧾09-19 저녁 — 번호가 빈 공개 공간(S10)이 처음 채워 검토로 내려왔다. 이름·주소는 그대로다.
+    case "space-review-bizfirst": {
+      const x = pickSpace(full, MOCK_IDS.space.noBiz);
+      const now = {
+        ...x.sp, status: "pending" as const, bizNumber: "0000112347", bizOwnerName: "김느린", bizOpenDate: "20210315",
+        bizCertPath: `${x.sp.ownerUserId}/00000000-0000-4000-8000-000000009112.jpg`, bizName: "느린오후 로스터리",
+        bizCheckStatus: "valid" as const, bizCheckDetail: { valid: "01", bSttCd: "01", bStt: "계속사업자", taxType: "부가가치세 일반과세자" },
+      };
+      return admin(buildSpaceReviewNotice(now, x.owner, { name: x.sp.name, address: x.sp.address, status: x.sp.status, why: "biz-first" }));
+    }
     case "remind-guest": { const x = pick(full, B.confirmed); return buildRemindGuest(x.b, x.sp, x.host, x.guest); }
     case "remind-host": { const x = pick(full, B.confirmed); return buildRemindHost(x.b, x.sp, x.host, x.guest); }
     case "remind-host-unaccepted": { const x = pick(full, B.paid); return buildRemindHost(x.b, x.sp, x.host, x.guest); }
