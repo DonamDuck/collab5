@@ -68,6 +68,9 @@ export function buildPreviewMail(kind: string): Mail | null {
     case "remind-host": { const x = pick(full, B.confirmed); return buildRemindHost(x.b, x.sp, x.host, x.guest); }
     case "remind-host-unaccepted": { const x = pick(full, B.paid); return buildRemindHost(x.b, x.sp, x.host, x.guest); }
     case "stress-paid-host": { const x = pick(buildWorld("stress"), B.stressPaid); return buildBookingPaid(x.b, x.sp, x.host, x.guest, x.brand); }
+    // ⏱09-19 30분 단위 예약 — 메일의 「언제」 줄(`bookingWhen`)이 「2시간 30분」으로 서는지 본다.
+    case "paid-host-halfhour": { const x = pick(full, B.halfPaid); return buildBookingPaid(x.b, x.sp, x.host, x.guest, x.brand); }
+    case "confirmed-guest-halfhour": { const x = pick(full, B.halfConfirmed); return buildBookingConfirmed(x.b, x.sp, x.host, x.guest); }
     // 가입 알림은 받는 사람이 운영자 한 명이라 `to`를 비워 둔다(실제로는 `ADMIN_EMAIL`).
     case "signup-email": return { to: "", ...buildSignupMail({ userId: 9001, brandName: "느린오후", email: "slow.afternoon@example.com", origin: "email" }) };
     case "signup-kakao-noname": return { to: "", ...buildSignupMail({ userId: 9010, brandName: "", email: "new.member@example.com", origin: "kakao" }) };
