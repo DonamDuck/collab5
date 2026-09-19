@@ -23,6 +23,7 @@ import {
 } from "@/lib/rent-actions";
 import { InfoList, InfoRow, primaryBtnCls, rentTextareaCls, secondaryBtnCls, won } from "../ui";
 import { HOST_MESSAGE_MAX } from "@/lib/rent-limits";
+import { REJECT_REASONS } from "@/lib/rent-reject-reasons";
 import { ConfirmDialog } from "../ConfirmDialog";
 
 /** 들어온 요청 — 수락 · 거절. 거절은 전액 환불이라 되돌릴 수 없다(대표 09-13).
@@ -115,7 +116,37 @@ export function HostDecide({
         onCancel={() => setConfirmReject(false)}
       >
         <p>거절하면 {won(amountTotal)} 전액이 손님께 돌아가요. 그 시간은 다시 열려요.</p>
-        {message.trim() && <p className="text-mute">남기신 말도 같이 전해드려요.</p>}
+        {/* 💬09-19 대표 — 거절 이유 칩 + 직접 쓰기. 칩을 누르면 문장이 칸에 들어가고, 고쳐 쓸 수 있다.
+            카드의 한 줄 칸과 같은 값(`message`)이라 거기 적어 둔 말도 여기서 이어 고친다. 손님 메일의 「사장님 말씀」으로 간다. */}
+        <div className="mt-4">
+          <p className="text-[15px] font-medium text-ink">손님께 남길 말</p>
+          <div className="mt-2 flex flex-wrap gap-2" role="group" aria-label="자주 쓰는 거절 이유">
+            {REJECT_REASONS.map((r) => (
+              <button
+                key={r.label}
+                type="button"
+                aria-pressed={message === r.text}
+                onClick={() => setMessage(r.text)}
+                className={`h-[44px] rounded-md border px-3 text-[15px] transition-colors ${
+                  message === r.text
+                    ? "border-transparent bg-primary-tint font-medium text-primary-on"
+                    : "border-hairline bg-surface text-ink hover:bg-primary-pale"
+                }`}
+              >
+                {r.label}
+              </button>
+            ))}
+          </div>
+          <textarea
+            rows={3}
+            className={`${rentTextareaCls} mt-3 resize-y`}
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            maxLength={HOST_MESSAGE_MAX}
+            placeholder="위에서 고르거나 직접 적어 주세요. 비워 두셔도 돼요."
+            aria-label="거절하며 손님께 남길 말"
+          />
+        </div>
       </ConfirmDialog>
     </div>
   );
