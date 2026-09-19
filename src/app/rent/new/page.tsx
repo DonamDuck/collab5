@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { HOST_REQUEST_STEPS } from "@/lib/rent-copy";
 import { getSessionUserId, getProfileById } from "@/lib/profiles";
 import { repo } from "@/lib/repo";
 import { FEE_RATE, listSpacesByOwner } from "@/lib/spaces";
@@ -96,20 +95,8 @@ export default async function NewSpacePage({
         </p>
       </header>
 
-      {/* 🧭09-17 대표 — 등록하기 «전에» 요청이 들어온 뒤 할 일을 먼저 보여 준다. 수락 뒤 2일 안에 연락하는 규칙이 여기서 처음 나온다.
-          번호는 장식이 아니라 순서라 붙였다. 문장 정본은 `rent-copy`의 `HOST_REQUEST_STEPS`(메일과 같은 약속). */}
-      <section className="mt-8 rounded-md bg-surface-soft px-5 py-5">
-        <h2 className="text-[17px] font-bold leading-snug tracking-tight text-ink">요청이 들어오면 이렇게 해요</h2>
-        <ol className="mt-3 space-y-2.5">
-          {HOST_REQUEST_STEPS.map((t, i) => (
-            <li key={t} className="flex gap-3 text-[15px] leading-relaxed break-keep text-body">
-              <span className="w-[16px] shrink-0 text-right tabular-nums text-mute">{i + 1}</span>
-              <span className="min-w-0 flex-1">{t}</span>
-            </li>
-          ))}
-        </ol>
-      </section>
-
+      {/* 🔻09-19 대표 코멘트 #67·#111 — 「요청이 들어오면 이렇게 해요」는 폼 맨 아래(등록 버튼 바로 위)로 옮겼다.
+          제목은 「등록 전 확인해 주세요」, 수수료 한 줄이 붙었다. 그리는 곳은 `SpaceForm`(새로 올리기일 때만). */}
       {/* 수수료율을 서버에서 내려보낸다 — 클라가 숫자를 따로 들고 있으면 요율이 바뀌는 날
           화면만 옛 값을 말한다(그리고 그 어긋남은 아무 에러도 안 낸다). */}
       <SpaceForm

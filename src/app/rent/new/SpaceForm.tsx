@@ -33,7 +33,7 @@ import {
 } from "@/lib/bizcheck";
 import { pausedChangeProblem, spaceSaveReview } from "@/lib/rent-review";
 import {
-  COFFEE_CHAT_LABEL, COFFEE_CHAT_WHEN_HOST, PRODUCT_HINT_HOST, PRODUCT_LABEL_HOST, PRODUCT_NOTE_PLACEHOLDER, withJosa,
+  COFFEE_CHAT_LABEL, COFFEE_CHAT_WHEN_HOST, HOST_REQUEST_STEPS, hostFeeLine, PRODUCT_HINT_HOST, PRODUCT_LABEL_HOST, PRODUCT_NOTE_PLACEHOLDER, withJosa,
 } from "@/lib/rent-copy";
 import { CATEGORY_OPTIONS, dateLabel, primaryBtnCls, RentSelect, rentInputCls, rentTextareaCls, secondaryBtnCls, won } from "../ui";
 import { AddressField } from "./AddressField";
@@ -410,13 +410,15 @@ export function SpaceForm({
 
   /** 저장은 그대로 «줄바꿈 문자열»이다(DB·상세 화면을 안 건드린다). 화면에서만 목록으로 다룬다. */
   const ruleList = rules.split(/\n+/).map((r) => r.trim()).filter(Boolean);
+  /** 담기 전 칸의 글 → 줄 목록에 더한 결과. 🔁09-19 대표 #84 — 칸이 여러 줄 입력이 되면서 한 번에 두 줄 이상이 올 수 있다.
+   *  저장 형식이 «줄바꿈 = 한 항목»이라 줄마다 한 항목으로 나눠 담는다(목록을 붙여 넣어도 그대로 번호가 붙는다). 같은 줄은 한 번만. */
+  const withTyped = (list: string[], typed: string) => {
+    const out = [...list];
+    for (const line of typed.split(/\n+/).map((r) => r.trim()).filter(Boolean)) if (!out.includes(line)) out.push(line);
+    return out;
+  };
   const addRule = () => {
-    const v = ruleInput.trim();
-    if (!v || ruleList.includes(v)) {
-      setRuleInput("");
-      return;
-    }
-    setRules([...ruleList, v].join("\n"));
+    setRules(withTyped(ruleList, ruleInput).join("\n"));
     setRuleInput("");
   };
 
@@ -553,8 +555,7 @@ export function SpaceForm({
       //   사장님 눈엔 적어 둔 줄이 칸에 그대로 보이니 담긴 줄 안다. 저장하고 목록에 돌아와서야 빠진 걸 안다.
       //   ⭐[담기]는 «여러 줄을 나누는 방법»이지 관문이 아니다. 보내기 직전에 남은 한 줄을 같이 담는다.
       const leftoverRule = ruleInput.trim();
-      const ruleListFinal = leftoverRule && !ruleList.includes(leftoverRule) ? [...ruleList, leftoverRule] : ruleList;
-      const rulesFinal = ruleListFinal.join("\n");
+      const rulesFinal = withTyped(ruleList, leftoverRule).join("\n");
       const leftoverFacility = facilityInput.trim();
       const facilitiesFinal =
         leftoverFacility && !facilities.includes(leftoverFacility) ? [...facilities, leftoverFacility] : facilities;
@@ -950,23 +951,20 @@ export function SpaceForm({
             입력 버튼, 추가하면 하단에 +규칙 추가 이런 식으로」*).
             ⭐줄바꿈으로 나누라는 건 «규칙»이 아니라 «약속»이었다 — 지키는 사람이 없으면 한 덩어리로 저장되고
               상세 화면의 번호 매기기가 통째로 무너진다. 한 줄씩 담게 하면 그 약속이 필요 없어진다.
-            🔗저장 형식은 그대로 줄바꿈 문자열이다(상세 화면·DB를 안 건드린다). 바뀐 건 넣는 방법뿐. */}
+            🔗저장 형식은 그대로 줄바꿈 문자열이다(상세 화면·DB를 안 건드린다). 바뀐 건 넣는 방법뿐.
+            🔁09-19 대표 코멘트 #84 — 「multitext로, 그냥 줄글 많이 쓸 수 있게」. 칸만 여러 줄 입력으로 바꿨다. 담기 방식은 그대로다.
+              Enter는 줄바꿈이고(긴 문장을 편하게), 담는 건 [담기] 버튼이다. 여러 줄을 담으면 줄마다 한 항목이 된다(`withTyped`).
+              담기를 안 눌러도 제출 때 같이 담긴다(09-18 밤 H-14, `submit`). */}
         <div>
-          <div className="flex gap-2">
-            <input
+          <div className="flex items-end gap-2">
+            <textarea
               id="sp-rules"
-              className={`${rentInputCls} min-w-0`}
+              rows={2}
+              className={`${rentTextareaCls} min-w-0 flex-1 resize-y`}
               value={ruleInput}
               onChange={(e) => setRuleInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  // 폼 제출로 새지 않게 막는다 — 이 화면의 제출은 맨 아래 버튼 하나뿐이다.
-                  e.preventDefault();
-                  addRule();
-                }
-              }}
               placeholder="예) 신발은 벗고 들어와 주세요"
-              aria-label="사용 유의 사항"
+              aria-label="사용 시 유의 사항"
             />
             <button type="button" onClick={addRule} className={`${secondaryBtnCls} h-[48px] shrink-0`}>
               담기
@@ -1400,15 +1398,40 @@ export function SpaceForm({
         )}
       </Group>
 
-      <div>
+      {/* 🧭등록 전 확인(대표 09-19 코멘트 #67·#111) — 원래 폼 머리의 「요청이 들어오면 이렇게 해요」였다. 대표: 「하단 어딘가로 내리자,
+          마지막이면 좋겠다」. 등록 버튼 바로 위에서 요청 뒤 할 일과 수수료를 한 번에 읽고 누르게 한다.
+          번호는 장식이 아니라 순서라 붙였다. 문장 정본은 `rent-copy`의 `HOST_REQUEST_STEPS`(공간 공개 메일과 같은 약속).
+          💰수수료 줄은 서버가 넘긴 요율(`feeRate`)로 쓴다(`hostFeeLine`). 고치기 화면엔 전에도 없던 절이라 새로 올리기만. */}
+      {!editing && (
+        <section className="rounded-md bg-surface-soft px-5 py-5">
+          <h2 className="text-[17px] font-bold leading-snug tracking-tight text-ink">등록 전 확인해 주세요</h2>
+          <ol className="mt-3 space-y-2.5">
+            {[...HOST_REQUEST_STEPS, hostFeeLine(feeRate)].map((t, i) => (
+              <li key={t} className="flex gap-3 text-[15px] leading-relaxed break-keep text-body">
+                <span className="w-[16px] shrink-0 text-right tabular-nums text-mute">{i + 1}</span>
+                <span className="min-w-0 flex-1">{t}</span>
+              </li>
+            ))}
+          </ol>
+        </section>
+      )}
+
+      {/* 📌등록 바(대표 09-19 코멘트 #68: 「플로팅으로 고정으로 따라다니게」). 폰·데스크톱 둘 다 화면 아래에 붙어 따라온다.
+          ⭐`fixed`가 아니라 `sticky`다. 폼 «안»에서만 따라다니다가 폼이 끝나면 제자리(마지막 절 밑)에 내려앉는다.
+            그래서 맨 아래까지 내리면 마지막 칸과 푸터를 가리지 않는다. `fixed`면 푸터 위에 늘 떠 있어서 여백을 따로 벌려야 했다.
+          ⚠️이 바는 폼 뿌리(`space-y-12`)의 «직계 자식»이어야 한다. 한 겹 더 감싸면 그 겹 안에서만 붙어 있다가 같이 사라진다.
+          📐모양은 신청 폼의 결제 바(`BookingForm`의 `PayBar`)와 같다 — 위만 둥근 면 + hairline + e2, 아래 여백은 안전 영역과 12px 중 큰 쪽.
+            양옆은 `main`의 여백(px-4 · sm:px-6)만큼 밖으로 빼서 폰에선 화면 끝까지 닿는다.
+            `mb-3`은 뿌리의 칸 사이 48px을 줄인다(버튼 밑 한 줄이 버튼에 붙어 읽히게). */}
+      <div className="sticky bottom-0 z-30 -mx-4 mb-3 rounded-t-2xl border border-b-0 border-hairline bg-surface px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-e2 sm:-mx-6 sm:px-6">
         {(err || (tried && blocked) || bizServerMsg) && (
           // 서버가 돌려준 말이 있으면 그것을, 없으면 지금 막고 있는 이유를. 둘이 같이 뜨면 잔소리가 된다.
           // 🧾사업자 칸의 서버 말은 칸 밑이 빨갛고 여기선 옅게 한 번 더(칸 막힘과 같은 처리).
-          <p className={`mb-4 text-[15px] leading-relaxed break-keep ${err ? "text-danger" : "text-faint"}`}>
+          <p className={`mb-2 text-[15px] leading-relaxed break-keep ${err ? "text-danger" : "text-faint"}`}>
             {err || (tried && blocked) || bizServerMsg}
           </p>
         )}
-        {savedNote && <p role="status" className="mb-4 text-[15px] leading-relaxed break-keep text-mute">{savedNote}</p>}
+        {savedNote && <p role="status" className="mb-2 text-[15px] leading-relaxed break-keep text-mute">{savedNote}</p>}
         <button
           type="button"
           onClick={submit}
@@ -1427,21 +1450,22 @@ export function SpaceForm({
                     : "고친 내용 올리기"
                 : "등록 신청하기"}
         </button>
-        <p className="mt-3 text-center text-[15px] leading-relaxed break-keep text-faint">
-          {/* 🔁09-17 QA — 「승인이 완료되는 대로 노출이 시작돼요」 명사화 둘, 고치기 쪽은 머리글과 같은 말 + 「반영됩니다」 피동.
-              검토 기한은 아직 대표가 안 정해서 적지 않는다. */}
-          {/* 🔁09-18 밤 QA(H-09) — 이름·주소를 «이미 바꾼» 사장님에겐 위 칸 옆 안내가 말했으니 여기선 되풀이하지 않는다. */}
-          {!editing
-            ? "등록 요청 시 관리자 승인 후 하루 가게에 노출됩니다."
-            : fixing
-              ? "보내 주시면 부탁드린 부분을 확인하고 목록에 열어 드려요."
-              : initial?.status === "pending"
-              ? "고친 내용은 지금 하는 검토에 같이 담겨요."
-              : reviewAgain
-                ? "고친 내용을 읽어 보고 다시 열어 드릴게요."
-                : "가게 이름이나 주소를 바꾸시면 한 번 더 읽어 볼게요. 그동안 목록에서 잠시 빠져요."}
-        </p>
       </div>
+      <p className="text-center text-[15px] leading-relaxed break-keep text-faint">
+        {/* 🔁09-17 QA — 「승인이 완료되는 대로 노출이 시작돼요」 명사화 둘, 고치기 쪽은 머리글과 같은 말 + 「반영됩니다」 피동.
+            검토 기한은 아직 대표가 안 정해서 적지 않는다. */}
+        {/* 🔁09-18 밤 QA(H-09) — 이름·주소를 «이미 바꾼» 사장님에겐 위 칸 옆 안내가 말했으니 여기선 되풀이하지 않는다. */}
+        {/* 🔁09-19 대표 코멘트 #69 — 새로 올리기 줄은 대표 문안 그대로(관리자 승인 뒤 노출). */}
+        {!editing
+          ? "등록 요청 시 관리자 승인 후 하루 가게에 노출됩니다."
+          : fixing
+            ? "보내 주시면 부탁드린 부분을 확인하고 목록에 열어 드려요."
+            : initial?.status === "pending"
+            ? "고친 내용은 지금 하는 검토에 같이 담겨요."
+            : reviewAgain
+              ? "고친 내용을 읽어 보고 다시 열어 드릴게요."
+              : "가게 이름이나 주소를 바꾸시면 한 번 더 읽어 볼게요. 그동안 목록에서 잠시 빠져요."}
+      </p>
     </div>
   );
 }
