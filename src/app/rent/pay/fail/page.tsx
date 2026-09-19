@@ -88,7 +88,7 @@ export default async function RentPayFailPage({
         </Link>
         {/* 09-16 손님 전용 목록으로(B81). `/rent/my`는 사장님 화면이다. */}
         <Link href="/rent/requests" className={secondaryBtnCls}>
-          내 신청 보기
+          내 예약 보기
         </Link>
       </div>
       {/* 💬막혔을 때 갈 곳. 버튼 무게를 늘리지 않으려고 글자 링크로 둔다(`/rent/done`과 같은 자리). */}

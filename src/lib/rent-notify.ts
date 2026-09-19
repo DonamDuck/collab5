@@ -410,7 +410,7 @@ export function buildBookingPaidToGuest(
   ];
   const tail = ASK("사장님과 연락이 잘 닿지 않으면 알려 주세요.");
   // ⚖️09-19 대표 — 결제 메일 끝에 통신판매중개자 한 줄(`BROKER_NOTE`).
-  return { to: guest?.email ?? "", subject, ...compose(lead, rows, { href: link, label: "예약 내역 보기" }, tail, BROKER_NOTE) };
+  return { to: guest?.email ?? "", subject, ...compose(lead, rows, { href: link, label: "내 예약 보기" }, tail, BROKER_NOTE) };
 }
 
 /** 보내는 쪽 — 문장은 `buildBookingPaidToGuest`가 만든다(09-17 메일 미리보기 `/dev/rent-mail`이 같은 함수를 부른다). */
@@ -602,7 +602,7 @@ export function buildBookingCancelledToGuest(
     [LABEL.paid, won(booking.amountTotal)],
     [LABEL.refund, refund === 0 ? "없어요" : `${won(refund)}${full ? " 전액" : ""}\n${REFUND_TIMING_LINE}`],
   ];
-  return { to: guest?.email ?? "", subject, ...compose(lead, rows, { href: link, label: "예약 내역 보기" }, tail) };
+  return { to: guest?.email ?? "", subject, ...compose(lead, rows, { href: link, label: "내 예약 보기" }, tail) };
 }
 
 /** 보내는 쪽 — 문장은 `buildBookingCancelledToGuest`가 만든다(09-17 메일 미리보기 `/dev/rent-mail`이 같은 함수를 부른다). */
@@ -718,7 +718,7 @@ export function buildRemindGuest(
   ];
   // 손님 약관 제10조 — 「연락이 없으면 회사 고객센터로 알려 주세요」.
   const tail = ASK("사장님께 이용 안내를 아직 못 받으셨나요? 저희가 사장님께 먼저 연락해 볼게요.");
-  return { to: guest?.email ?? "", subject, ...compose(lead, rows, { href: link, label: "예약 내역 보기" }, tail) };
+  return { to: guest?.email ?? "", subject, ...compose(lead, rows, { href: link, label: "내 예약 보기" }, tail) };
 }
 
 /** 보내는 쪽 — 문장은 `buildRemindGuest`가 만든다(09-17 메일 미리보기 `/dev/rent-mail`이 같은 함수를 부른다). */

@@ -82,7 +82,7 @@ export const RENT_GROUPS: Group[] = [
           { desc: "결제 실패 · 그 사이 시간이 차서 자동 취소 (다시 결제하기 없음)", c: "guest-full", to: `/rent/pay/fail?code=RENT_SLOT_TAKEN_REFUNDED&orderId=mock-order-${B.pending}` },
           { desc: "결제 실패 · 자동 환불도 실패해서 연락드림", c: "guest-full", to: `/rent/pay/fail?code=RENT_SLOT_TAKEN_REFUND_PENDING&orderId=mock-order-${B.pending}` },
           { desc: "결제 실패 · 모르는 코드나 주소에 글을 붙인 경우 (기본 문장)", c: "guest-full", to: "/rent/pay/fail?message=아무 글이나&code=SOMETHING_ELSE" },
-          { desc: "결제 시간이 지난 주문을 열면 보낸 신청 목록으로 넘어가요", c: "guest-full", to: `/rent/pay/mock-order-${B.expired}` },
+          { desc: "결제 시간이 지난 주문을 열면 내 예약으로 넘어가요", c: "guest-full", to: `/rent/pay/mock-order-${B.expired}` },
           { desc: "이미 끝난 주문(다녀온 예약)을 열면 예약 한 건 화면으로 넘어가요", c: "guest-full", to: `/rent/pay/mock-order-${B.done}` },
           { desc: "남의 주문 (404)", c: "guest-full", to: `/rent/pay/mock-order-${B.refundReq}` },
         ],
@@ -101,7 +101,7 @@ export const RENT_GROUPS: Group[] = [
           { desc: "손님 취소, 일부 돌려받음", c: "guest-full", to: `/rent/done/${B.cancelledFuture}` },
           { desc: "손님 취소, 이용일 지남", c: "guest-full", to: `/rent/done/${B.cancelledPast}` },
           { desc: "결제 시간이 지난 신청", c: "guest-full", to: `/rent/done/${B.expired}` },
-          { desc: "결제 전 신청을 열면 신청 목록으로 넘어가요", c: "guest-full", to: `/rent/done/${B.pending}` },
+          { desc: "결제 전 신청을 열면 내 예약으로 넘어가요", c: "guest-full", to: `/rent/done/${B.pending}` },
           { desc: "결제는 마쳤는데 사장님이 수락하지 않은 채 이용 시간이 시작됨", c: "guest-full", to: `/rent/done/${B.paidStarted}` },
           { desc: "로그인 안 하고 열면 로그인 화면으로 (돌아올 주소가 붙어요)", c: "anon", to: `/rent/done/${B.paid}` },
           { desc: "남의 예약이나 없는 번호 (404)", c: "guest-full", to: `/rent/done/${B.refundReq}` },
@@ -110,7 +110,7 @@ export const RENT_GROUPS: Group[] = [
         ],
       },
       {
-        title: "내가 보낸 신청",
+        title: "내 예약",
         path: "/rent/requests",
         note: "결제 안 한 신청 세 건은 맨 아래에 접혀 있어요. 날짜가 지난 결제 전 신청도 한 줄 있어요.",
         rows: [

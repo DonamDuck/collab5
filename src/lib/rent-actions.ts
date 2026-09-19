@@ -819,7 +819,7 @@ export async function confirmBookingAction(
       if (late) return late;
       return {
         ok: false, code: approved.code, bookingId: b.id,
-        message: "결제를 확인하고 있어요. 잠시 뒤 신청 내역에서 한 번 더 봐 주세요.",
+        message: "결제를 확인하고 있어요. 잠시 뒤 내 예약에서 한 번 더 봐 주세요.",
       };
     }
     // 돈은 안 움직였다. 결제 줄만 ABORTED로 남기고 예약은 그대로 둔다(30분 안이면 다시 시도할 수 있다).
@@ -1017,7 +1017,7 @@ export async function cancelBookingAction(bookingId: number, quotedRefund?: numb
     //   그대로 밀면 이미 환불된 결제에 취소가 한 번 더 가고, 장부의 「거절」이 「손님 취소」로 뒤집힌다.
     const fresh = await getBooking(bookingId);
     if (!fresh || (fresh.status !== "paid" && fresh.status !== "confirmed")) {
-      return { ok: false, message: "그 사이 예약 상태가 바뀌었어요. 신청 내역에서 한 번 더 봐 주세요." };
+      return { ok: false, message: "그 사이 예약 상태가 바뀌었어요. 내 예약에서 한 번 더 봐 주세요." };
     }
     const r = await cancelPayment(
       pay.paymentKey || b.paymentKey, "게스트 취소",

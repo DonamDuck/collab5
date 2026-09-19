@@ -8,10 +8,10 @@ export default function RentDoneNotFound() {
     <main className="mx-auto w-full max-w-[560px] px-4 py-14 sm:px-6">
       <h1 className="text-[22px] font-bold leading-tight tracking-tight text-ink">이 예약을 찾지 못했어요</h1>
       <p className="mt-3 text-[16px] leading-relaxed break-keep text-mute">
-        주소가 틀렸거나 다른 계정으로 한 예약일 수 있어요. 내 신청 내역에서 다시 찾아보세요.
+        주소가 틀렸거나 다른 계정으로 한 예약일 수 있어요. 내 예약에서 다시 찾아보세요.
       </p>
       <Link href="/rent/requests" className={`${primaryBtnCls} mt-8 h-[48px] w-full`}>
-        신청 내역 보기
+        내 예약 보기
       </Link>
     </main>
   );

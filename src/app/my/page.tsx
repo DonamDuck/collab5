@@ -311,7 +311,7 @@ export default async function MyPage({ searchParams }: { searchParams: Promise<{
             {[
               { href: "/rent/my?tab=host", n: rentToAnswer, label: "새 요청", hot: rentToAnswer > 0 },
               { href: "/rent/my?tab=host", n: rentUpcoming, label: "다가오는 예약", hot: false },
-              { href: "/rent/my?tab=guest", n: rentMyTrips, label: "빌린 예약", hot: false },
+              { href: "/rent/my?tab=guest", n: rentMyTrips, label: "내 예약", hot: false },
             ].map((c) => (
               <Link
                 key={c.label}
@@ -344,7 +344,7 @@ export default async function MyPage({ searchParams }: { searchParams: Promise<{
                 //   ⭐숫자는 «예약 완료» 한 판정(`rentMyTrips`)만 쓰고, 나머지는 세지 말고 무엇이 있는지만 말한다.
                 desc:
                   rentMyTrips > 0
-                    ? `빌린 예약 ${rentMyTrips}건을 봐요`
+                    ? `내 예약 ${rentMyTrips}건을 봐요`
                     : rentGuestBookings.length > 0
                       ? "지난 예약과 취소한 예약을 봐요"
                       : "아직 빌린 공간이 없어요",

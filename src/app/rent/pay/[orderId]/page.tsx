@@ -96,7 +96,7 @@ export default async function RentPayPage({ params }: { params: Promise<{ orderI
             {backToSpace ? `${brief.name} 다시 보기` : "다른 공간 보기"}
           </Link>
           <Link href="/rent/requests" className={secondaryBtnCls}>
-            내 신청 보기
+            내 예약 보기
           </Link>
         </div>
       </main>

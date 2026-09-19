@@ -24,7 +24,7 @@ export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   // 확정·완료 어느 쪽이든 열리는 화면이라 탭 제목은 중립으로 둔다(본문 제목이 상태를 말한다).
-  title: "예약 내역 — collab5",
+  title: "내 예약 — collab5",
   robots: { index: false },
 };
 
@@ -140,7 +140,7 @@ export default async function RentDonePage({ params }: { params: Promise<{ booki
                     <span className="block text-[15px] text-mute">지금 돌려드리는 중이에요</span>
                   </>
                 ) : refunded === null ? (
-                  <span className="text-mute">신청 내역에서 확인해 주세요</span>
+                  <span className="text-mute">내 예약에서 확인해 주세요</span>
                 ) : (
                   <span className="font-medium text-ink">{won(refunded)}</span>
                 )
@@ -230,10 +230,11 @@ export default async function RentDonePage({ params }: { params: Promise<{ booki
       {/* 🔻09-15 대표 — 버튼 둘을 나란히 두지 않는다. 「신청 내역 보기」가 지금 할 일이고
           「다른 공간도 둘러보기」는 그 다음에 «혹시» 할 일이라 무게가 다르다.
           🔗09-16 「신청 내역 보기」는 손님 전용 `/rent/requests`로 간다(B81). 전엔 사장님 화면인 `/rent/my`로
-          가서, 손님이 자기 신청을 찾으려면 공간·받은 신청 두 덩이를 지나야 했다. */}
+          가서, 손님이 자기 신청을 찾으려면 공간·받은 신청 두 덩이를 지나야 했다.
+          🔁09-19 대표 [F] — 이름을 「내 예약」 한 벌로(「일단은 내 예약으로 하자」). 메뉴 바·메일·목록 제목이 같은 이름이다. */}
       <div className="mt-9">
         <Link href="/rent/requests" className={`${primaryBtnCls} h-[48px] w-full`}>
-          신청 내역 보기
+          내 예약 보기
         </Link>
         <Link href="/rent" className={`${secondaryBtnCls} mt-2 h-[48px] w-full`}>
           다른 공간도 둘러보기

@@ -597,7 +597,7 @@ export default async function MyRentPage({
       {tab === "guest" && (
         <section className="mt-8">
           <div className="flex items-baseline justify-between gap-3">
-            <h2 className={h2Cls}>내가 빌린 공간</h2>
+            <h2 className={h2Cls}>내 예약</h2>
             <Link href="/rent/requests" className="shrink-0 py-[12px] text-[15px] text-mute underline underline-offset-2">
               따로 모아 보기
             </Link>

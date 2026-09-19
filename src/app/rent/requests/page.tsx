@@ -18,7 +18,7 @@ import { KAKAO_CHAT_URL } from "@/lib/site";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "내가 보낸 신청 — collab5",
+  title: "내 예약 — collab5",
   // 로그인해야 보이는 화면이라 검색에 걸릴 이유가 없다.
   robots: { index: false },
   // 🔎09-18 밤 QA SC-18 — 대표 주소를 안 두면 루트의 `canonical: "/"`가 상속돼 «이 화면은 홈의 사본»이라고 말하게 된다. 자기 주소로.
@@ -35,7 +35,7 @@ export default async function RentRequestsPage() {
   if (!uid) {
     return (
       <main className="mx-auto w-full max-w-[560px] px-4 py-14 sm:px-6">
-        <h1 className="text-[28px] font-bold leading-[1.25] tracking-[-0.02em] text-ink">내가 보낸 신청</h1>
+        <h1 className="text-[28px] font-bold leading-[1.25] tracking-[-0.02em] text-ink">내 예약</h1>
         <p className="mt-3 text-[17px] leading-relaxed break-keep text-mute">
           로그인하시면 보내신 신청과 사장님 답을 같이 보실 수 있어요.
         </p>
@@ -69,7 +69,7 @@ export default async function RentRequestsPage() {
         <Link href="/rent" className="inline-block py-[12px] text-[15px] text-mute underline underline-offset-2">
           ← 하루 가게
         </Link>
-        <h1 className="mt-3 text-[28px] font-bold leading-[1.25] tracking-[-0.02em] text-ink">내가 보낸 신청</h1>
+        <h1 className="mt-3 text-[28px] font-bold leading-[1.25] tracking-[-0.02em] text-ink">내 예약</h1>
         {/* 💬09-16 phase 1 — 채팅이 없으니 막히면 갈 곳이 여기다. 사장님과 연락이 안 닿는 일도 우리가 받는다. */}
         <p className="mt-2 text-[15px] leading-relaxed break-keep text-mute">
           사장님과 연락이 닿지 않거나 예약에 문제가 생기면{" "}
