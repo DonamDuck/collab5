@@ -1,7 +1,7 @@
 import { MOCK_IDS } from "@/lib/rent-mock-data";
 import type { Group, Popup } from "./types";
 
-// 🗺하루 가게 묶음 (2026-09-17 `/dev/rent-map`에서 옮겨 옴 → 09-18 사이트 지도 `/dev/map#rent`의 한 묶음)
+// 🗺하루 팝업 묶음 (2026-09-17 `/dev/rent-map`에서 옮겨 옴 → 09-18 사이트 지도 `/dev/map#rent`의 한 묶음)
 // ⭐이 목록은 코드의 실제 분기를 읽고 만들었다. 화면에 갈래가 늘면 여기에도 줄을 더한다.
 
 const S = MOCK_IDS.space;
@@ -147,7 +147,7 @@ export const RENT_GROUPS: Group[] = [
       {
         // 🔁09-18 밤 QA SC-15 — 이 화면은 위에 칸이 둘이다(「빌린 공간」 기본 · 「빌려준 공간」). 전엔 줄에 `tab=host`가 없어서
         //   사장님 줄 열다섯이 전부 빌린 공간 칸으로 열렸다. 사장님 줄은 `tab=host`, 빌린 공간은 아래 따로.
-        title: "내 하루 가게 · 빌려준 공간 칸",
+        title: "내 하루 팝업 · 빌려준 공간 칸",
         path: "/rent/my?tab=host",
         note: "위 칸 둘 중 「빌려준 공간」으로 열려요. 공간은 공개 중 둘·검토 대기·쉬는 중·초안, 그리고 사업자등록번호가 빈 공간(「사업자 정보 필요」와 「고치러 가기」 줄)이에요. 들어온 요청은 새 요청(수락 전 손님 정보), 이용 시간이 시작된 결제 완료, 확정(연락처 열림), 환불 신청 중, 다녀감(가림), 거절, 환불, 손님 취소 둘이에요. 「알림」 줄은 맨 위에 한 번 뜨고 주소에서 지워지는데 칸은 그대로 남아요. 다시 보려면 링크를 한 번 더 누르면 돼요.",
         rows: [
@@ -171,7 +171,7 @@ export const RENT_GROUPS: Group[] = [
         ],
       },
       {
-        title: "내 하루 가게 · 빌린 공간 칸",
+        title: "내 하루 팝업 · 빌린 공간 칸",
         path: "/rent/my?tab=guest",
         note: "위 칸 둘 중 「빌린 공간」(기본 칸)이에요. 모든 상태의 신청이 있는 손님 계정으로 열어요. 칩 셋이 예약 완료·지난 예약·취소·환불로 나눠요.",
         rows: [
@@ -257,18 +257,18 @@ export const RENT_GROUPS: Group[] = [
     title: "공통",
     screens: [
       {
-        title: "하루 가게에서 이어지는 다른 화면",
+        title: "하루 팝업에서 이어지는 다른 화면",
         path: "",
         rows: [
           { desc: "홈 (오른쪽 아래 카카오톡 버튼)", c: "guest-full", to: "/" },
           { desc: "고객센터", c: "guest-full", to: "/help" },
-          { desc: "이용약관 · 하루 가게 조항", c: "guest-full", to: "/terms#rent" },
+          { desc: "이용약관 · 하루 팝업 조항", c: "guest-full", to: "/terms#rent" },
           { desc: "호스트 약관", c: "guest-full", to: "/terms/host" },
           { desc: "개인정보처리방침", c: "guest-full", to: "/privacy" },
-          { desc: "사장님 소개서 (하루 가게로 돌아가기 버튼)", c: "guest-full", to: `/m/${M.host}?back=/rent/${S.full}` },
+          { desc: "사장님 소개서 (하루 팝업으로 돌아가기 버튼)", c: "guest-full", to: `/m/${M.host}?back=/rent/${S.full}` },
           { desc: "긴 이름 소개서 (돌아가기 버튼)", c: "stress-guest", to: `/m/${M.stress}?back=/rent/${S.stress}` },
-          { desc: "없는 예약 번호 (하루 가게 404)", c: "guest-full", to: "/rent/done/99999999" },
-          // 🔙09-18 밤 QA SC-05·SC-15 — 하루 가게에서 넘어온 로그인·가입. 가입 링크와 가입 뒤 로그인이 돌아올 주소를 들고 가고, 가입 부제가 바뀐다.
+          { desc: "없는 예약 번호 (하루 팝업 404)", c: "guest-full", to: "/rent/done/99999999" },
+          // 🔙09-18 밤 QA SC-05·SC-15 — 하루 팝업에서 넘어온 로그인·가입. 가입 링크와 가입 뒤 로그인이 돌아올 주소를 들고 가고, 가입 부제가 바뀐다.
           { desc: "로그인 · 공간에서 「로그인하고 신청하기」로 넘어옴 (회원가입 링크에도 돌아올 주소)", c: "anon", to: `/login?redirect=${encodeURIComponent(`/rent/${S.full}`)}` },
           { desc: "회원가입 · 공간에서 넘어온 손님 (부제 「가입하면 바로 공간을 신청할 수 있어요」)", c: "anon", to: `/signup?redirect=${encodeURIComponent(`/rent/${S.full}`)}` },
           { desc: "회원가입 · 공간 올리기에서 넘어온 사장님 (부제 「가입하면 바로 공간을 올릴 수 있어요」)", c: "anon", to: `/signup?redirect=${encodeURIComponent("/rent/new")}` },
@@ -283,9 +283,9 @@ export const RENT_POPUPS: Popup[] = [
   // 🔑09-19 [G] 로그인 안 한 사람은 바 버튼이 「로그인하고 신청하기」라 팝업 대신 로그인 화면으로 가요. 돌아오면 이 팝업이 떠요.
   { where: { desc: "예약 한 건", c: "guest-full", to: `/rent/done/${B.confirmed}` }, button: "「예약 취소하기」", title: "예약을 취소할까요?" },
   // 사장님 버튼은 「빌려준 공간」 칸에 있다. `tab=host` 없이 열면 빌린 공간 칸이 떠서 누를 버튼이 안 보인다(09-18 밤 QA SC-15).
-  { where: { desc: "내 하루 가게", c: "host-full", to: "/rent/my?tab=host" }, button: "새 요청 줄의 「거절」", title: "이 요청을 거절할까요" },
-  { where: { desc: "내 하루 가게", c: "host-full", to: "/rent/my?tab=host" }, button: "이용 시간이 시작된 줄의 「관리자에게 환불 신청하기」", title: "관리자에게 환불을 신청할까요" },
-  { where: { desc: "내 하루 가게", c: "host-full", to: "/rent/my?tab=host" }, button: "공개 중인 공간 줄의 「잠시 쉬기」", title: "잠시 쉴까요?" },
+  { where: { desc: "내 하루 팝업", c: "host-full", to: "/rent/my?tab=host" }, button: "새 요청 줄의 「거절」", title: "이 요청을 거절할까요" },
+  { where: { desc: "내 하루 팝업", c: "host-full", to: "/rent/my?tab=host" }, button: "이용 시간이 시작된 줄의 「관리자에게 환불 신청하기」", title: "관리자에게 환불을 신청할까요" },
+  { where: { desc: "내 하루 팝업", c: "host-full", to: "/rent/my?tab=host" }, button: "공개 중인 공간 줄의 「잠시 쉬기」", title: "잠시 쉴까요?" },
   { where: { desc: "공간 검토", c: "admin-full", to: "/rent/review" }, button: "검토 대기 줄의 「보완 요청」", title: "○○, 무엇을 고쳐 주시면 될까요 (칩 넷 + 사장님께 보낼 말)" },
   { where: { desc: "정산", c: "admin-full", to: "/rent/payouts" }, button: "환불 신청 줄의 「승인하고 환불」", title: "환불을 승인할까요" },
   { where: { desc: "정산", c: "admin-full", to: "/rent/payouts" }, button: "환불 신청 줄의 「신청 닫기」", title: "환불 신청을 닫을까요" },

@@ -1,6 +1,6 @@
 "use client";
 
-// 하루 가게 — 결제 위젯 패널 (2026-09-15)
+// 하루 팝업 — 결제 위젯 패널 (2026-09-15)
 //
 // 토스 결제창을 그리고 띄우는 일만 한다. 금액·주문번호는 **서버가 정해 준 값을 그대로 받는다** —
 // 이 컴포넌트는 값을 계산하지 않는다(화면의 숫자로 결제하면 그게 곧 구멍이다).
@@ -201,7 +201,7 @@ export function PayPanel({
             「이걸 읽고 이 버튼을 누른다」가 된다. `space-y-6`에서 빼내 한 덩어리로 묶었다. */}
       <div className="space-y-3">
         {/* 📜09-17 QA — 돈이 실제로 나가는 화면에 취소 규정도 약관 링크도 없었다. 이 예약 날짜로 계산한 한 줄과
-            하루 가게 조항(`/terms#rent`)으로 가는 길. 토스 약관 칸 «위»에 둬서 「읽고 → 동의하고 → 누른다」 순서가 된다. */}
+            하루 팝업 조항(`/terms#rent`)으로 가는 길. 토스 약관 칸 «위»에 둬서 「읽고 → 동의하고 → 누른다」 순서가 된다. */}
         <p className="text-[15px] leading-relaxed break-keep text-mute">
           {cancelLine}{" "}
           <Link href="/terms#rent" target="_blank" className="text-body underline underline-offset-2">

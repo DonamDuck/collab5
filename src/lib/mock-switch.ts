@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { RENT_MOCK_COOKIE } from "./rent-mock";
 import { MOCK_CASES } from "./rent-mock-data";
 
-// 🧪목 데이터 켜고 끄기 (09-17 하루 가게 → 09-18 사이트 전체) · 개발 빌드 전용
+// 🧪목 데이터 켜고 끄기 (09-17 하루 팝업 → 09-18 사이트 전체) · 개발 빌드 전용
 //
 // `?case=<이름>&to=<경로>` → 쿠키를 넣고 그 화면으로 보낸다. `?off=1` → 쿠키를 지우고 지도로 돌아간다.
 // 주소가 둘이다. `/dev/mock`(사이트 지도가 쓴다)과 `/dev/rent-mock`(09-17부터 대표·디자인팀이 쓰던 링크). 하는 일은 같다.

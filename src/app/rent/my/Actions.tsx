@@ -1,6 +1,6 @@
 "use client";
 
-// 내 하루 가게 — 버튼 세 종류 (2026-09-13)
+// 내 하루 팝업 — 버튼 세 종류 (2026-09-13)
 //
 // ⚠️화면에서 버튼을 숨기는 건 UX일 뿐이다. 권한은 세 액션이 전부 **자기 첫 줄에서** 다시 검사한다
 //   (`lib/rent-actions.ts` 머리말). 그러니 여기서 할 일은 「막기」가 아니라
@@ -413,7 +413,7 @@ export function PauseToggle({ slug, paused }: { slug: string; paused: boolean })
         onConfirm={() => run(true)}
         onCancel={() => setAsk(false)}
       >
-        <p>쉬는 동안엔 하루 가게 목록에서 이 공간이 빠져서 새 예약이 안 들어와요.</p>
+        <p>쉬는 동안엔 하루 팝업 목록에서 이 공간이 빠져서 새 예약이 안 들어와요.</p>
         <p className="text-mute">손님이 이미 결제한 예약은 그대로라 그날 손님은 오세요. 다시 열기를 누르면 바로 돌아와요.</p>
       </ConfirmDialog>
     </div>

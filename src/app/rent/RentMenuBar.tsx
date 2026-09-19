@@ -1,6 +1,6 @@
 "use client";
 
-// 하루 가게 상단 메뉴바 — 헤더 밑에 붙어 따라오는 **2칸** 바 (대표 지시 09-14). 09-19부터 로그인하면 「내 예약」이 셋째 칸(대표 [H]).
+// 하루 팝업 상단 메뉴바 — 헤더 밑에 붙어 따라오는 **2칸** 바 (대표 지시 09-14). 09-19부터 로그인하면 「내 예약」이 셋째 칸(대표 [H]).
 //
 // 대표 원문(코멘트 위젯 1호): *「버튼을 제거하고, 차라리 우리 홈화면에 있는 플로팅 헤더를 띄우고 메뉴를
 // 하루 빌리기 | 내 공간 등록 이렇게 표현해주면 어떨까. 현재화면이 하루 빌리기이니깐 색이나 언더바나,
@@ -8,7 +8,7 @@
 // 이어서(코멘트 1호): *「탭 누르면 부드럽게 초록 백그라운드가 옮겨 갔음 좋겠어」*
 //
 // 🔻헤더의 「안 쓰는 날 올리기」 키위 버튼을 이 바가 대신한다. 버튼은 부르는 자리가 하나뿐이었는데,
-//   바는 두 방향(빌리는 쪽·빌려주는 쪽)을 늘 같이 보여준다. 하루 가게는 양면 시장이라 그게 맞다.
+//   바는 두 방향(빌리는 쪽·빌려주는 쪽)을 늘 같이 보여준다. 하루 팝업은 양면 시장이라 그게 맞다.
 //
 // ⭐**활성 표시를 «쓴다» — 홈 메뉴바와 정반대다.** 그쪽(`HomeMenuBar`)은 두 칸 중 하나가 페이지 안
 //   앵커라 「영원히 안 켜지는 칸」이 생겨서 일부러 뺐다(08-17 대표 확정). 여기는 **두 칸 다 페이지를
@@ -90,7 +90,7 @@ export function RentMenuBar({ signedIn }: { signedIn: boolean }) {
     return () => window.removeEventListener("scroll", onScroll);
   }, [isForm]);
 
-  // 🚪두 탭 화면이 아니면 바를 안 보인다(상세·내 하루 가게·결제 복귀는 각자 돌아갈 길이 따로 있다).
+  // 🚪두 탭 화면이 아니면 바를 안 보인다(상세·내 하루 팝업·결제 복귀는 각자 돌아갈 길이 따로 있다).
   //   ⭐판정을 레이아웃이 아니라 **여기서** 한다 — 화면이 늘 때 고칠 자리가 하나여야 어긋나지 않는다.
   if (activeIndex < 0) return null;
 
@@ -107,7 +107,7 @@ export function RentMenuBar({ signedIn }: { signedIn: boolean }) {
     >
       <nav
         ref={navRef}
-        aria-label="하루 가게 바로가기"
+        aria-label="하루 팝업 바로가기"
         // 🔒`border-[0.5px] border-[#DFDFE3]` + `shadow-e2` = 홈 메뉴바·브랜드 카드와 완전히 같은 값.
         // 숨었을 땐 클릭도 안 받는다 — 투명해진 바가 뒤 카드의 클릭을 먹지 않게.
         className={`no-scrollbar ${hidden && !isForm ? "pointer-events-none" : "pointer-events-auto"} relative inline-flex max-w-full items-center gap-1 overflow-x-auto rounded-pill border-[0.5px] border-[#DFDFE3] bg-surface p-1 shadow-e2`}

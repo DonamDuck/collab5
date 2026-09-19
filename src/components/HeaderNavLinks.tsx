@@ -28,7 +28,7 @@ export function HeaderNavLinks() {
 
   return (
     <>
-      {/* 🏠 하루 가게 (09-13 신설) — **대표 지시로 헤더에 둔다.**
+      {/* 🏠 하루 팝업 (09-13 신설) — **대표 지시로 헤더에 둔다.**
           *"일단은 헤더에 둘거야. 로컬에서 작업할거니 과감하게 하면서 테스트해보자."*
           ⚠️매거진 링크와 달리 **모바일에서도 보인다.** 이 기능은 진입로가 여기 하나뿐이고
             홈 메뉴바는 3칸이면 360px에서 넘친다는 실측이 이미 있어(HomeMenuBar 주석) 그쪽을 못 쓴다.
@@ -38,7 +38,7 @@ export function HeaderNavLinks() {
         href="/rent"
         className="flex h-[44px] shrink-0 items-center whitespace-nowrap rounded-md px-2 font-medium text-mute transition-colors hover:text-ink sm:px-3"
       >
-        하루 가게
+        하루 팝업
       </Link>
       {/* 매거진 — 🚨**데스크톱에서만 보인다(`hidden sm:flex`)**. 모바일에 넣지 말 것.
           07-29에 이 헤더가 정확히 그것 때문에 터졌다: 워드마크(123px) + 우측 메뉴(244px)가
@@ -67,7 +67,7 @@ export function HeaderNavLinks() {
       {!isHome && (
         <Link
           href="/search"
-          // 📱09-13: 「하루 가게」가 헤더에 들어오면서 375px에서 이 칩이 「콜라...」로 잘렸다.
+          // 📱09-13: 「하루 팝업」이 헤더에 들어오면서 375px에서 이 칩이 「콜라...」로 잘렸다.
           //   글자를 줄이는 대신 **폰에서는 돋보기만** 남긴다 — 검색은 아이콘만으로도 읽히고, 잘린 글자는 안 읽힌다.
           //   44px 터치 타깃은 지킨다(w-[44px] 정사각 알약).
           className="flex h-[44px] min-w-0 items-center justify-center gap-1.5 rounded-pill bg-surface-soft px-0 w-[44px] text-mute transition-colors hover:bg-primary-pale hover:text-primary-on sm:w-auto sm:justify-start sm:pl-3 sm:pr-4"

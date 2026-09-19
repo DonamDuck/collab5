@@ -4,7 +4,7 @@ import { FEE_RATE } from "@/lib/spaces";
 
 export const metadata: Metadata = {
   title: "공간 제공자 약관 — collab5",
-  description: "하루 가게에 공간을 올리는 분과 collab5 사이의 약관",
+  description: "하루 팝업에 공간을 올리는 분과 collab5 사이의 약관",
   // ⚠️필수 — 루트 layout의 `canonical: "/"`가 자식 페이지에 그대로 상속된다(08-07 발견).
   alternates: { canonical: "/terms/host" },
 };
@@ -23,7 +23,7 @@ export const metadata: Metadata = {
 // 🚨회사 면책은 좁게 썼다 — 고의·중과실 면책이나 위험 전가 조항은 약관규제법 제7조 제1·2호로 무효다.
 //
 // ⚠️**법률 검토 전 초안이다.**
-// 📅**시행일 = 하루 가게의 «결제를 여는 날»** (대표 09-16 확정).
+// 📅**시행일 = 하루 팝업의 «결제를 여는 날»** (대표 09-16 확정).
 //   지금은 토스 테스트 키라 실제 돈이 오가지 않는다. 약관의 핵심은 「언제부터 효력이 생기나」인데,
 //   거래가 없는 동안 날짜를 박아 두면 그 사이에 등록한 사장님이 «무엇에» 동의한 것인지 애매해진다.
 //   ⭐결제가 열리는 날 이 부칙에 그 날짜를 적는다. 그때부터 변경은 「적용일 7일 전 공지」를 밟는다.
@@ -35,7 +35,7 @@ export default function HostTermsPage() {
         공간 제공자 약관
       </h1>
       <p className="mt-3 text-[15px] leading-relaxed text-mute">
-        본 약관은 collab5(이하 &lsquo;회사&rsquo;)가 운영하는 &lsquo;하루 가게&rsquo;에 공간을 등록하여 대여하는 분(이하
+        본 약관은 collab5(이하 &lsquo;회사&rsquo;)가 운영하는 &lsquo;하루 팝업&rsquo;에 공간을 등록하여 대여하는 분(이하
         &lsquo;호스트&rsquo;)과 회사 사이의 권리·의무를 정합니다. 회사의{" "}
         <Link href="/terms" className="underline underline-offset-4">
           이용약관
@@ -216,7 +216,7 @@ export default function HostTermsPage() {
 
         <Article title="부칙">
           <p className="text-mute">
-            본 약관은 collab5가 하루 가게의 결제를 여는 날부터 적용되며, 그 날짜를 이 자리에 밝힙니다. 그전까지
+            본 약관은 collab5가 하루 팝업의 결제를 여는 날부터 적용되며, 그 날짜를 이 자리에 밝힙니다. 그전까지
             등록하신 공간은 준비 중인 상태로, 실제 결제와 정산은 일어나지 않습니다. 약관을 변경할 때는 적용일
             7일 전부터 서비스 안에 알려 드립니다.
           </p>

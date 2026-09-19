@@ -401,7 +401,7 @@ export interface MagazineSaveInput {
 }
 
 // ─────────────────────────────────────────────────────────────
-// 하루 가게 — 공간 대여 (2026-09-13)
+// 하루 팝업 — 공간 대여 (2026-09-13)
 // 스펙 = docs/superpowers/specs/2026-09-13-daily-shop-design.md
 // DB   = supabase/migrations/2026-09-13-daily-shop.sql
 // ─────────────────────────────────────────────────────────────

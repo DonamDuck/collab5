@@ -7,7 +7,7 @@ import { GuestBookingRow, loadGuestBookings, type GuestBookingView } from "../Gu
 import { primaryBtnCls } from "../ui";
 import { KAKAO_CHAT_URL } from "@/lib/site";
 
-// 하루 가게 — 손님이 보낸 신청만 모아 보는 화면 (2026-09-16 · 백로그 B81)
+// 하루 팝업 — 손님이 보낸 신청만 모아 보는 화면 (2026-09-16 · 백로그 B81)
 //
 // 🩸전엔 손님이 자기 신청을 보려면 `/rent/my`로 갔다. 거기는 사장님 화면이라 내가 올린 공간과 받은 신청
 //   두 덩이를 지나야 자기 것이 나왔다. 대표: *「신청 내역 정리 페이지 만들어서 그쪽으로 보내자」*.
@@ -67,7 +67,7 @@ export default async function RentRequestsPage() {
     <main className="mx-auto w-full max-w-[720px] px-4 pt-8 pb-16 sm:px-6 sm:pt-12">
       <header>
         <Link href="/rent" className="inline-block py-[12px] text-[15px] text-mute underline underline-offset-2">
-          ← 하루 가게
+          ← 하루 팝업
         </Link>
         <h1 className="mt-3 text-[28px] font-bold leading-[1.25] tracking-[-0.02em] text-ink">내 예약</h1>
         {/* 💬09-16 phase 1 — 채팅이 없으니 막히면 갈 곳이 여기다. 사장님과 연락이 안 닿는 일도 우리가 받는다. */}

@@ -1,12 +1,12 @@
 // 사이트 전체 화면 지도용 목 데이터 (2026-09-18 대표: 「map으로 만들면 디자인팀 검수 같은 것도 하기 편하고 나도 그냥 들어가서 막 볼 수 있기도 하고」)
 //
-// ⭐하루 가게 세계(`rent-mock-data.ts`) 위에 «소개서·찜·리포트·성사 기록·매거진·요약 리포트» 층을 얹는다.
-//   사람도 같다. 하루 가게에서 공간을 빌려주는 느린오후 사장님(9001)이 여기선 소개서 셋을 가진 브랜드 회원이고,
+// ⭐하루 팝업 세계(`rent-mock-data.ts`) 위에 «소개서·찜·리포트·성사 기록·매거진·요약 리포트» 층을 얹는다.
+//   사람도 같다. 하루 팝업에서 공간을 빌려주는 느린오후 사장님(9001)이 여기선 소개서 셋을 가진 브랜드 회원이고,
 //   손님 밀가루 일기(9002)는 느린오후를 찜하고 리포트를 받아 본 회원이다.
 // ⭐여기 적는 건 DB 행이 아니라 읽기 함수가 내놓는 타입(`Maker`·`MagazineArticle`…) 그대로다. `site-mock-repo.ts`가
 //   이걸 `Repo` 모양으로 돌려준다. 타입에 칸이 늘면 `satisfies`가 여기서 멈춘다.
 // ⛔실제 파트너·브랜드 이름은 한 글자도 안 쓴다(이름마다 볼트 grep 0건 확인). 사진은 `public/`에 실제 파트너 캡처뿐이라
-//   하루 가게와 같이 색면 SVG(`photo()`)를 쓴다. 파일을 더하지 않아 운영 배포물에 안 실린다.
+//   하루 팝업과 같이 색면 SVG(`photo()`)를 쓴다. 파일을 더하지 않아 운영 배포물에 안 실린다.
 // ⏱날짜는 오늘(KST) 기준 상대값. 「새로 온 브랜드」(30일)·리포트 신선도처럼 시간에 달린 갈래가 매일 같게 나온다.
 // 🚨서버 전용. `rent-mock.ts`만 부른다.
 import type {
@@ -49,7 +49,7 @@ export type SiteWorld = MockWorld & SiteLayer;
 
 const siteCache = new Map<string, SiteWorld>();
 
-/** 케이스의 세계 = 하루 가게 세계 + 사이트 층. 같은 날 같은 세계는 한 번만 만든다. */
+/** 케이스의 세계 = 하루 팝업 세계 + 사이트 층. 같은 날 같은 세계는 한 번만 만든다. */
 export function buildSiteWorld(kind: MockCaseDef["world"], today = todayKst()): SiteWorld {
   const key = `${kind}:${today}`;
   const hit = siteCache.get(key);
@@ -495,7 +495,7 @@ const BRIEF_FLOUR = `밀가루 일기 님의 요약 리포트예요. 주인이 �
 올리신 사진 여든 장 중 쉰 장이 굽기 전 반죽이에요.
 `;
 
-/** 📨사이트 메일 미리보기 종류 — `/dev/rent-mail/[kind]`가 하루 가게 메일과 같은 틀로 띄운다. */
+/** 📨사이트 메일 미리보기 종류 — `/dev/rent-mail/[kind]`가 하루 팝업 메일과 같은 틀로 띄운다. */
 export const SITE_MAIL_KINDS: { kind: string; label: string }[] = [
   { kind: "signup-email", label: "새 가입 알림 → 대표 슬랙 · 이메일 가입" },
   { kind: "signup-kakao-noname", label: "새 가입 알림 → 대표 슬랙 · 카카오 로그인, 브랜드명 비움" },

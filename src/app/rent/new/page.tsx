@@ -8,7 +8,7 @@ import { redirect } from "next/navigation";
 import { primaryBtnCls } from "../ui";
 import { OG_IMAGE } from "@/lib/site";
 
-// 하루 가게 — 공간 올리기 (2026-09-13)
+// 하루 팝업 — 공간 올리기 (2026-09-13)
 //
 // ⭐**이 화면이 이 기능의 병목이다.** 조사에서 등록 23곳 중 쉬는 날을 적어 둔 곳이 0곳이었고,
 //   돌아오는 사람도 게스트가 아니라 매달 비는 날을 올리러 오는 호스트다(설계 §조사 ②④).
@@ -17,7 +17,7 @@ import { OG_IMAGE } from "@/lib/site";
 // 🎨09-13 재작업 — 한 열 560px, 제목 28 · 한 줄 17, 섹션은 register 규칙(21px 제목 → 첫 입력 23px, 섹션 사이 12).
 export const dynamic = "force-dynamic";
 
-const TITLE = "공간 올리기 — 하루 가게";
+const TITLE = "공간 올리기 — 하루 팝업";
 const DESCRIPTION = "공간이 비는 시간만 골라 빌려주세요. 규칙은 사장님이 정하세요.";
 
 export const metadata: Metadata = {
@@ -83,7 +83,7 @@ export default async function NewSpacePage({
     <main className="mx-auto w-full max-w-[560px] px-4 pt-4 pb-16 sm:px-6 sm:pt-6">
       <header>
         <Link href="/rent" className="inline-block py-[12px] text-[15px] text-mute underline underline-offset-2">
-          ← 하루 가게
+          ← 하루 팝업
         </Link>
         <h1 className="mt-3 text-[28px] font-bold leading-[1.25] tracking-[-0.02em] break-keep text-ink">
           {/* 🔁09-19 대표 코멘트 #65 — 「공간이 노는 날, 빌려주세요」에서 한 번 더(맞춤법: 「빌려 줄」→「빌려줄」, 끝 마침표는 제목이라 뺐다). */}

@@ -18,7 +18,7 @@ import { AreaMap } from "./AreaMap";
 import { HostBrandCard } from "./HostBrandCard";
 import { SectionNav } from "./SectionNav";
 
-// 하루 가게 — 공간 한 곳 + 신청 (2026-09-13)
+// 하루 팝업 — 공간 한 곳 + 신청 (2026-09-13)
 //
 // 🔁**09-13엔 주소도 소개서 링크도 가렸다.** 확정 전에 가게가 특정되면 결제 없이 직거래로 샐까 봐였다
 //   (대표 09-13: *「사장님과 연결을 미리 해버리면 우리 결제 없이 그들끼리 거래로 해버릴 수도」*).
@@ -91,7 +91,7 @@ export async function generateMetadata({
   // ⏱09-16 대표 — 시간 단위 대여. 「하루 빌려보세요」는 사실이 틀린 말이라 링크 카드에도 안 싣는다.
   const description = sp.tagline || `${sp.area}에서 필요한 시간만큼 빌릴 수 있는 공간이에요.`;
   const meta: Metadata = {
-    title: `${sp.name} — 하루 가게`,
+    title: `${sp.name} — 하루 팝업`,
     description,
     alternates: { canonical: url },
   };
@@ -101,7 +101,7 @@ export async function generateMetadata({
   //   카톡에 공간 링크를 붙이면 제목은 사이트 슬로건, 주소는 홈, 그림은 로고 카드로 떠서 «홈 링크»처럼 보였다.
   //   ⚠️`openGraph`는 루트와 합쳐지지 않고 통째로 갈린다. 사이트 이름·언어도 여기 다시 적는다.
   //   사진은 http 주소만 쓴다. 크롤러는 data URL을 못 읽는다(`/m` 소개서와 같은 규칙). 없으면 사이트 기본 썸네일.
-  const cardTitle = `${sp.name} · 하루 가게`;
+  const cardTitle = `${sp.name} · 하루 팝업`;
   const image = sp.photos.find((p) => /^https?:\/\//.test(p)) ?? OG_IMAGE;
   return {
     ...meta,
@@ -265,7 +265,7 @@ export default async function SpaceDetailPage({
             </div>
           )}
 
-          {/* 🔻09-14 「← 하루 가게」 삭제 — 대표: *「앱이 아닌 경우 다들 모바일 기기의 뒤로 가기 버튼을
+          {/* 🔻09-14 「← 하루 팝업」 삭제 — 대표: *「앱이 아닌 경우 다들 모바일 기기의 뒤로 가기 버튼을
               잘 쓸 거 같은데, 일단 뒤로 가기 버튼은 지워도 될 거 같아」*. */}
           <header id="space-head" className={sp.photos.length > 0 ? "mt-5 sm:mt-7" : ""}>
             {eyebrow && <p className="text-[15px] text-mute">{eyebrow}</p>}
@@ -319,7 +319,7 @@ export default async function SpaceDetailPage({
               // ⏸09-17 잠시 쉬기 — 쉬는 공간에 「저희가 확인하고 열어 드릴게요」가 뜨면 검토에 걸린 줄 안다.
               <p className="mt-4 text-[15px] leading-relaxed break-keep text-mute">
                 {sp.status === "paused"
-                  ? "쉬는 중이라 손님에겐 안 보여요. 내 하루 가게에서 다시 열 수 있어요."
+                  ? "쉬는 중이라 손님에겐 안 보여요. 내 하루 팝업에서 다시 열 수 있어요."
                   : "아직 공개 전이라 사장님에게만 보이는 화면이에요. 저희가 확인하고 열어 드릴게요."}
               </p>
             ) : null}
@@ -551,7 +551,7 @@ export default async function SpaceDetailPage({
               ))}
             </dl>
             {/* 📜09-17 QA — 「이 규정은 collab5 규정을 따릅니다」는 동어반복이었고 원문으로 가는 길이 없었다.
-                하루 가게 조항은 `/terms#rent`에 있다(본 세션이 넣는다). */}
+                하루 팝업 조항은 `/terms#rent`에 있다(본 세션이 넣는다). */}
             <p className="mt-3 text-[15px] leading-relaxed break-keep text-faint">
               돌려드리는 돈은 결제하신 수단으로 들어가요. 자세한 내용은{" "}
               <Link href="/terms#rent" className="underline underline-offset-2">
@@ -573,7 +573,7 @@ export default async function SpaceDetailPage({
               <p className="text-[17px] leading-relaxed break-keep text-body">
                 사장님 공간이라 신청은 못 하세요. 받은 신청은{" "}
                 <Link href="/rent/my?tab=host" className="underline underline-offset-4">
-                  내 하루 가게
+                  내 하루 팝업
                 </Link>
                 에서 보실 수 있어요.
               </p>

@@ -11,12 +11,12 @@ import type { Group, Popup, Row } from "./types";
 // 🗺사이트 화면 지도 (2026-09-18) · 개발 빌드 전용
 //
 // 대표 09-18: *「map으로 만들면 디자인팀 검수 같은 것도 하기 편하고 나도 그냥 들어가서 막 볼 수 있기도 하고」*.
-//   「화면 지도 띄워 줘」 = 이 한 장. 09-17 하루 가게 지도(`/dev/rent-map`)를 사이트 전체로 넓혔고, 옛 주소는 `#rent`로 보낸다.
+//   「화면 지도 띄워 줘」 = 이 한 장. 09-17 하루 팝업 지도(`/dev/rent-map`)를 사이트 전체로 넓혔고, 옛 주소는 `#rent`로 보낸다.
 //   링크는 전부 `/dev/mock`을 거쳐 케이스 쿠키를 넣고 들어간다. 로그인·결제·기다림 없이 모든 화면 × 모든 상태를 연다.
 //
 // 🚨**규칙 (대표 결정 09-18) — 화면을 새로 만들거나 상태를 늘리면 여기에 케이스도 같이 더한다.**
 //   안 더하면 지도에서 조용히 빠지고, 디자인팀 검수에서도 같이 빠진다.
-//   줄은 `site-rows.ts`(하루 가게 밖) · `rent-rows.ts`(하루 가게)에, 가상 데이터는 `lib/site-mock-data.ts` · `lib/rent-mock-data.ts`에.
+//   줄은 `site-rows.ts`(하루 팝업 밖) · `rent-rows.ts`(하루 팝업)에, 가상 데이터는 `lib/site-mock-data.ts` · `lib/rent-mock-data.ts`에.
 // 🚨목 데이터에서 쓰기는 두 겹으로 막는다. 서버 액션 첫 줄(`rentMockOn()`) + 쓰기 함수 첫 줄(`site-mock-repo.ts`·`throwIfMock`).
 //   새 쓰기 액션을 만들면 첫 줄 울타리도 같이 넣는다. 외부 AI(Gemini·Claude, 유료)와 메일(Resend)은 목 모드에서 절대 부르지 않는다.
 // 🚨운영에선 404(미들웨어가 `/dev/*`를 막고, 여기서도 한 번 더). 검색에도 안 걸리게 noindex.
@@ -119,7 +119,7 @@ export default async function SiteMapPage() {
             {g.title}
           </a>
         ))}
-        <a href="#rent" className={linkCls}>하루 가게</a>
+        <a href="#rent" className={linkCls}>하루 팝업</a>
         <a href="#popup" className={linkCls}>팝업</a>
         <a href="#mail" className={linkCls}>메일</a>
         <a href="#cases" className={linkCls}>케이스 전체</a>
@@ -130,9 +130,9 @@ export default async function SiteMapPage() {
       ))}
 
       <section id="rent" className="mt-12 scroll-mt-20">
-        <h2 className="text-[22px] font-bold leading-snug tracking-tight text-ink">하루 가게</h2>
+        <h2 className="text-[22px] font-bold leading-snug tracking-tight text-ink">하루 팝업</h2>
         <p className="mt-1.5 text-[15px] leading-relaxed break-keep text-mute">
-          09-17에 만든 하루 가게 지도를 그대로 옮겼어요. 예전 주소 /dev/rent-map으로 들어와도 여기로 와요.
+          09-17에 만든 하루 팝업 지도를 그대로 옮겼어요. 예전 주소 /dev/rent-map으로 들어와도 여기로 와요.
         </p>
         {RENT_GROUPS.map((g) => (
           <Screens key={g.id} group={g} level={3} />
@@ -146,7 +146,7 @@ export default async function SiteMapPage() {
         </p>
         <h3 className="mt-6 text-[17px] font-bold text-ink">사이트</h3>
         <PopupList items={SITE_POPUPS} />
-        <h3 className="mt-6 text-[17px] font-bold text-ink">하루 가게</h3>
+        <h3 className="mt-6 text-[17px] font-bold text-ink">하루 팝업</h3>
         <PopupList items={RENT_POPUPS} />
       </section>
 
@@ -165,7 +165,7 @@ export default async function SiteMapPage() {
             </li>
           ))}
         </ul>
-        <h3 className="mt-6 text-[17px] font-bold text-ink">하루 가게</h3>
+        <h3 className="mt-6 text-[17px] font-bold text-ink">하루 팝업</h3>
         <ul className="mt-2">
           {MOCK_MAIL_KINDS.map((k) => (
             <li key={k.kind} className="border-b border-hairline py-2.5">

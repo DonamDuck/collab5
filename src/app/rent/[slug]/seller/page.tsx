@@ -6,7 +6,7 @@ import { getSpaceFull } from "@/lib/spaces";
 import { formatBizNumber, spaceListed } from "@/lib/bizcheck";
 import { telHref } from "@/lib/rent-copy";
 
-// 하루 가게 — 판매자 정보 (2026-09-19 대표 [J])
+// 하루 팝업 — 판매자 정보 (2026-09-19 대표 [J])
 //
 // 대표 원문: *「매장 전화번호는 공개 상세에서 빼자! 미리 노출하는 건 최대한 빼는 게 맞을 거 같아.」*
 //   이어서 *「여기어때, 스마트스토어 들어가 보니깐 별도 '판매자 정보' 버튼? 섹션을 만들어서 클릭하면 별도 페이지에서도
@@ -32,7 +32,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const sp = await loadSpace(slug);
   if (!sp || !spaceListed(sp)) return NOT_FOUND_META;
   return {
-    title: `판매자 정보 · ${sp.name} — 하루 가게`,
+    title: `판매자 정보 · ${sp.name} — 하루 팝업`,
     robots: { index: false, follow: false },
     // 루트의 `canonical: "/"`를 물려받으면 «홈의 사본»이라고 말하게 된다. 자기 주소로.
     alternates: { canonical: `/rent/${sp.slug}/seller` },

@@ -1,7 +1,7 @@
 import { getSessionUserLight } from "@/lib/supabase/server";
 import { RentMenuBar } from "./RentMenuBar";
 
-// 하루 가게 구역 레이아웃 (2026-09-14)
+// 하루 팝업 구역 레이아웃 (2026-09-14)
 //
 // ⭐**바가 여기 있는 이유는 「부드럽게 옮겨 가는」 초록 때문이다**(대표 09-14).
 //   처음엔 두 페이지가 각자 `<RentMenuBar />`를 그렸는데, 그러면 탭을 누를 때 컴포넌트가 **통째로

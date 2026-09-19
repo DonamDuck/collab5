@@ -5,7 +5,7 @@ import { KAKAO_CHAT_URL, SUPPORT_EMAIL, SUPPORT_PHONE } from "@/lib/site";
 // 고객센터 (2026-09-16 대표)
 //
 // ⭐대표: *「고객센터 메뉴를 하나 만들어서 거기도 넣자」*. 문의가 모이는 곳은 카카오톡 채널이다.
-//   phase 1(채팅 기능 없음)에서 하루 가게의 «사장님이 답을 안 하는 일»도 여기로 받아 우리가 직접 처리한다.
+//   phase 1(채팅 기능 없음)에서 하루 팝업의 «사장님이 답을 안 하는 일»도 여기로 받아 우리가 직접 처리한다.
 // ⛔운영 시간·답변 시간은 적지 않았다. 정한 적이 없는 약속을 화면에 먼저 쓰지 않는다 — 정하면 그때 더한다.
 export const metadata: Metadata = {
   title: "고객센터 — collab5",
@@ -36,7 +36,7 @@ export default function HelpPage() {
       </a>
 
       <section className="mt-10 border-t border-hairline pt-7">
-        <h2 className="text-[19px] font-bold leading-snug tracking-tight text-ink">하루 가게를 쓰시다가</h2>
+        <h2 className="text-[19px] font-bold leading-snug tracking-tight text-ink">하루 팝업을 쓰시다가</h2>
         <p className="mt-3 text-[16px] leading-relaxed break-keep text-body">
           예약한 날 사장님과 연락이 닿지 않거나, 취소와 환불이 생각과 다르게 됐을 때도 카카오톡으로 알려 주세요.
           신청 내역을 같이 보면서 확인해 드릴게요.

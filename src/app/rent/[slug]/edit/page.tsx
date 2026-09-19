@@ -8,7 +8,7 @@ import { bizMissingLine, bizOnFile } from "@/lib/bizcheck";
 import { needsFix } from "@/lib/rent-review";
 import { SpaceForm } from "../../new/SpaceForm";
 
-// 하루 가게 — 공간 고치기 (2026-09-14)
+// 하루 팝업 — 공간 고치기 (2026-09-14)
 //
 // 🚨`getSpaceFull`을 부른다 — 주소·「들어오는 법」이 폼에 실려야 하니까. 그래서 **주인 확인이 먼저**다.
 //   주인이 아니면 그 공간의 공개 화면으로 돌려보낸다. 404가 아닌 이유 — 공간은 실재하고 그 사람도
@@ -17,7 +17,7 @@ import { SpaceForm } from "../../new/SpaceForm";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "공간 고치기 — 하루 가게",
+  title: "공간 고치기 — 하루 팝업",
   robots: { index: false },
 };
 
@@ -41,7 +41,7 @@ export default async function EditSpacePage({ params }: { params: Promise<{ slug
     <main className="mx-auto w-full max-w-[560px] px-4 pt-8 pb-16 sm:px-6 sm:pt-12">
       <header>
         <Link href="/rent/my?tab=host" className="inline-block py-[12px] text-[15px] text-mute underline underline-offset-2">
-          ← 내 하루 가게
+          ← 내 하루 팝업
         </Link>
         <h1 className="mt-3 text-[28px] font-bold leading-[1.25] tracking-[-0.02em] break-keep text-ink">
           공간 고치기
@@ -66,7 +66,7 @@ export default async function EditSpacePage({ params }: { params: Promise<{ slug
         {needsFix(sp) ? null : missingBiz ? (
           <p className="mt-3 rounded-md bg-lemon-pale px-4 py-3 text-[16px] leading-relaxed break-keep text-lemon-on">
             {bizMissingLine(sp.status)}{" "}
-            {/* 같은 화면 아래 「사업자 정보」 절(`f-biz`)로. 누를 자리를 44px로(내 하루 가게 줄과 같은 모양). */}
+            {/* 같은 화면 아래 「사업자 정보」 절(`f-biz`)로. 누를 자리를 44px로(내 하루 팝업 줄과 같은 모양). */}
             <a href="#f-biz" className="-my-[13px] inline-block py-[13px] underline underline-offset-2">
               고치러 가기
             </a>

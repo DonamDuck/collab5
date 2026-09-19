@@ -14,7 +14,7 @@
 import { fetchStaticMap } from "@/lib/ncp-map";
 
 /** 허용하는 `폭x높이@줌` — 호출부를 grep해서 모은 것(09-18). 🚨호출부의 크기·줌을 바꾸면 여기도 같이 바꾼다. 안 맞으면 그 지도가 400으로 비어 보인다.
- *  · `640x240@16` — 하루 가게 공간 상세의 위치 지도(`app/rent/[slug]/AreaMap.tsx`, 줌을 명시해서 보낸다)
+ *  · `640x240@16` — 하루 팝업 공간 상세의 위치 지도(`app/rent/[slug]/AreaMap.tsx`, 줌을 명시해서 보낸다)
  *  · `640x280@16` — 소개서 상세주소 지도(`components/MapCard.tsx` 기본, `app/m/[slug]/MakerArticle.tsx`). 줌을 안 보내 기본 16
  *  · `640x180@16` — 소개서 작성 폼·AI 위저드의 확인용 지도(`MapCard` compact, `app/register/page.tsx`·`EnrichWizard.tsx`) */
 const ALLOWED = new Set(["640x240@16", "640x280@16", "640x180@16"]);
@@ -44,7 +44,7 @@ export async function GET(req: Request) {
   if (!ALLOWED.has(`${w}x${h}@${level}`)) {
     return new Response("unsupported size", { status: 400 });
   }
-  // 🚨`pin=0` = 핀 없이. 하루 가게가 확정 «전»에 쓰던 모드다 — 건물을 짚지 않고 「이 근처」만 말한다(09-16부터 쓰는 곳은 없다).
+  // 🚨`pin=0` = 핀 없이. 하루 팝업이 확정 «전»에 쓰던 모드다 — 건물을 짚지 않고 「이 근처」만 말한다(09-16부터 쓰는 곳은 없다).
   const pin = searchParams.get("pin") !== "0";
 
   const map = await fetchStaticMap({ lat, lng, w, h, pin, level });

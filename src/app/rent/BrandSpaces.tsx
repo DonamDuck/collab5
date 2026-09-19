@@ -18,7 +18,7 @@ export function BrandSpaces({ brandName, spaces }: { brandName: string; spaces: 
       <h2 id="brand-spaces-title" className="text-[21px] font-bold leading-snug tracking-tight break-keep text-ink">
         {withJosa(brandName, "이/가")} 빌려주는 공간
       </h2>
-      <p className="mt-1.5 text-[15px] leading-relaxed break-keep text-mute">하루 가게에서 필요한 시간만큼 빌릴 수 있어요.</p>
+      <p className="mt-1.5 text-[15px] leading-relaxed break-keep text-mute">하루 팝업에서 필요한 시간만큼 빌릴 수 있어요.</p>
       <ul className="mt-4 space-y-3">
         {spaces.map((sp) => {
           const cover = sp.photos[0];

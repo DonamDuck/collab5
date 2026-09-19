@@ -1,6 +1,6 @@
 "use client";
 
-// 하루 가게 — 공간 올리기·고치기 폼 (2026-09-13 · 09-14 재작업)
+// 하루 팝업 — 공간 올리기·고치기 폼 (2026-09-13 · 09-14 재작업)
 //
 // 칸 구성은 `SpaceFormInput`(lib/rent-actions.ts)을 그대로 따른다. 화면이 필드를 더 만들거나 빼면
 // 서버가 받는 모양과 어긋나는데, 타입이 옵셔널을 허용하는 자리는 **컴파일러가 안 잡아 준다.**
@@ -693,7 +693,7 @@ export function SpaceForm({
           ⚠️저장은 막지 않는다(대표 추천안) — 공급을 막을 만한 일이 아니고, 요청은 이 화면에서도 볼 수 있다. */}
       {noEmail && (
         <p className="rounded-md bg-lemon-pale px-4 py-3 text-[15px] leading-relaxed break-keep text-lemon-on">
-          이 계정엔 이메일이 없어서 요청이 들어와도 알려 드릴 곳이 없어요. 올리신 뒤에는 내 하루 가게에서 직접 확인해 주세요.
+          이 계정엔 이메일이 없어서 요청이 들어와도 알려 드릴 곳이 없어요. 올리신 뒤에는 내 하루 팝업에서 직접 확인해 주세요.
         </p>
       )}
       {/* 🏠09-18 밤 QA(H-16) — 공간 넷을 올린 사장님에게도 「내 공간 등록」이 빈 폼으로 열렸다. 고치러 온 분이
@@ -702,7 +702,7 @@ export function SpaceForm({
         <p className="text-[15px] leading-relaxed break-keep text-mute">
           이미 올리신 공간이 {mySpaceCount}곳 있어요.{" "}
           <Link href="/rent/my?tab=host" className="text-body underline underline-offset-2">
-            내 하루 가게에서 보기
+            내 하루 팝업에서 보기
           </Link>
         </p>
       )}
@@ -1491,7 +1491,7 @@ export function SpaceForm({
         {/* 🔁09-18 밤 QA(H-09) — 이름·주소를 «이미 바꾼» 사장님에겐 위 칸 옆 안내가 말했으니 여기선 되풀이하지 않는다. */}
         {/* 🔁09-19 대표 코멘트 #69 — 새로 올리기 줄은 대표 문안 그대로(관리자 승인 뒤 노출). */}
         {!editing
-          ? "등록 요청 시 관리자 승인 후 하루 가게에 노출됩니다."
+          ? "등록 요청 시 관리자 승인 후 하루 팝업에 노출됩니다."
           : fixing
             ? "보내 주시면 부탁드린 부분을 확인하고 목록에 열어 드려요."
             : initial?.status === "pending"

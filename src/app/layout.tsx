@@ -76,7 +76,7 @@ export default function RootLayout({
         {/* 🗒 화면에서 바로 남기는 코멘트 위젯 (09-14 대표 요청) — **개발 빌드 전용**.
             `NODE_ENV`는 빌드 때 상수로 박히므로 운영 번들에선 이 줄과 컴포넌트가 통째로 사라진다. */}
         {process.env.NODE_ENV === "development" && <DevComments />}
-        {/* 🧪하루 가게 목 데이터 띠(09-17) — 개발 빌드 전용. 목 쿠키가 있을 때만 뜬다(`/dev/rent-map`). */}
+        {/* 🧪하루 팝업 목 데이터 띠(09-17) — 개발 빌드 전용. 목 쿠키가 있을 때만 뜬다(`/dev/rent-map`). */}
         {process.env.NODE_ENV === "development" && <RentMockBarSlot />}
       </body>
     </html>

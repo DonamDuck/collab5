@@ -1,4 +1,4 @@
-// 하루 가게 — 사업자 확인의 «순수» 규칙 (2026-09-18 대표: 공간 등록에 사업자 확인 필수)
+// 하루 팝업 — 사업자 확인의 «순수» 규칙 (2026-09-18 대표: 공간 등록에 사업자 확인 필수)
 //
 // 🚨훅도 DB도 fetch도 없다. 등록 폼(클라이언트)과 서버 액션이 «같은 함수»로 검사한다.
 //   화면과 서버가 규칙을 따로 적으면 화면은 통과시키고 서버는 막는(또는 그 반대) 날이 온다.
@@ -170,7 +170,7 @@ export function spaceListed(sp: { status: string } & ({ bizNumber: string } | { 
   return "bizOnFile" in sp ? sp.bizOnFile : bizOnFile(sp);
 }
 
-/** 사장님께 하는 말 — 번호가 빈 공간의 내 하루 가게 줄과 고치기 화면이 같이 쓴다. 검토 대기면 «다시»가 거짓이라 뺀다. */
+/** 사장님께 하는 말 — 번호가 빈 공간의 내 하루 팝업 줄과 고치기 화면이 같이 쓴다. 검토 대기면 «다시»가 거짓이라 뺀다. */
 export function bizMissingLine(status: string): string {
   return status === "pending"
     ? "사업자 정보를 채워 주셔야 열어 드릴 수 있어요."

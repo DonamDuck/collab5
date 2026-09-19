@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { confirmBookingAction } from "@/lib/rent-actions";
 
-// 하루 가게 — 토스 결제창이 돌아오는 자리 (2026-09-13)
+// 하루 팝업 — 토스 결제창이 돌아오는 자리 (2026-09-13)
 //
 // ⚠️**페이지가 아니라 라우트 핸들러다.** 승인은 화면을 그리는 일이 아니라 «쓰기»라서,
 //   서버 컴포넌트 렌더 중에 하면 `revalidatePath`가 렌더 단계에서 터진다. 여기서 처리하고 보낸다.

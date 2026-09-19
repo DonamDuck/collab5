@@ -15,7 +15,7 @@ import { listPayoutAccounts, type PayoutAccount } from "@/lib/payout-accounts";
 import { bankName, HOLDER_TYPE_LABEL } from "@/lib/banks";
 import { kstDateKey } from "@/lib/time";
 
-// 하루 가게 — 정산 (2026-09-16) · 대표만
+// 하루 팝업 — 정산 (2026-09-16) · 대표만
 //
 // 🔁**정산은 토스 «지급대행»이다**(대표 09-16 확정, 볼트 [[결제-모듈-토스]]). 돈이 우리 계좌를 거치지 않는다.
 //   처음엔 「대표가 은행에서 손으로 입금 → 여기서 표시」로 만들었는데, 그건 손님 돈이 대표 통장을
@@ -32,7 +32,7 @@ export const dynamic = "force-dynamic";
  *  아니면 제목을 안 줘서 사이트 기본 제목이 선다. 판정은 `isRentAdmin` 한 벌(공간 검토 화면과 같다). */
 export async function generateMetadata(): Promise<Metadata> {
   if (!(await isRentAdmin())) return { robots: { index: false } };
-  return { title: "정산 — 하루 가게", robots: { index: false } };
+  return { title: "정산 — 하루 팝업", robots: { index: false } };
 }
 
 type Row = { payment: Payment; booking: SpaceBooking | null };
@@ -102,7 +102,7 @@ export default async function RentPayoutsPage() {
         {/* 🧾09-18 「검토하기」 — 관리자 화면 둘을 오간다. */}
         <div className="flex flex-wrap items-center justify-between gap-x-5">
           <Link href="/rent/my?tab=host" className="inline-block py-[12px] text-[15px] text-mute underline underline-offset-2">
-            ← 내 하루 가게
+            ← 내 하루 팝업
           </Link>
           <Link href="/rent/review" className="inline-block py-[12px] text-[15px] text-mute underline underline-offset-2">
             검토하기

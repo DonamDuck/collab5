@@ -1,10 +1,10 @@
 import { MOCK_IDS } from "@/lib/rent-mock-data";
 import type { Group, Popup } from "./types";
 
-// 🗺사이트 화면 지도 · 하루 가게 밖 묶음 (2026-09-18)
+// 🗺사이트 화면 지도 · 하루 팝업 밖 묶음 (2026-09-18)
 // ⭐케이스·주소는 코드의 실제 분기(`searchParams`·로그인·주인·편집자·빈 목록)를 읽고 골랐다.
 //   화면을 새로 만들거나 상태를 늘리면 여기에도 줄을 더한다. 안 더하면 지도에서 조용히 빠진다.
-// 소개서 주소는 `site-mock-data.ts`의 가상 브랜드다. 사람은 하루 가게와 같다(느린오후 9001 · 밀가루 일기 9002).
+// 소개서 주소는 `site-mock-data.ts`의 가상 브랜드다. 사람은 하루 팝업과 같다(느린오후 9001 · 밀가루 일기 9002).
 
 const M = {
   full: "mock-slow-afternoon", flour: MOCK_IDS.maker.guest, needle: "mock-needle-forest", text: "mock-low-desk",
@@ -57,7 +57,7 @@ export const SITE_GROUPS: Group[] = [
           { desc: "보강 배너 시안 A · B 강제로 보기", c: "anon", to: `/m/${M.full}?banner=b` },
           { desc: "계정 없이 만들어 비밀번호로 연결할 수 있는 소개서", c: "member-full", to: `/m/${M.claimable}?connect=1` },
           { desc: "콜라보 찾기에서 숨긴 내 소개서", c: "member-full", to: `/m/${M.hidden}` },
-          { desc: "하루 가게에서 넘어온 소개서 (돌아가기 버튼)", c: "guest-full", to: `/m/${M.full}?back=/rent/${MOCK_IDS.space.full}` },
+          { desc: "하루 팝업에서 넘어온 소개서 (돌아가기 버튼)", c: "guest-full", to: `/m/${M.full}?back=/rent/${MOCK_IDS.space.full}` },
           { desc: "촬영용 화면 (수정·하단 바 숨김)", c: "member-full", to: `/m/${M.full}?film=1` },
           { desc: "긴 글 (활동 5, 콜라보 12, 사진 10, 긴 링크)", c: "stress-host", to: `/m/${M.stress}` },
           { desc: "이름만 있는 소개서", c: "minimal-host", to: `/m/${M.minimal}` },
@@ -222,9 +222,9 @@ export const SITE_GROUPS: Group[] = [
         path: "/my",
         note: "리포트 탭의 「원두 구독 × 오후 세 시 도자기」 카드는 리포트 뒤에 소개서를 고친 경우라, 열면 시트에 다시 분석하기가 떠요. 연결된 계정·비밀번호 변경 칸은 브라우저의 진짜 로그인을 읽어요.",
         rows: [
-          { desc: "큰 칸 「하루 가게」 — 새 요청이 있어 처음부터 이 칸이 열림 (숫자 세 칸·빌려준/빌린 공간 입구)", c: "host-full", to: "/my" },
-          { desc: "큰 칸 「하루 가게」 — 공간 없이 빌리기만 한 회원 (내 공간 올리기 한 줄)", c: "guest-full", to: "/my?area=rent" },
-          { desc: "큰 칸 「하루 가게」 — 아무것도 없는 새 회원", c: "member-new", to: "/my?area=rent" },
+          { desc: "큰 칸 「하루 팝업」 — 새 요청이 있어 처음부터 이 칸이 열림 (숫자 세 칸·빌려준/빌린 공간 입구)", c: "host-full", to: "/my" },
+          { desc: "큰 칸 「하루 팝업」 — 공간 없이 빌리기만 한 회원 (내 공간 올리기 한 줄)", c: "guest-full", to: "/my?area=rent" },
+          { desc: "큰 칸 「하루 팝업」 — 아무것도 없는 새 회원", c: "member-new", to: "/my?area=rent" },
           { desc: "내 소개서 탭 (소개서 셋, 하나는 숨김)", c: "member-full", to: "/my?area=brand" },
           { desc: "찜한 브랜드 탭", c: "member-full", to: "/my?tab=saved" },
           { desc: "콜라보 리포트 탭", c: "member-full", to: "/my?tab=reports" },

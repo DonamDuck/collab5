@@ -146,7 +146,7 @@ export async function getProfileById(userId: number): Promise<Profile | null> {
 /** ⭐ 세션 → 정수 user_id 중앙 리졸버. 소유권·찜·제안 판정은 전부 이걸 거친다(07-25 uuid→user_id 전환).
  *  profiles 행이 없으면 null(= 소유권 없음)로 안전하게 떨어진다. */
 export async function getSessionUserId(): Promise<number | null> {
-  // 🧪09-17 하루 가게 목 데이터(개발 빌드 전용). ⚠️사이트 전체에 먹는다 — 목 쿠키가 있는 동안엔 어느 화면이든
+  // 🧪09-17 하루 팝업 목 데이터(개발 빌드 전용). ⚠️사이트 전체에 먹는다 — 목 쿠키가 있는 동안엔 어느 화면이든
   //   케이스의 가상 사용자로 보인다. 그래서 루트 레이아웃이 모든 화면 위에 「목 데이터 보는 중」 띠를 붙인다.
   const m = await getRentMock();
   if (m) return m.viewer.userId;
@@ -177,7 +177,7 @@ export async function getProfile(authUuid: string): Promise<Profile | null> {
   };
 }
 
-/** ☎️하루 가게 신청 때 받은 손님 번호를 프로필에 «비어 있을 때만» 적는다 (대표 09-17).
+/** ☎️하루 팝업 신청 때 받은 손님 번호를 프로필에 «비어 있을 때만» 적는다 (대표 09-17).
  *  사장님이 예약을 받은 뒤 보는 손님 연락처가 프로필 전화라(`ContactBlock`), 소셜 가입처럼 번호 없이 들어온
  *  손님은 사장님 화면에 번호가 비어 있었다. 신청 폼이 번호를 필수로 받고 여기서 채운다.
  *  ⚠️이미 번호가 있으면 덮지 않는다. 가입 때 적은 번호를 신청 한 번으로 바꾸면 계정 정보가 모르는 사이에 바뀐다.

@@ -1,4 +1,4 @@
-// 하루 가게 — 신청·수락·거절·취소 알림 (2026-09-14). 서버 전용.
+// 하루 팝업 — 신청·수락·거절·취소 알림 (2026-09-14). 서버 전용.
 //
 // ⭐`notify.ts`와 같은 규율 하나: **알림이 본작업을 절대 막지 않는다.**
 //   결제는 됐는데 메일이 안 나가서 손님에게 에러가 뜨면 최악이다. 그래서 이 파일의 함수는 throw하지 않고,
@@ -131,7 +131,7 @@ function subjectDate(iso: string): string {
 /** 본문 공통 틀 — 첫 문장 + 표 + 링크 버튼. 네 통이 같은 얼굴이어야 받는 사람이 「collab5 메일」로 알아본다.
  *
  *  🎨09-17 디자인팀 — 틀만 고쳐 열여섯 통이 같이 바뀐다. 문장(`lead`·`rows`·`tail`)은 그대로다.
- *   ① 머리에 「collab5 하루 가게」 글자. 받은편지함에서 연 뒤 «어디서 온 메일인지»가 첫 줄에 선다. 이미지는 안 쓴다(차단되면 빈칸).
+ *   ① 머리에 「collab5 하루 팝업」 글자. 받은편지함에서 연 뒤 «어디서 온 메일인지»가 첫 줄에 선다. 이미지는 안 쓴다(차단되면 빈칸).
  *   ② `lead`의 **첫 문장을 굵은 제목**으로 가른다. 「예약이 완료됐어요」가 뒤따르는 안내와 같은 15px라 한 덩어리로 읽혔다.
  *   ③ 항목 표를 옅은 판(사이트 `InfoPanel`과 같은 #F6F6F7 · 12px 모서리) 안에 넣고 라벨 폭을 88px로 고정한다.
  *      화면의 확인 팝업·완료 화면과 같은 모양이라, 메일과 화면을 나란히 대조하기 쉽다.
@@ -214,7 +214,7 @@ function layout(
     .join("\n      ");
   const [head, rest] = splitLead(lead);
   return `<div style="font-family:-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo',sans-serif;font-size:15px;line-height:1.7;color:${MAIL.ink};max-width:560px">
-  <p style="margin:0 0 20px;font-size:13px;font-weight:600;color:${MAIL.faint};letter-spacing:0.01em">collab5 · 하루 가게</p>
+  <p style="margin:0 0 20px;font-size:13px;font-weight:600;color:${MAIL.faint};letter-spacing:0.01em">collab5 · 하루 팝업</p>
   ${head ? `<p style="margin:0 0 8px;font-size:20px;line-height:1.4;font-weight:700;color:${MAIL.ink};word-break:keep-all">${esc(head)}</p>` : ""}
   <p style="margin:0 0 20px;color:${MAIL.body};word-break:keep-all">${esc(rest)}</p>
   <div style="background:${MAIL.soft};border-radius:12px;padding:12px 16px">
@@ -515,9 +515,9 @@ export function buildBookingConfirmedToHost(
       ? `이메일로만 연락돼요 · ${gEmail}`
       : "연락처를 안 남기셨어요";
   const lead = `${when} 예약을 수락하셨어요. 이제 손님께 직접 연락하실 수 있어요.`;
-  // 「관리자에게 환불 신청하기」 = 내 하루 가게의 그 버튼 이름 그대로(`my/Actions.tsx`). 확정 예약 줄에 뜬다.
+  // 「관리자에게 환불 신청하기」 = 내 하루 팝업의 그 버튼 이름 그대로(`my/Actions.tsx`). 확정 예약 줄에 뜬다.
   const tail =
-    "사정이 생겨 이 예약을 무르셔야 하면 내 하루 가게에서 「관리자에게 환불 신청하기」를 눌러 주세요. 저희가 두 분께 전화로 여쭤본 뒤 처리할게요.";
+    "사정이 생겨 이 예약을 무르셔야 하면 내 하루 팝업에서 「관리자에게 환불 신청하기」를 눌러 주세요. 저희가 두 분께 전화로 여쭤본 뒤 처리할게요.";
   const rows: [string, string][] = [
     guestNameRow(booking, guest),
     [LABEL.guestContact, guestContact],
@@ -531,7 +531,7 @@ export function buildBookingConfirmedToHost(
     // 🏦09-17 — 계좌가 없으면 이용일 뒤에 보낼 곳이 없다.
     [LABEL.payoutAccount, hasPayoutAccount === false ? PAYOUT_ACCOUNT_MISSING : ""],
   ];
-  return { to: host?.email ?? "", subject, ...compose(lead, rows, { href: link, label: "내 하루 가게 보기" }, tail) };
+  return { to: host?.email ?? "", subject, ...compose(lead, rows, { href: link, label: "내 하루 팝업 보기" }, tail) };
 }
 
 /** 보내는 쪽 — 문장은 `buildBookingConfirmedToHost`가 만든다(09-17 메일 미리보기 `/dev/rent-mail`이 같은 함수를 부른다). */
@@ -588,7 +588,7 @@ export function buildBookingCancelled(
   ];
   // 「다시 비었어요」 = 겹침 제약(`no_time_overlap`)이 paid·confirmed·done만 막는다. 취소된 예약은 자리를 안 잡는다.
   const lead = `손님이 예약을 취소했어요. 그 시간이 다시 비었어요.`;
-  return { to: host?.email ?? "", subject, ...compose(lead, rows, { href: link, label: "내 하루 가게 보기" }) };
+  return { to: host?.email ?? "", subject, ...compose(lead, rows, { href: link, label: "내 하루 팝업 보기" }) };
 }
 
 /** 보내는 쪽 — 문장은 `buildBookingCancelled`가 만든다(09-17 메일 미리보기 `/dev/rent-mail`이 같은 함수를 부른다). */
@@ -676,7 +676,7 @@ export function buildAdminRefund(
     // 호스트 약관 제8조 「환불된 예약은 호스트 정산에서 제외」. 관리자 환불은 남은 돈 전액이라 사장님 몫이 없다.
     [LABEL.payout, "없어요. 이 예약은 정산에서 빠져요."],
   ];
-  const h = compose(hLead, hRows, { href: hLink, label: "내 하루 가게 보기" }, hTail);
+  const h = compose(hLead, hRows, { href: hLink, label: "내 하루 팝업 보기" }, hTail);
 
   return [
     { to: guest?.email ?? "", subject: gSubject, ...g },
@@ -700,7 +700,7 @@ export function buildSpacePublished(
   // 🔁09-18 메일 전수 — 「올리신 공간이 … 올라갔어요」가 한 문장에 «올리다»를 두 번 썼다. 무슨 일이 끝났는지(검토)를 앞에 둔다.
   const subject = `[collab5] 검토를 마치고 공간을 목록에 열었어요`;
   const link = spaceLink(space);
-  const lead = `${withJosa(space.name, "을/를")} 하루 가게 목록에 열어 드렸어요. 이제 손님들이 보고 예약할 수 있어요.`;
+  const lead = `${withJosa(space.name, "을/를")} 하루 팝업 목록에 열어 드렸어요. 이제 손님들이 보고 예약할 수 있어요.`;
   // 네 단계는 순서가 곧 정보라 번호를 붙인다(`HOST_REQUEST_STEPS` 주석과 같은 이유).
   const steps = HOST_REQUEST_STEPS.map((line, i) => `${i + 1}. ${line}`).join("\n");
   const rows: [string, string][] = [
@@ -708,7 +708,7 @@ export function buildSpacePublished(
     [LABEL.payoutAccount, hasPayoutAccount === false ? PAYOUT_ACCOUNT_MISSING : ""],
   ];
   // 🔁09-18 메일 전수 — 마지막 안내 여섯 통이 「~면」으로 열려 한 금형이었다. 이 통은 조건 없이 할 수 있는 일로 말한다.
-  const tail = "내 하루 가게의 「잠시 쉬기」로 한동안 목록에서 빼 둘 수 있어요. 이미 받은 예약은 그대로예요.";
+  const tail = "내 하루 팝업의 「잠시 쉬기」로 한동안 목록에서 빼 둘 수 있어요. 이미 받은 예약은 그대로예요.";
   return { to: host?.email ?? "", subject, ...compose(lead, rows, { href: link, label: "내 공간 보기" }, tail) };
 }
 
@@ -727,7 +727,7 @@ export function buildRemindGuest(
   const hostName = displayName(host, "사장님");
   const start = booking.startTime || "";
   // ✂️09-18 대표 #57과 같은 결 — 「내일」이 날짜 자리다. 공간 이름은 본문으로.
-  const subject = `[collab5] 내일${start ? ` ${start}` : ""}, 하루 가게 예약이 있어요`;
+  const subject = `[collab5] 내일${start ? ` ${start}` : ""}, 하루 팝업 예약이 있어요`;
   const link = `${SITE_URL}/rent/requests`;
   const contact = hostContactLine(space.contactPhone, host?.phone, host?.email);
   const lead = `내일은 ${withJosa(space.name, "을/를")} 예약하신 날이에요. 시간과 주소를 한 번 더 적어 둘게요.`;
@@ -762,7 +762,7 @@ export function buildRemindHost(
   // ✂️09-18 대표 #57과 같은 결 — 「내일 몇 시」 뒤에 무슨 일만. 손님 이름은 표의 「성함」 칸이 든다.
   //   수락 전이면 할 일이 다르니 제목부터 갈라 말한다(전엔 두 갈래 제목이 같았다).
   const subject = accepted
-    ? `[collab5] 내일${start ? ` ${start}` : ""}, 하루 가게 손님이 오세요`
+    ? `[collab5] 내일${start ? ` ${start}` : ""}, 하루 팝업 손님이 오세요`
     : `[collab5] 내일${start ? ` ${start}` : ""}, 아직 수락하지 않은 예약이 있어요`;
   const link = `${SITE_URL}/rent/my?tab=host`;
   const gPhone = booking.guestPhone?.trim() || guest?.phone?.trim() || "";
@@ -784,7 +784,7 @@ export function buildRemindHost(
       : "수락하시면 손님 연락처를 보실 수 있어요. 그때 바로 이용 안내를 보내 주세요."],
     chatRow(booking, true),
   ];
-  return { to: host?.email ?? "", subject, ...compose(lead, rows, { href: link, label: accepted ? "내 하루 가게 보기" : "수락하러 가기" }) };
+  return { to: host?.email ?? "", subject, ...compose(lead, rows, { href: link, label: accepted ? "내 하루 팝업 보기" : "수락하러 가기" }) };
 }
 
 /** 보내는 쪽 — 문장은 `buildRemindHost`가 만든다(09-17 메일 미리보기 `/dev/rent-mail`이 같은 함수를 부른다). */
@@ -1070,7 +1070,7 @@ function moneyBackLine(m: AdminDailySummary["moneyBack"]): string {
 export function buildAdminDaily(
   s: AdminDailySummary | null, today: string, remind: RemindRun | null, now = Date.now(),
 ): AdminNotice {
-  const subject = `[collab5] ${subjectDate(today)} 하루 가게 아침 요약`;
+  const subject = `[collab5] ${subjectDate(today)} 하루 팝업 아침 요약`;
   const todo: string[] = [];
   if (s?.waiting.count) todo.push(`수락을 기다리는 요청 ${s.waiting.count}건`);
   if (s?.refundRequests) todo.push(`환불 신청 ${s.refundRequests}건`);

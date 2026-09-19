@@ -16,7 +16,7 @@ import { SocialDivider } from "@/components/SocialDivider";
 import { validatePassword, formatPhone } from "@/lib/validation";
 
 /** 부제 — 어디서 넘어왔는지에 맞춰 할 일을 말한다(09-18 밤 QA SC-05).
- *  하루 가게에서 온 사람에게 「소개서를 관리해보세요」는 남의 이야기다. 공간 올리기·고치기에서 왔으면 사장님, 나머지 하루 가게는 손님. */
+ *  하루 팝업에서 온 사람에게 「소개서를 관리해보세요」는 남의 이야기다. 공간 올리기·고치기에서 왔으면 사장님, 나머지 하루 팝업은 손님. */
 function subtitleFor(back: string): string {
   if (/^\/rent\/(?:new|[^/?#]+\/edit)(?:[/?#]|$)/.test(back)) return "가입하면 바로 공간을 올릴 수 있어요.";
   if (/^\/rent(?:[/?#]|$)/.test(back)) return "가입하면 바로 공간을 신청할 수 있어요.";
@@ -36,7 +36,7 @@ function SignupForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   // 🔙가입을 마치면 로그인 화면으로 가는데, 거기서 로그인한 뒤 돌아갈 곳을 들고 간다(09-18 밤 QA SC-05).
-  //   전엔 `/login?welcome=1`로만 보내서 하루 가게 공간에서 온 손님도 로그인 뒤 홈에 떨어졌다.
+  //   전엔 `/login?welcome=1`로만 보내서 하루 팝업 공간에서 온 손님도 로그인 뒤 홈에 떨어졌다.
   const back = safeRedirect(searchParams.get("redirect"));
   const [pending, start] = useTransition();
   const [email, setEmail] = useState("");
@@ -193,7 +193,7 @@ function SignupForm() {
           />
           {dup.phone && <p className="mt-1.5 text-[14px] text-red-600">{DUP_MSG.phone}</p>}
         </Field>
-        {/* 🙋09-17 대표 — 하루 가게로 브랜드가 없는 사람도 회원이 된다. 브랜드명은 선택이고, 비워도 된다고 바로 밑에서 말한다. */}
+        {/* 🙋09-17 대표 — 하루 팝업으로 브랜드가 없는 사람도 회원이 된다. 브랜드명은 선택이고, 비워도 된다고 바로 밑에서 말한다. */}
         <Field label="브랜드명" htmlFor="signup-brand" optional>
           <input
             id="signup-brand"

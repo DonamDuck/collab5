@@ -45,7 +45,7 @@ export default function WelcomePage() {
 
   // 진입 판정 ①세션 없음 → /login ②이미 채워짐 → 보던 화면(없으면 /) ③비었음 → 폼
   // 🔙«보던 화면» = 소셜 버튼이 떠나기 직전 sessionStorage에 맡긴 경로(`lib/safe-redirect`, 09-18 밤 QA SC-05).
-  //   전엔 ②와 폼 제출 뒤가 늘 홈이라, 하루 가게 공간에서 「로그인하고 신청하기」로 온 손님이 그 공간을 잃었다.
+  //   전엔 ②와 폼 제출 뒤가 늘 홈이라, 하루 팝업 공간에서 「로그인하고 신청하기」로 온 손님이 그 공간을 잃었다.
   useEffect(() => {
     let alive = true;
     (async () => {

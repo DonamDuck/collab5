@@ -23,7 +23,7 @@ import { needsFix } from "@/lib/rent-review";
 import { bookingHasChat, productPrice, sellableProducts } from "@/lib/rent-products";
 import { groupGuestBookings, groupHostBookings, hostBookingGroup, type HostBookingGroup } from "@/lib/rent-groups";
 
-// 하루 가게 — 내 공간 · 들어온 요청 · 내가 빌린 공간 (2026-09-13)
+// 하루 팝업 — 내 공간 · 들어온 요청 · 내가 빌린 공간 (2026-09-13)
 //
 // 🔁09-17 대표 결정 4 — 사장님 쪽에 들어온 것은 «요청», 수락한 뒤가 «예약»이다. 손님 쪽은 결제 전 «신청», 결제 뒤 «예약».
 //   09-16까지 절 제목 「받은 신청」·배지 「새 신청이에요」·메일 「예약이 들어왔어요」가 한 건을 세 이름으로 불렀다.
@@ -41,7 +41,7 @@ import { groupGuestBookings, groupHostBookings, hostBookingGroup, type HostBooki
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "내 하루 가게 — collab5",
+  title: "내 하루 팝업 — collab5",
   // 로그인해야 보이는 화면이라 검색 결과에 뜰 일이 없다. 설명은 짧게.
   description: "내가 올린 공간과 들어온 요청, 내가 빌린 공간을 한곳에서 봐요.",
   alternates: { canonical: "/rent/my" },
@@ -107,7 +107,7 @@ export default async function MyRentPage({
     const back = backTab ? `/rent/my?tab=${backTab}${backTab === "guest" && backG ? `&g=${backG}` : ""}` : "/rent/my";
     return (
       <main className="mx-auto w-full max-w-[560px] px-4 py-14 sm:px-6">
-        <h1 className="text-[28px] font-bold leading-[1.25] tracking-[-0.02em] text-ink">내 하루 가게</h1>
+        <h1 className="text-[28px] font-bold leading-[1.25] tracking-[-0.02em] text-ink">내 하루 팝업</h1>
         <p className="mt-3 text-[17px] leading-relaxed break-keep text-mute">
           올리신 공간과 주고받은 신청을 보시려면 로그인해 주세요.
         </p>
@@ -357,19 +357,19 @@ export default async function MyRentPage({
       {/* 한 번 뜬 알림 표시(`saved`·`did`)를 주소에서 지운다. key로 새로 달아야 같은 화면 안의 두 번째 알림에서도 돈다. */}
       {(saved || did) && <ClearQuery key={`${saved ?? ""}-${did ?? ""}-${didBooking ?? ""}`} />}
       <header>
-        {/* 🔁09-18 대표 코멘트 — 「← 하루 가게」가 제목 위 한 줄을 통째로 차지해 상단이 비어 보였다.
+        {/* 🔁09-18 대표 코멘트 — 「← 하루 팝업」이 제목 위 한 줄을 통째로 차지해 상단이 비어 보였다.
             앱처럼 헤더에 넣기엔 우리 헤더가 사이트 공용이라, 제목 왼쪽에 44px 화살표 하나로 붙인다(원티드·리멤버 웹의 상세 제목 줄). */}
         <div className="flex items-center gap-1">
           <Link
             href="/rent"
-            aria-label="하루 가게로 돌아가기"
+            aria-label="하루 팝업으로 돌아가기"
             className="-ml-3 flex size-[44px] shrink-0 items-center justify-center rounded-pill text-body transition-colors hover:bg-surface-soft"
           >
             <svg aria-hidden="true" viewBox="0 0 24 24" className="size-[22px]" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M15 18l-6-6 6-6" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </Link>
-          <h1 className="text-[28px] font-bold leading-[1.25] tracking-[-0.02em] text-ink">내 하루 가게</h1>
+          <h1 className="text-[28px] font-bold leading-[1.25] tracking-[-0.02em] text-ink">내 하루 팝업</h1>
         </div>
         {/* 🏦대표만 보인다. 판정은 `isRentAdmin` 한 벌이고, 정산 화면도 같은 판정으로 다시 막는다. */}
         {admin && (
@@ -397,7 +397,7 @@ export default async function MyRentPage({
           기본 칸: 공간이나 들어온 요청이 있으면 «빌려준 공간», 빌린 것만 있으면 «빌린 공간». */}
       <StickyTabs
         className="mt-6"
-        label="내 하루 가게 나누기"
+        label="내 하루 팝업 나누기"
         active={tab}
         items={[
           // 🔁09-18 대표 코멘트 — 「대부분 공급자보다 신청자가 많을 거라 빌린 공간이 먼저, default 왼쪽으로」.

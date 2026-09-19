@@ -1,5 +1,5 @@
 import "server-only"; // 🔒클라이언트 컴포넌트가 import하면 빌드가 멈춘다. 서비스 롤 키로 DB를 읽는 파일이다(09-18 밤 QA SEC-09).
-// 하루 가게 — 공간 대여 데이터 계층 (2026-09-13)
+// 하루 팝업 — 공간 대여 데이터 계층 (2026-09-13)
 // 스펙 = docs/superpowers/specs/2026-09-13-daily-shop-design.md
 //
 // ⚠️`repo.ts`에 넣지 않고 별도 파일로 둔 이유 둘.
@@ -790,7 +790,7 @@ function toPayment(r: Row): Payment {
 }
 
 /** 결제창을 열기 «직전»에 결제 줄을 만든다(READY). 예약 pending 줄과 같은 주문번호다.
- *  ⚠️판매자 칸은 하루 가게에선 반드시 채운다 — 지급대행이 돈을 보낼 상대가 이 사람이다. */
+ *  ⚠️판매자 칸은 하루 팝업에선 반드시 채운다 — 지급대행이 돈을 보낼 상대가 이 사람이다. */
 export async function createPayment(input: {
   orderId: string; bookingId: number; buyingUserId: number; sellingUserId: number; amount: number;
 }): Promise<Payment | null> {

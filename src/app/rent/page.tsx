@@ -9,7 +9,7 @@ import { PRODUCT_LABEL } from "@/lib/rent-copy";
 import { lowestPrice, productPrice, sellableProducts } from "@/lib/rent-products";
 import { OG_IMAGE } from "@/lib/site";
 
-// 하루 가게 — 목록 (2026-09-13)
+// 하루 팝업 — 목록 (2026-09-13)
 // 스펙 = docs/superpowers/specs/2026-09-13-daily-shop-design.md
 //
 // ⚠️`force-dynamic` — 공개하자마자 목록에 떠야 한다. 프리렌더면 재배포 전까지 새 공간이 안 보인다
@@ -21,7 +21,7 @@ import { OG_IMAGE } from "@/lib/site";
 //     히어로 옆의 키위 버튼 하나가 더 잘한다(배너는 목록을 훑으러 온 사람에게 광고처럼 읽혔다).
 export const dynamic = "force-dynamic";
 
-const TITLE = "하루 가게 — collab5";
+const TITLE = "하루 팝업 — collab5";
 const DESCRIPTION =
   "안 쓰는 날의 공간을 시간 단위로 빌려드려요. 가게를 열어보고 싶은 사람이 그 시간만큼 사장님이 됩니다.";
 
@@ -31,7 +31,7 @@ export const metadata: Metadata = {
   // ⚠️필수 — 루트 layout의 `canonical: "/"`가 자식에 상속돼, 안 덮으면 이 페이지가 홈의 사본이 된다.
   alternates: { canonical: "/rent" },
   // 🔗링크 미리보기(09-18 밤 QA SC-06). 안 주면 루트의 홈 카드(주소 `/`·홈 제목)가 그대로 상속돼서
-  //   카톡에 하루 가게 링크를 붙여도 홈 카드가 떴다.
+  //   카톡에 하루 팝업 링크를 붙여도 홈 카드가 떴다.
   //   ⚠️`openGraph`는 칸 하나만 줘도 루트 것을 «통째로» 갈아 끼운다(Next 메타데이터는 얕게 합친다).
   //   그래서 사이트 이름·언어·기본 썸네일도 여기 같이 적는다. 빼면 카드에서 그림이 사라진다.
   openGraph: {

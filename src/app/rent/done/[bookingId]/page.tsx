@@ -13,7 +13,7 @@ import type { BookingStatus } from "@/lib/types";
 import { GuestCancel } from "../../my/Actions";
 import { bookingWhen, InfoPanel, InfoRow, primaryBtnCls, secondaryBtnCls, won } from "../../ui";
 
-// 하루 가게 — 신청 완료 화면 (2026-09-14)
+// 하루 팝업 — 신청 완료 화면 (2026-09-14)
 //
 // 결제창에서 돌아온 사람이 처음 보는 화면이다. 전엔 `/rent/my`로 떨어졌는데, 거기는 목록이라 「내가 방금
 // 한 게 뭐지」가 한눈에 안 잡혔다. 여기는 그 한 건만 보여 준다.
@@ -36,7 +36,7 @@ const TITLE: Record<BookingStatus, string> = {
   pending: "결제가 안 끝난 신청이에요",
   paid: BOOKING_HEADLINE.guestPaid,
   confirmed: BOOKING_HEADLINE.guestConfirmed,
-  done: "다녀온 하루 가게예요",
+  done: "다녀온 하루 팝업이에요",
   rejected: "사장님이 이번엔 어렵대요",
   refunded: "돈을 돌려드린 예약이에요",
   cancelled: "취소한 예약이에요",
@@ -70,7 +70,7 @@ export default async function RentDonePage({ params }: { params: Promise<{ booki
   // 🎉이모지는 제목 «오른쪽»에(대표: *「타이틀 우측이나 좀 뭐 재밌게」*). 왼쪽에 두면 글머리표처럼 읽혀서
   //   제목이 목록의 한 줄로 내려앉는다. 오른쪽은 문장이 끝난 뒤라 축하가 된다.
   //   ⚠️`aria-hidden` — 화면 낭독기가 「파티 크래커」를 읽으면 제목이 길어지기만 한다.
-  // 🔁09-17 제목은 위 `TITLE`로(대표: 상태 이름에 하루 가게 맥락). 이모지 자리 규칙은 그대로다.
+  // 🔁09-17 제목은 위 `TITLE`로(대표: 상태 이름에 하루 팝업 맥락). 이모지 자리 규칙은 그대로다.
   const title = TITLE[b.status];
   const emoji = b.status === "paid" ? "✨" : b.status === "confirmed" ? "🎉" : "";
   const spaceName = brief?.name ?? "공간";

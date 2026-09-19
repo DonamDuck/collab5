@@ -63,7 +63,7 @@ export async function uploadPhoto(
   return signed.publicUrl;
 }
 
-/** 🧾하루 가게 사업자등록증 업로드(2026-09-18) — 사진과 같은 서명 URL 방식이되 **비공개 버킷 `host-docs`**.
+/** 🧾하루 팝업 사업자등록증 업로드(2026-09-18) — 사진과 같은 서명 URL 방식이되 **비공개 버킷 `host-docs`**.
  *  리사이즈하지 않는다(글자가 뭉개지면 검토를 못 한다). 공개 URL이 없어서 «경로»를 돌려준다. 저장할 때 서버가 이 사람 폴더인지 다시 본다.
  *  실패하면 사장님께 그대로 보일 문장을 담아 던진다. `mime`은 호출부가 파일에서 정한 값(확장자로 보충한 것 포함). */
 export async function uploadBizCert(file: File, mime: string): Promise<string> {

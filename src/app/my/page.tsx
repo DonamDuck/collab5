@@ -50,7 +50,7 @@ export default async function MyPage({ searchParams }: { searchParams: Promise<{
   const editedPairs = await findEditedPairs(reports);
   const displayName = profile?.brandName || user.email?.split("@")[0] || "내 브랜드";
 
-  // 🏠09-18 대표 코멘트 — 「하루 가게 영역이 너무 하단이라 서브 메뉴처럼 느껴진다. 소개서&콜라보 | 하루 가게를 같은 위계로」.
+  // 🏠09-18 대표 코멘트 — 「하루 팝업 영역이 너무 하단이라 서브 메뉴처럼 느껴진다. 소개서&콜라보 | 하루 팝업을 같은 위계로」.
   //   ⭐목록은 `/rent/my` 한 곳에만 그린다(두 곳에 그리면 한쪽만 고쳐지는 날이 온다). 여기는 숫자와 입구만.
   const [rentSpaces, rentHostBookings, rentGuestBookings] = profile
     ? await Promise.all([listSpacesByOwner(profile.id), listBookingsForHost(profile.id), listBookingsForGuest(profile.id)])
@@ -63,7 +63,7 @@ export default async function MyPage({ searchParams }: { searchParams: Promise<{
   const rentUpcoming = rentHost.upcoming.length;
   // 「빌린 예약」 = `/rent/my?tab=guest`가 처음 여는 «예약 완료» 칸의 수.
   const rentMyTrips = groupGuestBookings(rentGuestBookings, (b) => b).upcoming.length;
-  // 큰 칸의 기본: 답할 새 요청이 있으면 하루 가게, 아니면 소개서·콜라보. 주소(`?area=`)가 있으면 그게 이긴다.
+  // 큰 칸의 기본: 답할 새 요청이 있으면 하루 팝업, 아니면 소개서·콜라보. 주소(`?area=`)가 있으면 그게 이긴다.
   //   소개서 안쪽 탭(`?tab=`)으로 들어온 주소는 소개서 칸을 연다.
   const area: "brand" | "rent" =
     areaParam === "rent" || areaParam === "brand" ? areaParam : tab ? "brand" : rentToAnswer > 0 ? "rent" : "brand";
@@ -255,7 +255,7 @@ export default async function MyPage({ searchParams }: { searchParams: Promise<{
         <LogoutButton />
       </div>
 
-      {/* 🗂09-18 큰 칸 두 개 — 「소개서·콜라보 | 하루 가게」. `/rent/my`의 「빌려준 공간 | 빌린 공간」과 같은 알약 모양이라
+      {/* 🗂09-18 큰 칸 두 개 — 「소개서·콜라보 | 하루 팝업」. `/rent/my`의 「빌려준 공간 | 빌린 공간」과 같은 알약 모양이라
           큰 칸 → 작은 칸의 두 단계로 읽힌다. 주소(`?area=`)로 나눠 새로고침·메일 링크에서도 같은 칸이 열린다. */}
       {/* 🔁09-18 대표 코멘트 — 「플로팅 처럼 보이긴 하는데… 중앙 플로팅이면 어떨까?」 → 떠 있는 알약은 「안 이쁘다」로 한 번 더 바뀌어 폭을 채운 밑줄 탭(`StickyTabs`). */}
       <StickyTabs
@@ -264,7 +264,7 @@ export default async function MyPage({ searchParams }: { searchParams: Promise<{
         active={area}
         items={[
           { key: "brand", label: "소개서·콜라보", href: "/my?area=brand" },
-          { key: "rent", label: "하루 가게", href: "/my?area=rent", dot: rentToAnswer > 0 },
+          { key: "rent", label: "하루 팝업", href: "/my?area=rent", dot: rentToAnswer > 0 },
         ]}
       />
 

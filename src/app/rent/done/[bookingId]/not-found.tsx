@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { primaryBtnCls } from "../../ui";
 
-// 🔎09-17 QA — 없는 예약 번호로 오면 루트 404(「삭제된 소개서일 수 있어요」)가 떴다. 하루 가게 말로 돌려보낸다.
+// 🔎09-17 QA — 없는 예약 번호로 오면 루트 404(「삭제된 소개서일 수 있어요」)가 떴다. 하루 팝업 말로 돌려보낸다.
 //   남의 예약도 여기로 온다(`page.tsx`가 notFound). 「있는데 못 본다」를 말하지 않는 건 그대로다.
 export default function RentDoneNotFound() {
   return (

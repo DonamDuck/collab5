@@ -19,11 +19,11 @@ export default function TermsPage() {
         본 약관은 collab5(이하 &lsquo;회사&rsquo;)가 제공하는 브랜드 소개서 및 콜라보 연결 서비스(이하 &lsquo;서비스&rsquo;)의 이용과
         관련하여 회사와 이용자 간의 권리·의무 및 책임사항을 규정합니다.
       </p>
-      {/* 🏠하루 가게에 공간을 올리는 분께는 약관이 하나 더 있다(2026-09-16).
+      {/* 🏠하루 팝업에 공간을 올리는 분께는 약관이 하나 더 있다(2026-09-16).
           호스트 약관 머리말이 「이용약관과 함께 적용된다」고 말하는데, 정작 이쪽에서 그리로 가는 길이 없었다.
           한 문서가 다른 문서를 전제하면 양쪽에서 서로 찾아갈 수 있어야 한다. */}
       <p className="mt-2 text-[15px] leading-relaxed text-mute">
-        하루 가게에 공간을 올리시는 분께는{" "}
+        하루 팝업에 공간을 올리시는 분께는{" "}
         <Link href="/terms/host" className="underline underline-offset-4">
           공간 제공자 약관
         </Link>
@@ -107,14 +107,14 @@ export default function TermsPage() {
           </ul>
         </Article>
 
-        {/* 🏠09-17 — 하루 가게 손님 조항. QA에서 «손님 약관에 환불 규정이 0건»이 나왔다(규정은 호스트 약관 제8조에만 있었다).
+        {/* 🏠09-17 — 하루 팝업 손님 조항. QA에서 «손님 약관에 환불 규정이 0건»이 나왔다(규정은 호스트 약관 제8조에만 있었다).
             손님이 돈을 내는 흐름인데 손님이 동의한 우리 규정이 없으면 분쟁 때 근거가 약하다.
             ⚠️환불표는 `src/lib/rent-payment.ts` `guestCancelRefundRate`와 호스트 약관 제8조와 «셋이 같아야» 한다. 하나를 고치면 셋 다.
             `id="rent"` — 공간 상세·결제 화면이 `/terms#rent`로 바로 건다. */}
-        <Article id="rent" title="제10조 (하루 가게 이용)">
+        <Article id="rent" title="제10조 (하루 팝업 이용)">
           <ul className="list-disc space-y-1 pl-5">
             <li>
-              하루 가게는 공간을 올린 호스트와 공간을 빌리는 이용자를 이어 주는 서비스입니다. 회사는 통신판매중개자로서
+              하루 팝업은 공간을 올린 호스트와 공간을 빌리는 이용자를 이어 주는 서비스입니다. 회사는 통신판매중개자로서
               거래 당사자가 아니며, 공간과 그 이용에 대한 책임은 호스트에게 있습니다. 다만 회사는 결제·환불을 대행하고 분쟁
               해결을 돕습니다.
             </li>
@@ -165,7 +165,7 @@ export default function TermsPage() {
             <li>이용자는 호스트가 공간 상세에 적은 사용 유의 사항을 지켜야 하며, 이용 중 생긴 손해는 관련 법령에 따라 책임집니다.</li>
           </ul>
           <p className="mt-2 text-mute">
-            이 조항은 회사가 하루 가게의 결제를 여는 날부터 적용됩니다. 호스트에게는{" "}
+            이 조항은 회사가 하루 팝업의 결제를 여는 날부터 적용됩니다. 호스트에게는{" "}
             <Link href="/terms/host" className="underline underline-offset-2">
               공간 제공자 약관
             </Link>

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { primaryBtnCls, secondaryBtnCls } from "./ui";
 
-// 하루 가게 404 (2026-09-18 밤 QA G-03)
+// 하루 팝업 404 (2026-09-18 밤 QA G-03)
 //
 // 🩸없는 공간·아직 안 열린 공간 주소로 오면 루트 404가 떴고, 거기 적힌 말은 *「삭제된 소개서일 수 있어요」*였다.
 //   공간을 찾아온 손님에게 소개서 이야기를 하고, 다음 버튼은 「브랜드 찾아보기」였다. 다른 서비스로 안내한 셈이다.
@@ -16,7 +16,7 @@ export default function RentNotFound() {
         공개가 끝났거나 주소가 바뀌었을 수 있어요.
       </p>
       <Link href="/rent" className={`${primaryBtnCls} mt-8 h-[48px] w-full`}>
-        하루 가게 둘러보기
+        하루 팝업 둘러보기
       </Link>
       <Link href="/rent/requests" className={`${secondaryBtnCls} mt-2 h-[48px] w-full`}>
         내 예약 보기

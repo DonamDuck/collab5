@@ -12,7 +12,7 @@ import type { BizCheckStatus, Space } from "@/lib/types";
 import { InfoList, InfoRow, SpaceBadge } from "../ui";
 import { ReviewActions } from "./ReviewActions";
 
-// 하루 가게 — 공간 검토 (2026-09-18) · 관리자만
+// 하루 팝업 — 공간 검토 (2026-09-18) · 관리자만
 //
 // 🧾대표 09-17 — 「개인까지 받으면 너무 무방비 범죄가 일어날 것 같다」. 공간 등록 = 사업자등록증 + 국세청 자동 조회 + «관리자 검토 뒤 공개».
 // 🩸그 전엔 공개 손잡이가 `/rent/my`의 [공개하기] 하나뿐이었고, 그 화면은 «내» 공간만 그린다(`listSpacesByOwner`).
@@ -29,7 +29,7 @@ export const dynamic = "force-dynamic";
  *  이 주소가 무엇을 하는 곳인지 알려 주고 있었다. 아니면 제목을 안 줘서 사이트 기본 제목이 선다. 판정은 `isRentAdmin` 한 벌. */
 export async function generateMetadata(): Promise<Metadata> {
   if (!(await isRentAdmin())) return { robots: { index: false } };
-  return { title: "공간 검토 — 하루 가게", robots: { index: false } };
+  return { title: "공간 검토 — 하루 팝업", robots: { index: false } };
 }
 
 const h2Cls = "text-[21px] font-bold leading-snug tracking-tight text-ink";
@@ -272,7 +272,7 @@ export default async function RentReviewPage() {
     <main className="mx-auto w-full max-w-[720px] px-4 pt-8 pb-16 sm:px-6 sm:pt-12">
       <header>
         <Link href="/rent/my?tab=host" className="inline-block py-[12px] text-[15px] text-mute underline underline-offset-2">
-          ← 내 하루 가게
+          ← 내 하루 팝업
         </Link>
         <h1 className="mt-3 text-[28px] font-bold leading-[1.25] tracking-[-0.02em] text-ink">공간 검토</h1>
         <p className="mt-3 text-[17px] leading-relaxed break-keep text-mute">

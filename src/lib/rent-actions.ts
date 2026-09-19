@@ -52,7 +52,7 @@ import type { Space, SpaceBooking, SpaceUseType, SpaceCategory, OpenSlot, Access
 import { bookingAmount, compatScopePrice } from "./rent-products";
 import { PRODUCT_LABEL, withJosa } from "./rent-copy";
 
-// 하루 가게 — 쓰기 서버 액션 (2026-09-13)
+// 하루 팝업 — 쓰기 서버 액션 (2026-09-13)
 // 스펙 = docs/superpowers/specs/2026-09-13-daily-shop-design.md
 //
 // 🚨**이 파일은 «async 함수»만 export한다.** 타입이나 상수를 하나라도 내보내면 빌드가
@@ -114,7 +114,7 @@ function randomTail(n: number): string {
   return Array.from(crypto.getRandomValues(new Uint8Array(n)), (b) => abc[b % 36]).join("");
 }
 
-/** 📸공간 사진으로 받을 주소의 앞부분 — **우리 저장소의 하루 가게 폴더**만 (09-18 밤 QA SC-20·H-17).
+/** 📸공간 사진으로 받을 주소의 앞부분 — **우리 저장소의 하루 팝업 폴더**만 (09-18 밤 QA SC-20·H-17).
  *  등록 폼이 부르는 `uploadPhoto(파일, 1200, "rent")`가 만드는 모양 그대로다:
  *  `createUploadUrlAction`이 버킷 `maker-photos`의 `rent/p/{uuid}.jpg`에 서명 URL을 내주고, 공개 주소는 그 경로 앞에
  *  `{프로젝트}/storage/v1/object/public/`이 붙는다(supabase-js `getPublicUrl`). */
@@ -645,7 +645,7 @@ export async function requestSpaceFixAction(slug: string, note: string): Promise
     const mail = await notifySpaceFixRequest(saved, host, text, wasListed);
     mailed = mail.sent ? "sent" : mail.skipped === "no-recipient" ? "no-recipient" : "not-sent";
   });
-  // 메일이 나갔는지를 그대로 말한다. 안 나갔어도 사장님 화면(내 하루 가게·고치기)엔 사유가 떠 있다.
+  // 메일이 나갔는지를 그대로 말한다. 안 나갔어도 사장님 화면(내 하루 팝업·고치기)엔 사유가 떠 있다.
   const mailLine = {
     "sent": "사장님께 사유를 메일로 보냈어요.",
     "no-recipient": "사장님 계정에 이메일이 없어 메일은 못 보냈어요. 전화로 알려 주세요.",

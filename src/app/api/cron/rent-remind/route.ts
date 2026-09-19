@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { runRentRemind } from "@/lib/rent-remind";
 import { sendAdminDaily, type RemindRun } from "@/lib/rent-admin-daily";
 
-// GET /api/cron/rent-remind — 하루 가게 이용 전날 리마인드 (2026-09-17)
+// GET /api/cron/rent-remind — 하루 팝업 이용 전날 리마인드 (2026-09-17)
 //
 // ⏰Vercel Cron이 매일 00:00 UTC(= KST 09:00)에 부른다(`vercel.json`).
 // 🔒Vercel Cron은 `CRON_SECRET` 환경변수가 있으면 `Authorization: Bearer <그 값>`을 실어 보낸다.

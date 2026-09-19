@@ -1,4 +1,4 @@
-// 하루 가게 — 목 데이터 스위치 (2026-09-17 대표: 디자인팀과 대표가 모든 화면 × 모든 상태를 URL 하나로)
+// 하루 팝업 — 목 데이터 스위치 (2026-09-17 대표: 디자인팀과 대표가 모든 화면 × 모든 상태를 URL 하나로)
 //
 // ⭐**페이지는 안 고친다. 읽기 함수 첫 줄에서 값을 갈아 끼운다.** 페이지마다 목 분기를 넣으면 목 화면과
 //   실제 화면이 갈라지고, 디자인팀이 본 화면이 손님이 보는 화면이 아니게 된다.
@@ -9,7 +9,7 @@
 // 🚨**운영에선 절대 안 켜진다.** 첫 줄이 `process.env.NODE_ENV !== "development"`면 null이다. Next는 빌드 때
 //   이 값을 문자열 상수로 박으므로 운영 번들에선 조건이 `"production" !== "development"` → 늘 참이 되어
 //   아래 쿠키 읽기까지 닿는 길이 없다. 쿠키를 손으로 넣어도 운영 서버는 이 파일에서 바로 돌아간다.
-// 🚨쓰기는 막는다. 목 쿠키가 있는 동안 하루 가게 서버 액션은 DB·토스를 안 건드리고 `RENT_MOCK_BLOCKED`를 돌려준다.
+// 🚨쓰기는 막는다. 목 쿠키가 있는 동안 하루 팝업 서버 액션은 DB·토스를 안 건드리고 `RENT_MOCK_BLOCKED`를 돌려준다.
 //
 // 🗺09-18 사이트 전체로 넓혔다(`/dev/map`). 대표: 「map으로 만들면 디자인팀 검수 같은 것도 하기 편하고 나도 그냥 들어가서 막 볼 수 있기도 하고」.
 //   목 모드면 `repo` 전체(`site-mock-repo.ts`)·세션(`supabase/server.ts`의 `getSessionUser*`)·프로필·매거진 편집 권한·
@@ -39,7 +39,7 @@ export async function getRentMock(): Promise<MockCase | null> {
   return { ...def, data: buildSiteWorld(def.world) };
 }
 
-/** 사이트 전체에서 부르는 이름. 하루 가게 코드는 옛 이름(`getRentMock`)을 그대로 쓴다. */
+/** 사이트 전체에서 부르는 이름. 하루 팝업 코드는 옛 이름(`getRentMock`)을 그대로 쓴다. */
 export const getSiteMock = getRentMock;
 
 /** 목 모드인가 — 쓰기 함수 첫 줄에서 쓴다. */

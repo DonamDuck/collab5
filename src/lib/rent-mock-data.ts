@@ -1,4 +1,4 @@
-// 하루 가게 — 디자인 확인용 목 데이터 (2026-09-17 대표: 「mock data로 해도 충분해」)
+// 하루 팝업 — 디자인 확인용 목 데이터 (2026-09-17 대표: 「mock data로 해도 충분해」)
 //
 // ⭐화면은 안 고치고 «읽기 함수가 돌려주는 값»만 이걸로 갈아 끼운다(`rent-mock.ts`). 그래서 여기 적는 건
 //   DB 행이 아니라 읽기 함수가 내놓는 타입(`Space`·`SpaceBooking`·`Payment`…) 그대로다. `satisfies`로 모양을 잠가
@@ -75,7 +75,7 @@ export const MOCK_CASES: MockCaseDef[] = [
   { id: "stress-admin", label: "긴 글 · 관리자로 보기", viewer: { userId: MOCK_USER.admin, admin: true }, world: "stress" },
   { id: "minimal-guest", label: "최소 입력 · 손님으로 보기", viewer: { userId: MOCK_USER.minGuest, admin: false }, world: "minimal" },
   { id: "minimal-host", label: "최소 입력 · 사장님으로 보기", viewer: { userId: MOCK_USER.minHost, admin: false }, world: "minimal" },
-  // 🗺09-18 사이트 전체 지도(`/dev/map`)가 더한 케이스. 세계는 하루 가게와 같고, 소개서·매거진·찜·리포트 층은
+  // 🗺09-18 사이트 전체 지도(`/dev/map`)가 더한 케이스. 세계는 하루 팝업과 같고, 소개서·매거진·찜·리포트 층은
   //   `site-mock-data.ts`가 그 위에 얹는다. 같은 가상 인물(느린오후·밀가루 일기)이 두 서비스에 이어서 나온다.
   { id: "member-full", label: "브랜드 회원 · 소개서 셋, 찜·리포트·성사 기록·요약 리포트 있음", viewer: { userId: MOCK_USER.host, admin: false }, world: "full" },
   { id: "member-new", label: "새 회원 · 브랜드명 비움, 소개서 없음", viewer: { userId: MOCK_USER.newbie, admin: false }, world: "full" },
@@ -261,7 +261,7 @@ function emptyWorld(): MockWorld {
     profiles: [
       profile(MOCK_USER.host, "느린오후", "010-2345-6789", "host@example.com"),
       profile(MOCK_USER.guest, "밀가루 일기", "010-3456-7890", "guest@example.com"),
-      profile(MOCK_USER.admin, "하루 가게 운영", "010-0000-0000", "admin@example.com"),
+      profile(MOCK_USER.admin, "하루 팝업 운영", "010-0000-0000", "admin@example.com"),
     ],
   };
 }
@@ -274,7 +274,7 @@ function fullWorld(today: string, withAccount: boolean): MockWorld {
   const profiles = [
     profile(U.host, "느린오후", "010-2345-6789", "slow.afternoon@example.com"),
     profile(U.guest, "밀가루 일기", "010-3456-7890", "flour.diary@example.com"),
-    profile(U.admin, "하루 가게 운영", "010-0000-0000", "admin@example.com"),
+    profile(U.admin, "하루 팝업 운영", "010-0000-0000", "admin@example.com"),
     profile(U.host2, "바늘숲 공방", "010-4567-8901", "needle.forest@example.com"),
     profile(U.guest2, "낮은책상", "010-5678-9012", "low.desk@example.com"),
     profile(U.host3, "새벽반죽", "010-6789-0123", "dawn.dough@example.com"),
@@ -286,7 +286,7 @@ function fullWorld(today: string, withAccount: boolean): MockWorld {
       oneLiner: "동네 사람들이 오후를 천천히 보내는 작은 로스터리예요.",
       region: "서울 성동", keywords: ["로스팅", "동네 카페", "원데이 클래스"],
       description: "성수동 골목 2층에서 원두를 볶고 커피를 내려요. 평일 오후엔 동네 분들이 책을 읽다 가시고, 주말엔 작은 클래스를 열어요.",
-      story: "회사 다니며 주말마다 원두를 볶다가 가게를 열었어요.\n쉬는 월요일마다 비어 있는 2층이 아까워 하루 가게에 올렸어요.",
+      story: "회사 다니며 주말마다 원두를 볶다가 가게를 열었어요.\n쉬는 월요일마다 비어 있는 2층이 아까워 하루 팝업에 올렸어요.",
       photos: [photo("느린오후 로스터리 1층", 28), photo("로스팅 기계", 18, 900, 1200), photo("창가 자리", 45)],
       activities: [
         { title: "월간 핸드드립 클래스", desc: "한 달에 한 번, 여섯 분과 원두 세 가지를 내려 봐요.", photos: [photo("드립 클래스", 32)] },
@@ -520,7 +520,7 @@ function fullWorld(today: string, withAccount: boolean): MockWorld {
   }, today);
 
   // 🔁S11 — 보완 필요(대표 09-19 저녁). 공개 중이던 공간을 관리자가 반려했다: 등록증 주소(2층)와 공간 주소(3층)가 다르다.
-  //   목록에서 내려갔고(검토 대기 + 반려 시각), 내 하루 가게 줄과 고치기 화면 맨 위에 사유가 선다. 검토 화면 「보완을 기다리는 공간」.
+  //   목록에서 내려갔고(검토 대기 + 반려 시각), 내 하루 팝업 줄과 고치기 화면 맨 위에 사유가 선다. 검토 화면 「보완을 기다리는 공간」.
   const s11 = space({
     id: 9113, slug: "mock-slow-afternoon-studio", ownerUserId: U.host, status: "pending",
     name: "느린오후 3층 작업실", category: "workshop",
@@ -646,7 +646,7 @@ function stressWorld(today: string): MockWorld {
   const profiles = [
     profile(U.stressHost, longBrand, "02-0000-0000", "a.very.long.mailbox.name.for.layout.testing@subdomain.example.com"),
     profile(U.stressGuest, longGuest, "010-9999-8888", "weekend.market.friends.six.people.together@example.com"),
-    profile(U.admin, "하루 가게 운영", "010-0000-0000", "admin@example.com"),
+    profile(U.admin, "하루 팝업 운영", "010-0000-0000", "admin@example.com"),
   ];
   const makers = [
     maker({ id: 9905, slug: "mock-long-kitchen", name: longBrand, ownerUserId: U.stressHost, oneLiner: "이름이 아주 긴 소개서예요. 링크 글자가 몇 줄로 접히는지 보려고 만들었어요." }),
@@ -727,7 +727,7 @@ function stressWorld(today: string): MockWorld {
 function minimalWorld(today: string): MockWorld {
   const d = (n: number) => addDaysIso(today, n);
   const U = MOCK_USER;
-  const profiles = [profile(U.minHost, "", "", ""), profile(U.minGuest, "", "", ""), profile(U.admin, "하루 가게 운영", "", "admin@example.com")];
+  const profiles = [profile(U.minHost, "", "", ""), profile(U.minGuest, "", "", ""), profile(U.admin, "하루 팝업 운영", "", "admin@example.com")];
   const s = space({
     id: 9108, slug: "mock-minimal-room", ownerUserId: U.minHost, status: "open",
     name: "작업실", address: "서울 종로구 창신길 00", rules: "깨끗이 써 주세요",

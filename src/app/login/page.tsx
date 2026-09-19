@@ -31,7 +31,7 @@ function LoginForm() {
   const [password, setPassword] = useState("");
   const [err, setErr] = useState("");
   // 🔙가입으로 건너가도 돌아갈 곳을 들고 간다(09-18 밤 QA SC-05). 전엔 가입 링크가 `/signup`뿐이라
-  //   하루 가게 공간에서 「로그인하고 신청하기」를 누른 손님이 가입을 거치면 그 공간을 잃고 홈에 떨어졌다.
+  //   하루 팝업 공간에서 「로그인하고 신청하기」를 누른 손님이 가입을 거치면 그 공간을 잃고 홈에 떨어졌다.
   const back = safeRedirect(searchParams.get("redirect"));
 
   const submit = () =>
