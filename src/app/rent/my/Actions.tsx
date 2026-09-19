@@ -160,7 +160,7 @@ function cancelReason(q: { refund: number; rate: number; daysBefore: number; gra
   if (q.refund === 0) return "당일 취소라 돌려드릴 수 없어요.";
   if (q.rate >= 1) {
     return q.grace
-      ? "결제하고 한 시간이 안 지나서 전액 돌아와요."
+      ? "사장님이 수락하신 지 한 시간이 안 지나서 전액 돌아와요."
       : `이용일까지 ${q.daysBefore}일 남아 전액 돌아와요.`;
   }
   // ✍️09-18 밤 QA(G-26) — 바로 위 두 줄은 「돌아와요」(손님에게 오는 돈)인데 이 줄만 「돌아가요」였다.

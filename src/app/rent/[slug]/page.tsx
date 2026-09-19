@@ -525,12 +525,12 @@ export default async function SpaceDetailPage({
               사장님이 거절하시면 <span className="font-medium text-ink">전액</span> 돌려드려요.
             </p>
             <p className="mt-3 text-[16px] leading-relaxed break-keep text-body">
-              결제하고 <span className="font-medium text-ink">한 시간 안</span>에 취소하시면 남은 날과 상관없이 전액
-              돌려드려요.
+              사장님이 수락하신 뒤 <span className="font-medium text-ink">한 시간 안</span>에 취소하시면 남은 날과
+              상관없이 전액 돌려드려요.
             </p>
             {/* ✍️09-17 QA — 「남은 기간으로 정해져요」 피동·행정어. 경계가 날짜 기준이라는 것도 같이 말한다(`kstDaysUntil`). */}
             <p className="mt-3 text-[16px] leading-relaxed break-keep text-mute">
-              그 뒤엔 이용일까지 며칠 남았는지에 따라 달라져요. 몇 시에 취소하든 달력 날짜로 세요.
+              수락 전이거나 한 시간이 지나면 이용일까지 며칠 남았는지에 따라 달라져요. 몇 시에 취소하든 달력 날짜로 세요.
             </p>
             <dl className="mt-3 space-y-2 text-[16px]">
               {[

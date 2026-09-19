@@ -1254,7 +1254,7 @@ export function SpaceForm({
               // ✍️09-18 밤 QA(H-30) — 이 줄만 1인칭(「내 소유」)이라 옆 줄들과 화자가 달랐다. 사장님께 말하는 결로 맞춘다.
               `약관에는 사장님 소유이거나 임대인 동의를 받으셨다는 것, 수수료 ${Math.round(feeRate * 100)}%와 정산 방법, 환불 규정이 담겨 있어요.`,
               "손님은 신청하기 전에 브랜드 이름·주소·가게 전화번호를 볼 수 있어요.",
-              "예약이 잡히면 예약한 손님께 사장님 연락처가 전달되고, 사장님도 손님 연락처를 받아요.",
+              "손님이 결제를 마치면 사장님 연락처가 그 손님께 전달돼요. 손님 연락처는 사장님이 요청을 수락하신 뒤에 보실 수 있어요.",
             ].map((line) => (
               <li key={line} className="flex gap-2 text-[15px] leading-relaxed break-keep text-mute">
                 <span aria-hidden="true">·</span>
