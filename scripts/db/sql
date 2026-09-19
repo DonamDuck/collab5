@@ -1,0 +1,81 @@
+#!/usr/bin/env python3
+"""운영 DB에 SQL을 돌린다 — Supabase rpc `exec_sql` 경유(설치 = scripts/db/setup-exec-sql.sql, 대시보드에서 1회).
+
+  scripts/db/sql "select slug, name from brands order by created_at desc limit 5"
+  scripts/db/sql -f artifact/inject-final.sql --go        # 값 바꾸는 문장은 --go 없이는 «보여주기»만 한다
+  echo "select 1" | scripts/db/sql
+
+규칙(대표 확정 08-29·09-19):
+  · 조회는 자유. update/insert 는 문장을 «먼저 보여주고» 대표 「고고」를 받은 뒤 --go 로 돌린다.
+  · delete / truncate / drop 은 이 도구가 거부한다 — 삭제는 대표가 직접.
+  · update/delete 에 where 가 없으면 거부(PostgREST 와 달리 SQL 은 전체 행이 조용히 바뀐다).
+  · 키는 1팀 작업트리 ~/Desktop/collab5/.env.local 에서 읽는다(파일에 한글 주석이 있어 grep 방식).
+"""
+import json, os, re, sys, urllib.request, urllib.error
+
+ENV = os.path.expanduser("~/Desktop/collab5/.env.local")
+
+def creds():
+    s = open(ENV, encoding="utf-8").read()
+    url = re.search(r"^SUPABASE_URL=(\S+)", s, re.M)
+    key = re.search(r"^SUPABASE_SERVICE_ROLE_KEY=(\S+)", s, re.M)
+    if not (url and key):
+        sys.exit(f"SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY 를 {ENV} 에서 못 찾음")
+    return url.group(1).strip(), key.group(1).strip()
+
+def classify(q):
+    h = re.sub(r"^\s*(--[^\n]*\n\s*)*", "", q).lstrip().lower()  # 앞머리 주석 걷어내고
+    first = h.split(None, 1)[0] if h else ""
+    if first in ("delete", "truncate", "drop", "alter", "grant", "revoke"):
+        return "forbidden", first
+    if first in ("select", "with", "explain", "show", "table"):
+        return "read", first
+    if first in ("update", "insert", "create"):
+        return "write", first
+    return "write", first or "?"
+
+def main(argv):
+    go = "--go" in argv; argv = [a for a in argv if a != "--go"]
+    if "-f" in argv:
+        q = open(argv[argv.index("-f") + 1], encoding="utf-8").read()
+    elif argv:
+        q = " ".join(argv)
+    else:
+        q = sys.stdin.read()
+    q = q.strip()
+    kind, verb = classify(q)
+    if kind == "forbidden":
+        sys.exit(f"⛔ `{verb}` 는 이 도구로 돌리지 않는다 — 삭제·스키마 변경은 대표가 대시보드에서 직접.")
+    if verb == "update" and not re.search(r"\bwhere\b", q, re.I):
+        sys.exit("⛔ where 없는 update — 전체 행이 바뀐다. 거부.")
+    if kind == "write" and not go:
+        print("── 값을 바꾸는 문장이에요. 대표 「고고」 뒤에 --go 를 붙여 다시 돌리세요. ──")
+        print(q[:1500] + (" …(%d자)" % len(q) if len(q) > 1500 else ""))
+        return
+    url, key = creds()
+    req = urllib.request.Request(
+        f"{url}/rest/v1/rpc/exec_sql",
+        data=json.dumps({"q": q}).encode(),
+        headers={"apikey": key, "Authorization": f"Bearer {key}", "Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        res = json.load(urllib.request.urlopen(req, timeout=120))
+    except urllib.error.HTTPError as e:
+        body = e.read().decode("utf-8", "replace")
+        if e.code == 404 and "exec_sql" in body:
+            sys.exit("exec_sql 함수가 아직 없어요 → scripts/db/setup-exec-sql.sql 을 Supabase SQL Editor 에서 한 번 실행.")
+        sys.exit(f"HTTP {e.code}: {body[:800]}")
+    if isinstance(res, list):
+        if not res:
+            print("(0행)"); return
+        cols = list(res[0].keys())
+        print(" | ".join(cols))
+        for row in res:
+            print(" | ".join(json.dumps(row.get(c), ensure_ascii=False)[:60] for c in cols))
+        print(f"({len(res)}행)")
+    else:
+        print(json.dumps(res, ensure_ascii=False))
+
+if __name__ == "__main__":
+    main(sys.argv[1:])
