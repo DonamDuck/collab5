@@ -35,7 +35,8 @@ import {
 } from "@/lib/bizcheck";
 import { pausedChangeProblem, spaceSaveReview } from "@/lib/rent-review";
 import {
-  COFFEE_CHAT_FREE, COFFEE_CHAT_WHEN_HOST, HOST_REQUEST_STEPS, hostFeeLine, PRODUCT_HINT_HOST, PRODUCT_LABEL, PRODUCT_NOTE_PLACEHOLDER, withJosa,
+  COFFEE_CHAT_FREE, COFFEE_CHAT_WHEN_HOST, FEE_NOTICE_LABEL, HOST_REQUEST_STEPS, hostFeeLine, PRODUCT_HINT_HOST, PRODUCT_LABEL,
+  PRODUCT_NOTE_PLACEHOLDER, withJosa,
 } from "@/lib/rent-copy";
 import { CATEGORY_OPTIONS, dateLabel, primaryBtnCls, RentSelect, rentInputCls, rentTextareaCls, secondaryBtnCls, won } from "../ui";
 import { AddressField } from "./AddressField";
@@ -216,7 +217,10 @@ export function SpaceForm({
   const [rules, setRules] = useState(initial?.rules ?? "");
   const [ruleInput, setRuleInput] = useState("");
   // 🛍09-18 상품 셋. 고치기면 저장된 상품을 그대로(SQL 전 옛 공간은 `toSpace`가 옛 범위에서 만들어 준다).
-  const [spaceOn, setSpaceOn] = useState(initial?.rentSpaceOn ?? false);
+  // 🔁09-20 대표 코멘트 #119 — 새로 올릴 때는 「대관만」이 켜진 채로 시작한다. 제일 흔한 답을 미리 얹어 두는 것이라
+  //   고치기 화면(`initial`)과 되살린 초안은 저장된 값을 그대로 따른다. 아래 `blank`의 첫 모습도 같이 켜 둬야
+  //   폼을 열어만 봤는데 초안이 남지 않는다(첫 모습과 지금 폼을 견줘서 판정한다).
+  const [spaceOn, setSpaceOn] = useState(initial?.rentSpaceOn ?? true);
   const [spacePrice, setSpacePrice] = useState<number>(initial?.rentSpacePrice ?? 0);
   const [spaceNote, setSpaceNote] = useState(initial?.rentSpaceNote ?? "");
   const [fullOn, setFullOn] = useState(initial?.rentFullOn ?? false);
@@ -237,6 +241,12 @@ export function SpaceForm({
   );
   const [repeatWeekly, setRepeatWeekly] = useState<RepeatRule[]>(initial?.repeatWeekly ?? []);
   const [termsOk, setTermsOk] = useState(!!initial?.hostTermsAt);
+  /** 🏠임대차·관리 규약을 살펴봤다는 확인(대표 09-20 코멘트 #130).
+   *  🔁09-17엔 「체크는 다시 넣지 않는다」였다가 09-20에 다시 넣기로 했다. 안내 한 줄은 읽히지 않고 지나갔다.
+   *  ⚠️저장 칸을 새로 만들지 않는다 — 화면에서만 묻고 서버로 안 보낸다. 그래서 «새로 올릴 때»만 묻는다.
+   *    고치기 화면은 이미 올라간 공간이라 여기서 다시 막으면 문구 하나 고치려다 발이 묶인다.
+   *  ✋임시 저장에도 안 담는다(약관 동의와 같은 처리 — 다시 눌러야 확인이다). */
+  const [constraintOk, setConstraintOk] = useState(false);
   // 📎소개서 보여주기 토글(대표 09-16). 끄면 저장값은 빈 문자열이지만 고른 소개서는 기억해 둬서, 다시 켜면 그대로 돌아온다.
   const [brandOn, setBrandOn] = useState(initial ? !!initial.brandSlug : !!defaultBrandSlug);
   const [brandPick, setBrandPick] = useState(initial?.brandSlug || defaultBrandSlug || myBrands[0]?.slug || "");
@@ -310,7 +320,8 @@ export function SpaceForm({
     name: defaultName, category: "", body: "", photos: [],
     addrBase: "", addrDetail: "", contactPhone: defaultPhone, accessHow: "sms",
     facilities: [], facilitiesNote: "", capacity: "", rules: "",
-    spaceOn: false, spacePrice: 0, spaceNote: "", fullOn: false, fullPrice: 0, fullNote: "",
+    // 🔁09-20 #119 — 「대관만」이 기본으로 켜진 첫 모습(위 `spaceOn` 주석).
+    spaceOn: true, spacePrice: 0, spaceNote: "", fullOn: false, fullPrice: 0, fullNote: "",
     chatOn: false, chatMin: "60", chatPrice: 0, chatTopics: "", chatFree: false,
     openSlots: [], repeatWeekly: [],
     brandOn: !!defaultBrandSlug, brandPick: defaultBrandSlug || myBrands[0]?.slug || "",
@@ -629,6 +640,8 @@ export function SpaceForm({
       if (dateProblem) return ["bizOpenDate", dateProblem];
     }
     if (pausedLine) return [pausedLine.field === "biz" ? "bizNumber" : pausedLine.field, pausedLine.message];
+    // 🏠09-20 #130 — 제약 확인이 약관 동의 «위»에 있으니 막는 순서도 그 순서다(H-21과 같은 이유). 새로 올릴 때만 묻는다.
+    if (!editing && !constraintOk) return ["constraint", "제약 사항을 살펴보셨으면 「확인했어요」를 눌러 주세요."];
     if (!termsOk) return ["terms", "공간 제공자 약관에 동의해 주세요."];
     return null;
   };
@@ -820,10 +833,15 @@ export function SpaceForm({
             ))}
           </RentSelect>
         </L>
+        {/* 🔁09-20 대표 코멘트 #125 — *「가격 설정할 때 시설 설명이 나오는데, 공간 소개에 미리 다 써 버릴까 걱정…
+            중복으로 쓰게끔 하는 헷갈리는 UX를 피해 보고 싶어」*.
+            ⭐두 칸이 겹치는 이유는 둘 다 「공간을 설명하라」고만 말해서였다. 축을 갈랐다 —
+              여기는 «어떤 곳인지»(분위기), 아래 대여 타입의 설명 칸은 «무엇을 쓸 수 있는지»(시설·장비).
+            🔗한쪽만 좁히면 사장님은 시설을 어디에 적을지 모른다. 두 자리가 서로를 가리키게 적는다. */}
         <L
-          label="공간 소개"
+          label="공간을 간단히 소개해 주세요"
           htmlFor="sp-body"
-          hint="자세히 남겨 주실수록 손님이 마음을 정하기 쉬워요."
+          hint="어떤 분위기의 어떤 공간인지 두세 문장이면 충분해요. 쓸 수 있는 시설과 장비는 아래 대여 타입에서 따로 적어요."
         >
           <textarea
             id="sp-body"
@@ -1132,6 +1150,11 @@ export function SpaceForm({
         anchor="products"
         error={fieldErr("products")}
       >
+        {/* 💰09-20 대표 코멘트 #122 — *「수수료 이거 회색보다 중요한 내용이야… 완전 검정 text + 앞에 [수수료 안내] 같은 시선 끄는 게 필요해」*.
+            ⭐상품마다 붙이지 않고 절에 하나만 둔다. 대표: *「대관 따로 공간 전체 따로 수수료를 다르게 하진 않을 거라」* —
+              요율이 하나니 말도 한 번이면 된다. 상품마다 되풀이하면 그 자체로 회색 한 줄처럼 읽힌다.
+            📍값 칸 «위»에 둔 이유 — 값을 적기 전에 읽어야 얼마를 받을지 정할 수 있다. */}
+        <FeeNotice feeRate={feeRate} />
         <ProductCard
           title={PRODUCT_LABEL.space}
           hint={PRODUCT_HINT_HOST.space}
@@ -1145,8 +1168,9 @@ export function SpaceForm({
             note={spaceNote}
             onNote={setSpaceNote}
             notePlaceholder={PRODUCT_NOTE_PLACEHOLDER.space}
-            noteLabel="무엇을 쓰고, 무엇을 할 수 있나요"
-            noteHint="손님은 이 글을 읽고 어느 쪽을 빌릴지 정해요. 못 쓰는 것도 적어 두시면 그날 서로 편해요."
+            // 🔁09-20 대표 코멘트 #123·#124 — 라벨과 도움말을 대표 문안으로. 뒤 한 문장은 #125(겹쳐 쓰지 않게 위를 가리킨다).
+            noteLabel="대여한 날 사용할 수 있는 것들을 알려 주세요"
+            noteHint="빌리는 분이 미리 확인할 수 있도록 이용 가능한 시설과 공간을 알려 주세요. 공간 분위기는 위 「공간 소개」에 적으셨으니 여기서는 빼셔도 돼요."
             feeRate={feeRate}
             payout={payoutOf(spacePrice)}
             priceErr={fieldErr("spacePrice")}
@@ -1170,7 +1194,8 @@ export function SpaceForm({
             onNote={setFullNote}
             notePlaceholder={PRODUCT_NOTE_PLACEHOLDER.full}
             noteLabel="어떤 시설까지 쓰고, 무엇을 할 수 있나요"
-            noteHint="기계 쓰는 법을 알려 주시는지, 손님이 챙겨 올 재료가 있는지도 같이 담아 주세요."
+            // 🔗09-20 #125 — 대관만 쪽과 같은 뜻을 다른 결로. 두 카드가 같은 문장으로 끝나면 그 자체가 한 금형으로 읽힌다.
+            noteHint="기계 쓰는 법을 알려 주시는지, 손님이 챙겨 올 재료가 있는지도 같이 담아 주세요. 위 「공간 소개」와 겹치는 이야기는 안 적으셔도 괜찮아요."
             feeRate={feeRate}
             payout={payoutOf(fullPrice)}
             priceErr={fieldErr("fullPrice")}
@@ -1214,12 +1239,15 @@ export function SpaceForm({
           </L>
           <L label="커피챗 비용" htmlFor="sp-cp" anchor="chatPrice" error={fieldErr("chatPrice")}>
             {/* 무료면 칸을 잠그고 「무료」를 보인다. 적어 둔 값은 지우지 않는다(다시 끄면 돌아온다). */}
+            {/* 📐09-20 #121 — 공간 값 칸과 같은 모양으로. 단위는 「/시간」이 아니라 「/회」다.
+                커피챗 값은 시간당이 아니라 위에서 고르신 «한 번» 값이라, 「/시간」을 붙이면 없는 계산을 하게 만든다. */}
             <WonInput
               id="sp-cp"
               value={chatFree ? 0 : chatPrice}
               onChange={setChatPrice}
               placeholder={chatFree ? COFFEE_CHAT_FREE : "예) 20,000"}
               disabled={chatFree}
+              unit="/회"
             />
             {/* 👆44px 줄(약관 체크와 같은 처리) — 체크 상자 18px만 누름 자리면 손끝이 빗나간다. */}
             <label className="mt-2 flex min-h-[44px] cursor-pointer items-center gap-3">
@@ -1337,8 +1365,9 @@ export function SpaceForm({
             <p className="text-[15px] leading-relaxed break-keep text-mute">등록증을 읽고 있어요…</p>
           )}
           {certRead === "filled" && (
+            // 🔁09-20 대표 코멘트 #129 — 무엇을 보고 무엇을 했는지 다 적는다. 「읽었어요」만으로는 칸이 채워진 이유가 안 보였다.
             <p className="rounded-md bg-primary-tint px-4 py-3 text-[15px] leading-relaxed break-keep text-primary-on">
-              등록증에서 읽었어요. 맞는지 한 번 확인해 주세요.
+              올려 주신 사업자등록증을 바탕으로 아래 정보를 채웠어요. 맞는지 확인해 주세요.
             </p>
           )}
           {certRead === "none" && (
@@ -1439,16 +1468,38 @@ export function SpaceForm({
               우리 기존 약관엔 호스트 의무가 한 줄도 없었다. 수수료·정산·구상을 주장할 근거가 없었다. */}
         {/* 🏠09-17 대표 결정 6 — 임대인 동의 «체크»는 다시 넣지 않는다. 대신 동의 바로 위에 한 줄로 먼저 생각하게 한다.
             임차 가게 사장님은 여기서 처음 떠올린다(QA). */}
-        {/* 🔁09-18 대표 코멘트 — 문안(「제약 사항은 없는지」) + 불렛. */}
-        <ul className="space-y-1.5">
-          <li className="flex gap-2 text-[15px] leading-relaxed break-keep text-body">
-            <span aria-hidden="true" className="text-mute">·</span>
-            <span className="min-w-0 flex-1">
-              공간을 빌려주는 데 제약 사항은 없는지 미리 살펴봐 주세요. 임대차 계약이나 건물 관리 규약에 제한이 있을 수
-              있어요.
-            </span>
-          </li>
-        </ul>
+        {/* 🔁09-18 대표 코멘트 — 문안(「제약 사항은 없는지」) + 불렛.
+            🔁09-20 대표 코멘트 #130 — 그 줄 아래에 확인 체크를 넣고, 눌러야 등록 신청이 되게 한다.
+              09-17엔 「체크는 다시 넣지 않는다」였는데 09-20에 뒤집혔다. 안내만 있는 줄은 읽히지 않고 지나갔다.
+            ⚠️저장 칸은 새로 안 만든다(화면에서만 확인) — 그래서 «새로 올릴 때»만 묻는다. 위 `constraintOk` 주석. */}
+        <div id="f-constraint" className="scroll-mt-24">
+          <ul className="space-y-1.5">
+            <li className="flex gap-2 text-[15px] leading-relaxed break-keep text-body">
+              <span aria-hidden="true" className="text-mute">·</span>
+              <span className="min-w-0 flex-1">
+                공간을 빌려주는 데 제약 사항은 없는지 미리 살펴봐 주세요. 임대차 계약이나 건물 관리 규약에 제한이 있을 수
+                있어요.
+              </span>
+            </li>
+          </ul>
+          {!editing && (
+            <>
+              {/* 👆약관 체크와 같은 처리 — 줄 자체를 44px 이상으로(음수 여백으로 자리는 그대로). */}
+              <label className="mt-1 -mb-2 flex min-h-[44px] cursor-pointer items-start gap-3 py-2">
+                <input
+                  type="checkbox"
+                  className="mt-[3px] size-[18px] shrink-0 accent-primary"
+                  checked={constraintOk}
+                  onChange={(e) => setConstraintOk(e.target.checked)}
+                />
+                <span className="min-w-0 text-[16px] leading-relaxed break-keep text-body">확인했어요</span>
+              </label>
+              {fieldErr("constraint") && (
+                <p className="mt-2 text-[15px] leading-relaxed break-keep text-danger">{fieldErr("constraint")}</p>
+              )}
+            </>
+          )}
+        </div>
         <div id="f-terms" className="space-y-4">
           {/* 👆09-18 밤 QA(H-28) — 체크박스가 18px이었다. 글자까지가 누름 상자라 실제로는 넓지만, 한 줄로 끝나는 화면에선
               줄 높이(28px)가 곧 누름 높이였다. 위아래 여백으로 줄 자체를 44px 이상으로 만든다(음수 여백으로 자리는 그대로). */}
@@ -1541,18 +1592,23 @@ export function SpaceForm({
       {/* 🧭등록 전 확인(대표 09-19 코멘트 #67·#111) — 원래 폼 머리의 「요청이 들어오면 이렇게 해요」였다. 대표: 「하단 어딘가로 내리자,
           마지막이면 좋겠다」. 등록 버튼 바로 위에서 요청 뒤 할 일과 수수료를 한 번에 읽고 누르게 한다.
           번호는 장식이 아니라 순서라 붙였다. 문장 정본은 `rent-copy`의 `HOST_REQUEST_STEPS`(공간 공개 메일과 같은 약속).
-          💰수수료 줄은 서버가 넘긴 요율(`feeRate`)로 쓴다(`hostFeeLine`). 고치기 화면엔 전에도 없던 절이라 새로 올리기만. */}
+          💰수수료 줄은 서버가 넘긴 요율(`feeRate`)로 쓴다(`hostFeeLine`). 고치기 화면엔 전에도 없던 절이라 새로 올리기만.
+          🔁09-20 대표 코멘트 #131 — 그 수수료 줄이 번호 목록의 다섯째 항목이라 넷과 같은 무게로 읽혔고, 대표 눈에 안 띄었다.
+            ⭐수수료는 «요청이 들어오면 할 일»이 아니다. 목록에서 빼서 위 대여 타입 절과 같은 상자로 세운다(`FeeNotice`). */}
       {!editing && (
         <section className="rounded-md bg-surface-soft px-5 py-5">
           <h2 className="text-[17px] font-bold leading-snug tracking-tight text-ink">등록 전 확인해 주세요</h2>
           <ol className="mt-3 space-y-2.5">
-            {[...HOST_REQUEST_STEPS, hostFeeLine(feeRate)].map((t, i) => (
+            {HOST_REQUEST_STEPS.map((t, i) => (
               <li key={t} className="flex gap-3 text-[15px] leading-relaxed break-keep text-body">
                 <span className="w-[16px] shrink-0 text-right tabular-nums text-mute">{i + 1}</span>
                 <span className="min-w-0 flex-1">{t}</span>
               </li>
             ))}
           </ol>
+          <div className="mt-4">
+            <FeeNotice feeRate={feeRate} />
+          </div>
         </section>
       )}
 
@@ -1623,12 +1679,31 @@ function ReviewAgainNote({ what, listed }: { what: string; listed: boolean }) {
 
 /** 금액 칸 — 표시는 `50,000`, 상태는 숫자. 오른쪽에 「원」.
  *  `type="number"`를 안 쓰는 이유 — 콤마를 못 넣고, 스크롤 휠에 값이 바뀌고, iOS 자판에 콤마가 없다. */
+/** 💰수수료 안내 상자(대표 09-20 코멘트 #122·#131) — 폼의 «두 자리»가 이 한 벌을 쓴다.
+ *  ① 「대여 타입을 선택해 주세요」 절 머리(값을 적기 직전)
+ *  ② 「등록 전 확인해 주세요」 절(등록 버튼 직전)
+ *  🩸전엔 ①이 값 칸 밑 회색 한 줄이었고 ②는 번호 붙은 다섯째 항목이었다. 대표가 둘 다 못 봤다.
+ *  ⭐문장은 `hostFeeLine` 하나다 — 요율이 바뀌는 날 두 자리가 다른 숫자를 말할 자리가 없다.
+ *  🎨레몬 = 이 사이트에서 「먼저 읽어 두셔야 하는 것」의 면색이다(`/rent/my`·신청 폼과 같은 어휘).
+ *    라벨만 진한 레몬으로 한 단 더 띄우고, 본문은 제일 진한 글자색(`text-ink`)으로 적는다. */
+function FeeNotice({ feeRate }: { feeRate: number }) {
+  return (
+    <div className="rounded-md bg-lemon-pale px-4 py-4">
+      <span className="inline-flex items-center rounded-pill bg-lemon px-2.5 py-1 text-[13px] font-bold text-lemon-on">
+        {FEE_NOTICE_LABEL}
+      </span>
+      <p className="mt-2 text-[16px] font-medium leading-relaxed break-keep text-ink">{hostFeeLine(feeRate)}</p>
+    </div>
+  );
+}
+
 function WonInput({
   id,
   value,
   onChange,
   placeholder,
   disabled,
+  unit,
 }: {
   id: string;
   value: number;
@@ -1636,24 +1711,34 @@ function WonInput({
   placeholder?: string;
   /** 무료 커피챗처럼 값을 안 받는 때(09-19). 잠근 칸은 옅은 면으로 보인다. */
   disabled?: boolean;
+  /** 📐칸 «밖» 오른쪽에 서는 단위(09-20 대표 #121: 「input 우측에 /시간」).
+   *  ⭐칸 «안»의 「원」과 자리가 다르다. 「원」은 적는 값의 단위라 칸 안에, 「/시간」은 그 값이 무엇당인지라 칸 밖이다.
+   *  안 넘기면 안 그린다 — 단위가 없는 값 칸도 있다. */
+  unit?: string;
 }) {
   return (
-    <div className="relative sm:max-w-[260px]">
-      <input
-        id={id}
-        inputMode="numeric"
-        disabled={disabled}
-        className={`${rentInputCls} pr-11 disabled:bg-surface-soft disabled:placeholder:text-body`}
-        value={value > 0 ? value.toLocaleString("ko-KR") : ""}
-        onChange={(e) => onChange(Number(e.target.value.replace(/\D/g, "")) || 0)}
-        placeholder={placeholder}
-      />
-      {/* 잠근 칸(무료)엔 「원」을 안 붙인다 — 「무료 원」으로 읽힌다. */}
-      {!disabled && (
-        <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-[16px] text-mute">
-          원
-        </span>
-      )}
+    // 📐09-20 #121 — 값 칸을 숫자 칸답게 좁혔다(`sm:max-w-[260px]` → 폰 200 · 넓은 화면 220).
+    //   천 단위 콤마가 붙은 「1,500,000」까지 잘리지 않는 폭이다. 남은 자리에 단위가 선다.
+    <div className="flex items-center gap-2">
+      <div className="relative w-[200px] shrink-0 sm:w-[220px]">
+        <input
+          id={id}
+          inputMode="numeric"
+          disabled={disabled}
+          className={`${rentInputCls} pr-11 disabled:bg-surface-soft disabled:placeholder:text-body`}
+          value={value > 0 ? value.toLocaleString("ko-KR") : ""}
+          onChange={(e) => onChange(Number(e.target.value.replace(/\D/g, "")) || 0)}
+          placeholder={placeholder}
+        />
+        {/* 잠근 칸(무료)엔 「원」을 안 붙인다 — 「무료 원」으로 읽힌다. */}
+        {!disabled && (
+          <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-[16px] text-mute">
+            원
+          </span>
+        )}
+      </div>
+      {/* 잠근 칸도 같은 이유로 단위를 뗀다 — 「무료 /회」가 된다. */}
+      {unit && !disabled && <span className="shrink-0 text-[16px] text-mute">{unit}</span>}
     </div>
   );
 }
@@ -1746,19 +1831,16 @@ function ProductFields({
 }) {
   return (
     <>
-      <L label="한 시간에 얼마인가요" htmlFor={`${idPrefix}-price`} anchor={priceAnchor} error={priceErr}>
-        <WonInput id={`${idPrefix}-price`} value={price} onChange={onPrice} placeholder="예) 15,000" />
+      {/* 🔁09-20 대표 코멘트 #120·#121 — 라벨은 대표 문안, 칸은 숫자 칸답게 좁히고 오른쪽에 「/시간」을 세운다. */}
+      <L label="1시간당 대여 비용을 알려 주세요" htmlFor={`${idPrefix}-price`} anchor={priceAnchor} error={priceErr}>
+        <WonInput id={`${idPrefix}-price`} value={price} onChange={onPrice} placeholder="예) 15,000" unit="/시간" />
         {/* ⭐정직하게 적는다. 「수수료 15%」만 적어 두면 사장님은 손에 쥐는 금액을 직접 계산해야 한다(09-16).
-            💰값을 적는 «그 순간»이 수수료를 알아야 하는 순간이라 상품마다 붙인다. */}
-        {price > 0 ? (
+            🔻09-20 #122 — 값이 비었을 때 서던 회색 한 줄은 지웠다. 같은 말을 절 머리의 「수수료 안내」가 진한 글씨로 한다.
+              여기 남은 줄은 그 말의 되풀이가 아니라 «이 값이면 얼마»라는 계산이다. */}
+        {price > 0 && (
           <p className="mt-2 text-[15px] text-mute">
             수수료 {Math.round(feeRate * 100)}%를 뺀 <span className="font-medium text-ink">{won(payout)}</span>이 한 시간마다
             사장님께 가요.
-          </p>
-        ) : (
-          <p className="mt-2 text-[15px] text-faint">
-            {/* ✍️09-18 밤 QA(H-30) — 「성사된 금액」은 행정어다. 사장님이 쓰는 말로. */}
-            빌려주고 받으신 금액에서 수수료 {Math.round(feeRate * 100)}%를 뺀 나머지를 사장님께 드려요.
           </p>
         )}
       </L>
