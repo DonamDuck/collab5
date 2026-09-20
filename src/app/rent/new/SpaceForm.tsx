@@ -1193,7 +1193,7 @@ export function SpaceForm({
             note={fullNote}
             onNote={setFullNote}
             notePlaceholder={PRODUCT_NOTE_PLACEHOLDER.full}
-            noteLabel="어떤 시설까지 쓰고, 무엇을 할 수 있나요"
+            noteLabel="대여한 날 사용할 수 있는 것들을 알려 주세요"
             // 🔗09-20 #125 — 대관만 쪽과 같은 뜻을 다른 결로. 두 카드가 같은 문장으로 끝나면 그 자체가 한 금형으로 읽힌다.
             noteHint="기계 쓰는 법을 알려 주시는지, 손님이 챙겨 올 재료가 있는지도 같이 담아 주세요. 위 「공간 소개」와 겹치는 이야기는 안 적으셔도 괜찮아요."
             feeRate={feeRate}
