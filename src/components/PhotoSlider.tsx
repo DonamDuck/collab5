@@ -217,7 +217,9 @@ export function PhotoSlider({
 
 /** 원본 보기 — 목록은 4:3 크롭이지만 여기선 object-contain으로 잘린 부분까지 전부 보여준다.
  *  닫기 = X·배경 탭·Esc / 이동 = 좌우 화살표·키보드 ←→ (사진 여러 장일 때만). */
-function Lightbox({
+/** 원본 보기 — 소개서(슬라이더)와 **수정 페이지(사진 그리드)가 같이 쓴다**(대표 09-20).
+ *  ⛔두 벌로 만들지 마라. 출처 캡션·좌우 이동·ESC 닫기가 한 곳에만 고쳐지면 두 화면이 어긋난다. */
+export function Lightbox({
   photos,
   sources,
   index,
