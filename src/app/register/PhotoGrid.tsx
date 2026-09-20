@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Lightbox } from "@/components/PhotoSlider";
 import { PhotoSourceDialog } from "./PhotoSourceDialog";
 
 // 사진 업로드 그리드 — 업로드 + 삭제 + 드래그로 순서 변경. 브랜드·활동·콜라보 사진 공통.
@@ -32,9 +33,17 @@ export function PhotoGrid({
 }) {
   const [drag, setDrag] = useState<number | null>(null);
   const [sourceOpen, setSourceOpen] = useState(false);
+  // 원본 보기 — 열린 사진의 «viewable 기준» index(null=닫힘). 대표 09-20: 소개서에선 사진을 눌러
+  // 원본을 볼 수 있는데 수정 페이지엔 그게 없어, 올린 사진이 제대로 들어갔는지 확인할 길이 없었다.
+  const [zoom, setZoom] = useState<number | null>(null);
   // 업로드가 끝난 사진만 대상 — 올라가는 중이거나 실패한 건 주소가 blob:이라 표의 열쇠가 될 수 없다.
   const settled = items.filter((it) => !it.uploading && !it.failed).map((it) => it.url);
   const filled = settled.filter((u) => sources?.[u]?.trim()).length;
+  // 원본으로 볼 수 있는 사진 — 실패한 것만 뺀다. 올라가는 중인 건 blob: 주소라도 화면엔 제대로 보인다.
+  const viewable = items.filter((it) => !it.failed).map((it) => it.url);
+  // 타일 번호 → viewable 번호. ⚠️`indexOf(url)`로 찾지 않는다 — 같은 사진을 두 번 올리면
+  //   주소가 같아 **앞엣것으로 잘못 열린다.** 앞쪽에서 빠진 실패 타일 수를 세는 쪽이 정확하다.
+  const viewIndex = (i: number) => items.slice(0, i).filter((it) => !it.failed).length;
 
   return (
     <div>
@@ -66,6 +75,20 @@ export function PhotoGrid({
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={it.url} alt="" className="pointer-events-none h-full w-full object-cover" />
+            {/* 사진을 누르면 원본 보기. ⚠️위 `img`가 `pointer-events-none`이라(끌 때 고스트 방지)
+                클릭을 받을 레이어를 따로 깐다.
+                🚨**z를 주지 않는다 — 일부러 «아래»에 깔린다.** 뒤에 오는 실패 덮개와
+                  ✕·대표·← →(z-10)가 위에 있어야 그 버튼들이 먼저 눌린다.
+                끌어서 순서 바꾸기는 그대로 산다 — HTML5 드래그는 부모의 `draggable`을 따르고,
+                끌고 나면 click이 안 뜬다(브라우저 표준). */}
+            {!it.failed && (
+              <button
+                type="button"
+                onClick={() => setZoom(viewIndex(i))}
+                aria-label="사진 원본 보기"
+                className="absolute inset-0 cursor-zoom-in"
+              />
+            )}
             {/* 실패 타일 — 자리를 지키고 '다시 올리기'를 준다. 여러 장을 올렸을 때
                 **어느 사진이 실패했는지**가 보이는 게 핵심(전엔 타일이 사라져 알 수 없었다). */}
             {it.failed && (
@@ -178,6 +201,15 @@ export function PhotoGrid({
             </button>
           )}
         </div>
+      )}
+      {zoom !== null && viewable[zoom] && (
+        <Lightbox
+          photos={viewable}
+          sources={sources}
+          index={zoom}
+          onIndex={setZoom}
+          onClose={() => setZoom(null)}
+        />
       )}
       {sourceOpen && onSources && (
         <PhotoSourceDialog
