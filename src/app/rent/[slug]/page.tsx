@@ -246,7 +246,7 @@ export default async function SpaceDetailPage({
     <main
       className={`mx-auto w-full max-w-[720px] px-4 sm:px-6 sm:pt-10 lg:max-w-[1120px] sm:pb-16 ${
         sp.photos.length > 0 ? "pt-0" : "pt-8"
-      } ${showForm ? "pb-[120px]" : "pb-12"}`}
+      } ${showForm ? "pb-[120px] lg:pb-12" : "pb-12"}`}
     >
       {/* 🎨09-17 디자인팀 재구성 (3팀 요청 · 아워플레이스·에어비앤비 참고)
           ① **사진이 먼저다.** 전엔 제목 카드 → 폭 460 사진이라 1440 화면에서 사진이 왼쪽 구석에 작게 붙고
@@ -445,12 +445,17 @@ export default async function SpaceDetailPage({
               「사장님께 잠깐 배워 볼 수 있어요」로 정규 타이틀로 섹션으로 다루자」*.
               ⭐설명하는 자리와 고르는 자리를 갈랐다. 고르는 일은 결제 단계의 옵션이 맡는다. */}
           {sp.coffeeChat && sp.coffeeChatMinutes > 0 && (
-            <Section title="사장님과 커피챗" nav="커피챗">
+            <Section title="사장님과 커피챗 (선택)" nav="커피챗">
               {/* ☕09-16 대표 — 「사장님께 잠깐 배워보기」를 커피챗으로 다시 잡았다. 파는 것은 «현업 이야기»다.
                   🔁09-17 — 「언제」는 `COFFEE_CHAT_WHEN_GUEST` 한 줄만 쓴다(대표: 시간은 사장님이 정한다).
                     전엔 「사장님과 협의한 날짜에」라 메일의 「그날」과 말이 갈렸다.
                   🔻09-17 QA — 주제가 비었을 때 넣던 기본 예시(「재료는 어디서 떼는지…」)를 뺐다. 요가원·공방에도
                     같은 문장이 붙어 업종과 안 맞았고, 공간 셋을 이어 보면 같은 틀로 읽혔다. 비면 짧게 둔다. */}
+              {/* ☕09-21 대표 코멘트 — 「좀만 타이틀 쪽으로 올리고 (선택)인 점을 노티」. 값 줄을 절 맨 끝에서 제목 바로 밑으로,
+                  제목엔 「(선택)」. 안 담아도 공간은 빌릴 수 있다는 게 먼저 읽힌다. */}
+              <p className="-mt-1 mb-3 text-[15px] text-mute">
+                <span className="font-medium text-ink">{coffeeChatFree(sp) ? COFFEE_CHAT_FREE : `+${won(sp.coffeeChatPrice)}`}</span> · 원하시면 신청할 때 함께 담을 수 있어요
+              </p>
               <p className="text-[17px] leading-relaxed break-keep text-body">
                 {sp.coffeeChatMinutes}분 동안 사장님께 현업 이야기를 들을 수 있어요. {COFFEE_CHAT_WHEN_GUEST}
               </p>
@@ -473,10 +478,6 @@ export default async function SpaceDetailPage({
                   </ul>
                 </div>
               )}
-              {/* ✍️「고르시면 돼요」와 「(선택 사항)」이 같은 말 두 번이라 하나로. */}
-              <p className="mt-3 text-[15px] text-mute">
-                <span className="font-medium text-ink">{coffeeChatFree(sp) ? COFFEE_CHAT_FREE : `+${won(sp.coffeeChatPrice)}`}</span> · 신청할 때 담을 수 있어요
-              </p>
             </Section>
           )}
 
@@ -669,7 +670,9 @@ export default async function SpaceDetailPage({
                 className="mt-5"
               />
             )}
-            {/* 🔑09-19 [G] 로그인 전에도 아래 결제 바가 뜬다. 바가 이 카드의 버튼 노릇을 해서 「신청하러 가기」 길은 뺐다. */}
+            {/* 🔑09-19 [G] 로그인 전에도 아래 결제 바가 뜬다. 바가 이 카드의 버튼 노릇을 해서 「신청하러 가기」 길은 뺐다.
+                🧱09-21 대표 — lg에선 그 바가 이 카드 안으로 들어온다(`BookingForm`의 `PayBar`가 여기로 포털). 폼이 없는 공간이면 빈 자리. */}
+            <div id="rent-side-pay" />
           </div>
         </aside>
       </div>

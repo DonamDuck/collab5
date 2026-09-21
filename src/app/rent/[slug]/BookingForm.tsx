@@ -26,6 +26,7 @@
 //   모바일에선 `MakerActionBar`처럼 **하단 고정 바**에 금액과 같이 앉는다(폼이 길어서 버튼이
 //   화면 밖에 있으면 「어디서 내지」가 된다).
 import { useEffect, useRef, useState, useTransition } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { startBookingAction, confirmBookingAction } from "@/lib/rent-actions";
 import type { SpaceUseType, OpenSlot, RentProduct, Space } from "@/lib/types";
@@ -78,6 +79,42 @@ function PayBar({
   disabled: boolean;
   onClick: () => void;
 }) {
+  // 🧱09-21 대표 코멘트 — 「데스크탑일 때 위에 가격 있는 보드하고 합쳐져야」. lg에선 바를 화면 바닥에 따로 띄우지 않고
+  //   오른쪽 요약 카드(`page.tsx`의 `#rent-side-pay` 자리) «안»으로 옮긴다. 카드가 sticky라 스크롤 내내 같이 간다.
+  //   폰·태블릿은 전처럼 바닥 고정 바. 자리가 없으면(다른 화면에서 쓸 때) 바닥 바로 물러난다.
+  const [slot, setSlot] = useState<HTMLElement | null>(null);
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 1024px)");
+    const pick = () => setSlot(mq.matches ? document.getElementById("rent-side-pay") : null);
+    pick();
+    mq.addEventListener("change", pick);
+    return () => mq.removeEventListener("change", pick);
+  }, []);
+
+  if (slot) {
+    return createPortal(
+      <div className="mt-5 border-t border-hairline pt-5">
+        {amount === null ? (
+          <p className="text-[15px] leading-snug break-keep text-mute">{emptyText}</p>
+        ) : (
+          <div className="flex items-baseline justify-between gap-3">
+            <p className="text-[14px] text-faint">대여 비용{caption ? ` · ${caption}` : ""}</p>
+            <p className="text-[19px] font-bold tabular-nums text-ink">{won(amount)}</p>
+          </div>
+        )}
+        <button
+          type="button"
+          onClick={onClick}
+          disabled={disabled}
+          className={`${primaryBtnCls} mt-3 h-[52px] w-full px-5`}
+        >
+          {label}
+        </button>
+      </div>,
+      slot,
+    );
+  }
+
   return (
     <div className="fixed inset-x-0 bottom-0 z-40">
       {/* 📐09-17 디자인팀 — lg부터 상세가 두 기둥이 되면서, 화면 가운데 640 바가 어느 기둥에도 안 맞았다.
@@ -746,7 +783,9 @@ export function BookingForm({
           placeholder="예) 카페를 열기 전에 일일카페로 네 시간 장사를 해 보려고 해요. 친구랑 둘이 커피와 구움과자를 팔 거예요."
         />
         {badField === "plan" && <p className={errCls}>그날 무엇을 하실지 열 글자 이상 적어 주세요.</p>}
-        <p className={hintCls}>사장님이 이 글만 보고 정하세요. 열 글자면 충분해요.</p>
+        {/* ✍️09-21 대표 코멘트 — 「사장님께, 대여 당일 공간 사용 계획을 알려주세요. 사장님 검토과정에 해당 내용을 전달해요.」
+            대표 요청대로 맞춤법과 어색한 데만 손봄. */}
+        <p className={hintCls}>대여 당일 공간을 어떻게 쓰실지 사장님께 알려 주세요. 사장님이 신청을 검토하실 때 이 내용을 함께 전해 드려요.</p>
       </div>
 
       {/* 🪪09-18 대표 코멘트 — 「실명 확인 당일날도 필요하고」. 사장님 메일·내 하루 팝업의 「성함」 칸이 이 값이다.
@@ -876,7 +915,8 @@ export function BookingForm({
       <PayBar
         amount={timePicked && product ? total : null}
         caption={timePicked ? durationLabel(minutes) : undefined}
-        emptyText={!product ? "방식을 고르면 금액이 나와요" : activeStart ? "끝나는 시각을 고르면 금액이 나와요" : "시간을 고르면 금액이 나와요"}
+        // ✍️09-21 대표 코멘트 — 「빌릴 시간을 선택해주세요」. 금액 얘기보다 할 일을 먼저 말한다. 세 갈래를 같은 틀로.
+        emptyText={!product ? "빌릴 방식을 선택해 주세요" : activeStart ? "끝나는 시각을 선택해 주세요" : "빌릴 시간을 선택해 주세요"}
         // 🔑09-19 [G] 로그인 전엔 같은 바가 「로그인하고 신청하기」다. 누르면 고른 값을 맡기고 로그인으로 간다.
         label={pending ? "결제 화면으로 가는 중…" : signedIn ? "신청하기" : "로그인하고 신청하기"}
         disabled={pending}

@@ -5,7 +5,7 @@
 // 목 쿠키가 켜져 있는 동안 모든 화면 위에 뜬다. 세션·소개서·매거진까지 사이트 전체가 가상 데이터로 보이므로,
 //   진짜 화면으로 착각하지 않게 하려고.
 // 🎨화면 구성을 보러 온 사람을 가리지 않게 왼쪽 아래 작은 알약으로 두고, 눌러서 접을 수 있다.
-//   하단 고정 신청 바(`BookingForm`) 위로 올려 둔다.
+//   하단 고정 신청 바(`BookingForm`, z-40) 위로 올려 두되 확인 팝업(z-60)은 덮지 않는다(09-21 실측: 팝업 버튼 위에 띠가 얹혔다).
 // 서버 쪽 판정은 `RentMockBarSlot`이 한다. 여기는 받은 글자를 그리기만 한다.
 import Link from "next/link";
 import { useState } from "react";
@@ -14,7 +14,7 @@ export function RentMockBar({ label }: { label: string }) {
   const [open, setOpen] = useState(true);
   return (
     <div
-      className="fixed left-3 z-[1000] print:hidden"
+      className="fixed left-3 z-50 print:hidden"
       style={{ bottom: "calc(96px + env(safe-area-inset-bottom, 0px))" }}
     >
       {open ? (

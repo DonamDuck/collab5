@@ -65,7 +65,7 @@ export function ConfirmDialog({
         <h2 id="rent-confirm-title" className="shrink-0 text-[18px] font-medium leading-snug break-keep text-ink">
           {title}
         </h2>
-        <div className="mt-3 min-h-0 flex-1 space-y-2 overflow-y-auto text-[17px] leading-relaxed break-keep text-body">
+        <div className="mt-3 min-h-0 flex-1 space-y-2 overflow-y-auto overflow-x-hidden text-[17px] leading-relaxed break-keep text-body">
           {children}
         </div>
         {error && (

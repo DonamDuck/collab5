@@ -226,7 +226,9 @@ export function InfoRow({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div className="flex gap-3 text-[16px] leading-relaxed break-keep">
       <dt className="w-[88px] shrink-0 text-mute">{label}</dt>
-      <dd className="min-w-0 flex-1 text-body">{value}</dd>
+      {/* ↔️09-21 대표 코멘트 — 띄어쓰기 없는 긴 글(「브랜드팝업행사로…」)이 `break-keep`에 걸려 한 덩어리로 서면서
+          확인 팝업이 옆으로 밀렸다(474폭 실측 378 → 446). 넘칠 때만 글자 사이에서 꺾는다. */}
+      <dd className="min-w-0 flex-1 text-body [overflow-wrap:anywhere]">{value}</dd>
     </div>
   );
 }
