@@ -405,12 +405,7 @@ export function MakerActionBar({
       ? "인스타 DM으로 이동"
       : "채널 열고 보내기";
 
-  // 소개서 링크 복사 — copyText + flash로 정리(pill 라벨은 정적 고정).
-  const copy = () => {
-    const url = typeof window !== "undefined" ? window.location.href : "";
-    copyText(url);
-    flash("✓ 소개서 링크를 복사했어요.");
-  };
+  // 🔻09-21 소개서 링크 복사는 상단 카드의 「수정」 옆으로 옮겼다(대표). `CopyLinkButton`.
 
   const loginTitle =
     loginReason === "report"
@@ -523,17 +518,8 @@ export function MakerActionBar({
       {/* 하단 고정 플로팅 — 640px 중앙, 모바일·데스크탑 공통. 좌우 마진 없이 화면 끝까지(바텀시트) */}
       <div className="fixed inset-x-0 bottom-0 z-40 print:hidden">
         <div className="relative mx-auto w-full max-w-[640px]">
-          {/* 유틸 줄 — 바 위 우측. [🔗 링크 복사][♡ 찜] */}
+          {/* 유틸 줄 — 바 위 우측. [♡ 찜] (🔻09-21 링크 복사는 상단 카드로 옮겼다) */}
           <div className="absolute -top-[52px] right-4 flex items-center gap-2">
-            <button
-              type="button"
-              onClick={copy}
-              aria-label="링크 복사"
-              className="flex h-10 items-center gap-1.5 rounded-pill bg-primary px-4 text-[14px] font-medium text-primary-on shadow-e2 transition-colors"
-            >
-              🔗 링크 복사
-            </button>
-
             {/* 찜 하트 — 빈 → 채워진 빨강 토글. 내 소개서면 숨김(내가 나를 찜하는 건 신호가 아니다) */}
             {!isOwner && (
             <button

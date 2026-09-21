@@ -4,6 +4,7 @@ import { Avatar } from "@/components/Avatar";
 import { instagramUrl, instagramHandle, normalizeUrl, prettyUrl, mapLinkLabel, channelLabel } from "@/lib/links";
 import type { Maker } from "@/lib/types";
 import { EditButton } from "./EditButton";
+import { CopyLinkButton } from "./CopyLinkButton";
 
 export function BrandSummaryCard({
   maker,
@@ -45,7 +46,8 @@ export function BrandSummaryCard({
           </div>
         </div>
         {!readOnly && (
-          <div className="shrink-0">
+          <div className="flex shrink-0 items-center gap-1.5">
+            <CopyLinkButton />
             <EditButton
               slug={maker.slug}
               isOwner={isOwner}
