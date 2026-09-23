@@ -86,6 +86,11 @@ export const PAY_FAIL_NOT_AVAILABLE = "RENT_NOT_AVAILABLE";
 /** 🆕09-18 밤 QA(SC-12) — 승인은 됐는데 «아직 받지 않은» 결제(입금 대기 가상계좌 등). 그 자리에서 취소하고 돌려보낸다. */
 export const PAY_FAIL_METHOD_UNSUPPORTED = "RENT_METHOD_UNSUPPORTED";
 
+/** 🔁토스가 「이 결제는 지금 처리 중」이라고 돌려주는 코드 둘(09-18 문서 확인). 겹쳐 들어온 «우리» 요청이 곧 결과를 쓴다.
+ *  ⭐승인 액션(`confirmBookingAction`)과 결제 실패 화면이 «같은 목록»을 본다. 화면에만 따로 적으면
+ *    코드가 하나 늘어나는 날 화면만 뒤처져서, 처리 중인 결제를 「안 됐어요」로 말하게 된다(09-23 QA). */
+export const PAY_IN_FLIGHT_CODES: readonly string[] = ["IDEMPOTENT_REQUEST_PROCESSING", "ALREADY_PROCESSING_REQUEST"];
+
 /** 🤖사람 손 없이 우리가 되돌리는 취소의 사유 둘(`confirmBookingAction`). 토스 취소 내역(`cancels[].cancelReason`)에 이 글자
  *  그대로 남는다. 아침 요약이 이 글자로 «자동 환불»을 손님 취소와 가른다(둘 다 예약은 `cancelled`라서). ⚠️글자를 바꾸면 옛 줄은 손님 취소로 세진다. */
 export const AUTO_REFUND_REASON = "예약 확정 실패 — 자동 환불";
