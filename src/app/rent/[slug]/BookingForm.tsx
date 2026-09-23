@@ -91,6 +91,21 @@ function PayBar({
     return () => mq.removeEventListener("change", pick);
   }, []);
 
+  // 📐09-18 밤 QA(G-21) — 바닥 고정 바가 **푸터 마지막 줄을 가렸다**(폰에서 사업자 정보 줄이 바 뒤에 깔렸다).
+  //   상세 `main`은 이미 아래 여백을 두지만 푸터는 `main` 밖이라 그 여백이 안 닿는다.
+  //   ⭐그래서 바가 «바닥에 떠 있는 동안만» `body` 아래를 바 높이만큼 비워 둔다.
+  //   🔁09-23 QA — 전엔 `BookingForm`이 폼이 있기만 하면 늘 104px을 깔았다. 09-21부터 lg에선 바가
+  //     요약 카드 «안»으로 들어가 바닥에 뜨지 않는데 여백만 남아서, 1440에서 **푸터 아래 104px이 빈 띠**로
+  //     섰다(실측: 푸터 bottom 796 · 그 아래 104px에 아무것도 없음). 가릴 바가 있을 때만 비운다.
+  useEffect(() => {
+    if (slot) return;
+    const prev = document.body.style.paddingBottom;
+    document.body.style.paddingBottom = "104px";
+    return () => {
+      document.body.style.paddingBottom = prev;
+    };
+  }, [slot]);
+
   if (slot) {
     return createPortal(
       <div className="mt-5 border-t border-hairline pt-5">
@@ -246,16 +261,8 @@ export function BookingForm({
   const router = useRouter();
   const [pending, start] = useTransition();
 
-  // 📐09-18 밤 QA(G-21) — 하단 고정 바가 **푸터 마지막 줄을 가렸다**(폰에서 사업자 정보 줄이 바 뒤에 깔렸다).
-  //   상세 `main`은 이미 아래 여백을 두지만 푸터는 `main` 밖이라 그 여백이 안 닿는다.
-  //   ⭐그래서 바가 뜨는 동안만 `body` 아래에 바 높이만큼을 비워 둔다. 폼이 사라지면 원래대로 돌린다.
-  useEffect(() => {
-    const prev = document.body.style.paddingBottom;
-    document.body.style.paddingBottom = "104px";
-    return () => {
-      document.body.style.paddingBottom = prev;
-    };
-  }, []);
+  // 📐푸터를 가리지 않게 `body` 아래를 비우는 일은 **바 자신이** 한다(`PayBar`) — 바닥에 떠 있을 때만이라
+  //   lg에서 요약 카드 안으로 들어간 판에는 여백이 안 붙는다(09-23 QA).
 
   // 🔁09-17 QA — 전엔 첫 열린 날이 미리 골라져 있었다. 달력을 안 보고 시간만 고르면 «고른 적 없는 날»로
   //   결제까지 갔다. 날짜도 시각도 손님이 직접 고른 값만 쓴다.
