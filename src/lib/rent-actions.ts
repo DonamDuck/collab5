@@ -31,6 +31,7 @@ import {
   approvePayment, cancelPayment, guestCancelQuote, AUTO_CANCEL_WAITING_REASON, AUTO_REFUND_REASON,
   PAY_EXPIRED_LINE, PAY_FAIL_METHOD_UNSUPPORTED, PAY_FAIL_NOT_AVAILABLE, PAY_FAIL_REFUND_CHANGED, PAY_FAIL_SLOT_TAKEN,
   PAY_FAIL_SLOT_TAKEN_REFUNDED, PAY_FAIL_SLOT_TAKEN_REFUND_PENDING, PAY_FAIL_USE_STARTED, PAY_FAIL_WINDOW_OVER,
+  PAY_IN_FLIGHT_CODES,
 } from "./rent-payment";
 // ⭐신청이 «지금도» 말이 되나 — 신청 시작·결제 승인·결제 화면이 같이 쓰는 순수 규칙(09-18 밤 QA G-01).
 import { pendingBookingProblem, validateBookingRequest } from "./rent-booking-rules";
@@ -848,9 +849,6 @@ async function notifyParties(b: SpaceBooking): Promise<{ space: Space; host: Awa
   const [host, guest] = await Promise.all([getProfileById(space.ownerUserId), getProfileById(b.guestUserId)]);
   return { space, host, guest };
 }
-
-/** 🔁토스가 「이 결제는 지금 처리 중」이라고 돌려주는 코드 둘(09-18 문서 확인). 겹쳐 들어온 우리 요청이 곧 결과를 쓴다. */
-const PAY_IN_FLIGHT_CODES = ["IDEMPOTENT_REQUEST_PROCESSING", "ALREADY_PROCESSING_REQUEST"];
 
 /** 이 주문이 «이미 끝나 있나» — 겹쳐 온 다른 요청이 먼저 올렸을 수 있다(09-18 밤 QA SC-02).
  *  예약이 결제 완료 이상이거나 결제 줄이 DONE이면 성공으로 돌려준다. 알림은 먼저 끝낸 쪽이 이미 보냈다.

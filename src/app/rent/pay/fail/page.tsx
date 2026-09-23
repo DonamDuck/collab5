@@ -3,7 +3,7 @@ import Link from "next/link";
 import {
   PAY_FAIL_METHOD_UNSUPPORTED, PAY_FAIL_NOT_AVAILABLE, PAY_FAIL_SLOT_TAKEN,
   PAY_FAIL_SLOT_TAKEN_REFUNDED, PAY_FAIL_SLOT_TAKEN_REFUND_PENDING,
-  PAY_FAIL_USE_STARTED, PAY_FAIL_WINDOW_OVER,
+  PAY_FAIL_USE_STARTED, PAY_FAIL_WINDOW_OVER, PAY_IN_FLIGHT_CODES,
 } from "@/lib/rent-payment";
 import { KAKAO_CHAT_URL } from "@/lib/site";
 import { secondaryBtnCls } from "../../ui";
@@ -44,8 +44,17 @@ const REASONS = new Map<string, string>([
   [PAY_FAIL_SLOT_TAKEN, "그 사이 다른 분이 그 시간을 먼저 예약했어요. 돈은 움직이지 않았어요."],
   [PAY_FAIL_NOT_AVAILABLE, "그 사이 사장님이 이 시간이나 상품을 바꾸셨어요. 돈은 움직이지 않았어요."],
   [PAY_FAIL_METHOD_UNSUPPORTED, "이 결제 수단은 아직 받지 않아요. 카드나 간편결제로 다시 결제해 주세요."],
+  // 🔁겹쳐 들어온 승인 — 토스가 「이 결제는 지금 처리 중」이라고 답했다(`PAY_IN_FLIGHT_CODES`).
+  //   🩸09-23 QA: 이 둘이 표에 없어서 기본 문장으로 떨어졌고, 화면 첫 줄은 「신청은 아직 접수되지 않았어요」였다.
+  //     먼저 들어온 요청이 곧 돈을 받고 예약을 올리는 상태라 그 말이 거짓이 된다. 손님이 한 번 더 결제하게 만든다.
+  ...PAY_IN_FLIGHT_CODES.map(
+    (code) => [code, "잠시 뒤 내 예약에서 결제가 끝났는지 한 번 더 봐 주세요."] as [string, string],
+  ),
 ]);
 const DEFAULT_REASON = "결제를 마치지 못했어요. 잠시 뒤 다시 시도해 주세요.";
+
+/** 아직 «처리 중»인 결제. 이 화면의 첫 줄이 「안 됐어요」라고 말하면 안 되는 갈래다. */
+const IN_FLIGHT = new Set<string>(PAY_IN_FLIGHT_CODES);
 
 /** 다시 결제할 수 없는 사유 — 그 신청은 이미 닫혔다. */
 const CLOSED = new Set([
@@ -66,15 +75,20 @@ export default async function RentPayFailPage({
   const code = typeof sp.code === "string" ? sp.code : "";
   const reason = REASONS.get(code) ?? DEFAULT_REASON;
   const orderId = typeof sp.orderId === "string" && ORDER_ID_RE.test(sp.orderId) ? sp.orderId : "";
+  const inFlight = IN_FLIGHT.has(code);
   // 🔁다시 결제하기 — 30분 안의 신청은 같은 주문으로 다시 결제할 수 있다. 결제 화면이 주인·상태를 다시 본다
   //   (남의 주문이면 404, 결제 시간이 지났으면 신청 목록, 이미 끝났으면 예약 화면으로 보낸다).
   const retryHref = orderId && !CLOSED.has(code) ? `/rent/pay/${orderId}` : "";
 
   return (
     <main className="mx-auto w-full max-w-[640px] px-4 py-14 sm:px-6">
-      <h1 className="text-[22px] font-bold leading-tight tracking-tight text-ink">결제가 끝나지 않았어요</h1>
+      <h1 className="text-[22px] font-bold leading-tight tracking-tight text-ink">
+        {inFlight ? "결제를 확인하고 있어요" : "결제가 끝나지 않았어요"}
+      </h1>
       <p className="mt-3 text-[17px] leading-relaxed break-keep text-body">
-        신청은 아직 접수되지 않았어요. 사장님께도 아무 연락이 가지 않았어요.
+        {inFlight
+          ? "조금 전 결제가 아직 처리되고 있어요. 두 번 결제되지는 않아요."
+          : "신청은 아직 접수되지 않았어요. 사장님께도 아무 연락이 가지 않았어요."}
       </p>
       <p className="mt-5 border-l-2 border-hairline pl-4 text-[15px] leading-relaxed break-keep text-mute">{reason}</p>
       <div className="mt-8 flex flex-wrap gap-2">
