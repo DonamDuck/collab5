@@ -496,8 +496,10 @@ export default async function MyRentPage({
         {/* 🔁09-18 대표 코멘트 — 제목 옆 글자 링크 「새로 올리기」 대신, 목록 아래 「+ 공간 올리기」 버튼. */}
         <h2 className={h2Cls}>내가 올린 공간</h2>
         {mySpaces.length === 0 ? (
-          // ⚠️대표 문안은 「1시간, 30분 단위」였는데 열리는 시간은 정시만이다(`OpenSlotsCalendar` 09-16 대표 결정). 사실에 맞춰 1시간으로.
-          <p className={emptyCls}>아직 올린 공간이 없어요. 내 공간이 있다면 비는 시간을 1시간 단위로 빌려줄 수 있어요.</p>
+          // 🩸09-16엔 「열리는 시간은 정시만」이라 「1시간 단위」로 적었는데, 09-19에 눈금이 30분이 됐다
+          //   (`DAY_MARKS` · 대표 「9시 30분 ~ 12시의 자투리도 가능」). 최소 1시간은 그대로지만 단위는 아니다.
+          //   다른 화면들과 같은 말(「시간 단위로」)로 맞춘다 — `/rent` 머리글·호스트 약관이 그 말을 쓴다.
+          <p className={emptyCls}>아직 올린 공간이 없어요. 내 공간이 있다면 비는 시간을 시간 단위로 빌려줄 수 있어요.</p>
         ) : (
           <ul className="mt-5">
             {mySpaces.map((sp) => (
@@ -518,13 +520,16 @@ export default async function MyRentPage({
                         상품 값에 «시간당»이라는 말이 없어 하루 값으로 읽혔다(손님 화면엔 「/ 시간」이 붙어 있다).
                         ⭐토막마다 줄바꿈을 막고 값 뒤에 단위를 붙인다. 줄은 토막 사이 `·`에서만 바뀐다.
                         ✍️그리고 「동네 미정」을 뺐다 — 사장님이 안 적은 게 아니라 옛 공간이라 비어 있는 칸이고,
-                          모르는 값은 말하지 않는 편이 낫다(업종 라벨이 같은 이유로 09-17에 빈 값을 안 그린다). */}
+                          모르는 값은 말하지 않는 편이 낫다(업종 라벨이 같은 이유로 09-17에 빈 값을 안 그린다).
+                        🩸09-23 QA — 상품 둘을 «먼저 `·`로 이어 붙인 뒤» 한 토막으로 넘겨서, 그 토막 하나가 401px짜리
+                          `nowrap`이 됐다. 390·360·320에서 화면이 가로로 밀렸다(상품 둘을 파는 공간만).
+                          ⭐상품 하나가 곧 한 토막이다. 그래야 위 규칙대로 상품 사이 `·`에서 줄이 바뀐다. */}
                     <p className="mt-1 text-[15px] leading-relaxed break-keep text-mute">
                       {[
                         sp.area,
-                        sellableProducts(sp)
-                          .map((p) => `${PRODUCT_LABEL[p]} 시간당 ${won(productPrice(sp, p))}`)
-                          .join(" · ") || `시간당 ${won(sp.priceHour)}`,
+                        ...(sellableProducts(sp).length > 0
+                          ? sellableProducts(sp).map((p) => `${PRODUCT_LABEL[p]} 시간당 ${won(productPrice(sp, p))}`)
+                          : [`시간당 ${won(sp.priceHour)}`]),
                         `열어 둔 날 ${new Set(sp.openSlots.map((sl) => sl.date)).size}일`,
                       ]
                         .filter(Boolean)

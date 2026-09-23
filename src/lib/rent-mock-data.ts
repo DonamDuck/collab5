@@ -149,6 +149,11 @@ function space(
     ...SPACE_BASE,
     createdAt: at,
     updatedAt: at,
+    // 🩸09-23 QA — 초안 말고는 다 «등록 폼을 통과한» 공간이다. 폼이 약관 동의 없이는 저장을 안 하니
+    //   실제 DB엔 `host_terms_at`이 찍혀 있다. 목 세계는 S1만 갖고 있어서, 나머지 여섯을 고치기 화면에서
+    //   저장하면 「공간 제공자 약관에 동의해 주세요」에 막혀 그 줄이 보여 주려던 것(상호만 바꾸기·재제출 등)까지
+    //   닿지 못했다. 초안은 아직 안 낸 공간이라 그대로 빈다. 줄에서 직접 적은 값은 아래 `...rest`가 이긴다.
+    hostTermsAt: p.status === "draft" ? undefined : at,
     ...rest,
     ...products,
     ...(hasProducts ? compatScopePrice(products) : {}),
