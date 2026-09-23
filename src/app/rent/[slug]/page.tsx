@@ -617,7 +617,9 @@ export default async function SpaceDetailPage({
         {/* ── 데스크톱 오른쪽 기둥 — «얼마 · 언제 · 누구»를 스크롤 내내 들고 간다 ──
             아워플레이스 상세가 같은 자리에 호스트·시간당 값·예약 버튼을 세운다. 우리는 버튼 대신 «신청 절로 가는 길»만 둔다.
             ⛔폰에선 안 그린다 — 폰은 위 메타 한 줄과 하단 고정 바가 같은 일을 한다. */}
-        <aside className="hidden lg:sticky lg:top-24 lg:block">
+        {/* 📐09-23 QA — 카드가 세로 768 이하 화면에서 잘려 금액과 신청하기 버튼이 영영 안 보였다(1280x720 실측: 버튼 top 790).
+            카드 높이를 화면에 맞추고 넘치면 카드 «안»에서 굴린다. 긴 화면(1440x900)에서는 지금과 똑같다. */}
+        <aside className="hidden lg:sticky lg:top-24 lg:block lg:max-h-[calc(100dvh-7rem)] lg:overflow-y-auto lg:overscroll-contain">
           {/* 메타 줄·소개서 줄은 lg에서 위 헤더에서 숨기고 여기로 모인다. 같은 값이 한 화면에 두 번 서지 않게. */}
           <div className="rounded-lg border border-hairline bg-surface p-6 shadow-e1">
             <PriceLine priceHour={fromPrice} from={priceVaries} capacity={sp.capacity} />
@@ -672,7 +674,9 @@ export default async function SpaceDetailPage({
             )}
             {/* 🔑09-19 [G] 로그인 전에도 아래 결제 바가 뜬다. 바가 이 카드의 버튼 노릇을 해서 「신청하러 가기」 길은 뺐다.
                 🧱09-21 대표 — lg에선 그 바가 이 카드 안으로 들어온다(`BookingForm`의 `PayBar`가 여기로 포털). 폼이 없는 공간이면 빈 자리. */}
-            <div id="rent-side-pay" />
+            {/* 짧은 화면에서 카드가 안쪽으로 굴러도 금액과 버튼은 카드 바닥에 붙어 있게 한다(09-23 QA).
+                `-mb-6 pb-6`은 카드의 아래 여백만큼 자리를 덮어 글이 버튼 밑으로 비쳐 보이지 않게 하는 것이다. */}
+            <div id="rent-side-pay" className="sticky bottom-0 -mx-6 -mb-6 bg-surface px-6 pb-6" />
           </div>
         </aside>
       </div>
