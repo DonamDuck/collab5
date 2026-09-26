@@ -1036,7 +1036,7 @@ export async function notifyDeal(kind: DealKind, booking: SpaceBooking, space: S
 /** 🆕09-27 D4 — 정리 작업이 결제 시간이 지난 신청을 닫기 전에 토스에 되물어 본 결과 중 대표가 알아야 할 셋(`rent-recover.ts`).
  *  · `refunded` 승인 응답이 끊겨 돈만 나간 결제를 찾아 전액 돌려줬다
  *  · `refund-failed` 찾았는데 환불이 실패했다(예약은 `rejected`, 손이 필요한 예약)
- *  · `gave-up` 하루 동안 토스가 답을 안 줘서 더 묻지 않고 신청을 닫았다 */
+ *  · `gave-up` 하루 동안 결론을 못 내서(토스가 답을 안 줌·입금 대기 취소 실패) 더 묻지 않고 신청을 닫았다 */
 export type RecoverKind = "refunded" | "refund-failed" | "gave-up";
 
 /** 알림에 싣는 사실. 예약·공간을 못 읽었으면 빈 칸으로 두고 주문번호로 찾는다. */
@@ -1052,7 +1052,7 @@ export interface RecoverFacts {
   endTime?: string;
   guestUserId?: number;
   space: { id: number; name: string; ownerUserId: number } | null;
-  /** 토스가 답을 못 준 까닭(오류 글자). 그만 물었을 때만 싣는다. */
+  /** 결론을 못 낸 까닭(오류 글자). 그만 물었을 때만 싣는다. */
   why?: string;
 }
 
@@ -1064,7 +1064,7 @@ export function buildRecoverNotice(kind: RecoverKind, f: RecoverFacts): AdminNot
       ? [`끊긴 결제를 찾아 자동 환불했어요 · ${won(f.refund)}`, "손님이 결제를 마쳤는데 승인 응답이 우리 서버에 닿지 않아 예약이 안 생겼어요. 정리 작업이 토스에 되물어 찾아냈고, 결제한 돈을 전액 돌려드렸어요."]
       : kind === "refund-failed"
         ? [`손님 돈이 붙잡혀 있어요 · ${won(f.paid)}`, "승인 응답이 끊겨 예약이 안 생긴 결제를 찾았는데 돌려드리는 환불이 실패했어요. 토스 관리자 화면에서 직접 환불해 주세요. 정산 화면의 손이 필요한 예약에도 떠 있어요."]
-        : ["토스에 결제를 확인하지 못한 채 신청을 닫았어요", "결제 승인이 실패로 남은 신청을 하루 동안 토스에 되물었는데 답을 받지 못했어요. 돈이 빠져나갔는지 토스 관리자 화면에서 이 주문번호로 찾아봐 주세요."];
+        : ["토스에 결제를 확인하지 못한 채 신청을 닫았어요", "결제를 시도한 흔적이 있는 신청을 하루 동안 토스에 되물었는데 결론을 내지 못했어요. 돈이 빠져나갔는지 토스 관리자 화면에서 이 주문번호로 찾아봐 주세요. 까닭은 맨 아래 칸에 있어요."];
   const rows: [string, string][] = [
     [LABEL.dealBooking, String(f.bookingId)],
     [LABEL.dealOrder, f.orderId],
@@ -1087,6 +1087,37 @@ export function buildRecoverNotice(kind: RecoverKind, f: RecoverFacts): AdminNot
 /** 보내는 쪽 — 대표 알림 한 곳(`notifyAdmin`)으로. 슬랙이 없으면 건너뛴다. */
 export async function notifyRecover(kind: RecoverKind, f: RecoverFacts) {
   return notifyAdmin(buildRecoverNotice(kind, f));
+}
+
+/** ⑭ 환불을 확인하지 못한 손님 취소 → 대표 슬랙 (09-27, 대표 결정 D5).
+ *  토스가 200을 줬는데 본문이 그 취소의 결제 객체가 아니었다. 예약은 그대로 두었고 손님께는 「확인하지 못했다」고 말했다.
+ *  같은 멱등키로 다시 부르면 같은 응답이 와서 손님이 다시 눌러도 안 풀린다. 그래서 대표가 토스 관리자 화면에서 본다.
+ *  🔒거래 알림과 같은 규칙(회원 번호만, 슬랙에만).
+ *  @param refund 돌려드리려던 금액(취소 규정으로 센 값, 토스에 보낸 값 그대로). */
+export function buildRefundUnconfirmedNotice(booking: SpaceBooking, space: Space, refund: number): AdminNotice {
+  const rows: [string, string][] = [
+    [LABEL.dealBooking, String(booking.id)],
+    [LABEL.dealOrder, booking.orderId],
+    [LABEL.dealPaid, won(booking.amountTotal)],
+    ["돌려드릴 돈", won(Math.max(0, Math.floor(refund || 0)))],
+    [LABEL.dealSpace, `${space.name} (공간 번호 ${space.id})`],
+    [LABEL.dealWhen, bookingWhen(booking)],
+    [LABEL.dealGuest, String(booking.guestUserId)],
+    [LABEL.dealHost, String(space.ownerUserId)],
+  ];
+  return {
+    title: `손님 취소의 환불을 확인하지 못했어요 · ${won(Math.max(0, Math.floor(refund || 0)))}`,
+    lead: "손님이 예약을 취소했는데 토스가 환불 결과를 제대로 돌려주지 않았어요. 예약은 그대로 두었어요. 토스 관리자 화면에서 이 주문번호가 환불됐는지 보시고, 안 됐으면 거기서 돌려드려 주세요. 정산 화면의 손이 필요한 예약에도 떠 있어요.",
+    rows,
+    link: { href: `${SITE_URL}/rent/payouts`, label: "정산 화면 열기" },
+    note: "거래 알림은 슬랙에만 와요. 이름과 연락처는 싣지 않아요.",
+    slackOnly: true,
+  };
+}
+
+/** 보내는 쪽 — 대표 알림 한 곳(`notifyAdmin`)으로. */
+export async function notifyRefundUnconfirmed(booking: SpaceBooking, space: Space, refund: number) {
+  return notifyAdmin(buildRefundUnconfirmedNotice(booking, space, refund));
 }
 
 /** 「3시간」·「2일」 — 결제한 지 얼마나 됐나. 하루가 안 되면 시간, 넘으면 날로. */

@@ -246,6 +246,40 @@ export interface CancelResult {
   ok: boolean;
   /** 환불이 됐을 때 토스가 돌려준 Payment 객체(남은 돈·환불 이력이 들어 있다). */
   payment?: TossPayment;
+  /** 🆕09-27 D5 — 토스가 200을 줬는데 본문이 «그 취소»의 결제 객체가 아니다. 돈이 돌아갔는지 모른다.
+   *  ⚠️같은 멱등키로 다시 부르면 토스는 이 첫 응답을 그대로 준다(15일). 다시 시도해서 풀리는 실패가 아니라 사람이 봐야 한다. */
+  unconfirmed?: boolean;
+}
+
+/** 🆕09-27 D5 — 취소 응답이 «우리가 보낸 취소»의 결과인가. 문제가 있으면 까닭 글자를, 없으면 null.
+ *  🩸그 전엔 200이면 본문을 안 보고 성공으로 읽었다. 결제 객체가 아닌 본문이 오면 손님에겐 「돌려드릴게요」,
+ *    예약은 취소, 결제 줄은 DONE 그대로라 이용일이 지나면 그 돈이 사장님 지급 대기로 올라갔다(09-23 QA).
+ *  보는 것(토스 문서 09-27 확인: 「결제 취소에 성공하면 Payment 객체의 cancels 필드에 취소 객체가 배열로 돌아옵니다」)
+ *   · 상태가 CANCELED·PARTIAL_CANCELED
+ *   · 결제 키가 있으면 우리가 취소한 그 결제
+ *   · 남은 돈(balanceAmount)이 숫자이고 «취소 전 잔액 − 취소 금액»과 같다. 취소 금액이 요청과 맞는지를 여기서 본다.
+ *   · 취소 내역이 배열이면 그 금액의 취소가 들어 있다(`cancelStatus`가 있으면 DONE).
+ *  ⚠️상태와 잔액을 서로 맞춰 보지는 않는다. 부분 취소를 거듭해 잔액이 0이 돼도 상태가 PARTIAL_CANCELED로 남는다(토스 예시).
+ *  ⚠️취소 내역이 null이면 잔액 셈만으로 받아 준다. 승인 응답의 `cancels: null`로 09-16에 죽은 적이 있어 null을 오류로 두지 않는다. */
+export function cancelResponseProblem(
+  body: unknown, paymentKey: string, refundableAmount: number, amount: number | undefined,
+): string | null {
+  if (!isPaymentShape(body)) return "결제 객체가 아닌 본문";
+  if (body.status !== "CANCELED" && body.status !== "PARTIAL_CANCELED") return `상태가 ${body.status}`;
+  if (typeof body.paymentKey === "string" && body.paymentKey && body.paymentKey !== paymentKey) return "다른 결제의 응답";
+  if (typeof body.balanceAmount !== "number") return "남은 금액 칸이 없다";
+  const want = amount ?? refundableAmount;
+  if (refundableAmount > 0 && body.balanceAmount !== refundableAmount - want) {
+    return `남은 금액 ${body.balanceAmount} ≠ ${refundableAmount} − ${want}`;
+  }
+  if (Array.isArray(body.cancels)) {
+    const hit = body.cancels.some((c) => {
+      const x = c as { cancelAmount?: unknown; cancelStatus?: unknown } | null;
+      return !!x && x.cancelAmount === want && (x.cancelStatus === undefined || x.cancelStatus === null || x.cancelStatus === "DONE");
+    });
+    if (!hit) return `취소 내역에 ${want}원 완료 건이 없다`;
+  }
+  return null;
 }
 
 /** 결제 취소 — 호스트 거절과 게스트 취소가 둘 다 이리로 온다.
@@ -295,6 +329,12 @@ export async function cancelPayment(
     if (!res.ok) {
       console.error(`[rent-payment] cancel failed key=${paymentKey}: ${body.message ?? res.status}`);
       return { ok: false };
+    }
+    // 🆕09-27 D5 — 200이어도 «그 취소»의 결제 객체인지 본다. 아니면 성공으로 읽지 않는다(호출부가 예약을 안 바꾼다).
+    const problem = cancelResponseProblem(body, paymentKey, refundableAmount, amount);
+    if (problem) {
+      console.error(`[rent-payment] 🚨취소 응답을 확인하지 못했다 — 사람이 봐야 한다 key=${paymentKey}: ${problem}`);
+      return { ok: false, unconfirmed: true };
     }
     return { ok: true, payment: body };
   } catch (e) {

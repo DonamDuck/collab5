@@ -117,17 +117,7 @@ async function settleOne(r: StalePending, now: number, run: RecoverRun, timeoutM
 
   if (ans.kind === "error") {
     markDown();
-    if (minutesSince(r.createdAt, now) >= GIVE_UP_HOURS * 60) {
-      // 🛑그만 묻는다. 예약만 닫고 결제 칸은 모르는 채로 둔다(«실패»로 덮어쓰지 않는다).
-      const moved = await rentSync(r.orderId, { bookingStatus: "expired" });
-      if (moved.ok) {
-        run.gaveUp += 1;
-        await tell("gave-up", r, r.amount, 0, ans.reason);
-      } else run.deferred += 1;
-      return;
-    }
-    console.warn(`[rent-recover] 토스가 답을 안 줬다 — 다음 정리 때 다시 묻는다 order=${r.orderId}: ${ans.reason}`);
-    run.deferred += 1;
+    await deferOrGiveUp(r, now, run, ans.reason);
     return;
   }
 
@@ -171,7 +161,10 @@ async function settleOne(r: StalePending, now: number, run: RecoverRun, timeoutM
     const undo = await cancelPayment(key, AUTO_CANCEL_WAITING_REASON, undefined, balance);
     if (undo.ok) {
       if ((await rentSync(r.orderId, { bookingStatus: "expired", toss: undo.payment })).ok) run.closed += 1;
-    } else run.deferred += 1;
+    } else {
+      // 같은 멱등키라 다시 해도 같은 답일 수 있다. 하루가 지나면 그만하고 알린다(입금이 들어오면 대조가 잡는다).
+      await deferOrGiveUp(r, now, run, `입금 대기 결제 취소 실패${undo.unconfirmed ? "(응답 확인 못 함)" : ""}`);
+    }
     return;
   }
 
@@ -184,6 +177,21 @@ async function settleOne(r: StalePending, now: number, run: RecoverRun, timeoutM
 
   // READY·IN_PROGRESS·ABORTED·EXPIRED — 돈이 안 움직였다.
   if ((await rentSync(r.orderId, { bookingStatus: "expired", toss: { status: "EXPIRED" } })).ok) run.closed += 1;
+}
+
+/** 답을 못 받았거나 풀지 못한 신청 — 하루가 안 됐으면 다음 회차로 미루고, 지났으면 그만 묻는다.
+ *  🛑그만 물을 땐 예약만 만료로 닫고 결제 칸은 모르는 채로 둔다(«실패»로 덮어쓰지 않는다). 알림은 이때 한 번이다
+ *  (닫힌 신청은 다음 회차의 대상이 아니다). */
+async function deferOrGiveUp(r: StalePending, now: number, run: RecoverRun, why: string): Promise<void> {
+  if (minutesSince(r.createdAt, now) < GIVE_UP_HOURS * 60) {
+    console.warn(`[rent-recover] 이번엔 못 풀었다 — 다음 정리 때 다시 본다 order=${r.orderId}: ${why}`);
+    run.deferred += 1;
+    return;
+  }
+  const moved = await rentSync(r.orderId, { bookingStatus: "expired" });
+  if (!moved.ok) { run.deferred += 1; return; }
+  run.gaveUp += 1;
+  await tell("gave-up", r, r.amount, 0, why);
 }
 
 /** 슬랙 거래 알림 한 건. 🔒예약·주문번호·금액·회원 번호만(이름·연락처 없음, `buildRecoverNotice`). 🚨알림이 본작업을 막지 않는다. */

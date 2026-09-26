@@ -200,6 +200,8 @@ function toBooking(r: Row): SpaceBooking {
     hostMessage: s(r.host_message),
     decidedAt: r.decided_at ? s(r.decided_at) : undefined,
     remindedAt: r.reminded_at ? s(r.reminded_at) : undefined,
+    // 🧾09-27 D5. SQL 전 DB엔 칸이 없어 undefined다(표시 없음으로 읽힌다).
+    refundUnconfirmedAt: r.refund_unconfirmed_at ? s(r.refund_unconfirmed_at) : undefined,
     createdAt: s(r.created_at), updatedAt: s(r.updated_at),
   };
 }
@@ -909,9 +911,13 @@ export async function sweepBookings(opts: { tossLookups?: number } = {}): Promis
   //   사장님이 수락을 안 눌렀을 수 있다. 안 넘기면 다녀간 예약이 정산에 영영 안 올라간다.
   //   실제 지급은 아직 사람이 보고 보내므로(지급대행 계약 전) 잘못 나갈 일은 없다.
   //   🙋사장님이 «관리자에게 환불 신청»한 예약은 건너뛴다 — 우리가 전화로 확인하는 중이다.
-  const { data: conf } = await c.from("space_bookings").select("order_id,use_date,end_time")
+  //   🧾09-27 D5 — 손님이 취소했는데 환불을 확인하지 못한 예약(`refund_unconfirmed_at`)도 건너뛴다. 돈이 돌아갔는지 모르는데
+  //     이용 완료로 넘기면 그 돈이 사장님 지급 대기로 올라간다. ⚠️칸을 조건절에 안 쓰고 `*`로 읽어 코드에서 거른다 —
+  //     SQL 전 DB엔 칸이 없어 조건절에 쓰면 조회가 통째로 실패한다(그땐 표시된 예약도 없다).
+  const { data: conf } = await c.from("space_bookings").select("*")
     .in("status", ["confirmed", "paid"]).is("refund_requested_at", null).lte("use_date", today);
   for (const r of conf ?? []) {
+    if ((r as Row).refund_unconfirmed_at) continue;
     if (!bookingFinished({ useDate: s(r.use_date), endTime: s(r.end_time).slice(0, 5) })) continue;
     if ((await rentSync(s(r.order_id), { bookingStatus: "done", payoutStatus: "WAITING" })).ok) run.done += 1;
   }
@@ -971,6 +977,23 @@ export async function requestRefund(bookingId: number, note: string): Promise<bo
   return (data ?? []).length === 1;
 }
 
+/** 🧾09-27 D5 — 손님 취소의 환불을 토스 응답으로 확인하지 못했다고 적는다. 예약 상태는 안 바꾼다.
+ *  처음 적을 때만 참(겹쳐 눌려도 시각이 처음 것으로 남는다). ⚠️SQL 전 DB엔 칸이 없어 거짓이다(슬랙 알림만 남는다). */
+export async function markRefundUnconfirmed(bookingId: number): Promise<boolean> {
+  if (await rentMockOn()) return false;
+  const c = db();
+  if (!c) return false;
+  const { data, error } = await c.from("space_bookings")
+    .update({ refund_unconfirmed_at: new Date().toISOString() })
+    .eq("id", bookingId).is("refund_unconfirmed_at", null)
+    .select("id");
+  if (error) {
+    console.error(`[spaces] markRefundUnconfirmed failed id=${bookingId}${/refund_unconfirmed_at/.test(error.message) ? " (칸이 없다 — 2026-09-27-rent-refund-unconfirmed.sql 전)" : ""}: ${error.message}`);
+    return false;
+  }
+  return (data ?? []).length === 1;
+}
+
 /** 관리자가 «신청을 닫는다» — 전화로 확인해 보니 환불할 일이 아니었을 때. 예약은 원래대로 살아 있다. */
 export async function clearRefundRequest(bookingId: number): Promise<boolean> {
   if (await rentMockOn()) return false;
@@ -999,27 +1022,34 @@ export async function listRefundRequests(): Promise<SpaceBooking[]> {
   return (data ?? []).map((r) => toBooking(r as Row));
 }
 
-/** 🧾정산 화면이 따로 보여줄 «손이 필요한» 예약 둘.
+/** 🧾정산 화면이 따로 보여줄 «손이 필요한» 예약 셋.
  *  - `paid` 인데 이용일이 지남 — 사장님이 답을 안 한 채 날이 갔다. 손님 돈이 붙잡혀 있다
- *  - `rejected` — 거절했는데 환불이 실패했다. 손님께 돌려드려야 한다 */
-export async function listStuckBookings(): Promise<{ unanswered: SpaceBooking[]; refundFailed: SpaceBooking[] }> {
+ *  - `rejected` — 거절했는데 환불이 실패했다. 손님께 돌려드려야 한다
+ *  - 🆕09-27 D5 `refundUnconfirmed` — 손님이 취소했는데 토스 응답으로 환불을 확인하지 못했다. 예약은 결제 완료·확정 그대로다.
+ *    같은 멱등키로 다시 불러도 같은 응답이 와서 손님 쪽에선 풀 수 없다. 관리자가 토스 관리자 화면에서 본다. */
+export async function listStuckBookings(): Promise<{ unanswered: SpaceBooking[]; refundFailed: SpaceBooking[]; refundUnconfirmed: SpaceBooking[] }> {
   const m = await getRentMock();
   if (m) {
     const byDate = (a: SpaceBooking, b: SpaceBooking) => (a.useDate < b.useDate ? -1 : 1);
     return {
       unanswered: m.data.bookings.filter((b) => b.status === "paid" && b.useDate < todayKst()).sort(byDate),
       refundFailed: m.data.bookings.filter((b) => b.status === "rejected").sort(byDate),
+      refundUnconfirmed: m.data.bookings.filter((b) => !!b.refundUnconfirmedAt && (b.status === "paid" || b.status === "confirmed")).sort(byDate),
     };
   }
   const c = db();
-  if (!c) return { unanswered: [], refundFailed: [] };
-  const [a, b] = await Promise.all([
+  if (!c) return { unanswered: [], refundFailed: [], refundUnconfirmed: [] };
+  const [a, b, u] = await Promise.all([
     c.from("space_bookings").select("*").eq("status", "paid").lt("use_date", todayKst()).order("use_date"),
     c.from("space_bookings").select("*").eq("status", "rejected").order("use_date"),
+    c.from("space_bookings").select("*").not("refund_unconfirmed_at", "is", null).in("status", ["paid", "confirmed"]).order("use_date"),
   ]);
+  // ⚠️SQL 전 DB엔 칸이 없어 셋째 조회만 실패한다. 나머지 둘은 그대로 보여 준다.
+  if (u.error) console.error(`[spaces] listStuckBookings refundUnconfirmed failed: ${u.error.message}`);
   return {
     unanswered: (a.data ?? []).map((r) => toBooking(r as Row)),
     refundFailed: (b.data ?? []).map((r) => toBooking(r as Row)),
+    refundUnconfirmed: (u.data ?? []).map((r) => toBooking(r as Row)),
   };
 }
 

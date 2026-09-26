@@ -85,6 +85,7 @@ export default async function RentPayoutsPage() {
     ...all.map((r) => r.booking?.spaceId).filter((x): x is number => typeof x === "number"),
     ...stuck.unanswered.map((b) => b.spaceId),
     ...stuck.refundFailed.map((b) => b.spaceId),
+    ...stuck.refundUnconfirmed.map((b) => b.spaceId),
   ];
   const spaces = await listSpacesByIds(spaceIds);
 
@@ -179,7 +180,7 @@ export default async function RentPayoutsPage() {
         </section>
       )}
 
-      {(stuck.unanswered.length > 0 || stuck.refundFailed.length > 0) && (
+      {(stuck.unanswered.length > 0 || stuck.refundFailed.length > 0 || stuck.refundUnconfirmed.length > 0) && (
         <section className="mt-12 border-t border-hairline pt-8">
           <h2 className="text-[21px] font-bold leading-snug tracking-tight text-ink">손이 필요한 예약</h2>
           <p className="mt-2 text-[15px] leading-relaxed break-keep text-mute">
@@ -203,6 +204,18 @@ export default async function RentPayoutsPage() {
               hint="토스 관리자 화면에서 직접 취소해 주세요. 손님께 돌려드릴 돈이에요."
               rows={stuck.refundFailed}
               spaces={spaces}
+            />
+          )}
+          {/* 🧾09-27 D5 — 손님이 취소했는데 토스 응답으로 환불을 확인하지 못한 예약. 예약은 결제 완료·확정 그대로다.
+              같은 멱등키라 손님이 다시 눌러도 같은 응답이 와서, 여기서 사람이 토스 관리자 화면으로 푼다.
+              손님께 «연락드릴게요»라고 말해 두었으니 연락처를 같이 보여 준다(이 화면은 관리자만 연다). */}
+          {stuck.refundUnconfirmed.length > 0 && (
+            <StuckList
+              title="환불을 확인하지 못한 취소"
+              hint="손님이 취소하셨는데 토스가 환불 결과를 제대로 돌려주지 않았어요. 토스 관리자 화면에서 주문번호로 찾아 환불됐는지 보시고, 안 됐으면 거기서 취소 규정대로 돌려드려 주세요. 손님께는 확인해서 연락드린다고 말씀드렸어요."
+              rows={stuck.refundUnconfirmed}
+              spaces={spaces}
+              showGuest
             />
           )}
         </section>
@@ -280,11 +293,14 @@ function StuckList({
   hint,
   rows,
   spaces,
+  showGuest = false,
 }: {
   title: string;
   hint: string;
   rows: SpaceBooking[];
   spaces: Map<number, SpaceBrief>;
+  /** 손님 성함·연락처를 같이 보인다(손님께 연락드리기로 한 줄). */
+  showGuest?: boolean;
 }) {
   return (
     <div className="mt-6">
@@ -296,6 +312,13 @@ function StuckList({
             <div className="min-w-0">
               <p className="truncate text-[15px] text-body">{spaces.get(b.spaceId)?.name ?? "공간"}</p>
               <p className="mt-0.5 text-[14px] text-mute">{PRODUCT_LABEL[b.product]} · {bookingWhen(b)}</p>
+              {/* 🧾09-27 토스 관리자 화면에서 찾을 때 쓰는 주문번호. 손이 필요한 줄은 대개 거기서 푼다. */}
+              <p className="mt-0.5 text-[13px] break-all text-faint">주문번호 {b.orderId}</p>
+              {showGuest && (
+                <p className="mt-0.5 text-[14px] break-all text-body">
+                  손님 {[b.guestName?.trim(), b.guestPhone?.trim()].filter(Boolean).join(" · ") || `회원 번호 ${b.guestUserId}`}
+                </p>
+              )}
             </div>
             <p className="shrink-0 text-[15px] tabular-nums text-ink">{won(b.amountTotal)}</p>
           </li>
