@@ -37,7 +37,8 @@ const TITLE: Record<BookingStatus, string> = {
   paid: BOOKING_HEADLINE.guestPaid,
   confirmed: BOOKING_HEADLINE.guestConfirmed,
   done: "다녀온 하루 팝업이에요",
-  rejected: "사장님이 이번엔 어렵대요",
+  // ✍️09-27 대표 B8 — 「어렵대요」 전언체 → 존대. 거절 메일 첫 줄과 같은 말이다.
+  rejected: "사장님이 이번엔 어렵다고 하셨어요",
   refunded: "돈을 돌려드린 예약이에요",
   cancelled: "취소한 예약이에요",
   expired: "결제 시간이 지난 신청이에요",
@@ -166,7 +167,8 @@ export default async function RentDonePage({ params }: { params: Promise<{ booki
                   // ⏱09-17 대표 — 확정 뒤 2일 안 연락 규칙. 이미 수락된 건은 조건형(「확정하면」) 대신 지난 일로 말한다.
                   b.status === "confirmed" ? CONTACT_RULE_GUEST_DONE : CONTACT_RULE_GUEST,
                   // 🆕09-19 오후 대표 — 수락 전 취소는 전액(`CancelStage`). 수락을 기다리는 동안만 참인 말이라 그때만 선다.
-                  ...(b.status === "paid" ? ["사장님이 아직 수락하기 전이라, 지금 취소하시면 날짜와 상관없이 전액 돌려드려요."] : []),
+                  // 🔁09-27 대표 A4 — 손님이 읽는 자리라 「수락」을 「확정」으로.
+                  ...(b.status === "paid" ? ["사장님이 아직 확정하기 전이라, 지금 취소하시면 날짜와 상관없이 전액 돌려드려요."] : []),
                   // 💳09-18 환불 시점은 메일과 한 줄(`REFUND_TIMING_LINE`). 약관 제10조의 「3~5영업일」에 맞췄다.
                   `사장님 사정으로 어려워지면 전액 돌려드려요. ${REFUND_TIMING_LINE}`,
                   // ☕09-17 커피챗을 담았으면 «언제»를 여기서도 말한다. 문장은 한 벌(`rent-copy`)이다.
@@ -217,7 +219,7 @@ export default async function RentDonePage({ params }: { params: Promise<{ booki
       {b.hostMessage && (
         <p className="mt-6 text-[16px] leading-relaxed break-keep text-body">
           {b.refundRequestedAt && (b.status === "refunded" || b.status === "cancelled")
-            ? "수락하실 때 사장님이 남기신 말"
+            ? "확정하실 때 사장님이 남기신 말"
             : "사장님 말씀"}{" "}
           · {b.hostMessage}
         </p>
@@ -236,8 +238,10 @@ export default async function RentDonePage({ params }: { params: Promise<{ booki
           🔗09-16 「신청 내역 보기」는 손님 전용 `/rent/requests`로 간다(B81). 전엔 사장님 화면인 `/rent/my`로
           가서, 손님이 자기 신청을 찾으려면 공간·받은 신청 두 덩이를 지나야 했다.
           🔁09-19 대표 [F] — 이름을 「내 예약」 한 벌로(「일단은 내 예약으로 하자」). 메뉴 바·메일·목록 제목이 같은 이름이다. */}
+      {/* 🔗09-27 대표 D2 — *「그 해당건에 한해 가는게 맞는거 같음」*. 목록 맨 위가 아니라 이 예약 한 줄로 데려간다
+          (`/rent/requests`의 줄 id `b-<번호>` · 도착하면 `HashFocus`가 그 줄로 내려가 잠깐 옅게 칠한다). */}
       <div className="mt-9">
-        <Link href="/rent/requests" className={`${primaryBtnCls} h-[48px] w-full`}>
+        <Link href={`/rent/requests#b-${b.id}`} className={`${primaryBtnCls} h-[48px] w-full`}>
           내 예약 보기
         </Link>
         <Link href="/rent" className={`${secondaryBtnCls} mt-2 h-[48px] w-full`}>

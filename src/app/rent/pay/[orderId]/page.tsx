@@ -53,7 +53,8 @@ function cancelRuleLine(useDate: string): string {
   // 🆕09-19 오후 대표 — 수락 전 취소는 전액이다(`CancelStage`). 결제를 마친 손님은 먼저 수락을 기다리니,
   //   손님이 가장 먼저 겪는 구간부터 말한다. 수락 뒤 한 시간(`GRACE_MINUTES`)도 같은 전액이라 한 문장에 묶는다.
   //   표는 그 «밖»의 때다. 표가 이용일까지 줄곧 전액이면 두 창이 바꾸는 게 없어서 붙이지 않는다.
-  const head = `사장님이 수락하시기 전이나 수락하시고 ${GRACE_MINUTES / 60}시간 안에 취소하면 전액 돌려드려요.`;
+  // 🔁09-27 대표 A6 — 손님이 읽는 자리라 「수락」을 「확정」으로. 시간은 여전히 상수(`GRACE_MINUTES` = 60분 → 「1시간」)에서 읽는다.
+  const head = `사장님이 확정하기 전이나 확정하고 ${GRACE_MINUTES / 60}시간 안에 취소하면 전액 돌려드려요.`;
   if (now >= 1) {
     return next === null || next === now
       ? `${until}까지 취소하면 전액 돌려드려요.`

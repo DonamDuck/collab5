@@ -58,7 +58,7 @@ export default async function NewSpacePage({
           공간이 쉬는 날, 필요한 분에게 빌려줄 수 있어요
         </h1>
         <p className="mt-3 text-[17px] leading-relaxed break-keep text-mute">
-          비어 있는 공간, 필요한 분에게 빌려주고 부가 수익도 만들어보세요. 먼저 로그인해 주세요.
+          비어 있는 시간으로 부가 수익을 만들어 보세요. 먼저 로그인해 주세요.
         </p>
         {/* ⚠️복귀 키는 `redirect`다 — 로그인 화면이 읽는 이름이 그것이라 `next`로 적으면 홈으로 떨어진다. */}
         <Link href={`/login?redirect=${encodeURIComponent("/rent/new")}`} className={`${primaryBtnCls} mt-8 h-[48px]`}>
@@ -91,8 +91,8 @@ export default async function NewSpacePage({
           공간이 쉬는 날, 필요한 분에게 빌려줄 수 있어요
         </h1>
         <p className="mt-3 text-[17px] leading-relaxed break-keep text-mute">
-          {/* 🔁09-19 대표 코멘트 #66 */}
-          비어 있는 공간, 필요한 분에게 빌려주고 부가 수익도 만들어보세요.
+          {/* 🔁09-19 대표 코멘트 #66 · 🔁09-27 대표 B13 — 제목이 이미 「필요한 분에게 빌려줄 수 있어요」라 둘째 줄은 수익 이야기만. */}
+          비어 있는 시간으로 부가 수익을 만들어 보세요.
         </p>
       </header>
 

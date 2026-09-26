@@ -172,7 +172,7 @@ export default async function RentPage({
           ) : (
             <EmptyState
               title="첫 번째 공간을 기다리고 있어요"
-              desc="안 쓰는 날이 있는 공간을 먼저 올려주시면, 빌리실 분들께 보여드릴게요."
+              desc="안 쓰는 날이 있는 공간을 먼저 올려 주시면, 빌리실 분들께 보여 드릴게요."
             >
               <Link href="/rent/new" className={secondaryBtnCls}>
                 내 공간 올리기

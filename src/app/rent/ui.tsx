@@ -78,7 +78,8 @@ const BOOKING_TONE: Record<BookingStatus, { label: string; cls: string }> = {
   rejected: { label: "사장님 거절", cls: "text-faint" },
   refunded: { label: "전액 환불", cls: "text-faint" },
   cancelled: { label: "예약 취소", cls: "text-faint" },
-  done: { label: "다녀왔어요", cls: "text-faint" },
+  // 🔁09-27 대표 B7 — 「다녀왔어요」(손님)·「손님 다녀감」(사장님) → 둘 다 「이용 완료」. 위 「완료」 한 금형 주의는 대표 결정으로 넘는다.
+  done: { label: "이용 완료", cls: "text-faint" },
   // ⏳09-16 — 결제창만 열고 30분이 지나 닫힌 신청. 실패가 아니라 시간이 지난 것이라 말투도 그렇게.
   expired: { label: "결제 시간 지남", cls: "text-faint" },
 };
@@ -91,7 +92,7 @@ const TONE_FOR: Record<"guest" | "host", Partial<Record<BookingStatus, { label: 
     paid: { label: "새 요청", cls: "text-lemon-on" },
     rejected: { label: "거절한 요청", cls: "text-faint" },
     cancelled: { label: "손님이 취소", cls: "text-faint" },
-    done: { label: "손님 다녀감", cls: "text-faint" },
+    done: { label: "이용 완료", cls: "text-faint" },
   },
 };
 

@@ -311,7 +311,8 @@ export default async function MyPage({ searchParams }: { searchParams: Promise<{
             {[
               { href: "/rent/my?tab=host", n: rentToAnswer, label: "새 요청", hot: rentToAnswer > 0 },
               { href: "/rent/my?tab=host", n: rentUpcoming, label: "다가오는 예약", hot: false },
-              { href: "/rent/my?tab=guest", n: rentMyTrips, label: "내 예약", hot: false },
+              // 🔗09-27 대표 D2 — 「내 예약」은 손님 전용 `/rent/requests`로(메뉴 바와 같은 곳). 숫자는 그 화면의 「예약 완료」 절과 같은 판정이다.
+              { href: "/rent/requests", n: rentMyTrips, label: "내 예약", hot: false },
             ].map((c) => (
               <Link
                 key={c.label}

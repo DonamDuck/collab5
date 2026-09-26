@@ -131,7 +131,10 @@ export const RENT_GROUPS: Group[] = [
         path: "/rent/requests",
         note: "결제 안 한 신청 세 건은 맨 아래에 접혀 있어요. 날짜가 지난 결제 전 신청도 한 줄 있어요.",
         rows: [
-          { desc: "앞으로 갈 곳, 지난 신청, 접힌 결제 안 한 신청", c: "guest-full", to: "/rent/requests" },
+          { desc: "예약 완료, 지난 예약, 접힌 결제 안 한 신청 · 위 메뉴 바의 「내 예약」 칸이 켜져 있어요", c: "guest-full", to: "/rent/requests" },
+          // 🔗09-27 대표 D2 — 완료 화면의 「내 예약 보기」가 이 주소로 온다. 그 줄로 내려가 1초 남짓 옅게 칠해졌다 걷혀요.
+          { desc: "완료 화면에서 온 자리(`#b-예약번호`) · 그 예약 줄로 내려가 잠깐 옅게 칠해져요", c: "guest-full", to: `/rent/requests#b-${B.confirmed}` },
+          { desc: "접힌 결제 안 한 신청을 짚고 온 자리 · 접힌 칸이 열리고 그 줄이 칠해져요", c: "guest-full", to: `/rent/requests#b-${B.expired}` },
           { desc: "빈 목록", c: "guest-empty", to: "/rent/requests" },
           { desc: "로그인 안 했을 때", c: "anon", to: "/rent/requests" },
           { desc: "긴 글", c: "stress-guest", to: "/rent/requests" },
@@ -292,11 +295,11 @@ export const RENT_POPUPS: Popup[] = [
   // 🔑09-19 [G] 로그인 안 한 사람은 바 버튼이 「로그인하고 신청하기」라 팝업 대신 로그인 화면으로 가요. 돌아오면 이 팝업이 떠요.
   { where: { desc: "예약 한 건", c: "guest-full", to: `/rent/done/${B.confirmed}` }, button: "「예약 취소하기」", title: "예약을 취소할까요?" },
   // 사장님 버튼은 「빌려준 공간」 칸에 있다. `tab=host` 없이 열면 빌린 공간 칸이 떠서 누를 버튼이 안 보인다(09-18 밤 QA SC-15).
-  { where: { desc: "내 하루 팝업", c: "host-full", to: "/rent/my?tab=host" }, button: "새 요청 줄의 「거절」", title: "이 요청을 거절할까요" },
-  { where: { desc: "내 하루 팝업", c: "host-full", to: "/rent/my?tab=host" }, button: "이용 시간이 시작된 줄의 「관리자에게 환불 신청하기」", title: "관리자에게 환불을 신청할까요" },
+  { where: { desc: "내 하루 팝업", c: "host-full", to: "/rent/my?tab=host" }, button: "새 요청 줄의 「거절」", title: "이 요청을 거절할까요?" },
+  { where: { desc: "내 하루 팝업", c: "host-full", to: "/rent/my?tab=host" }, button: "이용 시간이 시작된 줄의 「관리자에게 환불 신청하기」", title: "관리자에게 환불을 신청할까요?" },
   { where: { desc: "내 하루 팝업", c: "host-full", to: "/rent/my?tab=host" }, button: "공개 중인 공간 줄의 「잠시 쉬기」", title: "잠시 쉴까요?" },
-  { where: { desc: "공간 검토", c: "admin-full", to: "/rent/review" }, button: "검토 대기 줄의 「보완 요청」", title: "○○, 무엇을 고쳐 주시면 될까요 (칩 넷 + 사장님께 보낼 말)" },
-  { where: { desc: "정산", c: "admin-full", to: "/rent/payouts" }, button: "환불 신청 줄의 「승인하고 환불」", title: "환불을 승인할까요" },
-  { where: { desc: "정산", c: "admin-full", to: "/rent/payouts" }, button: "환불 신청 줄의 「신청 닫기」", title: "환불 신청을 닫을까요" },
+  { where: { desc: "공간 검토", c: "admin-full", to: "/rent/review" }, button: "검토 대기 줄의 「보완 요청」", title: "○○, 무엇을 고쳐 주시면 될까요? (칩 넷 + 사장님께 보낼 말)" },
+  { where: { desc: "정산", c: "admin-full", to: "/rent/payouts" }, button: "환불 신청 줄의 「승인하고 환불」", title: "환불을 승인할까요?" },
+  { where: { desc: "정산", c: "admin-full", to: "/rent/payouts" }, button: "환불 신청 줄의 「신청 닫기」", title: "환불 신청을 닫을까요?" },
 ];
 

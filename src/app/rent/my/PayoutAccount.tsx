@@ -88,7 +88,7 @@ export function PayoutAccount({ initial }: { initial: PayoutAccountMasked | null
       {editing && (
         <div className="space-y-5 rounded-lg border border-hairline bg-surface px-4 py-5 sm:px-5">
           <div>
-            <p className={labelCls}>누구 이름의 계좌인가요</p>
+            <p className={labelCls}>누구 이름의 계좌인가요?</p>
             <div role="radiogroup" aria-label="예금주 유형" className="mt-2 flex flex-wrap gap-2">
               {HOLDER_TYPES.map((v) => (
                 <button

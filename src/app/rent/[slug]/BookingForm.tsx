@@ -429,7 +429,8 @@ export function BookingForm({
     // 그새 바뀐 것을 가린다. 화면이 방금 서버에서 받은 열린 시간·찬 시간이 기준이다(서버 관문과 같은 함수).
     const notes: string[] = [];
     const p = saved.product && sellable.includes(saved.product) ? saved.product : "";
-    if (saved.product && !p) notes.push("고르신 방식은 이제 이 공간에서 빌릴 수 없어요. 방식을 다시 확인해 주세요.");
+    // 🔁09-27 대표 A14 — 이 칸의 이름은 「신청 타입」 한 벌(라벨·결제 바·막힘 말과 같은 이름).
+    if (saved.product && !p) notes.push("고르신 신청 타입은 이제 이 공간에서 빌릴 수 없어요. 신청 타입을 다시 확인해 주세요.");
     const pickedProduct = sellable.length === 1 ? sellable[0] : p;
     let d = saved.useDate;
     let st = saved.startTime;
@@ -549,7 +550,8 @@ export function BookingForm({
       {sellable.length > 0 && (
         <div ref={productRef}>
           {/* 🔁09-18 대표 코멘트 — 「어떻게 빌리실까요」가 위 「빌릴 수 있는 것」과 겹쳐 읽혔다. 하나면 확인, 둘이면 고르기. */}
-          <p className={labelCls}>{sellable.length === 1 ? "어떻게 빌리실지 확인해 주세요" : "어떻게 빌리실지 골라 주세요"}</p>
+          {/* 🔁09-27 대표 A14 — 「어떻게 빌리실지」 → 「신청 타입」. 아래 결제 바·막힘 말도 같은 이름이다(한 화면에 이름 하나). */}
+          <p className={labelCls}>{sellable.length === 1 ? "신청 타입을 확인해 주세요" : "신청 타입을 골라 주세요"}</p>
           {sellable.length === 1 ? (
             <div className="rounded-lg bg-surface-soft px-4 py-3">
               <p className="text-[16px] text-ink">
@@ -607,7 +609,7 @@ export function BookingForm({
               })}
             </div>
           )}
-          {badField === "product" && <p className={errCls}>어느 쪽으로 빌릴지 먼저 골라 주세요.</p>}
+          {badField === "product" && <p className={errCls}>신청 타입을 먼저 골라 주세요.</p>}
         </div>
       )}
 
@@ -646,7 +648,8 @@ export function BookingForm({
             이미 팔린 칸 셋은 칩이 먼저 걸러 주므로 손님이 머리로 맞출 일이 없다. 고른 구간은 칩 색이 한 덩어리로 이어지고,
             그 아래 한 줄(「10:30~13:00 · 2시간 30분」)이 요약한다. 아워플레이스의 시간 고르기처럼 누르는 순서가 곧 답이다. */}
       <div ref={timeRef}>
-        <p className={labelCls}>시작과 끝 시각을 골라 주세요</p>
+        {/* ✍️09-27 대표 B3 — 위 「날짜를 선택해 주세요」와 같은 동사로. */}
+        <p className={labelCls}>시작과 끝 시각을 선택해 주세요</p>
         {!useDate ? (
           <p className={hintCls}>날짜를 고르면 열린 시각이 나와요.</p>
         ) : startChoices.length === 0 ? (
@@ -789,7 +792,7 @@ export function BookingForm({
           //   예시 둘을 나란히 두면 고르는 문제처럼 읽혀서, 한 문장 안에 «창업 전 연습 + 무엇을·누구와»를 담았다.
           placeholder="예) 카페를 열기 전에 일일카페로 네 시간 장사를 해 보려고 해요. 친구랑 둘이 커피와 구움과자를 팔 거예요."
         />
-        {badField === "plan" && <p className={errCls}>그날 무엇을 하실지 열 글자 이상 적어 주세요.</p>}
+        {badField === "plan" && <p className={errCls}>그날 무엇을 하실지 10자 이상 적어 주세요.</p>}
         {/* ✍️09-21 대표 코멘트 — 「사장님께, 대여 당일 공간 사용 계획을 알려주세요. 사장님 검토과정에 해당 내용을 전달해요.」
             대표 요청대로 맞춤법과 어색한 데만 손봄. */}
         <p className={hintCls}>대여 당일 공간을 어떻게 쓰실지 사장님께 알려 주세요. 사장님이 신청을 검토하실 때 이 내용을 함께 전해 드려요.</p>
@@ -923,7 +926,7 @@ export function BookingForm({
         amount={timePicked && product ? total : null}
         caption={timePicked ? durationLabel(minutes) : undefined}
         // ✍️09-21 대표 코멘트 — 「빌릴 시간을 선택해주세요」. 금액 얘기보다 할 일을 먼저 말한다. 세 갈래를 같은 틀로.
-        emptyText={!product ? "빌릴 방식을 선택해 주세요" : activeStart ? "끝나는 시각을 선택해 주세요" : "빌릴 시간을 선택해 주세요"}
+        emptyText={!product ? "신청 타입을 선택해 주세요" : activeStart ? "끝나는 시각을 선택해 주세요" : "빌릴 시간을 선택해 주세요"}
         // 🔑09-19 [G] 로그인 전엔 같은 바가 「로그인하고 신청하기」다. 누르면 고른 값을 맡기고 로그인으로 간다.
         label={pending ? "결제 화면으로 가는 중…" : signedIn ? "신청하기" : "로그인하고 신청하기"}
         disabled={pending}

@@ -455,7 +455,8 @@ export default async function MyRentPage({
       <section id="requests" className="mt-10 scroll-mt-32">
         <h2 className={h2Cls}>들어온 요청</h2>
         {hostBookings.length === 0 ? (
-          <p className={emptyCls}>아직 들어온 요청이 없어요.</p>
+          // ✍️09-27 대표 B10 — 빈 상태에 «그다음»을 한 줄. 요청은 기다리는 것이라 어디로 오는지를 말한다.
+          <p className={emptyCls}>아직 들어온 요청이 없어요. 공간이 열려 있으면 요청이 이메일로 바로 와요.</p>
         ) : (
           <>
             {toAnswer.length > 0 && (
@@ -638,15 +639,17 @@ export default async function MyRentPage({
         <section className="mt-8">
           <div className="flex items-baseline justify-between gap-3">
             <h2 className={h2Cls}>내 예약</h2>
+            {/* 🔁09-27 대표 B4 — 「따로 모아 보기」 → 가는 곳의 이름으로. */}
             <Link href="/rent/requests" className="shrink-0 py-[12px] text-[15px] text-mute underline underline-offset-2">
-              따로 모아 보기
+              예약 내역 보기
             </Link>
           </div>
           {guestBookings.length === 0 ? (
             <p className="mt-5 text-[16px] leading-relaxed break-keep text-mute">
               아직 빌린 공간이 없어요.{" "}
+              {/* 🔁09-27 — `/rent/requests`의 같은 링크(대표 B6)와 같은 이름으로. */}
               <Link href="/rent" className="text-body underline underline-offset-2">
-                빌릴 곳 둘러보기
+                공간 둘러보기
               </Link>
             </p>
           ) : (
@@ -661,6 +664,7 @@ export default async function MyRentPage({
                 // 나누는 판정은 `lib/rent-groups`의 `groupGuestBookings` 한 벌 — `/my`의 「빌린 예약」 숫자가 «예약 완료» 칸을 센다.
                 const { upcoming: upcomingG, past: pastG, cancel: cancelG } = groupGuestBookings(guestBookings, (v) => v.booking);
                 const views = [
+                  // ✍️09-27 대표 B10 — 예약 완료 칸만 다음 행동(둘러보기)이 있다. 나머지 둘은 할 일이 없어 문장만.
                   { key: "upcoming", label: "예약 완료", list: upcomingG, empty: "다가오는 예약이 없어요." },
                   { key: "past", label: "지난 예약", list: pastG, empty: "다녀온 예약이 아직 없어요." },
                   { key: "cancel", label: "취소·환불", list: cancelG, empty: "취소하거나 돌려받은 예약이 없어요." },
@@ -690,7 +694,17 @@ export default async function MyRentPage({
                       })}
                     </div>
                     {cur.list.length === 0 ? (
-                      <p className="mt-5 text-[15px] leading-relaxed break-keep text-mute">{cur.empty}</p>
+                      <p className="mt-5 text-[15px] leading-relaxed break-keep text-mute">
+                        {cur.empty}
+                        {cur.key === "upcoming" && (
+                          <>
+                            {" "}
+                            <Link href="/rent" className="text-body underline underline-offset-2">
+                              빌릴 공간을 둘러보시겠어요?
+                            </Link>
+                          </>
+                        )}
+                      </p>
                     ) : (
                       <ul className="mt-4">
                         {cur.list.map((v) => (

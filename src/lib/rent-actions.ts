@@ -53,7 +53,7 @@ import {
 import { bookingStarted, dateLabel, kstDaysUntil, durationLabel, isTimeMark, minutesBetween, RENT_MIN_MINUTES, toMinutes, todayKst } from "./rent-time";
 import type { Space, SpaceBooking, SpaceUseType, SpaceCategory, OpenSlot, AccessHow, RentProduct, BizCheckStatus, BizCertRead } from "./types";
 import { bookingAmount, compatScopePrice } from "./rent-products";
-import { PRODUCT_LABEL, withJosa } from "./rent-copy";
+import { PRODUCT_LABEL, SPACE_FORM_MSG, slotReversedMsg, slotTooShortMsg } from "./rent-copy";
 
 // 하루 팝업 — 쓰기 서버 액션 (2026-09-13)
 // 스펙 = docs/superpowers/specs/2026-09-13-daily-shop-design.md
@@ -178,9 +178,10 @@ export async function saveSpaceAction(input: SpaceFormInput): Promise<ActionResu
   //   푸는 것이 맞고(식품위생법 제37조④), 그것도 약관이 맡는다.
   // ⭐「사용 유의 사항」은 이 서비스에서 제일 중요한 칸이라 빈칸으로 못 넘어간다.
   if (input.rules.trim().length < 10) {
-    return { ok: false, message: "유의 사항을 열 글자 넘게 담아 주세요. 이 칸이 사장님을 지켜 줘요." };
+    return { ok: false, message: SPACE_FORM_MSG.rules };
   }
-  if (!input.name.trim()) return { ok: false, message: "공간 이름을 적어 주세요." };
+  // ✍️09-27 대표 A9 — 막힘 말은 등록 폼과 한 벌(`SPACE_FORM_MSG`). 화면이 먼저 막고 여기가 관문이라, 같은 칸에서 같은 말을 듣는다.
+  if (!input.name.trim()) return { ok: false, message: SPACE_FORM_MSG.name };
   // 🏠09-19 오후 — 주소는 판매자 정보에 그대로 나가고 사업자등록증의 사업장 주소와 대조하는 값이다. 폼도 막지만 관문은 여기다.
   if (!input.address.trim()) return { ok: false, field: "address", message: "주소를 찾아 주세요." };
   // 🔁09-19 대표 #74 — 화면 라벨이 「공간 타입」이 됐다. 같은 말로.
@@ -188,25 +189,25 @@ export async function saveSpaceAction(input: SpaceFormInput): Promise<ActionResu
   // 🔁09-17 — 매주 계속 여는 요일이 있으면 그걸로 «하루 이상»이 찬다.
   const repeat = Array.isArray(input.repeatWeekly) ? input.repeatWeekly : [];
   if (input.openSlots.length === 0 && repeat.length === 0) {
-    return { ok: false, message: "빌려줄 수 있는 날과 시간을 하나 이상 정해 주세요." };
+    return { ok: false, message: SPACE_FORM_MSG.slots };
   }
   if (input.photos.length === 0) return { ok: false, message: "사진을 한 장 이상 올려 주세요. 사진 없는 공간은 아무도 안 빌려요." };
   // 🛍09-18 상품 셋 — 공간 상품은 하나 이상, 켠 상품은 값과 설명이 있어야 한다. 화면도 막지만 관문은 여기다.
   if (!input.rentSpaceOn && !input.rentFullOn) {
-    return { ok: false, message: `파실 상품을 하나는 켜 주세요. ${PRODUCT_LABEL.space}, ${PRODUCT_LABEL.full} 중에서요.` };
+    return { ok: false, message: SPACE_FORM_MSG.products };
   }
-  for (const [on, price, note, label] of [
-    [input.rentSpaceOn, input.rentSpacePrice, input.rentSpaceNote, PRODUCT_LABEL.space],
-    [input.rentFullOn, input.rentFullPrice, input.rentFullNote, PRODUCT_LABEL.full],
+  for (const [on, price, note, label, noteMsg] of [
+    [input.rentSpaceOn, input.rentSpacePrice, input.rentSpaceNote, PRODUCT_LABEL.space, SPACE_FORM_MSG.note.space],
+    [input.rentFullOn, input.rentFullPrice, input.rentFullNote, PRODUCT_LABEL.full, SPACE_FORM_MSG.note.full],
   ] as const) {
     if (!on) continue;
-    if (!(price > 0)) return { ok: false, message: `${withJosa(label, "은/는")} 한 시간에 얼마인지 적어 주세요.` };
+    if (!(price > 0)) return { ok: false, message: SPACE_FORM_MSG.price };
     // 💰09-18 밤 QA(H-13) — 상한. 전엔 칸(`integer`)을 넘기는 값이 들어가 「저장에 실패했어요」로만 떨어졌다.
     if (!Number.isFinite(price) || price > PRICE_HOUR_MAX) {
-      return { ok: false, message: `${label} 한 시간 값은 ${PRICE_HOUR_MAX.toLocaleString()}원까지 받을 수 있어요.` };
+      return { ok: false, message: `${label} 한 시간 비용은 ${PRICE_HOUR_MAX.toLocaleString()}원까지 받을 수 있어요.` };
     }
     if ((note ?? "").trim().length < 10) {
-      return { ok: false, message: `${label} 설명이 짧아요. 손님이 무엇을 쓰고 할 수 있는지 열 글자 넘게 담아 주세요.` };
+      return { ok: false, message: noteMsg };
     }
   }
   // ⏱🔒09-19 대표 #88 — 최소 대여 시간은 모든 공간 1시간이다. 사장님이 고르던 칸(09-18 밤 H-36 검사)이 없어졌다.
@@ -217,9 +218,9 @@ export async function saveSpaceAction(input: SpaceFormInput): Promise<ActionResu
   //   🔁09-19 대표 #93 — 「무료로 제공할게요」를 고른 커피챗만 0원을 받는다. 무료를 안 골랐는데 0원이면 여전히 막는다(값을 빠뜨린 것).
   const chatFree = input.coffeeChat && input.coffeeChatFree === true;
   if (input.coffeeChat) {
-    if (!chatFree && !(input.coffeeChatPrice > 0)) return { ok: false, message: "커피챗을 켜셨으면 얼마인지 적어 주세요. 무료로 하시려면 「무료로 제공할게요」를 눌러 주세요." };
+    if (!chatFree && !(input.coffeeChatPrice > 0)) return { ok: false, message: SPACE_FORM_MSG.chatPrice };
     if (input.coffeeChatPrice > COFFEE_CHAT_PRICE_MAX) {
-      return { ok: false, message: `커피챗 값은 ${COFFEE_CHAT_PRICE_MAX.toLocaleString()}원까지 받을 수 있어요.` };
+      return { ok: false, message: `커피챗 비용은 ${COFFEE_CHAT_PRICE_MAX.toLocaleString()}원까지 받을 수 있어요.` };
     }
     const cm = input.coffeeChatMinutes;
     if (!Number.isInteger(cm) || cm < COFFEE_CHAT_MINUTES_MIN || cm > COFFEE_CHAT_MINUTES_MAX || cm % COFFEE_CHAT_MINUTES_STEP !== 0) {
@@ -237,12 +238,12 @@ export async function saveSpaceAction(input: SpaceFormInput): Promise<ActionResu
   //   청약 전에 소비자에게 제공해야 하고, 안 하면 제20조의2②로 **우리가 연대 책임**을 진다.
   if (!input.contactPhone.trim()) {
     // 🔁09-17 QA — 「법에 따라」가 위협조로 읽혔다. 근거는 위 주석에 두고 사장님께는 쓰임만 말한다.
-    return { ok: false, message: "매장 전화번호가 비어 있어요. 손님이 신청하기 전에 보는 번호예요." };
+    return { ok: false, message: SPACE_FORM_MSG.phoneEmpty };
   }
   // ✂️09-18 밤 QA(SEC-07) — 전화번호 모양과 길이. 전엔 아무 글이나 들어가 상세 화면의 전화 걸기 링크가 엉뚱한 번호가 됐다.
   //   화면(`SpaceForm`)도 같은 함수로 먼저 막아 그 칸 밑에 말한다.
   if (input.contactPhone.trim().length > CONTACT_PHONE_MAX || !storePhoneOk(input.contactPhone)) {
-    return { ok: false, message: "매장 전화번호를 다시 봐 주세요. 예) 02-1234-5678" };
+    return { ok: false, message: SPACE_FORM_MSG.phoneBad };
   }
   // 📜호스트 약관 동의. 없으면 수수료·정산·구상을 나중에 주장할 근거가 없다.
   if (!input.hostTermsOk) {
@@ -259,10 +260,8 @@ export async function saveSpaceAction(input: SpaceFormInput): Promise<ActionResu
       return { ok: false, message: `${dateLabel(sl.date)}의 시각을 알아보지 못했어요. 시작과 끝 시각을 다시 골라 주세요.` };
     }
     const m = minutesBetween(sl.start, sl.end);
-    if (m <= 0) return { ok: false, message: `${dateLabel(sl.date)}의 시간이 거꾸로예요. 끝나는 시각이 더 늦어야 해요.` };
-    if (m < minMinutes) {
-      return { ok: false, message: `${dateLabel(sl.date)}은 ${durationLabel(m)}만 열려 있어서 최소 ${minLabel}을 못 채워요.` };
-    }
+    if (m <= 0) return { ok: false, message: slotReversedMsg(dateLabel(sl.date)) };
+    if (m < minMinutes) return { ok: false, message: slotTooShortMsg(dateLabel(sl.date), minLabel) };
   }
 
   // 🔁요일 규칙 검사(09-17). 화면이 막아도 여기서 다시 본다 — 깨진 규칙 하나가 12주치 날짜를 만든다.
@@ -276,8 +275,8 @@ export async function saveSpaceAction(input: SpaceFormInput): Promise<ActionResu
       return { ok: false, message: `${dayName} 여는 시각이 비어 있어요.` };
     }
     const m = minutesBetween(r.start, r.end);
-    if (m <= 0) return { ok: false, message: `${dayName}의 시간이 거꾸로예요. 끝나는 시각이 더 늦어야 해요.` };
-    if (m < minMinutes) return { ok: false, message: `${dayName}은 ${durationLabel(m)}만 열려 있어서 최소 ${minLabel}을 못 채워요.` };
+    if (m <= 0) return { ok: false, message: slotReversedMsg(dayName) };
+    if (m < minMinutes) return { ok: false, message: slotTooShortMsg(dayName, minLabel) };
     if (r.skip !== undefined && (!Array.isArray(r.skip) || r.skip.length > 200 || r.skip.some((d) => !/^\d{4}-\d{2}-\d{2}$/.test(d)))) {
       return { ok: false, message: `${dayName} 쉬는 날 목록이 깨져 있어요. 새로고침하고 한 번 더 올려 주세요.` };
     }
@@ -766,7 +765,7 @@ export async function startBookingAction(input: BookingFormInput): Promise<Start
   const sp = await getSpaceFull(input.spaceSlug);
   if (!sp || sp.status !== "open") return { ok: false, message: "지금은 신청할 수 없는 공간이에요." };
   if (sp.ownerUserId === uid) return { ok: false, message: "내 공간은 내가 빌릴 수 없어요." };
-  if (input.plan.trim().length < 10) return { ok: false, message: "그날 무엇을 하실지 열 글자 이상 적어 주세요." };
+  if (input.plan.trim().length < 10) return { ok: false, message: "그날 무엇을 하실지 10자 이상 적어 주세요." };
   // ✂️09-18 밤 QA(SEC-07) — 상한. 화면 칸도 같은 숫자로 막는다(`PLAN_MAX`). 이 글은 사장님 메일·요청 카드로 그대로 간다.
   if (input.plan.trim().length > PLAN_MAX) {
     return { ok: false, message: `그날 무엇을 하실지 ${PLAN_MAX.toLocaleString()}자 안으로 줄여 주세요.` };
@@ -1166,7 +1165,7 @@ export async function cancelBookingAction(bookingId: number, quotedRefund?: numb
       return { ok: false, message: "그 사이 예약 상태가 바뀌었어요. 내 예약에서 한 번 더 봐 주세요." };
     }
     const r = await cancelPayment(
-      pay.paymentKey || b.paymentKey, "게스트 취소",
+      pay.paymentKey || b.paymentKey, "손님 취소",
       refund >= pay.balanceAmount ? undefined : refund, pay.balanceAmount,
     );
     // 🩸09-16까지 이 결과를 안 봤다. 토스 환불이 실패해도 상태는 「취소」가 됐고 손님에겐

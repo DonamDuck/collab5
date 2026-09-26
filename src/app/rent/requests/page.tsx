@@ -6,14 +6,16 @@ import { groupGuestBookings } from "@/lib/rent-groups";
 import { GuestBookingRow, loadGuestBookings, type GuestBookingView } from "../GuestBookingRow";
 import { primaryBtnCls } from "../ui";
 import { KAKAO_CHAT_URL } from "@/lib/site";
+import { HashFocus } from "./HashFocus";
 
 // 하루 팝업 — 손님이 보낸 신청만 모아 보는 화면 (2026-09-16 · 백로그 B81)
 //
 // 🩸전엔 손님이 자기 신청을 보려면 `/rent/my`로 갔다. 거기는 사장님 화면이라 내가 올린 공간과 받은 신청
 //   두 덩이를 지나야 자기 것이 나왔다. 대표: *「신청 내역 정리 페이지 만들어서 그쪽으로 보내자」*.
 // ⭐줄은 `/rent/my`와 **같은 한 벌**(`../GuestBookingRow`)을 쓴다. 이 화면이 새로 정하는 건 순서와 나눔뿐이다.
-// 🗂나눔의 판정도 `/rent/my` 빌린 공간 칸과 한 벌이다(`lib/rent-groups`, 09-18 밤 QA SC-14). 그쪽 «예약 완료»가 여기 「앞으로 갈 곳」이고,
-//   나머지(지난 예약·취소·환불)를 「지난 신청」으로 묶는다.
+// 🗂나눔의 판정도 `/rent/my` 빌린 공간 칸과 한 벌이다(`lib/rent-groups`, 09-18 밤 QA SC-14). 그쪽 «예약 완료»가 여기도 「예약 완료」이고,
+//   나머지(지난 예약·취소·환불)를 「지난 예약」으로 묶는다. (🔁09-27 대표 B5 — 「앞으로 갈 곳」·「지난 신청」에서 이름을 바꿨다.)
+// 🔗09-27 대표 D2 — 메뉴 바·마이페이지의 「내 예약」이 여기로 온다. 완료 화면에서 오면 `#b-<예약번호>`로 그 줄을 짚는다(`HashFocus`).
 //   🩸전엔 여기서 따로 적어서, 이용 시각이 이미 시작된 결제 전 신청이 이 화면엔 「앞으로 갈 곳」, `/rent/my`엔 「취소·환불」로 섰다.
 export const dynamic = "force-dynamic";
 
@@ -80,23 +82,26 @@ export default async function RentRequestsPage() {
         </p>
       </header>
 
+      <HashFocus />
+      {/* ✍️09-27 대표 B5·B6 — 절 이름을 「예약 완료」·「지난 예약」으로(`/rent/my` 빌린 공간 칸의 칩과 같은 이름),
+          빈 줄은 「예약」으로 부르고 둘러보러 가는 링크는 「공간 둘러보기」 한 이름으로. */}
       {all.length === 0 ? (
         // 한 건도 없을 땐 절을 세우지 않는다. 빈 제목 둘이 서면 비어 있다는 말을 두 번 하게 된다.
         <p className="mt-8 text-[15px] leading-relaxed break-keep text-faint">
-          아직 신청하신 곳이 없어요.{" "}
+          아직 신청하신 예약이 없어요.{" "}
           <Link href="/rent" className="underline underline-offset-2">
-            빌릴 곳 둘러보기
+            공간 둘러보기
           </Link>
         </p>
       ) : (
         <>
           <section className="mt-12">
-            <h2 className={h2Cls}>앞으로 갈 곳</h2>
+            <h2 className={h2Cls}>예약 완료</h2>
             {upcoming.length === 0 ? (
               <p className="mt-5 text-[15px] leading-relaxed break-keep text-faint">
-                잡아 둔 날이 지금은 없네요.{" "}
+                다가오는 예약이 없어요.{" "}
                 <Link href="/rent" className="underline underline-offset-2">
-                  다음에 쓸 곳 찾아보기
+                  공간 둘러보기
                 </Link>
               </p>
             ) : (
@@ -108,10 +113,10 @@ export default async function RentRequestsPage() {
             )}
           </section>
 
-          {/* 지난 신청이 없으면 절째로 안 그린다. 처음 신청한 분에게 빈 「지난 신청」은 알려 주는 게 없다. */}
+          {/* 지난 예약이 없으면 절째로 안 그린다. 처음 신청한 분에게 빈 「지난 예약」은 알려 주는 게 없다. */}
           {past.length > 0 && (
             <section className="mt-12">
-              <h2 className={h2Cls}>지난 신청</h2>
+              <h2 className={h2Cls}>지난 예약</h2>
               {pastKept.length > 0 && (
                 <ul className="mt-5">
                   {pastKept.map((v) => (
@@ -122,7 +127,9 @@ export default async function RentRequestsPage() {
               {/* 🗂09-17 QA — 결제창만 열었다 닫은 흔적(expired)이 16줄 쌓여 진짜 지난 예약이 묻혔다.
                   기본은 접고 건수만 말한다. 다시 열 길이 없는 줄이라 펼쳐 볼 일은 드물다. */}
               {expired.length > 0 && (
-                <details className="mt-5">
+                // 🔗09-27 D2 — 주소가 `#b-<번호>`로 이 안의 줄을 짚으면 크롬이 React보다 먼저 접힌 칸을 연다(조각 이동 때 details 자동 펼침).
+                //   그러면 서버 HTML과 `open` 한 칸이 달라 하이드레이션 경고가 뜬다. 해가 없는 차이라 이 요소만 경고를 끈다.
+                <details className="mt-5" suppressHydrationWarning>
                   <summary className="cursor-pointer py-[12px] text-[15px] text-mute underline underline-offset-2">
                     결제 안 한 신청 {expired.length}건
                   </summary>
