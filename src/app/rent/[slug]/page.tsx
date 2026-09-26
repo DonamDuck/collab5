@@ -381,7 +381,7 @@ export default async function SpaceDetailPage({
               ))}
             </div>
             <p className="mt-3 text-[15px] text-mute">
-              {products.length > 1 ? "신청할 때 둘 중 하나를 골라요. " : ""}최소 {durationLabel(RENT_MIN_MINUTES)}부터 빌릴 수 있어요.
+              {products.length > 1 ? "신청할 때 둘 중 하나를 고르시면 돼요. " : ""}최소 {durationLabel(RENT_MIN_MINUTES)}부터 빌릴 수 있어요.
             </p>
             {sp.coffeeChat && sp.coffeeChatMinutes > 0 && (
               // 🔁09-18 밤 QA(G-17) — 「어느 쪽에든」은 상품이 둘일 때만 맞는 말이다. 하나뿐인 공간에선 고를 쪽이 없다.
@@ -529,14 +529,15 @@ export default async function SpaceDetailPage({
               사장님이 거절하시면 <span className="font-medium text-ink">전액</span> 돌려드려요.
             </p>
             {/* 🆕09-19 오후 대표 — *「수락 전 취소는 당연히 전액 취소」*. 수락 뒤 한 시간 창과 같은 전액이라 한 문단에 둔다.
+                🔁09-27 대표 A3 — 손님이 읽는 자리라 「수락」을 「확정」으로(사장님 버튼 이름만 «수락»).
                 숫자는 `guestCancelRefundPercent`의 두 갈래(`CancelStage`) 그대로다. */}
             <p className="mt-3 text-[16px] leading-relaxed break-keep text-body">
-              사장님이 <span className="font-medium text-ink">수락하시기 전</span>에 취소하셔도 전액이에요. 수락하신 뒤에도{" "}
+              사장님이 <span className="font-medium text-ink">확정하시기 전</span>에 취소하셔도 전액이에요. 확정하신 뒤에도{" "}
               <span className="font-medium text-ink">한 시간 안</span>이면 남은 날과 상관없이 전액 돌려드려요.
             </p>
             {/* ✍️09-17 QA — 「남은 기간으로 정해져요」 피동·행정어. 경계가 날짜 기준이라는 것도 같이 말한다(`kstDaysUntil`). */}
             <p className="mt-3 text-[16px] leading-relaxed break-keep text-mute">
-              수락하고 한 시간이 지나면 이용일까지 며칠 남았는지에 따라 달라져요. 몇 시에 취소하든 달력 날짜로 세요.
+              확정하고 한 시간이 지나면 이용일까지 며칠 남았는지에 따라 달라져요. 몇 시에 취소하든 달력 날짜로 세요.
             </p>
             <dl className="mt-3 space-y-2 text-[16px]">
               {[

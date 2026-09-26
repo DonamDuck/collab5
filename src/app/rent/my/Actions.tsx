@@ -109,7 +109,7 @@ export function HostDecide({
       </div>
       <ConfirmDialog
         open={confirmReject}
-        title="이 요청을 거절할까요"
+        title="이 요청을 거절할까요?"
         confirmLabel="거절하기"
         busy={pending}
         onConfirm={() => run(false)}
@@ -158,11 +158,12 @@ export function HostDecide({
 /** 취소 팝업의 이유 한 줄. 전액이면 «왜 전액인지», 깎이면 «며칠 남아서인지», 0원이면 당일이라서.
  *  🆕09-19 오후 대표 — 수락 전 취소는 전액이다. 이유도 날짜보다 그게 먼저라 첫 갈래로 둔다. */
 function cancelReason(q: { refund: number; rate: number; daysBefore: number; beforeAccept: boolean; grace: boolean }): string {
-  if (q.beforeAccept && q.rate >= 1) return "사장님이 아직 수락하기 전이라 전액 돌아와요.";
+  // 🔁09-27 대표 A5 — 손님이 읽는 팝업이라 「수락」을 「확정」으로(사장님 버튼 이름만 «수락»).
+  if (q.beforeAccept && q.rate >= 1) return "사장님이 아직 확정하기 전이라 전액 돌아와요.";
   if (q.refund === 0) return "당일 취소라 돌려드릴 수 없어요.";
   if (q.rate >= 1) {
     return q.grace
-      ? "사장님이 수락하신 지 한 시간이 안 지나서 전액 돌아와요."
+      ? "사장님이 확정하신 지 한 시간이 안 지나서 전액 돌아와요."
       : `이용일까지 ${q.daysBefore}일 남아 전액 돌아와요.`;
   }
   // ✍️09-18 밤 QA(G-26) — 바로 위 두 줄은 「돌아와요」(손님에게 오는 돈)인데 이 줄만 「돌아가요」였다.
@@ -349,7 +350,7 @@ export function RefundRequest({ bookingId }: { bookingId: number }) {
       )}
       <ConfirmDialog
         open={open}
-        title="관리자에게 환불을 신청할까요"
+        title="관리자에게 환불을 신청할까요?"
         confirmLabel="신청하기"
         busy={pending}
         onConfirm={run}

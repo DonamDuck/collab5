@@ -140,6 +140,8 @@ export function GuestBookingRow({ view }: { view: GuestBookingView }) {
   return (
     <ListRow
       card
+      // 🔗09-27 대표 D2 — 완료 화면의 「내 예약 보기」가 `/rent/requests#b-<번호>`로 이 줄을 짚는다(`requests/HashFocus`).
+      id={`b-${b.id}`}
       head={
         // 🖼09-18 대표 코멘트 — 「가독성이 좀 떨어지고, 작은 정방형 이미지도 1장」. 한 줄에 여섯 토막이던 메타를
         //   **언제 / 무엇을·어디서 / 얼마** 세 줄로 나누고, 왼쪽에 공간 첫 사진(정사각 64)을 둔다.

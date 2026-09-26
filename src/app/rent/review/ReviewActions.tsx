@@ -110,7 +110,7 @@ export function ReviewActions({
 
       <ConfirmDialog
         open={open}
-        title={`${spaceName}, 무엇을 고쳐 주시면 될까요`}
+        title={`${spaceName}, 무엇을 고쳐 주시면 될까요?`}
         confirmLabel="보완 요청하기"
         busy={pending}
         error={dialogErr}
