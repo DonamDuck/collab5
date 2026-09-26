@@ -15,7 +15,8 @@
 import { rentMockOn } from "./rent-mock";
 import type { AdminNotice } from "./admin-notify";
 import { notifyAdmin } from "./admin-notify";
-import type { AdminDailySummary, RemindRun } from "./rent-admin-daily";
+import type { AdminDailySummary, DailyRuns, RemindRun } from "./rent-admin-daily";
+import type { LedgerKind, LedgerMismatch, LedgerRun } from "./rent-ledger";
 import { KAKAO_CHAT_URL, SITE_URL } from "./site";
 import { bookingWhen, dateLabel } from "./rent-time";
 import {
@@ -101,6 +102,8 @@ const LABEL = {
   dailyReview: "검토 대기",
   dailyUse: "이용 예약",
   dailyRemind: "리마인드",
+  // ↓ 09-27 D6 장부 대조 한 줄.
+  dailyLedger: "장부 대조",
   // ↓ 대표 슬랙 거래 알림에만 쓴다(09-19 오후). 사람을 가리키는 칸은 회원 번호뿐이다(`buildDealNotice`).
   dealBooking: "예약 번호",
   dealOrder: "주문번호",
@@ -1138,6 +1141,74 @@ function remindLine(r: RemindRun | null): string {
   return `${r.sent}통 보냈어요.${r.failed > 0 ? ` ${r.failed}통은 실패했어요.` : ""}${held}`;
 }
 
+/** 🆕09-27 D6 장부 대조 한 줄. 이번에 안 돌렸으면(`undefined`) 빈 값이라 줄이 안 선다.
+ *  ⭐못 셌으면 0이라고 하지 않는다. 일부를 못 봤으면 그 수를 같이 말한다. */
+function ledgerLine(run: LedgerRun | null | undefined): string {
+  if (run === undefined) return "";
+  if (run === null) return "대조가 도중에 멈췄어요. Vercel 로그에서 rent-ledger를 봐 주세요.";
+  if (!run.ok) {
+    return run.reason === "no-key" ? "토스 키가 없어 대조하지 않았어요."
+      : run.reason === "db" ? "우리 장부를 못 읽어 못 셌어요."
+        : "토스 거래 내역을 못 불러와 못 셌어요.";
+  }
+  const head = run.mismatches.length === 0
+    ? `어긋남 없음(${run.checked}건 확인)`
+    : `어긋남 ${run.mismatches.length}건(${run.checked}건 확인)\n한 건씩 슬랙에 따로 적어 두었어요. 자동으로 고치지는 않았어요.`;
+  return [
+    head,
+    run.unchecked > 0 ? `토스가 답을 안 줘 ${run.unchecked}건은 못 봤어요.` : "",
+    run.truncated ? "거래가 많아 앞쪽만 봤어요." : "",
+    run.outside > 0 ? `하루 팝업 밖 결제 ${run.outside}건은 대조하지 않았어요.` : "",
+  ].filter(Boolean).join("\n");
+}
+
+/** 어긋남 갈래의 이름. 슬랙 칸 이름으로 쓴다(값 칸에 주문·금액이 붙는다). */
+const LEDGER_KIND: Record<LedgerKind, string> = {
+  "missing": "토스엔 승인, 우리 장부엔 주문이 없음",
+  "not-recorded": "토스엔 승인, 우리는 대기·실패",
+  "ours-only": "우리는 승인, 토스엔 승인이 없음",
+  "amount": "결제 금액이 다름",
+  "refund-unrecorded": "토스엔 환불됐는데 우리 장부엔 안 적힘",
+  "balance-left": "우리는 환불로 적었는데 토스엔 돈이 남음",
+  "closed-money-left": "예약은 끝났는데 돈이 그대로 남음",
+  "other-attempt": "같은 주문에 다른 결제가 살아 있음",
+  "toss-missing": "우리 장부의 결제를 토스가 모름",
+};
+
+const PAY_STATUS_KO: Record<string, string> = {
+  READY: "결제 전", IN_PROGRESS: "인증만", WAITING_FOR_DEPOSIT: "입금 대기", DONE: "승인",
+  CANCELED: "환불", PARTIAL_CANCELED: "부분 환불", ABORTED: "실패", EXPIRED: "만료",
+};
+
+function ledgerValue(m: LedgerMismatch): string {
+  const side = (label: string, st: string, total: number, balance: number) =>
+    `${label} ${PAY_STATUS_KO[st] ?? st} ${won(total)} · 남은 ${won(balance)}`;
+  return [
+    `주문 ${m.orderId}`,
+    `예약 ${m.bookingId ?? "없음"} · 손님 회원 ${m.guestUserId ?? "-"} · 사장님 회원 ${m.hostUserId ?? "-"}`,
+    m.ours ? side("우리", m.ours.status, m.ours.amount, m.ours.balance) + (m.ours.booking ? ` (예약 ${m.ours.booking})` : "") : "우리 장부에 없음",
+    m.toss ? side("토스", m.toss.status, m.toss.total, m.toss.balance) : "토스에 없음",
+  ].join("\n");
+}
+
+/** ⑮ 장부 대조 어긋남 → 대표 슬랙 (09-27, 대표 결정 D6). 어긋남이 있을 때만 간다.
+ *  🔒거래 알림과 같은 규칙 — 주문·예약 번호·금액·회원 번호만, 이름·연락처는 싣지 않는다. 슬랙에만 간다.
+ *  슬랙 칸 수가 많아지면 읽기 어려워서 앞의 12건만 싣고 나머지는 수만 말한다(전부는 Vercel 로그 `rent-ledger`에 있다). */
+export function buildLedgerNotice(run: Extract<LedgerRun, { ok: true }>): AdminNotice {
+  const shown = run.mismatches.slice(0, 12);
+  const rest = run.mismatches.length - shown.length;
+  const rows: [string, string][] = shown.map((m) => [LEDGER_KIND[m.kind], ledgerValue(m)]);
+  if (rest > 0) rows.push(["그 밖에", `${rest}건 더 있어요. Vercel 로그의 rent-ledger에 전부 있어요.`]);
+  return {
+    title: `장부 대조 · 토스와 어긋난 결제 ${run.mismatches.length}건`,
+    lead: `${dateLabel(run.day)} 토스 거래와 우리 장부를 맞대 봤더니 어긋난 결제가 있어요. 자동으로 고치지는 않았어요. 토스 관리자 화면과 정산 화면에서 한 건씩 봐 주세요.`,
+    rows,
+    link: { href: `${SITE_URL}/rent/payouts`, label: "정산 화면 열기" },
+    note: "거래 알림은 슬랙에만 와요. 이름과 연락처는 싣지 않아요.",
+    slackOnly: true,
+  };
+}
+
 /** 어제 돈이 돌아간 일 한 칸 — 건수가 있는 갈래만 한 줄씩. 다 0이면 「없었어요」. */
 function moneyBackLine(m: AdminDailySummary["moneyBack"]): string {
   const refundOf = (r: number) => (r > 0 ? `환불 ${won(r)}` : "환불 없음");
@@ -1155,10 +1226,13 @@ function moneyBackLine(m: AdminDailySummary["moneyBack"]): string {
  *  @param s 못 셌으면 null(DB 읽기 실패). 그땐 0이라고 하지 않고 못 셌다고 말한다.
  *  @param now 「결제한 지 N시간」을 셀 기준. 미리보기가 고정값을 넘긴다. */
 export function buildAdminDaily(
-  s: AdminDailySummary | null, today: string, remind: RemindRun | null, now = Date.now(),
+  s: AdminDailySummary | null, today: string, remind: RemindRun | null, now = Date.now(), runs: DailyRuns = {},
 ): AdminNotice {
   const subject = `[collab5] ${subjectDate(today)} 하루 팝업 아침 요약`;
   const todo: string[] = [];
+  // 🆕09-27 D6 — 토스와 우리 장부가 어긋난 결제가 있으면 할 일 맨 앞에 선다.
+  const ledgerOff = runs.ledger?.ok ? runs.ledger.mismatches.length : 0;
+  if (ledgerOff > 0) todo.push(`장부 어긋남 ${ledgerOff}건`);
   if (s?.waiting.count) todo.push(`수락을 기다리는 요청 ${s.waiting.count}건`);
   if (s?.refundRequests) todo.push(`환불 신청 ${s.refundRequests}건`);
   if (s?.reviewPending) todo.push(`검토 대기 공간 ${s.reviewPending}곳`);
@@ -1186,8 +1260,9 @@ export function buildAdminDaily(
         : "없어요"],
       [LABEL.dailyUse, `오늘 ${s.useToday}건 · 내일 ${s.useTomorrow}건`],
       [LABEL.dailyRemind, remindLine(remind)],
+      [LABEL.dailyLedger, ledgerLine(runs.ledger)],
     ]
-    : [[LABEL.dailyRemind, remindLine(remind)]];
+    : [[LABEL.dailyRemind, remindLine(remind)], [LABEL.dailyLedger, ledgerLine(runs.ledger)]];
   const go = { href: `${SITE_URL}/rent/payouts`, label: "정산 화면 열기" };
   const tail = "매일 아침 9시 리마인드가 끝나면 와요. 숫자가 다 0이어도 와요. 안 온 날은 크론이 멈춘 거예요.";
   return {

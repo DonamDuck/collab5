@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { runRentRemind } from "@/lib/rent-remind";
 import { sendAdminDaily, type RemindRun } from "@/lib/rent-admin-daily";
+import { reconcileLedger, sendLedgerAlert, type LedgerRun } from "@/lib/rent-ledger";
+import { addDaysIso, todayKst } from "@/lib/rent-time";
 
 // GET /api/cron/rent-remind — 하루 팝업 이용 전날 리마인드 (2026-09-17)
 //
@@ -28,6 +30,19 @@ export async function GET(req: Request) {
   } catch (e) {
     console.error("[cron/rent-remind] 리마인드 실패 — 요약만 보낸다", e);
   }
-  const daily = await sendAdminDaily(remind);
-  return NextResponse.json({ ...(remind ?? { remind: "failed" }), daily: daily.channel, counted: daily.counted });
+  // 📒09-27 D6 — 전날(KST) 토스 거래와 우리 장부를 맞대 본다. 알려 주기만 하고 고치지 않는다(`rent-ledger.ts`).
+  //   어긋남이 있으면 슬랙 거래 알림 한 통, 결과는 아침 요약에 한 줄. 도중에 던지면 요약에 「멈췄어요」로 선다(null).
+  const today = todayKst();
+  let ledger: LedgerRun | null = null;
+  try {
+    ledger = await reconcileLedger(addDaysIso(today, -1));
+    await sendLedgerAlert(ledger);
+  } catch (e) {
+    console.error("[cron/rent-remind] 장부 대조 실패 — 요약엔 멈췄다고 적는다", e);
+  }
+  const daily = await sendAdminDaily(remind, today, { ledger });
+  return NextResponse.json({
+    ...(remind ?? { remind: "failed" }), daily: daily.channel, counted: daily.counted,
+    ledger: !ledger ? "failed" : ledger.ok ? { checked: ledger.checked, mismatches: ledger.mismatches.length, unchecked: ledger.unchecked } : { skipped: ledger.reason },
+  });
 }

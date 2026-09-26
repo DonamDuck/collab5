@@ -176,9 +176,10 @@ export async function approvePayment(
   return failed ? { ok: false, ...failed } : { ok: false, message: "결제 서버에 닿지 못했어요. 잠시 뒤 다시 시도해 주세요." };
 }
 
-/** 승인 대기 시간(토스 권장 하한) · 되묻기 한 번의 대기 시간. */
+/** 승인 대기 시간(토스 권장 하한) · 되묻기 한 번 · 거래 조회 한 쪽의 대기 시간(토스 권장 하한). */
 const CONFIRM_TIMEOUT_MS = 60_000;
 export const LOOKUP_TIMEOUT_MS = 10_000;
+const TRANSACTIONS_TIMEOUT_MS = 60_000;
 
 /** 토스 결제 객체처럼 생겼나 — 상태 글자가 있는 객체. 승인·되묻기·대조가 같은 문턱을 쓴다. */
 function isPaymentShape(v: unknown): v is TossPayment {
@@ -240,6 +241,58 @@ export async function lookupPaymentByOrderId(orderId: string, timeoutMs = LOOKUP
 /** 🔁결제 키로 결제 조회 — `GET /v1/payments/{paymentKey}`. 아침 장부 대조가 «지금» 토스 장부를 읽는 길이다. */
 export async function lookupPayment(paymentKey: string, timeoutMs = LOOKUP_TIMEOUT_MS): Promise<LookupResult> {
   return lookup(`/v1/payments/${encodeURIComponent(paymentKey)}`, timeoutMs, (p) => !p.paymentKey || p.paymentKey === paymentKey);
+}
+
+/** 토스 거래 한 줄(Transaction 객체). 승인 한 번·취소 한 번이 각각 한 줄이다(같은 `paymentKey`, 다른 `transactionKey`). */
+export interface TossTransaction {
+  transactionKey: string;
+  paymentKey: string;
+  orderId: string;
+  /** 그 거래의 상태 — 승인 줄은 `DONE`, 취소 줄은 `CANCELED`·`PARTIAL_CANCELED`(토스 블로그 예시 09-27 확인). */
+  status: string;
+  /** `yyyy-MM-dd'T'HH:mm:ss±hh:mm` */
+  transactionAt: string;
+  /** 그 거래의 금액 — 취소 줄이면 취소한 금액. */
+  amount: number;
+}
+
+/** 📒거래 조회 — `GET /v1/transactions?startDate&endDate&startingAfter&limit` (토스 문서 09-27 확인).
+ *  · 날짜는 `yyyy-MM-dd'T'hh:mm:ss`이고 시간대는 문서에 없다. 그래서 호출부가 앞뒤로 넉넉히 잡고 `transactionAt`으로 다시 거른다.
+ *  · 한 번에 최대 5000줄, 넘으면 마지막 `transactionKey`를 `startingAfter`로 넘겨 잇는다. 한 쪽 조회가 최대 60초라 제한 시간도 60초.
+ *  · 쪽 수에 상한을 둔다(`maxPages`). 넘으면 `truncated`로 알린다 — 다 본 척하지 않는다. */
+export async function listTransactions(
+  startDate: string, endDate: string, opts: { limit?: number; maxPages?: number; timeoutMs?: number } = {},
+): Promise<{ ok: true; rows: TossTransaction[]; truncated: boolean } | { ok: false; reason: string }> {
+  if (!paymentsLive()) return { ok: false, reason: "no-key" };
+  const limit = opts.limit ?? 1000;
+  const maxPages = opts.maxPages ?? 20;
+  const rows: TossTransaction[] = [];
+  let after = "";
+  for (let page = 0; page < maxPages; page++) {
+    const q = new URLSearchParams({ startDate, endDate, limit: String(limit) });
+    if (after) q.set("startingAfter", after);
+    const r = await tossGet(`/v1/transactions?${q.toString()}`, opts.timeoutMs ?? TRANSACTIONS_TIMEOUT_MS);
+    if ("error" in r) return { ok: false, reason: r.error };
+    if (r.status !== 200 || !Array.isArray(r.body)) {
+      const code = (r.body as { code?: unknown } | null)?.code;
+      return { ok: false, reason: `HTTP ${r.status}${typeof code === "string" ? ` ${code}` : ""}` };
+    }
+    for (const x of r.body as Record<string, unknown>[]) {
+      if (!x || typeof x !== "object") continue;
+      rows.push({
+        transactionKey: typeof x.transactionKey === "string" ? x.transactionKey : "",
+        paymentKey: typeof x.paymentKey === "string" ? x.paymentKey : "",
+        orderId: typeof x.orderId === "string" ? x.orderId : "",
+        status: typeof x.status === "string" ? x.status : "",
+        transactionAt: typeof x.transactionAt === "string" ? x.transactionAt : "",
+        amount: typeof x.amount === "number" ? x.amount : Number(x.amount ?? 0) || 0,
+      });
+    }
+    const last = (r.body as Record<string, unknown>[]).at(-1);
+    if (r.body.length < limit || !last || typeof last.transactionKey !== "string") return { ok: true, rows, truncated: false };
+    after = last.transactionKey;
+  }
+  return { ok: true, rows, truncated: true };
 }
 
 export interface CancelResult {
