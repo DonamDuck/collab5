@@ -46,7 +46,7 @@ export function RefundDecision({ bookingId, amount }: { bookingId: number; amoun
       {msg && <p className="mt-2 text-[15px] leading-relaxed break-keep text-mute">{msg}</p>}
       <ConfirmDialog
         open={open}
-        title="환불을 승인할까요"
+        title="환불을 승인할까요?"
         confirmLabel="승인하고 환불"
         busy={pending}
         onConfirm={() => run(true)}
@@ -58,7 +58,7 @@ export function RefundDecision({ bookingId, amount }: { bookingId: number; amoun
       </ConfirmDialog>
       <ConfirmDialog
         open={closeOpen}
-        title="환불 신청을 닫을까요"
+        title="환불 신청을 닫을까요?"
         confirmLabel="신청 닫기"
         cancelLabel="그냥 둘게요"
         busy={pending}
