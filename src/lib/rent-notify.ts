@@ -1033,6 +1033,62 @@ export async function notifyDeal(kind: DealKind, booking: SpaceBooking, space: S
   return notifyAdmin(buildDealNotice(kind, booking, space, refund));
 }
 
+/** 🆕09-27 D4 — 정리 작업이 결제 시간이 지난 신청을 닫기 전에 토스에 되물어 본 결과 중 대표가 알아야 할 셋(`rent-recover.ts`).
+ *  · `refunded` 승인 응답이 끊겨 돈만 나간 결제를 찾아 전액 돌려줬다
+ *  · `refund-failed` 찾았는데 환불이 실패했다(예약은 `rejected`, 손이 필요한 예약)
+ *  · `gave-up` 하루 동안 토스가 답을 안 줘서 더 묻지 않고 신청을 닫았다 */
+export type RecoverKind = "refunded" | "refund-failed" | "gave-up";
+
+/** 알림에 싣는 사실. 예약·공간을 못 읽었으면 빈 칸으로 두고 주문번호로 찾는다. */
+export interface RecoverFacts {
+  orderId: string;
+  bookingId: number;
+  /** 결제 줄에 적힌 금액(손님이 낸 돈, 또는 내려던 돈). */
+  paid: number;
+  /** 실제로 돌려준 금액(토스에 보낸 잔액 그대로). */
+  refund: number;
+  useDate?: string;
+  startTime?: string;
+  endTime?: string;
+  guestUserId?: number;
+  space: { id: number; name: string; ownerUserId: number } | null;
+  /** 토스가 답을 못 준 까닭(오류 글자). 그만 물었을 때만 싣는다. */
+  why?: string;
+}
+
+/** ⑬ 결제 되묻기 알림 → 대표 슬랙 (09-27, 대표 결정 D4).
+ *  거래 알림(`buildDealNotice`)과 같은 규칙이다. 🔒사람은 회원 번호로만 가리키고 이름·연락처는 싣지 않는다. 📮슬랙에만 간다. */
+export function buildRecoverNotice(kind: RecoverKind, f: RecoverFacts): AdminNotice {
+  const [title, lead] =
+    kind === "refunded"
+      ? [`끊긴 결제를 찾아 자동 환불했어요 · ${won(f.refund)}`, "손님이 결제를 마쳤는데 승인 응답이 우리 서버에 닿지 않아 예약이 안 생겼어요. 정리 작업이 토스에 되물어 찾아냈고, 결제한 돈을 전액 돌려드렸어요."]
+      : kind === "refund-failed"
+        ? [`손님 돈이 붙잡혀 있어요 · ${won(f.paid)}`, "승인 응답이 끊겨 예약이 안 생긴 결제를 찾았는데 돌려드리는 환불이 실패했어요. 토스 관리자 화면에서 직접 환불해 주세요. 정산 화면의 손이 필요한 예약에도 떠 있어요."]
+        : ["토스에 결제를 확인하지 못한 채 신청을 닫았어요", "결제 승인이 실패로 남은 신청을 하루 동안 토스에 되물었는데 답을 받지 못했어요. 돈이 빠져나갔는지 토스 관리자 화면에서 이 주문번호로 찾아봐 주세요."];
+  const rows: [string, string][] = [
+    [LABEL.dealBooking, String(f.bookingId)],
+    [LABEL.dealOrder, f.orderId],
+    [LABEL.dealPaid, won(f.paid)],
+    [LABEL.dealRefund, kind === "refunded" ? won(f.refund) : kind === "refund-failed" ? "아직 못 돌려드렸어요" : ""],
+    [LABEL.dealSpace, f.space ? `${f.space.name} (공간 번호 ${f.space.id})` : ""],
+    [LABEL.dealWhen, f.useDate ? bookingWhen({ useDate: f.useDate, startTime: f.startTime, endTime: f.endTime }) : ""],
+    [LABEL.dealGuest, f.guestUserId ? String(f.guestUserId) : ""],
+    [LABEL.dealHost, f.space ? String(f.space.ownerUserId) : ""],
+    ["토스 응답", kind === "gave-up" ? (f.why ?? "").slice(0, 200) : ""],
+  ];
+  return {
+    title, lead, rows,
+    link: { href: `${SITE_URL}/rent/payouts`, label: "정산 화면 열기" },
+    note: "거래 알림은 슬랙에만 와요. 이름과 연락처는 싣지 않아요.",
+    slackOnly: true,
+  };
+}
+
+/** 보내는 쪽 — 대표 알림 한 곳(`notifyAdmin`)으로. 슬랙이 없으면 건너뛴다. */
+export async function notifyRecover(kind: RecoverKind, f: RecoverFacts) {
+  return notifyAdmin(buildRecoverNotice(kind, f));
+}
+
 /** 「3시간」·「2일」 — 결제한 지 얼마나 됐나. 하루가 안 되면 시간, 넘으면 날로. */
 function agoLabel(iso: string, now: number): string {
   const mins = Math.max(0, Math.floor((now - Date.parse(iso)) / 60_000));

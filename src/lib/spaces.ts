@@ -842,25 +842,67 @@ export async function rentSync(
   return { ok: true, message: "" };
 }
 
-/** 🧹시간이 흘러서 바뀌어야 하는 것들을 한 번에 옮긴다. 크론 없이 `/rent/my`·신청 내역·정산 화면이 열릴 때 부른다.
- *  셋 다 조건절이 «지금 상태»를 보므로 두 번 불려도 같은 결과다(멱등).
+/** 정리 작업 한 번이 한 일. 크론이 로그와 응답에 싣는다(페이지는 안 본다). */
+export interface SweepRun {
+  /** ① 결제 시간이 지난 신청 — 닫기 전에 토스에 되물어 본 결과(`rent-recover.ts`). 읽기가 실패했으면 null. */
+  stale: import("./rent-recover").RecoverRun | null;
+  /** ② 이용 완료로 넘긴 수 · ③ 지급 대기로 올린 취소 예약 수. */
+  done: number;
+  keptToPayout: number;
+}
+
+/** 페이지를 열 때 토스에 물어볼 최대 수. 크론은 더 크게 넘긴다(`/api/cron/rent-remind`). */
+export const SWEEP_PAGE_TOSS_LOOKUPS = 3;
+
+/** 🧹시간이 흘러서 바뀌어야 하는 것들을 한 번에 옮긴다. `/rent/my`·신청 내역·정산 화면이 열릴 때, 그리고
+ *  🆕09-27 D7 매일 아침 크론이 요약을 세기 «전»에 부른다(전엔 사람이 화면을 열어야만 돌았다).
+ *  셋 다 조건절이 «지금 상태»를 보므로 두 번 불려도 같은 결과다(멱등). 페이지와 크론이 겹쳐 돌아도 된다.
  *  ① 결제창만 열고 30분 지난 신청 → 예약 expired · 결제 EXPIRED (토스 결제 유효 시간이 30분)
+ *     🆕09-27 D4 — 결제를 시도한 흔적이 있으면 닫기 전에 토스에 되묻는다. 돈이 빠져 있으면 전액 환불(`rent-recover.ts`).
  *  ② 끝난 확정 예약 → 예약 done · 지급 WAITING
  *  ③ 이용일이 지난 «취소» 예약인데 환불하고 남은 돈이 있는 것 → 지급 WAITING
- *     당일 취소(환불 0원)와 부분 환불이 여기 온다. 약관 제8조 「환불되지 않은 금액은 정산 시 지급」. */
-export async function sweepBookings(): Promise<void> {
+ *     당일 취소(환불 0원)와 부분 환불이 여기 온다. 약관 제8조 「환불되지 않은 금액은 정산 시 지급」.
+ *  @param opts.tossLookups ①에서 이번에 토스에 물어볼 최대 수(기본 = 페이지용 `SWEEP_PAGE_TOSS_LOOKUPS`). */
+export async function sweepBookings(opts: { tossLookups?: number } = {}): Promise<SweepRun | null> {
   // 🧪목 모드에선 옮기지 않는다 — 이 함수는 «쓰기»다. 목 세계의 상태는 케이스가 정한 그대로 보여야 한다.
-  if (await rentMockOn()) return;
+  if (await rentMockOn()) return null;
   const c = db();
-  if (!c) return;
+  if (!c) return null;
   const today = todayKst();
+  const run: SweepRun = { stale: null, done: 0, keptToPayout: 0 };
 
   // ①
   const cutoff = new Date(Date.now() - 30 * 60_000).toISOString();
-  const { data: stale } = await c.from("space_bookings").select("order_id")
+  const { data: stale, error: staleError } = await c.from("space_bookings").select("id,order_id,created_at")
     .eq("status", "pending").lt("created_at", cutoff);
-  for (const r of stale ?? []) {
-    await rentSync(s(r.order_id), { bookingStatus: "expired", toss: { status: "EXPIRED" } });
+  if (staleError) console.error(`[spaces] sweep ① failed: ${staleError.message}`);
+  const staleOrders = (stale ?? []).map((r) => s((r as Row).order_id)).filter(Boolean);
+  if (staleOrders.length > 0) {
+    // 결제 줄의 상태·키 = «결제를 시도한 흔적». ⚠️이걸 못 읽으면 흔적을 모르는 채로 닫게 되니 이번엔 ①을 통째로 건너뛴다.
+    //   주소 길이 때문에 100건씩 끊어 읽는다(크론이 하루치를 한 번에 볼 수 있다).
+    const pays: Row[] = [];
+    let payError: { message: string } | null = null;
+    for (let i = 0; i < staleOrders.length && !payError; i += 100) {
+      const got = await c.from("payments").select("order_id,status,payment_key,amount").in("order_id", staleOrders.slice(i, i + 100));
+      if (got.error) payError = got.error;
+      else pays.push(...((got.data ?? []) as Row[]));
+    }
+    if (payError) {
+      console.error(`[spaces] sweep ① 결제 줄 읽기 실패 — 이번엔 닫지 않는다: ${payError.message}`);
+    } else {
+      const byOrder = new Map(pays.map((p) => [s(p.order_id), p]));
+      const rows = (stale ?? []).map((r) => {
+        const row = r as Row;
+        const p = byOrder.get(s(row.order_id));
+        return {
+          bookingId: n(row.id), orderId: s(row.order_id), createdAt: s(row.created_at),
+          payStatus: p ? s(p.status) : "", payKey: p ? s(p.payment_key) : "", amount: p ? n(p.amount) : 0,
+        };
+      });
+      // 🔁토스·알림을 부르는 층이라 파일을 따로 뒀다. 그 파일이 이 파일(`rentSync`)을 쓰므로 여기선 부를 때 가져온다.
+      const { recoverStalePending } = await import("./rent-recover");
+      run.stale = await recoverStalePending(rows, { lookups: opts.tossLookups ?? SWEEP_PAGE_TOSS_LOOKUPS });
+    }
   }
 
   // ② 👀phase 1(대표 09-16) — 결제 완료(paid)도 확정처럼 본다. 손님은 결제하는 순간 「예약 완료」를 봤고
@@ -871,7 +913,7 @@ export async function sweepBookings(): Promise<void> {
     .in("status", ["confirmed", "paid"]).is("refund_requested_at", null).lte("use_date", today);
   for (const r of conf ?? []) {
     if (!bookingFinished({ useDate: s(r.use_date), endTime: s(r.end_time).slice(0, 5) })) continue;
-    await rentSync(s(r.order_id), { bookingStatus: "done", payoutStatus: "WAITING" });
+    if ((await rentSync(s(r.order_id), { bookingStatus: "done", payoutStatus: "WAITING" })).ok) run.done += 1;
   }
 
   // ③
@@ -887,8 +929,9 @@ export async function sweepBookings(): Promise<void> {
     // ⚠️거르기는 DB가 한다. 이 줄은 «조회가 조용히 달라졌을 때»를 위한 울타리다 — 지급은 되돌리기 어렵다.
     const b = (r as Row).booking as Row | undefined;
     if (!b || s(b.status) !== "cancelled" || s(b.use_date) >= today) continue;
-    await rentSync(s((r as Row).order_id), { payoutStatus: "WAITING" });
+    if ((await rentSync(s((r as Row).order_id), { payoutStatus: "WAITING" })).ok) run.keptToPayout += 1;
   }
+  return run;
 }
 
 /** 지급 목록 — 대기·요청·실패·완료. 정산 화면이 판매자별로 묶는다. 예약을 같이 읽어 온다. */
