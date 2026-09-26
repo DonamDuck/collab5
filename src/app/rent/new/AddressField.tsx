@@ -29,6 +29,10 @@ declare global {
         oncomplete: (data: PostcodeResult) => void;
         width?: string | number;
         height?: string | number;
+        /** 열릴 때 검색창에 포커스를 줄지(서비스 기본 참). */
+        focusInput?: boolean;
+        /** 열릴 때 서비스 화면(iframe)에 포커스를 줄지(서비스 기본 참). */
+        focusContent?: boolean;
       }) => { embed: (el: HTMLElement) => void };
     };
   }
@@ -78,6 +82,13 @@ export function AddressField({
   //   폰에서 주소 목록을 넘기다 손가락이 레이어 밖으로 나가면 등록 폼이 뒤에서 움직여, 닫고 나면 딴 데 와 있다.
   //   ⭐확인 팝업(`ConfirmDialog`)이 쓰는 훅을 그대로 쓴다. 자리마다 따로 붙이면 언젠가 또 하나가 빠진다(07-29 시트 19곳).
   //   ⚠️`overlayClose`는 그대로 참 — 여기선 딤 클릭이 「안 고를래요」라 잃을 입력이 없다(전에도 그렇게 닫혔다).
+  // 🩸09-27 — 그날 훅을 붙여 스크롤 잠금은 됐지만 ESC는 여전히 안 먹었다. 훅은 우리 문서(`document`)에서 키를 듣는데,
+  //   우편번호 서비스가 뜨자마자 자기 검색창으로 포커스를 가져가서 ESC가 우리 문서까지 안 왔다. 그 검색창은
+  //   `postcode.map.kakao.com`에서 온 iframe 안에 있어서, 거기서 난 키는 우리 쪽 리스너가 못 듣는다.
+  //   실측: 연 직후 `activeElement`가 IFRAME이었고 ESC를 눌러도 레이어가 그대로였다.
+  //   ✅대표 결정 — 검색창 자동 포커스를 포기한다. 아래 embed에 `focusInput`·`focusContent`를 끄면 포커스가 훅이 준 패널에 남아 ESC가 먹는다.
+  //   ⚠️검색창을 눌러 들어간 뒤엔 ESC가 여전히 안 온다. 그때 ESC는 서비스가 받아서 검색어를 지운다(09-27 실측).
+  //     서비스가 우리에게 보내는 신호는 검색·크기·선택 완료 셋뿐이라 키를 받아 올 길이 없다. 그때는 ×·닫기·딤 클릭으로 닫는다.
   const closeLayer = useCallback(() => setOpen(false), []);
   const layer = useDismissable(open, { onClose: closeLayer, overlayClose: true });
 
@@ -88,6 +99,9 @@ export function AddressField({
     new window.daum.Postcode({
       width: "100%",
       height: "100%",
+      // 포커스를 iframe으로 안 가져가게 한다. 그래야 ESC가 우리 문서에 온다(위 09-27 주석).
+      focusInput: false,
+      focusContent: false,
       oncomplete: (d) => {
         const road = (d.roadAddress || d.jibunAddress || "").trim();
         const area = [d.sigungu, d.bname].filter(Boolean).join(" ").trim();
@@ -98,6 +112,7 @@ export function AddressField({
   }, [open, onPick]);
 
   const find = async () => {
+    if (busy) return;
     setBusy(true);
     try {
       await loadPostcode();
@@ -124,7 +139,14 @@ export function AddressField({
           aria-label="주소"
         />
         {!manual && (
-          <button type="button" onClick={find} disabled={busy} className={`${secondaryBtnCls} h-[48px] shrink-0`}>
+          // ⌨️`disabled` 대신 `aria-disabled`(09-27). 여는 동안 버튼을 `disabled`로 바꾸면 브라우저가 그 버튼의 포커스를 빼서
+          //   레이어가 «돌아갈 자리»로 body를 기억했다. ESC로 닫으면 포커스가 페이지 맨 위로 튀었다. 두 번 누름은 `find` 첫 줄이 막는다.
+          <button
+            type="button"
+            onClick={find}
+            aria-disabled={busy}
+            className={`${secondaryBtnCls} h-[48px] shrink-0 aria-disabled:opacity-60`}
+          >
             {busy ? "여는 중…" : "주소 찾기"}
           </button>
         )}
