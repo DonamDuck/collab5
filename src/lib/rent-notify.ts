@@ -17,6 +17,7 @@ import type { AdminNotice } from "./admin-notify";
 import { notifyAdmin } from "./admin-notify";
 import type { AdminDailySummary, DailyRuns, RemindRun } from "./rent-admin-daily";
 import type { LedgerKind, LedgerMismatch, LedgerRun } from "./rent-ledger";
+import type { SweepRun } from "./spaces";
 import { KAKAO_CHAT_URL, SITE_URL } from "./site";
 import { bookingWhen, dateLabel } from "./rent-time";
 import {
@@ -104,6 +105,7 @@ const LABEL = {
   dailyRemind: "리마인드",
   // ↓ 09-27 D6 장부 대조 한 줄.
   dailyLedger: "장부 대조",
+  dailySweep: "정리 작업",
   // ↓ 대표 슬랙 거래 알림에만 쓴다(09-19 오후). 사람을 가리키는 칸은 회원 번호뿐이다(`buildDealNotice`).
   dealBooking: "예약 번호",
   dealOrder: "주문번호",
@@ -1162,6 +1164,24 @@ function ledgerLine(run: LedgerRun | null | undefined): string {
   ].filter(Boolean).join("\n");
 }
 
+/** 🆕09-27 D7 정리 작업 한 줄. 이번에 안 돌렸으면(`undefined`) 빈 값이라 줄이 안 선다.
+ *  끊긴 결제 되묻기(D4)가 한 일이 있으면 둘째 줄에 붙인다. 환불은 그때그때 슬랙에도 따로 갔다. */
+function sweepLine(run: SweepRun | null | undefined): string {
+  if (run === undefined) return "";
+  if (run === null) return "정리 작업이 멈췄어요. Vercel 로그에서 rent-remind를 봐 주세요.";
+  const st = run.stale;
+  const closed = st ? st.expired + st.closed + st.gaveUp : 0;
+  const head = `만료 ${closed}건 · 이용 완료 ${run.done}건 · 취소 뒤 남은 돈 정산 ${run.keptToPayout}건`;
+  if (!st) return `${head}\n결제 시간이 지난 신청은 이번에 읽지 못했어요.`;
+  const recover = [
+    st.refunded > 0 ? `끊긴 결제 환불 ${st.refunded}건` : "",
+    st.refundFailed > 0 ? `환불 실패 ${st.refundFailed}건` : "",
+    st.gaveUp > 0 ? `확인 못 하고 닫음 ${st.gaveUp}건` : "",
+    st.deferred > 0 ? `토스 답을 기다리는 신청 ${st.deferred}건` : "",
+  ].filter(Boolean).join(" · ");
+  return recover ? `${head}\n${recover}` : head;
+}
+
 /** 어긋남 갈래의 이름. 슬랙 칸 이름으로 쓴다(값 칸에 주문·금액이 붙는다). */
 const LEDGER_KIND: Record<LedgerKind, string> = {
   "missing": "토스엔 승인, 우리 장부엔 주문이 없음",
@@ -1261,8 +1281,9 @@ export function buildAdminDaily(
       [LABEL.dailyUse, `오늘 ${s.useToday}건 · 내일 ${s.useTomorrow}건`],
       [LABEL.dailyRemind, remindLine(remind)],
       [LABEL.dailyLedger, ledgerLine(runs.ledger)],
+      [LABEL.dailySweep, sweepLine(runs.sweep)],
     ]
-    : [[LABEL.dailyRemind, remindLine(remind)], [LABEL.dailyLedger, ledgerLine(runs.ledger)]];
+    : [[LABEL.dailyRemind, remindLine(remind)], [LABEL.dailyLedger, ledgerLine(runs.ledger)], [LABEL.dailySweep, sweepLine(runs.sweep)]];
   const go = { href: `${SITE_URL}/rent/payouts`, label: "정산 화면 열기" };
   const tail = "매일 아침 9시 리마인드가 끝나면 와요. 숫자가 다 0이어도 와요. 안 온 날은 크론이 멈춘 거예요.";
   return {

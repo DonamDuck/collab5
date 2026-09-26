@@ -15,6 +15,7 @@ import { addDaysIso, todayKst } from "./rent-time";
 import { listSpacesForReview } from "./spaces";
 import type { Payment, SpaceBooking } from "./types";
 import type { LedgerRun } from "./rent-ledger";
+import type { SweepRun } from "./spaces";
 
 /** 요약이 읽는 예약 칸. 목 세계의 `SpaceBooking`이 그대로 들어온다.
  *  🆕09-19 저녁 `updatedAt` — 취소·환불된 예약이 «언제» 그 상태가 됐나. 예약 행은 상태가 바뀔 때 말고는 거의 안 고쳐진다(트리거가 적는다). */
@@ -41,9 +42,11 @@ export interface RemindRun {
 }
 
 /** 🆕09-27 크론이 요약 «전»에 돌린 일들의 결과. 안 돌렸으면 칸이 없고, 도중에 멈췄으면 null.
- *  · `ledger` 토스와 우리 장부 대조(D6, `rent-ledger.ts`) */
+ *  · `ledger` 토스와 우리 장부 대조(D6, `rent-ledger.ts`)
+ *  · `sweep` 정리 작업(D7, `sweepBookings`) — 만료·이용 완료·지급 대기와 끊긴 결제 되묻기(D4) */
 export interface DailyRuns {
   ledger?: LedgerRun | null;
+  sweep?: SweepRun | null;
 }
 
 export interface AdminDailySummary {
