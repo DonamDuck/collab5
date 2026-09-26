@@ -721,6 +721,9 @@ export interface SpaceBooking {
   decidedAt?: string;
   /** ⏰이용 전날 리마인드를 보낸 시각(09-17). 비어 있으면 아직 안 보냈다 — 하루 한 번 도는 작업이 두 번 안 보내게. */
   remindedAt?: string;
+  /** 🧾손님이 취소했는데 토스 응답으로 환불을 확인하지 못한 시각(09-27 D5). 있으면 예약은 그대로 두고 관리자가 토스에서 확인한다.
+   *  ⚠️SQL(`2026-09-27-rent-refund-unconfirmed.sql`) 전 DB엔 칸이 없어 늘 비어 있다. */
+  refundUnconfirmedAt?: string;
   createdAt: string;
   updatedAt: string;
 }

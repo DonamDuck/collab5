@@ -14,6 +14,8 @@ import { isAutoCancelReason } from "./rent-payment";
 import { addDaysIso, todayKst } from "./rent-time";
 import { listSpacesForReview } from "./spaces";
 import type { Payment, SpaceBooking } from "./types";
+import type { LedgerRun } from "./rent-ledger";
+import type { SweepRun } from "./spaces";
 
 /** 요약이 읽는 예약 칸. 목 세계의 `SpaceBooking`이 그대로 들어온다.
  *  🆕09-19 저녁 `updatedAt` — 취소·환불된 예약이 «언제» 그 상태가 됐나. 예약 행은 상태가 바뀔 때 말고는 거의 안 고쳐진다(트리거가 적는다). */
@@ -37,6 +39,14 @@ export interface RemindRun {
   heldToday: number;
   /** `RESEND_API_KEY`가 없어 한 통도 못 보내는 날인가. */
   noMailKey: boolean;
+}
+
+/** 🆕09-27 크론이 요약 «전»에 돌린 일들의 결과. 안 돌렸으면 칸이 없고, 도중에 멈췄으면 null.
+ *  · `ledger` 토스와 우리 장부 대조(D6, `rent-ledger.ts`)
+ *  · `sweep` 정리 작업(D7, `sweepBookings`) — 만료·이용 완료·지급 대기와 끊긴 결제 되묻기(D4) */
+export interface DailyRuns {
+  ledger?: LedgerRun | null;
+  sweep?: SweepRun | null;
 }
 
 export interface AdminDailySummary {
@@ -214,13 +224,15 @@ async function loadDailyRows(today: string): Promise<{
 }
 
 /** 크론 끝에 한 번 — 세고, 대표에게 보낸다. 🚨throw하지 않는다(크론 응답이 이 알림 때문에 실패하면 안 된다). */
-export async function sendAdminDaily(remind: RemindRun | null, today = todayKst()): Promise<AdminNotifyResult & { counted: boolean }> {
+export async function sendAdminDaily(
+  remind: RemindRun | null, today = todayKst(), runs: DailyRuns = {},
+): Promise<AdminNotifyResult & { counted: boolean }> {
   try {
     const [rows, review] = await Promise.all([loadDailyRows(today), listSpacesForReview()]);
     const summary = rows
       ? summarizeDaily({ ...rows, reviewPending: review.pending.length, reviewApproveOnly: review.approveOnly.length, remind }, today)
       : null;
-    const r = await notifyAdmin(buildAdminDaily(summary, today, remind));
+    const r = await notifyAdmin(buildAdminDaily(summary, today, remind, Date.now(), runs));
     return { ...r, counted: !!summary };
   } catch (e) {
     console.error("[rent-admin-daily] 요약 실패", e);

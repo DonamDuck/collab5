@@ -95,8 +95,10 @@ export const PAY_IN_FLIGHT_CODES: readonly string[] = ["IDEMPOTENT_REQUEST_PROCE
  *  그대로 남는다. 아침 요약이 이 글자로 «자동 환불»을 손님 취소와 가른다(둘 다 예약은 `cancelled`라서). ⚠️글자를 바꾸면 옛 줄은 손님 취소로 세진다. */
 export const AUTO_REFUND_REASON = "예약 확정 실패 — 자동 환불";
 export const AUTO_CANCEL_WAITING_REASON = "입금 전 결제 수단이라 자동 취소";
+/** 🆕09-27 D4 — 승인 응답이 끊겨 예약이 안 생긴 결제를 정리 작업이 토스에 되물어 찾아낸 뒤 돌려준 취소(`rent-recover.ts`). */
+export const RECOVER_REFUND_REASON = "승인 응답 유실 — 자동 환불";
 export function isAutoCancelReason(reason: string | undefined | null): boolean {
-  return reason === AUTO_REFUND_REASON || reason === AUTO_CANCEL_WAITING_REASON;
+  return reason === AUTO_REFUND_REASON || reason === AUTO_CANCEL_WAITING_REASON || reason === RECOVER_REFUND_REASON;
 }
 
 /** 🆕09-18 밤 QA(G-05) — 취소 팝업이 본 금액보다 실제 환불액이 «적어졌다». 돌려주지 않고 다시 확인받는다. */
@@ -133,6 +135,12 @@ export async function approvePayment(
   if (paymentsTestMode() && process.env.NODE_ENV === "production") {
     console.warn(`[rent-payment] 🧪운영인데 «테스트» 키다 — 돈은 안 움직인다 (order=${orderId}, ${amount}원)`);
   }
+  // 🔁09-27 D4 — **응답이 끊기면 돈만 나가고 장부엔 안 남는다.** 토스는 승인을 끝냈는데 우리가 답을 못 받은 경우다.
+  //   그래서 «처리됐는지 모르는» 네 갈래(던짐·시간 초과·5xx·결제 객체가 아닌 200)에선 실패로 닫기 «전»에
+  //   주문번호로 한 번 되묻는다(`recheckApproval`). 토스가 `DONE`이라 하면 그 응답으로 정상 흐름을 잇는다.
+  //   4xx는 토스가 «안 했다»고 분명히 말한 것이라 되묻지 않는다.
+  let unsure = "";
+  let failed: { message: string; code?: string } | null = null;
   try {
     const res = await fetch(`${TOSS_BASE}/confirm`, {
       method: "POST",
@@ -145,20 +153,186 @@ export async function approvePayment(
         "Idempotency-Key": idemKey("rent-confirm", orderId, paymentKey),
       },
       body: JSON.stringify({ paymentKey, orderId, amount }),
+      // ⏱토스 문서(09-27 확인): 「결제 승인은 최대 60초가 소요됩니다. 타임아웃 값을 최소 60초로 설정하세요.」
+      //   전엔 제한이 없었다. 끊긴 연결을 붙잡고 있다가 함수가 통째로 죽으면 되묻기도 ABORTED 기록도 못 한다.
+      signal: AbortSignal.timeout(CONFIRM_TIMEOUT_MS),
     });
-    const body = (await res.json()) as TossPayment & { message?: string; code?: string };
-    if (!res.ok) return { ok: false, message: body.message || "결제 승인에 실패했어요.", code: body.code };
-    return { ok: true, message: "", payment: body };
+    const body = (await res.json().catch(() => null)) as (TossPayment & { message?: string; code?: string }) | null;
+    if (res.ok && isPaymentShape(body)) return { ok: true, message: "", payment: body };
+    if (!res.ok && res.status < 500) {
+      return { ok: false, message: body?.message || "결제 승인에 실패했어요.", code: body?.code };
+    }
+    unsure = `HTTP ${res.status}${res.ok ? " · 결제 객체가 아닌 본문" : ""}`;
+    if (!res.ok && body) failed = { message: body.message || "결제 승인에 실패했어요.", code: body.code };
   } catch (e) {
-    console.error(`[rent-payment] approve threw order=${orderId}: ${String(e)}`);
-    return { ok: false, message: "결제 서버에 닿지 못했어요. 잠시 뒤 다시 시도해 주세요." };
+    unsure = String(e);
   }
+  console.error(`[rent-payment] 승인 결과를 모른다 — 토스에 되묻는다 order=${orderId}: ${unsure}`);
+  const again = await recheckApproval(paymentKey, orderId, amount);
+  if (again) {
+    console.warn(`[rent-payment] 되묻기로 승인 확인 — 정상 흐름을 잇는다 order=${orderId}`);
+    return { ok: true, message: "", payment: again };
+  }
+  return failed ? { ok: false, ...failed } : { ok: false, message: "결제 서버에 닿지 못했어요. 잠시 뒤 다시 시도해 주세요." };
+}
+
+/** 승인 대기 시간(토스 권장 하한) · 되묻기 한 번 · 거래 조회 한 쪽의 대기 시간(토스 권장 하한). */
+const CONFIRM_TIMEOUT_MS = 60_000;
+export const LOOKUP_TIMEOUT_MS = 10_000;
+const TRANSACTIONS_TIMEOUT_MS = 60_000;
+
+/** 토스 결제 객체처럼 생겼나 — 상태 글자가 있는 객체. 승인·되묻기·대조가 같은 문턱을 쓴다. */
+function isPaymentShape(v: unknown): v is TossPayment {
+  return !!v && typeof v === "object" && !Array.isArray(v) && typeof (v as { status?: unknown }).status === "string";
+}
+
+/** 승인 응답을 못 받았을 때 한 번 되묻는다. **그 결제**가 `DONE`이고 금액이 같을 때만 돌려준다.
+ *  ⚠️키가 다르면 같은 주문의 «다른 시도»다. 그 승인은 그 시도의 흐름이 맡는다(여기서 가져다 쓰면 남의 결제로 예약을 올린다).
+ *  ⚠️금액이 다르면 성공으로 안 읽는다. 돈이 빠졌다면 정리 작업의 되묻기(`rent-recover.ts`)나 아침 장부 대조가 잡는다. */
+async function recheckApproval(paymentKey: string, orderId: string, amount: number): Promise<TossPayment | null> {
+  const r = await lookupPaymentByOrderId(orderId);
+  if (r.kind !== "found") return null;
+  const p = r.payment;
+  if (p.status !== "DONE") return null;
+  if (paymentKey && p.paymentKey && p.paymentKey !== paymentKey) return null;
+  if (typeof p.totalAmount === "number" && p.totalAmount !== amount) return null;
+  return p;
+}
+
+/** 되묻기 결과 셋 — 찾았다 · 토스에 그 결제가 없다(404 `NOT_FOUND_PAYMENT`) · 답을 못 받았다.
+ *  ⭐«없다»와 «모른다»를 가른다. 없다면 돈이 안 움직인 것이라 닫아도 되고, 모르면 아무것도 확정하지 않는다. */
+export type LookupResult =
+  | { kind: "found"; payment: TossPayment }
+  | { kind: "not-found" }
+  | { kind: "error"; reason: string };
+
+async function tossGet(path: string, timeoutMs: number): Promise<{ status: number; body: unknown } | { error: string }> {
+  try {
+    const res = await fetch(`https://api.tosspayments.com${path}`, {
+      method: "GET",
+      headers: { Authorization: authHeader() },
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    const body = await res.json().catch(() => null);
+    return { status: res.status, body };
+  } catch (e) {
+    return { error: String(e) };
+  }
+}
+
+async function lookup(path: string, timeoutMs: number, match: (p: TossPayment) => boolean): Promise<LookupResult> {
+  // 🔒키가 없으면 «모른다»다. 모의 모드에서 「없다」로 읽으면 운영 DB의 결제를 만료로 닫을 수 있다(개발 서버도 같은 DB를 본다).
+  if (!paymentsLive()) return { kind: "error", reason: "no-key" };
+  const r = await tossGet(path, timeoutMs);
+  if ("error" in r) return { kind: "error", reason: r.error };
+  const code = (r.body as { code?: unknown } | null)?.code;
+  if (r.status === 404 && code === "NOT_FOUND_PAYMENT") return { kind: "not-found" };
+  if (r.status !== 200) return { kind: "error", reason: `HTTP ${r.status}${typeof code === "string" ? ` ${code}` : ""}` };
+  if (!isPaymentShape(r.body)) return { kind: "error", reason: "결제 객체가 아닌 200" };
+  if (!match(r.body)) return { kind: "error", reason: "다른 결제가 왔다" };
+  return { kind: "found", payment: r.body };
+}
+
+/** 🔁주문번호로 결제 조회 — `GET /v1/payments/orders/{orderId}` (토스 문서 09-27 확인). */
+export async function lookupPaymentByOrderId(orderId: string, timeoutMs = LOOKUP_TIMEOUT_MS): Promise<LookupResult> {
+  return lookup(`/v1/payments/orders/${encodeURIComponent(orderId)}`, timeoutMs, (p) => !p.orderId || p.orderId === orderId);
+}
+
+/** 🔁결제 키로 결제 조회 — `GET /v1/payments/{paymentKey}`. 아침 장부 대조가 «지금» 토스 장부를 읽는 길이다. */
+export async function lookupPayment(paymentKey: string, timeoutMs = LOOKUP_TIMEOUT_MS): Promise<LookupResult> {
+  return lookup(`/v1/payments/${encodeURIComponent(paymentKey)}`, timeoutMs, (p) => !p.paymentKey || p.paymentKey === paymentKey);
+}
+
+/** 토스 거래 한 줄(Transaction 객체). 승인 한 번·취소 한 번이 각각 한 줄이다(같은 `paymentKey`, 다른 `transactionKey`). */
+export interface TossTransaction {
+  transactionKey: string;
+  paymentKey: string;
+  orderId: string;
+  /** 그 거래의 상태 — 승인 줄은 `DONE`, 취소 줄은 `CANCELED`·`PARTIAL_CANCELED`(토스 블로그 예시 09-27 확인). */
+  status: string;
+  /** `yyyy-MM-dd'T'HH:mm:ss±hh:mm` */
+  transactionAt: string;
+  /** 그 거래의 금액 — 취소 줄이면 취소한 금액. */
+  amount: number;
+}
+
+/** 📒거래 조회 — `GET /v1/transactions?startDate&endDate&startingAfter&limit` (토스 문서 09-27 확인).
+ *  · 날짜는 `yyyy-MM-dd'T'hh:mm:ss`이고 시간대는 문서에 없다. 그래서 호출부가 앞뒤로 넉넉히 잡고 `transactionAt`으로 다시 거른다.
+ *  · 한 번에 최대 5000줄, 넘으면 마지막 `transactionKey`를 `startingAfter`로 넘겨 잇는다. 한 쪽 조회가 최대 60초라 제한 시간도 60초.
+ *  · 쪽 수에 상한을 둔다(`maxPages`). 넘으면 `truncated`로 알린다 — 다 본 척하지 않는다. */
+export async function listTransactions(
+  startDate: string, endDate: string, opts: { limit?: number; maxPages?: number; timeoutMs?: number } = {},
+): Promise<{ ok: true; rows: TossTransaction[]; truncated: boolean } | { ok: false; reason: string }> {
+  if (!paymentsLive()) return { ok: false, reason: "no-key" };
+  const limit = opts.limit ?? 1000;
+  const maxPages = opts.maxPages ?? 20;
+  const rows: TossTransaction[] = [];
+  let after = "";
+  for (let page = 0; page < maxPages; page++) {
+    const q = new URLSearchParams({ startDate, endDate, limit: String(limit) });
+    if (after) q.set("startingAfter", after);
+    const r = await tossGet(`/v1/transactions?${q.toString()}`, opts.timeoutMs ?? TRANSACTIONS_TIMEOUT_MS);
+    if ("error" in r) return { ok: false, reason: r.error };
+    if (r.status !== 200 || !Array.isArray(r.body)) {
+      const code = (r.body as { code?: unknown } | null)?.code;
+      return { ok: false, reason: `HTTP ${r.status}${typeof code === "string" ? ` ${code}` : ""}` };
+    }
+    for (const x of r.body as Record<string, unknown>[]) {
+      if (!x || typeof x !== "object") continue;
+      rows.push({
+        transactionKey: typeof x.transactionKey === "string" ? x.transactionKey : "",
+        paymentKey: typeof x.paymentKey === "string" ? x.paymentKey : "",
+        orderId: typeof x.orderId === "string" ? x.orderId : "",
+        status: typeof x.status === "string" ? x.status : "",
+        transactionAt: typeof x.transactionAt === "string" ? x.transactionAt : "",
+        amount: typeof x.amount === "number" ? x.amount : Number(x.amount ?? 0) || 0,
+      });
+    }
+    const last = (r.body as Record<string, unknown>[]).at(-1);
+    if (r.body.length < limit || !last || typeof last.transactionKey !== "string") return { ok: true, rows, truncated: false };
+    after = last.transactionKey;
+  }
+  return { ok: true, rows, truncated: true };
 }
 
 export interface CancelResult {
   ok: boolean;
   /** 환불이 됐을 때 토스가 돌려준 Payment 객체(남은 돈·환불 이력이 들어 있다). */
   payment?: TossPayment;
+  /** 🆕09-27 D5 — 토스가 200을 줬는데 본문이 «그 취소»의 결제 객체가 아니다. 돈이 돌아갔는지 모른다.
+   *  ⚠️같은 멱등키로 다시 부르면 토스는 이 첫 응답을 그대로 준다(15일). 다시 시도해서 풀리는 실패가 아니라 사람이 봐야 한다. */
+  unconfirmed?: boolean;
+}
+
+/** 🆕09-27 D5 — 취소 응답이 «우리가 보낸 취소»의 결과인가. 문제가 있으면 까닭 글자를, 없으면 null.
+ *  🩸그 전엔 200이면 본문을 안 보고 성공으로 읽었다. 결제 객체가 아닌 본문이 오면 손님에겐 「돌려드릴게요」,
+ *    예약은 취소, 결제 줄은 DONE 그대로라 이용일이 지나면 그 돈이 사장님 지급 대기로 올라갔다(09-23 QA).
+ *  보는 것(토스 문서 09-27 확인: 「결제 취소에 성공하면 Payment 객체의 cancels 필드에 취소 객체가 배열로 돌아옵니다」)
+ *   · 상태가 CANCELED·PARTIAL_CANCELED
+ *   · 결제 키가 있으면 우리가 취소한 그 결제
+ *   · 남은 돈(balanceAmount)이 숫자이고 «취소 전 잔액 − 취소 금액»과 같다. 취소 금액이 요청과 맞는지를 여기서 본다.
+ *   · 취소 내역이 배열이면 그 금액의 취소가 들어 있다(`cancelStatus`가 있으면 DONE).
+ *  ⚠️상태와 잔액을 서로 맞춰 보지는 않는다. 부분 취소를 거듭해 잔액이 0이 돼도 상태가 PARTIAL_CANCELED로 남는다(토스 예시).
+ *  ⚠️취소 내역이 null이면 잔액 셈만으로 받아 준다. 승인 응답의 `cancels: null`로 09-16에 죽은 적이 있어 null을 오류로 두지 않는다. */
+export function cancelResponseProblem(
+  body: unknown, paymentKey: string, refundableAmount: number, amount: number | undefined,
+): string | null {
+  if (!isPaymentShape(body)) return "결제 객체가 아닌 본문";
+  if (body.status !== "CANCELED" && body.status !== "PARTIAL_CANCELED") return `상태가 ${body.status}`;
+  if (typeof body.paymentKey === "string" && body.paymentKey && body.paymentKey !== paymentKey) return "다른 결제의 응답";
+  if (typeof body.balanceAmount !== "number") return "남은 금액 칸이 없다";
+  const want = amount ?? refundableAmount;
+  if (refundableAmount > 0 && body.balanceAmount !== refundableAmount - want) {
+    return `남은 금액 ${body.balanceAmount} ≠ ${refundableAmount} − ${want}`;
+  }
+  if (Array.isArray(body.cancels)) {
+    const hit = body.cancels.some((c) => {
+      const x = c as { cancelAmount?: unknown; cancelStatus?: unknown } | null;
+      return !!x && x.cancelAmount === want && (x.cancelStatus === undefined || x.cancelStatus === null || x.cancelStatus === "DONE");
+    });
+    if (!hit) return `취소 내역에 ${want}원 완료 건이 없다`;
+  }
+  return null;
 }
 
 /** 결제 취소 — 호스트 거절과 게스트 취소가 둘 다 이리로 온다.
@@ -208,6 +382,12 @@ export async function cancelPayment(
     if (!res.ok) {
       console.error(`[rent-payment] cancel failed key=${paymentKey}: ${body.message ?? res.status}`);
       return { ok: false };
+    }
+    // 🆕09-27 D5 — 200이어도 «그 취소»의 결제 객체인지 본다. 아니면 성공으로 읽지 않는다(호출부가 예약을 안 바꾼다).
+    const problem = cancelResponseProblem(body, paymentKey, refundableAmount, amount);
+    if (problem) {
+      console.error(`[rent-payment] 🚨취소 응답을 확인하지 못했다 — 사람이 봐야 한다 key=${paymentKey}: ${problem}`);
+      return { ok: false, unconfirmed: true };
     }
     return { ok: true, payment: body };
   } catch (e) {

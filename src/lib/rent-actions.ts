@@ -8,7 +8,7 @@ import { getSessionUser } from "./supabase/server";
 import { getRentMock, rentMockOn, RENT_MOCK_BLOCKED } from "./rent-mock";
 import {
   saveSpace, getSpaceFull, getBooking, createPendingBooking, getBookingByOrderId,
-  decideBooking, requestRefund, clearRefundRequest,
+  decideBooking, requestRefund, clearRefundRequest, markRefundUnconfirmed,
   setBookingStatus, listSpacesByOwner, listSpacesByIds,
   createPayment, getPaymentByOrderId, rentSync,
   type SpaceSaveInput,
@@ -49,6 +49,7 @@ import {
   notifyBookingPaid, notifyBookingConfirmed, notifyBookingRejected, notifyBookingCancelled,
   notifyBookingPaidToGuest, notifyBookingConfirmedToHost, notifyBookingCancelledToGuest, notifyAdminRefund,
   notifySpacePublished, notifySpaceReview, notifyRefundRequest, notifyDeal, notifySpaceFixRequest, type DealKind,
+  notifyRefundUnconfirmed,
 } from "./rent-notify";
 import { bookingStarted, dateLabel, kstDaysUntil, durationLabel, isTimeMark, minutesBetween, RENT_MIN_MINUTES, toMinutes, todayKst } from "./rent-time";
 import type { Space, SpaceBooking, SpaceUseType, SpaceCategory, OpenSlot, AccessHow, RentProduct, BizCheckStatus, BizCertRead } from "./types";
@@ -1112,6 +1113,11 @@ function cancelRefund(b: SpaceBooking) {
   return guestCancelQuote(b);
 }
 
+/** 🧾09-27 D5 — 손님 취소의 환불을 토스 응답으로 확인하지 못했을 때 손님께 하는 말. 처음 한 번과, 그 예약을 다시 취소하려 할 때.
+ *  ⚠️export하지 않는다(이 파일은 async 함수만 내보낸다). */
+const REFUND_UNCONFIRMED_LINE = "환불이 됐는지 토스에서 확인하지 못했어요. 예약은 그대로 두고 저희가 직접 확인해서 연락드릴게요.";
+const REFUND_CHECKING_LINE = "환불을 확인하고 있는 예약이에요. 저희가 확인해서 연락드릴게요.";
+
 /** 취소 «전» 팝업에 보여줄 환불액. 환불표는 서버 전용 파일(`rent-payment.ts`)에만 있다 —
  *  화면에 표를 다시 적으면 표가 바뀌는 날 화면만 뒤처진다. 그래서 화면은 늘 이걸 부른다. */
 export async function quoteCancelAction(
@@ -1123,6 +1129,7 @@ export async function quoteCancelAction(
   const b = await getBooking(bookingId);
   if (!b || b.guestUserId !== uid) return { ok: false, message: "내 신청만 볼 수 있어요.", ...none };
   if (b.status !== "paid" && b.status !== "confirmed") return { ok: false, message: "이미 끝난 신청이에요.", ...none };
+  if (b.refundUnconfirmedAt) return { ok: false, message: REFUND_CHECKING_LINE, ...none };
   if (bookingStarted(b)) return { ok: false, message: "이미 시작한 예약은 취소할 수 없어요.", ...none };
   // 💬09-17 QA — 팝업이 「왜 그 %인지」를 한 줄로 말하게 재료(`daysBefore`·`beforeAccept`·`grace`)를 같이 준다. 같은 계산에서 나온 값이다.
   //   `beforeAccept` = 사장님이 아직 수락하기 전이다(09-19 오후부터 전액).
@@ -1141,6 +1148,8 @@ export async function cancelBookingAction(bookingId: number, quotedRefund?: numb
   const b = await getBooking(bookingId);
   if (!b || b.guestUserId !== uid) return { ok: false, message: "내 예약만 취소할 수 있어요." };
   if (b.status !== "paid" && b.status !== "confirmed") return { ok: false, message: "이미 끝난 신청이에요." };
+  // 🧾09-27 D5 — 앞선 취소의 환불을 확인하지 못한 예약. 다시 불러도 토스는 같은 첫 응답을 준다(멱등키). 사람이 풀 때까지 멈춘다.
+  if (b.refundUnconfirmedAt) return { ok: false, message: REFUND_CHECKING_LINE };
   // 🚨이미 시작한 예약은 취소할 수 없다(09-16). 막지 않으면 다 쓴 예약을 「취소」로 바꿔
   //   환불은 0원인데 사장님 정산에서 통째로 빠진다. 화면도 버튼을 숨기지만 관문은 여기다.
   if (bookingStarted(b)) return { ok: false, message: "이미 시작한 예약은 취소할 수 없어요." };
@@ -1175,6 +1184,19 @@ export async function cancelBookingAction(bookingId: number, quotedRefund?: numb
       const after = await getBooking(bookingId);
       if (after && (after.status === "cancelled" || after.status === "refunded")) {
         return { ok: true, message: "이미 취소된 예약이에요. 환불도 그대로 진행돼요." };
+      }
+      // 🧾09-27 D5 — 토스가 200을 줬는데 본문이 그 취소의 결제 객체가 아니다. 돈이 돌아갔는지 모른다.
+      //   예약은 안 바꾼다(바꾸면 「취소됨」인데 돈은 그대로일 수 있고, 이용일 뒤 정리 작업이 그 돈을 사장님 지급 대기로 올린다).
+      //   멱등키 때문에 다시 눌러도 같은 응답이 오니 「다시 시도해 주세요」라고 하지 않는다. 표시를 남겨 「손이 필요한 예약」에 띄운다.
+      if (r.unconfirmed) {
+        await markRefundUnconfirmed(bookingId);
+        revalidatePath("/rent/my");
+        revalidatePath("/rent/payouts");
+        await notifyLater(async () => {
+          const p = await notifyParties(b);
+          if (p) await notifyRefundUnconfirmed(b, p.space, refund);
+        });
+        return { ok: false, message: REFUND_UNCONFIRMED_LINE };
       }
       return { ok: false, message: "환불을 처리하지 못해 취소하지 않았어요. 잠시 뒤 다시 시도해 주세요." };
     }
