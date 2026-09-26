@@ -127,7 +127,9 @@ export default async function RentRequestsPage() {
               {/* 🗂09-17 QA — 결제창만 열었다 닫은 흔적(expired)이 16줄 쌓여 진짜 지난 예약이 묻혔다.
                   기본은 접고 건수만 말한다. 다시 열 길이 없는 줄이라 펼쳐 볼 일은 드물다. */}
               {expired.length > 0 && (
-                <details className="mt-5">
+                // 🔗09-27 D2 — 주소가 `#b-<번호>`로 이 안의 줄을 짚으면 크롬이 React보다 먼저 접힌 칸을 연다(조각 이동 때 details 자동 펼침).
+                //   그러면 서버 HTML과 `open` 한 칸이 달라 하이드레이션 경고가 뜬다. 해가 없는 차이라 이 요소만 경고를 끈다.
+                <details className="mt-5" suppressHydrationWarning>
                   <summary className="cursor-pointer py-[12px] text-[15px] text-mute underline underline-offset-2">
                     결제 안 한 신청 {expired.length}건
                   </summary>
