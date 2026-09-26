@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { getSpaceFull } from "@/lib/spaces";
 import { formatBizNumber, spaceListed } from "@/lib/bizcheck";
 import { telHref } from "@/lib/rent-copy";
+import { spaceShareImage } from "../share-image";
 
 // 하루 팝업 — 판매자 정보 (2026-09-19 대표 [J])
 //
@@ -31,11 +32,22 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const { slug } = await params;
   const sp = await loadSpace(slug);
   if (!sp || !spaceListed(sp)) return NOT_FOUND_META;
+  const url = `/rent/${sp.slug}/seller`;
+  // 🔗09-27 QA — 설명과 링크 카드가 없어서 루트 것(소개서 안내 문장·사이트 슬로건·홈 주소)을 물려받았다.
+  //   검색엔 안 올려도 주소는 남에게 건넬 수 있다. 붙이면 이 공간의 판매자 정보라고 말하게 한다.
+  //   ⚠️`openGraph`는 루트와 합쳐지지 않고 통째로 갈린다(상세 화면 SC-06과 같다). 그림도 상세와 같은 규칙이다.
+  //   설명엔 칸 이름만 적고 값(번호·주소·전화)은 옮기지 않는다.
+  const cardTitle = `판매자 정보 · ${sp.name}`;
+  const description = `${sp.name}의 판매자 정보예요. 상호·대표자·사업자등록번호·사업장 주소·가게 전화를 담았어요.`;
+  const image = spaceShareImage(sp.photos);
   return {
-    title: `판매자 정보 · ${sp.name} — 하루 팝업`,
+    title: `${cardTitle} — 하루 팝업`,
+    description,
     robots: { index: false, follow: false },
     // 루트의 `canonical: "/"`를 물려받으면 «홈의 사본»이라고 말하게 된다. 자기 주소로.
-    alternates: { canonical: `/rent/${sp.slug}/seller` },
+    alternates: { canonical: url },
+    openGraph: { type: "website", siteName: "collab5", locale: "ko_KR", url, title: cardTitle, description, images: [image] },
+    twitter: { card: "summary_large_image", title: cardTitle, description, images: [image.url] },
   };
 }
 

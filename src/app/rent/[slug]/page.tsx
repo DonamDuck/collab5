@@ -10,13 +10,13 @@ import { accessHowLine, COFFEE_CHAT_FREE, COFFEE_CHAT_WHEN_GUEST, CONTACT_RULE_G
 import { coffeeChatFree, lowestPrice, productNote, productPrice, sellableProducts } from "@/lib/rent-products";
 import { durationLabel, futureSlots, rangeLabel, RENT_MIN_MINUTES } from "@/lib/rent-time";
 import { bizMissingLine, bizVerified, spaceListed } from "@/lib/bizcheck";
-import { OG_IMAGE } from "@/lib/site";
 import { PhotoSlider } from "@/components/PhotoSlider";
 import { BookingForm } from "./BookingForm";
 import { categoryLabel, Chip, dateLabel, InfoList, InfoRow, won } from "../ui";
 import { AreaMap } from "./AreaMap";
 import { HostBrandCard } from "./HostBrandCard";
 import { SectionNav } from "./SectionNav";
+import { spaceShareImage } from "./share-image";
 
 // 하루 팝업 — 공간 한 곳 + 신청 (2026-09-13)
 //
@@ -100,13 +100,13 @@ export async function generateMetadata({
   // 🔗09-18 밤 QA(SC-06) — 공개 공간의 링크 카드. 전엔 `openGraph`가 없어 루트 것을 물려받았다.
   //   카톡에 공간 링크를 붙이면 제목은 사이트 슬로건, 주소는 홈, 그림은 로고 카드로 떠서 «홈 링크»처럼 보였다.
   //   ⚠️`openGraph`는 루트와 합쳐지지 않고 통째로 갈린다. 사이트 이름·언어도 여기 다시 적는다.
-  //   사진은 http 주소만 쓴다. 크롤러는 data URL을 못 읽는다(`/m` 소개서와 같은 규칙). 없으면 사이트 기본 썸네일.
+  //   🖼그림은 공간 사진 첫 장, 없으면 사이트 기본 썸네일(`spaceShareImage`, 판매자 정보 화면과 같은 규칙).
   const cardTitle = `${sp.name} · 하루 팝업`;
-  const image = sp.photos.find((p) => /^https?:\/\//.test(p)) ?? OG_IMAGE;
+  const image = spaceShareImage(sp.photos);
   return {
     ...meta,
-    openGraph: { type: "website", siteName: "collab5", locale: "ko_KR", url, title: cardTitle, description, images: [{ url: image }] },
-    twitter: { card: "summary_large_image", title: cardTitle, description, images: [image] },
+    openGraph: { type: "website", siteName: "collab5", locale: "ko_KR", url, title: cardTitle, description, images: [image] },
+    twitter: { card: "summary_large_image", title: cardTitle, description, images: [image.url] },
   };
 }
 
