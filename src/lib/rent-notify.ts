@@ -20,7 +20,7 @@ import { KAKAO_CHAT_URL, SITE_URL } from "./site";
 import { bookingWhen, dateLabel } from "./rent-time";
 import {
   accessMeetLine, hostContactLine, withJosa, BROKER_NOTE, CONTACT_RULE_GUEST, CONTACT_RULE_GUEST_CONFIRMED, CONTACT_RULE_HOST,
-  BOOKING_HEADLINE, COFFEE_CHAT_FREE, COFFEE_CHAT_WHEN_GUEST, COFFEE_CHAT_WHEN_HOST, HOST_REQUEST_STEPS,
+  BOOKING_HEADLINE, COFFEE_CHAT_FREE, COFFEE_CHAT_WHEN_GUEST_ROW, COFFEE_CHAT_WHEN_HOST_ROW, HOST_REQUEST_STEPS,
   PRODUCT_HINT_GUEST, PRODUCT_LABEL, REFUND_TIMING_LINE,
 } from "./rent-copy";
 import type { Space, SpaceBooking } from "./types";
@@ -187,9 +187,15 @@ type Tail = string | { text: string; href: string; label: string };
 const ASK = (text: string): Tail => ({ text, href: KAKAO_CHAT_URL, label: "문의하기" });
 
 function tailHtml(tail: Tail): string {
-  const inner = typeof tail === "string"
-    ? esc(tail)
-    : `${esc(tail.text)} <a href="${esc(tail.href)}" style="color:${MAIL.body};text-decoration:underline;text-underline-offset:2px;white-space:nowrap">${esc(tail.label)}</a>`;
+  // ✂️09-27 대표 B12 — 줄바꿈으로 나눈 안내는 줄마다 한 문단으로 선다. 약속 두 개가 한 덩어리로 읽히지 않게.
+  //   글자판(`tailText`)은 줄바꿈이 그대로 두 줄이 된다.
+  if (typeof tail === "string") {
+    return tail
+      .split("\n")
+      .map((line, i) => `<p style="margin:${i === 0 ? 20 : 8}px 0 0;color:${MAIL.mute};font-size:14px;word-break:keep-all">${esc(line)}</p>`)
+      .join("\n  ");
+  }
+  const inner = `${esc(tail.text)} <a href="${esc(tail.href)}" style="color:${MAIL.body};text-decoration:underline;text-underline-offset:2px;white-space:nowrap">${esc(tail.label)}</a>`;
   return `<p style="margin:20px 0 0;color:${MAIL.mute};font-size:14px;word-break:keep-all">${inner}</p>`;
 }
 
@@ -320,8 +326,9 @@ function boughtChat(b: SpaceBooking): boolean {
 function chatRow(b: SpaceBooking, forHost: boolean): [string, string] {
   if (!boughtChat(b)) return [LABEL.chat, ""];
   // ☕09-19 무료 커피챗 — 값이 0이면 「무료」를 붙인다. 사장님은 돈을 안 받는 약속인지 여기서 알아야 하고, 손님은 결제액에 커피챗이 없는 이유를 안다.
-  const free = !(b.amountChat > 0 || b.amountMentor > 0) ? `${COFFEE_CHAT_FREE} ` : "";
-  return [LABEL.chat, forHost ? `손님이 ${free}커피챗도 함께 골랐어요. ${COFFEE_CHAT_WHEN_HOST}` : `${free}커피챗도 함께 예약하셨어요. ${COFFEE_CHAT_WHEN_GUEST}`];
+  // ✂️09-27 대표 B11 — 칸 이름이 이미 「커피챗」이라 값에서 「커피챗」을 뗐다(「커피챗도 함께 예약하셨어요. 커피챗 시간은…」이 한 칸에 세 번이었다).
+  const free = !(b.amountChat > 0 || b.amountMentor > 0) ? `${COFFEE_CHAT_FREE}로 ` : "";
+  return [LABEL.chat, forHost ? `손님이 ${free}함께 골랐어요. ${COFFEE_CHAT_WHEN_HOST_ROW}` : `${free}함께 예약하셨어요. ${COFFEE_CHAT_WHEN_GUEST_ROW}`];
 }
 
 /** 🛍고른 상품 한 줄(09-18) — 「공간 전체 · 자리에 시설과 장비까지 같이 써요」.
@@ -348,15 +355,17 @@ function spaceRowWithLink(space: Space): [string, string] {
  *  수수료율은 예약마다 적힌 값(`feeRate`)이다. 요율이 바뀌어도 이미 성사된 거래엔 그때 요율이 간다(호스트 약관 제9조). */
 function payoutLine(b: SpaceBooking): string {
   const rate = Math.round((b.feeRate || 0) * 100);
-  return `${won(b.amountPayout)}이에요. 손님이 결제한 ${won(b.amountTotal)}에서 수수료 ${rate}%를 뺐어요.`;
+  // ✂️09-27 대표 C2 — 문장 두 개를 금액 + 괄호 한 줄로.
+  return `${won(b.amountPayout)} (결제 ${won(b.amountTotal)}, 수수료 ${rate}% 제외)`;
 }
 
 /** 취소·환불 규정 한 줄. 상세 페이지 «환불 규정» 절과 호스트 약관 제8조의 숫자 그대로다 — 바뀌면 셋 다.
  *  🔁09-19 대표 — 전액 창이 «결제하고 한 시간»에서 «사장님이 수락하신 뒤 한 시간»으로 옮겨 갔다(`GRACE_MINUTES`).
  *  🆕09-19 오후 대표 — 수락 전 취소는 전액(`CancelStage`). 이 메일은 결제 직후, 곧 수락 전에 나간다.
  *    그래서 손님이 지금 서 있는 구간(수락 전 전액)을 먼저 말하고, 수락 뒤 한 시간과 표를 차례로 붙인다. */
+// 🔁09-27 대표 A2 — 손님이 읽는 자리의 「수락」은 「확정」으로.
 const CANCEL_POLICY_LINE =
-  "사장님이 수락하시기 전에 취소하시면 전액 돌려드려요. 수락하신 뒤에도 한 시간 안이면 전액이고, 그 뒤엔 이용일 7일 전까지 전액, 3일 전까지 70%, 1일 전까지 50%를 돌려드려요. 당일은 환불이 없어요.";
+  "사장님이 예약을 확정하기 전에 취소하시면 전액 돌려드려요. 확정하신 뒤에도 한 시간 안이면 전액이고, 그 뒤엔 이용일 7일 전까지 전액, 3일 전까지 70%, 1일 전까지 50%를 돌려드려요. 당일은 환불이 없어요.";
 
 /** 🏦계좌가 없을 때의 한 줄 — 공개 메일과 수락 메일이 같이 쓴다(09-18 메일 전수. 전엔 두 통의 말이 달랐다).
  *  「이용이 끝나면」 = 호스트 약관 제9조 「정산은 이용이 끝난 것을 확인한 뒤」. 날짜는 말하지 않는다(토스 계약 뒤 대표가 정한다).
@@ -394,7 +403,8 @@ export function buildBookingPaid(
   // ❓«답해야 하나»를 첫 줄에서 말한다(09-17 QA). 🧭09-17 대표 — 요청 확인 → 수락·거절 → 2일 안에 공간 안내.
   // 🔁09-18 대표 #58 — 「연락처가 열려요」 → 「연락처를 보실 수 있어요」.
   const lead = `${BOOKING_HEADLINE.hostPaid}. 결제는 이미 끝났어요. 날짜와 손님이 적은 계획을 읽어 보시고 수락하거나 거절해 주세요. 수락하시면 손님 연락처를 보실 수 있어요.`;
-  const tail = `거절은 이용 시작 전까지 할 수 있고, 손님께 전액 돌아가요. ${CONTACT_RULE_HOST}`;
+  // ✂️09-27 대표 B12 — 거절 안내와 연락 규칙을 두 줄로(`tailHtml`이 줄마다 문단을 세운다).
+  const tail = `거절은 이용 시작 전까지 할 수 있고, 손님께 전액 돌아가요.\n${CONTACT_RULE_HOST}`;
   // ⚖️09-19 대표 — 결제 메일 끝에 통신판매중개자 한 줄(`BROKER_NOTE`).
   return { to: host?.email ?? "", subject, ...compose(lead, rows, { href: link, label: "들어온 요청 보기" }, tail, BROKER_NOTE) };
 }
@@ -455,7 +465,8 @@ export function buildBookingConfirmed(
   const contact = hostContactLine(space.contactPhone, host?.phone, host?.email);
   const meet = accessMeetLine(space.accessHow);
   // 🩸09-16까지 「그날 오시기만 하면 돼요」 — 원상복구·판매 금지 같은 유의 사항이 있는 공간과 부딪혔다(09-17 QA).
-  const lead = `${BOOKING_HEADLINE.guestConfirmed}. 가시기 전에 공간 페이지에서 유의 사항을 한 번 읽어 봐 주세요.`;
+  // 🔁09-27 A15 — 제목 문장이 느낌표로 끝나서 뒤에 마침표를 붙이지 않는다(`splitLead`가 「요!」에서 자른다).
+  const lead = `${BOOKING_HEADLINE.guestConfirmed} 가시기 전에 공간 페이지에서 유의 사항을 한 번 읽어 봐 주세요.`;
   const rows: [string, string][] = [
     [LABEL.when, bookingWhen(booking)],
     spaceRowWithLink(space),
@@ -503,7 +514,8 @@ export function buildBookingConfirmedToHost(
   const when = dateLabel(booking.useDate);
   // 🔁09-17 QA — 제목이 「수락이 잘 들어갔어요」였다. 방금 자기 손으로 누른 일을 되풀이하는 시스템 말이라,
   //   제목을 «그날 챙길 것»으로 바꿨다. 09-18 — 공간 이름을 빼고 날짜 뒤 한 문장으로(대표 #57과 같은 결).
-  const subject = `[collab5] ${subjectDate(booking.useDate)}, 손님 연락처와 그날 챙기실 일을 보내 드려요`;
+  // 🔁09-27 대표 C1 — 「손님 연락처와 그날 챙기실 일을 보내 드려요」 → 「예약을 확정하셨어요」. 다른 메일과 같은 `[collab5] 날짜,` 틀.
+  const subject = `[collab5] ${subjectDate(booking.useDate)}, 예약을 확정하셨어요`;
   const link = `${SITE_URL}/rent/my?tab=host`;
   // ☎️번호가 없는 손님이면 «이메일로만 연락된다»고 분명히 쓴다. 문자 안내를 고른 사장님이 할 일을 알 수 있게.
   // ☎️신청 때 받은 번호가 먼저다(09-17). 옛 예약만 프로필 번호로.
@@ -514,7 +526,8 @@ export function buildBookingConfirmedToHost(
     : gEmail
       ? `이메일로만 연락돼요 · ${gEmail}`
       : "연락처를 안 남기셨어요";
-  const lead = `${when} 예약을 수락하셨어요. 이제 손님께 직접 연락하실 수 있어요.`;
+  // 🔁09-27 — 제목(C1)이 「확정하셨어요」라 첫 줄도 같은 말로. 한 통 안에서 같은 일을 두 이름으로 부르지 않게.
+  const lead = `${when} 예약을 확정하셨어요. 이제 손님께 직접 연락하실 수 있어요.`;
   // 「관리자에게 환불 신청하기」 = 내 하루 팝업의 그 버튼 이름 그대로(`my/Actions.tsx`). 확정 예약 줄에 뜬다.
   const tail =
     "사정이 생겨 이 예약을 무르셔야 하면 내 하루 팝업에서 「관리자에게 환불 신청하기」를 눌러 주세요. 저희가 두 분께 전화로 여쭤본 뒤 처리할게요.";
