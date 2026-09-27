@@ -207,7 +207,7 @@ export const RENT_GROUPS: Group[] = [
         rows: [
           { desc: "공개 중인 내 공간 (신청 대신 안내 한 줄)", c: "host-full", to: `/rent/${S.full}` },
           // 📝09-27 #164 — 칸이 둘이던 때의 옛 공간. 고치기 전엔 소개 글과 시설 안내 글이 두 절로 따로 서요.
-          { desc: "검토 대기 중인 내 공간 · 칸이 둘이던 때 올린 옛 공간이라 「공간 소개」와 「공간·시설 안내」 절에 글이 따로 서요", c: "host-full", to: `/rent/${S.pending}` },
+          { desc: "검토 대기 중인 내 공간 · 칸이 둘이던 때 올린 옛 공간이라 두 글이 「공간·시설 안내」 한 절에 빈 줄 하나로 이어 서요", c: "host-full", to: `/rent/${S.pending}` },
           { desc: "쉬는 중인 내 공간", c: "host-full", to: `/rent/${S.paused}` },
           { desc: "작성 중(초안)인 내 공간", c: "host-full", to: `/rent/${S.draft}` },
           { desc: "사업자등록번호가 빈 내 공간 (주인은 볼 수 있어요)", c: "host-full", to: `/rent/${S.noBiz}` },

@@ -371,7 +371,7 @@ function fullWorld(today: string, withAccount: boolean): MockWorld {
 
   // 🟡S2 — 검토 대기
   //   📝09-27 #164 — 칸이 둘이던 때 올린 «옛 공간» 모양을 일부러 남겨 둔다(소개 `body` + 시설 안내 `facilitiesNote`가 다 찼다).
-  //   상세는 두 절(공간 소개 · 공간·시설 안내)로 그대로 보이고, 고치기 화면은 두 글을 빈 줄 하나로 이어 한 칸에 보여 준다.
+  //   상세는 🔁09-27부터 한 절(「공간·시설 안내」)에 두 글을 빈 줄 하나로 이어 보이고, 고치기 화면도 같은 규칙으로 한 칸에 보여 준다.
   const s2 = space({
     id: 9102, slug: "mock-slow-afternoon-showroom", ownerUserId: U.host, status: "pending",
     name: "느린오후 지하 쇼룸", brandSlug: "mock-slow-afternoon", category: "shop", scope: "whole_shop",
