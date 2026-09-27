@@ -7,7 +7,12 @@
 // 🚨사장님 연락처의 문은 `guestSeesHost(booking)` 하나다(09-16부터 결제를 마치면 열린다). `loadGuestBookings`가 열린 예약의 원본과
 //   사장님 프로필만 읽고, 줄은 받은 값을 그리기만 한다. 화면에서 가리는 게 아니라 «읽지를 않는다».
 //
-// 훅이 없는 서버 컴포넌트 파일이다(`"use client"` 없음). 취소 버튼(`GuestCancel`)만 클라이언트 조각이다.
+// 🗂09-27 대표 — 탭(「예약 확정 대기」·「예약 확정 완료」·「지난 예약」·「취소 예약」)으로 나누는 것도 이 파일의 `guestTabViews` 한 벌이다.
+//   판정은 `lib/rent-groups`(`GUEST_TABS`·`guestBookingTab`), 순서는 여기. 두 화면이 같은 순서로 같은 줄을 보인다.
+// 🔗09-27 대표 #158·#161 — 줄 전체가 예약 한 건 화면(`/rent/done`)으로 가는 링크다. 「자세히」 글자 링크와 「예약 취소하기」는 뺐다.
+//   취소는 그 화면의 버튼에서만 한다.
+//
+// 훅이 없는 서버 컴포넌트 파일이다(`"use client"` 없음).
 import Link from "next/link";
 import { getSpaceFull, guestSeesHost, listBookingsForGuest, listPaymentsByOrderIds, listSpacesByIds, type SpaceBrief } from "@/lib/spaces";
 // 🔒09-27(fix-money3) 결제 전 신청에 «결제를 시도한 흔적»이 있나 — 정리 작업·승인 관문과 같은 판정 한 벌이다.
@@ -16,10 +21,10 @@ import { PAY_CHECKING_TITLE, PAY_CHECKING_WAIT } from "@/lib/rent-payment";
 import { getProfileById, type Profile } from "@/lib/profiles";
 import { repo } from "@/lib/repo";
 import type { Space, SpaceBooking } from "@/lib/types";
-import { bookingFinished, bookingStarted, dateLabel, rangeLabel } from "@/lib/rent-time";
+import { bookingFinished, dateLabel, rangeLabel } from "@/lib/rent-time";
 import { PRODUCT_LABEL, telHref } from "@/lib/rent-copy";
 import { bookingHasChat } from "@/lib/rent-products";
-import { GuestCancel } from "./my/Actions";
+import { GUEST_TABS, groupGuestBookings, guestBookingTab, type GuestTabKey } from "@/lib/rent-groups";
 import { autoRejected, BookingBadge, CoverPlaceholder, InfoList, InfoRow, ListRow, bookingWhen, won } from "./ui";
 
 type Reveal = {
@@ -35,19 +40,30 @@ export type GuestBookingView = {
   reveal?: Reveal;
   /** 확정된 예약에만 읽는다. 아니면 null. */
   host: Profile | null;
-  /** 🆕09-27(fix-money3) 결제 전(`pending`)인데 결제를 시도한 흔적이 있다 — 승인 결과를 아직 모른다. 「이어서 결제하기」를 안 띄운다. */
+  /** 🆕09-27(fix-money3) 결제 전(`pending`)인데 결제를 시도한 흔적이 있다 — 승인 결과를 아직 모른다. 「결제를 확인하고 있어요」 한 줄로 선다. */
   checking?: boolean;
+  /** 이 줄이 서는 탭(`lib/rent-groups`의 `guestBookingTab`). */
+  tab: GuestTabKey;
 };
 
-/** 로그인한 사람이 보낸 신청 전부를, 줄을 그리는 데 필요한 것과 함께. 최근에 보낸 것부터. */
+/** 로그인한 사람이 보낸 신청 중 «목록에 서는 것»을, 줄을 그리는 데 필요한 것과 함께. 최근에 보낸 것부터.
+ *  🔻09-27 대표 — 결제창만 열고 떠난 신청(흔적 없는 `pending`)과 결제 시간이 지난 신청(`expired`)은 여기서 뺀다.
+ *    대표 원문: 「이어서 결제하기는 결제 중간 이탈이라 리스트에 별도 안 남겨도 될 거 같아. 결제 중 취소는 그냥 새로 결제하는 걸로 가자」.
+ *    ⚠️흔적이 있는 결제 전 신청은 남긴다 — 돈이 나갔을 수 있어서 손님이 봐야 한다(「결제를 확인하고 있어요」). */
 export async function loadGuestBookings(uid: number): Promise<GuestBookingView[]> {
-  const bookings = await listBookingsForGuest(uid);
-  // 내가 «빌린» 곳은 남의 공간이라 id로 따로 읽는다(`listSpacesByIds` 주석 참조).
-  // 🔒09-27(fix-money3) 결제 전 신청은 결제 줄도 같이 읽는다. 승인 결과를 모르는 신청에 「이어서 결제하기」를 띄우면 두 번 나갈 수 있다.
-  const [spaces, pays] = await Promise.all([
-    listSpacesByIds(bookings.map((b) => b.spaceId)),
-    listPaymentsByOrderIds(bookings.filter((b) => b.status === "pending").map((b) => b.orderId)),
+  const all = await listBookingsForGuest(uid);
+  // 🔒09-27(fix-money3) 결제 전 신청은 결제 줄도 같이 읽는다. 흔적이 있으면 「결제를 확인하고 있어요」로 세운다.
+  //   ⚠️결제 줄 읽기가 실패하면(빈 표) 흔적을 모르는 채라 결제 전 신청이 다 빠진다. 다음에 열면 다시 읽는다.
+  //   내가 «빌린» 곳은 남의 공간이라 id로 따로 읽는다(`listSpacesByIds` 주석 참조). 둘은 같이 읽는다.
+  const [pays, spaces] = await Promise.all([
+    listPaymentsByOrderIds(all.filter((b) => b.status === "pending").map((b) => b.orderId)),
+    listSpacesByIds(all.map((b) => b.spaceId)),
   ]);
+  const checkingOf = (b: SpaceBooking) => {
+    const pay = b.status === "pending" ? pays.get(b.orderId) : undefined;
+    return !!pay && hasPayTrace({ payStatus: pay.status, payKey: pay.paymentKey });
+  };
+  const bookings = all.filter((b) => guestBookingTab(b, checkingOf(b)) !== null);
 
   // 원본·프로필은 열린 예약 것만, 같은 공간·같은 사장님은 한 번만 읽는다.
   const openSpaceIds = new Set<number>();
@@ -80,14 +96,31 @@ export async function loadGuestBookings(uid: number): Promise<GuestBookingView[]
   return bookings.map((b) => {
     const sp = spaces.get(b.spaceId);
     const open = guestSeesHost(b) && !!sp;
-    const pay = b.status === "pending" ? pays.get(b.orderId) : undefined;
+    const checking = checkingOf(b);
     return {
       booking: b,
       space: sp,
       reveal: open ? reveals.get(b.spaceId) : undefined,
       host: open ? (hosts.get(sp!.ownerUserId) ?? null) : null,
-      checking: !!pay && hasPayTrace({ payStatus: pay.status, payKey: pay.paymentKey }),
+      checking,
+      tab: guestBookingTab(b, checking) as GuestTabKey,
     };
+  });
+}
+
+/** 정렬 열쇠 — 날짜 + 시작 시각. 둘 다 고정폭 글자라 문자열 비교로 순서가 맞다. */
+const whenKey = (v: GuestBookingView) => `${v.booking.useDate} ${v.booking.startTime ?? ""}`;
+
+export type GuestTabView = (typeof GUEST_TABS)[number] & { list: GuestBookingView[] };
+
+/** 🗂09-27 대표 — 탭마다의 줄. `/rent/requests`와 `/rent/my?tab=guest`가 이 한 벌로 나누고 줄 세운다.
+ *  아직 쓰기 전인 탭(`ahead`)은 가까운 날부터(다음에 챙길 것이 맨 위), 나머지는 최근 것부터.
+ *  결제를 확인하고 있는 신청은 「예약 확정 대기」 맨 위에 선다 — 돈이 나갔을 수 있어서 먼저 보여야 한다. */
+export function guestTabViews(views: GuestBookingView[]): GuestTabView[] {
+  const g = groupGuestBookings(views, (v) => v.booking, (v) => !!v.checking);
+  return GUEST_TABS.map((t) => {
+    const list = [...g[t.key]].sort((a, b) => (t.ahead ? whenKey(a).localeCompare(whenKey(b)) : whenKey(b).localeCompare(whenKey(a))));
+    return { ...t, list: [...list.filter((v) => v.checking), ...list.filter((v) => !v.checking)] };
   });
 }
 
@@ -114,7 +147,8 @@ function CompactContact({ host, shopPhone, address }: { host: Profile | null; sh
             value={
               // ☎️09-18 밤 QA(G-19) — 번호에 메모가 섞이면 `tel:` 값이 틀어졌다. 뽑기는 한 벌(`telHref`).
               telHref(phone) ? (
-                <a href={`tel:${telHref(phone)}`} className="underline underline-offset-2">
+                // 줄 전체를 덮는 링크(`ListRow`의 `href`) 위로 올려 따로 눌린다(09-27 #158).
+                <a href={`tel:${telHref(phone)}`} className="relative z-[1] underline underline-offset-2">
                   {phone}
                 </a>
               ) : (
@@ -126,7 +160,7 @@ function CompactContact({ host, shopPhone, address }: { host: Profile | null; sh
           <InfoRow
             label="연락"
             value={
-              <a href={`mailto:${email}`} className="break-all underline underline-offset-2">
+              <a href={`mailto:${email}`} className="relative z-[1] break-all underline underline-offset-2">
                 {email}
               </a>
             }
@@ -141,9 +175,10 @@ function CompactContact({ host, shopPhone, address }: { host: Profile | null; sh
 export function GuestBookingRow({ view }: { view: GuestBookingView }) {
   const { booking: b, space: sp, reveal, host, checking } = view;
   const open = guestSeesHost(b);
-  // 🔗09-17 QA — 줄 어디에도 링크가 없어서 완료 화면(`/rent/done`)은 결제 직후 한 번만 볼 수 있었다.
-  //   「자세히」는 결제를 마친 건에만 건다 — 결제 전·만료 건은 완료 화면이 보여 줄 게 없다.
-  const paidOnce = b.status !== "pending" && b.status !== "expired";
+  // 🔗09-27 대표 코멘트 #158 — 「자세히 버튼 삭제하고, 섹션 영역 클릭하면 자세히 화면으로 들어가게 하자」.
+  //   줄 전체가 예약 한 건 화면(`/rent/done`)으로 간다. 결제를 확인하고 있는 신청(`pending`)은 누를 곳을 두지 않는다 —
+  //   그 화면은 결제 전 신청을 결제 화면으로 돌려보내고, 결제 화면은 「결제를 확인하고 있어요」만 다시 말한다. 이 줄이 이미 그 말이다.
+  const href = b.status === "pending" ? undefined : `/rent/done/${b.id}`;
   // 🔻09-18 밤 QA(G-27) — 카드 오른쪽 배지가 「예약 완료」인데 바로 아래에 「하루 팝업 예약이 완료됐어요」가 또 섰다.
   //   같은 말이 한 카드에 두 번이라, 목록을 세로로 훑으면 줄마다 같은 문장이 반복됐다.
   //   ⭐긴 문장(`BOOKING_HEADLINE`)이 사는 자리는 «그 한 건만 보여 주는» 화면(`/rent/done`)과 메일 제목이다.
@@ -151,8 +186,10 @@ export function GuestBookingRow({ view }: { view: GuestBookingView }) {
   return (
     <ListRow
       card
-      // 🔗09-27 대표 D2 — 완료 화면의 「내 예약 보기」가 `/rent/requests#b-<번호>`로 이 줄을 짚는다(`requests/HashFocus`).
+      // 🔗09-27 대표 D2 — 예약 한 건 화면의 「예약 내역 확인」이 `/rent/requests?g=<탭>#b-<번호>`로 이 줄을 짚는다(`requests/HashFocus`).
       id={`b-${b.id}`}
+      href={href}
+      hrefLabel={href ? `${sp?.name ?? "공간"} ${whenParts(b).join(" ")} 예약 자세히 보기` : undefined}
       head={
         // 🖼09-18 대표 코멘트 — 「가독성이 좀 떨어지고, 작은 정방형 이미지도 1장」. 한 줄에 여섯 토막이던 메타를
         //   **언제 / 무엇을·어디서 / 얼마** 세 줄로 나누고, 왼쪽에 공간 첫 사진(정사각 64)을 둔다.
@@ -168,7 +205,8 @@ export function GuestBookingRow({ view }: { view: GuestBookingView }) {
           <div className="min-w-0 flex-1">
             <p className="truncate text-[17px] font-medium text-ink">
               {sp ? (
-                <Link href={`/rent/${sp.slug}`} className="underline-offset-2 hover:underline">
+                // 줄 전체를 덮는 링크(`ListRow`의 `href`) 위로 올려 따로 눌린다 — 이 이름은 공간 상세로 간다.
+                <Link href={`/rent/${sp.slug}`} className="relative z-[1] underline-offset-2 hover:underline">
                   {sp.name}
                 </Link>
               ) : (
@@ -198,35 +236,18 @@ export function GuestBookingRow({ view }: { view: GuestBookingView }) {
       }
       status={<BookingBadge status={b.status} auto={autoRejected(b)} />}
     >
-      {/* 🩸09-16 — `pending`에도 「사장님이 수락하면…」이 붙어 있었다. 그 신청은 **사장님에게
-          보이지도 않는다**(`listBookingsForHost`가 거른다). 기다릴 것이 없는데 기다리라고 말하고,
-          이어서 낼 길도 없어서 목록에 쌓이기만 했다. 결제 화면은 주문번호로 되돌아갈 수 있다. */}
-      {/* ⏳날짜가 지난 미결제 신청엔 「이어서 결제하기」를 안 띄운다(09-16). 눌러도 서버가 지난 날짜를 막아서
-          (`startBookingAction`) 손님은 결제 화면에서 막다른 길을 만난다. 버튼을 거두고 사실만 말한다. */}
-      {/* 🔒09-27(fix-money3) 결제를 시도한 흔적이 있으면(승인 결과를 모른다) 「이어서 결제하기」 대신 확인 중이라는 한 줄만.
-          결제 실패 화면이 「몇 분 뒤 내 예약에서 확인해 주세요」라며 손님을 이 줄로 보낸다. 여기서 다시 결제하면 두 번 나갈 수 있다.
-          날짜가 지났어도 이 말이 먼저다(「결제를 마치지 않은 채」가 사실이 아닐 수 있다). 정리 작업이 토스에 되물어 끝낸다. */}
+      {/* 🔒09-27(fix-money3) 결제를 시도한 흔적이 있는 결제 전 신청 — 승인 결과를 모른다. 확인 중이라는 한 줄만.
+          결제 실패 화면이 「몇 분 뒤 내 예약에서 확인해 주세요」라며 손님을 이 줄로 보낸다. 정리 작업이 토스에 되물어 끝낸다.
+          🔻09-27 대표 — 흔적 없는 결제 전 신청의 「이어서 결제하기」·「결제를 마치지 않은 채 날짜가 지났어요」 줄은 지웠다.
+            그 신청은 이제 목록에 안 선다(`loadGuestBookings`). */}
       {b.status === "pending" && checking ? (
         <p className="mt-3 text-[15px] leading-relaxed break-keep text-faint">
           {`${PAY_CHECKING_TITLE}. ${PAY_CHECKING_WAIT}`}
         </p>
-      ) : b.status === "pending" ? (
-        bookingStarted(b) ? (
-          <p className="mt-3 text-[15px] leading-relaxed break-keep text-faint">
-            결제를 마치지 않은 채 날짜가 지났어요. 사장님께는 전달되지 않았어요.
-          </p>
-        ) : (
-          <p className="mt-3 text-[15px] leading-relaxed break-keep text-faint">
-            아직 결제가 끝나지 않아 사장님께 전달되지 않았어요.{" "}
-            <Link href={`/rent/pay/${b.orderId}`} className="text-body underline underline-offset-2">
-              이어서 결제하기
-            </Link>
-          </p>
-        )
       ) : open && !(b.status === "done" || bookingFinished(b)) ? (
         // 🎨09-17 디자인팀 — 목록에선 **바로 쓸 두 줄만**. 전엔 줄마다 7줄짜리 「가게 정보」 블록(제목·안내·사장님·소개서·
         //   가게 전화·전화번호·이메일·주소·이용 안내)을 통째로 펼쳐서, 앞으로 갈 곳 셋이면 폰에서 이 화면이 6,300px였다.
-        //   목록에서 손님이 하는 일은 «연락하기»와 «찾아가기» 둘이다. 나머지는 「자세히」(`/rent/done`)가 전부 보여 준다.
+        //   목록에서 손님이 하는 일은 «연락하기»와 «찾아가기» 둘이다. 나머지는 예약 한 건 화면(`/rent/done`)이 전부 보여 준다.
         //   ⚠️문은 그대로 `guestSeesHost` 하나다. 줄이는 건 보여 주는 칸 수지, 여는 조건이 아니다.
         //   🙈이용일이 지난 줄엔 판을 안 그린다. 가려진 「-」 넷이 남는 것보다 조용하고, 완료 화면이 가림을 따로 말한다.
         <CompactContact host={host} shopPhone={reveal?.contactPhone} address={sp?.address} />
@@ -236,20 +257,8 @@ export function GuestBookingRow({ view }: { view: GuestBookingView }) {
       {b.hostMessage && (
         <p className="mt-2 text-[15px] leading-relaxed break-keep text-body">사장님 말씀 · {b.hostMessage}</p>
       )}
-
-      {/* 🚨이미 시작한 예약엔 취소 버튼을 안 띄운다(09-16). 다 쓴 예약을 취소로 바꾸면
-          환불은 0원인데 사장님 정산에서 통째로 빠졌다. 관문은 서버 액션이고 이건 화면 쪽 짝이다. */}
-      <div className="flex flex-wrap items-center gap-x-5">
-        {paidOnce && (
-          <Link
-            href={`/rent/done/${b.id}`}
-            className="mt-2 inline-block py-[12px] text-[15px] text-body underline underline-offset-2"
-          >
-            자세히
-          </Link>
-        )}
-        {(b.status === "paid" || b.status === "confirmed") && !bookingStarted(b) && <GuestCancel bookingId={b.id} />}
-      </div>
+      {/* 🔻09-27 대표 코멘트 #161 — 「이거 취소하기도 삭제, 자세히 화면에서 버튼으로 처리할거야」. 줄의 「예약 취소하기」를 뺐다.
+          취소 조건(결제 완료·확정이고 이용 시작 전)과 버튼(`GuestCancel`)은 예약 한 건 화면 한 곳에만 있다. */}
     </ListRow>
   );
 }

@@ -12,6 +12,7 @@
 //   만들고 있었다. 소개서(`/m`) 사다리와 디자인-시스템 정본에 맞춰 통째로 갈았다.
 //   ⛔`rem` 유틸 금지(루트 17px라 6.25% 부푼다) — 전부 px로 박는다.
 import type { ReactNode } from "react";
+import Link from "next/link";
 import type { BookingStatus, SpaceCategory } from "@/lib/types";
 
 /** 금액은 늘 「12,000원」 한 모양으로. 숫자만 던져두면 자릿수를 눈으로 세게 된다. */
@@ -290,10 +291,18 @@ export function ListRow({
   children,
   card = false,
   id,
+  href,
+  hrefLabel,
 }: {
   head: ReactNode;
   status: ReactNode;
   children?: ReactNode;
+  /** 🔗09-27 대표 코멘트 #158 — 「자세히 버튼 삭제하고, 섹션 영역 클릭하면 자세히 화면으로」. 카드일 때만 쓴다.
+   *  카드 전체를 덮는 링크 한 겹을 깐다(`<a>` 안에 `<a>`를 넣지 않으려고). 카드 안의 다른 링크(공간 이름·전화·메일)는
+   *  `relative z-[1]`로 그 위에 올라와 따로 눌린다 — 카드 안에 링크를 더할 땐 같은 클래스를 붙일 것. */
+  href?: string;
+  /** 덮는 링크의 이름(낭독기). 링크 안에 글자가 없어서 이게 없으면 「링크」로만 읽힌다. */
+  hrefLabel?: string;
   /** 🔗줄을 주소로 가리킬 이름(09-18 밤 QA H-08). 화면 위 결과 줄이 `#booking-12`로 이 줄까지 데려온다.
    *  `scroll-mt`는 헤더(3.5rem)와 고정 탭이 덮는 만큼을 미리 비켜 둔 값이다. */
   id?: string;
@@ -303,7 +312,19 @@ export function ListRow({
 }) {
   if (card) {
     return (
-      <li id={id} className="mb-3 scroll-mt-32 rounded-xl border border-hairline bg-surface p-4 last:mb-0 sm:p-5">
+      <li
+        id={id}
+        className={`mb-3 scroll-mt-32 rounded-xl border border-hairline bg-surface p-4 last:mb-0 sm:p-5 ${
+          href ? "relative transition-colors hover:bg-surface-soft" : ""
+        }`}
+      >
+        {href && (
+          <Link
+            href={href}
+            aria-label={hrefLabel}
+            className="absolute inset-0 rounded-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+          />
+        )}
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0 flex-1">{head}</div>
           {status}

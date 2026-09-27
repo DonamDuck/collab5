@@ -35,7 +35,9 @@ export function StickyTabs({
               scroll={false}
               aria-current={on ? "page" : undefined}
               // 👆09-18 밤 QA(G-22·H-28) — 40px이라 4px 모자랐다. 판(`p-1`) 안쪽 여백을 히트영역으로 빌려 44를 채운다.
-              className={`relative flex h-[40px] items-center justify-center gap-1.5 rounded-lg text-[15px] transition-colors after:absolute after:-inset-y-[2px] after:content-[''] ${
+              // 📐09-27 칸이 넷인 곳(`/rent/requests` 「예약 확정 대기」 등)은 390에서 한 칸이 84px라 일곱 글자가 한 줄에 안 든다.
+              //   높이를 40으로 못 박지 않고(`min-h`) 낱말 사이에서만 두 줄로 꺾는다. 칸이 둘인 곳은 한 줄이라 전과 같다.
+              className={`relative flex min-h-[40px] items-center justify-center gap-1.5 rounded-lg px-2 py-1 text-center text-[15px] leading-tight break-keep transition-colors after:absolute after:-inset-y-[2px] after:content-[''] ${
                 on ? "bg-surface font-semibold text-ink shadow-[0_1px_2px_rgba(0,0,0,0.08)]" : "font-medium text-mute hover:text-body"
               }`}
             >
