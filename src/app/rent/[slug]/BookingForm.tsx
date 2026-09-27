@@ -32,10 +32,10 @@ import { startBookingAction, confirmBookingAction } from "@/lib/rent-actions";
 import type { SpaceUseType, OpenSlot, RentProduct, Space } from "@/lib/types";
 import { bookingAmount, productNote, productPrice, sellableProducts } from "@/lib/rent-products";
 import { dayMarks, durationLabel, endChoices, minutesBetween, nowHhmmKst, rangeLabel, RENT_MIN_MINUTES, startChoices as startChoicesOf, toMinutes, todayKst } from "@/lib/rent-time";
-import { PLAN_MAX } from "@/lib/rent-limits";
+import { CAPACITY_MAX, PLAN_MAX } from "@/lib/rent-limits";
 import { dateLabel, InfoList, InfoRow, primaryBtnCls, RentSelect, rentInputCls, rentTextareaCls, won } from "../ui";
 import Link from "next/link";
-import { COFFEE_CHAT_FREE, COFFEE_CHAT_LABEL, CONTACT_RULE_GUEST, isTestPayment, PRODUCT_HINT_GUEST, PRODUCT_LABEL } from "@/lib/rent-copy";
+import { COFFEE_CHAT_FREE, COFFEE_CHAT_LABEL, CONTACT_RULE_GUEST, HEADCOUNT_MSG_EMPTY, headcountRangeMsg, isTestPayment, PRODUCT_HINT_GUEST, PRODUCT_LABEL } from "@/lib/rent-copy";
 import { ConfirmDialog } from "../ConfirmDialog";
 import { PickDateCalendar } from "./PickDateCalendar";
 import { MentorOptions } from "./MentorOption";
@@ -53,10 +53,9 @@ const chipRangeCls = "border-transparent bg-primary-pale text-primary-on";
 /** 시작을 고른 뒤 «끝으로 고를 수 있는» 칩 — 진한 키위 테두리로 켜서 어디까지 갈 수 있는지 보인다.
  *  📐375 실측(09-19) — 옅은 테두리(`primary-tint`)는 흰 칩과 거의 안 갈렸다. 한 단 진한 `primary-strong`에 글자도 키위로. */
 const chipEndableCls = "border-primary-strong bg-surface font-medium text-primary-on hover:bg-primary-pale";
-/** 시작을 고른 뒤, 끝은 못 되지만 «새 시작»으로는 누를 수 있는 칩. 끝 후보가 먼저 읽히게 한 단 물린다. */
-const chipDimCls = "border-hairline bg-surface text-mute hover:bg-surface-soft";
+// 🔻09-27 대표 코멘트 #142 — 시작을 고른 뒤 «새 시작»으로 누를 수 있게 흐리게만 두던 칩(`chipDimCls`)을 없앴다. 그 칩들은 이제 비활성이다.
 const chipOffCls = "border-hairline bg-surface text-ink hover:bg-primary-pale";
-/** 못 고르는 칩(찬 시간·최소 시간을 못 채우는 꼬리·닫는 시각). 눈금은 남겨 두어 그날의 모양이 보이게 한다. */
+/** 못 고르는 칩(시작보다 앞·최소 시간을 못 채우는 자리·찬 시간·닫는 시각). 눈금은 남겨 두어 그날의 모양이 보이게 한다. */
 const chipDisabledCls = "border-transparent bg-surface-soft text-faint";
 
 /** 화면 아래 고정 바 — 금액 + 이 화면의 키위 버튼. 어느 폭에서나 이 하나가 유일한 결제 버튼이다.
@@ -64,6 +63,7 @@ const chipDisabledCls = "border-transparent bg-surface-soft text-faint";
 function PayBar({
   amount,
   caption,
+  detail,
   emptyText,
   label,
   disabled,
@@ -73,6 +73,8 @@ function PayBar({
   amount: number | null;
   /** 금액 위 작은 줄에 붙는 길이(「2시간 30분」). 무엇에 대한 값인지 바에서 바로 읽힌다(09-19 30분 단위). */
   caption?: string;
+  /** 💸lg 요약 카드 위 금액 자리(`#rent-side-price`)에 총액 밑으로 서는 한 줄 — 상품 · 길이(「대관만 · 1시간 30분」). 09-27 #147. */
+  detail?: string;
   /** 금액 자리에 대신 서는 말. 무엇을 골라야 금액이 나오는지(09-18: 상품 → 시간 순). */
   emptyText: string;
   label: string;
@@ -83,9 +85,15 @@ function PayBar({
   //   오른쪽 요약 카드(`page.tsx`의 `#rent-side-pay` 자리) «안»으로 옮긴다. 카드가 sticky라 스크롤 내내 같이 간다.
   //   폰·태블릿은 전처럼 바닥 고정 바. 자리가 없으면(다른 화면에서 쓸 때) 바닥 바로 물러난다.
   const [slot, setSlot] = useState<HTMLElement | null>(null);
+  // 💸09-27 대표 코멘트 #147 — 금액은 요약 카드 «위» 값 자리(`#rent-side-price`) 하나에서 갱신된다. 아래 자리엔 버튼만.
+  //   위 자리가 없는 화면이면(다른 화면에서 쓸 때) 전처럼 아래 자리에 금액을 같이 든다.
+  const [priceSlot, setPriceSlot] = useState<HTMLElement | null>(null);
   useEffect(() => {
     const mq = window.matchMedia("(min-width: 1024px)");
-    const pick = () => setSlot(mq.matches ? document.getElementById("rent-side-pay") : null);
+    const pick = () => {
+      setSlot(mq.matches ? document.getElementById("rent-side-pay") : null);
+      setPriceSlot(mq.matches ? document.getElementById("rent-side-price") : null);
+    };
     pick();
     mq.addEventListener("change", pick);
     return () => mq.removeEventListener("change", pick);
@@ -107,26 +115,40 @@ function PayBar({
   }, [slot]);
 
   if (slot) {
-    return createPortal(
-      <div className="mt-5 border-t border-hairline pt-5">
-        {amount === null ? (
-          <p className="text-[15px] leading-snug break-keep text-mute">{emptyText}</p>
-        ) : (
-          <div className="flex items-baseline justify-between gap-3">
-            <p className="text-[14px] text-faint">대여 비용{caption ? ` · ${caption}` : ""}</p>
-            <p className="text-[19px] font-bold tabular-nums text-ink">{won(amount)}</p>
-          </div>
+    const totalUp = !!priceSlot && amount !== null;
+    return (
+      <>
+        {createPortal(
+          <div className="mt-5 border-t border-hairline pt-5">
+            {amount === null ? (
+              <p className="mb-3 text-[15px] leading-snug break-keep text-mute">{emptyText}</p>
+            ) : !priceSlot ? (
+              <div className="mb-3 flex items-baseline justify-between gap-3">
+                <p className="text-[14px] text-faint">대여 비용{caption ? ` · ${caption}` : ""}</p>
+                <p className="text-[19px] font-bold tabular-nums text-ink">{won(amount)}</p>
+              </div>
+            ) : null}
+            <button
+              type="button"
+              onClick={onClick}
+              disabled={disabled}
+              className={`${primaryBtnCls} h-[52px] w-full px-5`}
+            >
+              {label}
+            </button>
+          </div>,
+          slot,
         )}
-        <button
-          type="button"
-          onClick={onClick}
-          disabled={disabled}
-          className={`${primaryBtnCls} mt-3 h-[52px] w-full px-5`}
-        >
-          {label}
-        </button>
-      </div>,
-      slot,
+        {/* 총액 덩어리. 이것이 들어오면 위 자리의 시간당 값(`data-side-default`)이 CSS로 숨는다(`page.tsx`). 크기는 그 값과 같은 24px. */}
+        {totalUp &&
+          createPortal(
+            <div data-side-total>
+              <p className="text-[24px] font-bold leading-none tracking-tight tabular-nums text-ink">{won(amount)}</p>
+              {detail && <p className="mt-2 text-[15px] leading-snug break-keep text-mute">{detail}</p>}
+            </div>,
+            priceSlot,
+          )}
+      </>
     );
   }
 
@@ -175,14 +197,16 @@ function PayBar({
  *  sessionStorage라 같은 탭에만 남는다. 카카오·구글을 다녀와도 같은 탭이면 그대로다(`lib/safe-redirect` 머리말과 같은 성질). */
 const resumeKeyOf = (slug: string) => `collab5:rent-resume:${slug}`;
 
-/** 맡겨 두는 폼 값. 소개서 고르기는 안 담는다 — 로그인 전엔 고를 소개서가 없다. */
+/** 맡겨 두는 폼 값. 소개서 고르기는 안 담는다 — 로그인 전엔 고를 소개서가 없다.
+ *  🔻09-27 대표 #143·#148 — 「아직 잘 모르겠어요」(`headUnsure`)를 뺐다. 인원이 필수가 됐다.
+ *    그 전에 맡긴 초안에 `headUnsure: true`가 남아 있어도 읽을 때 무시한다. 인원 칸은 비어서 돌아오고,
+ *    되살리기가 빈 칸을 만나면 바를 누른 것과 똑같이 그 칸으로 데려간다(아래 되살리기 effect). */
 interface ResumeDraft {
   product: RentProduct | "";
   useDate: string;
   startTime: string;
   endTime: string;
   headcount: string;
-  headUnsure: boolean;
   plan: string;
   withChat: boolean;
   guestName: string;
@@ -202,7 +226,6 @@ function readResume(raw: string | null): ResumeDraft | null {
       startTime: str(o.startTime),
       endTime: str(o.endTime),
       headcount: /^\d{1,4}$/.test(str(o.headcount)) ? str(o.headcount) : "",
-      headUnsure: o.headUnsure === true,
       plan: str(o.plan).slice(0, PLAN_MAX),
       withChat: o.withChat === true,
       guestName: str(o.guestName).slice(0, 50),
@@ -283,10 +306,8 @@ export function BookingForm({
   const [brandOn, setBrandOn] = useState(true);
   const [brandPick, setBrandPick] = useState(myBrands[0]?.slug ?? "");
   const brandSlug = myBrands.length > 0 && brandOn ? brandPick : "";
-  /** 👥09-18 대표 코멘트 — 「아직 잘 모르겠어요」 체크. 켜면 인원 칸을 비우고 잠근다. */
-  const [headUnsure, setHeadUnsure] = useState(false);
   const [phone, setPhone] = useState(initialPhone);
-  /** 🪪09-18 대표 — 이용하실 분 성함(실명). 당일 신분 확인에 쓴다. 프로필엔 실명 칸이 없어 미리 채우지 않는다. */
+  /** 🪪09-18 대표 — 예약하시는 분 성함(09-27 #145 칸 이름). 당일 신분 확인에 쓴다. 프로필엔 실명 칸이 없어 미리 채우지 않는다. */
   const [guestName, setGuestName] = useState("");
   /** 결제 직전 확인 팝업(대표 09-14: 의사 확인은 팝업으로). */
   const [confirming, setConfirming] = useState(false);
@@ -303,10 +324,11 @@ export function BookingForm({
    *  **누른 자리에서 3,000px 떨어진 곳에 글자가 생겼다.** 화면에는 아무 변화도 없고 팝업도 안 열리니
    *  「버튼이 죽었다」로 읽힌다. 실제로 대표가 그렇게 읽었다.
    *  ⭐그래서 둘을 같이 한다 — 문구는 그 칸 아래에 놓고, 화면을 그 칸으로 끌어올린다. */
-  const [badField, setBadField] = useState<"product" | "date" | "time" | "plan" | "name" | "phone" | "">("");
+  const [badField, setBadField] = useState<"product" | "date" | "time" | "head" | "plan" | "name" | "phone" | "">("");
   const productRef = useRef<HTMLDivElement>(null);
   const dateRef = useRef<HTMLDivElement>(null);
   const timeRef = useRef<HTMLDivElement>(null);
+  const headRef = useRef<HTMLInputElement>(null);
   const planRef = useRef<HTMLTextAreaElement>(null);
   const nameRef = useRef<HTMLInputElement>(null);
   const phoneRef = useRef<HTMLInputElement>(null);
@@ -330,17 +352,34 @@ export function BookingForm({
   const endTime = ends.includes(endPick) ? endPick : "";
   const minutes = activeStart && endTime ? minutesBetween(activeStart, endTime) : 0;
 
-  /** 칩 하나를 눌렀을 때. 시작 → 끝 순서로 고르고, 다 고른 뒤 다른 칩을 누르면 그 칩을 새 시작으로 처음부터 고른다.
-   *  시작을 한 번 더 누르면 풀린다. 시작만 고른 상태에서 끝이 될 수 없는 칩을 누르면 그 칩이 새 시작이다. */
+  /** ⏱칩 하나를 눌렀을 때 — 세 상태로 간다(대표 09-27 코멘트 #142).
+   *  대표: 「17:00 클릭한 경우, 17:00 이전 시간과 17:30분은 비활성 처리해도 될 거 같아. 즉 시간 규칙 최소 1시간부터,
+   *    그리고 시작 시간 이후부터 클릭하는 것을 기준으로 UI/UX가 나왔으면 좋겠어.」
+   *  ① 아무것도 안 고름 — 시작이 될 수 있는 칩만 켜진다. 누르면 그 칩이 시작.
+   *  ② 시작만 고름 — **끝이 될 수 있는 칩만** 켜진다(시작 뒤 · 최소 시간을 채운 자리부터 · 찬 시간과 닫는 시각 전까지).
+   *     시작보다 앞 칩과 최소 시간을 못 채우는 칩은 비활성이다. 🩸09-19~09-27엔 앞 칩이 «새 시작»으로 눌리게 흐리게만 있었다.
+   *     시작을 바꾸는 길은 둘 — 고른 시작 칩을 한 번 더 누르거나, 안내 줄 옆 「시작 시각 다시 고르기」.
+   *  ③ 시작과 끝을 고름 — 시작이 될 수 있는 칩이 다시 다 켜진다. 다른 칩을 누르면 그 칩을 시작으로 처음부터(안내 줄이 그렇게 말한다).
+   *     끝 칩을 다시 누르면 끝만 풀려 ②로, 시작 칩을 다시 누르면 둘 다 풀려 ①로 간다. */
   const tapMark = (t: string) => {
     setBadField((f) => (f === "time" ? "" : f));
     setResumeNote("");
     if (activeStart && !endTime) {
-      if (t === activeStart) { setStartTime(""); return; }
-      if (ends.includes(t)) { setEndPick(t); return; }
+      if (t === activeStart) setStartTime("");
+      else if (ends.includes(t)) setEndPick(t);
+      return;
     }
-    if (activeStart && endTime && t === endTime && !startChoices.includes(t)) { setEndPick(""); return; }
+    if (activeStart && endTime) {
+      if (t === activeStart) { setStartTime(""); setEndPick(""); return; }
+      if (t === endTime) { setEndPick(""); return; }
+    }
     if (startChoices.includes(t)) { setStartTime(t); setEndPick(""); }
+  };
+  /** 「시작 시각 다시 고르기」 — ②·③에서 ①로. 누른 자리가 격자 위라 칩 격자는 그대로 둔다. */
+  const resetTime = () => {
+    setStartTime("");
+    setEndPick("");
+    setBadField((f) => (f === "time" ? "" : f));
   };
 
   // 💸금액 = 고른 상품 값 × 길이(분) (+ 커피챗). 서버(`startBookingAction`)가 같은 함수로 다시 계산한다 — 여기는 보여주기용.
@@ -355,6 +394,11 @@ export function BookingForm({
   const phoneOk = /^0\d{8,10}$/.test(phone.replace(/\D/g, ""));
   // 🪪서버(`startBookingAction`)와 같은 규칙 — 앞뒤 공백을 뺀 두 글자 이상.
   const nameOk = guestName.trim().length >= 2;
+  // 🙋09-27 대표 #143·#148 — 사용 인원 필수. 칸을 그리는 공간(`as_is`가 아닌 곳)에서만 묻는다. 서버(`startBookingAction`)와 같은 조건이고,
+  //   범위(1명~정원, 정원이 없으면 `CAPACITY_MAX`)는 서버 `validateBookingRequest`와 같은 셈이다. 말은 `rent-copy` 한 벌.
+  const askHead = useType !== "as_is";
+  const headCap = capacity && capacity > 0 ? Math.min(capacity, CAPACITY_MAX) : CAPACITY_MAX;
+  const headOkOf = (v: string) => /^\d+$/.test(v.trim()) && Number(v) >= 1 && Number(v) <= headCap;
   // ⚠️열 글자는 서버(`confirmBookingAction`)가 강제하는 값이다. 여기서 먼저 막는 건 왕복을 아끼려는 것이지
   //   이게 관문이라서가 아니다 — 관문은 늘 서버 쪽이다.
   const planShort = plan.trim().length < 10;
@@ -362,11 +406,12 @@ export function BookingForm({
   /** 버튼이 부르는 건 이것 — 싼 검사만 하고 팝업을 연다. 서버 왕복은 팝업에서 [신청하기]를 누른 뒤다. */
   /** 위에서부터 첫 번째로 비어 있는 칸으로 데려간다. 두 칸이 다 비어도 «위엣것» 하나만 말한다 —
    *  한 번에 둘을 고치라고 하면 어디부터 볼지 또 고민하게 된다. */
-  const stopAt = (f: "product" | "date" | "time" | "plan" | "name" | "phone") => {
+  const stopAt = (f: "product" | "date" | "time" | "head" | "plan" | "name" | "phone") => {
     setBadField(f);
-    const el = { product: productRef.current, date: dateRef.current, time: timeRef.current, plan: planRef.current, name: nameRef.current, phone: phoneRef.current }[f];
+    const el = { product: productRef.current, date: dateRef.current, time: timeRef.current, head: headRef.current, plan: planRef.current, name: nameRef.current, phone: phoneRef.current }[f];
     el?.scrollIntoView({ behavior: "smooth", block: "center" });
     // 글 칸은 커서까지 넣어 준다. 날짜는 격자라 커서가 갈 곳이 없다.
+    if (f === "head") headRef.current?.focus({ preventScroll: true });
     if (f === "plan") planRef.current?.focus({ preventScroll: true });
     if (f === "name") nameRef.current?.focus({ preventScroll: true });
     if (f === "phone") phoneRef.current?.focus({ preventScroll: true });
@@ -378,6 +423,7 @@ export function BookingForm({
     if (!product) { stopAt("product"); return; }
     if (!useDate) { stopAt("date"); return; }
     if (!endTime) { stopAt("time"); return; }
+    if (askHead && !headOkOf(headcount)) { stopAt("head"); return; }
     if (planShort) { stopAt("plan"); return; }
     if (!nameOk) { stopAt("name"); return; }
     if (!phoneOk) { stopAt("phone"); return; }
@@ -394,7 +440,7 @@ export function BookingForm({
   const resumeKey = resumeKeyOf(spaceSlug);
   const goLogin = () => {
     const draft: ResumeDraft = {
-      product, useDate, startTime: activeStart, endTime, headcount, headUnsure, plan, withChat, guestName, phone,
+      product, useDate, startTime: activeStart, endTime, headcount, plan, withChat, guestName, phone,
     };
     try {
       sessionStorage.setItem(resumeKey, JSON.stringify(draft));
@@ -453,8 +499,7 @@ export function BookingForm({
     setUseDate(d);
     setStartTime(st);
     setEndPick(en);
-    setHeadcount(saved.headUnsure ? "" : saved.headcount);
-    setHeadUnsure(saved.headUnsure);
+    setHeadcount(saved.headcount);
     setPlan(saved.plan);
     // ☕09-19 무료 커피챗(값 0)도 고를 수 있는 커피챗이다 — 켜짐으로만 본다.
     setWithChat(coffeeChat && saved.withChat);
@@ -475,6 +520,7 @@ export function BookingForm({
     if (!pickedProduct) return stopAt("product");
     if (!d) return stopAt("date");
     if (!en) return stopAt("time");
+    if (askHead && !headOkOf(saved.headcount)) return stopAt("head");
     if (saved.plan.trim().length < 10) return stopAt("plan");
     if (saved.guestName.trim().length < 2) return stopAt("name");
     if (!/^0\d{8,10}$/.test(ph.replace(/\D/g, ""))) return stopAt("phone");
@@ -634,10 +680,14 @@ export function BookingForm({
             setBadField((f) => (f === "date" ? "" : f));
           }}
         />
-        {badField === "date" && <p className={errCls}>날짜부터 골라 주세요.</p>}
+        {/* ✍️09-27 대표 코멘트 #140 — 「날짜부터 골라 주세요」 → 대표 문장 그대로. */}
+        {badField === "date" && <p className={errCls}>아직 날짜가 선택되지 않았어요.</p>}
         {daySlots.length > 0 && (
+          // ✍️09-27 대표 코멘트 #141 — 「10:00~20:00 사이 시간을 빌릴 수 있어요. 최소 1시간부터」 그대로(시각·최소 시간만 변수).
+          //   한 날에 칸이 둘 이상이면(오전·오후) 「10:00~12:00 사이나 14:00~20:00 사이 시간을」로 잇는다. 쉼표로 이으면 「A, B 사이」가
+          //   두 칸 «사이»(12:00~14:00)로 읽힌다.
           <p className={hintCls}>
-            {daySlots.map((sl) => `${sl.start}~${sl.end}`).join(", ")} 열려 있어요 · 최소 {durationLabel(minMinutes)}부터
+            {daySlots.map((sl) => `${sl.start}~${sl.end}`).join(" 사이나 ")} 사이 시간을 빌릴 수 있어요. 최소 {durationLabel(minMinutes)}부터
           </p>
         )}
       </div>
@@ -656,14 +706,29 @@ export function BookingForm({
           <p className={hintCls}>이 날은 빌릴 수 있는 시간이 남아 있지 않아요. 다른 날을 골라 주세요.</p>
         ) : (
           <div>
-            {/* 지금 무엇을 누를 차례인지 칩 «위»에 한 줄. 누르는 손가락이 가리는 자리를 피한다. */}
-            <p className="-mt-1 mb-3 text-[15px] leading-relaxed break-keep text-mute" aria-live="polite">
-              {!activeStart
-                ? "시작 시각을 먼저 눌러 주세요."
-                : !endTime
-                  ? `${activeStart}부터예요. 끝나는 시각을 눌러 주세요.`
-                  : "다른 시각을 누르면 처음부터 다시 골라요."}
-            </p>
+            {/* 지금 무엇을 누를 차례인지 칩 «위»에 한 줄. 누르는 손가락이 가리는 자리를 피한다.
+                🔁09-27 #142 — 옆에 「시작 시각 다시 고르기」. 시작을 고른 뒤엔 앞 칩이 비활성이라 시작을 바꾸는 길이 따로 있어야 한다.
+                📐폰에선 버튼을 늘 둘째 줄에 둔다. 한 줄에 둘 수 있을 때만 붙이면(390에서 ①은 붙고 ②는 안내가 길어 꺾인다) 시작을 고르는
+                  순간 줄이 생겨 격자가 23px 밀리고, 끝 칩을 누르려던 손가락이 빗나간다(실측). 버튼 자리는 늘 잡아 두고(`invisible`)
+                  시작을 고르면 보이게만 한다. sm부터는 폼 폭(520)이 넉넉해 한 줄에 선다. */}
+            <div className="-mt-1 mb-3 flex flex-wrap items-baseline justify-between gap-x-3">
+              <p className="basis-full text-[15px] leading-relaxed break-keep text-mute sm:basis-auto" aria-live="polite">
+                {!activeStart
+                  ? "시작 시각을 먼저 눌러 주세요."
+                  : !endTime
+                    ? `${activeStart}부터예요. 끝나는 시각을 눌러 주세요.`
+                    : "다른 시각을 누르면 그 시각부터 다시 골라요."}
+              </p>
+              {/* 배경 없는 글자 버튼 — 세로 패딩으로 44px를 채우고 음수 마진으로 줄 높이는 그대로 둔다(디자인-시스템 §터치 타깃). */}
+              <button
+                type="button"
+                onClick={resetTime}
+                // `invisible`(visibility: hidden)은 자리만 남기고 누를 수도, 초점이 갈 수도, 낭독기가 읽을 수도 없다.
+                className={`-my-[11px] py-[11px] text-[15px] text-mute underline underline-offset-2 ${activeStart ? "" : "invisible"}`}
+              >
+                시작 시각 다시 고르기
+              </button>
+            </div>
             <div className="grid grid-cols-4 gap-2 sm:grid-cols-6" role="group" aria-label="시작과 끝 시각">
               {marks.map((t) => {
                 const isStart = t === activeStart;
@@ -671,18 +736,21 @@ export function BookingForm({
                 const inRange = !!endTime && t > activeStart && t < endTime;
                 const endable = !!activeStart && !endTime && ends.includes(t);
                 const startable = startChoices.includes(t);
-                const enabled = isStart || isEnd || endable || startable;
+                // ①은 시작 후보만, ②는 고른 시작과 끝 후보만, ③은 고른 둘과 새 시작 후보(`tapMark` 머리말).
+                const enabled = !activeStart
+                  ? startable
+                  : !endTime
+                    ? isStart || endable
+                    : isStart || isEnd || startable;
                 const cls = isStart || isEnd
                   ? chipOnCls
                   : inRange
                     ? chipRangeCls
                     : endable
                       ? chipEndableCls
-                      : !enabled
-                        ? chipDisabledCls
-                        : activeStart && !endTime
-                          ? chipDimCls
-                          : chipOffCls;
+                      : enabled
+                        ? chipOffCls
+                        : chipDisabledCls;
                 return (
                   <button
                     key={t}
@@ -690,7 +758,15 @@ export function BookingForm({
                     data-time-chip={t}
                     disabled={!enabled}
                     aria-pressed={isStart || isEnd}
-                    aria-label={isStart ? `${t} 시작` : isEnd ? `${t} 끝` : endable ? `${t}까지` : t}
+                    aria-label={
+                      isStart
+                        ? `${t} 시작, 다시 누르면 풀려요`
+                        : isEnd
+                          ? `${t} 끝, 다시 누르면 풀려요`
+                          : endable
+                            ? `${t}까지`
+                            : t
+                    }
                     onClick={() => tapMark(t)}
                     className={`${chipCls} ${cls}`}
                   >
@@ -717,10 +793,11 @@ export function BookingForm({
         )}
       </div>
 
-      {useType !== "as_is" && (
+      {askHead && (
         <div>
+          {/* 🔁09-27 대표 코멘트 #143·#148 — 「오시는 인원 (선택)」 → 「사용 인원」, 그리고 필수. */}
           <label htmlFor="rent-head" className={labelCls}>
-            오시는 인원 <span className="ml-1 text-[15px] font-normal text-faint">(선택)</span>
+            사용 인원
           </label>
           {/* 🔁09-14 대표 — 「input이 이렇게 길지 않아도 될 거 같은데」. 숫자 두세 자리를 받는 칸이
               화면 폭을 다 쓰면 **긴 글을 기대하는 칸처럼** 보인다. 폭이 곧 기대 길이다.
@@ -729,19 +806,22 @@ export function BookingForm({
               140px에선 「숫자를 입력…」, 200px에서도 한 글자가 끊겼다. **재서 240px**로 잡았다
               (글자 자리 ~196 + 「명」 자리 44). 전체 폭 380의 63%라 여전히 「짧은 칸」으로 읽힌다.
               ⭐폭은 기대 길이를 말하는 장치지 최소화할 값이 아니다 — 문구가 잘리면 그 장치가 거짓말을 한다. */}
-          {/* 📐09-18 대표 코멘트 — 칸을 조금 줄이고 옆에 「아직 잘 모르겠어요」. 「예) 3」은 180px에서도 안 잘린다. */}
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          {/* 📐09-18 대표 코멘트 — 칸을 180px로 줄였다. 「예) 3」은 180px에서도 안 잘린다.
+              🔻09-27 #148 — 옆의 「아직 잘 모르겠어요」 체크는 뺐다. 필수 칸과 부딪친다. */}
           <div className="relative w-[180px]">
             <input
               id="rent-head"
+              ref={headRef}
               type="number"
               inputMode="numeric"
               min={1}
-              max={capacity}
+              max={headCap}
               className={`${rentInputCls} pr-11`}
               value={headcount}
-              disabled={headUnsure}
-              onChange={(e) => setHeadcount(e.target.value)}
+              onChange={(e) => {
+                setHeadcount(e.target.value);
+                if (headOkOf(e.target.value)) setBadField((f) => (f === "head" ? "" : f));
+              }}
               // ✍️09-17 「숫자를 입력해주세요」 → 예시 숫자(행정어 걷기). 칸 안 「명」과 붙여 읽힌다.
               placeholder="예) 3"
             />
@@ -752,20 +832,11 @@ export function BookingForm({
               명
             </span>
           </div>
-          <label className="flex min-h-[44px] cursor-pointer items-center gap-2 text-[15px] text-body">
-            <input
-              type="checkbox"
-              className="size-[18px] accent-primary"
-              checked={headUnsure}
-              onChange={(e) => {
-                setHeadUnsure(e.target.checked);
-                if (e.target.checked) setHeadcount("");
-              }}
-            />
-            아직 잘 모르겠어요
-          </label>
-          </div>
-          {capacity ? <p className={hintCls}>최대 {capacity}명까지 들어가요.</p> : null}
+          {badField === "head" && (
+            <p className={errCls}>{headcount.trim() ? headcountRangeMsg(headCap) : HEADCOUNT_MSG_EMPTY}</p>
+          )}
+          {/* ✍️09-27 대표 코멘트 #144 — 「들어가요」 → 대표 문장(숫자는 공간 정원). */}
+          {capacity ? <p className={hintCls}>동시에 최대 {capacity}명까지 수용할 수 있어요.</p> : null}
         </div>
       )}
 
@@ -802,8 +873,9 @@ export function BookingForm({
           번호 칸 «위»에 둔다. 누가 오는지를 먼저 적고, 그 사람에게 닿는 번호를 다음에 적는 순서다.
           ⚠️두 글자 검사는 서버(`startBookingAction`)가 관문이다. 여기는 왕복을 아끼려고 먼저 막는다. */}
       <div>
+        {/* ✍️09-27 대표 코멘트 #145 — 「이용하실 분 성함(실명)」 → 대표 문장 그대로. 당일 신분 확인 정책은 그대로라 아래 안내 줄은 둔다. */}
         <label htmlFor="rent-name" className={labelCls}>
-          이용하실 분 성함(실명)
+          예약하시는 분 성함
         </label>
         <input
           id="rent-name"
@@ -820,7 +892,7 @@ export function BookingForm({
           placeholder="예) 김하루"
         />
         {badField === "name" && (
-          <p className={errCls}>{guestName.trim() ? "성함을 두 글자 이상 적어 주세요." : "이용하실 분 성함이 필요해요."}</p>
+          <p className={errCls}>{guestName.trim() ? "성함을 두 글자 이상 적어 주세요." : "예약하시는 분 성함이 필요해요."}</p>
         )}
         <p className={hintCls}>이용 당일 신분 확인에 쓰여요. 사장님께만 전달돼요.</p>
       </div>
@@ -903,8 +975,9 @@ export function BookingForm({
       ) : (
         // 📎09-17 QA — 소개서가 없는 손님에겐 이 칸이 통째로 안 보였다. 소개서로 데려올 사람이 바로 이분들이라
         //   같은 자리에 한 줄을 둔다. 새 탭으로 연다 — 이 탭에서 가면 적던 신청이 날아간다.
+        // ✍️09-27 대표 코멘트 #146 — 앞에 「collab5」를 붙였다(어느 소개서인지).
         <p className="text-[15px] leading-relaxed break-keep text-mute">
-          소개서가 있으면 사장님이 어떤 브랜드가 오는지 미리 볼 수 있어요.{" "}
+          collab5 소개서가 있으면 사장님이 어떤 브랜드가 오는지 미리 볼 수 있어요.{" "}
           <Link href="/register" target="_blank" className="text-body underline underline-offset-2">
             3분 만에 소개서 만들기
           </Link>
@@ -925,6 +998,11 @@ export function BookingForm({
       <PayBar
         amount={timePicked && product ? total : null}
         caption={timePicked ? durationLabel(minutes) : undefined}
+        detail={
+          timePicked && product
+            ? [PRODUCT_LABEL[product], durationLabel(minutes), withChat && coffeeChat ? `${COFFEE_CHAT_LABEL} 포함` : ""].filter(Boolean).join(" · ")
+            : undefined
+        }
         // ✍️09-21 대표 코멘트 — 「빌릴 시간을 선택해주세요」. 금액 얘기보다 할 일을 먼저 말한다. 세 갈래를 같은 틀로.
         emptyText={!product ? "신청 타입을 선택해 주세요" : activeStart ? "끝나는 시각을 선택해 주세요" : "빌릴 시간을 선택해 주세요"}
         // 🔑09-19 [G] 로그인 전엔 같은 바가 「로그인하고 신청하기」다. 누르면 고른 값을 맡기고 로그인으로 간다.

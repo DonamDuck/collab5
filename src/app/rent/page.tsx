@@ -4,7 +4,7 @@ import { listOpenSpaces } from "@/lib/spaces";
 import type { SpaceCategory, SpacePublic, SpaceUseType } from "@/lib/types";
 import { EmptyState } from "@/components/EmptyState";
 import { RentFilters, type UseFilter } from "./RentFilters";
-import { CATEGORY_OPTIONS, categoryLabel, CoverPlaceholder, secondaryBtnCls, won } from "./ui";
+import { CATEGORY_OPTIONS, categoryLabel, CoffeeChatChip, CoverPlaceholder, secondaryBtnCls, won } from "./ui";
 import { PRODUCT_LABEL } from "@/lib/rent-copy";
 import { lowestPrice, productPrice, sellableProducts } from "@/lib/rent-products";
 import { OG_IMAGE } from "@/lib/site";
@@ -62,8 +62,8 @@ function parseCategory(raw: string | undefined): SpaceCategory | undefined {
 
 /** 카드 한 장 — 고르는 것이라 박스(디자인-시스템 §카드 어휘). `/search` 카드와 같은 옷:
  *  위 3:2 커버, 아래 이름 15 bold · 한 줄 15 · 메타 13 faint.
- *  ⭐카드 위 pill은 「사장님이 알려줘요」 하나뿐. 비는 날 개수·가까운 날·쓰임새 칩은 뺐다 —
- *    카드는 고르게만 하면 되고, 나머지는 눌러서 본다(칩 셋이 쌓이니 표처럼 보였다).
+ *  ⭐비는 날 개수·가까운 날·쓰임새 칩은 뺐다 — 카드는 고르게만 하면 되고, 나머지는 눌러서 본다(칩 셋이 쌓이니 표처럼 보였다).
+ *    🔁09-27 대표 코멘트 #138 — 커버 위에 남아 있던 커피챗 알약도 뺐다. 커피챗은 값 줄 옆 칩 하나로 선다(`CoffeeChatChip`).
  *  📍09-16부터 공개 값(`toPublic`)에도 주소가 실린다(대표: 공간 이름이 이미 가게를 특정해서 감추는 게 무의미하다).
  *    카드는 고르는 자리라 주소 앞 두 토막(「서울 성동구」)만 쓴다. 전체 주소와 지도는 상세 화면에 있다.
  *    🧹09-18 밤 QA SC-28 — 여기 있던 「런타임 객체에 주소 자체가 없다」는 09-16 전의 설명이라 고쳤다. */
@@ -72,7 +72,7 @@ function SpaceCard({ sp }: { sp: SpacePublic }) {
   return (
     <Link
       href={`/rent/${sp.slug}`}
-      className="block h-full overflow-hidden rounded-lg border-[0.5px] border-[#DFDFE3] bg-surface transition-colors hover:bg-surface-soft"
+      className="group block h-full overflow-hidden rounded-lg border-[0.5px] border-[#DFDFE3] bg-surface transition-colors hover:bg-surface-soft"
     >
       <div className="relative aspect-[3/2] w-full overflow-hidden bg-surface-soft">
         {cover ? (
@@ -81,12 +81,7 @@ function SpaceCard({ sp }: { sp: SpacePublic }) {
         ) : (
           <CoverPlaceholder />
         )}
-        {/* 커피챗은 이 서비스만 파는 물건이라 커버 위에 미리 알린다(설계 §노하우 = 옵션 상품). */}
-        {sp.coffeeChat && sp.coffeeChatMinutes > 0 && (
-          <span className="absolute bottom-2.5 left-2.5 rounded-pill bg-surface/90 px-3 py-1 text-[13px] font-medium text-ink">
-            사장님과 커피챗 {sp.coffeeChatMinutes}분
-          </span>
-        )}
+        {/* 🔻09-27 대표 코멘트 #138 — 커버 위 「사장님과 커피챗 60분」 알약을 뺐다. 커피챗은 아래 값 줄 옆 칩(`CoffeeChatChip`)이 알린다. */}
       </div>
 
       <div className="px-4 py-3.5">
@@ -102,13 +97,17 @@ function SpaceCard({ sp }: { sp: SpacePublic }) {
         <p className="mt-1 text-[14px] text-faint">{sp.address.split(/\s+/).slice(0, 2).join(" ") || "위치 미정"}</p>
         {/* 💸09-17 디자인팀 — 값을 흐린 13px 꼬리에서 **굵은 줄 하나**로 올렸다. 목록을 훑는 손님이 이름 다음으로
             대 보는 것이 값인데, 동네 뒤에 붙은 faint 글자라 카드 둘을 나란히 두고 비교가 안 됐다(아워플레이스 카드). */}
-        <p className="mt-2.5 text-ink">
-          {/* 🛍09-18 값이 상품마다 다르면 낮은 값에 「부터」. */}
-          <span className="text-[16px] font-bold tabular-nums">{won(lowestPrice(sp) || sp.priceHour)}</span>
-          <span className="ml-0.5 text-[14px] text-mute">
-            {new Set(sellableProducts(sp).map((p) => productPrice(sp, p))).size > 1 ? "부터 / 시간" : "/ 시간"}
-          </span>
-        </p>
+        {/* ☕09-27 대표 코멘트 #138 — 값 줄 옆에 「사장님 커피챗 선택」 칩. 좁은 카드에선 칩이 값 아래로 꺾인다(`flex-wrap`). */}
+        <div className="mt-2.5 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-ink">
+          <p>
+            {/* 🛍09-18 값이 상품마다 다르면 낮은 값에 「부터」. */}
+            <span className="text-[16px] font-bold tabular-nums">{won(lowestPrice(sp) || sp.priceHour)}</span>
+            <span className="ml-0.5 text-[14px] text-mute">
+              {new Set(sellableProducts(sp).map((p) => productPrice(sp, p))).size > 1 ? "부터 / 시간" : "/ 시간"}
+            </span>
+          </p>
+          {sp.coffeeChat && sp.coffeeChatMinutes > 0 && <CoffeeChatChip />}
+        </div>
       </div>
     </Link>
   );
@@ -143,10 +142,10 @@ export default async function RentPage({
             사장님이 쉬는 날, 그 가게를 빌려보세요
           </h1>
           <p className="mt-3 text-[17px] leading-relaxed break-keep text-mute">
-            {/* 🔁09-17 QA — 「대여해 보실 수 있어요」는 안내문 어미였고 제목과 말이 겹쳤다.
-                두 번째 문장이 이 서비스만 가진 것(커피챗)을 말한다. */}
-            {/* 제목이 「사장님이 쉬는 날」을 가져가서, 여기선 같은 말을 되풀이하지 않고 «시간 단위»를 말한다. */}
-            필요한 시간만큼 그대로 써 보세요. 커피챗으로 운영 이야기도 들을 수 있어요.
+            {/* 제목이 「사장님이 쉬는 날」을 가져가서, 여기선 같은 말을 되풀이하지 않고 «시간 단위»를 말한다.
+                ✍️09-27 대표 코멘트 #136 — 대표 문장 그대로(띄어쓰기만). 뒤에 있던 커피챗 문장도 대표 지시로 뺐다.
+                커피챗이 되는 공간은 카드 값 줄 옆 칩(「사장님 커피챗 선택」)이 알린다. */}
+            필요한 시간만큼 빌려 볼 수 있어요.
           </p>
         </div>
       </header>

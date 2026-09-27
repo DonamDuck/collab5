@@ -8,7 +8,7 @@ import { isRentAdmin } from "@/lib/rent-actions";
 import { repo } from "@/lib/repo";
 import { accessHowLine, COFFEE_CHAT_FREE, COFFEE_CHAT_WHEN_GUEST, CONTACT_RULE_GUEST, PRODUCT_HINT_GUEST, PRODUCT_LABEL } from "@/lib/rent-copy";
 import { coffeeChatFree, lowestPrice, productNote, productPrice, sellableProducts } from "@/lib/rent-products";
-import { durationLabel, futureSlots, rangeLabel, RENT_MIN_MINUTES } from "@/lib/rent-time";
+import { durationLabel, futureSlots, RENT_MIN_MINUTES } from "@/lib/rent-time";
 import { bizMissingLine, bizVerified, spaceListed } from "@/lib/bizcheck";
 import { PhotoSlider } from "@/components/PhotoSlider";
 import { BookingForm } from "./BookingForm";
@@ -229,8 +229,6 @@ export default async function SpaceDetailPage({
   //   고른 값을 맡기고 로그인으로 보낸다(`BookingForm`의 `goLogin`). 서버 관문(`startBookingAction`의 로그인 검사)은 그대로다.
   const showForm = !isOwner && listed && openDates.length > 0;
 
-  // 🧭09-17 디자인팀 — 데스크톱 오른쪽 기둥에 싣는 «가장 가까운 열린 시간».
-  const nextSlot = openSlots[0];
   const eyebrow = [categoryLabel(sp.category), sp.area].filter(Boolean).join(" · ");
   // 🛍09-18 켜진 공간 상품. 값 줄은 낮은 값, 값이 서로 다르면 「부터」.
   const products = sellableProducts(sp);
@@ -623,7 +621,17 @@ export default async function SpaceDetailPage({
         <aside className="hidden lg:sticky lg:top-24 lg:block lg:max-h-[calc(100dvh-7rem)] lg:overflow-y-auto lg:overscroll-contain">
           {/* 메타 줄·소개서 줄은 lg에서 위 헤더에서 숨기고 여기로 모인다. 같은 값이 한 화면에 두 번 서지 않게. */}
           <div className="rounded-lg border border-hairline bg-surface p-6 shadow-e1">
-            <PriceLine priceHour={fromPrice} from={priceVaries} capacity={sp.capacity} />
+            {/* 💸09-27 대표 코멘트 #147 — 「금액이 여기(아래 바)가 바뀌는 게 아니라 위에 15,000원 고정으로 들어간 부분 하나만 쓰고
+                그게 갱신되는 형태로」. 금액 자리를 여기 하나로 모았다.
+                ⭐서버가 먼저 시간당 값(`PriceLine`)을 그려 두고, 손님이 시간을 고르면 `BookingForm`의 `PayBar`가 총액 덩어리
+                (`data-side-total`)를 이 자리로 포털한다. 그 덩어리가 들어오면 CSS(`:has`)가 시간당 값을 숨긴다 — 서버가 그린 것을
+                스크립트가 지우지 않으니 하이드레이션이 안 깨지고, 시간을 풀면 덩어리가 빠지며 시간당 값이 저절로 돌아온다.
+                아래 `#rent-side-pay`엔 버튼(과 고르기 전 안내 한 줄)만 남는다. */}
+            <div id="rent-side-price" className="[&:has([data-side-total])>[data-side-default]]:hidden">
+              <div data-side-default>
+                <PriceLine priceHour={fromPrice} from={priceVaries} capacity={sp.capacity} />
+              </div>
+            </div>
             <TrustMarks biz={bizOk} naver={onNaver} className="mt-4 flex-col" />
             <InfoList className="mt-5 border-t border-hairline pt-5">
               {/* 🛍09-18 켜진 상품 이름 — 「부터」가 무엇 중 낮은 값인지 요약 카드에서도 읽히게. */}
@@ -642,22 +650,8 @@ export default async function SpaceDetailPage({
                   }
                 />
               )}
-              <InfoRow
-                label="가까운 날"
-                value={
-                  nextSlot ? (
-                    <>
-                      {/* ⏱09-19 30분 단위 — 자투리(09:30~12:00)가 몇 시간인지 셈하지 않게 길이를 붙인다(`rangeLabel`). */}
-                      {dateLabel(nextSlot.date)} {rangeLabel(nextSlot.start, nextSlot.end)}
-                      {openSlots.length > 1 && (
-                        <span className="block text-[15px] text-mute">그 밖에 {openSlots.length - 1}번 더</span>
-                      )}
-                    </>
-                  ) : (
-                    <span className="text-mute">아직 없어요</span>
-                  )
-                }
-              />
+              {/* 🔻09-27 대표 코멘트 #139 — 「가까운 날」 줄을 뺐다. 대표: 「신청하기를 누르거나 날짜를 선택해 주세요에서 충분히 확인 가능」.
+                  (09-17 디자인팀이 «가장 가까운 열린 시간»을 싣던 자리. 이 줄만 쓰던 값 `nextSlot`도 같이 걷었다.) */}
               {sp.coffeeChat && sp.coffeeChatMinutes > 0 && (
                 <InfoRow label="커피챗" value={`${sp.coffeeChatMinutes}분 ${coffeeChatFree(sp) ? COFFEE_CHAT_FREE : `+${won(sp.coffeeChatPrice)}`}`} />
               )}
@@ -675,9 +669,10 @@ export default async function SpaceDetailPage({
             )}
             {/* 🔑09-19 [G] 로그인 전에도 아래 결제 바가 뜬다. 바가 이 카드의 버튼 노릇을 해서 「신청하러 가기」 길은 뺐다.
                 🧱09-21 대표 — lg에선 그 바가 이 카드 안으로 들어온다(`BookingForm`의 `PayBar`가 여기로 포털). 폼이 없는 공간이면 빈 자리. */}
-            {/* 짧은 화면에서 카드가 안쪽으로 굴러도 금액과 버튼은 카드 바닥에 붙어 있게 한다(09-23 QA).
-                `-mb-6 pb-6`은 카드의 아래 여백만큼 자리를 덮어 글이 버튼 밑으로 비쳐 보이지 않게 하는 것이다. */}
-            <div id="rent-side-pay" className="sticky bottom-0 -mx-6 -mb-6 bg-surface px-6 pb-6" />
+            {/* 짧은 화면에서 카드가 안쪽으로 굴러도 버튼은 카드 바닥에 붙어 있게 한다(09-23 QA). 금액은 09-27부터 위 `#rent-side-price` 자리다.
+                `-mb-6 pb-6`은 카드의 아래 여백만큼 자리를 덮어 글이 버튼 밑으로 비쳐 보이지 않게 하는 것이다.
+                🩹09-27 `rounded-b-lg` — 네모난 흰 면이 카드의 둥근 아래 모서리 테두리를 덮어서, 1440에서 카드 바닥 양 끝이 잘려 보였다(실측). */}
+            <div id="rent-side-pay" className="sticky bottom-0 -mx-6 -mb-6 rounded-b-lg bg-surface px-6 pb-6" />
           </div>
         </aside>
       </div>

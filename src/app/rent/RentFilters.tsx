@@ -70,26 +70,31 @@ export function RentFilters({
           ⭐`use_type`은 **DB·등록 폼·상세 화면에 그대로 살아 있다.** 없앤 건 목록의 «거르개»뿐이라
             되살릴 땐 이 줄만 복구하면 된다(`UseFilter`·`apply`의 `use` 배선을 남겨 둔 이유). */}
       <form
-        className="flex gap-2"
+        className="flex flex-wrap gap-2 sm:flex-nowrap"
         onSubmit={(e) => {
           e.preventDefault();
           apply({});
         }}
       >
         {/* 🔎09-18 밤 QA(G-23) — 375에서 안내 글이 「지역, 이름으로 검색해 보…」로 잘렸고, 자판에 [검색] 키가 없어
-            Enter를 누를 곳이 안 보였다. 말을 짧게 줄이고 자판에 검색 키를 띄운다.
+            Enter를 누를 곳이 안 보였다. 자판에 검색 키를 띄운다.
+            ✍️09-27 대표 코멘트 #137 — 안내 글은 대표 문장 그대로다(띄어쓰기만). 09-17에도 불러 준 문장을 우리가 「동네·이름·설비」로
+              줄여 넣어서 반영이 안 됐다. ⛔문장을 줄여 폭에 맞추지 말고 칸을 넓힌다.
+            📐그래서 폰에선 찾기 칸이 한 줄을 다 쓰고 업종 고르개가 그 아래로 내려간다. 안내 글이 16px로 약 250px인데, 옆에 두면
+              375에서 글 자리가 153px라 뒤가 잘린다. 한 줄을 다 쓰면 390에서 322px, 320에서 252px라 둘 다 안 잘린다(09-27 실측).
+              sm부터는 전처럼 한 줄에 둘이 선다.
             ⚠️`type="search"`는 브라우저가 지우기 ×를 그려 준다 — 「조건 지우기」와 둘이 되지만, 이 칸 하나만 비우는 일이라 뜻이 다르다. */}
         <input
           type="search"
           enterKeyHint="search"
-          className={`${rentQuietInputCls} min-w-0 flex-1`}
+          className={`${rentQuietInputCls} min-w-0 basis-full sm:basis-auto sm:flex-1`}
           value={area}
           onChange={(e) => setArea(e.target.value)}
           onBlur={() => {
             if (area.trim() !== initialArea) apply({});
           }}
-          placeholder="동네·이름·설비"
-          aria-label="지역이나 공간 이름"
+          placeholder="지역, 매장명, 주요 시설로 검색해 보세요"
+          aria-label="지역, 매장명, 주요 시설로 검색"
         />
         {/* 업종도 고르는 순간이 곧 확정이다. 고른 뒤 버튼을 또 누르게 하면 한 번 더 일을 시킨다. */}
         <RentSelect

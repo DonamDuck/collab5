@@ -56,7 +56,7 @@ import {
 import { bookingStarted, dateLabel, kstDaysUntil, durationLabel, isTimeMark, minutesBetween, RENT_MIN_MINUTES, toMinutes, todayKst } from "./rent-time";
 import type { Space, SpaceBooking, SpaceUseType, SpaceCategory, OpenSlot, AccessHow, RentProduct, BizCheckStatus, BizCertRead } from "./types";
 import { bookingAmount, compatScopePrice } from "./rent-products";
-import { PRODUCT_LABEL, SPACE_FORM_MSG, slotReversedMsg, slotTooShortMsg } from "./rent-copy";
+import { HEADCOUNT_MSG_EMPTY, PRODUCT_LABEL, SPACE_FORM_MSG, slotReversedMsg, slotTooShortMsg } from "./rent-copy";
 
 // 하루 팝업 — 쓰기 서버 액션 (2026-09-13)
 // 스펙 = docs/superpowers/specs/2026-09-13-daily-shop-design.md
@@ -738,6 +738,7 @@ export interface BookingFormInput {
   spaceSlug: string;
   useDate: string;
   plan: string;
+  /** 🙋사용 인원 — 09-27부터 필수(대표 #143·#148). 단 쓰임새가 「원래 목적대로」(`as_is`)인 공간은 폼이 안 묻는다. 그래서 타입은 선택으로 둔다. */
   headcount?: number;
   /** ⏱`HH:MM`. 하루 통째가 아니라 「그날 몇 시부터 몇 시까지」를 받는다(09-16). */
   startTime: string;
@@ -785,8 +786,15 @@ export async function startBookingAction(input: BookingFormInput): Promise<Start
   // 🪪09-18 대표 — 이용하실 분 성함(실명) 필수. 당일 신분 확인에 쓰는 이름이라 두 글자 미만이면 받지 않는다.
   //   위 번호와 같이 화면도 막지만 관문은 여기다. 너무 긴 값은 메일 표를 깨뜨려서 50자를 넘으면 돌려보낸다.
   const guestName = (input.guestName ?? "").trim().replace(/\s+/g, " ");
-  if (guestName.length < 2) return { ok: false, message: "이용하실 분 성함을 두 글자 이상 적어 주세요." };
+  // ✍️09-27 대표 코멘트 #145 — 칸 이름이 「예약하시는 분 성함」이 됐다. 막힘 말도 같은 이름으로 부른다.
+  if (guestName.length < 2) return { ok: false, message: "예약하시는 분 성함을 두 글자 이상 적어 주세요." };
   if (guestName.length > 50) return { ok: false, message: "성함이 너무 길어요. 50자 안으로 적어 주세요." };
+  // 🙋09-27 대표 코멘트 #143·#148 — 사용 인원 필수. 폼이 인원 칸을 그리는 공간(쓰임새가 「원래 목적대로」(`as_is`)가 아닌 곳)에서만 묻는다.
+  //   화면도 막지만 관문은 여기다. 범위(1명~정원)는 아래 `validateBookingRequest`가 본다(0명·음수·정원 초과).
+  //   ⚠️«비었나»를 그 함수에 안 넣은 이유는 그 함수의 인원 검사 옆에 적었다 — 이미 저장된 결제 전 신청을 승인에서 떨어뜨리지 않으려고.
+  if (sp.useType !== "as_is" && (typeof input.headcount !== "number" || !Number.isFinite(input.headcount))) {
+    return { ok: false, message: HEADCOUNT_MSG_EMPTY };
+  }
 
   // 🪪09-18 밤 QA(G-04) — 손님이 붙이는 소개서도 «내 것»만 받는다. 신청은 막지 않고 남의 것이면 빈 값으로 저장한다 —
   //   이 값은 사장님 메일과 요청 카드에 그대로 붙어서, 남의 브랜드를 달면 그 브랜드가 신청한 것처럼 읽힌다.
