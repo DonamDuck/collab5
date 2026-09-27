@@ -41,12 +41,12 @@ function minusDays(iso: string, n: number): string {
   return d.toISOString().slice(0, 10);
 }
 
-/** 💸**이 예약 기준** 취소 규정 한 줄 (09-17 QA).
+/** 💸**이 예약 기준** 취소 규정 (09-17 QA).
  *  결제 직전에 망설이게 하는 건 「취소하면 얼마 돌아오나」인데, 규정표를 읽고 날짜를 셈하는 건 손님 몫이었다.
  *  ⭐비율은 `guestCancelRefundRate`에 날짜를 하나씩 넣어 «물어서» 얻는다. 구간표(7·3·1일)를 여기 다시 적지 않는다 —
  *    표가 바뀌는 날 이 문장만 뒤처진다(상세 「환불 규정」 절 주석과 같은 규율).
  *  지금 구간이 언제까지 이어지는지 찾고, 그 날짜와 다음 구간을 말한다. */
-function cancelRuleLine(useDate: string): string {
+function cancelRules(useDate: string): string[] {
   const pct = (r: number) => (r >= 1 ? "전액" : `${Math.round(r * 100)}%`);
   const days = kstDaysUntil(useDate);
   // 표만 묻는다(두 번째 인자 없음). 수락 전·수락 뒤 한 시간은 아래 `head`가 따로 말한다.
@@ -59,14 +59,20 @@ function cancelRuleLine(useDate: string): string {
   //   손님이 가장 먼저 겪는 구간부터 말한다. 수락 뒤 한 시간(`GRACE_MINUTES`)도 같은 전액이라 한 문장에 묶는다.
   //   표는 그 «밖»의 때다. 표가 이용일까지 줄곧 전액이면 두 창이 바꾸는 게 없어서 붙이지 않는다.
   // 🔁09-27 대표 A6 — 손님이 읽는 자리라 「수락」을 「확정」으로. 시간은 여전히 상수(`GRACE_MINUTES` = 60분 → 「1시간」)에서 읽는다.
+  // 📋09-27 대표 코멘트 #156 — 「불렛으로 각각 규정 나누자」 · 「그 밖엔 -> 이후에는」. 한 문단이던 것을 규정 하나에 한 줄로 나눈다.
+  //   날짜·비율은 그대로 이 예약 기준으로 계산한 값이다. 전액 창(확정 전·확정 뒤 1시간)이 첫 줄, 그 «이후»의 표가 다음 줄들이다.
   const head = `사장님이 확정하기 전이나 확정하고 ${GRACE_MINUTES / 60}시간 안에 취소하면 전액 돌려드려요.`;
   if (now >= 1) {
     return next === null || next === now
-      ? `${until}까지 취소하면 전액 돌려드려요.`
-      : `${head} 그 밖엔 ${until}까지 전액이고, 그 뒤엔 ${next > 0 ? `${pct(next)}로 줄어요` : "돌려드릴 수 없어요"}.`;
+      ? [`${until}까지 취소하면 전액 돌려드려요.`]
+      : [
+        head,
+        `이후에는 ${until}까지 취소하면 전액 돌려드려요.`,
+        next > 0 ? `그 뒤에 취소하면 ${pct(next)}를 돌려드려요.` : "그 뒤에 취소하면 돌려드릴 수 없어요.",
+      ];
   }
-  if (now === 0) return `${head} 그 밖엔 오늘 쓰는 예약이라 돌려드릴 수 없어요.`;
-  return `${head} 그 밖엔 ${until}까지 취소하면 ${pct(now)}를 돌려드려요.`;
+  if (now === 0) return [head, "이후에는 오늘 쓰는 예약이라 돌려드릴 수 없어요."];
+  return [head, `이후에는 ${until}까지 취소하면 ${pct(now)}를 돌려드려요.`];
 }
 
 export default async function RentPayPage({ params }: { params: Promise<{ orderId: string }> }) {
@@ -198,7 +204,7 @@ export default async function RentPayPage({ params }: { params: Promise<{ orderI
         scheduleLabel={bookingWhen(b)}
         amountLabel={won(b.amountTotal)}
         breakdown={breakdown}
-        cancelLine={cancelRuleLine(b.useDate)}
+        cancelRules={cancelRules(b.useDate)}
       />
     </main>
   );
