@@ -96,18 +96,35 @@ const TONE_FOR: Record<"guest" | "host", Partial<Record<BookingStatus, { label: 
   },
 };
 
+/** 🧾09-27 대표 — 사장님이 거절한 적 없는 `rejected`. 결제 직후 자리가 찼거나 끊긴 결제를 자동으로 취소하려다 실패한 예약이다.
+ *  사장님이 답한 시각(`decidedAt`, `decideBooking`만 적는다)이 없으면 이쪽이다. 아침 요약(`rent-admin-daily`)도 같은 칸으로 가른다. */
+export function autoRejected(b: { status: BookingStatus; decidedAt?: string }): boolean {
+  return b.status === "rejected" && !b.decidedAt;
+}
+
+/** 자동 취소가 실패해 관리자가 처리할 예약. 손님에겐 돈이 돌아오는 중이고, 사장님은 거절한 적이 없다. */
+const AUTO_REJECTED_TONE = {
+  guest: { label: "환불 진행 중", cls: "text-faint" },
+  host: { label: "자동 취소", cls: "text-faint" },
+} as const;
+
 export function BookingBadge({
   status,
   viewer = "guest",
   dot = false,
+  auto = false,
 }: {
   status: BookingStatus;
   viewer?: "guest" | "host";
+  /** `autoRejected(b)`의 값. 참이면 `rejected`를 「사장님 거절」·「거절한 요청」 대신 위 말로 그린다. */
+  auto?: boolean;
   /** 🔵09-18 들어온 요청 카드(대표 코멘트 #63) — 카드 맨 앞에 설 때 앞에 작은 점과 medium 굵기를 얹는다.
    *  ⚠️알약(면)은 여전히 안 쓴다(09-13 대표 지시). 점은 탭의 「새 요청 있음」 점(`StickyTabs`)과 같은 7px이다. */
   dot?: boolean;
 }) {
-  const t = TONE_FOR[viewer][status] ?? BOOKING_TONE[status] ?? BOOKING_TONE.paid;
+  const t = auto && status === "rejected"
+    ? AUTO_REJECTED_TONE[viewer]
+    : TONE_FOR[viewer][status] ?? BOOKING_TONE[status] ?? BOOKING_TONE.paid;
   if (dot) {
     return (
       <span className={`inline-flex shrink-0 items-center gap-1.5 text-[15px] font-medium ${t.cls}`}>

@@ -589,6 +589,9 @@ function fullWorld(today: string, withAccount: boolean): MockWorld {
     // 🔒09-27(fix-money3) 결제 확인 중 — 승인 결과를 모르는 신청(결제 줄 ABORTED · 결제 키 있음). 내 예약 줄엔 「이어서 결제하기」 대신
     //   「결제를 확인하고 있어요」, 결제 화면은 위젯 대신 같은 안내가 선다.
     payChecking: booking({ id: 90025, spaceId: s6.id, guestUserId: U.guest, status: "pending", useDate: d(7), startTime: "10:00", endTime: "12:00", plan: "원두 두 가지로 작은 시음 모임을 하려고 해요.", headcount: 4, guestPhone: "010-3456-7890", guestName: "한서윤", ...P6 }, today),
+    // 🧾09-27 자동 취소 실패 — 결제 직후 자리가 차서 자동으로 취소하려다 실패했다. 사장님은 답한 적이 없다(`decidedAt` 없음).
+    //   손님 배지는 「환불 진행 중」, 예약 한 건 제목은 「예약이 잡히지 않았어요」(`autoRejected`).
+    autoRejected: booking({ id: 90026, spaceId: s6.id, guestUserId: U.guest, status: "rejected", useDate: d(11), startTime: "14:00", endTime: "16:00", plan: "작은 드로잉 모임을 하려고 해요. 여섯 명이에요.", headcount: 6, guestPhone: "010-3456-7890", guestName: "한서윤", ...P6 }, today),
     hostAsGuest: booking({ id: 90020, spaceId: s6.id, guestUserId: U.host, status: "confirmed", useDate: d(4), startTime: "17:00", endTime: "20:00", plan: "원두 시음회를 다른 동네에서 열어 보려고 해요.", headcount: 10, guestPhone: "010-2345-6789", guestName: "문하람", guestBrandSlug: "mock-slow-afternoon", decidedAt: `${d(-1)}T05:00:00.000Z`, ...P6 }, today),
   };
   const bookings = Object.values(b);
@@ -622,6 +625,8 @@ function fullWorld(today: string, withAccount: boolean): MockWorld {
     payment(b.refundUnconfirmed, U.host2, { status: "DONE" }),
     // 결과를 모르는 승인 — 승인 시각·수단은 없다(토스 답을 못 받았다). 결제 키는 승인 직전에 적어 둔 것이다.
     { ...payment(b.payChecking, U.host2, { status: "ABORTED" }), approvedAt: undefined, method: "" },
+    // 자동 취소가 실패해 돈이 그대로 남은 결제 — 정산 화면 「환불이 안 된 결제」에도 뜬다.
+    payment(b.autoRejected, U.host2, { status: "DONE" }),
   ];
 
   // 🪪09-19 — S8 사장님은 개인 명의(가족) 계좌다. 예금주가 대표자와 달라 검토 화면에 한 줄이 뜬다. 「계좌 없음」 세계에서도 둔다(그 세계는 느린오후 쪽만 뺀다).
@@ -790,6 +795,8 @@ export const MOCK_IDS = {
     refundUnconfirmed: 90024,
     /** 🔒09-27(fix-money3) 결제 확인 중 — 승인 결과를 모르는 결제 전 신청 */
     payChecking: 90025,
+    /** 🧾09-27 자동 취소 실패(사장님이 거절한 적 없는 rejected) */
+    autoRejected: 90026,
   },
 } as const;
 

@@ -11,7 +11,7 @@ import { BOOKING_HEADLINE, COFFEE_CHAT_WHEN_GUEST, CONTACT_RULE_GUEST, CONTACT_R
 import { bookingHasChat } from "@/lib/rent-products";
 import type { BookingStatus } from "@/lib/types";
 import { GuestCancel } from "../../my/Actions";
-import { bookingWhen, InfoPanel, InfoRow, primaryBtnCls, secondaryBtnCls, won } from "../../ui";
+import { autoRejected, bookingWhen, InfoPanel, InfoRow, primaryBtnCls, secondaryBtnCls, won } from "../../ui";
 
 // 하루 팝업 — 신청 완료 화면 (2026-09-14)
 //
@@ -72,7 +72,8 @@ export default async function RentDonePage({ params }: { params: Promise<{ booki
   //   제목이 목록의 한 줄로 내려앉는다. 오른쪽은 문장이 끝난 뒤라 축하가 된다.
   //   ⚠️`aria-hidden` — 화면 낭독기가 「파티 크래커」를 읽으면 제목이 길어지기만 한다.
   // 🔁09-17 제목은 위 `TITLE`로(대표: 상태 이름에 하루 팝업 맥락). 이모지 자리 규칙은 그대로다.
-  const title = TITLE[b.status];
+  // 🧾09-27 대표 — 사장님이 거절한 적 없는 거절(자동 취소 실패)에 「사장님이 어렵다고 하셨어요」가 섰다.
+  const title = autoRejected(b) ? "예약이 잡히지 않았어요" : TITLE[b.status];
   const emoji = b.status === "paid" ? "✨" : b.status === "confirmed" ? "🎉" : "";
   const spaceName = brief?.name ?? "공간";
   // ☕09-19 무료 커피챗(값 0)까지 보는 한 벌.

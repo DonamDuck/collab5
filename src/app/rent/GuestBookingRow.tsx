@@ -20,7 +20,7 @@ import { bookingFinished, bookingStarted, dateLabel, rangeLabel } from "@/lib/re
 import { PRODUCT_LABEL, telHref } from "@/lib/rent-copy";
 import { bookingHasChat } from "@/lib/rent-products";
 import { GuestCancel } from "./my/Actions";
-import { BookingBadge, CoverPlaceholder, InfoList, InfoRow, ListRow, bookingWhen, won } from "./ui";
+import { autoRejected, BookingBadge, CoverPlaceholder, InfoList, InfoRow, ListRow, bookingWhen, won } from "./ui";
 
 type Reveal = {
   accessNote: string; contactPhone: string; accessHow: Space["accessHow"];
@@ -196,7 +196,7 @@ export function GuestBookingRow({ view }: { view: GuestBookingView }) {
           </div>
         </div>
       }
-      status={<BookingBadge status={b.status} />}
+      status={<BookingBadge status={b.status} auto={autoRejected(b)} />}
     >
       {/* 🩸09-16 — `pending`에도 「사장님이 수락하면…」이 붙어 있었다. 그 신청은 **사장님에게
           보이지도 않는다**(`listBookingsForHost`가 거른다). 기다릴 것이 없는데 기다리라고 말하고,
