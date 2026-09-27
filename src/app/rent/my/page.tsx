@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { sweepBookings, listSpacesByOwner, listBookingsForHost, isRevealed } from "@/lib/spaces";
+import { sweepBookings, listSpacesByOwner, listBookingsForHost, listPaymentsByOrderIds, isRevealed } from "@/lib/spaces";
 import { getSessionUserId, getProfileById, type Profile } from "@/lib/profiles";
 import { repo } from "@/lib/repo";
 import type { Space } from "@/lib/types";
@@ -17,7 +17,8 @@ import { PlanQuote } from "./PlanQuote";
 import { GuestBookingRow, guestTabViews, loadGuestBookings } from "../GuestBookingRow";
 import { StickyTabs } from "@/components/StickyTabs";
 import { autoRefunded, autoRejected, BookingBadge, ListRow as Row, SpaceBadge, primaryBtnCls, secondaryBtnCls, won } from "../ui";
-import { PRODUCT_LABEL } from "@/lib/rent-copy";
+import { CONFIRM_LAPSED_HOST, PRODUCT_LABEL } from "@/lib/rent-copy";
+import { confirmLapse } from "@/lib/rent-booking-rules";
 import { bizMissingLine, bizOnFile, spaceListed } from "@/lib/bizcheck";
 import { needsFix } from "@/lib/rent-review";
 import { bookingHasChat, productPrice, sellableProducts } from "@/lib/rent-products";
@@ -178,6 +179,10 @@ export default async function MyRentPage({
       }),
     ),
   );
+  // ⏳09-27(fix-six) 확정 기한 — 결제 완료(답을 기다리는) 요청의 결제 승인 시각. 기한이 지난 카드는 수락·거절 버튼을 거둔다.
+  //   보통은 위 정리 작업이 이미 돌려줘서 «자동 취소»로 서지만, 한도(3건)·토스 장애로 미룬 예약이 남을 수 있다.
+  //   ⚠️못 읽으면(빈 표) 이용 시작만 본다 — 버튼이 남아도 누르면 서버가 그 자리에서 자동 환불로 돌린다(`decideBookingAction`).
+  const paidPays = await listPaymentsByOrderIds(hostBookings.filter((b) => b.status === "paid").map((b) => b.orderId));
   const savedLine = saved ? SAVED_LINE[saved] ?? "" : "";
   const didId = Number(didBooking) || 0;
 
@@ -218,6 +223,8 @@ export default async function MyRentPage({
       const tone: RowTone = hostBookingGroup(b);
       // 답할 수 있나 = «답을 기다려요» 무리(결제 완료·이용 시작 전). 수락·거절 버튼과 손님 한 줄이 이걸 본다.
       const answerable = tone === "answer";
+      // ⏳기한이 지난 결제 완료 — 답을 받지 않는다. 버튼 자리에 한 줄만(대표 09-27).
+      const lapsed = answerable && !!confirmLapse(b, paidPays.get(b.orderId)?.approvedAt);
       const finished = bookingFinished(b);
       const masked = b.status === "done" || finished;
       const brandName = b.guestBrandSlug ? guestBrands.get(b.guestBrandSlug) : undefined;
@@ -320,8 +327,12 @@ export default async function MyRentPage({
             </p>
           )}
 
-          {/* ⏯이용 시간이 시작하면 수락·거절 버튼을 거둔다(서버도 막는다). 결제 완료는 phase 1에서 곧 예약 완료다. */}
-          {answerable && <HostDecide bookingId={b.id} amountTotal={b.amountTotal} />}
+          {/* ⏯이용 시간이 시작하면 수락·거절 버튼을 거둔다(서버도 막는다).
+              ⏳09-27 확정 기한(결제 후 48시간)이 먼저 지나도 거둔다. 그 예약은 자동으로 취소되고 손님께 전액 돌아간다. */}
+          {answerable && !lapsed && <HostDecide bookingId={b.id} amountTotal={b.amountTotal} />}
+          {lapsed && (
+            <p className="mt-4 border-t border-hairline pt-4 text-[15px] leading-relaxed break-keep text-mute">{CONFIRM_LAPSED_HOST.card}</p>
+          )}
           {/* 🙋관리자에게 환불 신청(대표 09-16) — 수락해 확정한 예약에서만. 수락 전(결제 완료)엔 거절이 곧 전액 환불이라
               관리자를 거칠 일이 없다. 단 수락 안 한 채 이용 시간이 시작되면 거절이 막히니 그때는 신청으로 연다.
               신청이 들어가 있으면 버튼 대신 상태 한 줄. */}

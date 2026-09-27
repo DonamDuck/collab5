@@ -23,6 +23,7 @@ import {
 } from "@/lib/rent-actions";
 import { InfoList, InfoRow, primaryBtnCls, rentTextareaCls, secondaryBtnCls, won } from "../ui";
 import { HOST_MESSAGE_MAX } from "@/lib/rent-limits";
+import { CONFIRM_LAPSED_CODE } from "@/lib/rent-copy";
 import { REJECT_REASONS } from "@/lib/rent-reject-reasons";
 import { ConfirmDialog } from "../ConfirmDialog";
 
@@ -43,6 +44,9 @@ export function HostDecide({
   const [message, setMessage] = useState("");
   const [err, setErr] = useState("");
   const [confirmReject, setConfirmReject] = useState(false);
+  /** ⏳09-27 확정 기한이 지나 자동으로 취소된 예약이었다 — 서버가 그 자리에서 돌려줬다(`CONFIRM_LAPSED_CODE`).
+   *  말은 실패 문구 자리 그대로 두고, 더 누를 칸(한 줄 칸·버튼)만 거둔다. 새로 고치면 카드가 「자동 취소」로 선다. */
+  const [closed, setClosed] = useState(false);
 
   const run = (accept: boolean) =>
     start(async () => {
@@ -51,6 +55,7 @@ export function HostDecide({
       const r = await decideBookingAction(bookingId, accept, message);
       if (!r.ok) {
         setErr(r.message);
+        if (r.code === CONFIRM_LAPSED_CODE) setClosed(true);
         return;
       }
       // 💬09-17 QA — 누르면 버튼이 사라지고 화면이 조용히 바뀌어서 됐는지 배지를 찾아봐야 했다.
@@ -65,16 +70,18 @@ export function HostDecide({
     <div className="mt-4 space-y-3 border-t border-hairline pt-4">
       {/* 한 줄 메시지 — 수락이든 거절이든 같은 칸을 쓴다. 거절에만 칸을 주면 「거절할 때만 말한다」가
           되고, 수락 뒤 첫 연락이 아무 말 없이 주소만 열리는 것으로 시작된다. */}
-      <textarea
-        rows={2}
-        className={`${rentTextareaCls} resize-y`}
-        value={message}
-        onChange={(e) => setMessage(e.target.value)}
-        // ✂️09-18 밤 QA(SEC-07) — 서버(`decideBookingAction`)와 같은 상한. 서버가 돌려보내면 그 말은 바로 아래 줄에 뜬다.
-        maxLength={HOST_MESSAGE_MAX}
-        placeholder="한 줄 남기실 말 (예: 그날 오전엔 제가 있을게요)"
-        aria-label="손님께 남길 말"
-      />
+      {!closed && (
+        <textarea
+          rows={2}
+          className={`${rentTextareaCls} resize-y`}
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
+          // ✂️09-18 밤 QA(SEC-07) — 서버(`decideBookingAction`)와 같은 상한. 서버가 돌려보내면 그 말은 바로 아래 줄에 뜬다.
+          maxLength={HOST_MESSAGE_MAX}
+          placeholder="한 줄 남기실 말 (예: 그날 오전엔 제가 있을게요)"
+          aria-label="손님께 남길 말"
+        />
+      )}
       {err && <p className="text-[15px] leading-relaxed break-keep text-danger">{err}</p>}
       {/* ⏯이용 시간이 이미 지난 신청 — 답을 못 한 채 날이 갔다. 손님 돈이 붙잡혀 있으니 돌려줄 길만 남긴다. */}
       {started && (
@@ -84,29 +91,31 @@ export function HostDecide({
       )}
       {/* 🔁09-18 — 순서를 [거절][수락]으로. 확인 팝업(`ConfirmDialog`)과 같이 «앞으로 가는 쪽»이 오른쪽이다.
           넓은 화면은 카드 오른쪽 끝에 모으고, 폰은 한 줄을 1:2로 나눠 엄지가 닿게 한다. */}
-      <div className="flex gap-2 sm:justify-end">
-        <button
-          type="button"
-          onClick={() => setConfirmReject(true)}
-          disabled={pending}
-          className={`${secondaryBtnCls} flex-1 text-[15px] sm:flex-none`}
-        >
-          거절
-        </button>
-        {/* ⭐항목마다 키위가 하나씩 나올 수 있는 화면이라(받은 신청 여러 건) 예외로 허용하되 작게 —
-            넓은 화면에선 폭을 내용만큼만. 높이는 옆 보조 버튼과 같은 44px(한 줄에서 높이가 다르면 어긋나 보인다). */}
-        {/* 수락은 팝업 없이 — 문구가 결과를 미리 말한다(누르면 연락처가 열린다는 것). */}
-        {!started && (
+      {!closed && (
+        <div className="flex gap-2 sm:justify-end">
           <button
             type="button"
-            onClick={() => run(true)}
+            onClick={() => setConfirmReject(true)}
             disabled={pending}
-            className={`${primaryBtnCls} h-[44px] flex-[2] px-5 text-[15px] sm:flex-none`}
+            className={`${secondaryBtnCls} flex-1 text-[15px] sm:flex-none`}
           >
-            {pending ? "처리 중…" : "수락하고 연락처 열기"}
+            거절
           </button>
-        )}
-      </div>
+          {/* ⭐항목마다 키위가 하나씩 나올 수 있는 화면이라(받은 신청 여러 건) 예외로 허용하되 작게 —
+              넓은 화면에선 폭을 내용만큼만. 높이는 옆 보조 버튼과 같은 44px(한 줄에서 높이가 다르면 어긋나 보인다). */}
+          {/* 수락은 팝업 없이 — 문구가 결과를 미리 말한다(누르면 연락처가 열린다는 것). */}
+          {!started && (
+            <button
+              type="button"
+              onClick={() => run(true)}
+              disabled={pending}
+              className={`${primaryBtnCls} h-[44px] flex-[2] px-5 text-[15px] sm:flex-none`}
+            >
+              {pending ? "처리 중…" : "수락하고 연락처 열기"}
+            </button>
+          )}
+        </div>
+      )}
       <ConfirmDialog
         open={confirmReject}
         title="이 요청을 거절할까요?"

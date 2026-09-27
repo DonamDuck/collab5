@@ -37,7 +37,7 @@ import {
 // 🆕09-27(fix-money3) «결제를 시도한 흔적» — 정리 작업이 토스에 되물을지 정하는 그 판정 한 벌을 승인 관문도 쓴다.
 import { hasPayTrace } from "./rent-recover";
 // ⭐신청이 «지금도» 말이 되나 — 신청 시작·결제 승인·결제 화면이 같이 쓰는 순수 규칙(09-18 밤 QA G-01).
-import { CONFIRM_DEADLINE_HOURS, confirmLapse, pendingBookingProblem, validateBookingRequest } from "./rent-booking-rules";
+import { confirmLapse, pendingBookingProblem, validateBookingRequest } from "./rent-booking-rules";
 // 🧾09-19 저녁 저장하면 어느 상태로 가나 — 등록 폼과 같은 순수 함수.
 import {
   fixNoteProblem, needsFix, pausedChangeProblem, REVIEW_SQL_LINE, reviewPrevFor, spaceSaveReview,
@@ -58,7 +58,11 @@ import {
 import { bookingStarted, dateLabel, kstDaysUntil, durationLabel, isTimeMark, minutesBetween, overlaps, RENT_MIN_MINUTES, toMinutes, todayKst } from "./rent-time";
 import type { Space, SpaceBooking, SpaceUseType, SpaceCategory, OpenSlot, AccessHow, RentProduct, BizCheckStatus, BizCertRead } from "./types";
 import { bookingAmount, compatScopePrice } from "./rent-products";
-import { HEADCOUNT_MSG_EMPTY, PRODUCT_LABEL, SPACE_FORM_MSG, slotReversedMsg, slotTooShortMsg } from "./rent-copy";
+import {
+  CONFIRM_LAPSED_CODE, CONFIRM_LAPSED_HOST, HEADCOUNT_MSG_EMPTY, PRODUCT_LABEL, SPACE_FORM_MSG, slotReversedMsg, slotTooShortMsg,
+} from "./rent-copy";
+// 🆕09-27(fix-six) 확정 기한이 지난 예약에 사장님이 답하면 그 한 건만 자동 환불 길을 태운다(정리 작업과 같은 한 벌).
+import { refundLapsedBooking } from "./rent-unconfirmed";
 
 // 하루 팝업 — 쓰기 서버 액션 (2026-09-13)
 // 스펙 = docs/superpowers/specs/2026-09-13-daily-shop-design.md
@@ -1136,6 +1140,15 @@ export async function confirmBookingAction(
   return { ok: true, message: "예약을 완료했어요.", bookingId: paid.id }; // 👀09-16 대표 phase 1 — 결제를 마치면 곧 예약 완료, 기다리게 하지 않는다
 }
 
+/** 🆕09-27(fix-six) 사장님 답이 들어가지 못했을 때 지금 상태로 하는 말. 사장님이 답한 적 없는(`decidedAt` 없음) 취소·환불이면
+ *  확정 기한이 지나 자동으로 취소된 예약이다 — 돈까지 돌아갔으면(`refunded`) 그렇다고, 아직이면(`rejected`) 확인한다고 말한다.
+ *  ⚠️export하지 않는다(이 파일은 async 함수만 내보낸다). */
+function lapsedAnswer(now: SpaceBooking | null): ActionResult {
+  if (now && !now.decidedAt && now.status === "refunded") return { ok: false, code: CONFIRM_LAPSED_CODE, message: CONFIRM_LAPSED_HOST.done };
+  if (now && !now.decidedAt && now.status === "rejected") return { ok: false, code: CONFIRM_LAPSED_CODE, message: CONFIRM_LAPSED_HOST.pending };
+  return { ok: false, message: "이미 답하신 요청이에요." };
+}
+
 /** 호스트의 수락·거절. 거절이면 **전액 환불**한다(대표 09-13). */
 export async function decideBookingAction(
   bookingId: number, accept: boolean, message: string
@@ -1155,41 +1168,46 @@ export async function decideBookingAction(
   const sp = mine.find((x) => x.id === b.spaceId);
   if (!sp) return { ok: false, message: "내 공간에 들어온 요청만 답할 수 있어요." };
 
-  // ⏳09-27 대표 — 확정 기한(결제 후 48시간·이용 시작 중 먼저 온 쪽)이 지난 결제 완료는 수락을 안 받는다.
-  //   그 예약은 정리 작업이 전액 돌려준다(`rent-unconfirmed.ts`). 기한은 정리 작업과 같은 함수(`confirmLapse`) 한 벌로 잰다 —
+  // ⏳09-27 대표 — 확정 기한(결제 후 48시간·이용 시작 중 먼저 온 쪽)이 지난 결제 완료는 수락도 거절도 사장님 답으로 받지 않는다.
+  //   그 예약은 자동으로 취소돼 전액 돌아가는 예약이다(`rent-unconfirmed.ts`). 기한은 정리 작업과 같은 함수(`confirmLapse`) 한 벌로 잰다 —
   //   둘이 따로 재면 그 틈에서 «수락했는데 돈은 돌아간» 예약이 난다. 기준 시각은 결제 줄의 승인 시각이다.
-  //   🤝이 검사를 지난 뒤 정리 작업이 먼저 잡아도(`claimUnconfirmedBooking`) 아래 `decideBooking`의 조건(status = paid)에서 떨어진다.
-  if (accept && b.status === "paid") {
-    const lapse = confirmLapse(b, (await getPaymentByOrderId(b.orderId))?.approvedAt);
-    if (lapse) {
-      return {
-        ok: false,
-        message: lapse === "48h"
-          ? `결제 후 ${CONFIRM_DEADLINE_HOURS}시간이 지나 수락할 수 없어요. 이 예약은 자동으로 취소되고 손님께 전액 돌아가요.`
-          : "이용 시간이 시작돼 수락할 수 없어요. 이 예약은 자동으로 취소되고 손님께 전액 돌아가요.",
-      };
+  //   🆕09-27(fix-six) 대표: 「자동 환불되니 문제되는 케이스는 없을 것 같은데, 거절 클릭하면 '이미 취소된 예약입니다' 등과 같은 얼럿을 띄우자」.
+  //     정리 작업이 아직 안 돌았을 수 있어서 «그 자리에서» 이 예약 하나만 자동 환불 길을 태우고(`refundLapsedBooking`) 그 결과를 말한다.
+  //     🩸전엔 이용 전이면 거절이 사장님 거절로 돌았고(답한 시각 · 거절 메일), 수락은 막히기만 한 채 예약이 paid로 남았다.
+  //   🤝정리 작업·다른 클릭과 겹쳐도 잡기(`claimUnconfirmedBooking`)가 하나만 이긴다. 토스 취소는 한 번, 메일은 한 통씩이다.
+  //   ⚠️결과는 «실패 자리»(ok=false)로 돌려준다. 버튼(`HostDecide`)이 성공 줄(`did=reject` → 「거절했어요」)을 띄우면 거짓이 된다.
+  if (b.status === "paid") {
+    const pay = await getPaymentByOrderId(b.orderId);
+    if (confirmLapse(b, pay?.approvedAt)) {
+      // 🙋관리자 환불 신청이 걸린 예약은 정리 작업도 안 건드린다(우리가 전화로 확인한다). 여기서도 그대로 둔다.
+      if (b.refundRequestedAt) return { ok: false, code: CONFIRM_LAPSED_CODE, message: CONFIRM_LAPSED_HOST.refundRequested };
+      const got = await refundLapsedBooking(b, pay);
+      revalidatePath("/rent/my");
+      revalidatePath("/rent/payouts");
+      if (got === "refunded") return { ok: false, code: CONFIRM_LAPSED_CODE, message: CONFIRM_LAPSED_HOST.done };
+      if (got !== "skipped") return { ok: false, code: CONFIRM_LAPSED_CODE, message: CONFIRM_LAPSED_HOST.pending };
+      // 그 사이 누가 먼저 옮겼다 — 지금 상태를 읽어 말한다(아래 `decideBooking`이 떨어졌을 때와 같은 판정).
+      return lapsedAnswer(await getBooking(bookingId));
     }
   }
   // ⏯이용 시간이 이미 시작했으면 수락도 거절도 안 받는다(phase 1, 대표 09-16).
-  //   🔁09-27 — 수락 전(`paid`)인 채로 시작한 예약은 정리 작업이 전액 돌려준다. 그래서 거절 말도 그 사실을 말한다.
+  //   🔁09-27 — 수락 전(`paid`)인 채로 시작한 예약은 위(확정 기한 — 이용 시작)에서 자동 환불로 간다. 여기 오는 건 확정한 예약 등이다.
   //   확정한 예약에 문제가 생겼으면 여전히 «관리자에게 환불 신청»이다(우리가 양쪽에 전화로 확인한다).
   if (bookingStarted(b)) {
+    // 이미 자동으로 취소된 예약(답한 시각 없는 취소·환불)을 열어 둔 화면에서 또 누른 경우 — 「관리자에게 환불을 신청해 주세요」가 아니다.
+    if ((b.status === "rejected" || b.status === "refunded") && !b.decidedAt) return lapsedAnswer(b);
     return {
       ok: false,
       message: accept
         ? "이용 시간이 이미 시작돼 수락할 수 없어요."
-        : b.status === "paid" && !b.refundRequestedAt
-          ? "이용 시간이 이미 시작돼 거절할 수 없어요. 수락하지 않은 예약이라 자동으로 취소되고 손님께 전액 돌아가요."
-          : "이용 시간이 이미 지나 거절할 수 없어요. 문제가 있으면 관리자에게 환불을 신청해 주세요.",
+        : "이용 시간이 이미 지나 거절할 수 없어요. 문제가 있으면 관리자에게 환불을 신청해 주세요.",
     };
   }
 
   const decided = await decideBooking(bookingId, accept, message.trim());
   if (!decided) {
-    // 🤝정리 작업이 기한이 지난 예약을 먼저 잡았을 수 있다(답한 시각 없이 자동 취소·환불). 그땐 «이미 답했다»가 아니다.
-    const now = await getBooking(bookingId);
-    const auto = !!now && !now.decidedAt && (now.status === "rejected" || now.status === "refunded");
-    return { ok: false, message: auto ? "확정 기한이 지나 자동으로 취소된 요청이에요. 손님께는 전액 돌아가요." : "이미 답하신 요청이에요." };
+    // 🤝정리 작업·다른 클릭이 기한이 지난 예약을 먼저 잡았을 수 있다(답한 시각 없이 자동 취소·환불). 그땐 «이미 답했다»가 아니다.
+    return lapsedAnswer(await getBooking(bookingId));
   }
 
   if (!accept) {

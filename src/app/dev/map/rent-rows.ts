@@ -172,6 +172,7 @@ export const RENT_GROUPS: Group[] = [
         rows: [
           { desc: "모든 상태, 정산 계좌 있음 (요청 줄 첫머리에 대관만·공간 전체 · 검토 대기 공간에 국세청 기록과 다르다는 줄 · 보완 필요 공간에 사유와 「고치고 다시 보내기」)", c: "host-full", to: "/rent/my?tab=host" },
           { desc: "같은 화면, 정산 계좌 없음 (확정 줄마다 계좌 등록 한 줄)", c: "host-noaccount", to: "/rent/my?tab=host" },
+          { desc: "확정 기한(결제 후 48시간)이 지났는데 아직 결제 완료인 새 요청 · 수락·거절 버튼 대신 한 줄", c: "host-full", to: `/rent/my?tab=host#booking-${B.paidLapsed}` },
           { desc: "관리자이기도 한 사장님 (정산하기·검토하기 링크, 검토 대기 공간에 공개하기 버튼)", c: "host-admin", to: "/rent/my?tab=host" },
           { desc: "올린 공간이 없을 때", c: "host-empty", to: "/rent/my?tab=host" },
           { desc: "로그인 안 했을 때", c: "anon", to: "/rent/my?tab=host" },
