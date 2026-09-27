@@ -1361,14 +1361,23 @@ function sweepLine(run: SweepRun | null | undefined): string {
   const st = run.stale;
   const closed = st ? st.expired + st.closed + st.gaveUp : 0;
   const head = `만료 ${closed}건 · 이용 완료 ${run.done}건 · 취소 뒤 남은 돈 정산 ${run.keptToPayout}건`;
-  if (!st) return `${head}\n결제 시간이 지난 신청은 이번에 읽지 못했어요.`;
+  // 🆕09-27 확정 기한이 지난 결제 완료(②'). 칸이 없으면(옛 정리 작업) 줄을 안 세운다. 못 읽었으면(null) 그렇게 말한다.
+  const u = run.unconfirmed;
+  const unconfirmed = u === undefined ? ""
+    : u === null ? "확정 기한이 지난 결제 완료는 이번에 읽지 못했어요."
+      : [
+        u.refunded > 0 ? `확정 기한 지나 환불 ${u.refunded}건` : "",
+        u.refundFailed > 0 ? `확정 기한 환불 실패 ${u.refundFailed}건` : "",
+        u.deferred > 0 ? `확정 기한이 지났는데 다음으로 미룬 예약 ${u.deferred}건` : "",
+      ].filter(Boolean).join(" · ");
+  if (!st) return [head, "결제 시간이 지난 신청은 이번에 읽지 못했어요.", unconfirmed].filter(Boolean).join("\n");
   const recover = [
     st.refunded > 0 ? `끊긴 결제 환불 ${st.refunded}건` : "",
     st.refundFailed > 0 ? `환불 실패 ${st.refundFailed}건` : "",
     st.gaveUp > 0 ? `확인 못 하고 닫음 ${st.gaveUp}건` : "",
     st.deferred > 0 ? `토스 답을 기다리는 신청 ${st.deferred}건` : "",
   ].filter(Boolean).join(" · ");
-  return recover ? `${head}\n${recover}` : head;
+  return [head, recover, unconfirmed].filter(Boolean).join("\n");
 }
 
 /** 어긋남 갈래의 이름. 슬랙 칸 이름으로 쓴다(값 칸에 주문·금액이 붙는다). */
@@ -1426,6 +1435,8 @@ function moneyBackLine(m: AdminDailySummary["moneyBack"]): string {
     m.hostReject.count > 0 ? `사장님 거절 ${m.hostReject.count}건 · ${refundOf(m.hostReject.refund)}` : "",
     m.adminRefund.count > 0 ? `관리자 환불 ${m.adminRefund.count}건 · ${won(m.adminRefund.refund)}` : "",
     m.autoRefund.count > 0 ? `결제 직후 자동 환불 ${m.autoRefund.count}건 · ${won(m.autoRefund.refund)}` : "",
+    // 🆕09-27 사장님이 확정 기한 안에 확정하지 않아 정리 작업이 돌려준 것. 위 «결제 직후 자동 환불»과 따로 센다.
+    m.unconfirmedRefund?.count ? `확정 기한 지나 자동 환불 ${m.unconfirmedRefund.count}건 · ${won(m.unconfirmedRefund.refund)}` : "",
   ].filter(Boolean);
   return lines.length > 0 ? lines.join("\n") : "없었어요";
 }

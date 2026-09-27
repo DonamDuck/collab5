@@ -10,7 +10,7 @@ import "server-only"; // 🔒서비스 롤 키로 DB를 읽는 파일이다. 클
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { notifyAdmin, type AdminNotifyResult } from "./admin-notify";
 import { buildAdminDaily } from "./rent-notify";
-import { isAutoCancelReason } from "./rent-payment";
+import { isAutoCancelReason, isUnconfirmedRefundReason } from "./rent-payment";
 import { addDaysIso, todayKst } from "./rent-time";
 import { listSpacesForReview } from "./spaces";
 import type { Payment, SpaceBooking } from "./types";
@@ -27,6 +27,9 @@ export type DailyPayment = Pick<Payment, "orderId" | "amount" | "approvedAt"> & 
   balanceAmount?: number;
   /** 토스 취소 내역에 자동 취소 사유(`AUTO_REFUND_REASON` 등)가 있나. 손님 취소와 자동 환불이 둘 다 예약 `cancelled`라 이걸로 가른다. */
   autoCancel?: boolean;
+  /** 🆕09-27 토스 취소 내역에 «확정 기한 지남» 사유(`UNCONFIRMED_REFUND_REASON`)가 있나. 사장님이 답한 적 없는 `refunded` 둘
+   *  (결제 직후 자동 환불이 실패했다가 정리된 것 · 확정 기한이 지나 정리 작업이 돌려준 것)을 이걸로 가른다. */
+  unconfirmedCancel?: boolean;
 };
 
 /** 건수와 돌려준 돈. */
@@ -68,8 +71,10 @@ export interface AdminDailySummary {
   useTomorrow: number;
   /** 🆕09-19 저녁 대표 [4] — 어제(KST) 돈이 돌아간 일. 예약 행이 그 상태로 바뀐 날로 센다.
    *  손님 취소(`cancelled`) · 사장님 거절(`refunded`, 환불 신청 없음, 사장님이 답함) · 관리자 환불(`refunded`, 환불 신청 있음)
-   *  · 자동 환불(`cancelled` + 자동 취소 사유, 또는 🆕09-27 `refunded`인데 사장님이 답한 적 없음 — 자동 환불이 실패해 정산 화면 [새로고침]으로 정리된 것). */
-  moneyBack: { guestCancel: CountRefund; hostReject: CountRefund; adminRefund: CountRefund; autoRefund: CountRefund };
+   *  · 자동 환불(`cancelled` + 자동 취소 사유, 또는 🆕09-27 `refunded`인데 사장님이 답한 적 없음 — 자동 환불이 실패해 정산 화면 [새로고침]으로 정리된 것)
+   *  · 🆕09-27 확정 기한 지남(`refunded`, 사장님이 답한 적 없음, 토스 취소 사유가 `UNCONFIRMED_REFUND_REASON`) — 결제 후 48시간·이용 시작 중
+   *    먼저 온 기한까지 사장님이 확정하지 않아 정리 작업이 돌려준 것. 자동 환불과 따로 센다. */
+  moneyBack: { guestCancel: CountRefund; hostReject: CountRefund; adminRefund: CountRefund; autoRefund: CountRefund; unconfirmedRefund: CountRefund };
   /** 🚨환불이 실패해 손님 돈이 붙잡혀 있는 예약(`rejected`) — 날짜와 상관없이 지금 남은 것 전부. 금액은 결제 줄의 남은 돈. 있으면 요약 맨 위에 선다. */
   stuck: { count: number; amount: number };
   remind: RemindRun | null;
@@ -112,7 +117,7 @@ export function summarizeDaily(input: {
 
   // 💸어제 돈이 돌아간 일 — 예약이 그 상태가 된 날(`updatedAt`)이 어제인 것만. 환불액은 결제 줄의 «낸 돈 − 남은 돈».
   const zero = (): CountRefund => ({ count: 0, refund: 0 });
-  const moneyBack = { guestCancel: zero(), hostReject: zero(), adminRefund: zero(), autoRefund: zero() };
+  const moneyBack = { guestCancel: zero(), hostReject: zero(), adminRefund: zero(), autoRefund: zero(), unconfirmedRefund: zero() };
   for (const b of input.bookings) {
     if (b.status !== "cancelled" && b.status !== "refunded") continue;
     const at = Date.parse(b.updatedAt);
@@ -127,7 +132,9 @@ export function summarizeDaily(input: {
         //   [새로고침]으로 정리된 것(역시 찍혀 있다), 그리고 결제 직후·끊긴 결제의 자동 환불이 실패했다가 [새로고침]으로 정리된 것.
         //   마지막은 pending에서 곧장 rejected가 돼서 사장님이 답한 시각이 없다. 🩸전엔 이것까지 「사장님 거절」로 셌다(사장님은 거절한 적 없다).
         //   정산 화면 [새로고침]이 손님 메일을 고를 때와 같은 칸으로 가른다(`resyncStuckBookingAction`).
-        : b.decidedAt ? moneyBack.hostReject : moneyBack.autoRefund;
+        // 🆕09-27 넷째 길 — 확정 기한이 지나 정리 작업이 돌려준 것(`rent-unconfirmed.ts`). 역시 답한 시각이 없어서 토스 취소 사유로 가른다.
+        //   ⚠️그 환불이 실패했다가 관리자가 토스 관리자 화면에서 직접 돌려준 것은 사유 글자가 우리 것이 아니라 «자동 환불»로 세진다.
+        : b.decidedAt ? moneyBack.hostReject : pay?.unconfirmedCancel ? moneyBack.unconfirmedRefund : moneyBack.autoRefund;
     box.count += 1;
     box.refund += back;
   }
@@ -180,6 +187,7 @@ function toDailyPayment(r: Row): DailyPayment {
     orderId: s(r.order_id), amount: n(r.amount), approvedAt: r.approved_at ? s(r.approved_at) : undefined,
     balanceAmount: r.balance_amount === null || r.balance_amount === undefined ? undefined : n(r.balance_amount),
     autoCancel: cancels.some((c) => isAutoCancelReason(typeof c?.cancelReason === "string" ? c.cancelReason : "")),
+    unconfirmedCancel: cancels.some((c) => isUnconfirmedRefundReason(typeof c?.cancelReason === "string" ? c.cancelReason : "")),
   };
 }
 
