@@ -3,7 +3,7 @@ import { runRentRemind } from "@/lib/rent-remind";
 import { sendAdminDaily, type RemindRun } from "@/lib/rent-admin-daily";
 import { reconcileLedger, sendLedgerAlert, type LedgerRun } from "@/lib/rent-ledger";
 import { addDaysIso, todayKst } from "@/lib/rent-time";
-import { sweepBookings, type SweepRun } from "@/lib/spaces";
+import { purgeAbandonedCheckouts, sweepBookings, type PurgeRun, type SweepRun } from "@/lib/spaces";
 
 // GET /api/cron/rent-remind — 하루 팝업 이용 전날 리마인드 (2026-09-17)
 //
@@ -55,9 +55,22 @@ export async function GET(req: Request) {
   } catch (e) {
     console.error("[cron/rent-remind] 장부 대조 실패 — 요약엔 멈췄다고 적는다", e);
   }
-  const daily = await sendAdminDaily(remind, today, { ledger, sweep });
+  // 🧹09-27 대표 — 결제창만 열고 떠난 신청을 지운다(「다 남기면 우리 입장에서 너무 큰 데이터 낭비」). 장부 대조 «뒤»에 돈다.
+  //   ⚠️대조가 제대로 돈 날에만 지운다 — 토스 쪽을 못 본 날 지우면, 혹시 돈이 걸린 주문을 사람이 보기 전에 지울 수 있다.
+  //   대조가 짚은 주문은 지우지 않는다(`keepOrderIds`). 못 돈 날은 「skipped」로 요약에 한 줄 서고, 다음 날 이어 간다.
+  let purge: PurgeRun | null | "skipped" = "skipped";
+  if (ledger?.ok) {
+    try {
+      purge = await purgeAbandonedCheckouts({ keepOrderIds: ledger.mismatches.map((m) => m.orderId) });
+    } catch (e) {
+      console.error("[cron/rent-remind] 결제 이탈 정리 실패 — 요약엔 멈췄다고 적는다", e);
+      purge = null;
+    }
+  }
+  const daily = await sendAdminDaily(remind, today, { ledger, sweep, purge });
   return NextResponse.json({
     ...(remind ?? { remind: "failed" }), daily: daily.channel, counted: daily.counted, sweep: sweep ?? "failed",
+    purge: purge ?? "failed",
     ledger: !ledger ? "failed" : ledger.ok ? { checked: ledger.checked, mismatches: ledger.mismatches.length, unchecked: ledger.unchecked } : { skipped: ledger.reason },
   });
 }

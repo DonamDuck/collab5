@@ -1283,9 +1283,25 @@ function ledgerLine(run: LedgerRun | null | undefined): string {
   ].filter(Boolean).join("\n");
 }
 
+/** 🧹09-27 결제 이탈 정리 한 줄(대표 「결제창 갔다가 껐다가 고민하는 걸 다 남기면 … 데이터 낭비」). 안 돌렸으면 빈 값.
+ *  ⭐못 지운 날을 0건이라고 하지 않는다 — 장부 대조가 안 돈 날은 미룬 것이고, 도중에 멈췄으면 멈췄다고 말한다. */
+function purgeLine(run: DailyRuns["purge"]): string {
+  if (run === undefined) return "";
+  if (run === "skipped") return "결제 이탈 정리는 장부 대조가 안 돼 내일로 미뤘어요.";
+  if (run === null) return "결제 이탈 정리가 멈췄어요.";
+  return `결제 이탈 정리 ${run.deleted}건${run.kept > 0 ? ` · 흔적이 있어 남긴 ${run.kept}건` : ""}`;
+}
+
 /** 🆕09-27 D7 정리 작업 한 줄. 이번에 안 돌렸으면(`undefined`) 빈 값이라 줄이 안 선다.
- *  끊긴 결제 되묻기(D4)가 한 일이 있으면 둘째 줄에 붙인다. 환불은 그때그때 슬랙에도 따로 갔다. */
-function sweepLine(run: SweepRun | null | undefined): string {
+ *  끊긴 결제 되묻기(D4)가 한 일이 있으면 둘째 줄에 붙인다. 환불은 그때그때 슬랙에도 따로 갔다.
+ *  🆕09-27 결제 이탈 정리(`purgeLine`)는 맨 끝 줄에 붙는다. */
+function sweepLine(run: SweepRun | null | undefined, purge?: DailyRuns["purge"]): string {
+  const p = purgeLine(purge);
+  const body = sweepBody(run);
+  return [body, p].filter(Boolean).join("\n");
+}
+
+function sweepBody(run: SweepRun | null | undefined): string {
   if (run === undefined) return "";
   if (run === null) return "정리 작업이 멈췄어요. Vercel 로그에서 rent-remind를 봐 주세요.";
   const st = run.stale;
@@ -1400,9 +1416,9 @@ export function buildAdminDaily(
       [LABEL.dailyUse, `오늘 ${s.useToday}건 · 내일 ${s.useTomorrow}건`],
       [LABEL.dailyRemind, remindLine(remind)],
       [LABEL.dailyLedger, ledgerLine(runs.ledger)],
-      [LABEL.dailySweep, sweepLine(runs.sweep)],
+      [LABEL.dailySweep, sweepLine(runs.sweep, runs.purge)],
     ]
-    : [[LABEL.dailyRemind, remindLine(remind)], [LABEL.dailyLedger, ledgerLine(runs.ledger)], [LABEL.dailySweep, sweepLine(runs.sweep)]];
+    : [[LABEL.dailyRemind, remindLine(remind)], [LABEL.dailyLedger, ledgerLine(runs.ledger)], [LABEL.dailySweep, sweepLine(runs.sweep, runs.purge)]];
   const go = { href: `${SITE_URL}/rent/payouts`, label: "정산 화면 열기" };
   const tail = "매일 아침 9시 리마인드가 끝나면 와요. 숫자가 다 0이어도 와요. 안 온 날은 크론이 멈춘 거예요.";
   return {

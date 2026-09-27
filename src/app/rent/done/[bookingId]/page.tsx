@@ -55,8 +55,10 @@ export default async function RentDonePage({ params }: { params: Promise<{ booki
 
   const b = await getBooking(id);
   if (!b || b.guestUserId !== uid) notFound();
-  // 결제창만 열고 안 낸 자리는 「완료」가 아니다. 보낸 신청 목록으로 보내 상태를 그대로 보게 한다.
-  if (b.status === "pending") redirect("/rent/requests");
+  // 결제창만 열고 안 낸 자리는 「완료」가 아니다. 🔁09-27 — 전엔 내 예약 목록으로 보냈는데, 결제 전 신청은 이제 목록에 안 선다
+  //   (대표 「이어서 결제하기 스펙 자체를 지우자」). 결제 화면이 그 신청의 지금을 말한다 — 결제 시간 안이면 결제창,
+  //   결제를 확인하고 있으면 「결제를 확인하고 있어요」, 시간이 지났으면 공간으로 돌려보낸다(`/rent/pay/[orderId]`).
+  if (b.status === "pending") redirect(`/rent/pay/${b.orderId}`);
 
   const brief = (await listSpacesByIds([b.spaceId])).get(b.spaceId);
   // 👀09-16 phase 1 — 결제를 마치면 사장님 연락처가 바로 열린다(`guestSeesHost`). 원본(주소·안내)도 그때 읽는다.
