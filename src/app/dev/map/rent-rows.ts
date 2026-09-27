@@ -121,6 +121,7 @@ export const RENT_GROUPS: Group[] = [
           { desc: "사장님 거절, 환불이 아직 안 끝남", c: "guest-full", to: `/rent/done/${B.rejected}` },
           { desc: "자동 취소가 실패한 예약 · 제목 「예약이 잡히지 않았어요」 · 돌려드릴 돈 처리 중", c: "guest-full", to: `/rent/done/${B.autoRejected}` },
           { desc: "사장님 거절 뒤 환불 완료", c: "guest-full", to: `/rent/done/${B.refunded}` },
+          { desc: "확정 기한이 지나 자동 환불 · 제목 「사장님 확정이 없어 결제를 취소했어요」 · 돌려드린 돈 밑에 까닭 한 줄", c: "guest-full", to: `/rent/done/${B.unconfirmedRefunded}` },
           { desc: "손님 취소, 일부 돌려받음", c: "guest-full", to: `/rent/done/${B.cancelledFuture}` },
           { desc: "손님 취소, 이용일 지남", c: "guest-full", to: `/rent/done/${B.cancelledPast}` },
           { desc: "결제 시간이 지난 신청", c: "guest-full", to: `/rent/done/${B.expired}` },
