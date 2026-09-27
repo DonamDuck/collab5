@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import {
-  PAY_CHECKING_CODES, PAY_CHECKING_LINE, PAY_CHECKING_TITLE, PAY_FAIL_METHOD_UNSUPPORTED, PAY_FAIL_NOT_AVAILABLE, PAY_FAIL_SLOT_TAKEN,
+  PAY_CHECKING_BODY, PAY_CHECKING_CODES, PAY_CHECKING_LINE, PAY_CHECKING_TITLE, PAY_FAIL_METHOD_UNSUPPORTED, PAY_FAIL_NOT_AVAILABLE, PAY_FAIL_SLOT_TAKEN,
   PAY_FAIL_SLOT_TAKEN_REFUNDED, PAY_FAIL_SLOT_TAKEN_REFUND_PENDING,
   PAY_FAIL_USE_STARTED, PAY_FAIL_WINDOW_OVER,
 } from "@/lib/rent-payment";
@@ -88,7 +88,7 @@ export default async function RentPayFailPage({
       </h1>
       <p className="mt-3 text-[17px] leading-relaxed break-keep text-body">
         {checking
-          ? "조금 전 결제가 끝났는지 아직 확인하는 중이에요. 다시 결제하지 말고 기다려 주세요."
+          ? PAY_CHECKING_BODY
           : "신청은 아직 접수되지 않았어요. 사장님께도 아무 연락이 가지 않았어요."}
       </p>
       <p className="mt-5 border-l-2 border-hairline pl-4 text-[15px] leading-relaxed break-keep text-mute">{reason}</p>

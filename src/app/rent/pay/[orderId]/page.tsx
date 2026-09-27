@@ -1,9 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { getBookingByOrderId, getSpaceFull, listLiveBookings, listSpacesByIds } from "@/lib/spaces";
+import { getBookingByOrderId, getPaymentByOrderId, getSpaceFull, listLiveBookings, listSpacesByIds } from "@/lib/spaces";
 import { getSessionUserId } from "@/lib/profiles";
-import { GRACE_MINUTES, guestCancelRefundRate } from "@/lib/rent-payment";
+import {
+  GRACE_MINUTES, guestCancelRefundRate, PAY_CHECKING_BODY, PAY_CHECKING_LINE, PAY_CHECKING_TITLE,
+} from "@/lib/rent-payment";
+// 🔒09-27(fix-money3) 결제를 시도한 흔적 — 정리 작업·승인 관문·내 예약 줄과 같은 판정 한 벌.
+import { hasPayTrace } from "@/lib/rent-recover";
+import { KAKAO_CHAT_URL } from "@/lib/site";
 import { bookingMinutes, durationLabel, kstDaysUntil } from "@/lib/rent-time";
 import { payWindowLeftMs, pendingBookingProblem } from "@/lib/rent-booking-rules";
 import { spaceListed } from "@/lib/bizcheck";
@@ -76,6 +81,33 @@ export default async function RentPayPage({ params }: { params: Promise<{ orderI
   // ⏳결제 시간이 지난 신청은 결제 화면을 다시 열지 않는다 — 토스 결제가 이미 EXPIRED라 눌러도 막힌다.
   if (b.status === "expired") redirect("/rent/requests");
   if (b.status !== "pending") redirect(`/rent/done/${b.id}`);
+
+  // 🔒09-27(fix-money3) — **결제를 시도한 흔적이 있으면 위젯을 그리지 않는다.** 앞선 승인의 결과를 아직 모르는 주문이다
+  //   (승인 응답이 끊겼거나 승인 중에 서버가 죽었다). 내 예약 줄은 이 주문에 「이어서 결제하기」를 안 띄우지만, 주소로 직접
+  //   열 수 있다. 여기서 다시 결제하면 한 주문에 두 번 나갈 수 있다. 승인 관문(`confirmBookingAction`)도 같은 판정으로 막는다.
+  //   결제 시간 판정보다 먼저 본다 — 흔적 있는 주문에 「시간이 지났어요, 다시 골라 주세요」라고 하면 새로 신청해 또 결제하게 된다.
+  const pay = await getPaymentByOrderId(orderId);
+  if (pay && hasPayTrace({ payStatus: pay.status, payKey: pay.paymentKey })) {
+    return (
+      <main className="mx-auto w-full max-w-[560px] px-4 pt-6 pb-14 sm:px-6">
+        <h1 className="text-[22px] font-bold leading-tight tracking-tight text-ink">{PAY_CHECKING_TITLE}</h1>
+        <p className="mt-3 text-[17px] leading-relaxed break-keep text-body">{PAY_CHECKING_BODY}</p>
+        <p className="mt-5 border-l-2 border-hairline pl-4 text-[15px] leading-relaxed break-keep text-mute">{PAY_CHECKING_LINE}</p>
+        <div className="mt-8 flex flex-wrap gap-2">
+          <Link href="/rent/requests" className={secondaryBtnCls}>
+            내 예약 보기
+          </Link>
+        </div>
+        <p className="mt-6 text-[15px] leading-relaxed break-keep text-mute">
+          확인이 오래 걸리면{" "}
+          <a href={KAKAO_CHAT_URL} target="_blank" rel="noreferrer" className="text-body underline underline-offset-2">
+            카카오톡으로 알려 주세요
+          </a>
+          .
+        </p>
+      </main>
+    );
+  }
 
   const brief = (await listSpacesByIds([b.spaceId])).get(b.spaceId);
   if (!brief) notFound();

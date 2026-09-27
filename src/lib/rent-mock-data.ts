@@ -586,6 +586,9 @@ function fullWorld(today: string, withAccount: boolean): MockWorld {
     noBizConfirmed: booking({ id: 90023, spaceId: s10.id, guestUserId: U.guest, status: "confirmed", useDate: d(5), startTime: "14:00", endTime: "16:00", plan: "필름 카메라 모임 사진을 찍으려고 해요. 두 시간이면 돼요.", headcount: 4, guestPhone: "010-3456-7890", guestName: "한서윤", decidedAt: `${d(-1)}T05:00:00.000Z`, ...P10 }, today),
     // 🧾09-27 손님 취소의 환불을 토스 응답으로 확인하지 못한 예약(D5) — 정산 화면 「환불을 확인하지 못한 취소」 무리와 [토스에서 다시 읽기].
     refundUnconfirmed: booking({ id: 90024, spaceId: s6.id, guestUserId: U.guest2, status: "confirmed", useDate: d(9), startTime: "13:00", endTime: "16:00", plan: "그림책 낭독회를 하려다 일정이 바뀌어 취소했어요.", headcount: 8, guestPhone: "010-5678-9012", guestName: "정다온", decidedAt: `${d(-3)}T06:00:00.000Z`, refundUnconfirmedAt: `${d(-1)}T10:00:00.000Z`, ...P6 }, today),
+    // 🔒09-27(fix-money3) 결제 확인 중 — 승인 결과를 모르는 신청(결제 줄 ABORTED · 결제 키 있음). 내 예약 줄엔 「이어서 결제하기」 대신
+    //   「결제를 확인하고 있어요」, 결제 화면은 위젯 대신 같은 안내가 선다.
+    payChecking: booking({ id: 90025, spaceId: s6.id, guestUserId: U.guest, status: "pending", useDate: d(7), startTime: "10:00", endTime: "12:00", plan: "원두 두 가지로 작은 시음 모임을 하려고 해요.", headcount: 4, guestPhone: "010-3456-7890", guestName: "한서윤", ...P6 }, today),
     hostAsGuest: booking({ id: 90020, spaceId: s6.id, guestUserId: U.host, status: "confirmed", useDate: d(4), startTime: "17:00", endTime: "20:00", plan: "원두 시음회를 다른 동네에서 열어 보려고 해요.", headcount: 10, guestPhone: "010-2345-6789", guestName: "문하람", guestBrandSlug: "mock-slow-afternoon", decidedAt: `${d(-1)}T05:00:00.000Z`, ...P6 }, today),
   };
   const bookings = Object.values(b);
@@ -617,6 +620,8 @@ function fullWorld(today: string, withAccount: boolean): MockWorld {
     payment(b.halfConfirmed, U.host, { status: "DONE", method: "간편결제" }),
     payment(b.noBizConfirmed, U.host, { status: "DONE" }),
     payment(b.refundUnconfirmed, U.host2, { status: "DONE" }),
+    // 결과를 모르는 승인 — 승인 시각·수단은 없다(토스 답을 못 받았다). 결제 키는 승인 직전에 적어 둔 것이다.
+    { ...payment(b.payChecking, U.host2, { status: "ABORTED" }), approvedAt: undefined, method: "" },
   ];
 
   // 🪪09-19 — S8 사장님은 개인 명의(가족) 계좌다. 예금주가 대표자와 달라 검토 화면에 한 줄이 뜬다. 「계좌 없음」 세계에서도 둔다(그 세계는 느린오후 쪽만 뺀다).
@@ -783,6 +788,8 @@ export const MOCK_IDS = {
     noBizConfirmed: 90023,
     /** 🧾09-27 환불을 확인하지 못한 손님 취소(정산 화면 「손이 필요한 예약」) */
     refundUnconfirmed: 90024,
+    /** 🔒09-27(fix-money3) 결제 확인 중 — 승인 결과를 모르는 결제 전 신청 */
+    payChecking: 90025,
   },
 } as const;
 

@@ -99,6 +99,9 @@ export const RENT_GROUPS: Group[] = [
           { desc: "결제 실패 · 그 사이 시간이 차서 자동 취소 (다시 결제하기 없음)", c: "guest-full", to: `/rent/pay/fail?code=RENT_SLOT_TAKEN_REFUNDED&orderId=mock-order-${B.pending}` },
           { desc: "결제 실패 · 자동 환불도 실패해서 연락드림", c: "guest-full", to: `/rent/pay/fail?code=RENT_SLOT_TAKEN_REFUND_PENDING&orderId=mock-order-${B.pending}` },
           { desc: "결제 실패 · 모르는 코드나 주소에 글을 붙인 경우 (기본 문장)", c: "guest-full", to: "/rent/pay/fail?message=아무 글이나&code=SOMETHING_ELSE" },
+          { desc: "결제 실패 · 승인 결과를 모름 (「결제를 확인하고 있어요」, 다시 결제하기 없음)", c: "guest-full", to: `/rent/pay/fail?code=RENT_PAY_UNKNOWN&orderId=mock-order-${B.payChecking}` },
+          // 🔒09-27(fix-money3) 결제를 시도한 흔적이 있는 주문 — 주소로 직접 열어도 결제창을 안 그린다.
+          { desc: "결제 확인 중인 주문을 주소로 열면 결제창 대신 「결제를 확인하고 있어요」와 내 예약 보기", c: "guest-full", to: `/rent/pay/mock-order-${B.payChecking}` },
           { desc: "결제 시간이 지난 주문을 열면 내 예약으로 넘어가요", c: "guest-full", to: `/rent/pay/mock-order-${B.expired}` },
           { desc: "이미 끝난 주문(다녀온 예약)을 열면 예약 한 건 화면으로 넘어가요", c: "guest-full", to: `/rent/pay/mock-order-${B.done}` },
           { desc: "남의 주문 (404)", c: "guest-full", to: `/rent/pay/mock-order-${B.refundReq}` },
@@ -135,6 +138,7 @@ export const RENT_GROUPS: Group[] = [
           // 🔗09-27 대표 D2 — 완료 화면의 「내 예약 보기」가 이 주소로 온다. 그 줄로 내려가 1초 남짓 옅게 칠해졌다 걷혀요.
           { desc: "완료 화면에서 온 자리(`#b-예약번호`) · 그 예약 줄로 내려가 잠깐 옅게 칠해져요", c: "guest-full", to: `/rent/requests#b-${B.confirmed}` },
           { desc: "접힌 결제 안 한 신청을 짚고 온 자리 · 접힌 칸이 열리고 그 줄이 칠해져요", c: "guest-full", to: `/rent/requests#b-${B.expired}` },
+          { desc: "결제 확인 중인 신청 · 「이어서 결제하기」 대신 「결제를 확인하고 있어요」 한 줄", c: "guest-full", to: `/rent/requests#b-${B.payChecking}` },
           { desc: "빈 목록", c: "guest-empty", to: "/rent/requests" },
           { desc: "로그인 안 했을 때", c: "anon", to: "/rent/requests" },
           { desc: "긴 글", c: "stress-guest", to: "/rent/requests" },
@@ -178,7 +182,7 @@ export const RENT_GROUPS: Group[] = [
         path: "/rent/my?tab=guest",
         note: "위 칸 둘 중 「빌린 공간」(기본 칸)이에요. 모든 상태의 신청이 있는 손님 계정으로 열어요. 칩 셋이 예약 완료·지난 예약·취소·환불로 나눠요.",
         rows: [
-          { desc: "예약 완료 (결제 완료·확정, 이어서 결제할 수 있는 신청)", c: "guest-full", to: "/rent/my?tab=guest" },
+          { desc: "예약 완료 (결제 완료·확정, 이어서 결제할 수 있는 신청, 결제 확인 중인 신청)", c: "guest-full", to: "/rent/my?tab=guest" },
           { desc: "지난 예약 (다녀옴, 이용이 끝난 결제 완료·확정)", c: "guest-full", to: "/rent/my?tab=guest&g=past" },
           { desc: "취소·환불 (손님 취소, 사장님 거절·환불, 결제 안 한 채 끝난 신청)", c: "guest-full", to: "/rent/my?tab=guest&g=cancel" },
         ],
