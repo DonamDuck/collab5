@@ -994,6 +994,22 @@ export async function markRefundUnconfirmed(bookingId: number): Promise<boolean>
   return (data ?? []).length === 1;
 }
 
+/** 🆕09-27 관리자가 토스에서 다시 읽어 환불을 확인한 뒤 표시를 지운다(`resyncStuckBookingAction`). 예약 상태는 안 바꾼다.
+ *  «이번에 지웠을 때만» 참이다. 두 창에서 겹쳐 눌러도 메일이 한 번만 가게 호출부가 이 값으로 가른다.
+ *  ⚠️상태 칸이 아니라 표시 칸 하나라 `rent_sync`를 안 거친다(`markRefundUnconfirmed`가 이 칸을 적는 길과 같다).
+ *    예약·결제 상태는 호출부가 먼저 `rent_sync`로 옮긴 뒤에 이걸 부른다. */
+export async function clearRefundUnconfirmed(bookingId: number): Promise<boolean> {
+  if (await rentMockOn()) return false;
+  const c = db();
+  if (!c) return false;
+  const { data, error } = await c.from("space_bookings")
+    .update({ refund_unconfirmed_at: null })
+    .eq("id", bookingId).not("refund_unconfirmed_at", "is", null)
+    .select("id");
+  if (error) { console.error(`[spaces] clearRefundUnconfirmed failed id=${bookingId}: ${error.message}`); return false; }
+  return (data ?? []).length === 1;
+}
+
 /** 관리자가 «신청을 닫는다» — 전화로 확인해 보니 환불할 일이 아니었을 때. 예약은 원래대로 살아 있다. */
 export async function clearRefundRequest(bookingId: number): Promise<boolean> {
   if (await rentMockOn()) return false;

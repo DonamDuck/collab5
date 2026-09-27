@@ -279,7 +279,7 @@ export interface MailResult {
 /** 한 통 보내기. ⚠️수신자가 비어 있으면(카카오 가입은 이메일이 없을 수 있다) 보낼 곳이 없으니 스킵. 에러가 아니다.
  *  🔻09-19 대표 — 대표(`ADMIN_EMAIL`) 참조(cc)를 뺐다. 「이메일 말고 slack이나 채널톡 같은 서비스로 우회해서 무료로」.
  *    거래마다 대표 메일이 한 통씩 더 나가 무료 한도를 먹었다. 대표가 봐야 하는 흐름은 슬랙 하루 요약(`buildAdminDaily`)이 맡는다. */
-async function send(to: string, subject: string, html: string, text: string): Promise<MailResult> {
+async function send(to: string, subject: string, html: string, text: string, idem?: string): Promise<MailResult> {
   const out: MailResult = { sent: false, subject, html, text };
   // 🧪09-18 목 데이터 보기 중(개발 빌드 전용)엔 보내지 않는다. 첫 울타리는 `rent-actions.ts` 액션 첫 줄.
   if (await rentMockOn()) {
@@ -298,7 +298,13 @@ async function send(to: string, subject: string, html: string, text: string): Pr
   try {
     const res = await fetch(RESEND_ENDPOINT, {
       method: "POST",
-      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      headers: {
+        Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json",
+        // 🔁09-27 — 겹쳐 돌 수 있는 자리(정리 작업·관리자 버튼)가 보내는 메일은 멱등키를 단다.
+        //   Resend 문서(09-27 확인): 같은 키 + 같은 본문이면 다시 보내지 않고 첫 응답을 준다. 키는 24시간, 최대 256자.
+        //   같은 키가 아직 처리 중이면 409라 여기선 «발송 실패»로 찍히지만, 먼저 들어간 요청이 보낸다.
+        ...(idem ? { "Idempotency-Key": idem } : {}),
+      },
       body: JSON.stringify({ from: FROM, to: [to], subject, text, html }),
       // 메일 서버가 느려도 결제 응답을 오래 붙잡지 않는다.
       signal: AbortSignal.timeout(8000),
@@ -317,6 +323,12 @@ async function send(to: string, subject: string, html: string, text: string): Pr
 
 function sendMail(m: Mail): Promise<MailResult> {
   return send(m.to, m.subject, m.html, m.text);
+}
+
+/** 멱등키를 단 한 통(`send`의 머리말). ⚠️`sendMail`에 둘째 인자를 두지 않은 이유 — `.map(sendMail)`이 배열 번호를
+ *  둘째 인자로 넘겨서, 서로 다른 주문의 메일이 「0」 같은 같은 키를 쓰게 된다(Resend가 24시간 동안 뒤엣것을 안 보낸다). */
+function sendMailOnce(m: Mail, idem: string): Promise<MailResult> {
+  return send(m.to, m.subject, m.html, m.text, idem);
 }
 
 /** 커피챗을 같이 샀는가. 새 칸(`amountChat`)과 옛 칸(`amountMentor`) 둘 중 하나라도 돈이 있으면 샀다.
@@ -344,7 +356,7 @@ function productLine(b: SpaceBooking, forHost = false): string {
 }
 
 /** 🔗공간 페이지 — 유의 사항·사진을 그날 아침 다시 보는 자리(09-17 QA: 결제 완료 메일에 링크가 없었다). */
-function spaceLink(space: Space): string {
+function spaceLink(space: Pick<Space, "slug">): string {
   return `${SITE_URL}/rent/${encodeURIComponent(space.slug)}`;
 }
 
@@ -589,6 +601,14 @@ export async function notifyBookingRejected(
   return sendMail(buildBookingRejected(booking, space, host, guest));
 }
 
+/** 🆕09-27 같은 메일을 «한 번만» — 거절 환불이 실패해 미뤄 둔 이 메일을, 관리자가 토스에서 환불을 확인한 뒤 보낼 때
+ *  (`resyncStuckBookingAction`). 두 창에서 겹쳐 눌러도 한 통만 가게 주문번호로 멱등키를 단다. */
+export async function notifyBookingRejectedOnce(
+  booking: SpaceBooking, space: Space, host: Profile | null, guest: Profile | null,
+): Promise<MailResult> {
+  return sendMailOnce(buildBookingRejected(booking, space, host, guest), `rent-rejected-guest-${booking.orderId}`);
+}
+
 /** ④ 손님 취소 → 사장님. 그날이 다시 비는 날이 됐다는 것만. */
 export function buildBookingCancelled(
   booking: SpaceBooking, space: Space, host: Profile | null, guest: Profile | null,
@@ -707,6 +727,35 @@ export async function notifyAdminRefund(
   booking: SpaceBooking, space: Space, host: Profile | null, guest: Profile | null, refundAmount: number,
 ): Promise<MailResult[]> {
   return Promise.all(buildAdminRefund(booking, space, host, guest, refundAmount).map(sendMail));
+}
+
+/** ⑯ 끊긴 결제를 돌려드림 → 손님 (09-27, 대표 「제안대로 고고」).
+ *  손님은 결제 실패 화면을 봤는데 돈은 나갔다가 돌아온다. 모르면 불안하다. 그래서 «돌려드렸다»는 사실만 한 통으로 알린다.
+ *  부르는 곳 둘 — 정리 작업이 끊긴 결제를 찾아 전액 돌려줬을 때(`rent-recover.ts`), 그리고 그 환불이 실패해
+ *    「손이 필요한 예약」에 남았던 줄을 관리자가 토스에서 다시 읽어 환불을 확인했을 때(`resyncStuckBookingAction`).
+ *  ⚠️환불이 «끝난 뒤에만» 부른다. 돈이 아직 안 돌아갔으면 이 메일은 거짓말이 된다.
+ *  @param refund 돌려드린 돈(토스 기준). 끊긴 결제는 늘 낸 돈 전부라 「전액」으로 쓴다. */
+export function buildPaymentReturned(
+  booking: SpaceBooking, space: Pick<Space, "name" | "slug">, guest: Profile | null, refund: number,
+): Mail {
+  const back = Math.max(0, Math.floor(refund || 0));
+  const subject = `[collab5] ${subjectDate(booking.useDate)}, 결제를 전액 돌려드렸어요`;
+  const lead = "결제를 전액 돌려드렸어요. 결제가 제대로 끝나지 않아 신청이 접수되지 않았어요.";
+  const rows: [string, string][] = [
+    [LABEL.when, bookingWhen(booking)],
+    [LABEL.space, space.name],
+    [LABEL.refund, `${won(back)} 전액\n${REFUND_TIMING_LINE}`],
+  ];
+  const tail = ASK("결제 내역이 다르게 보이면 알려 주세요.");
+  return { to: guest?.email ?? "", subject, ...compose(lead, rows, { href: spaceLink(space), label: "공간에서 다시 신청하기" }, tail) };
+}
+
+/** 보내는 쪽 — 🔁정리 작업이 겹쳐 돌거나 관리자가 두 번 눌러도 한 통만 가게 주문번호로 멱등키를 단다(`send`).
+ *  두 자리가 같은 키를 쓴다. 한 주문에 이 메일은 한 번뿐이어야 한다. */
+export async function notifyPaymentReturned(
+  booking: SpaceBooking, space: Pick<Space, "name" | "slug">, guest: Profile | null, refund: number,
+): Promise<MailResult> {
+  return sendMailOnce(buildPaymentReturned(booking, space, guest, refund), `rent-payment-returned-${booking.orderId}`);
 }
 
 /** ⑥ 공간 공개 → 사장님 (09-17). 검토를 마치고 목록에 올렸다는 소식과, 요청이 오면 할 일.
@@ -1136,6 +1185,59 @@ export function buildRefundUnconfirmedNotice(booking: SpaceBooking, space: Space
 /** 보내는 쪽 — 대표 알림 한 곳(`notifyAdmin`)으로. */
 export async function notifyRefundUnconfirmed(booking: SpaceBooking, space: Space, refund: number) {
   return notifyAdmin(buildRefundUnconfirmedNotice(booking, space, refund));
+}
+
+/** 🆕09-27 「손이 필요한 예약」을 토스에서 다시 읽어 장부를 맞춘 결과 셋(`resyncStuckBookingAction`, 대표 「제안대로 고고」).
+ *  · `refunded` 환불이 실패했던 예약(rejected) — 토스엔 전액 돌아가 있었다. 예약을 환불로 맞췄다
+ *  · `partial` 같은 예약인데 토스엔 일부만 돌아가 있었다. 결제 줄만 맞추고 예약은 그대로 뒀다(손님 돈이 남아 있다)
+ *  · `cancelled` 환불을 확인하지 못한 손님 취소 — 토스엔 환불이 돼 있었다. 예약을 취소로 맞췄다 */
+export type ResyncKind = "refunded" | "partial" | "cancelled";
+
+export interface ResyncFacts {
+  /** 바꾸기 «전»에 읽은 예약(「예약 상태」 칸이 어디서 왔는지를 이 상태로 적는다). */
+  booking: SpaceBooking;
+  space: { id: number; name: string; ownerUserId: number } | null;
+  /** 결제 금액(토스 totalAmount = 우리 결제 줄 금액. 다르면 이 알림까지 오지 않는다). */
+  paid: number;
+  /** 토스 기준 돌아간 돈(낸 돈 − 남은 돈). */
+  refunded: number;
+  /** 토스 기준 남은 돈. */
+  balance: number;
+}
+
+/** ⑯ 토스에서 다시 읽어 장부를 맞춤 → 대표 슬랙. 거래 알림과 같은 규칙 — 🔒예약·주문번호·금액·회원 번호만, 슬랙에만.
+ *  장부를 «바꿨을 때만» 간다. 바꾼 게 없는 결과(아직 환불 전·금액이 다름·답 없음)는 버튼 옆 한 줄로 끝난다. */
+export function buildResyncNotice(kind: ResyncKind, f: ResyncFacts): AdminNotice {
+  const b = f.booking;
+  const [title, lead, move] =
+    kind === "refunded"
+      ? [`토스에서 환불을 확인해 장부를 맞췄어요 · ${won(f.refunded)}`, "환불이 안 된 줄 알았던 예약을 토스에서 다시 읽었더니 전액 돌아가 있었어요. 예약을 환불로 맞추고 손님께 메일을 보내요.", "환불 실패(rejected) → 환불(refunded)"]
+      : kind === "partial"
+        ? [`토스엔 일부만 돌아가 있어요 · 남은 ${won(f.balance)}`, "환불이 안 된 줄 알았던 예약을 토스에서 다시 읽었더니 일부만 돌아가 있었어요. 결제 줄만 토스 값으로 맞추고 예약은 그대로 두었어요. 남은 돈은 토스 관리자 화면에서 돌려드려 주세요.", "환불 실패(rejected) 그대로"]
+        : [`손님 취소의 환불을 확인해 장부를 맞췄어요 · ${won(f.refunded)}`, "환불을 확인하지 못했던 손님 취소를 토스에서 다시 읽었더니 환불이 돼 있었어요. 예약을 취소로 맞추고 손님과 사장님께 취소 메일을 보내요.", `${b.status === "paid" ? "결제 완료(paid)" : "확정(confirmed)"} → 취소(cancelled)`];
+  const rows: [string, string][] = [
+    [LABEL.dealBooking, String(b.id)],
+    [LABEL.dealOrder, b.orderId],
+    [LABEL.dealPaid, won(f.paid)],
+    [LABEL.dealRefund, f.refunded > 0 ? won(f.refunded) : "없어요"],
+    ["남은 돈", won(f.balance)],
+    ["예약 상태", move],
+    [LABEL.dealSpace, f.space ? `${f.space.name} (공간 번호 ${f.space.id})` : ""],
+    [LABEL.dealWhen, bookingWhen(b)],
+    [LABEL.dealGuest, String(b.guestUserId)],
+    [LABEL.dealHost, f.space ? String(f.space.ownerUserId) : ""],
+  ];
+  return {
+    title, lead, rows,
+    link: { href: `${SITE_URL}/rent/payouts`, label: "정산 화면 열기" },
+    note: "거래 알림은 슬랙에만 와요. 이름과 연락처는 싣지 않아요.",
+    slackOnly: true,
+  };
+}
+
+/** 보내는 쪽 — 대표 알림 한 곳(`notifyAdmin`)으로. 슬랙이 없으면 건너뛴다. */
+export async function notifyResync(kind: ResyncKind, f: ResyncFacts) {
+  return notifyAdmin(buildResyncNotice(kind, f));
 }
 
 /** 「3시간」·「2일」 — 결제한 지 얼마나 됐나. 하루가 안 되면 시간, 넘으면 날로. */

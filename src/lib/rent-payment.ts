@@ -91,6 +91,20 @@ export const PAY_FAIL_METHOD_UNSUPPORTED = "RENT_METHOD_UNSUPPORTED";
  *    코드가 하나 늘어나는 날 화면만 뒤처져서, 처리 중인 결제를 「안 됐어요」로 말하게 된다(09-23 QA). */
 export const PAY_IN_FLIGHT_CODES: readonly string[] = ["IDEMPOTENT_REQUEST_PROCESSING", "ALREADY_PROCESSING_REQUEST"];
 
+/** 🆕09-27(대표 「제안대로 고고」) — 승인 응답이 끊겼고 토스에 되물어도 결론이 안 났다. 돈이 나갔는지 «모른다».
+ *  🩸그 전엔 「결제 서버에 닿지 못했어요. 잠시 뒤 다시 시도해 주세요.」와 [다시 결제하기]를 보였다. 이미 돈이 나갔다면
+ *    손님이 새 카드로 한 번 더 결제하게 된다. 이 코드는 결제 실패 화면의 «확인 중» 갈래로 간다(다시 결제하기 없음).
+ *  돈이 나갔는데 예약이 안 생겼으면 정리 작업이 토스에 되물어 전액 돌려준다(`rent-recover.ts`). 그 표시가 결제 줄의 ABORTED다. */
+export const PAY_FAIL_UNKNOWN = "RENT_PAY_UNKNOWN";
+
+/** «확인 중» 갈래로 가는 코드 전부 — 겹쳐 들어온 승인(처리 중)과 결과를 모르는 승인. 승인 액션과 실패 화면이 이 목록 하나를 본다. */
+export const PAY_CHECKING_CODES: readonly string[] = [...PAY_IN_FLIGHT_CODES, PAY_FAIL_UNKNOWN];
+
+/** «확인 중»일 때 손님께 하는 사실 한 줄. 실패 화면의 사유 칸과 신청 폼 확인 팝업(승인 액션의 `message`)이 같은 글을 쓴다.
+ *  ⚠️「자동으로 돌려드려요」는 결제 줄에 흔적(ABORTED)이 남아 정리 작업이 토스에 되묻기 때문에 참이다(`confirmBookingAction`). */
+export const PAY_CHECKING_LINE = "몇 분 뒤 내 예약에서 확인해 주세요. 돈이 나갔는데 예약이 안 잡혔으면 자동으로 전액 돌려드려요.";
+export const PAY_CHECKING_TITLE = "결제를 확인하고 있어요";
+
 /** 🤖사람 손 없이 우리가 되돌리는 취소의 사유 둘(`confirmBookingAction`). 토스 취소 내역(`cancels[].cancelReason`)에 이 글자
  *  그대로 남는다. 아침 요약이 이 글자로 «자동 환불»을 손님 취소와 가른다(둘 다 예약은 `cancelled`라서). ⚠️글자를 바꾸면 옛 줄은 손님 취소로 세진다. */
 export const AUTO_REFUND_REASON = "예약 확정 실패 — 자동 환불";
@@ -169,9 +183,14 @@ export async function approvePayment(
   }
   console.error(`[rent-payment] 승인 결과를 모른다 — 토스에 되묻는다 order=${orderId}: ${unsure}`);
   const again = await recheckApproval(paymentKey, orderId, amount);
-  if (again) {
+  if (again.kind === "done") {
     console.warn(`[rent-payment] 되묻기로 승인 확인 — 정상 흐름을 잇는다 order=${orderId}`);
-    return { ok: true, message: "", payment: again };
+    return { ok: true, message: "", payment: again.payment };
+  }
+  // 🆕09-27 — 되묻기로도 결론이 안 났다. 「다시 시도해 주세요」라고 하면 이미 나간 돈 위에 한 번 더 결제하게 된다.
+  if (again.kind === "unknown") {
+    console.error(`[rent-payment] 되묻기로도 결론을 못 냈다 — 손님께 «확인 중»으로 말한다 order=${orderId}: ${again.reason}`);
+    return { ok: false, code: PAY_FAIL_UNKNOWN, message: `${PAY_CHECKING_TITLE}. ${PAY_CHECKING_LINE}` };
   }
   return failed ? { ok: false, ...failed } : { ok: false, message: "결제 서버에 닿지 못했어요. 잠시 뒤 다시 시도해 주세요." };
 }
@@ -186,17 +205,29 @@ function isPaymentShape(v: unknown): v is TossPayment {
   return !!v && typeof v === "object" && !Array.isArray(v) && typeof (v as { status?: unknown }).status === "string";
 }
 
-/** 승인 응답을 못 받았을 때 한 번 되묻는다. **그 결제**가 `DONE`이고 금액이 같을 때만 돌려준다.
+/** 되묻기 결과 셋 — 승인됐다(그 결제·그 금액) · 토스가 «안 했다»고 분명히 말한다 · 모른다. */
+type Recheck = { kind: "done"; payment: TossPayment } | { kind: "not-done" } | { kind: "unknown"; reason: string };
+
+/** 토스가 «돈이 안 움직였다»고 분명히 말하는 상태. 결제가 없거나(404) 이 넷이면 다시 결제해도 된다.
+ *  CANCELED는 돈이 이미 다 돌아간 상태라 여기에 둔다. 🔒이 밖의 상태(IN_PROGRESS·WAITING_FOR_DEPOSIT·PARTIAL_CANCELED 등)는 «모른다»다. */
+const SETTLED_NO_MONEY = new Set(["READY", "ABORTED", "EXPIRED", "CANCELED"]);
+
+/** 승인 응답을 못 받았을 때 한 번 되묻는다. **그 결제**가 `DONE`이고 금액이 같을 때만 승인으로 읽는다.
  *  ⚠️키가 다르면 같은 주문의 «다른 시도»다. 그 승인은 그 시도의 흐름이 맡는다(여기서 가져다 쓰면 남의 결제로 예약을 올린다).
- *  ⚠️금액이 다르면 성공으로 안 읽는다. 돈이 빠졌다면 정리 작업의 되묻기(`rent-recover.ts`)나 아침 장부 대조가 잡는다. */
-async function recheckApproval(paymentKey: string, orderId: string, amount: number): Promise<TossPayment | null> {
+ *  ⚠️금액이 다르면 성공으로 안 읽는다. 돈이 빠졌다면 정리 작업의 되묻기(`rent-recover.ts`)나 아침 장부 대조가 잡는다.
+ *  🆕09-27 — 승인이 아닐 때 «안 했다»와 «모른다»를 가른다. 위 두 경우(다른 시도·다른 금액)와 답을 못 받은 경우,
+ *    처리 중(IN_PROGRESS)처럼 아직 끝나지 않은 상태는 «모른다»다. 손님께 다시 결제하라고 하면 안 되는 자리다. */
+async function recheckApproval(paymentKey: string, orderId: string, amount: number): Promise<Recheck> {
   const r = await lookupPaymentByOrderId(orderId);
-  if (r.kind !== "found") return null;
+  if (r.kind === "not-found") return { kind: "not-done" };
+  if (r.kind === "error") return { kind: "unknown", reason: r.reason };
   const p = r.payment;
-  if (p.status !== "DONE") return null;
-  if (paymentKey && p.paymentKey && p.paymentKey !== paymentKey) return null;
-  if (typeof p.totalAmount === "number" && p.totalAmount !== amount) return null;
-  return p;
+  if (paymentKey && p.paymentKey && p.paymentKey !== paymentKey) return { kind: "unknown", reason: `다른 시도(${p.status})` };
+  if (p.status === "DONE") {
+    if (typeof p.totalAmount === "number" && p.totalAmount !== amount) return { kind: "unknown", reason: `금액이 다름 ${p.totalAmount}` };
+    return { kind: "done", payment: p };
+  }
+  return SETTLED_NO_MONEY.has(p.status) ? { kind: "not-done" } : { kind: "unknown", reason: `토스 상태 ${p.status}` };
 }
 
 /** 되묻기 결과 셋 — 찾았다 · 토스에 그 결제가 없다(404 `NOT_FOUND_PAYMENT`) · 답을 못 받았다.
