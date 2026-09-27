@@ -817,6 +817,45 @@ export async function getPaymentByOrderId(orderId: string): Promise<Payment | nu
   return data ? toPayment(data as Row) : null;
 }
 
+/** 🧷09-27(fix-money3) 토스 승인을 부르기 «직전»에 결제 키를 결제 줄에 먼저 적는다(`confirmBookingAction`).
+ *  🩸승인 호출 도중 서버 함수가 통째로 죽으면(타임아웃·배포 교체) 결제 줄이 흔적 없는 READY로 남았다. 정리 작업은 그걸
+ *    «결제창만 열고 떠난 신청»으로 읽어 토스에 묻지 않고 만료로 닫는다. 토스엔 돈이 나가 있는데 장부 대조가 다음 날에야 잡았다.
+ *    키가 적혀 있으면 «시도한 흔적»(`hasPayTrace`)이라 정리 작업이 토스에 되물어 돌려준다.
+ *  ⭐**상태·잔액은 안 건드리고 키 한 칸만**, 그것도 «READY이고 키가 빈 줄»에만 적는다(한 문장이라 확인과 쓰기 사이가 없다).
+ *    `rent_sync`로 적지 않는 이유 — 같은 결제 키가 먼저 적히면 뒤이은 승인이 «같은 결제»가 돼서 잔액 가드(`least`)를 탄다.
+ *    앞선 시도가 잔액 0으로 끝난 줄이면 새 승인의 잔액이 0으로 남는다. 빈 READY 줄만 건드리면 그 일이 안 생긴다
+ *    (흔적이 있는 줄엔 승인 관문이 새 승인을 안 받는다).
+ *  @returns `claimed` 이번에 적었다 · `taken` 적을 자리가 아니었다(이미 키가 있거나 READY가 아님) · `error` 쓰기 실패 */
+export async function markPaymentAttempt(orderId: string, paymentKey: string): Promise<"claimed" | "taken" | "error"> {
+  if (await rentMockOn()) return "error";
+  const c = db();
+  if (!c) return "error";
+  const { data, error } = await c.from("payments").update({ payment_key: paymentKey })
+    .eq("order_id", orderId).eq("status", "READY").is("payment_key", null)
+    .select("id");
+  if (error) {
+    console.error(`[spaces] markPaymentAttempt failed order=${orderId}: ${error.message}`);
+    return "error";
+  }
+  return (data ?? []).length === 1 ? "claimed" : "taken";
+}
+
+/** 토스가 «안 했다»고 분명히 답한 시도의 키를 거둔다 — 줄을 «결제창만 연 신청»으로 되돌려 다른 카드로 다시 결제할 수 있게.
+ *  그 키가 적힌 READY 줄에서만 지운다. 그 사이 다른 결과가 적혔으면(DONE·ABORTED) 손대지 않는다. 참 = 이번에 지웠다. */
+export async function clearPaymentAttempt(orderId: string, paymentKey: string): Promise<boolean> {
+  if (await rentMockOn()) return false;
+  const c = db();
+  if (!c || !paymentKey) return false;
+  const { data, error } = await c.from("payments").update({ payment_key: null })
+    .eq("order_id", orderId).eq("payment_key", paymentKey).eq("status", "READY")
+    .select("id");
+  if (error) {
+    console.error(`[spaces] clearPaymentAttempt failed order=${orderId}: ${error.message}`);
+    return false;
+  }
+  return (data ?? []).length === 1;
+}
+
 /** 🆕09-27(fix-money3) 주문번호 여럿의 결제 줄 — 내 예약 줄이 결제 전 신청의 «결제를 시도한 흔적»을 보려고 읽는다.
  *  읽기가 실패하면 빈 표다(줄은 「이어서 결제하기」로 물러서고, 결제 화면과 승인 관문이 한 건씩 다시 본다).
  *  주소 길이 때문에 100건씩 끊는다(정리 작업 ①과 같다). */

@@ -177,6 +177,7 @@ export async function approvePayment(
       body: JSON.stringify({ paymentKey, orderId, amount }),
       // ⏱토스 문서(09-27 확인): 「결제 승인은 최대 60초가 소요됩니다. 타임아웃 값을 최소 60초로 설정하세요.」
       //   전엔 제한이 없었다. 끊긴 연결을 붙잡고 있다가 함수가 통째로 죽으면 되묻기도 ABORTED 기록도 못 한다.
+      //   🧷09-27(fix-money3) 그래도 죽을 수 있어서, 호출부가 부르기 직전에 결제 키를 결제 줄에 먼저 적는다(`confirmBookingAction`).
       signal: AbortSignal.timeout(CONFIRM_TIMEOUT_MS),
     });
     const body = (await res.json().catch(() => null)) as (TossPayment & { message?: string; code?: string }) | null;

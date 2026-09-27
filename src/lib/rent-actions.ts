@@ -10,7 +10,7 @@ import {
   saveSpace, getSpaceFull, getBooking, createPendingBooking, getBookingByOrderId,
   decideBooking, requestRefund, clearRefundRequest, markRefundUnconfirmed, clearRefundUnconfirmed,
   setBookingStatus, listSpacesByOwner, listSpacesByIds,
-  createPayment, getPaymentByOrderId, rentSync,
+  createPayment, getPaymentByOrderId, rentSync, markPaymentAttempt, clearPaymentAttempt,
   type SpaceSaveInput,
   listLiveBookings, setSpaceStatus, approveSpace, markReminded, SLUG_TAKEN,
   rejectSpace, REVIEW_COLUMNS_MISSING,
@@ -936,9 +936,10 @@ export async function confirmBookingAction(
   //   ⭐«같은 결제 키»는 들여보낸다. 복귀 주소가 두 번 열린 것이라 멱등키가 같아 토스가 첫 응답을 그대로 준다(돈은 한 번).
   //   ⏳단 흔적이 있는데 결제 시간이 지났거나 시간이 찼으면(`problem`) 여기서 만료로 닫지 않는다. 닫으면 pending이 아니라서
   //     정리 작업이 토스에 다시 묻지 않고, 나간 돈이 장부 대조 전까지 그대로 남는다.
+  const checking = (): ActionResult => ({ ok: false, code: PAY_FAIL_UNKNOWN, bookingId: b.id, message: `${PAY_CHECKING_TITLE}. ${PAY_CHECKING_LINE}` });
   if (hasPayTrace({ payStatus: pay.status, payKey: pay.paymentKey }) && (!paymentKey || pay.paymentKey !== paymentKey || problem)) {
     console.warn(`[rent-actions] 결제 확인 중인 신청이라 새 승인을 받지 않는다 order=${orderId} 결제 줄=${pay.status}${problem ? ` · ${problem.code}` : ""}`);
-    return { ok: false, code: PAY_FAIL_UNKNOWN, bookingId: b.id, message: `${PAY_CHECKING_TITLE}. ${PAY_CHECKING_LINE}` };
+    return checking();
   }
 
   if (problem) {
@@ -952,6 +953,28 @@ export async function confirmBookingAction(
           : problem.code === "expired" ? PAY_FAIL_WINDOW_OVER : PAY_FAIL_NOT_AVAILABLE,
       bookingId: b.id,
     };
+  }
+
+  // 🧷09-27(fix-money3) — **승인을 부르기 직전에 결제 키를 결제 줄에 먼저 적는다**(`markPaymentAttempt`, 상태·잔액은 안 건드린다).
+  //   승인 호출 도중 이 함수가 통째로 죽어도(타임아웃·배포 교체) 결제 줄에 «시도한 흔적»이 남아, 정리 작업이 토스에 되물어
+  //   돈이 나갔으면 전액 돌려준다. 전엔 흔적 없는 READY로 남아 묻지도 않고 만료로 닫혔다(「자동으로 돌려드려요」가 거짓이 됐다).
+  //   ⚠️적기가 실패해도 결제는 막지 않는다(콘솔에만 남긴다). 그땐 전처럼 장부 대조가 다음 날 잡는다.
+  //   🔒적을 자리가 없으면(이미 키가 있다) 다시 읽는다. 같은 키면 복귀 주소가 두 번 열린 것이라 멱등키로 이어 가고,
+  //     다른 키면 두 창에서 겹쳐 들어온 다른 시도다. 위 관문을 둘이 같이 지났어도 여기서 먼저 적은 쪽만 토스를 부른다.
+  let marked = false;
+  let sameAttempt = false;
+  if (paymentKey) {
+    const mark = await markPaymentAttempt(orderId, paymentKey);
+    if (mark === "claimed") marked = true;
+    else if (mark === "error") console.error(`[rent-actions] 🚨승인 전에 결제 키를 먼저 적지 못했다 — 결제는 이어 간다 order=${orderId}`);
+    else {
+      const now = await getPaymentByOrderId(orderId);
+      if (!now || now.paymentKey !== paymentKey) {
+        console.warn(`[rent-actions] 다른 결제 시도가 먼저 들어와 있어 승인을 부르지 않는다 order=${orderId} 결제 줄=${now?.status ?? "읽지 못함"}`);
+        return checking();
+      }
+      sameAttempt = true;
+    }
   }
 
   const approved = await approvePayment(paymentKey, orderId, pay.amount);
@@ -981,6 +1004,11 @@ export async function confirmBookingAction(
     //    결제 키도 같이 적는다. 그래야 복귀 주소가 한 번 더 열렸을 때 «같은 시도»인지 위 관문이 알아본다(키가 없으면 다른 시도와 못 가른다).
     if (approved.code === PAY_FAIL_UNKNOWN || approved.code === PAY_ALREADY_PROCESSED) {
       await rentSync(orderId, { toss: { status: "ABORTED", ...(paymentKey ? { paymentKey } : {}) } });
+    } else if (marked || sameAttempt) {
+      // 🧷먼저 적어 둔 키를 거둔다. 남겨 두면 그 흔적 때문에 다시 결제할 길이 막힌다. 그 키가 적힌 READY 줄에서만 지운다.
+      //   거두기가 실패하면 흔적이 남는 쪽으로 틀린다 — 정리 작업이 토스에 묻고 닫는다(돈은 안 움직였다).
+      const cleared = await clearPaymentAttempt(orderId, paymentKey);
+      if (!cleared && marked) console.error(`[rent-actions] 먼저 적은 결제 키를 거두지 못했다 — 정리 작업이 토스에 물어 닫는다 order=${orderId}`);
     }
     return { ok: false, message: approved.message, code: approved.code };
   }
