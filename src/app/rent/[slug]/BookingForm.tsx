@@ -53,10 +53,9 @@ const chipRangeCls = "border-transparent bg-primary-pale text-primary-on";
 /** 시작을 고른 뒤 «끝으로 고를 수 있는» 칩 — 진한 키위 테두리로 켜서 어디까지 갈 수 있는지 보인다.
  *  📐375 실측(09-19) — 옅은 테두리(`primary-tint`)는 흰 칩과 거의 안 갈렸다. 한 단 진한 `primary-strong`에 글자도 키위로. */
 const chipEndableCls = "border-primary-strong bg-surface font-medium text-primary-on hover:bg-primary-pale";
-/** 시작을 고른 뒤, 끝은 못 되지만 «새 시작»으로는 누를 수 있는 칩. 끝 후보가 먼저 읽히게 한 단 물린다. */
-const chipDimCls = "border-hairline bg-surface text-mute hover:bg-surface-soft";
+// 🔻09-27 대표 코멘트 #142 — 시작을 고른 뒤 «새 시작»으로 누를 수 있게 흐리게만 두던 칩(`chipDimCls`)을 없앴다. 그 칩들은 이제 비활성이다.
 const chipOffCls = "border-hairline bg-surface text-ink hover:bg-primary-pale";
-/** 못 고르는 칩(찬 시간·최소 시간을 못 채우는 꼬리·닫는 시각). 눈금은 남겨 두어 그날의 모양이 보이게 한다. */
+/** 못 고르는 칩(시작보다 앞·최소 시간을 못 채우는 자리·찬 시간·닫는 시각). 눈금은 남겨 두어 그날의 모양이 보이게 한다. */
 const chipDisabledCls = "border-transparent bg-surface-soft text-faint";
 
 /** 화면 아래 고정 바 — 금액 + 이 화면의 키위 버튼. 어느 폭에서나 이 하나가 유일한 결제 버튼이다.
@@ -353,17 +352,34 @@ export function BookingForm({
   const endTime = ends.includes(endPick) ? endPick : "";
   const minutes = activeStart && endTime ? minutesBetween(activeStart, endTime) : 0;
 
-  /** 칩 하나를 눌렀을 때. 시작 → 끝 순서로 고르고, 다 고른 뒤 다른 칩을 누르면 그 칩을 새 시작으로 처음부터 고른다.
-   *  시작을 한 번 더 누르면 풀린다. 시작만 고른 상태에서 끝이 될 수 없는 칩을 누르면 그 칩이 새 시작이다. */
+  /** ⏱칩 하나를 눌렀을 때 — 세 상태로 간다(대표 09-27 코멘트 #142).
+   *  대표: 「17:00 클릭한 경우, 17:00 이전 시간과 17:30분은 비활성 처리해도 될 거 같아. 즉 시간 규칙 최소 1시간부터,
+   *    그리고 시작 시간 이후부터 클릭하는 것을 기준으로 UI/UX가 나왔으면 좋겠어.」
+   *  ① 아무것도 안 고름 — 시작이 될 수 있는 칩만 켜진다. 누르면 그 칩이 시작.
+   *  ② 시작만 고름 — **끝이 될 수 있는 칩만** 켜진다(시작 뒤 · 최소 시간을 채운 자리부터 · 찬 시간과 닫는 시각 전까지).
+   *     시작보다 앞 칩과 최소 시간을 못 채우는 칩은 비활성이다. 🩸09-19~09-27엔 앞 칩이 «새 시작»으로 눌리게 흐리게만 있었다.
+   *     시작을 바꾸는 길은 둘 — 고른 시작 칩을 한 번 더 누르거나, 안내 줄 옆 「시작 시각 다시 고르기」.
+   *  ③ 시작과 끝을 고름 — 시작이 될 수 있는 칩이 다시 다 켜진다. 다른 칩을 누르면 그 칩을 시작으로 처음부터(안내 줄이 그렇게 말한다).
+   *     끝 칩을 다시 누르면 끝만 풀려 ②로, 시작 칩을 다시 누르면 둘 다 풀려 ①로 간다. */
   const tapMark = (t: string) => {
     setBadField((f) => (f === "time" ? "" : f));
     setResumeNote("");
     if (activeStart && !endTime) {
-      if (t === activeStart) { setStartTime(""); return; }
-      if (ends.includes(t)) { setEndPick(t); return; }
+      if (t === activeStart) setStartTime("");
+      else if (ends.includes(t)) setEndPick(t);
+      return;
     }
-    if (activeStart && endTime && t === endTime && !startChoices.includes(t)) { setEndPick(""); return; }
+    if (activeStart && endTime) {
+      if (t === activeStart) { setStartTime(""); setEndPick(""); return; }
+      if (t === endTime) { setEndPick(""); return; }
+    }
     if (startChoices.includes(t)) { setStartTime(t); setEndPick(""); }
+  };
+  /** 「시작 시각 다시 고르기」 — ②·③에서 ①로. 누른 자리가 격자 위라 칩 격자는 그대로 둔다. */
+  const resetTime = () => {
+    setStartTime("");
+    setEndPick("");
+    setBadField((f) => (f === "time" ? "" : f));
   };
 
   // 💸금액 = 고른 상품 값 × 길이(분) (+ 커피챗). 서버(`startBookingAction`)가 같은 함수로 다시 계산한다 — 여기는 보여주기용.
@@ -683,14 +699,29 @@ export function BookingForm({
           <p className={hintCls}>이 날은 빌릴 수 있는 시간이 남아 있지 않아요. 다른 날을 골라 주세요.</p>
         ) : (
           <div>
-            {/* 지금 무엇을 누를 차례인지 칩 «위»에 한 줄. 누르는 손가락이 가리는 자리를 피한다. */}
-            <p className="-mt-1 mb-3 text-[15px] leading-relaxed break-keep text-mute" aria-live="polite">
-              {!activeStart
-                ? "시작 시각을 먼저 눌러 주세요."
-                : !endTime
-                  ? `${activeStart}부터예요. 끝나는 시각을 눌러 주세요.`
-                  : "다른 시각을 누르면 처음부터 다시 골라요."}
-            </p>
+            {/* 지금 무엇을 누를 차례인지 칩 «위»에 한 줄. 누르는 손가락이 가리는 자리를 피한다.
+                🔁09-27 #142 — 옆에 「시작 시각 다시 고르기」. 시작을 고른 뒤엔 앞 칩이 비활성이라 시작을 바꾸는 길이 따로 있어야 한다.
+                📐폰에선 버튼을 늘 둘째 줄에 둔다. 한 줄에 둘 수 있을 때만 붙이면(390에서 ①은 붙고 ②는 안내가 길어 꺾인다) 시작을 고르는
+                  순간 줄이 생겨 격자가 23px 밀리고, 끝 칩을 누르려던 손가락이 빗나간다(실측). 버튼 자리는 늘 잡아 두고(`invisible`)
+                  시작을 고르면 보이게만 한다. sm부터는 폼 폭(520)이 넉넉해 한 줄에 선다. */}
+            <div className="-mt-1 mb-3 flex flex-wrap items-baseline justify-between gap-x-3">
+              <p className="basis-full text-[15px] leading-relaxed break-keep text-mute sm:basis-auto" aria-live="polite">
+                {!activeStart
+                  ? "시작 시각을 먼저 눌러 주세요."
+                  : !endTime
+                    ? `${activeStart}부터예요. 끝나는 시각을 눌러 주세요.`
+                    : "다른 시각을 누르면 그 시각부터 다시 골라요."}
+              </p>
+              {/* 배경 없는 글자 버튼 — 세로 패딩으로 44px를 채우고 음수 마진으로 줄 높이는 그대로 둔다(디자인-시스템 §터치 타깃). */}
+              <button
+                type="button"
+                onClick={resetTime}
+                // `invisible`(visibility: hidden)은 자리만 남기고 누를 수도, 초점이 갈 수도, 낭독기가 읽을 수도 없다.
+                className={`-my-[11px] py-[11px] text-[15px] text-mute underline underline-offset-2 ${activeStart ? "" : "invisible"}`}
+              >
+                시작 시각 다시 고르기
+              </button>
+            </div>
             <div className="grid grid-cols-4 gap-2 sm:grid-cols-6" role="group" aria-label="시작과 끝 시각">
               {marks.map((t) => {
                 const isStart = t === activeStart;
@@ -698,18 +729,21 @@ export function BookingForm({
                 const inRange = !!endTime && t > activeStart && t < endTime;
                 const endable = !!activeStart && !endTime && ends.includes(t);
                 const startable = startChoices.includes(t);
-                const enabled = isStart || isEnd || endable || startable;
+                // ①은 시작 후보만, ②는 고른 시작과 끝 후보만, ③은 고른 둘과 새 시작 후보(`tapMark` 머리말).
+                const enabled = !activeStart
+                  ? startable
+                  : !endTime
+                    ? isStart || endable
+                    : isStart || isEnd || startable;
                 const cls = isStart || isEnd
                   ? chipOnCls
                   : inRange
                     ? chipRangeCls
                     : endable
                       ? chipEndableCls
-                      : !enabled
-                        ? chipDisabledCls
-                        : activeStart && !endTime
-                          ? chipDimCls
-                          : chipOffCls;
+                      : enabled
+                        ? chipOffCls
+                        : chipDisabledCls;
                 return (
                   <button
                     key={t}
@@ -717,7 +751,15 @@ export function BookingForm({
                     data-time-chip={t}
                     disabled={!enabled}
                     aria-pressed={isStart || isEnd}
-                    aria-label={isStart ? `${t} 시작` : isEnd ? `${t} 끝` : endable ? `${t}까지` : t}
+                    aria-label={
+                      isStart
+                        ? `${t} 시작, 다시 누르면 풀려요`
+                        : isEnd
+                          ? `${t} 끝, 다시 누르면 풀려요`
+                          : endable
+                            ? `${t}까지`
+                            : t
+                    }
                     onClick={() => tapMark(t)}
                     className={`${chipCls} ${cls}`}
                   >
