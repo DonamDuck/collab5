@@ -863,9 +863,11 @@ export const MOCK_MAIL_KINDS: { kind: string; label: string }[] = [
   { kind: "admin-unconfirmed-refund", label: "거래 → 대표 슬랙 · 확정 기한(결제 후 48시간)이 지나 자동 환불" },
   { kind: "admin-unconfirmed-refund-start", label: "거래 → 대표 슬랙 · 확정 기한(이용 시작)이 지나 자동 환불" },
   { kind: "admin-unconfirmed-refund-failed", label: "거래 → 대표 슬랙 · 확정 기한 자동 환불이 실패, 손님 돈이 붙잡힘 (손이 필요)" },
-  { kind: "remind-guest", label: "이용 전날 → 손님" },
+  // 🔁09-27 대표 「추천대로」 — 손님 리마인드는 확정된 예약에만. 확정 전 예약은 사장님께만 «기한 전까지 확정하지 않으면 자동 취소» 한 통.
+  { kind: "remind-guest", label: "이용 전날 → 손님 · 확정된 예약만" },
   { kind: "remind-host", label: "이용 전날 → 사장님 · 수락한 예약" },
-  { kind: "remind-host-unaccepted", label: "이용 전날 → 사장님 · 아직 수락 전" },
+  { kind: "remind-host-unaccepted", label: "이용 전날 → 사장님 · 아직 확정 전 (기한은 이용 시작, 손님께는 안 감)" },
+  { kind: "remind-host-unaccepted-48h", label: "이용 전날 → 사장님 · 아직 확정 전 (결제 후 48시간이 먼저 참, 손님께는 안 감)" },
   { kind: "stress-paid-host", label: "긴 글 · 결제 완료 → 사장님" },
   { kind: "paid-host-halfhour", label: "30분 단위 · 결제 완료 → 사장님 (13:00~15:30, 2시간 30분, 무료 커피챗)" },
   { kind: "paid-guest-freechat", label: "무료 커피챗 · 결제 완료 → 손님 (결제액은 공간 값뿐)" },

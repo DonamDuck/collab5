@@ -759,7 +759,8 @@ export async function setBookingStatus(id: number, status: BookingStatus): Promi
 // ─── 이용 전날 리마인드 (2026-09-17) ───
 
 /** 그날(대개 «내일») 이용하는 살아 있는 예약 중 아직 리마인드를 안 보낸 것.
- *  ⚠️`paid`도 넣는다 — phase 1은 결제가 곧 예약이라 사장님이 수락을 안 눌렀어도 손님은 온다.
+ *  ⚠️`paid`도 넣는다 — 🔁09-27부터 확정 전 예약은 손님께 안 보내고 사장님께만 «기한 전까지 확정하지 않으면 자동 취소» 한 통을 보낸다.
+ *    누구에게 무엇을 보낼지는 `rent-remind.ts`가 가른다(09-16 phase 1의 «결제가 곧 예약»은 09-27에 뒤집혔다).
  *  환불 신청이 걸린 예약도 뺀다. 우리가 전화로 확인하는 중이라 「내일 뵈어요」가 엇나갈 수 있다. */
 export async function listBookingsToRemind(useDates: string[]): Promise<SpaceBooking[]> {
   // 🗓09-18 밤 QA(SC-09) — 날짜를 «여럿» 받는다. 크론이 빠진 날을 챙기려면 오늘 것도 같이 봐야 한다(고를지는 `rent-remind`가 정한다).

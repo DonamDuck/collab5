@@ -8,6 +8,7 @@ import {
   buildUnconfirmedRefund, type Mail,
 } from "@/lib/rent-notify";
 import { isUnconfirmedRefundReason } from "@/lib/rent-payment";
+import { confirmDeadline } from "@/lib/rent-booking-rules";
 import { buildWorld, MOCK_IDS, type MockWorld } from "@/lib/rent-mock-data";
 import { buildSignupNotice } from "@/lib/notify";
 import { buildSlackPayload, type AdminNotice, type SlackPayload } from "@/lib/admin-notify";
@@ -135,7 +136,18 @@ export function buildPreviewMail(kind: string): PreviewMail | null {
     }
     case "remind-guest": { const x = pick(full, B.confirmed); return buildRemindGuest(x.b, x.sp, x.host, x.guest); }
     case "remind-host": { const x = pick(full, B.confirmed); return buildRemindHost(x.b, x.sp, x.host, x.guest); }
-    case "remind-host-unaccepted": { const x = pick(full, B.paid); return buildRemindHost(x.b, x.sp, x.host, x.guest); }
+    // 🔁09-27 확정 전 예약은 사장님께만 간다. 기한은 이용 시작이 먼저인 갈래 · 결제 후 48시간이 먼저인 갈래 둘.
+    //   「오늘·내일」은 크론이 도는 이용 전날 기준으로 그린다. 목 결제의 승인 시각(이틀 전)으로 재면 기한이 이미 지나 있어 안 쓴다.
+    case "remind-host-unaccepted": {
+      const x = pick(full, B.paid);
+      return buildRemindHost(x.b, x.sp, x.host, x.guest, confirmDeadline(x.b, null), addDaysIso(x.b.useDate, -1));
+    }
+    case "remind-host-unaccepted-48h": {
+      const x = pick(full, B.paid);
+      const eve = addDaysIso(x.b.useDate, -1);
+      // 이용 전날 23:10(KST)에 결제 후 48시간이 찬다 — 결제는 사흘 전 밤이었다.
+      return buildRemindHost(x.b, x.sp, x.host, x.guest, { at: Date.parse(`${eve}T14:10:00.000Z`), by: "48h" }, eve);
+    }
     case "stress-paid-host": { const x = pick(buildWorld("stress"), B.stressPaid); return buildBookingPaid(x.b, x.sp, x.host, x.guest, x.brand); }
     // ⏱09-19 30분 단위 예약 — 메일의 「언제」 줄(`bookingWhen`)이 「2시간 30분」으로 서는지 본다.
     case "paid-host-halfhour": { const x = pick(full, B.halfPaid); return buildBookingPaid(x.b, x.sp, x.host, x.guest, x.brand); }
