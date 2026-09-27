@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { SpacePublic } from "@/lib/types";
 import { withJosa } from "@/lib/rent-copy";
 import { lowestPrice, productPrice, sellableProducts } from "@/lib/rent-products";
-import { CoverPlaceholder, won } from "./ui";
+import { CoffeeChatChip, CoverPlaceholder, won } from "./ui";
 
 // 🎫소개서에 붙는 「○○가 빌려주는 공간」 (2026-09-19 대표 [H])
 //
@@ -42,9 +42,13 @@ export function BrandSpaces({ brandName, spaces }: { brandName: string; spaces: 
                   <span className="line-clamp-2 text-[16px] font-bold leading-snug break-keep text-ink">{sp.name}</span>
                   {sp.area && <span className="mt-0.5 block truncate text-[14px] text-mute">{sp.area}</span>}
                   {price > 0 && (
-                    <span className="mt-1 block text-[15px] text-ink">
-                      <span className="font-medium tabular-nums">{won(price)}</span>
-                      <span className="text-mute"> {varies ? "부터 / 시간" : "/ 시간"}</span>
+                    // ☕09-27 대표 코멘트 #138 — 목록 카드와 같이 값 옆에 커피챗 칩. 좁으면 값 아래로 꺾인다.
+                    <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[15px] text-ink">
+                      <span>
+                        <span className="font-medium tabular-nums">{won(price)}</span>
+                        <span className="text-mute"> {varies ? "부터 / 시간" : "/ 시간"}</span>
+                      </span>
+                      {sp.coffeeChat && sp.coffeeChatMinutes > 0 && <CoffeeChatChip />}
                     </span>
                   )}
                 </span>

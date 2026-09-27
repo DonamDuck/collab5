@@ -60,6 +60,20 @@ export function Chip({ children }: { children: ReactNode }) {
   );
 }
 
+/** ☕커피챗이 되는 공간 표시 — 공간 카드의 값 줄 옆에 서는 작은 칩(대표 09-27 코멘트 #138).
+ *  대표: 「(커버 위 표시는) 빼고 하단 6,261원/시간 옆에 커피챗 가능하면 (사장님 커피챗 선택) 정도로 chip을 추가」.
+ *  🩸09-13까지는 커버 사진 위에 「사장님과 커피챗 60분」 흰 알약을 얹었다. 사진 위라 값과 떨어져 읽혔고, 떠 있는 메뉴 바가 덮기도 했다.
+ *  🎨얼굴은 상세 값 줄의 「최소 1시간」·「최대 N명」 태그(`[slug]/page.tsx`의 `PriceLine`)와 같다. 값 옆에 서는 읽는 태그라 한 단 작다.
+ *    ⚠️09-13 「pill 금지」는 «상태 배지» 이야기다(`BookingBadge`). 정보 태그는 이 모양이 이 화면의 관례다.
+ *  카드 전체가 누르면 바탕이 `surface-soft`로 바뀌는 링크라(`group`), 그때는 칩이 흰 바탕으로 뒤집혀 묻히지 않는다. */
+export function CoffeeChatChip() {
+  return (
+    <span className="inline-flex shrink-0 items-center rounded-pill bg-surface-soft px-2.5 py-1 text-[13px] leading-none text-body group-hover:bg-surface">
+      사장님 커피챗 선택
+    </span>
+  );
+}
+
 /** 상태는 배지가 아니라 **글자**로 말한다(09-13 대표 지시 — pill 금지, 색만).
  *  기다리는 중은 레몬, 열린 것은 민트, 끝나거나 막힌 것은 회색.
  *  ⛔Kiwi(primary)는 안 쓴다. 브랜드색이 「성공」을 뜻하기 시작하면 희소성이 무너진다
