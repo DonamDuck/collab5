@@ -16,7 +16,8 @@ export async function GET(req: NextRequest) {
 
   // 🔒09-18 밤 QA(SEC-06) — 실패 화면엔 «글»이 아니라 «코드»를 넘긴다. 실패 화면이 주소의 글을 그대로 보여 주던 때는
   //   누구나 우리 화면에 문장을 띄우는 링크를 만들 수 있었다. 이제 그 화면은 코드로 우리 문장을 고른다.
-  //   주문번호는 「다시 결제하기」 링크에 쓴다(실패 화면이 모양을 다시 본다). 이유 글은 서버 로그에만 남긴다.
+  //   주문번호는 실패 화면이 «그 공간»을 찾는 데 쓴다(「다시 신청하기」, 09-27 fix-six — 같은 주문으로 다시 결제하는 버튼은 없앴다).
+  //   실패 화면이 모양을 다시 본다. 이유 글은 서버 로그에만 남긴다.
   const fail = (code: string | undefined, why: string) => {
     if (why) console.warn(`[rent/pay/success] 결제 실패 order=${orderId} code=${code ?? "-"}: ${why}`);
     const q = new URLSearchParams();

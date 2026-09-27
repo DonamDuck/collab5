@@ -96,12 +96,12 @@ export const RENT_GROUPS: Group[] = [
           { desc: "결제 전 신청 (대관만, 커피챗 담음, 취소 규정은 규정마다 한 줄 · 「취소 규정 전체 보기」는 목록 아래)", c: "guest-full", to: `/rent/pay/mock-order-${B.pending}` },
           { desc: "긴 글 · 큰 금액", c: "stress-guest", to: `/rent/pay/mock-order-${B.stressPending}` },
           // 🔒09-18 밤 — 실패 화면은 주소의 글(`message`)을 안 쓰고 코드로 우리 문장을 고른다. 갈래마다 한 줄.
-          { desc: "결제 실패 · 결제 창을 닫음 (다시 결제하기 버튼)", c: "guest-full", to: `/rent/pay/fail?code=PAY_PROCESS_CANCELED&orderId=mock-order-${B.pending}` },
+          { desc: "결제 실패 · 결제 창을 닫음 (주 버튼 「다시 신청하기」 → 그 공간 신청 자리 · 같은 주문으로 다시 결제하는 버튼은 없음)", c: "guest-full", to: `/rent/pay/fail?code=PAY_PROCESS_CANCELED&orderId=mock-order-${B.pending}` },
           { desc: "결제 실패 · 카드사 거절", c: "guest-full", to: `/rent/pay/fail?code=REJECT_CARD_COMPANY&orderId=mock-order-${B.pending}` },
-          { desc: "결제 실패 · 그 사이 시간이 차서 자동 취소 (다시 결제하기 없음)", c: "guest-full", to: `/rent/pay/fail?code=RENT_SLOT_TAKEN_REFUNDED&orderId=mock-order-${B.pending}` },
+          { desc: "결제 실패 · 그 사이 시간이 차서 자동 취소 (「다시 신청하기」로 다른 시간 고르기)", c: "guest-full", to: `/rent/pay/fail?code=RENT_SLOT_TAKEN_REFUNDED&orderId=mock-order-${B.pending}` },
           { desc: "결제 실패 · 자동 환불도 실패해서 연락드림", c: "guest-full", to: `/rent/pay/fail?code=RENT_SLOT_TAKEN_REFUND_PENDING&orderId=mock-order-${B.pending}` },
-          { desc: "결제 실패 · 모르는 코드나 주소에 글을 붙인 경우 (기본 문장)", c: "guest-full", to: "/rent/pay/fail?message=아무 글이나&code=SOMETHING_ELSE" },
-          { desc: "결제 실패 · 승인 결과를 모름 (「결제를 확인하고 있어요」, 다시 결제하기 없음)", c: "guest-full", to: `/rent/pay/fail?code=RENT_PAY_UNKNOWN&orderId=mock-order-${B.payChecking}` },
+          { desc: "결제 실패 · 모르는 코드나 주소에 글을 붙인 경우 (기본 문장 · 주문번호가 없어 「다른 공간 보기」가 주 버튼)", c: "guest-full", to: "/rent/pay/fail?message=아무 글이나&code=SOMETHING_ELSE" },
+          { desc: "결제 실패 · 승인 결과를 모름 (「결제를 확인하고 있어요」, 다시 결제·다시 신청 없이 내 예약만)", c: "guest-full", to: `/rent/pay/fail?code=RENT_PAY_UNKNOWN&orderId=mock-order-${B.payChecking}` },
           // 🔒09-27(fix-money3) 결제를 시도한 흔적이 있는 주문 — 주소로 직접 열어도 결제창을 안 그린다.
           { desc: "결제 확인 중인 주문을 주소로 열면 결제창 대신 「결제를 확인하고 있어요」와 내 예약 보기", c: "guest-full", to: `/rent/pay/mock-order-${B.payChecking}` },
           // 🧹09-27 대표 「결제 중 취소는 그냥 새로 결제하는 걸로」 — 이어서 낼 수 없는 주문은 그 공간의 신청 자리(`#apply`)로 보내요.
