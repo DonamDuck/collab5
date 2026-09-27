@@ -221,10 +221,12 @@ export interface SpaceFilter {
 
 /** 찾기 낱말이 이 공간에 걸리나 — 목 분기와 DB 분기가 같은 함수로 거른다. 둘이 따로 적히면 목 화면의 「0건」이 운영과 갈린다.
  *  🔎09-18 대표 — 동네·이름·주소에 **설비 태그**(「와이파이」·「에스프레소 머신」)까지. 소개 글(body)은 안 넣는다(대표 결정: 태그까지만).
- *  태그도 부분일치다. 「에스프레소」로 「에스프레소 머신」이 걸려야 한다. */
-function matchesKeyword(sp: Pick<Space, "area" | "name" | "address" | "facilities">, kw: string): boolean {
+ *  태그도 부분일치다. 「에스프레소」로 「에스프레소 머신」이 걸려야 한다.
+ *  🏷09-27 대표 코멘트 #137 — 찾기 칸 안내가 「지역, 매장명, 주요 시설로 검색해 보세요」가 됐다. 매장명은 공간 이름만이 아니라
+ *    사업자등록증의 상호(`bizName`)와 네이버 지도에 맞춘 가게 이름(`placeName`)까지 본다. 둘 다 공개 칸이다(판매자 정보·위치 지도). */
+function matchesKeyword(sp: Pick<Space, "area" | "name" | "address" | "facilities" | "bizName" | "placeName">, kw: string): boolean {
   const k = kw.toLowerCase();
-  return [sp.area, sp.name, sp.address, ...sp.facilities].some((v) => v.toLowerCase().includes(k));
+  return [sp.area, sp.name, sp.bizName ?? "", sp.placeName ?? "", sp.address, ...sp.facilities].some((v) => v.toLowerCase().includes(k));
 }
 
 /** 목록 — 공개된 것만. ⭐돌려주는 값에 주소가 없다(`toPublic`).

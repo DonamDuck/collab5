@@ -785,7 +785,8 @@ export async function startBookingAction(input: BookingFormInput): Promise<Start
   // 🪪09-18 대표 — 이용하실 분 성함(실명) 필수. 당일 신분 확인에 쓰는 이름이라 두 글자 미만이면 받지 않는다.
   //   위 번호와 같이 화면도 막지만 관문은 여기다. 너무 긴 값은 메일 표를 깨뜨려서 50자를 넘으면 돌려보낸다.
   const guestName = (input.guestName ?? "").trim().replace(/\s+/g, " ");
-  if (guestName.length < 2) return { ok: false, message: "이용하실 분 성함을 두 글자 이상 적어 주세요." };
+  // ✍️09-27 대표 코멘트 #145 — 칸 이름이 「예약하시는 분 성함」이 됐다. 막힘 말도 같은 이름으로 부른다.
+  if (guestName.length < 2) return { ok: false, message: "예약하시는 분 성함을 두 글자 이상 적어 주세요." };
   if (guestName.length > 50) return { ok: false, message: "성함이 너무 길어요. 50자 안으로 적어 주세요." };
 
   // 🪪09-18 밤 QA(G-04) — 손님이 붙이는 소개서도 «내 것»만 받는다. 신청은 막지 않고 남의 것이면 빈 값으로 저장한다 —

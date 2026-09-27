@@ -634,10 +634,14 @@ export function BookingForm({
             setBadField((f) => (f === "date" ? "" : f));
           }}
         />
-        {badField === "date" && <p className={errCls}>날짜부터 골라 주세요.</p>}
+        {/* ✍️09-27 대표 코멘트 #140 — 「날짜부터 골라 주세요」 → 대표 문장 그대로. */}
+        {badField === "date" && <p className={errCls}>아직 날짜가 선택되지 않았어요.</p>}
         {daySlots.length > 0 && (
+          // ✍️09-27 대표 코멘트 #141 — 「10:00~20:00 사이 시간을 빌릴 수 있어요. 최소 1시간부터」 그대로(시각·최소 시간만 변수).
+          //   한 날에 칸이 둘 이상이면(오전·오후) 「10:00~12:00 사이나 14:00~20:00 사이 시간을」로 잇는다. 쉼표로 이으면 「A, B 사이」가
+          //   두 칸 «사이»(12:00~14:00)로 읽힌다.
           <p className={hintCls}>
-            {daySlots.map((sl) => `${sl.start}~${sl.end}`).join(", ")} 열려 있어요 · 최소 {durationLabel(minMinutes)}부터
+            {daySlots.map((sl) => `${sl.start}~${sl.end}`).join(" 사이나 ")} 사이 시간을 빌릴 수 있어요. 최소 {durationLabel(minMinutes)}부터
           </p>
         )}
       </div>
@@ -765,7 +769,8 @@ export function BookingForm({
             아직 잘 모르겠어요
           </label>
           </div>
-          {capacity ? <p className={hintCls}>최대 {capacity}명까지 들어가요.</p> : null}
+          {/* ✍️09-27 대표 코멘트 #144 — 「들어가요」 → 대표 문장(숫자는 공간 정원). */}
+          {capacity ? <p className={hintCls}>동시에 최대 {capacity}명까지 수용할 수 있어요.</p> : null}
         </div>
       )}
 
@@ -802,8 +807,9 @@ export function BookingForm({
           번호 칸 «위»에 둔다. 누가 오는지를 먼저 적고, 그 사람에게 닿는 번호를 다음에 적는 순서다.
           ⚠️두 글자 검사는 서버(`startBookingAction`)가 관문이다. 여기는 왕복을 아끼려고 먼저 막는다. */}
       <div>
+        {/* ✍️09-27 대표 코멘트 #145 — 「이용하실 분 성함(실명)」 → 대표 문장 그대로. 당일 신분 확인 정책은 그대로라 아래 안내 줄은 둔다. */}
         <label htmlFor="rent-name" className={labelCls}>
-          이용하실 분 성함(실명)
+          예약하시는 분 성함
         </label>
         <input
           id="rent-name"
@@ -820,7 +826,7 @@ export function BookingForm({
           placeholder="예) 김하루"
         />
         {badField === "name" && (
-          <p className={errCls}>{guestName.trim() ? "성함을 두 글자 이상 적어 주세요." : "이용하실 분 성함이 필요해요."}</p>
+          <p className={errCls}>{guestName.trim() ? "성함을 두 글자 이상 적어 주세요." : "예약하시는 분 성함이 필요해요."}</p>
         )}
         <p className={hintCls}>이용 당일 신분 확인에 쓰여요. 사장님께만 전달돼요.</p>
       </div>
@@ -903,8 +909,9 @@ export function BookingForm({
       ) : (
         // 📎09-17 QA — 소개서가 없는 손님에겐 이 칸이 통째로 안 보였다. 소개서로 데려올 사람이 바로 이분들이라
         //   같은 자리에 한 줄을 둔다. 새 탭으로 연다 — 이 탭에서 가면 적던 신청이 날아간다.
+        // ✍️09-27 대표 코멘트 #146 — 앞에 「collab5」를 붙였다(어느 소개서인지).
         <p className="text-[15px] leading-relaxed break-keep text-mute">
-          소개서가 있으면 사장님이 어떤 브랜드가 오는지 미리 볼 수 있어요.{" "}
+          collab5 소개서가 있으면 사장님이 어떤 브랜드가 오는지 미리 볼 수 있어요.{" "}
           <Link href="/register" target="_blank" className="text-body underline underline-offset-2">
             3분 만에 소개서 만들기
           </Link>
