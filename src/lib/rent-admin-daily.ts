@@ -18,8 +18,10 @@ import type { LedgerRun } from "./rent-ledger";
 import type { SweepRun } from "./spaces";
 
 /** 요약이 읽는 예약 칸. 목 세계의 `SpaceBooking`이 그대로 들어온다.
- *  🆕09-19 저녁 `updatedAt` — 취소·환불된 예약이 «언제» 그 상태가 됐나. 예약 행은 상태가 바뀔 때 말고는 거의 안 고쳐진다(트리거가 적는다). */
-export type DailyBooking = Pick<SpaceBooking, "id" | "spaceId" | "status" | "useDate" | "orderId" | "refundRequestedAt" | "createdAt" | "updatedAt">;
+ *  🆕09-19 저녁 `updatedAt` — 취소·환불된 예약이 «언제» 그 상태가 됐나. 예약 행은 상태가 바뀔 때 말고는 거의 안 고쳐진다(트리거가 적는다).
+ *  🆕09-27 `decidedAt` — 사장님이 수락·거절을 누른 시각(`decideBooking`만 적는다). 환불된 예약이 사장님 거절인지 자동 환불인지 이 칸으로 가른다. */
+export type DailyBooking = Pick<SpaceBooking, "id" | "spaceId" | "status" | "useDate" | "orderId" | "refundRequestedAt" | "createdAt" | "updatedAt">
+  & Partial<Pick<SpaceBooking, "decidedAt">>;
 /** 요약이 읽는 결제 칸. 🆕09-19 저녁 남은 돈(환불액 = 낸 돈 − 남은 돈)과 «우리가 자동으로 되돌린 취소인가». */
 export type DailyPayment = Pick<Payment, "orderId" | "amount" | "approvedAt"> & {
   balanceAmount?: number;
@@ -65,7 +67,8 @@ export interface AdminDailySummary {
   useToday: number;
   useTomorrow: number;
   /** 🆕09-19 저녁 대표 [4] — 어제(KST) 돈이 돌아간 일. 예약 행이 그 상태로 바뀐 날로 센다.
-   *  손님 취소(`cancelled`) · 사장님 거절(`refunded`, 환불 신청 없음) · 관리자 환불(`refunded`, 환불 신청 있음) · 자동 환불(`cancelled` + 자동 취소 사유). */
+   *  손님 취소(`cancelled`) · 사장님 거절(`refunded`, 환불 신청 없음, 사장님이 답함) · 관리자 환불(`refunded`, 환불 신청 있음)
+   *  · 자동 환불(`cancelled` + 자동 취소 사유, 또는 🆕09-27 `refunded`인데 사장님이 답한 적 없음 — 자동 환불이 실패해 정산 화면 [새로고침]으로 정리된 것). */
   moneyBack: { guestCancel: CountRefund; hostReject: CountRefund; adminRefund: CountRefund; autoRefund: CountRefund };
   /** 🚨환불이 실패해 손님 돈이 붙잡혀 있는 예약(`rejected`) — 날짜와 상관없이 지금 남은 것 전부. 금액은 결제 줄의 남은 돈. 있으면 요약 맨 위에 선다. */
   stuck: { count: number; amount: number };
@@ -119,7 +122,12 @@ export function summarizeDaily(input: {
     const box = b.status === "cancelled"
       ? pay?.autoCancel ? moneyBack.autoRefund : moneyBack.guestCancel
       // 관리자 환불은 사장님의 «환불 신청»을 거친다. 거절 환불은 수락 전(`paid`)에만 나서 신청이 붙을 수 없다(`requestRefundAction`).
-      : b.refundRequestedAt ? moneyBack.adminRefund : moneyBack.hostReject;
+      : b.refundRequestedAt ? moneyBack.adminRefund
+        // 🆕09-27 — `refunded`로 오는 길은 셋이다. 사장님 거절(거절 때 `decidedAt`이 찍힌다), 그 거절의 환불이 실패했다가 정산 화면
+        //   [새로고침]으로 정리된 것(역시 찍혀 있다), 그리고 결제 직후·끊긴 결제의 자동 환불이 실패했다가 [새로고침]으로 정리된 것.
+        //   마지막은 pending에서 곧장 rejected가 돼서 사장님이 답한 시각이 없다. 🩸전엔 이것까지 「사장님 거절」로 셌다(사장님은 거절한 적 없다).
+        //   정산 화면 [새로고침]이 손님 메일을 고를 때와 같은 칸으로 가른다(`resyncStuckBookingAction`).
+        : b.decidedAt ? moneyBack.hostReject : moneyBack.autoRefund;
     box.count += 1;
     box.refund += back;
   }
@@ -177,7 +185,7 @@ function toDailyPayment(r: Row): DailyPayment {
 
 /** 요약이 읽는 결제 칸. 🔎취소 내역은 `toss_raw` 통째가 아니라 `cancels`만 꺼낸다(PostgREST JSON 경로). */
 const PAY_COLS = "order_id,amount,balance_amount,approved_at,cancels:toss_raw->cancels";
-const BOOKING_COLS = "id,space_id,status,use_date,order_id,refund_requested_at,created_at,updated_at";
+const BOOKING_COLS = "id,space_id,status,use_date,order_id,refund_requested_at,decided_at,created_at,updated_at";
 
 /** 운영 DB에서 요약에 필요한 줄만 읽는다. 읽기가 실패하면 null — 요약은 「못 셌다」고 말한다(0이라고 하지 않는다). */
 async function loadDailyRows(today: string): Promise<{
@@ -201,6 +209,7 @@ async function loadDailyRows(today: string): Promise<{
   const bookings: DailyBooking[] = [...(bk.data ?? []), ...(back.data ?? []), ...(stuck.data ?? [])].map((r: Row) => ({
     id: n(r.id), spaceId: n(r.space_id), status: s(r.status) as SpaceBooking["status"], useDate: s(r.use_date),
     orderId: s(r.order_id), refundRequestedAt: r.refund_requested_at ? s(r.refund_requested_at) : undefined,
+    decidedAt: r.decided_at ? s(r.decided_at) : undefined,
     createdAt: s(r.created_at), updatedAt: s(r.updated_at),
   }));
   const payments: DailyPayment[] = ((py.data ?? []) as Row[]).map(toDailyPayment);
