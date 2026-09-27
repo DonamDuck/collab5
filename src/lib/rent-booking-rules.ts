@@ -9,7 +9,7 @@
 import type { RentProduct, Space, SpaceBooking } from "./types";
 import { bookingStarted, durationLabel, fitsOpenSlot, isTimeMark, minutesBetween, overlaps, RENT_MIN_MINUTES, toMinutes } from "./rent-time";
 import { bookingHasChat, isRentProduct, productPrice } from "./rent-products";
-import { CAPACITY_MAX } from "./rent-limits";
+import { CAPACITY_MAX, CONFIRM_DEADLINE_HOURS } from "./rent-limits";
 import { headcountRangeMsg } from "./rent-copy";
 import { bizOnFile } from "./bizcheck";
 
@@ -19,8 +19,9 @@ export const PAY_WINDOW_MINUTES = 30;
 /** ⏳사장님이 결제 뒤 예약을 확정할 수 있는 시간(대표 09-27). 이 시간이 지나거나 이용 시작이 먼저 오면 더는 확정할 수 없고,
  *  정리 작업(`sweepBookings` → `rent-unconfirmed.ts`)이 결제를 전액 취소해 예약을 환불로 닫는다.
  *  대표 원문: *「paid 상태에서 시간이 지나면 done 되는 게 문제 같아. 이거는 사장님이 done이나 confirmed를 안 한 거니, refunded로 되어야」*.
- *  기준 시각은 토스 결제 승인 시각(결제 줄 `approved_at`)이다. 예약 행엔 «결제된 때» 칸이 없다. */
-export const CONFIRM_DEADLINE_HOURS = 48;
+ *  기준 시각은 토스 결제 승인 시각(결제 줄 `approved_at`)이다. 예약 행엔 «결제된 때» 칸이 없다.
+ *  값은 `rent-limits.ts`에 둔다 — 손님 안내 문장(`rent-copy.ts`)도 이 숫자를 읽는데, `rent-copy`가 이 파일을 가져오면 순환이 된다. */
+export { CONFIRM_DEADLINE_HOURS } from "./rent-limits";
 
 /** 확정 기한이 무엇으로 지났나 — `48h` 결제 후 48시간 · `start` 이용 시작. 둘 중 먼저 온 쪽 하나다. */
 export type ConfirmLapse = "48h" | "start";

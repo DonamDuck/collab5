@@ -21,7 +21,7 @@ import type { SweepRun } from "./spaces";
 import { KAKAO_CHAT_URL, SITE_URL } from "./site";
 import { bookingWhen, dateLabel } from "./rent-time";
 import {
-  accessMeetLine, hostContactLine, withJosa, BROKER_NOTE, CONTACT_RULE_GUEST, CONTACT_RULE_GUEST_CONFIRMED, CONTACT_RULE_HOST,
+  accessMeetLine, hostContactLine, withJosa, BROKER_NOTE, CONFIRM_DEADLINE_GUEST, CONTACT_RULE_GUEST, CONTACT_RULE_GUEST_CONFIRMED, CONTACT_RULE_HOST,
   BOOKING_HEADLINE, COFFEE_CHAT_FREE, COFFEE_CHAT_WHEN_GUEST_ROW, COFFEE_CHAT_WHEN_HOST_ROW, HOST_REQUEST_STEPS,
   PRODUCT_HINT_GUEST, PRODUCT_LABEL, REFUND_TIMING_LINE, unconfirmedReasonLine,
 } from "./rent-copy";
@@ -461,7 +461,8 @@ export function buildBookingPaidToGuest(
     chatRow(booking, false),
     [LABEL.hostContact, `${hostName} · ${contact}`],
     [LABEL.access, [CONTACT_RULE_GUEST, meet].filter(Boolean).join(" ")],
-    [LABEL.policy, CANCEL_POLICY_LINE],
+    // ⏳09-27 대표 — 확정 기한과 자동 환불을 취소 규정 칸 맨 앞에(화면 확인 팝업·예약 한 건 화면과 같은 상수).
+    [LABEL.policy, `${CONFIRM_DEADLINE_GUEST}\n${CANCEL_POLICY_LINE}`],
   ];
   const tail = ASK("사장님과 연락이 잘 닿지 않으면 알려 주세요.");
   // ⚖️09-19 대표 — 결제 메일 끝에 통신판매중개자 한 줄(`BROKER_NOTE`).

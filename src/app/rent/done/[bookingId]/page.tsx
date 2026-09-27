@@ -7,7 +7,7 @@ import { repo } from "@/lib/repo";
 import { ContactBlock } from "../../ContactBlock";
 import { KAKAO_CHAT_URL } from "@/lib/site";
 import { bookingFinished, bookingStarted } from "@/lib/rent-time";
-import { BOOKING_HEADLINE, COFFEE_CHAT_WHEN_GUEST, CONFIRM_BEFORE_USE_GUEST, CONTACT_RULE_GUEST, CONTACT_RULE_GUEST_DONE, PRODUCT_LABEL, REFUND_TIMING_LINE, unconfirmedReasonLine } from "@/lib/rent-copy";
+import { BOOKING_HEADLINE, COFFEE_CHAT_WHEN_GUEST, CONFIRM_BEFORE_USE_GUEST, CONFIRM_DEADLINE_GUEST, CONTACT_RULE_GUEST, CONTACT_RULE_GUEST_DONE, PRODUCT_LABEL, REFUND_TIMING_LINE, unconfirmedReasonLine } from "@/lib/rent-copy";
 import { CONFIRM_DEADLINE_HOURS, confirmLapse } from "@/lib/rent-booking-rules";
 import { isUnconfirmedRefundReason } from "@/lib/rent-payment";
 import { guestBookingHref } from "@/lib/rent-groups";
@@ -185,7 +185,7 @@ export default async function RentDonePage({ params }: { params: Promise<{ booki
                 {[
                   // 🔑09-27 대표 코멘트 #157 — 「여기 1번 불렛에 … 사장님이 예약확정해야 이용이 가능하다는 내용 여기도 넣자」.
                   //   신청 확인 팝업 첫 줄(#154)과 같은 상수다. 이미 확정된 예약엔 맞지 않는 말이라 결제 완료(확정 대기)일 때만.
-                  ...(b.status === "paid" ? [CONFIRM_BEFORE_USE_GUEST] : []),
+                  ...(b.status === "paid" ? [`${CONFIRM_BEFORE_USE_GUEST} ${CONFIRM_DEADLINE_GUEST}`] : []),
                   // ⏱09-17 대표 — 확정 뒤 2일 안 연락 규칙. 이미 수락된 건은 조건형(「확정하면」) 대신 지난 일로 말한다.
                   b.status === "confirmed" ? CONTACT_RULE_GUEST_DONE : CONTACT_RULE_GUEST,
                   // 🆕09-19 오후 대표 — 수락 전 취소는 전액(`CancelStage`). 수락을 기다리는 동안만 참인 말이라 그때만 선다.

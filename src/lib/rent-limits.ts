@@ -58,3 +58,7 @@ export function joinSpaceAbout(body: string, facilitiesNote: string): string {
   if (!b || a === b) return a;
   return a ? `${a}\n\n${b}` : b;
 }
+
+/** ⏳사장님이 결제 뒤 예약을 확정할 수 있는 시간(대표 09-27). 판정은 `rent-booking-rules.ts`의 `confirmLapse`,
+ *  손님 안내는 `rent-copy.ts`의 `CONFIRM_DEADLINE_GUEST`, 약관은 이용자 약관 제10조·공간 제공자 약관 제7조. 바꾸면 넷 다. */
+export const CONFIRM_DEADLINE_HOURS = 48;

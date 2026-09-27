@@ -35,7 +35,7 @@ import { dayMarks, durationLabel, endChoices, minutesBetween, nowHhmmKst, rangeL
 import { CAPACITY_MAX, PLAN_MAX } from "@/lib/rent-limits";
 import { dateLabel, InfoList, InfoRow, infoLabelCls, infoValueCls, primaryBtnCls, RentSelect, rentInputCls, rentTextareaCls, won } from "../ui";
 import Link from "next/link";
-import { COFFEE_CHAT_FREE, COFFEE_CHAT_LABEL, CONFIRM_BEFORE_USE_GUEST, CONTACT_RULE_GUEST, HEADCOUNT_MSG_EMPTY, headcountRangeMsg, isTestPayment, PRODUCT_HINT_GUEST, PRODUCT_LABEL } from "@/lib/rent-copy";
+import { COFFEE_CHAT_FREE, COFFEE_CHAT_LABEL, CONFIRM_BEFORE_USE_GUEST, CONFIRM_DEADLINE_GUEST, CONTACT_RULE_GUEST, HEADCOUNT_MSG_EMPTY, headcountRangeMsg, isTestPayment, PRODUCT_HINT_GUEST, PRODUCT_LABEL } from "@/lib/rent-copy";
 import { ConfirmDialog } from "../ConfirmDialog";
 import { PickDateCalendar } from "./PickDateCalendar";
 import { MentorOptions } from "./MentorOption";
@@ -1148,7 +1148,8 @@ export function BookingForm({
           <ul className="mt-2 space-y-2 border-t border-hairline pt-3">
             {[
               // 🔑09-27 대표 코멘트 #154 — 첫 줄로 «결제가 곧 이용은 아니다». 예약 한 건 화면 첫 줄과 같은 상수다.
-              CONFIRM_BEFORE_USE_GUEST,
+              //   ⏳같은 날 대표 결정 — 확정 기한(48시간·이용 시작 중 먼저)과 자동 환불을 같은 줄에 잇는다.
+              `${CONFIRM_BEFORE_USE_GUEST} ${CONFIRM_DEADLINE_GUEST}`,
               CONTACT_RULE_GUEST,
               // 🪪09-18 대표 — 「신청할 때 약관 동의 같은 데 넣어야 할 수도」. 약관 제10조에 넣은 한 줄을 돈 내기 직전에 한 번 더.
               "이용 당일 사장님이 신분증으로 성함을 확인할 수 있어요.",

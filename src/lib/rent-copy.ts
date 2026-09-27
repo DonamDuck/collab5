@@ -6,7 +6,7 @@
 //     커피챗 라벨이 화면마다 「사장님 시간 포함」과 「커피챗 포함」으로 달랐다.
 // 🚨훅도 DB도 안 부른다. 서버 액션·메일·클라이언트 어디서든 부를 수 있어야 한다.
 import type { AccessHow } from "./types";
-import { SPACE_ABOUT_MIN } from "./rent-limits";
+import { CONFIRM_DEADLINE_HOURS, SPACE_ABOUT_MIN } from "./rent-limits";
 
 /** 📨이용 안내를 «어떻게» 받게 되는지. 내용(비밀번호 등)은 우리가 안 가진다 — 방식만 말한다. */
 export function accessHowLine(how: AccessHow): string {
@@ -113,6 +113,11 @@ export const BOOKING_HEADLINE = {
  *  「예약 안내 사항」의 첫 줄이 이 한 벌이다. 대표 원문: 「결제 후 사장님의 예약확정이 진행 되어야 실제 공간 이용이 가능해요 등과 같이」.
  *  ⚠️이미 확정된 예약(`confirmed`)엔 맞지 않는 말이라 예약 한 건 화면은 결제 완료(`paid`)일 때만 세운다. */
 export const CONFIRM_BEFORE_USE_GUEST = "결제 후 사장님이 예약을 확정해야 공간을 이용할 수 있어요.";
+
+/** ⏳09-27 대표 — 확정 기한과 자동 환불을 손님께 미리 알리는 한 줄. `CONFIRM_BEFORE_USE_GUEST` 바로 뒤에 같이 선다
+ *  (신청 확인 팝업 · 예약 한 건 화면 결제 완료 · 결제 완료 메일). 결제는 «취소»되고 돌려드리는 건 «돈»이다(대표 09-27). */
+export const CONFIRM_DEADLINE_GUEST =
+  `${CONFIRM_DEADLINE_HOURS}시간 안에(이용 시작이 더 빠르면 그 전까지) 확정되지 않으면 결제를 취소하고 전액 돌려드려요.`;
 
 /** ⏱연락 규칙 — 사장님이 수락하고 2일 안에 손님께 공간 안내를 전한다(대표 09-17).
  *  ⭐손님 쪽과 사장님 쪽이 같은 약속을 서로 다른 방향에서 말한다. 한쪽만 고치면 약속이 둘이 된다.
