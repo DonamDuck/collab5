@@ -64,6 +64,7 @@ const chipDisabledCls = "border-transparent bg-surface-soft text-faint";
 function PayBar({
   amount,
   caption,
+  detail,
   emptyText,
   label,
   disabled,
@@ -73,6 +74,8 @@ function PayBar({
   amount: number | null;
   /** 금액 위 작은 줄에 붙는 길이(「2시간 30분」). 무엇에 대한 값인지 바에서 바로 읽힌다(09-19 30분 단위). */
   caption?: string;
+  /** 💸lg 요약 카드 위 금액 자리(`#rent-side-price`)에 총액 밑으로 서는 한 줄 — 상품 · 길이(「대관만 · 1시간 30분」). 09-27 #147. */
+  detail?: string;
   /** 금액 자리에 대신 서는 말. 무엇을 골라야 금액이 나오는지(09-18: 상품 → 시간 순). */
   emptyText: string;
   label: string;
@@ -83,9 +86,15 @@ function PayBar({
   //   오른쪽 요약 카드(`page.tsx`의 `#rent-side-pay` 자리) «안»으로 옮긴다. 카드가 sticky라 스크롤 내내 같이 간다.
   //   폰·태블릿은 전처럼 바닥 고정 바. 자리가 없으면(다른 화면에서 쓸 때) 바닥 바로 물러난다.
   const [slot, setSlot] = useState<HTMLElement | null>(null);
+  // 💸09-27 대표 코멘트 #147 — 금액은 요약 카드 «위» 값 자리(`#rent-side-price`) 하나에서 갱신된다. 아래 자리엔 버튼만.
+  //   위 자리가 없는 화면이면(다른 화면에서 쓸 때) 전처럼 아래 자리에 금액을 같이 든다.
+  const [priceSlot, setPriceSlot] = useState<HTMLElement | null>(null);
   useEffect(() => {
     const mq = window.matchMedia("(min-width: 1024px)");
-    const pick = () => setSlot(mq.matches ? document.getElementById("rent-side-pay") : null);
+    const pick = () => {
+      setSlot(mq.matches ? document.getElementById("rent-side-pay") : null);
+      setPriceSlot(mq.matches ? document.getElementById("rent-side-price") : null);
+    };
     pick();
     mq.addEventListener("change", pick);
     return () => mq.removeEventListener("change", pick);
@@ -107,26 +116,40 @@ function PayBar({
   }, [slot]);
 
   if (slot) {
-    return createPortal(
-      <div className="mt-5 border-t border-hairline pt-5">
-        {amount === null ? (
-          <p className="text-[15px] leading-snug break-keep text-mute">{emptyText}</p>
-        ) : (
-          <div className="flex items-baseline justify-between gap-3">
-            <p className="text-[14px] text-faint">대여 비용{caption ? ` · ${caption}` : ""}</p>
-            <p className="text-[19px] font-bold tabular-nums text-ink">{won(amount)}</p>
-          </div>
+    const totalUp = !!priceSlot && amount !== null;
+    return (
+      <>
+        {createPortal(
+          <div className="mt-5 border-t border-hairline pt-5">
+            {amount === null ? (
+              <p className="mb-3 text-[15px] leading-snug break-keep text-mute">{emptyText}</p>
+            ) : !priceSlot ? (
+              <div className="mb-3 flex items-baseline justify-between gap-3">
+                <p className="text-[14px] text-faint">대여 비용{caption ? ` · ${caption}` : ""}</p>
+                <p className="text-[19px] font-bold tabular-nums text-ink">{won(amount)}</p>
+              </div>
+            ) : null}
+            <button
+              type="button"
+              onClick={onClick}
+              disabled={disabled}
+              className={`${primaryBtnCls} h-[52px] w-full px-5`}
+            >
+              {label}
+            </button>
+          </div>,
+          slot,
         )}
-        <button
-          type="button"
-          onClick={onClick}
-          disabled={disabled}
-          className={`${primaryBtnCls} mt-3 h-[52px] w-full px-5`}
-        >
-          {label}
-        </button>
-      </div>,
-      slot,
+        {/* 총액 덩어리. 이것이 들어오면 위 자리의 시간당 값(`data-side-default`)이 CSS로 숨는다(`page.tsx`). 크기는 그 값과 같은 24px. */}
+        {totalUp &&
+          createPortal(
+            <div data-side-total>
+              <p className="text-[24px] font-bold leading-none tracking-tight tabular-nums text-ink">{won(amount)}</p>
+              {detail && <p className="mt-2 text-[15px] leading-snug break-keep text-mute">{detail}</p>}
+            </div>,
+            priceSlot,
+          )}
+      </>
     );
   }
 
@@ -932,6 +955,11 @@ export function BookingForm({
       <PayBar
         amount={timePicked && product ? total : null}
         caption={timePicked ? durationLabel(minutes) : undefined}
+        detail={
+          timePicked && product
+            ? [PRODUCT_LABEL[product], durationLabel(minutes), withChat && coffeeChat ? `${COFFEE_CHAT_LABEL} 포함` : ""].filter(Boolean).join(" · ")
+            : undefined
+        }
         // ✍️09-21 대표 코멘트 — 「빌릴 시간을 선택해주세요」. 금액 얘기보다 할 일을 먼저 말한다. 세 갈래를 같은 틀로.
         emptyText={!product ? "신청 타입을 선택해 주세요" : activeStart ? "끝나는 시각을 선택해 주세요" : "빌릴 시간을 선택해 주세요"}
         // 🔑09-19 [G] 로그인 전엔 같은 바가 「로그인하고 신청하기」다. 누르면 고른 값을 맡기고 로그인으로 간다.
