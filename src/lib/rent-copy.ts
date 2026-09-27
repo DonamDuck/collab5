@@ -6,6 +6,7 @@
 //     커피챗 라벨이 화면마다 「사장님 시간 포함」과 「커피챗 포함」으로 달랐다.
 // 🚨훅도 DB도 안 부른다. 서버 액션·메일·클라이언트 어디서든 부를 수 있어야 한다.
 import type { AccessHow } from "./types";
+import { SPACE_ABOUT_MIN } from "./rent-limits";
 
 /** 📨이용 안내를 «어떻게» 받게 되는지. 내용(비밀번호 등)은 우리가 안 가진다 — 방식만 말한다. */
 export function accessHowLine(how: AccessHow): string {
@@ -192,6 +193,8 @@ export const PRODUCT_NOTE_PLACEHOLDER = {
  *  ⚠️`rent-actions.ts`는 "use server"라 상수를 못 내보낸다. 그래서 여기 둔다(서버·클라이언트 둘 다 부르는 파일). */
 export const SPACE_FORM_MSG = {
   name: "검색에 노출할 공간명을 적어 주세요.",
+  /** 📝09-27 대표 #164 — 「공간 소개」를 없애고 시설 안내와 합친 칸. 필수가 됐다(`SPACE_ABOUT_MIN`, 유의 사항과 같은 10자). */
+  about: `공간과 시설 사용에 대해 ${SPACE_ABOUT_MIN}자 이상 적어 주세요.`,
   phoneEmpty: "전화번호가 비어 있어요.",
   phoneBad: "전화번호를 다시 봐 주세요. 예) 02-1234-5678",
   rules: "유의 사항을 10자 넘게 적어 주셔야 올릴 수 있어요.",

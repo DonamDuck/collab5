@@ -43,7 +43,7 @@ import {
 } from "./rent-review";
 import {
   CAPACITY_MAX, COFFEE_CHAT_MINUTES_MAX, COFFEE_CHAT_MINUTES_MIN, COFFEE_CHAT_MINUTES_STEP, COFFEE_CHAT_PRICE_MAX,
-  CONTACT_PHONE_MAX, HOST_MESSAGE_MAX, PHOTOS_MAX, PLAN_MAX, PRICE_HOUR_MAX, storePhoneOk,
+  CONTACT_PHONE_MAX, HOST_MESSAGE_MAX, joinSpaceAbout, PHOTOS_MAX, PLAN_MAX, PRICE_HOUR_MAX, SPACE_ABOUT_MIN, storePhoneOk,
 } from "./rent-limits";
 import { geocode } from "./geocode";
 import { repo } from "./repo";
@@ -143,10 +143,12 @@ const SLUG_TRIES = 5;
 
 export interface SpaceFormInput {
   slug?: string;
+  /** 📝09-27 대표 #164 — 「공간 소개」와 「시설 안내」가 한 칸(「공간 및 시설 사용에 대해 설명해 주세요.」)이 됐다. 그 글이 `body`로 온다. */
   name: string; body: string; photos: string[];
   address: string;
   category: SpaceCategory;
-  useType: SpaceUseType; facilities: string[]; facilitiesNote: string; capacity?: number;
+  /** 🔻09-27 #164 — `facilitiesNote`는 화면이 더 안 보낸다. 배포 전에 열어 둔 옛 탭이 보내 오면 `body`에 이어 붙인다(`joinSpaceAbout`). */
+  useType: SpaceUseType; facilities: string[]; facilitiesNote?: string; capacity?: number;
   rules: string;
   /** 🛍상품 셋(09-18). 옛 `scope`·`priceHour`는 화면이 안 보낸다 — 서버가 이 값에서 호환 값을 만든다. */
   rentSpaceOn: boolean; rentSpacePrice: number; rentSpaceNote: string;
@@ -188,6 +190,9 @@ export async function saveSpaceAction(input: SpaceFormInput): Promise<ActionResu
   }
   // ✍️09-27 대표 A9 — 막힘 말은 등록 폼과 한 벌(`SPACE_FORM_MSG`). 화면이 먼저 막고 여기가 관문이라, 같은 칸에서 같은 말을 듣는다.
   if (!input.name.trim()) return { ok: false, message: SPACE_FORM_MSG.name };
+  // 📝09-27 대표 #164 — 공간 설명 한 칸이 필수가 됐다(화면과 같은 10자·같은 말). 옛 탭이 두 칸을 따로 보내 와도 합친 글로 본다.
+  const about = joinSpaceAbout(input.body ?? "", input.facilitiesNote ?? "");
+  if (about.length < SPACE_ABOUT_MIN) return { ok: false, message: SPACE_FORM_MSG.about };
   // 🏠09-19 오후 — 주소는 판매자 정보에 그대로 나가고 사업자등록증의 사업장 주소와 대조하는 값이다. 폼도 막지만 관문은 여기다.
   if (!input.address.trim()) return { ok: false, field: "address", message: "주소를 찾아 주세요." };
   // 🔁09-19 대표 #74 — 화면 라벨이 「공간 타입」이 됐다. 같은 말로.
@@ -462,13 +467,15 @@ export async function saveSpaceAction(input: SpaceFormInput): Promise<ActionResu
 
   const row: SpaceSaveInput = {
     slug, ownerUserId: uid, brandSlug,
-    name: input.name.trim(), tagline: "", body: input.body, photos: input.photos,
+    name: input.name.trim(), tagline: "", body: about, photos: input.photos,
     // 동네는 이제 안 묻는다(대표 09-16: 「주소면 충분」). 옛 칸은 주소에서 앞 두 조각만 넣어 둔다 —
     // 목록의 동네 거르개가 아직 이 칸을 본다.
     area: input.address.trim().split(/\s+/).slice(0, 2).join(" "),
     address: input.address.trim(), lat, lng, accessNote: "",
     useType: input.useType, facilities: input.facilities,
-    facilitiesNote: input.facilitiesNote.trim(), capacity: input.capacity,
+    // 📝09-27 #164 — 시설 안내 글은 `body`(위 `about`)로 합쳐 저장한다. 이 칼럼은 비워서 상세 화면에 같은 글이 두 번 서지 않게.
+    //   저장하기 전의 옛 공간만 이 칼럼이 차 있고, 상세 화면은 그때 지금처럼 「공간·시설 안내」 절에 싣는다.
+    facilitiesNote: "", capacity: input.capacity,
     hours: "", rules: input.rules.trim(),
     priceDay: 0, mentorMinutes: 0, mentorPrice: 0,
     openDates: [], servesFood: false, subleaseOk: true,
