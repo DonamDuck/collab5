@@ -206,6 +206,14 @@ export const SPACE_FORM_MSG = {
   slots: "빌려줄 날을 달력에서 하루 이상 골라 주세요.",
 } as const;
 
+/** 🙋사용 인원 막힘 말 — 신청 폼(`BookingForm`)과 서버(`startBookingAction`·`validateBookingRequest`)가 이 한 벌을 쓴다(대표 09-27 #143·#148).
+ *  대표: 「오시는 인원 (선택)」 → 「사용 인원」, 그리고 필수. 비었을 때와 범위를 벗어났을 때 말이 다르다. */
+export const HEADCOUNT_MSG_EMPTY = "사용 인원을 적어 주세요.";
+/** `cap` = 공간 정원(없으면 상한 `CAPACITY_MAX`). 폼의 「동시에 최대 N명까지 수용할 수 있어요.」와 같은 숫자다. */
+export function headcountRangeMsg(cap: number): string {
+  return `인원은 1명부터 최대 ${cap.toLocaleString("ko-KR")}명까지 적어 주세요.`;
+}
+
 /** 🗓열어 둔 시간이 거꾸로일 때. `label`은 날짜(「9월 20일 (일)」)나 매주 여는 요일(「매주 월요일」). 화면·서버 한 벌(09-27 A9). */
 export function slotReversedMsg(label: string): string {
   return `${label}은 끝나는 시각이 여는 시각보다 앞이에요. 두 시각을 바꿔 주세요.`;

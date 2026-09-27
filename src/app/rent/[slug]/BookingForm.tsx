@@ -32,10 +32,10 @@ import { startBookingAction, confirmBookingAction } from "@/lib/rent-actions";
 import type { SpaceUseType, OpenSlot, RentProduct, Space } from "@/lib/types";
 import { bookingAmount, productNote, productPrice, sellableProducts } from "@/lib/rent-products";
 import { dayMarks, durationLabel, endChoices, minutesBetween, nowHhmmKst, rangeLabel, RENT_MIN_MINUTES, startChoices as startChoicesOf, toMinutes, todayKst } from "@/lib/rent-time";
-import { PLAN_MAX } from "@/lib/rent-limits";
+import { CAPACITY_MAX, PLAN_MAX } from "@/lib/rent-limits";
 import { dateLabel, InfoList, InfoRow, primaryBtnCls, RentSelect, rentInputCls, rentTextareaCls, won } from "../ui";
 import Link from "next/link";
-import { COFFEE_CHAT_FREE, COFFEE_CHAT_LABEL, CONTACT_RULE_GUEST, isTestPayment, PRODUCT_HINT_GUEST, PRODUCT_LABEL } from "@/lib/rent-copy";
+import { COFFEE_CHAT_FREE, COFFEE_CHAT_LABEL, CONTACT_RULE_GUEST, HEADCOUNT_MSG_EMPTY, headcountRangeMsg, isTestPayment, PRODUCT_HINT_GUEST, PRODUCT_LABEL } from "@/lib/rent-copy";
 import { ConfirmDialog } from "../ConfirmDialog";
 import { PickDateCalendar } from "./PickDateCalendar";
 import { MentorOptions } from "./MentorOption";
@@ -197,14 +197,16 @@ function PayBar({
  *  sessionStorage라 같은 탭에만 남는다. 카카오·구글을 다녀와도 같은 탭이면 그대로다(`lib/safe-redirect` 머리말과 같은 성질). */
 const resumeKeyOf = (slug: string) => `collab5:rent-resume:${slug}`;
 
-/** 맡겨 두는 폼 값. 소개서 고르기는 안 담는다 — 로그인 전엔 고를 소개서가 없다. */
+/** 맡겨 두는 폼 값. 소개서 고르기는 안 담는다 — 로그인 전엔 고를 소개서가 없다.
+ *  🔻09-27 대표 #143·#148 — 「아직 잘 모르겠어요」(`headUnsure`)를 뺐다. 인원이 필수가 됐다.
+ *    그 전에 맡긴 초안에 `headUnsure: true`가 남아 있어도 읽을 때 무시한다. 인원 칸은 비어서 돌아오고,
+ *    되살리기가 빈 칸을 만나면 바를 누른 것과 똑같이 그 칸으로 데려간다(아래 되살리기 effect). */
 interface ResumeDraft {
   product: RentProduct | "";
   useDate: string;
   startTime: string;
   endTime: string;
   headcount: string;
-  headUnsure: boolean;
   plan: string;
   withChat: boolean;
   guestName: string;
@@ -224,7 +226,6 @@ function readResume(raw: string | null): ResumeDraft | null {
       startTime: str(o.startTime),
       endTime: str(o.endTime),
       headcount: /^\d{1,4}$/.test(str(o.headcount)) ? str(o.headcount) : "",
-      headUnsure: o.headUnsure === true,
       plan: str(o.plan).slice(0, PLAN_MAX),
       withChat: o.withChat === true,
       guestName: str(o.guestName).slice(0, 50),
@@ -305,10 +306,8 @@ export function BookingForm({
   const [brandOn, setBrandOn] = useState(true);
   const [brandPick, setBrandPick] = useState(myBrands[0]?.slug ?? "");
   const brandSlug = myBrands.length > 0 && brandOn ? brandPick : "";
-  /** 👥09-18 대표 코멘트 — 「아직 잘 모르겠어요」 체크. 켜면 인원 칸을 비우고 잠근다. */
-  const [headUnsure, setHeadUnsure] = useState(false);
   const [phone, setPhone] = useState(initialPhone);
-  /** 🪪09-18 대표 — 이용하실 분 성함(실명). 당일 신분 확인에 쓴다. 프로필엔 실명 칸이 없어 미리 채우지 않는다. */
+  /** 🪪09-18 대표 — 예약하시는 분 성함(09-27 #145 칸 이름). 당일 신분 확인에 쓴다. 프로필엔 실명 칸이 없어 미리 채우지 않는다. */
   const [guestName, setGuestName] = useState("");
   /** 결제 직전 확인 팝업(대표 09-14: 의사 확인은 팝업으로). */
   const [confirming, setConfirming] = useState(false);
@@ -325,10 +324,11 @@ export function BookingForm({
    *  **누른 자리에서 3,000px 떨어진 곳에 글자가 생겼다.** 화면에는 아무 변화도 없고 팝업도 안 열리니
    *  「버튼이 죽었다」로 읽힌다. 실제로 대표가 그렇게 읽었다.
    *  ⭐그래서 둘을 같이 한다 — 문구는 그 칸 아래에 놓고, 화면을 그 칸으로 끌어올린다. */
-  const [badField, setBadField] = useState<"product" | "date" | "time" | "plan" | "name" | "phone" | "">("");
+  const [badField, setBadField] = useState<"product" | "date" | "time" | "head" | "plan" | "name" | "phone" | "">("");
   const productRef = useRef<HTMLDivElement>(null);
   const dateRef = useRef<HTMLDivElement>(null);
   const timeRef = useRef<HTMLDivElement>(null);
+  const headRef = useRef<HTMLInputElement>(null);
   const planRef = useRef<HTMLTextAreaElement>(null);
   const nameRef = useRef<HTMLInputElement>(null);
   const phoneRef = useRef<HTMLInputElement>(null);
@@ -394,6 +394,11 @@ export function BookingForm({
   const phoneOk = /^0\d{8,10}$/.test(phone.replace(/\D/g, ""));
   // 🪪서버(`startBookingAction`)와 같은 규칙 — 앞뒤 공백을 뺀 두 글자 이상.
   const nameOk = guestName.trim().length >= 2;
+  // 🙋09-27 대표 #143·#148 — 사용 인원 필수. 칸을 그리는 공간(`as_is`가 아닌 곳)에서만 묻는다. 서버(`startBookingAction`)와 같은 조건이고,
+  //   범위(1명~정원, 정원이 없으면 `CAPACITY_MAX`)는 서버 `validateBookingRequest`와 같은 셈이다. 말은 `rent-copy` 한 벌.
+  const askHead = useType !== "as_is";
+  const headCap = capacity && capacity > 0 ? Math.min(capacity, CAPACITY_MAX) : CAPACITY_MAX;
+  const headOkOf = (v: string) => /^\d+$/.test(v.trim()) && Number(v) >= 1 && Number(v) <= headCap;
   // ⚠️열 글자는 서버(`confirmBookingAction`)가 강제하는 값이다. 여기서 먼저 막는 건 왕복을 아끼려는 것이지
   //   이게 관문이라서가 아니다 — 관문은 늘 서버 쪽이다.
   const planShort = plan.trim().length < 10;
@@ -401,11 +406,12 @@ export function BookingForm({
   /** 버튼이 부르는 건 이것 — 싼 검사만 하고 팝업을 연다. 서버 왕복은 팝업에서 [신청하기]를 누른 뒤다. */
   /** 위에서부터 첫 번째로 비어 있는 칸으로 데려간다. 두 칸이 다 비어도 «위엣것» 하나만 말한다 —
    *  한 번에 둘을 고치라고 하면 어디부터 볼지 또 고민하게 된다. */
-  const stopAt = (f: "product" | "date" | "time" | "plan" | "name" | "phone") => {
+  const stopAt = (f: "product" | "date" | "time" | "head" | "plan" | "name" | "phone") => {
     setBadField(f);
-    const el = { product: productRef.current, date: dateRef.current, time: timeRef.current, plan: planRef.current, name: nameRef.current, phone: phoneRef.current }[f];
+    const el = { product: productRef.current, date: dateRef.current, time: timeRef.current, head: headRef.current, plan: planRef.current, name: nameRef.current, phone: phoneRef.current }[f];
     el?.scrollIntoView({ behavior: "smooth", block: "center" });
     // 글 칸은 커서까지 넣어 준다. 날짜는 격자라 커서가 갈 곳이 없다.
+    if (f === "head") headRef.current?.focus({ preventScroll: true });
     if (f === "plan") planRef.current?.focus({ preventScroll: true });
     if (f === "name") nameRef.current?.focus({ preventScroll: true });
     if (f === "phone") phoneRef.current?.focus({ preventScroll: true });
@@ -417,6 +423,7 @@ export function BookingForm({
     if (!product) { stopAt("product"); return; }
     if (!useDate) { stopAt("date"); return; }
     if (!endTime) { stopAt("time"); return; }
+    if (askHead && !headOkOf(headcount)) { stopAt("head"); return; }
     if (planShort) { stopAt("plan"); return; }
     if (!nameOk) { stopAt("name"); return; }
     if (!phoneOk) { stopAt("phone"); return; }
@@ -433,7 +440,7 @@ export function BookingForm({
   const resumeKey = resumeKeyOf(spaceSlug);
   const goLogin = () => {
     const draft: ResumeDraft = {
-      product, useDate, startTime: activeStart, endTime, headcount, headUnsure, plan, withChat, guestName, phone,
+      product, useDate, startTime: activeStart, endTime, headcount, plan, withChat, guestName, phone,
     };
     try {
       sessionStorage.setItem(resumeKey, JSON.stringify(draft));
@@ -492,8 +499,7 @@ export function BookingForm({
     setUseDate(d);
     setStartTime(st);
     setEndPick(en);
-    setHeadcount(saved.headUnsure ? "" : saved.headcount);
-    setHeadUnsure(saved.headUnsure);
+    setHeadcount(saved.headcount);
     setPlan(saved.plan);
     // ☕09-19 무료 커피챗(값 0)도 고를 수 있는 커피챗이다 — 켜짐으로만 본다.
     setWithChat(coffeeChat && saved.withChat);
@@ -514,6 +520,7 @@ export function BookingForm({
     if (!pickedProduct) return stopAt("product");
     if (!d) return stopAt("date");
     if (!en) return stopAt("time");
+    if (askHead && !headOkOf(saved.headcount)) return stopAt("head");
     if (saved.plan.trim().length < 10) return stopAt("plan");
     if (saved.guestName.trim().length < 2) return stopAt("name");
     if (!/^0\d{8,10}$/.test(ph.replace(/\D/g, ""))) return stopAt("phone");
@@ -786,10 +793,11 @@ export function BookingForm({
         )}
       </div>
 
-      {useType !== "as_is" && (
+      {askHead && (
         <div>
+          {/* 🔁09-27 대표 코멘트 #143·#148 — 「오시는 인원 (선택)」 → 「사용 인원」, 그리고 필수. */}
           <label htmlFor="rent-head" className={labelCls}>
-            오시는 인원 <span className="ml-1 text-[15px] font-normal text-faint">(선택)</span>
+            사용 인원
           </label>
           {/* 🔁09-14 대표 — 「input이 이렇게 길지 않아도 될 거 같은데」. 숫자 두세 자리를 받는 칸이
               화면 폭을 다 쓰면 **긴 글을 기대하는 칸처럼** 보인다. 폭이 곧 기대 길이다.
@@ -798,19 +806,22 @@ export function BookingForm({
               140px에선 「숫자를 입력…」, 200px에서도 한 글자가 끊겼다. **재서 240px**로 잡았다
               (글자 자리 ~196 + 「명」 자리 44). 전체 폭 380의 63%라 여전히 「짧은 칸」으로 읽힌다.
               ⭐폭은 기대 길이를 말하는 장치지 최소화할 값이 아니다 — 문구가 잘리면 그 장치가 거짓말을 한다. */}
-          {/* 📐09-18 대표 코멘트 — 칸을 조금 줄이고 옆에 「아직 잘 모르겠어요」. 「예) 3」은 180px에서도 안 잘린다. */}
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          {/* 📐09-18 대표 코멘트 — 칸을 180px로 줄였다. 「예) 3」은 180px에서도 안 잘린다.
+              🔻09-27 #148 — 옆의 「아직 잘 모르겠어요」 체크는 뺐다. 필수 칸과 부딪친다. */}
           <div className="relative w-[180px]">
             <input
               id="rent-head"
+              ref={headRef}
               type="number"
               inputMode="numeric"
               min={1}
-              max={capacity}
+              max={headCap}
               className={`${rentInputCls} pr-11`}
               value={headcount}
-              disabled={headUnsure}
-              onChange={(e) => setHeadcount(e.target.value)}
+              onChange={(e) => {
+                setHeadcount(e.target.value);
+                if (headOkOf(e.target.value)) setBadField((f) => (f === "head" ? "" : f));
+              }}
               // ✍️09-17 「숫자를 입력해주세요」 → 예시 숫자(행정어 걷기). 칸 안 「명」과 붙여 읽힌다.
               placeholder="예) 3"
             />
@@ -821,19 +832,9 @@ export function BookingForm({
               명
             </span>
           </div>
-          <label className="flex min-h-[44px] cursor-pointer items-center gap-2 text-[15px] text-body">
-            <input
-              type="checkbox"
-              className="size-[18px] accent-primary"
-              checked={headUnsure}
-              onChange={(e) => {
-                setHeadUnsure(e.target.checked);
-                if (e.target.checked) setHeadcount("");
-              }}
-            />
-            아직 잘 모르겠어요
-          </label>
-          </div>
+          {badField === "head" && (
+            <p className={errCls}>{headcount.trim() ? headcountRangeMsg(headCap) : HEADCOUNT_MSG_EMPTY}</p>
+          )}
           {/* ✍️09-27 대표 코멘트 #144 — 「들어가요」 → 대표 문장(숫자는 공간 정원). */}
           {capacity ? <p className={hintCls}>동시에 최대 {capacity}명까지 수용할 수 있어요.</p> : null}
         </div>

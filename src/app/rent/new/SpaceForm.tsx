@@ -2065,7 +2065,8 @@ function L({
       {htmlFor ? (
         <label htmlFor={htmlFor} className="mb-2 block text-[16px] font-medium text-body">
           {label}
-          {/* 🔁09-27 대표 A13 — 「· 선택」 → 「(선택)」. 손님 쪽 신청 폼(`BookingForm`의 오시는 인원)과 같은 표기. */}
+          {/* 🔁09-27 대표 A13 — 「· 선택」 → 「(선택)」. 손님 쪽 화면(상세 「사장님과 커피챗 (선택)」)과 같은 표기.
+              (그때 짝으로 적은 신청 폼의 「오시는 인원 (선택)」은 09-27 #148에 필수 「사용 인원」이 됐다.) */}
           {optional && <> <span className="ml-1 text-[15px] font-normal text-faint">(선택)</span></>}
         </label>
       ) : (
