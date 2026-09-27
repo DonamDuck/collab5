@@ -31,12 +31,12 @@ import {
   approvePayment, cancelPayment, guestCancelQuote, lookupPayment, lookupPaymentByOrderId, AUTO_CANCEL_WAITING_REASON, AUTO_REFUND_REASON,
   PAY_EXPIRED_LINE, PAY_FAIL_METHOD_UNSUPPORTED, PAY_FAIL_NOT_AVAILABLE, PAY_FAIL_REFUND_CHANGED, PAY_FAIL_SLOT_TAKEN,
   PAY_FAIL_SLOT_TAKEN_REFUNDED, PAY_FAIL_SLOT_TAKEN_REFUND_PENDING, PAY_FAIL_USE_STARTED, PAY_FAIL_WINDOW_OVER,
-  PAY_CHECKING_LINE, PAY_CHECKING_TITLE, PAY_IN_FLIGHT_CODES, PAY_FAIL_UNKNOWN, PAY_ALREADY_PROCESSED,
+  PAY_CHECKING_LINE, PAY_CHECKING_TITLE, PAY_IN_FLIGHT_CODES, PAY_FAIL_UNKNOWN, PAY_ALREADY_PROCESSED, isUnconfirmedRefundReason,
 } from "./rent-payment";
 // 🆕09-27(fix-money3) «결제를 시도한 흔적» — 정리 작업이 토스에 되물을지 정하는 그 판정 한 벌을 승인 관문도 쓴다.
 import { hasPayTrace } from "./rent-recover";
 // ⭐신청이 «지금도» 말이 되나 — 신청 시작·결제 승인·결제 화면이 같이 쓰는 순수 규칙(09-18 밤 QA G-01).
-import { pendingBookingProblem, validateBookingRequest } from "./rent-booking-rules";
+import { CONFIRM_DEADLINE_HOURS, confirmLapse, pendingBookingProblem, validateBookingRequest } from "./rent-booking-rules";
 // 🧾09-19 저녁 저장하면 어느 상태로 가나 — 등록 폼과 같은 순수 함수.
 import {
   fixNoteProblem, needsFix, pausedChangeProblem, REVIEW_SQL_LINE, reviewPrevFor, spaceSaveReview,
@@ -52,6 +52,7 @@ import {
   notifyBookingPaidToGuest, notifyBookingConfirmedToHost, notifyBookingCancelledToGuest, notifyAdminRefund,
   notifySpacePublished, notifySpaceReview, notifyRefundRequest, notifyDeal, notifySpaceFixRequest, type DealKind,
   notifyRefundUnconfirmed, notifyPaymentReturned, notifyBookingRejectedOnce, notifyResync, type ResyncKind,
+  notifyUnconfirmedRefund,
 } from "./rent-notify";
 import { bookingStarted, dateLabel, kstDaysUntil, durationLabel, isTimeMark, minutesBetween, RENT_MIN_MINUTES, toMinutes, todayKst } from "./rent-time";
 import type { Space, SpaceBooking, SpaceUseType, SpaceCategory, OpenSlot, AccessHow, RentProduct, BizCheckStatus, BizCertRead } from "./types";
@@ -1107,22 +1108,42 @@ export async function decideBookingAction(
   const sp = mine.find((x) => x.id === b.spaceId);
   if (!sp) return { ok: false, message: "내 공간에 들어온 요청만 답할 수 있어요." };
 
-  // ⏯이용 시간이 이미 시작했으면 «수락»은 뜻이 없다. 거절(= 전액 환불)은 그대로 열어 둔다 —
-  //   답을 못 한 채 날이 간 신청은 손님 돈이 붙잡혀 있는 것이라, 사장님이 돌려줄 길은 남아 있어야 한다.
+  // ⏳09-27 대표 — 확정 기한(결제 후 48시간·이용 시작 중 먼저 온 쪽)이 지난 결제 완료는 수락을 안 받는다.
+  //   그 예약은 정리 작업이 전액 돌려준다(`rent-unconfirmed.ts`). 기한은 정리 작업과 같은 함수(`confirmLapse`) 한 벌로 잰다 —
+  //   둘이 따로 재면 그 틈에서 «수락했는데 돈은 돌아간» 예약이 난다. 기준 시각은 결제 줄의 승인 시각이다.
+  //   🤝이 검사를 지난 뒤 정리 작업이 먼저 잡아도(`claimUnconfirmedBooking`) 아래 `decideBooking`의 조건(status = paid)에서 떨어진다.
+  if (accept && b.status === "paid") {
+    const lapse = confirmLapse(b, (await getPaymentByOrderId(b.orderId))?.approvedAt);
+    if (lapse) {
+      return {
+        ok: false,
+        message: lapse === "48h"
+          ? `결제 후 ${CONFIRM_DEADLINE_HOURS}시간이 지나 수락할 수 없어요. 이 예약은 자동으로 취소되고 손님께 전액 돌아가요.`
+          : "이용 시간이 시작돼 수락할 수 없어요. 이 예약은 자동으로 취소되고 손님께 전액 돌아가요.",
+      };
+    }
+  }
   // ⏯이용 시간이 이미 시작했으면 수락도 거절도 안 받는다(phase 1, 대표 09-16).
-  //   손님은 결제 때 이미 「예약 완료」를 봤고 다녀갔을 수 있다. 그때 사장님이 거절을 누르면 다녀간 손님에게
-  //   전액이 돌아간다. 문제가 있으면 «관리자에게 환불 신청»으로 — 우리가 양쪽에 전화로 확인한다.
+  //   🔁09-27 — 수락 전(`paid`)인 채로 시작한 예약은 정리 작업이 전액 돌려준다. 그래서 거절 말도 그 사실을 말한다.
+  //   확정한 예약에 문제가 생겼으면 여전히 «관리자에게 환불 신청»이다(우리가 양쪽에 전화로 확인한다).
   if (bookingStarted(b)) {
     return {
       ok: false,
       message: accept
-        ? "이용 시간이 이미 지나 따로 수락하지 않으셔도 돼요."
-        : "이용 시간이 이미 지나 거절할 수 없어요. 문제가 있으면 관리자에게 환불을 신청해 주세요.",
+        ? "이용 시간이 이미 시작돼 수락할 수 없어요."
+        : b.status === "paid" && !b.refundRequestedAt
+          ? "이용 시간이 이미 시작돼 거절할 수 없어요. 수락하지 않은 예약이라 자동으로 취소되고 손님께 전액 돌아가요."
+          : "이용 시간이 이미 지나 거절할 수 없어요. 문제가 있으면 관리자에게 환불을 신청해 주세요.",
     };
   }
 
   const decided = await decideBooking(bookingId, accept, message.trim());
-  if (!decided) return { ok: false, message: "이미 답하신 요청이에요." };
+  if (!decided) {
+    // 🤝정리 작업이 기한이 지난 예약을 먼저 잡았을 수 있다(답한 시각 없이 자동 취소·환불). 그땐 «이미 답했다»가 아니다.
+    const now = await getBooking(bookingId);
+    const auto = !!now && !now.decidedAt && (now.status === "rejected" || now.status === "refunded");
+    return { ok: false, message: auto ? "확정 기한이 지나 자동으로 취소된 요청이에요. 손님께는 전액 돌아가요." : "이미 답하신 요청이에요." };
+  }
 
   if (!accept) {
     // 예약은 이미 rejected다(`decideBooking`). 환불이 «성공»하면 예약 refunded + 결제 CANCELED를 같이 옮긴다.
@@ -1467,10 +1488,19 @@ export async function resyncStuckBookingAction(bookingId: number): Promise<Actio
   //   사장님이 답한 흔적(`decidedAt`)으로 가른다. 자동 환불 갈래는 pending에서 바로 rejected가 돼서 답한 시각이 없다.
   //   🔁겹쳐 눌리면 두 통이 될 수 있어 두 메일 다 주문번호 멱등키로 나간다(`notifyBookingRejectedOnce`·`notifyPaymentReturned`).
   const decided = !!b.decidedAt;
+  // 🆕09-27 답한 시각이 없는 셋째 길 — 확정 기한이 지나 정리 작업이 돌려주려다 실패한 예약(`rent-unconfirmed.ts`).
+  //   토스 취소 내역에 우리 사유 글자가 있으면 그 길이다(우리 취소가 토스엔 닿았는데 응답만 못 받은 경우).
+  //   기한이 무엇으로 지났나는 그 취소 시각에 다시 잰다. ⚠️관리자가 토스 화면에서 직접 돌려줬으면 사유가 우리 글자가 아니라
+  //   이 길을 못 알아보고 「결제가 취소됐어요」(끊긴 결제) 메일로 간다. 가를 칸이 예약 행에 없다(보고서 판단 사항).
+  const ours = (tp.cancels ?? []).filter((c) => isUnconfirmedRefundReason(c.cancelReason));
+  const lapse = !decided && ours.length > 0
+    ? confirmLapse(b, pay.approvedAt ?? tp.approvedAt, new Date(ours[0].canceledAt || Date.now())) ?? "start"
+    : null;
   await notifyLater(async () => {
     const p = await notifyParties(b);
     if (!p) return;
     if (decided) await notifyBookingRejectedOnce({ ...b, status: "refunded" }, p.space, p.host, p.guest);
+    else if (lapse) await notifyUnconfirmedRefund({ ...b, status: "refunded" }, p.space, p.host, p.guest, total, lapse);
     else await notifyPaymentReturned({ ...b, status: "refunded" }, p.space, p.guest, total);
   });
   await tellAdmin("refunded");

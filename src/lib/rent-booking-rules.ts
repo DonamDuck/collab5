@@ -16,6 +16,48 @@ import { bizOnFile } from "./bizcheck";
 /** ⏳토스 결제창이 살아 있는 시간. 정리 작업(`sweepBookings`)이 신청을 만료로 옮기는 기준과 같은 값이다. */
 export const PAY_WINDOW_MINUTES = 30;
 
+/** ⏳사장님이 결제 뒤 예약을 확정할 수 있는 시간(대표 09-27). 이 시간이 지나거나 이용 시작이 먼저 오면 더는 확정할 수 없고,
+ *  정리 작업(`sweepBookings` → `rent-unconfirmed.ts`)이 결제를 전액 취소해 예약을 환불로 닫는다.
+ *  대표 원문: *「paid 상태에서 시간이 지나면 done 되는 게 문제 같아. 이거는 사장님이 done이나 confirmed를 안 한 거니, refunded로 되어야」*.
+ *  기준 시각은 토스 결제 승인 시각(결제 줄 `approved_at`)이다. 예약 행엔 «결제된 때» 칸이 없다. */
+export const CONFIRM_DEADLINE_HOURS = 48;
+
+/** 확정 기한이 무엇으로 지났나 — `48h` 결제 후 48시간 · `start` 이용 시작. 둘 중 먼저 온 쪽 하나다. */
+export type ConfirmLapse = "48h" | "start";
+
+/** 이용 시작 시각(KST)을 밀리초로. 시각 칸이 빈 옛 예약은 그날 0시다(`bookingStarted`와 같은 물러섬). */
+function kstStartMs(b: Pick<SpaceBooking, "useDate" | "startTime">): number {
+  const [h, m] = (b.startTime || "00:00").split(":").map(Number);
+  const d = b.useDate ?? "";
+  return Date.UTC(+d.slice(0, 4), +d.slice(5, 7) - 1, +d.slice(8, 10), h || 0, m || 0) - 9 * 3_600_000;
+}
+
+/** 결제 완료(`paid`) 예약의 확정 기한이 지났나. 지났으면 먼저 온 쪽, 아니면 null.
+ *  ⭐사장님 확정 관문(`decideBookingAction`)과 정리 작업이 이 한 함수로 본다. 둘이 따로 재면 그 틈에서 «확정했는데 환불»이 난다.
+ *  이용 시작 쪽은 `bookingStarted`와 같은 경계다(시작 시각 그 분부터 지난 것).
+ *  @param approvedAt 결제 승인 시각. 없거나 못 읽으면 48시간 쪽은 안 보고 이용 시작만 본다(모르는 채로 일찍 돌려주지 않는다). */
+export function confirmLapse(
+  b: Pick<SpaceBooking, "useDate" | "startTime">, approvedAt: string | undefined | null, now: Date = new Date(),
+): ConfirmLapse | null {
+  const d = confirmDeadline(b, approvedAt);
+  if (!d || now.getTime() < d.at) return null;
+  return d.by;
+}
+
+/** 확정 기한 그 자체 — 언제(밀리초)와 무엇으로. 정리 작업이 «기한이 먼저 온 예약부터» 돌려줄 때 줄을 세운다.
+ *  둘 다 못 읽으면 null(기한을 모르는 예약은 돌려주지 않는다). */
+export function confirmDeadline(
+  b: Pick<SpaceBooking, "useDate" | "startTime">, approvedAt: string | undefined | null,
+): { at: number; by: ConfirmLapse } | null {
+  const startMs = kstStartMs(b);
+  const approved = approvedAt ? Date.parse(approvedAt) : NaN;
+  const dueMs = Number.isFinite(approved) ? approved + CONFIRM_DEADLINE_HOURS * 3_600_000 : Infinity;
+  const start = Number.isFinite(startMs) ? startMs : Infinity;
+  const at = Math.min(start, dueMs);
+  if (!Number.isFinite(at)) return null;
+  return { at, by: dueMs < start ? "48h" : "start" };
+}
+
 /** 걸린 이유. 화면·승인이 이 코드로 「돈을 되돌릴 일인가 · 만료로 옮길 일인가」를 가른다. */
 export type BookingRuleCode =
   | "closed"        // 공간이 쉬는 중이거나 아직 공개 전

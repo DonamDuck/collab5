@@ -728,6 +728,27 @@ export async function decideBooking(
   return data ? toBooking(data as Row) : null;
 }
 
+/** 🆕09-27 확정 기한이 지난 결제 완료를 정리 작업이 «먼저 잡는다» — `paid` → `rejected`(사장님이 답한 시각은 비워 둔다).
+ *  ⭐사장님 확정(`decideBooking`)과 같은 조건(`status = paid`)을 건 한 문장이라, 둘이 겹치면 먼저 닿은 쪽만 참을 받는다.
+ *    그래서 토스 취소를 부르기 «전»에 잡는다. 잡은 뒤엔 늦게 온 확정이 조건에 걸려 떨어지고, 확정이 먼저였으면 여기서 떨어져 토스를 안 부른다.
+ *    전 순서(취소 → 기록)였으면 그 사이 확정이 끼어 「확정됐는데 돈은 돌아간」 예약이 생긴다(`rent_sync`는 확정에서도 환불로 옮긴다).
+ *  `rejected`에 답한 시각이 없으면 화면·요약이 «자동 취소»로 읽는다(`autoRejected`). 환불이 끝나면 `rent_sync`로 `refunded`,
+ *    실패하면 이 상태 그대로 정산 화면 「손이 필요한 예약」에 남는다(결제 직후 자동 환불 실패와 같은 자리).
+ *  ⚠️예약 칸 하나만 바꾸고 결제 줄은 안 건드려서 `rent_sync`를 안 거친다(`decideBooking`이 거절을 적는 길과 같다).
+ *  🙋환불 신청이 걸린 예약은 잡지 않는다 — 우리가 전화로 확인하는 중이다.
+ *  @returns 참 = 이번에 내가 잡았다 */
+export async function claimUnconfirmedBooking(id: number): Promise<boolean> {
+  if (await rentMockOn()) return false;
+  const c = db();
+  if (!c) return false;
+  const { data, error } = await c.from("space_bookings")
+    .update({ status: "rejected" })
+    .eq("id", id).eq("status", "paid").is("refund_requested_at", null).is("decided_at", null)
+    .select("id");
+  if (error) { console.error(`[spaces] claimUnconfirmedBooking failed id=${id}: ${error.message}`); return false; }
+  return (data ?? []).length === 1;
+}
+
 export async function setBookingStatus(id: number, status: BookingStatus): Promise<void> {
   if (await rentMockOn()) return;
   const c = db();
@@ -773,6 +794,13 @@ export async function markReminded(bookingId: number): Promise<boolean> {
 // ⭐예약과 결제는 두 테이블이고, 두 상태를 바꾸는 문은 DB 함수 `rent_sync` 하나다(대표 09-16).
 //   앱이 두 번 나눠 쓰면 가운데서 끊기는 날 「예약은 취소, 결제는 완료」가 생긴다. 함수 안은 한 트랜잭션이다.
 
+/** 토스 응답 통째(`toss_raw`)에서 취소 사유만. 🩸토스는 취소가 없으면 `cancels: null`을 보낸다 — 배열일 때만 편다. */
+function cancelReasonsOf(raw: unknown): string[] {
+  const cancels = raw && typeof raw === "object" ? (raw as Row).cancels : null;
+  if (!Array.isArray(cancels)) return [];
+  return cancels.map((x) => (x && typeof (x as Row).cancelReason === "string" ? s((x as Row).cancelReason) : "")).filter(Boolean);
+}
+
 function toPayment(r: Row): Payment {
   return {
     id: n(r.id), orderId: s(r.order_id), paymentKey: s(r.payment_key),
@@ -784,6 +812,7 @@ function toPayment(r: Row): Payment {
     status: (s(r.status) || "READY") as PaymentStatus,
     approvedAt: r.approved_at ? s(r.approved_at) : undefined,
     canceledAt: r.canceled_at ? s(r.canceled_at) : undefined,
+    cancelReasons: cancelReasonsOf(r.toss_raw),
     feeRate: typeof r.fee_rate === "number" ? r.fee_rate : Number(r.fee_rate ?? FEE_RATE),
     payoutAmount: n(r.payout_amount),
     payoutStatus: (s(r.payout_status) || "NONE") as PayoutStatus,
@@ -919,27 +948,36 @@ export interface SweepRun {
   /** ② 이용 완료로 넘긴 수 · ③ 지급 대기로 올린 취소 예약 수. */
   done: number;
   keptToPayout: number;
+  /** 🆕09-27 ②' 확정 기한이 지난 결제 완료를 돌려준 결과(`rent-unconfirmed.ts`). 읽기가 실패했으면 null. */
+  unconfirmed: import("./rent-unconfirmed").UnconfirmedRun | null;
 }
 
 /** 페이지를 열 때 토스에 물어볼 최대 수. 크론은 더 크게 넘긴다(`/api/cron/rent-remind`). */
 export const SWEEP_PAGE_TOSS_LOOKUPS = 3;
+/** 🆕09-27 페이지를 열 때 ②'에서 토스 취소를 부를 최대 수. 크론은 더 크게 넘긴다(①의 되묻기 한도와 따로 센다). */
+export const SWEEP_PAGE_TOSS_REFUNDS = 3;
 
 /** 🧹시간이 흘러서 바뀌어야 하는 것들을 한 번에 옮긴다. `/rent/my`·신청 내역·정산 화면이 열릴 때, 그리고
  *  🆕09-27 D7 매일 아침 크론이 요약을 세기 «전»에 부른다(전엔 사람이 화면을 열어야만 돌았다).
  *  셋 다 조건절이 «지금 상태»를 보므로 두 번 불려도 같은 결과다(멱등). 페이지와 크론이 겹쳐 돌아도 된다.
  *  ① 결제창만 열고 30분 지난 신청 → 예약 expired · 결제 EXPIRED (토스 결제 유효 시간이 30분)
  *     🆕09-27 D4 — 결제를 시도한 흔적이 있으면 닫기 전에 토스에 되묻는다. 돈이 빠져 있으면 전액 환불(`rent-recover.ts`).
- *  ② 끝난 확정 예약 → 예약 done · 지급 WAITING
+ *  ② 끝난 «확정» 예약 → 예약 done · 지급 WAITING
+ *  ②' 🆕09-27 확정 기한(결제 후 48시간·이용 시작 중 먼저 온 쪽)이 지난 결제 완료 → 결제 전액 취소 · 예약 refunded(`rent-unconfirmed.ts`)
  *  ③ 이용일이 지난 «취소» 예약인데 환불하고 남은 돈이 있는 것 → 지급 WAITING
  *     당일 취소(환불 0원)와 부분 환불이 여기 온다. 약관 제8조 「환불되지 않은 금액은 정산 시 지급」.
- *  @param opts.tossLookups ①에서 이번에 토스에 물어볼 최대 수(기본 = 페이지용 `SWEEP_PAGE_TOSS_LOOKUPS`). */
-export async function sweepBookings(opts: { tossLookups?: number } = {}): Promise<SweepRun | null> {
+ *  @param opts.tossLookups ①에서 이번에 토스에 물어볼 최대 수(기본 = 페이지용 `SWEEP_PAGE_TOSS_LOOKUPS`).
+ *  @param opts.tossRefunds ②'에서 이번에 토스 취소를 부를 최대 수(기본 = 페이지용 `SWEEP_PAGE_TOSS_REFUNDS`).
+ *  @param opts.now ②'의 기한 판정 시각. 시험이 넘긴다(기본 = 지금). */
+export async function sweepBookings(
+  opts: { tossLookups?: number; tossRefunds?: number; now?: Date } = {},
+): Promise<SweepRun | null> {
   // 🧪목 모드에선 옮기지 않는다 — 이 함수는 «쓰기»다. 목 세계의 상태는 케이스가 정한 그대로 보여야 한다.
   if (await rentMockOn()) return null;
   const c = db();
   if (!c) return null;
   const today = todayKst();
-  const run: SweepRun = { stale: null, done: 0, keptToPayout: 0 };
+  const run: SweepRun = { stale: null, done: 0, keptToPayout: 0, unconfirmed: null };
 
   // ①
   const cutoff = new Date(Date.now() - 30 * 60_000).toISOString();
@@ -975,19 +1013,59 @@ export async function sweepBookings(opts: { tossLookups?: number } = {}): Promis
     }
   }
 
-  // ② 👀phase 1(대표 09-16) — 결제 완료(paid)도 확정처럼 본다. 손님은 결제하는 순간 「예약 완료」를 봤고
-  //   사장님이 수락을 안 눌렀을 수 있다. 안 넘기면 다녀간 예약이 정산에 영영 안 올라간다.
-  //   실제 지급은 아직 사람이 보고 보내므로(지급대행 계약 전) 잘못 나갈 일은 없다.
+  // ② 끝난 «확정» 예약만 이용 완료로 넘긴다.
+  //   🔁09-27 대표 — 전엔 결제 완료(paid)도 확정처럼 봐서 이용이 끝나면 done + 지급 대기로 넘겼다(phase 1, 09-16).
+  //     사장님이 확정을 한 번도 안 눌러도 사장님께 정산됐다. 대표 원문: *「이거는 사장님이 done이나 confirmed를 안 한 거니,
+  //     refunded로 되어야 되는 거지」*. 이제 확정 완료가 진짜 예약의 확정이다. 결제 완료는 ②'에서 기한이 지나면 돌려준다.
   //   🙋사장님이 «관리자에게 환불 신청»한 예약은 건너뛴다 — 우리가 전화로 확인하는 중이다.
   //   🧾09-27 D5 — 손님이 취소했는데 환불을 확인하지 못한 예약(`refund_unconfirmed_at`)도 건너뛴다. 돈이 돌아갔는지 모르는데
   //     이용 완료로 넘기면 그 돈이 사장님 지급 대기로 올라간다. ⚠️칸을 조건절에 안 쓰고 `*`로 읽어 코드에서 거른다 —
   //     SQL 전 DB엔 칸이 없어 조건절에 쓰면 조회가 통째로 실패한다(그땐 표시된 예약도 없다).
   const { data: conf } = await c.from("space_bookings").select("*")
-    .in("status", ["confirmed", "paid"]).is("refund_requested_at", null).lte("use_date", today);
+    .eq("status", "confirmed").is("refund_requested_at", null).lte("use_date", today);
   for (const r of conf ?? []) {
     if ((r as Row).refund_unconfirmed_at) continue;
     if (!bookingFinished({ useDate: s(r.use_date), endTime: s(r.end_time).slice(0, 5) })) continue;
     if ((await rentSync(s(r.order_id), { bookingStatus: "done", payoutStatus: "WAITING" })).ok) run.done += 1;
+  }
+
+  // ②' 🆕09-27 확정 기한이 지난 결제 완료 → 전액 환불(대표 09-27). 기한 = 결제 승인 후 48시간과 이용 시작 중 먼저 온 쪽.
+  //   결제 완료는 앞으로 올 예약도 많아서 날짜로 거르지 않는다(48시간 쪽은 이용일과 상관없이 온다). 그래도 사장님 답을 기다리는
+  //   예약만이라 수가 적다. 결제 승인 시각은 결제 줄에 있어 100건씩 끊어 같이 읽는다(①과 같다).
+  //   🙋환불 신청 중인 예약 · 🧾환불을 확인하지 못한 예약은 ②와 같은 이유로 건너뛴다(칸을 코드에서 거르는 것도 같다).
+  //   ⚠️결제 줄을 못 읽으면 이번엔 통째로 건너뛴다. 승인 시각을 모르면 48시간 쪽을 못 잰다.
+  const { data: waiting, error: waitingError } = await c.from("space_bookings").select("*")
+    .eq("status", "paid").is("refund_requested_at", null);
+  if (waitingError) console.error(`[spaces] sweep ②' failed: ${waitingError.message}`);
+  const waitRows = ((waiting ?? []) as Row[]).filter((r) => !r.refund_unconfirmed_at);
+  if (!waitingError && waitRows.length === 0) {
+    run.unconfirmed = { due: 0, refunded: 0, refundFailed: 0, skipped: 0, deferred: 0 };
+  } else if (waitRows.length > 0) {
+    const orders = waitRows.map((r) => s(r.order_id)).filter(Boolean);
+    const pays: Row[] = [];
+    let payError: { message: string } | null = null;
+    for (let i = 0; i < orders.length && !payError; i += 100) {
+      const got = await c.from("payments").select("order_id,status,payment_key,amount,balance_amount,approved_at").in("order_id", orders.slice(i, i + 100));
+      if (got.error) payError = got.error;
+      else pays.push(...((got.data ?? []) as Row[]));
+    }
+    if (payError) {
+      console.error(`[spaces] sweep ②' 결제 줄 읽기 실패 — 이번엔 돌려주지 않는다: ${payError.message}`);
+    } else {
+      const byOrder = new Map(pays.map((p) => [s(p.order_id), p]));
+      const rows = waitRows.map((r) => {
+        const p = byOrder.get(s(r.order_id));
+        return {
+          bookingId: n(r.id), orderId: s(r.order_id), useDate: s(r.use_date), startTime: s(r.start_time).slice(0, 5),
+          approvedAt: p && p.approved_at ? s(p.approved_at) : undefined,
+          payStatus: p ? s(p.status) : "", payKey: p ? s(p.payment_key) : "",
+          amount: p ? n(p.amount) : 0, balance: p ? n(p.balance_amount) : 0,
+        };
+      });
+      // 🔁토스·알림을 부르는 층이라 파일을 따로 뒀다(①의 `rent-recover.ts`와 같은 이유로 부를 때 가져온다).
+      const { refundUnconfirmedPaid } = await import("./rent-unconfirmed");
+      run.unconfirmed = await refundUnconfirmedPaid(rows, { refunds: opts.tossRefunds ?? SWEEP_PAGE_TOSS_REFUNDS, now: opts.now });
+    }
   }
 
   // ③
