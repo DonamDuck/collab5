@@ -812,7 +812,8 @@ export function SpaceForm({
             className={rentInputCls}
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="예) 을지로 2층 작업실"
+            // 🔁09-27 대표 코멘트 #163 — 예시를 둘로(대표 메모 「을지로 2층 작업실, collab5 카페 등」). 옆 칸들처럼 「예)」로 연다.
+            placeholder="예) 을지로 2층 작업실, collab5 카페"
           />
           {renamedNow && <ReviewAgainNote what="이름" listed={listedNow} />}
         </L>
