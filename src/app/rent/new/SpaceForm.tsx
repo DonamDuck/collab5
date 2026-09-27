@@ -26,7 +26,7 @@ import type { Space, SpaceUseType, SpaceCategory, OpenSlot, AccessHow, RepeatRul
 import { durationLabel, expandRepeat, minutesBetween, RENT_MIN_MINUTES, stripRepeat, todayKst } from "@/lib/rent-time";
 import { payoutAmount } from "@/lib/rent-money";
 import { coffeeChatFree } from "@/lib/rent-products";
-import { CONTACT_PHONE_MAX, storePhoneOk } from "@/lib/rent-limits";
+import { CONTACT_PHONE_MAX, joinSpaceAbout, SPACE_ABOUT_MIN, storePhoneOk } from "@/lib/rent-limits";
 import { josaRo } from "@/lib/josa";
 import {
   addressMoved,
@@ -142,7 +142,8 @@ const draftKeyOf = (uid: number) => `collab5:rent-new-draft:u${uid}`;
 interface SpaceDraft {
   name: string; category: SpaceCategory; body: string; photos: string[];
   addrBase: string; addrDetail: string; contactPhone: string; accessHow: AccessHow;
-  facilities: string[]; facilitiesNote: string; capacity: string; rules: string;
+  /** 🔻09-27 #164 — `facilitiesNote` 칸이 없어졌다(시설 안내 글은 `body` 한 칸). 그 전 초안의 값은 읽을 때 `body`에 잇는다. */
+  facilities: string[]; capacity: string; rules: string;
   spaceOn: boolean; spacePrice: number; spaceNote: string;
   fullOn: boolean; fullPrice: number; fullNote: string;
   chatOn: boolean; chatMin: string; chatPrice: number; chatTopics: string;
@@ -202,7 +203,9 @@ export function SpaceForm({
   //   🆕넣은 것: 업종/범위 · 시간당 값 · 최소 대여 시간 · 시간대 달력 · 커피챗 · 안내 방식 · 매장 전화 · 호스트 약관
   const [name, setName] = useState(initial?.name ?? defaultName);
   const [category, setCategory] = useState<SpaceCategory>(initial?.category ?? "");
-  const [body, setBody] = useState(initial?.body ?? "");
+  /** 📝공간 설명 한 칸(대표 09-27 #164 — 「공간 소개」를 지우고 시설 안내와 합쳤다). 저장은 `body` 칼럼이다.
+   *  옛 공간은 두 칼럼(`body` · `facilitiesNote`)이 다 차 있을 수 있어서, 고치기로 열면 둘을 이어 한 칸에 보여 준다(`joinSpaceAbout`). */
+  const [body, setBody] = useState(() => joinSpaceAbout(initial?.body ?? "", initial?.facilitiesNote ?? ""));
   const [photos, setPhotos] = useState<Photo[]>((initial?.photos ?? []).map((url) => ({ url })));
   const [addrBase, setAddrBase] = useState(() => splitAddress(initial?.address ?? "")[0]);
   const [addrDetail, setAddrDetail] = useState(() => splitAddress(initial?.address ?? "")[1]);
@@ -211,7 +214,6 @@ export function SpaceForm({
   // 🔻09-16 화면에서 안 묻는다(범위 축과 중복). 저장할 때 기존 값을 그대로 넘겨 옛 데이터를 지킨다.
   const useType: SpaceUseType = initial?.useType ?? "both";
   const [facilities, setFacilities] = useState<string[]>(initial?.facilities ?? []);
-  const [facilitiesNote, setFacilitiesNote] = useState(initial?.facilitiesNote ?? "");
   const [facilityInput, setFacilityInput] = useState("");
   const [capacity, setCapacity] = useState(initial?.capacity ? String(initial.capacity) : "");
   const [rules, setRules] = useState(initial?.rules ?? "");
@@ -319,7 +321,7 @@ export function SpaceForm({
   const [blank] = useState<SpaceDraft>(() => ({
     name: defaultName, category: "", body: "", photos: [],
     addrBase: "", addrDetail: "", contactPhone: defaultPhone, accessHow: "sms",
-    facilities: [], facilitiesNote: "", capacity: "", rules: "",
+    facilities: [], capacity: "", rules: "",
     // 🔁09-20 #119 — 「대관만」이 기본으로 켜진 첫 모습(위 `spaceOn` 주석).
     spaceOn: true, spacePrice: 0, spaceNote: "", fullOn: false, fullPrice: 0, fullNote: "",
     chatOn: false, chatMin: "60", chatPrice: 0, chatTopics: "", chatFree: false,
@@ -336,7 +338,7 @@ export function SpaceForm({
     setName(d.name); setCategory(d.category); setBody(d.body);
     setPhotos(d.photos.map((url) => ({ url })));
     setAddrBase(d.addrBase); setAddrDetail(d.addrDetail); setContactPhone(d.contactPhone); setAccessHow(d.accessHow);
-    setFacilities(d.facilities); setFacilitiesNote(d.facilitiesNote); setCapacity(d.capacity); setRules(d.rules);
+    setFacilities(d.facilities); setCapacity(d.capacity); setRules(d.rules);
     setSpaceOn(!!d.spaceOn); setSpacePrice(Number(d.spacePrice) || 0); setSpaceNote(d.spaceNote ?? "");
     setFullOn(!!d.fullOn); setFullPrice(Number(d.fullPrice) || 0); setFullNote(d.fullNote ?? "");
     setChatOn(d.chatOn); setChatMin(d.chatMin); setChatPrice(d.chatPrice); setChatTopics(d.chatTopics); setChatFree(!!d.chatFree);
@@ -355,10 +357,13 @@ export function SpaceForm({
     if (!draftKey) return;
     try {
       const raw = localStorage.getItem(draftKey);
-      const env = raw ? (JSON.parse(raw) as { v?: number; data?: Partial<SpaceDraft> & DraftV1Extra }) : null;
+      const env = raw ? (JSON.parse(raw) as { v?: number; data?: Partial<SpaceDraft> & DraftV1Extra & DraftOldNote }) : null;
       if ((env?.v === DRAFT_VERSION || env?.v === 1) && env.data && typeof env.data === "object") {
         // 모양이 어긋난 칸은 빈 모습으로 메운다. 초안 하나 때문에 폼이 안 뜨면 안 된다.
-        const d = { ...blank, ...(env.v === 1 ? draftFromV1(env.data) : env.data) } as SpaceDraft;
+        const { facilitiesNote: oldNote, ...data } = env.data;
+        const d = { ...blank, ...(env.v === 1 ? draftFromV1(data) : data) } as SpaceDraft;
+        // 📝09-27 #164 — 칸이 둘이던 때의 초안이면 시설 안내 글을 공간 설명 뒤에 잇는다(고치기 화면과 같은 규칙).
+        d.body = joinSpaceAbout(typeof d.body === "string" ? d.body : "", typeof oldNote === "string" ? oldNote : "");
         if (!Array.isArray(d.photos)) d.photos = [];
         d.photos = d.photos.filter((u) => typeof u === "string" && /^https?:\/\//.test(u));
         if (!Array.isArray(d.facilities)) d.facilities = [];
@@ -386,7 +391,7 @@ export function SpaceForm({
     // 주소가 http(s)인 사진만. 저장소 없는 로컬에선 사진이 data URL로 와서 한 장이 저장소 한도를 넘긴다.
     name, category, body, photos: readyPhotosOf(photos).filter((u) => /^https?:\/\//.test(u)),
     addrBase, addrDetail, contactPhone, accessHow,
-    facilities, facilitiesNote, capacity, rules,
+    facilities, capacity, rules,
     spaceOn, spacePrice, spaceNote, fullOn, fullPrice, fullNote,
     chatOn, chatMin, chatPrice, chatTopics, chatFree,
     openSlots, repeatWeekly,
@@ -604,6 +609,8 @@ export function SpaceForm({
     if (!name.trim()) return ["name", SPACE_FORM_MSG.name];
     if (!category) return ["category", "공간 타입을 골라 주세요."];
     if (readyPhotos.length === 0) return ["photos", "사진을 한 장 이상 올려 주세요. 사진 없는 공간은 아무도 안 빌려요."];
+    // 🔁09-27 대표 #164 — 시설·공간 절이 2단계로 올라왔다(위치·연락처 절보다 먼저). 막는 순서도 화면 순서다(H-21과 같은 이유).
+    if (body.trim().length < SPACE_ABOUT_MIN) return ["about", SPACE_FORM_MSG.about];
     if (!addrBase.trim()) return ["address", "주소를 찾아 주세요."];
     if (!contactPhone.trim()) return ["phone", SPACE_FORM_MSG.phoneEmpty];
     // ✂️09-18 밤 QA(SEC-07) — 서버(`saveSpaceAction`)와 같은 함수. 숫자만 세어 전화번호 모양인지 본다.
@@ -692,7 +699,6 @@ export function SpaceForm({
         category,
         useType,
         facilities: facilitiesFinal,
-        facilitiesNote,
         capacity: capacity ? Number(capacity) : undefined,
         rules: rulesFinal,
         rentSpaceOn: spaceOn,
@@ -812,7 +818,8 @@ export function SpaceForm({
             className={rentInputCls}
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="예) 을지로 2층 작업실"
+            // 🔁09-27 대표 코멘트 #163 — 예시를 둘로(대표 메모 「을지로 2층 작업실, collab5 카페 등」). 옆 칸들처럼 「예)」로 연다.
+            placeholder="예) 을지로 2층 작업실, collab5 카페"
           />
           {renamedNow && <ReviewAgainNote what="이름" listed={listedNow} />}
         </L>
@@ -834,25 +841,10 @@ export function SpaceForm({
             ))}
           </RentSelect>
         </L>
-        {/* 🔁09-20 대표 코멘트 #125 — *「가격 설정할 때 시설 설명이 나오는데, 공간 소개에 미리 다 써 버릴까 걱정…
-            중복으로 쓰게끔 하는 헷갈리는 UX를 피해 보고 싶어」*.
-            ⭐두 칸이 겹치는 이유는 둘 다 「공간을 설명하라」고만 말해서였다. 축을 갈랐다 —
-              여기는 «어떤 곳인지»(분위기), 아래 대여 타입의 설명 칸은 «무엇을 쓸 수 있는지»(시설·장비).
-            🔗한쪽만 좁히면 사장님은 시설을 어디에 적을지 모른다. 두 자리가 서로를 가리키게 적는다. */}
-        <L
-          label="공간을 간단히 소개해 주세요"
-          htmlFor="sp-body"
-          hint="어떤 분위기의 어떤 공간인지 두세 문장이면 충분해요. 쓸 수 있는 시설과 장비는 아래 대여 타입에서 따로 적어요."
-        >
-          <textarea
-            id="sp-body"
-            rows={5}
-            className={`${rentTextareaCls} resize-y`}
-            value={body}
-            onChange={(e) => setBody(e.target.value)}
-            placeholder="어떤 사람들이 여기서 무엇을 했는지, 어떤 날에 제일 예쁜지 같은 이야기를 적어 주세요."
-          />
-        </L>
+        {/* 🔻09-27 대표 코멘트 #164 — 「공간을 간단히 소개해 주세요」(`sp-body`) 칸을 지웠다.
+            대표: *「아무래도 안 되겠어. 이 섹션 삭제하고 하단의 시설 안내와 합치자」*.
+            09-20 #125에 두 칸의 축을 갈라 봤지만(여기는 분위기, 아래는 시설) 사장님 쪽에서 같은 걸 두 번 묻는 칸으로 읽혔다.
+            글은 2단계 「공간 및 시설 사용에 대해 설명해 주세요.」 한 칸이 받고, 저장 칼럼은 그대로 `body`다(`joinSpaceAbout`). */}
         {/* 📸09-17 QA — 몇 장·어떤 사진이 좋은지 힌트가 없어 사장님은 예쁜 창가만 올렸다. 손님이 정할 때 보는 건 자리와 화장실이다. */}
         <L
           label="사진"
@@ -875,6 +867,105 @@ export function SpaceForm({
             onReorder={movePhoto}
           />
         </L>
+      </Group>
+
+      {/* ── 어떻게 쓰나 ── 🔁09-27 대표 코멘트 #164 — 3/8 → 2/8. 대표: *「3/8과 2/8의 위치를 아예 바꾸자. 공간 정보 입력을 먼저 하게」*.
+           이름·사진 바로 다음에 공간과 시설을 적고, 위치·연락처는 그다음이다. 번호·목차·막는 순서는 `FORM_STEPS`와 `blocker`가 같이 따른다. */}
+      {/* 🔁09-19 대표 코멘트 #81 — 「공간 안내」 → 묻는 말로(다른 절 제목들과 같은 결). 🔁09-27 대표 C4 — 무엇을 알려 줄지까지. */}
+      <Group title="사용 가능한 시설과 공간에 대해 알려 주세요">
+        {/* 🔻09-16 대표 — 「쓰임새」(원래 목적대로 / 대관) 칸 삭제. *「위에 대관, 대관+시설이 있는 거 같아
+            이건 제거해도 될 듯, 중복처럼 보여」*. 맞다 — 09-16에 만든 «범위» 축이 같은 것을 더 정확히 말한다.
+            ⚠️`useType`은 DB와 타입에 남아 있고 저장할 때 기존 값을 그대로 넘긴다(옛 데이터가 안 깨지게). */}
+        <L label="쓸 수 있는 시설" optional hint="손님이 이걸 보고 고르세요. 누르면 담겨요.">
+          <div className="flex flex-wrap gap-2">
+            {facilityPool.map((f) => {
+              const on = facilities.includes(f);
+              return (
+                <button
+                  key={f}
+                  type="button"
+                  aria-pressed={on}
+                  onClick={() => setFacilities((p) => (on ? p.filter((x) => x !== f) : [...p, f]))}
+                  className={pickCls(on)}
+                >
+                  {f}
+                  {on && <span className="ml-1.5 text-primary-on/60">×</span>}
+                </button>
+              );
+            })}
+          </div>
+          <div className="mt-3 flex gap-2">
+            <input
+              className={`${rentInputCls} min-w-0`}
+              value={facilityInput}
+              onChange={(e) => setFacilityInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  // 폼 제출로 새지 않게 막는다 — 이 화면의 제출은 맨 아래 버튼 하나뿐이다.
+                  e.preventDefault();
+                  addFacility();
+                }
+              }}
+              placeholder="목록에 없으면 직접 적어 주세요"
+              aria-label="설비 직접 적기"
+            />
+            <button type="button" onClick={addFacility} className={`${secondaryBtnCls} h-[48px] shrink-0`}>
+              담기
+            </button>
+          </div>
+        </L>
+
+        {/* 📝줄글 = **읽는 것**. 대표 09-14: *「줄글은 시설 안내, multi text input으로 등록할 때 등록하게」*.
+            ⭐태그로는 「빔프로젝터 있음」까지만 말할 수 있고 「HDMI 케이블은 없어서 가져오셔야 해요」는
+              여기라야 한다. 둘은 대체재가 아니라 층이 다르다.
+            🔁09-27 대표 코멘트 #164 — 1단계의 「공간을 간단히 소개해 주세요」를 이 칸에 합쳤다. 선택 → **필수**(유의 사항과 같은 10자),
+              라벨은 대표 문장 그대로(띄어쓰기만). 이제 이 공간의 설명 글은 이 칸 하나라 `body`로 저장된다(상세 「공간 소개」 절).
+              옛 공간은 두 칼럼을 이어 보여 준다(`joinSpaceAbout`). 막는 말은 서버와 한 벌(`SPACE_FORM_MSG.about`). */}
+        <L
+          label="공간 및 시설 사용에 대해 설명해 주세요."
+          htmlFor="sp-about"
+          anchor="about"
+          error={fieldErr("about")}
+          hint="어떤 공간인지와 시설 쓰는 법, 조심할 것, 없는 것을 적어 주세요. 공간 화면에 소개 글로 보여요."
+        >
+          <textarea
+            id="sp-about"
+            rows={5}
+            className={`${rentTextareaCls} resize-y`}
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+            placeholder={"예) 을지로 골목 2층의 작은 작업실이에요. 오후엔 창으로 빛이 잘 들어요.\n빔프로젝터는 있는데 HDMI 케이블은 없어요. 음향은 블루투스로 연결하시면 돼요."}
+          />
+        </L>
+
+        {/* 🔁09-17 QA — 「수용이 가능한가요」「숫자를 입력해주세요」가 이 폼에서 드문 행정어였고, 자리글은 폰에서 잘렸다. */}
+        {/* 🔁09-19 대표 코멘트 #80 */}
+        <L label="공간에 몇 명까지 들어올 수 있나요?" htmlFor="sp-cap" optional>
+          {/* 🔁09-14 대표 — *「숫자 input으로 바꾸고 input 옆에 「명」으로 default로 넣어주라」*.
+              단위를 칸 «안»에 박는다. 밖에 두면 좁은 화면에서 줄이 바뀌어 떨어진다(신청 폼과 같은 처리). */}
+          <div className="relative w-[200px]">
+            <input
+              id="sp-cap"
+              type="number"
+              inputMode="numeric"
+              min={1}
+              className={`${rentInputCls} pr-11`}
+              value={capacity}
+              onChange={(e) => setCapacity(e.target.value)}
+              placeholder="예) 8"
+            />
+            <span
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-[16px] text-mute"
+            >
+              명
+            </span>
+          </div>
+        </L>
+
+        {/* 🔻09-16 「이용 가능 시간」(공간 전체에 한 줄) 삭제.
+            ⭐시간 단위로 바뀌면서 **날마다 다른 시간**을 열 수 있어야 한다 — 그건 아래 「어느 날·몇 시」
+              달력이 맡는다. 한 줄짜리 공통 시간은 날마다 다른 가게를 표현하지 못했다. */}
       </Group>
 
       {/* ── 어디에 있나 ── 🔁09-27 대표 A11 — 「어디에 있나요」 → 「공간 위치와 연락처를 적어 주세요」. */}
@@ -958,99 +1049,6 @@ export function SpaceForm({
             ))}
           </div>
         </L>
-      </Group>
-
-      {/* ── 어떻게 쓰나 ── */}
-      {/* 🔁09-19 대표 코멘트 #81 — 「공간 안내」 → 묻는 말로(다른 절 제목들과 같은 결). 🔁09-27 대표 C4 — 무엇을 알려 줄지까지. */}
-      <Group title="사용 가능한 시설과 공간에 대해 알려 주세요">
-        {/* 🔻09-16 대표 — 「쓰임새」(원래 목적대로 / 대관) 칸 삭제. *「위에 대관, 대관+시설이 있는 거 같아
-            이건 제거해도 될 듯, 중복처럼 보여」*. 맞다 — 09-16에 만든 «범위» 축이 같은 것을 더 정확히 말한다.
-            ⚠️`useType`은 DB와 타입에 남아 있고 저장할 때 기존 값을 그대로 넘긴다(옛 데이터가 안 깨지게). */}
-        <L label="쓸 수 있는 시설" optional hint="손님이 이걸 보고 고르세요. 누르면 담겨요.">
-          <div className="flex flex-wrap gap-2">
-            {facilityPool.map((f) => {
-              const on = facilities.includes(f);
-              return (
-                <button
-                  key={f}
-                  type="button"
-                  aria-pressed={on}
-                  onClick={() => setFacilities((p) => (on ? p.filter((x) => x !== f) : [...p, f]))}
-                  className={pickCls(on)}
-                >
-                  {f}
-                  {on && <span className="ml-1.5 text-primary-on/60">×</span>}
-                </button>
-              );
-            })}
-          </div>
-          <div className="mt-3 flex gap-2">
-            <input
-              className={`${rentInputCls} min-w-0`}
-              value={facilityInput}
-              onChange={(e) => setFacilityInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  // 폼 제출로 새지 않게 막는다 — 이 화면의 제출은 맨 아래 버튼 하나뿐이다.
-                  e.preventDefault();
-                  addFacility();
-                }
-              }}
-              placeholder="목록에 없으면 직접 적어 주세요"
-              aria-label="설비 직접 적기"
-            />
-            <button type="button" onClick={addFacility} className={`${secondaryBtnCls} h-[48px] shrink-0`}>
-              담기
-            </button>
-          </div>
-        </L>
-
-        {/* 📝줄글 = **읽는 것**. 대표 09-14: *「줄글은 시설 안내, multi text input으로 등록할 때 등록하게」*.
-            ⭐태그로는 「빔프로젝터 있음」까지만 말할 수 있고 「HDMI 케이블은 없어서 가져오셔야 해요」는
-              여기라야 한다. 둘은 대체재가 아니라 층이 다르다. */}
-        <L
-          label="시설 안내"
-          htmlFor="sp-facnote"
-          optional
-          hint="태그로 못 담는 말을 적어 주세요. 쓰는 법, 조심할 것, 없는 것 같은 것들이요."
-        >
-          <textarea
-            id="sp-facnote"
-            className={`${rentTextareaCls} min-h-[110px]`}
-            value={facilitiesNote}
-            onChange={(e) => setFacilitiesNote(e.target.value)}
-            placeholder="예) 빔프로젝터는 있는데 HDMI 케이블은 없어요. 음향은 블루투스로 연결하시면 돼요."
-          />
-        </L>
-
-        {/* 🔁09-17 QA — 「수용이 가능한가요」「숫자를 입력해주세요」가 이 폼에서 드문 행정어였고, 자리글은 폰에서 잘렸다. */}
-        {/* 🔁09-19 대표 코멘트 #80 */}
-        <L label="공간에 몇 명까지 들어올 수 있나요?" htmlFor="sp-cap" optional>
-          {/* 🔁09-14 대표 — *「숫자 input으로 바꾸고 input 옆에 「명」으로 default로 넣어주라」*.
-              단위를 칸 «안»에 박는다. 밖에 두면 좁은 화면에서 줄이 바뀌어 떨어진다(신청 폼과 같은 처리). */}
-          <div className="relative w-[200px]">
-            <input
-              id="sp-cap"
-              type="number"
-              inputMode="numeric"
-              min={1}
-              className={`${rentInputCls} pr-11`}
-              value={capacity}
-              onChange={(e) => setCapacity(e.target.value)}
-              placeholder="예) 8"
-            />
-            <span
-              aria-hidden="true"
-              className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-[16px] text-mute"
-            >
-              명
-            </span>
-          </div>
-        </L>
-
-        {/* 🔻09-16 「이용 가능 시간」(공간 전체에 한 줄) 삭제.
-            ⭐시간 단위로 바뀌면서 **날마다 다른 시간**을 열 수 있어야 한다 — 그건 아래 「어느 날·몇 시」
-              달력이 맡는다. 한 줄짜리 공통 시간은 날마다 다른 가게를 표현하지 못했다. */}
       </Group>
 
       {/* ── 사용 유의 사항 ── ⭐이 서비스에서 제일 중요한 칸.
@@ -1173,7 +1171,8 @@ export function SpaceForm({
             // 🔁09-20 대표 코멘트 #123·#124 — 라벨과 도움말을 대표 문안으로. 뒤 한 문장은 #125(겹쳐 쓰지 않게 위를 가리킨다).
             noteLabel="대여한 날 사용할 수 있는 것들을 알려 주세요"
             // 🔁09-27 대표 C6 — 한 카드 안에서 «빌리는 분»과 «손님»이 섞였다. 사장님 화면은 «손님» 한 벌.
-            noteHint="손님이 미리 확인할 수 있도록 이용 가능한 시설과 공간을 알려 주세요. 공간 분위기는 위 「공간 소개」에 적으셨으니 여기서는 빼셔도 돼요."
+            // 🔁09-27 #164 — 뒤 문장이 가리키던 「공간 소개」 칸이 없어졌다. 합친 칸(공간·시설 절의 설명)을 가리키게만 고쳤다.
+            noteHint="손님이 미리 확인할 수 있도록 이용 가능한 시설과 공간을 알려 주세요. 위 공간 설명에 이미 적으신 건 여기서 빼셔도 돼요."
             feeRate={feeRate}
             payout={payoutOf(spacePrice)}
             priceErr={fieldErr("spacePrice")}
@@ -1198,7 +1197,7 @@ export function SpaceForm({
             notePlaceholder={PRODUCT_NOTE_PLACEHOLDER.full}
             noteLabel="대여한 날 사용할 수 있는 것들을 알려 주세요"
             // 🔗09-20 #125 — 대관만 쪽과 같은 뜻을 다른 결로. 두 카드가 같은 문장으로 끝나면 그 자체가 한 금형으로 읽힌다.
-            noteHint="기계 쓰는 법을 알려 주시는지, 손님이 챙겨 올 재료가 있는지도 같이 담아 주세요. 위 「공간 소개」와 겹치는 이야기는 안 적으셔도 괜찮아요."
+            noteHint="기계 쓰는 법을 알려 주시는지, 손님이 챙겨 올 재료가 있는지도 같이 담아 주세요. 위에 적으신 공간·시설 설명과 겹치는 이야기는 안 적으셔도 괜찮아요."
             feeRate={feeRate}
             payout={payoutOf(fullPrice)}
             priceErr={fieldErr("fullPrice")}
@@ -1876,6 +1875,11 @@ interface DraftV1Extra {
   priceHour?: number;
 }
 
+/** 💾09-27 #164 전 초안의 시설 안내 칸. 읽을 때 `body`에 잇고 버린다(v1·v2 둘 다 이 칸이 있다). */
+interface DraftOldNote {
+  facilitiesNote?: string;
+}
+
 /** v1 → v2. 범위가 «공간만»이면 대관만, 그 밖이면 공간 전체를 켜고 옛 값을 옮긴다(SQL의 채우기 규칙과 같다). */
 function draftFromV1(d: Partial<SpaceDraft> & DraftV1Extra): Partial<SpaceDraft> {
   const { scope, priceHour, ...rest } = d;
@@ -1893,9 +1897,10 @@ function draftFromV1(d: Partial<SpaceDraft> & DraftV1Extra): Partial<SpaceDraft>
 const FORM_STEPS = [
   // 🔁09-27 대표 A11
   "공간 이름과 사진을 올려 주세요",
-  "공간 위치와 연락처를 적어 주세요",
   // 🔁09-19 대표 코멘트 #81·#82·#86 · 🔁09-27 대표 C4
+  // 🔁09-27 대표 #164 — 3번째에서 2번째로(위치·연락처와 자리를 맞바꿨다). 「공간 정보 입력을 먼저 하게」.
   "사용 가능한 시설과 공간에 대해 알려 주세요",
+  "공간 위치와 연락처를 적어 주세요",
   "사용 시 유의 사항을 알려 주세요",
   // 🔁09-18 「얼마에 빌려주실까요」 → 상품 셋(대표).
   "대여 타입을 선택해 주세요",

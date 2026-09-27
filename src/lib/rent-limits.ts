@@ -42,3 +42,19 @@ export function storePhoneOk(v: string): boolean {
   const d = (v ?? "").replace(/\D/g, "");
   return /^0\d{8,11}$/.test(d) || /^1[5-9]\d{6}$/.test(d);
 }
+
+/** 📝공간 설명 칸의 최소 글자 수(대표 09-27 #164: 「하단 시설 안내는 필수로」). 유의 사항·상품 설명 칸과 같은 10자다. */
+export const SPACE_ABOUT_MIN = 10;
+
+/** 📝공간 설명 한 칸 = 옛 두 칸(`body` 소개 + `facilities_note` 시설 안내)을 합친 글(대표 09-27 #164).
+ *  대표: 「이 섹션 삭제하고 하단의 시설 안내와 합치자」. 등록 폼엔 이제 칸이 하나고, 저장은 `body` 한 칼럼이다.
+ *  ⭐옛 공간(두 칸이 다 찬 공간)을 고치기로 열면 둘을 빈 줄 하나로 이어 보여 주고, 저장하면 이 글이 `body`로 가고 `facilities_note`는 빈다.
+ *    저장 전엔 DB를 안 건드리니 상세 화면은 지금처럼 두 절(공간 소개 · 공간·시설 안내)로 보인다.
+ *  ⚠️서버(`saveSpaceAction`)도 이 함수를 지난다. 배포 전에 열어 둔 옛 탭이 두 칸을 따로 보내 와도 시설 안내 글이 사라지지 않게.
+ *  같은 글이 두 칸에 똑같이 있으면 한 번만 싣는다. */
+export function joinSpaceAbout(body: string, facilitiesNote: string): string {
+  const a = (body ?? "").trim();
+  const b = (facilitiesNote ?? "").trim();
+  if (!b || a === b) return a;
+  return a ? `${a}\n\n${b}` : b;
+}

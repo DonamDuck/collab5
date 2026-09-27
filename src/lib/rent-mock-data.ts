@@ -312,6 +312,7 @@ function fullWorld(today: string, withAccount: boolean): MockWorld {
   ];
 
   // 🟢S1 — 풀. 폼의 모든 칸이 차 있다.
+  //   📝09-27 #164 — 공간 설명은 한 칸(`body`)이다. 옛 시설 안내 글(두 줄)은 등록 폼이 저장할 때처럼 빈 줄 하나 뒤에 이어 붙였다.
   const s1 = space({
     id: 9101, slug: "mock-slow-afternoon-2f", ownerUserId: U.host, status: "open",
     name: "느린오후 로스터리 2층", brandSlug: "mock-slow-afternoon",
@@ -320,7 +321,8 @@ function fullWorld(today: string, withAccount: boolean): MockWorld {
       "성수동 골목 안쪽 2층이에요. 남향 창이 두 면이라 오후 네 시까지 조명 없이도 밝아요.\n\n" +
       "평소엔 로스팅 클래스와 소규모 모임에 쓰는 방이라 긴 원목 테이블 하나와 의자 열두 개가 있어요. " +
       "에스프레소 머신과 그라인더도 같이 쓰실 수 있어서, 카페 창업을 준비하시는 분이 하루 운영을 연습해 보기 좋아요.\n\n" +
-      "1층 로스터리는 정상 영업 중이라 커피 향이 계속 올라와요. 조용한 촬영보다는 사람이 오가는 행사에 잘 맞아요.",
+      "1층 로스터리는 정상 영업 중이라 커피 향이 계속 올라와요. 조용한 촬영보다는 사람이 오가는 행사에 잘 맞아요.\n\n" +
+      "빔프로젝터는 HDMI 단자만 있어요. 맥북을 쓰시면 변환 젠더를 챙겨 주세요.\n머신 원두는 따로 가져오셔야 해요. 1층에서 사시면 10% 빼 드려요.",
     photos: [
       photo("2층 전경", 30), photo("원목 테이블", 24, 1200, 900), photo("에스프레소 머신", 12, 900, 1200),
       photo("창가 오후 빛", 44), photo("계단 입구", 200, 800, 1200), photo("1층 로스터리", 20),
@@ -328,8 +330,6 @@ function fullWorld(today: string, withAccount: boolean): MockWorld {
     area: "성수동", address: "서울 성동구 연무장길 00, 2층",
     lat: 37.5436, lng: 127.0559,
     facilities: ["에스프레소 머신", "그라인더", "냉장고", "와이파이", "빔프로젝터", "블루투스 스피커", "화장실(건물 공용)", "원목 테이블 1", "의자 12"],
-    facilitiesNote:
-      "빔프로젝터는 HDMI 단자만 있어요. 맥북을 쓰시면 변환 젠더를 챙겨 주세요.\n머신 원두는 따로 가져오셔야 해요. 1층에서 사시면 10% 빼 드려요.",
     capacity: 14,
     rules:
       "쓰신 컵과 도구는 설거지해서 제자리에 둬 주세요\n벽에 테이프·못은 안 돼요. 이젤은 빌려 드려요\n밤 9시 이후엔 1층 이웃을 위해 음악을 줄여 주세요\n음식은 포장해 온 것만 드실 수 있어요\n나가실 때 창문과 머신 전원을 꺼 주세요",
@@ -363,6 +363,8 @@ function fullWorld(today: string, withAccount: boolean): MockWorld {
   }, today);
 
   // 🟡S2 — 검토 대기
+  //   📝09-27 #164 — 칸이 둘이던 때 올린 «옛 공간» 모양을 일부러 남겨 둔다(소개 `body` + 시설 안내 `facilitiesNote`가 다 찼다).
+  //   상세는 두 절(공간 소개 · 공간·시설 안내)로 그대로 보이고, 고치기 화면은 두 글을 빈 줄 하나로 이어 한 칸에 보여 준다.
   const s2 = space({
     id: 9102, slug: "mock-slow-afternoon-showroom", ownerUserId: U.host, status: "pending",
     name: "느린오후 지하 쇼룸", brandSlug: "mock-slow-afternoon", category: "shop", scope: "whole_shop",
@@ -678,7 +680,8 @@ function stressWorld(today: string): MockWorld {
     id: 9107, slug: "mock-long-kitchen-space", ownerUserId: U.stressHost, status: "open",
     name: "오래된 골목 끝집 부엌 겸 작업실 전체와 뒷마당 평상, 그리고 2층 다락방까지 한꺼번에",
     brandSlug: "mock-long-kitchen", category: "restaurant", scope: "whole_shop",
-    body: [para, para, para, para, para].join("\n\n"),
+    // 📝09-27 #164 — 공간 설명 한 칸. 옛 시설 안내 두 문단을 등록 폼이 저장할 때처럼 빈 줄 하나 뒤에 이었다(`joinSpaceAbout`).
+    body: [[para, para, para, para, para].join("\n\n"), [para, para].join("\n")].join("\n\n"),
     // 📸등록 폼이 받는 최대 장수(`SpaceForm`의 `PhotoGrid max={10}`)와 같게(09-18 밤 QA SC-34). 전엔 12장이라 실제로는 생길 수 없는 공간을 보고 있었다.
     photos: Array.from({ length: 10 }, (_, i) => photo(`사진 ${i + 1}`, (i * 29) % 360, i % 3 === 0 ? 900 : 1200, i % 3 === 0 ? 1600 : 800)),
     area: "망원동", address: "서울 마포구 포은로 000-00, 골목 끝 파란 대문 집 1층과 2층 다락, 뒷마당 포함 (건물 이름 없음)",
@@ -688,7 +691,6 @@ function stressWorld(today: string): MockWorld {
       "제빙기", "식기 40인분", "평상", "빔프로젝터", "스크린 100인치", "마이크 2", "블루투스 스피커",
       "주차는 골목이 좁아서 한 대만 가능하고 그것도 오전 여덟 시 전에 빼 주셔야 해요",
     ],
-    facilitiesNote: [para, para].join("\n"),
     capacity: 120,
     rules: [
       "인덕션은 쓰고 나서 반드시 전원 코드까지 뽑아 주세요. 한 번 과열돼서 차단기가 내려간 적이 있어요",
@@ -749,6 +751,8 @@ function minimalWorld(today: string): MockWorld {
   const s = space({
     id: 9108, slug: "mock-minimal-room", ownerUserId: U.minHost, status: "open",
     name: "작업실", address: "서울 종로구 창신길 00", rules: "깨끗이 써 주세요",
+    // 📝09-27 #164 — 공간 설명이 필수 칸이 됐다(10자). 최소 세계도 그 한 칸은 채운다.
+    body: "책상 두 개가 있는 작업실이에요.",
     direct: [{ date: d(4), start: "13:00", end: "15:00" }],
     // 🛍최소 세계는 대관만 하나(09-18).
     rentSpaceOn: true, rentSpacePrice: 10000, rentSpaceNote: "책상 두 개를 쓸 수 있어요.",
