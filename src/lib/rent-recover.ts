@@ -10,6 +10,8 @@ import "server-only"; // 🔒토스 시크릿 키로 결제를 되묻고 환불�
 //     결제창만 열고 떠난 신청이다. 토스 승인은 우리 승인 호출로만 일어나고, 그 호출은 실패하면 ABORTED를 남긴다.
 //   · 흔적이 있는 신청은 토스에 주문번호로 묻는다(`GET /v1/payments/orders/{orderId}`).
 //       - 토스엔 돈이 있다(DONE·부분 취소 뒤 잔액) → 들어온 돈을 장부에 먼저 적고 **전액 자동 환불** + 슬랙 거래 알림.
+//         🆕09-27(대표 「제안대로 고고」) 손님께도 「결제를 전액 돌려드렸어요」 메일 한 통(`notifyPaymentReturned`).
+//         손님은 결제 실패 화면을 봤는데 돈이 나갔다가 돌아온다. 모르면 불안하다. 환불이 실패한 갈래엔 보내지 않는다.
 //         환불까지 실패하면 예약을 `rejected`로 둔다. 정산 화면 「손이 필요한 예약」에 뜨는 자리다(자동 환불 실패와 같은 길).
 //       - 토스에 결제가 없거나(404) 돈이 안 움직였다 → 전처럼 만료로 닫는다.
 //       - 토스가 답을 안 준다 → **아무것도 확정하지 않는다.** 다음 정리 때 다시 묻는다.
@@ -20,12 +22,14 @@ import "server-only"; // 🔒토스 시크릿 키로 결제를 되묻고 환불�
 //   토스 응답을 최대 60초 기다리고 되묻기까지 하므로, 그 사이에 여기서 환불을 걸면 막 성공한 결제와 부딪힌다.
 // 🤝페이지 열 때와 크론이 같이 돌아도 돈은 한 번만 움직인다. 환불은 멱등키(결제 키·잔액·금액)로 나가서 토스가 두 번째를
 //   처리하지 않고 첫 응답을 돌려준다. 겹치면 슬랙 알림만 두 번 갈 수 있다.
+//   손님 메일은 두 번 가면 안 되어서 메일에도 주문번호로 멱등키를 단다(Resend가 24시간 안의 같은 키를 다시 보내지 않는다).
 import { getBookingByOrderId, listSpacesByIds, rentSync } from "./spaces";
 import {
   AUTO_CANCEL_WAITING_REASON, cancelPayment, LOOKUP_TIMEOUT_MS, lookupPaymentByOrderId, paymentsLive, RECOVER_REFUND_REASON,
 } from "./rent-payment";
 import { PAY_WINDOW_MINUTES } from "./rent-booking-rules";
-import { notifyRecover, type RecoverKind } from "./rent-notify";
+import { notifyPaymentReturned, notifyRecover, type RecoverKind } from "./rent-notify";
+import { getProfileById } from "./profiles";
 
 /** 결제 시간이 지난 `pending` 신청 한 건과 그 결제 줄. `sweepBookings`가 DB에서 읽어 넘긴다. */
 export interface StalePending {
@@ -146,6 +150,8 @@ async function settleOne(r: StalePending, now: number, run: RecoverRun, timeoutM
       await rentSync(r.orderId, { bookingStatus: "cancelled", toss: refund.payment });
       run.refunded += 1;
       await tell("refunded", r, tp.totalAmount ?? r.amount, balance);
+      // 끊긴 결제는 늘 낸 돈 전부다. 앞서 일부가 돌아가 있었어도 이번 환불로 남은 돈이 0이 됐으니 「전액」이다.
+      await tellGuest(r, tp.totalAmount ?? r.amount);
     } else {
       // 손님 돈이 붙잡혀 있다. 「손이 필요한 예약」에 뜨게 rejected로 둔다(결제 직후 자동 환불 실패와 같은 자리).
       console.error(`[rent-recover] 🚨승인 응답 유실 결제의 자동 환불 실패 — 수동 환불 필요 order=${r.orderId}`);
@@ -192,6 +198,19 @@ async function deferOrGiveUp(r: StalePending, now: number, run: RecoverRun, why:
   if (!moved.ok) { run.deferred += 1; return; }
   run.gaveUp += 1;
   await tell("gave-up", r, r.amount, 0, why);
+}
+
+/** 손님 메일 한 통(「결제를 전액 돌려드렸어요」). 🚨알림이 본작업을 막지 않는다 — 조회가 던져도 삼킨다.
+ *  메일 키가 없거나 손님 이메일이 없으면 `rent-notify`가 조용히 건너뛴다. */
+async function tellGuest(r: StalePending, refund: number): Promise<void> {
+  try {
+    const b = await getBookingByOrderId(r.orderId);
+    const brief = b ? (await listSpacesByIds([b.spaceId])).get(b.spaceId) : undefined;
+    if (!b || !brief) return;
+    await notifyPaymentReturned(b, brief, await getProfileById(b.guestUserId), refund);
+  } catch (e) {
+    console.error("[rent-recover] 손님 메일 실패(본작업은 정상)", e);
+  }
 }
 
 /** 슬랙 거래 알림 한 건. 🔒예약·주문번호·금액·회원 번호만(이름·연락처 없음, `buildRecoverNotice`). 🚨알림이 본작업을 막지 않는다. */

@@ -798,6 +798,7 @@ export const MOCK_MAIL_KINDS: { kind: string; label: string }[] = [
   { kind: "admin-refund-guest", label: "관리자 승인 환불 → 손님" },
   { kind: "admin-refund-guest-partial", label: "관리자 승인 환불 → 손님 · 남은 돈이 낸 돈보다 적어 일부만 돌려줌" },
   { kind: "admin-refund-host", label: "관리자 승인 환불 → 사장님" },
+  { kind: "payment-returned-guest", label: "결제 되돌림 → 손님 · 승인 응답이 끊겨 돈만 나간 결제를 찾아 전액 돌려드림" },
   { kind: "published", label: "공간 공개 → 사장님 · 계좌 등록 전" },
   { kind: "published-account", label: "공간 공개 → 사장님 · 계좌 등록 뒤" },
   // 📣09-19 대표 알림은 슬랙이 먼저다(없으면 대표 메일). 미리보기에 둘 다 뜬다.

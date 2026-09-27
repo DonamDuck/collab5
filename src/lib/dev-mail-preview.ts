@@ -3,7 +3,7 @@
 // 부르는 곳: 화면 미리보기 `app/dev/mail/[kind]/page.tsx`(코멘트 위젯이 붙는다) · 날것 `app/dev/rent-mail/[kind]/route.ts?raw=1`.
 import {
   buildAdminDaily, buildAdminRefund, buildBookingCancelled, buildBookingCancelledToGuest, buildBookingConfirmed,
-  buildBookingConfirmedToHost, buildBookingPaid, buildBookingPaidToGuest, buildBookingRejected, buildDealNotice,
+  buildBookingConfirmedToHost, buildBookingPaid, buildBookingPaidToGuest, buildBookingRejected, buildDealNotice, buildPaymentReturned,
   buildRefundRequestNotice, buildRemindGuest, buildRemindHost, buildSpaceFixRequest, buildSpacePublished, buildSpaceReviewNotice, type Mail,
 } from "@/lib/rent-notify";
 import { buildWorld, MOCK_IDS, type MockWorld } from "@/lib/rent-mock-data";
@@ -83,6 +83,8 @@ export function buildPreviewMail(kind: string): PreviewMail | null {
     case "cancelled-guest-full": { const x = pick(full, B.cancelledFuture); return buildBookingCancelledToGuest(x.b, x.sp, x.host, x.guest, x.b.amountTotal); }
     case "admin-refund-guest-partial": { const x = pick(full, B.refundReq); return buildAdminRefund({ ...x.b, status: "refunded" }, x.sp, x.host, x.guest, Math.round(x.b.amountTotal * 0.5))[0]; }
     case "admin-refund-guest": { const x = pick(full, B.refundReq); return buildAdminRefund({ ...x.b, status: "refunded" }, x.sp, x.host, x.guest, x.b.amountTotal)[0]; }
+    // 🆕09-27 끊긴 결제를 정리 작업이 찾아 전액 돌려줬을 때 손님께. 결제 직전의 신청(pending)을 돌려준 모양으로 쓴다.
+    case "payment-returned-guest": { const x = pick(full, B.pending); return buildPaymentReturned({ ...x.b, status: "cancelled" }, x.sp, x.guest, x.b.amountTotal); }
     case "admin-refund-host": { const x = pick(full, B.refundReq); return buildAdminRefund({ ...x.b, status: "refunded" }, x.sp, x.host, x.guest, x.b.amountTotal)[1]; }
     case "published": { const x = pick(full, B.paid); return buildSpacePublished(x.sp, x.host, false); }
     // 📨09-18 메일 전수 — 발송 경로(`publishSpaceAction`)는 계좌 유무를 둘 다 넘기는데 미리보기엔 «없을 때»만 있었다.
