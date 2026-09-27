@@ -116,11 +116,21 @@ export function autoRejected(b: { status: BookingStatus; decidedAt?: string }): 
   return b.status === "rejected" && !b.decidedAt;
 }
 
+/** 🆕09-27 사장님이 답한 적 없는 `refunded` — 확정 기한(결제 후 48시간·이용 시작 중 먼저 온 쪽)이 지나 정리 작업이 돌려줬거나,
+ *  자동 취소가 실패했다가 관리자가 토스에서 정리한 예약이다. 관리자 환불(환불 신청을 거친다)은 빠진다.
+ *  ⚠️어느 쪽인지는 이 칸들로 못 가른다(토스 취소 사유를 봐야 한다). 그래서 둘 다 참인 말(사장님 쪽 「자동 취소」)에만 쓴다. */
+export function autoRefunded(b: { status: BookingStatus; decidedAt?: string; refundRequestedAt?: string }): boolean {
+  return b.status === "refunded" && !b.decidedAt && !b.refundRequestedAt;
+}
+
 /** 자동 취소가 실패해 관리자가 처리할 예약. 손님에겐 돈이 돌아오는 중이고, 사장님은 거절한 적이 없다. */
 const AUTO_REJECTED_TONE = {
   guest: { label: "환불 진행 중", cls: "text-faint" },
   host: { label: "자동 취소", cls: "text-faint" },
 } as const;
+/** 🆕09-27 자동으로 취소돼 전액 돌아간 예약(`autoRefunded`). 손님 쪽은 원래 이름(「전액 환불」)이 그대로 맞아서 사장님 쪽만 바꾼다.
+ *  「전액 환불」만 보이면 사장님은 누가 왜 돌려줬는지 모른다. 거절한 적도 없다. */
+const AUTO_REFUNDED_HOST_TONE = { label: "자동 취소", cls: "text-faint" } as const;
 
 export function BookingBadge({
   status,
@@ -130,7 +140,8 @@ export function BookingBadge({
 }: {
   status: BookingStatus;
   viewer?: "guest" | "host";
-  /** `autoRejected(b)`의 값. 참이면 `rejected`를 「사장님 거절」·「거절한 요청」 대신 위 말로 그린다. */
+  /** `autoRejected(b)`의 값. 참이면 `rejected`를 「사장님 거절」·「거절한 요청」 대신 위 말로 그린다.
+   *  🆕09-27 `autoRefunded(b)`도 여기로 넘긴다. 참이면 사장님 쪽 `refunded`를 「자동 취소」로 그린다(손님 쪽은 그대로). */
   auto?: boolean;
   /** 🔵09-18 들어온 요청 카드(대표 코멘트 #63) — 카드 맨 앞에 설 때 앞에 작은 점과 medium 굵기를 얹는다.
    *  ⚠️알약(면)은 여전히 안 쓴다(09-13 대표 지시). 점은 탭의 「새 요청 있음」 점(`StickyTabs`)과 같은 7px이다. */
@@ -138,7 +149,9 @@ export function BookingBadge({
 }) {
   const t = auto && status === "rejected"
     ? AUTO_REJECTED_TONE[viewer]
-    : TONE_FOR[viewer][status] ?? BOOKING_TONE[status] ?? BOOKING_TONE.paid;
+    : auto && status === "refunded" && viewer === "host"
+      ? AUTO_REFUNDED_HOST_TONE
+      : TONE_FOR[viewer][status] ?? BOOKING_TONE[status] ?? BOOKING_TONE.paid;
   if (dot) {
     return (
       <span className={`inline-flex shrink-0 items-center gap-1.5 text-[15px] font-medium ${t.cls}`}>

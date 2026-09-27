@@ -16,7 +16,7 @@ import { ClearQuery } from "./ClearQuery";
 import { PlanQuote } from "./PlanQuote";
 import { GuestBookingRow, loadGuestBookings } from "../GuestBookingRow";
 import { StickyTabs } from "@/components/StickyTabs";
-import { autoRejected, BookingBadge, ListRow as Row, SpaceBadge, primaryBtnCls, secondaryBtnCls, won } from "../ui";
+import { autoRefunded, autoRejected, BookingBadge, ListRow as Row, SpaceBadge, primaryBtnCls, secondaryBtnCls, won } from "../ui";
 import { PRODUCT_LABEL } from "@/lib/rent-copy";
 import { bizMissingLine, bizOnFile, spaceListed } from "@/lib/bizcheck";
 import { needsFix } from "@/lib/rent-review";
@@ -833,7 +833,8 @@ function RequestHead({
         <p className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[15px] leading-snug">
           {/* ⏯수락 안 한 채 이용 시간이 시작된 결제 완료 — phase 1에선 곧 예약 완료다(버튼도 거둔다).
               「새 요청」으로 두면 답할 수 없는 카드가 답을 기다리는 이름을 달고 지난 요청에 선다. 손님 쪽 이름을 빌린다. */}
-          <BookingBadge dot status={b.status} auto={autoRejected(b)} viewer={b.status === "paid" && bookingStarted(b) ? "guest" : "host"} />
+          {/* 🆕09-27 확정 기한이 지나 자동으로 취소·환불된 요청(`autoRefunded`)은 「전액 환불」 대신 「자동 취소」. 사장님이 거절한 적이 없다. */}
+          <BookingBadge dot status={b.status} auto={autoRejected(b) || autoRefunded(b)} viewer={b.status === "paid" && bookingStarted(b) ? "guest" : "host"} />
           {day && (
             <>
               <span aria-hidden="true" className="text-faint">·</span>

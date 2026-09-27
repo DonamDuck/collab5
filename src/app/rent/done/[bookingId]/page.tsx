@@ -7,11 +7,13 @@ import { repo } from "@/lib/repo";
 import { ContactBlock } from "../../ContactBlock";
 import { KAKAO_CHAT_URL } from "@/lib/site";
 import { bookingFinished, bookingStarted } from "@/lib/rent-time";
-import { BOOKING_HEADLINE, COFFEE_CHAT_WHEN_GUEST, CONTACT_RULE_GUEST, CONTACT_RULE_GUEST_DONE, PRODUCT_LABEL, REFUND_TIMING_LINE } from "@/lib/rent-copy";
+import { BOOKING_HEADLINE, COFFEE_CHAT_WHEN_GUEST, CONTACT_RULE_GUEST, CONTACT_RULE_GUEST_DONE, PRODUCT_LABEL, REFUND_TIMING_LINE, unconfirmedReasonLine } from "@/lib/rent-copy";
+import { CONFIRM_DEADLINE_HOURS, confirmLapse } from "@/lib/rent-booking-rules";
+import { isUnconfirmedRefundReason } from "@/lib/rent-payment";
 import { bookingHasChat } from "@/lib/rent-products";
 import type { BookingStatus } from "@/lib/types";
 import { GuestCancel } from "../../my/Actions";
-import { autoRejected, bookingWhen, InfoPanel, InfoRow, primaryBtnCls, secondaryBtnCls, won } from "../../ui";
+import { autoRefunded, autoRejected, bookingWhen, InfoPanel, InfoRow, primaryBtnCls, secondaryBtnCls, won } from "../../ui";
 
 // 하루 팝업 — 신청 완료 화면 (2026-09-14)
 //
@@ -73,7 +75,7 @@ export default async function RentDonePage({ params }: { params: Promise<{ booki
   //   ⚠️`aria-hidden` — 화면 낭독기가 「파티 크래커」를 읽으면 제목이 길어지기만 한다.
   // 🔁09-17 제목은 위 `TITLE`로(대표: 상태 이름에 하루 팝업 맥락). 이모지 자리 규칙은 그대로다.
   // 🧾09-27 대표 — 사장님이 거절한 적 없는 거절(자동 취소 실패)에 「사장님이 어렵다고 하셨어요」가 섰다.
-  const title = autoRejected(b) ? "예약이 잡히지 않았어요" : TITLE[b.status];
+  // (제목은 아래 `pay`를 읽은 뒤에 정한다 — 확정 기한이 지나 돌려준 환불은 결제 줄의 취소 사유로 알아본다.)
   const emoji = b.status === "paid" ? "✨" : b.status === "confirmed" ? "🎉" : "";
   const spaceName = brief?.name ?? "공간";
   // ☕09-19 무료 커피챗(값 0)까지 보는 한 벌.
@@ -89,6 +91,13 @@ export default async function RentDonePage({ params }: { params: Promise<{ booki
   //   «돌려드릴 돈»으로 부르고 처리 중이라는 것을 같이 말한다.
   //   ⚠️취소(`cancelled`)엔 이 처리를 안 한다 — 당일 취소는 0원이 «정답»이라 「돌려드릴 돈 0원」이 거짓말이 된다.
   const refundPending = b.status === "rejected" && (refunded === null || refunded === 0);
+  // ⏳09-27 대표 — 사장님이 확정 기한(결제 후 48시간·이용 시작 중 먼저 온 쪽) 안에 확정하지 않아 정리 작업이 돌려준 예약.
+  //   예약 칸만으론 «자동 취소가 실패했다가 정리된 환불»과 못 가른다(둘 다 답한 시각이 없다). 토스 취소 사유 글자로 가른다.
+  //   무엇으로 지났나는 그 취소 시각에 다시 잰다(손님 메일과 같은 말이 서게).
+  //   취소 시각이 비었으면 예약이 환불로 바뀐 시각(`updatedAt`)으로 잰다.
+  const unconfirmed = autoRefunded(b) && !!pay?.cancelReasons?.some(isUnconfirmedRefundReason);
+  const lapse = unconfirmed ? confirmLapse(b, pay?.approvedAt, new Date(pay?.canceledAt || b.updatedAt)) ?? "start" : null;
+  const title = lapse ? "사장님 확정이 없어 결제를 취소했어요" : autoRejected(b) ? "예약이 잡히지 않았어요" : TITLE[b.status];
 
   return (
     <main className="mx-auto w-full max-w-[560px] px-4 py-14 sm:px-6">
@@ -145,6 +154,11 @@ export default async function RentDonePage({ params }: { params: Promise<{ booki
                   </>
                 ) : refunded === null ? (
                   <span className="text-mute">내 예약에서 확인해 주세요</span>
+                ) : lapse ? (
+                  <>
+                    <span className="font-medium text-ink">{won(refunded)}</span>
+                    <span className="block text-[15px] text-mute">{unconfirmedReasonLine(lapse, CONFIRM_DEADLINE_HOURS)} 전액 돌려드려요</span>
+                  </>
                 ) : (
                   <span className="font-medium text-ink">{won(refunded)}</span>
                 )
