@@ -10,7 +10,7 @@ import "server-only"; // 🔒토스 시크릿 키로 결제를 되묻고 환불�
 //     결제창만 열고 떠난 신청이다. 토스 승인은 우리 승인 호출로만 일어나고, 그 호출은 실패하면 ABORTED를 남긴다.
 //   · 흔적이 있는 신청은 토스에 주문번호로 묻는다(`GET /v1/payments/orders/{orderId}`).
 //       - 토스엔 돈이 있다(DONE·부분 취소 뒤 잔액) → 들어온 돈을 장부에 먼저 적고 **전액 자동 환불** + 슬랙 거래 알림.
-//         🆕09-27(대표 「제안대로 고고」) 손님께도 「결제를 전액 돌려드렸어요」 메일 한 통(`notifyPaymentReturned`).
+//         🆕09-27(대표 「제안대로 고고」) 손님께도 「결제가 취소됐어요」 메일 한 통(`notifyPaymentReturned`).
 //         손님은 결제 실패 화면을 봤는데 돈이 나갔다가 돌아온다. 모르면 불안하다. 환불이 실패한 갈래엔 보내지 않는다.
 //         환불까지 실패하면 예약을 `rejected`로 둔다. 정산 화면 「손이 필요한 예약」에 뜨는 자리다(자동 환불 실패와 같은 길).
 //       - 토스에 결제가 없거나(404) 돈이 안 움직였다 → 전처럼 만료로 닫는다.
@@ -200,7 +200,7 @@ async function deferOrGiveUp(r: StalePending, now: number, run: RecoverRun, why:
   await tell("gave-up", r, r.amount, 0, why);
 }
 
-/** 손님 메일 한 통(「결제를 전액 돌려드렸어요」). 🚨알림이 본작업을 막지 않는다 — 조회가 던져도 삼킨다.
+/** 손님 메일 한 통(「결제가 취소됐어요」). 🚨알림이 본작업을 막지 않는다 — 조회가 던져도 삼킨다.
  *  메일 키가 없거나 손님 이메일이 없으면 `rent-notify`가 조용히 건너뛴다. */
 async function tellGuest(r: StalePending, refund: number): Promise<void> {
   try {

@@ -729,8 +729,8 @@ export async function notifyAdminRefund(
   return Promise.all(buildAdminRefund(booking, space, host, guest, refundAmount).map(sendMail));
 }
 
-/** ⑯ 끊긴 결제를 돌려드림 → 손님 (09-27, 대표 「제안대로 고고」).
- *  손님은 결제 실패 화면을 봤는데 돈은 나갔다가 돌아온다. 모르면 불안하다. 그래서 «돌려드렸다»는 사실만 한 통으로 알린다.
+/** ⑯ 끊긴 결제를 취소함 → 손님 (09-27, 대표 「제안대로 고고」).
+ *  손님은 결제 실패 화면을 봤는데 돈은 나갔다가 돌아온다. 모르면 불안하다. 그래서 «결제를 취소했다»는 사실만 한 통으로 알린다.
  *  부르는 곳 둘 — 정리 작업이 끊긴 결제를 찾아 전액 돌려줬을 때(`rent-recover.ts`), 그리고 그 환불이 실패해
  *    「손이 필요한 예약」에 남았던 줄을 관리자가 토스에서 다시 읽어 환불을 확인했을 때(`resyncStuckBookingAction`).
  *  ⚠️환불이 «끝난 뒤에만» 부른다. 돈이 아직 안 돌아갔으면 이 메일은 거짓말이 된다.
@@ -739,8 +739,10 @@ export function buildPaymentReturned(
   booking: SpaceBooking, space: Pick<Space, "name" | "slug">, guest: Profile | null, refund: number,
 ): Mail {
   const back = Math.max(0, Math.floor(refund || 0));
-  const subject = `[collab5] ${subjectDate(booking.useDate)}, 결제를 전액 돌려드렸어요`;
-  const lead = "결제를 전액 돌려드렸어요. 결제가 제대로 끝나지 않아 신청이 접수되지 않았어요.";
+  // ✍️09-27 대표 — 「결제가 취소되었습니다 정도의 제목으로. 결제를 돌려준다가 한국말로 말이 안 돼」.
+  //   돌려드리는 건 «돈»이지 «결제»가 아니다. 결제는 «취소»된다. 제목 말투는 다른 메일 제목(해요체)에 맞췄다.
+  const subject = `[collab5] ${subjectDate(booking.useDate)}, 결제가 취소됐어요`;
+  const lead = "결제가 제대로 끝나지 않아 신청이 접수되지 않았어요. 결제는 전액 취소했어요.";
   const rows: [string, string][] = [
     [LABEL.when, bookingWhen(booking)],
     [LABEL.space, space.name],

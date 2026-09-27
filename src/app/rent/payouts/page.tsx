@@ -207,7 +207,7 @@ export default async function RentPayoutsPage() {
           {stuck.refundFailed.length > 0 && (
             <StuckList
               title="환불이 안 된 결제"
-              hint="토스 관리자 화면에서 직접 취소해 주세요. 손님께 돌려드릴 돈이에요. 취소하신 뒤 「토스에서 다시 읽기」를 누르면 장부를 맞추고 손님께 메일을 보내요."
+              hint="토스 관리자 화면에서 직접 취소해 주세요. 손님께 돌려드릴 돈이에요. 취소하신 뒤 「새로고침」을 누르면 장부를 맞추고 손님께 메일을 보내요."
               rows={stuck.refundFailed}
               spaces={spaces}
               resync
@@ -219,7 +219,7 @@ export default async function RentPayoutsPage() {
           {stuck.refundUnconfirmed.length > 0 && (
             <StuckList
               title="환불을 확인하지 못한 취소"
-              hint="손님이 취소하셨는데 토스가 환불 결과를 제대로 돌려주지 않았어요. 토스 관리자 화면에서 주문번호로 찾아 환불됐는지 보시고, 안 됐으면 거기서 취소 규정대로 돌려드려 주세요. 손님께는 확인해서 연락드린다고 말씀드렸어요. 환불이 된 걸 보셨으면 「토스에서 다시 읽기」로 장부를 맞추고 취소 메일을 보내요."
+              hint="손님이 취소하셨는데 토스가 환불 결과를 제대로 돌려주지 않았어요. 토스 관리자 화면에서 주문번호로 찾아 환불됐는지 보시고, 안 됐으면 거기서 취소 규정대로 돌려드려 주세요. 손님께는 확인해서 연락드린다고 말씀드렸어요. 환불이 된 걸 보셨으면 「새로고침」으로 장부를 맞추고 취소 메일을 보내요."
               rows={stuck.refundUnconfirmed}
               spaces={spaces}
               showGuest

@@ -62,7 +62,7 @@ export function ResyncButton({ bookingId, orderId }: { bookingId: number; orderI
         disabled={pending}
         className="py-[10px] text-[15px] font-medium text-body underline underline-offset-2 disabled:opacity-60"
       >
-        {pending ? "토스에서 읽는 중…" : "토스에서 다시 읽기"}
+        {pending ? "새로고침 중…" : "새로고침"}
       </button>
       {msg && (
         <p role="status" className="min-w-0 text-[14px] leading-relaxed break-keep text-mute">
