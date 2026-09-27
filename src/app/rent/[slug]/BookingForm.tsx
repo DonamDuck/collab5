@@ -25,17 +25,17 @@
 //   입력 48px/16px · 도움말 15 faint). 금액 표는 **한 문장**으로. 버튼은 화면 유일 키위 52px이고,
 //   모바일에선 `MakerActionBar`처럼 **하단 고정 바**에 금액과 같이 앉는다(폼이 길어서 버튼이
 //   화면 밖에 있으면 「어디서 내지」가 된다).
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { startBookingAction, confirmBookingAction } from "@/lib/rent-actions";
 import type { SpaceUseType, OpenSlot, RentProduct, Space } from "@/lib/types";
-import { bookingAmount, productNote, productPrice, sellableProducts } from "@/lib/rent-products";
+import { bookingAmount, defaultProduct, productNote, productPrice, sellableProducts } from "@/lib/rent-products";
 import { dayMarks, durationLabel, endChoices, minutesBetween, nowHhmmKst, rangeLabel, RENT_MIN_MINUTES, startChoices as startChoicesOf, toMinutes, todayKst } from "@/lib/rent-time";
 import { CAPACITY_MAX, PLAN_MAX } from "@/lib/rent-limits";
-import { dateLabel, InfoList, InfoRow, primaryBtnCls, RentSelect, rentInputCls, rentTextareaCls, won } from "../ui";
+import { dateLabel, InfoList, InfoRow, infoLabelCls, infoValueCls, primaryBtnCls, RentSelect, rentInputCls, rentTextareaCls, won } from "../ui";
 import Link from "next/link";
-import { COFFEE_CHAT_FREE, COFFEE_CHAT_LABEL, CONTACT_RULE_GUEST, HEADCOUNT_MSG_EMPTY, headcountRangeMsg, isTestPayment, PRODUCT_HINT_GUEST, PRODUCT_LABEL } from "@/lib/rent-copy";
+import { COFFEE_CHAT_FREE, COFFEE_CHAT_LABEL, CONFIRM_BEFORE_USE_GUEST, CONTACT_RULE_GUEST, HEADCOUNT_MSG_EMPTY, headcountRangeMsg, isTestPayment, PRODUCT_HINT_GUEST, PRODUCT_LABEL } from "@/lib/rent-copy";
 import { ConfirmDialog } from "../ConfirmDialog";
 import { PickDateCalendar } from "./PickDateCalendar";
 import { MentorOptions } from "./MentorOption";
@@ -193,6 +193,18 @@ function PayBar({
 }
 
 
+/** 🛍☕09-27 대표 코멘트 #150·#151 — 상세 오른쪽 요약 카드(`page.tsx`)의 빈 자리에 이 폼의 상태를 채운다.
+ *  09-27 #147의 금액 자리(`PayBar` → `#rent-side-price`)와 같은 길이다. 서버가 자리와 기본값을 먼저 그리고, 여기서 포털로 값을 얹는다.
+ *  ⚠️자리를 여는 순간 한 번 찾는다. 자리가 없는 화면(다른 곳에서 폼을 쓸 때)이면 아무것도 안 그린다. */
+function SideSlot({ id, children }: { id: string; children: ReactNode }) {
+  const [el, setEl] = useState<HTMLElement | null>(null);
+  useEffect(() => {
+    const find = () => setEl(document.getElementById(id));
+    find();
+  }, [id]);
+  return el ? createPortal(children, el) : null;
+}
+
 /** 🔑09-19 대표 [G] — 로그인 안 한 손님이 고른 값을 로그인 동안 맡겨 두는 자리. 공간마다 따로(`slug`) 둔다.
  *  sessionStorage라 같은 탭에만 남는다. 카카오·구글을 다녀와도 같은 탭이면 그대로다(`lib/safe-redirect` 머리말과 같은 성질). */
 const resumeKeyOf = (slug: string) => `collab5:rent-resume:${slug}`;
@@ -298,9 +310,12 @@ export function BookingForm({
   const [plan, setPlan] = useState("");
   const [withChat, setWithChat] = useState(false);
   // 🛍09-18 대표 — 「고객은 신청할 때 이걸 선택할 수 있게」. 켜진 게 하나면 그것으로 정해 두고 고르기를 안 보인다.
-  //   둘이면 비워 둔다 — 날짜·시각과 같은 규칙(09-17 QA: 손님이 직접 고른 값만 쓴다).
+  // 🔁09-27 대표 코멘트 #149 — 「대관만을 일단 default 선택으로 하자」. 둘이면 대관만을 골라 둔 채로 연다(대관만을 안 팔면 파는 첫 상품).
+  //   09-17 QA(손님이 직접 고른 값만 쓴다)는 날짜·시각에만 남는다. 상품은 값 차이가 카드에 그대로 보여서 골라 둔 것이 숨지 않는다.
+  //   ⚠️기본값은 `defaultProduct` 한 벌이다. 상세 오른쪽 카드의 「선택한 상품」 서버 기본값(`page.tsx`)이 같은 함수를 부른다.
   const sellable = sellableProducts(products);
-  const [pickedProduct, setPickedProduct] = useState<RentProduct | "">(sellable.length === 1 ? sellable[0] : "");
+  const firstPick = defaultProduct(products) ?? "";
+  const [pickedProduct, setPickedProduct] = useState<RentProduct | "">(firstPick);
   const product: RentProduct | "" = sellable.length === 1 ? sellable[0] : pickedProduct;
   // 📎09-18 대표 코멘트 — 소개서 전달은 토글(예/아니요), **기본은 «예»**. 고르는 소개서는 첫 번째가 기본.
   const [brandOn, setBrandOn] = useState(true);
@@ -399,6 +414,20 @@ export function BookingForm({
   const askHead = useType !== "as_is";
   const headCap = capacity && capacity > 0 ? Math.min(capacity, CAPACITY_MAX) : CAPACITY_MAX;
   const headOkOf = (v: string) => /^\d+$/.test(v.trim()) && Number(v) >= 1 && Number(v) <= headCap;
+  /** 🙋09-27 대표 코멘트 #153 — 「팝업 앞에 처음 인원 input에서 사장님이 설정한 최대 max 이하 값으로만 쓸 수 있게」.
+   *  칸에 들어가는 값을 여기서 고친다 — 1명부터 정원까지의 정수만. 정원보다 크면 정원으로 줄이고, 0·음수·소수·글자는 못 들어간다.
+   *  🩸전엔 칸이 아무 수나 받고 확인 팝업(서버 응답)에서 「인원은 1명부터 최대 15명까지 적어 주세요」로 막았다. 다 적고 나서야 알았다.
+   *  ⚠️관문은 여전히 서버(`validateBookingRequest`)다. 여기서 막는 건 그 말이 팝업까지 갈 길을 없애는 것이다. */
+  const clampHead = (raw: string): string => {
+    const t = raw.trim();
+    if (t.startsWith("-")) return "";
+    // 소수는 정수 부분만 남긴다(붙여 넣은 「2.5」 → 2). 점을 지우고 숫자를 이으면 25가 된다.
+    const digits = t.split(/[.,]/)[0].replace(/[^0-9]/g, "");
+    if (!digits) return "";
+    const n = Number(digits);
+    if (!Number.isFinite(n) || n < 1) return "";
+    return String(Math.min(n, headCap));
+  };
   // ⚠️열 글자는 서버(`confirmBookingAction`)가 강제하는 값이다. 여기서 먼저 막는 건 왕복을 아끼려는 것이지
   //   이게 관문이라서가 아니다 — 관문은 늘 서버 쪽이다.
   const planShort = plan.trim().length < 10;
@@ -477,7 +506,9 @@ export function BookingForm({
     const p = saved.product && sellable.includes(saved.product) ? saved.product : "";
     // 🔁09-27 대표 A14 — 이 칸의 이름은 「신청 타입」 한 벌(라벨·결제 바·막힘 말과 같은 이름).
     if (saved.product && !p) notes.push("고르신 신청 타입은 이제 이 공간에서 빌릴 수 없어요. 신청 타입을 다시 확인해 주세요.");
-    const pickedProduct = sellable.length === 1 ? sellable[0] : p;
+    // 🔁09-27 #149 — 맡긴 값이 먼저다. 맡긴 상품이 없거나(그 전 초안) 이제 안 파는 상품이면 기본 상품으로 돌아간다.
+    //   안 파는 상품이었으면 위 안내 줄이 그 사실을 말하고 여기서 멈추니(아래 `notes`) 조용히 바뀌지 않는다.
+    const pickedProduct = sellable.length === 1 ? sellable[0] : p || firstPick;
     let d = saved.useDate;
     let st = saved.startTime;
     let en = saved.endTime;
@@ -495,7 +526,7 @@ export function BookingForm({
         st = en = "";
       }
     }
-    setPickedProduct(p);
+    setPickedProduct(pickedProduct);
     setUseDate(d);
     setStartTime(st);
     setEndPick(en);
@@ -816,11 +847,18 @@ export function BookingForm({
               inputMode="numeric"
               min={1}
               max={headCap}
+              step={1}
               className={`${rentInputCls} pr-11`}
               value={headcount}
+              // 🙋09-27 #153 — 소수점·부호·지수(e)는 누르는 순간 막는다. 숫자 칸(`type="number"`)은 이 글자들을 받아 두고
+              //   값을 비워서 넘기므로, 거기서 고치면 적던 숫자가 통째로 사라진다. 붙여 넣은 값은 아래 `clampHead`가 고친다.
+              onKeyDown={(e) => {
+                if ([".", ",", "-", "+", "e", "E"].includes(e.key)) e.preventDefault();
+              }}
               onChange={(e) => {
-                setHeadcount(e.target.value);
-                if (headOkOf(e.target.value)) setBadField((f) => (f === "head" ? "" : f));
+                const v = clampHead(e.target.value);
+                setHeadcount(v);
+                if (headOkOf(v)) setBadField((f) => (f === "head" ? "" : f));
               }}
               // ✍️09-17 「숫자를 입력해주세요」 → 예시 숫자(행정어 걷기). 칸 안 「명」과 붙여 읽힌다.
               placeholder="예) 3"
@@ -995,6 +1033,29 @@ export function BookingForm({
       {/* 🔁09-17 QA — 같은 흐름이 버튼 셋에서 「결제하고 신청하기 / 신청하기 / N원 결제하기」로 불렸다.
           바는 확인 팝업을 여는 버튼이라 「신청하기」, 팝업은 결제 화면으로 넘기니 「결제하러 가기」,
           결제 화면은 돈을 내는 버튼이라 「N원 결제하기」. 버튼 이름이 그 버튼이 여는 다음 화면을 말한다. */}
+      {/* 🛍09-27 #150 — 「선택한 상품으로 하고, 우측에는 내가 선택한 상품이 나오게 하자」. 카드의 값 자리(`#rent-side-product`)에
+          지금 고른 상품 하나를 얹는다. 이것이 들어오면 서버가 그린 기본값(`data-side-default`)이 CSS로 숨는다(`page.tsx`). */}
+      <SideSlot id="rent-side-product">
+        {product && (
+          <span data-side-pick className="block">
+            <span className="block font-medium text-ink">{PRODUCT_LABEL[product]}</span>
+            <span className="block text-mute tabular-nums">{won(productPrice(products, product))} / 시간</span>
+          </span>
+        )}
+      </SideSlot>
+      {/* ☕09-27 #151 — 「커피챗의 경우도 선택한 경우에만 메뉴 나오게 하자」. 확인 팝업(`MentorOptions`)에서 담았을 때만 카드에 줄이 선다.
+          자리(`#rent-side-chat`)는 비어 있으면 CSS(`empty:hidden`)로 사라진다. */}
+      <SideSlot id="rent-side-chat">
+        {withChat && coffeeChat && (
+          <>
+            <dt className={infoLabelCls}>{COFFEE_CHAT_LABEL}</dt>
+            <dd className={infoValueCls}>
+              {coffeeChatMinutes}분 {coffeeChatPrice > 0 ? `+${won(coffeeChatPrice)}` : COFFEE_CHAT_FREE}
+            </dd>
+          </>
+        )}
+      </SideSlot>
+
       <PayBar
         amount={timePicked && product ? total : null}
         caption={timePicked ? durationLabel(minutes) : undefined}
@@ -1086,10 +1147,13 @@ export function BookingForm({
           {/* 📐09-18 대표 코멘트 — 위 「예약 정보 확인」과 같은 위계로 제목 밑에 선 하나. */}
           <ul className="mt-2 space-y-2 border-t border-hairline pt-3">
             {[
+              // 🔑09-27 대표 코멘트 #154 — 첫 줄로 «결제가 곧 이용은 아니다». 예약 한 건 화면 첫 줄과 같은 상수다.
+              CONFIRM_BEFORE_USE_GUEST,
               CONTACT_RULE_GUEST,
               // 🪪09-18 대표 — 「신청할 때 약관 동의 같은 데 넣어야 할 수도」. 약관 제10조에 넣은 한 줄을 돈 내기 직전에 한 번 더.
               "이용 당일 사장님이 신분증으로 성함을 확인할 수 있어요.",
-              "공간을 빌려주시는 분은 사장님이에요. collab5는 신청과 결제를 이어 드리는 통신판매중개자라 거래의 당사자는 아니에요.",
+              // ⚖️09-27 대표 코멘트 #155 — 대표 문장 그대로. 고지의 두 사실(빌려주는 분 · 당사자가 아님)과 법 낱말은 그대로 있다.
+              "공간을 빌려주시는 분은 대여하는 공간의 사장님이에요. collab5는 거래의 당사자가 아닌 통신판매중개자 역할을 해요.",
             ].map((line) => (
               <li key={line} className="flex gap-2 text-[15px] leading-relaxed break-keep text-body">
                 <span aria-hidden="true" className="text-mute">·</span>

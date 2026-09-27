@@ -83,7 +83,8 @@ export function MentorOptions({
           제목이 이미 그 문장이라 두 줄이 같은 말을 두 번 했다. 값이 안 붙는 쪽은 설명할 것이 없다. */}
       {/* 🛍09-18 「공간만 빌릴게요」 → 「커피챗 없이 할게요」. 상품 이름 「대관만」과 「공간만」이 한 팝업에 같이 서면
           손님이 공간 상품을 또 고르는 줄로 읽는다. 이 줄이 가르는 건 커피챗 하나다. */}
-      <Row on={!value} pick={false} title="커피챗 없이 할게요" amount="+0원" dense={dense} onChange={onChange} />
+      {/* ✍️09-27 대표 코멘트 #152 — 「커피챗 없이 신청 할게요」(띄어쓰기만 맞춤). 아래 줄 「커피챗을 신청할게요」와 같은 동사다. */}
+      <Row on={!value} pick={false} title="커피챗 없이 신청할게요" amount="+0원" dense={dense} onChange={onChange} />
       <Row
         on={value}
         pick={true}

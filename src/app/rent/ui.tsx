@@ -254,13 +254,19 @@ export function InfoList({ children, className = "" }: { children: ReactNode; cl
   return <dl className={`space-y-2.5 ${className}`}>{children}</dl>;
 }
 
+/** 항목 줄 한 칸의 틀·라벨·값. 🛍09-27 #150·#151 — 상세 오른쪽 카드가 줄 자리를 먼저 그려 두고 신청 폼이 값을 채울 때
+ *  (`page.tsx` 「선택한 상품」·「커피챗」 자리) 이 모양을 그대로 쓴다. 두 벌로 적으면 한쪽 줄만 폭이 달라진다. */
+export const infoRowCls = "flex gap-3 text-[16px] leading-relaxed break-keep";
+export const infoLabelCls = "w-[88px] shrink-0 text-mute";
+// ↔️09-21 대표 코멘트 — 띄어쓰기 없는 긴 글(「브랜드팝업행사로…」)이 `break-keep`에 걸려 한 덩어리로 서면서
+//   확인 팝업이 옆으로 밀렸다(474폭 실측 378 → 446). 넘칠 때만 글자 사이에서 꺾는다.
+export const infoValueCls = "min-w-0 flex-1 text-body [overflow-wrap:anywhere]";
+
 export function InfoRow({ label, value }: { label: string; value: ReactNode }) {
   return (
-    <div className="flex gap-3 text-[16px] leading-relaxed break-keep">
-      <dt className="w-[88px] shrink-0 text-mute">{label}</dt>
-      {/* ↔️09-21 대표 코멘트 — 띄어쓰기 없는 긴 글(「브랜드팝업행사로…」)이 `break-keep`에 걸려 한 덩어리로 서면서
-          확인 팝업이 옆으로 밀렸다(474폭 실측 378 → 446). 넘칠 때만 글자 사이에서 꺾는다. */}
-      <dd className="min-w-0 flex-1 text-body [overflow-wrap:anywhere]">{value}</dd>
+    <div className={infoRowCls}>
+      <dt className={infoLabelCls}>{label}</dt>
+      <dd className={infoValueCls}>{value}</dd>
     </div>
   );
 }
