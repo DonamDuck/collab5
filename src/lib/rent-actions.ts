@@ -31,7 +31,7 @@ import {
   approvePayment, cancelPayment, guestCancelQuote, AUTO_CANCEL_WAITING_REASON, AUTO_REFUND_REASON,
   PAY_EXPIRED_LINE, PAY_FAIL_METHOD_UNSUPPORTED, PAY_FAIL_NOT_AVAILABLE, PAY_FAIL_REFUND_CHANGED, PAY_FAIL_SLOT_TAKEN,
   PAY_FAIL_SLOT_TAKEN_REFUNDED, PAY_FAIL_SLOT_TAKEN_REFUND_PENDING, PAY_FAIL_USE_STARTED, PAY_FAIL_WINDOW_OVER,
-  PAY_IN_FLIGHT_CODES,
+  PAY_CHECKING_LINE, PAY_CHECKING_TITLE, PAY_IN_FLIGHT_CODES,
 } from "./rent-payment";
 // ⭐신청이 «지금도» 말이 되나 — 신청 시작·결제 승인·결제 화면이 같이 쓰는 순수 규칙(09-18 밤 QA G-01).
 import { pendingBookingProblem, validateBookingRequest } from "./rent-booking-rules";
@@ -947,12 +947,15 @@ export async function confirmBookingAction(
       await new Promise((r) => setTimeout(r, 700));
       const late = await settledBooking(orderId, b.id);
       if (late) return late;
+      // 🆕09-27 — 결과를 모르는 승인(`PAY_FAIL_UNKNOWN`)과 같은 말을 쓴다. 실패 화면도 둘을 한 갈래(«확인 중»)로 그린다.
       return {
         ok: false, code: approved.code, bookingId: b.id,
-        message: "결제를 확인하고 있어요. 잠시 뒤 내 예약에서 한 번 더 봐 주세요.",
+        message: `${PAY_CHECKING_TITLE}. ${PAY_CHECKING_LINE}`,
       };
     }
-    // 돈은 안 움직였다. 결제 줄만 ABORTED로 남기고 예약은 그대로 둔다(30분 안이면 다시 시도할 수 있다).
+    // 결제 줄만 ABORTED로 남기고 예약은 그대로 둔다. 대개 돈은 안 움직였다(카드 거절 등 — 30분 안이면 다시 시도할 수 있다).
+    // 🆕09-27 결과를 모르는 승인(`PAY_FAIL_UNKNOWN`)도 여기로 온다. 그땐 돈이 나갔을 수 있어서 ABORTED가 곧 «흔적»이다 —
+    //   정리 작업이 이 흔적을 보고 40분 뒤 토스에 되물어, 돈이 있으면 전액 돌려준다(`rent-recover.ts`). 그래서 손님 말이 참이 된다.
     await rentSync(orderId, { toss: { status: "ABORTED" } });
     return { ok: false, message: approved.message, code: approved.code };
   }
