@@ -75,7 +75,8 @@ export default async function RentDonePage({ params }: { params: Promise<{ booki
   // 🔁09-17 제목은 위 `TITLE`로(대표: 상태 이름에 하루 팝업 맥락). 이모지 자리 규칙은 그대로다.
   // 🧾09-27 대표 — 사장님이 거절한 적 없는 거절(자동 취소 실패)에 「사장님이 어렵다고 하셨어요」가 섰다.
   const title = autoRejected(b) ? "예약이 잡히지 않았어요" : TITLE[b.status];
-  const emoji = b.status === "paid" ? "✨" : b.status === "confirmed" ? "🎉" : "";
+  // 🔁09-27 대표 — 결제 완료는 이제 «확정 대기»다(`BOOKING_HEADLINE.guestPaid`). 기다리는 자리에 ✨를 붙이면 축하로 읽혀서 뺐다. 🎉는 확정에만.
+  const emoji = b.status === "confirmed" ? "🎉" : "";
   const spaceName = brief?.name ?? "공간";
   // ☕09-19 무료 커피챗(값 0)까지 보는 한 벌.
   const withChat = bookingHasChat(b);

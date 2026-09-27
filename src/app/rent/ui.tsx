@@ -80,15 +80,17 @@ export function CoffeeChatChip() {
  *  ⛔Kiwi(primary)는 안 쓴다. 브랜드색이 「성공」을 뜻하기 시작하면 희소성이 무너진다
  *    (globals.css의 `--success-pale` 주석과 같은 규율). */
 // 🔁09-17 대표 결정 4 — 이름을 «짧은 명사꼴»로 맞췄다. 제목·첫 줄의 긴 문장은 `rent-copy.ts`의 `BOOKING_HEADLINE`이고,
-//   배지는 그 문장의 짧은 꼴이다(예약 완료 / 예약 확정 / 새 요청). 나머지 상태도 같은 결로 한 번에 갈았다.
+//   배지는 그 문장의 짧은 꼴이다(예약 확정 대기 / 예약 확정 / 새 요청). 나머지 상태도 같은 결로 한 번에 갈았다.
 //   ⭐용어 규칙: 손님은 결제 전 「신청」, 결제 뒤 「예약」. 사장님은 들어온 것이 「요청」, 수락 뒤 「예약」.
 //   🩸09-16까지 손님 쪽은 「예약을 완료했어요」, 사장님 쪽은 「새 신청이에요」라서 같은 건이 화면마다 다른 이름이었다.
-//   ⚠️「완료」를 셋(예약·환불·이용)에 붙이면 목록을 세로로 읽을 때 한 금형이 된다. 예약 완료 하나에만 쓴다.
+//   ⚠️「완료」를 셋(예약·환불·이용)에 붙이면 목록을 세로로 읽을 때 한 금형이 된다. 🔁09-27부터 결제 완료 배지엔 「완료」가 없다(아래).
 const BOOKING_TONE: Record<BookingStatus, { label: string; cls: string }> = {
   // ⭐`pending`은 결제창까지 갔다가 안 내고 돌아온 자리다. 게스트 화면에만 뜨고 호스트에겐 안 보인다.
   //   말투를 「실패」로 쓰지 않는 이유 — 대개는 실패가 아니라 마음이 바뀐 것이다.
   pending: { label: "결제 전", cls: "text-faint" },
-  paid: { label: "예약 완료", cls: "text-mint-on" },
+  // 🔁09-27 대표 — 「예약 완료」 → 「예약 확정 대기」. *「확정 완료가 진짜 예약의 확정이니까」*. 09-16~17의 «결제하면 곧 예약 완료»
+  //   (손님을 사장님 답에 세워 두지 않는다)를 뒤집었다. 기다리는 자리라 색도 위 규칙대로 레몬이다(전엔 완료라서 민트였다).
+  paid: { label: "예약 확정 대기", cls: "text-lemon-on" },
   confirmed: { label: "예약 확정", cls: "text-mint-on" },
   rejected: { label: "사장님 거절", cls: "text-faint" },
   refunded: { label: "전액 환불", cls: "text-faint" },
@@ -99,8 +101,8 @@ const BOOKING_TONE: Record<BookingStatus, { label: string; cls: string }> = {
   expired: { label: "결제 시간 지남", cls: "text-faint" },
 };
 
-/** 👥보는 사람에 따라 같은 상태를 다르게 말하는 자리. 09-16 phase 1 — 손님에게 `paid`는 기다림이 아니라
- *  «예약 완료»다(사장님 답을 기다리게 세워 두지 않는다). 사장님에게 같은 상태는 «새로 들어온 요청»이다(09-17 대표 결정 4). */
+/** 👥보는 사람에 따라 같은 상태를 다르게 말하는 자리. 손님에게 `paid`는 «예약 확정 대기»(09-27 대표 — 09-16 phase 1의
+ *  «예약 완료»를 뒤집었다), 사장님에게 같은 상태는 «새로 들어온 요청»이다(09-17 대표 결정 4, 그대로). */
 const TONE_FOR: Record<"guest" | "host", Partial<Record<BookingStatus, { label: string; cls: string }>>> = {
   guest: {},
   host: {

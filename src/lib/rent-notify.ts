@@ -434,15 +434,17 @@ export async function notifyBookingPaid(
   return sendMail(buildBookingPaid(booking, space, host, guest, guestBrand));
 }
 
-/** ①' 결제 완료 → 손님 (09-16 phase 1). 채팅이 없는 지금은 결제가 곧 예약 완료라, 손님이 알아야 할 것을 이 한 통에 다 담는다.
+/** ①' 결제 완료 → 손님 (09-16 phase 1). 손님이 알아야 할 것을 이 한 통에 다 담는다.
+ *  🔁09-27 대표 — 결제 완료는 «예약 완료»가 아니라 «사장님 확정 대기»다(`BOOKING_HEADLINE.guestPaid`). 연락처는 그대로 결제하면 열린다.
  *  사장님 연락처도 여기서 열린다 — 사장님 답을 기다리게 하지 않기로 했다(대표 09-16, `guestSeesHost`).
  *  🚨옛 「들어오는 법」(`space.accessNote`)은 넣지 않는다. 출입 비밀번호가 적혀 있을 수 있는 칸이다. */
 export function buildBookingPaidToGuest(
   booking: SpaceBooking, space: Space, host: Profile | null, guest: Profile | null,
 ): Mail {
   const hostName = displayName(host, "사장님");
-  // 🔁09-17 대표 결정 4 — 제목·첫 줄은 `BOOKING_HEADLINE.guestPaid`. ✂️09-18 대표 #57과 같은 결 — 제목은 날짜와 무슨 일만.
-  const subject = `[collab5] ${subjectDate(booking.useDate)}, ${BOOKING_HEADLINE.guestPaid}`;
+  // 🔁09-17 대표 결정 4 — 제목·첫 줄은 `BOOKING_HEADLINE`. ✂️09-18 대표 #57과 같은 결 — 제목은 날짜와 무슨 일만.
+  //   🔁09-27 첫 줄이 두 문장이 되어(결제를 마쳤어요 · 확정을 기다려요) 제목은 짧은 꼴(`guestPaidSubject`)을 쓴다.
+  const subject = `[collab5] ${subjectDate(booking.useDate)}, ${BOOKING_HEADLINE.guestPaidSubject}`;
   const link = `${SITE_URL}/rent/requests`;
   const contact = hostContactLine(space.contactPhone, host?.phone, host?.email);
   const meet = accessMeetLine(space.accessHow);
