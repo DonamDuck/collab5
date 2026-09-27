@@ -23,8 +23,9 @@ import { bookingWhen, dateLabel } from "./rent-time";
 import {
   accessMeetLine, hostContactLine, withJosa, BROKER_NOTE, CONTACT_RULE_GUEST, CONTACT_RULE_GUEST_CONFIRMED, CONTACT_RULE_HOST,
   BOOKING_HEADLINE, COFFEE_CHAT_FREE, COFFEE_CHAT_WHEN_GUEST_ROW, COFFEE_CHAT_WHEN_HOST_ROW, HOST_REQUEST_STEPS,
-  PRODUCT_HINT_GUEST, PRODUCT_LABEL, REFUND_TIMING_LINE,
+  PRODUCT_HINT_GUEST, PRODUCT_LABEL, REFUND_TIMING_LINE, unconfirmedReasonLine,
 } from "./rent-copy";
+import { CONFIRM_DEADLINE_HOURS, type ConfirmLapse } from "./rent-booking-rules";
 import type { Space, SpaceBooking } from "./types";
 import { bizOnFile } from "./bizcheck";
 import { bookingHasChat } from "./rent-products";
@@ -421,7 +422,9 @@ export function buildBookingPaid(
   // 🔁09-18 대표 #58 — 「연락처가 열려요」 → 「연락처를 보실 수 있어요」.
   const lead = `${BOOKING_HEADLINE.hostPaid}. 결제는 이미 끝났어요. 날짜와 손님이 적은 계획을 읽어 보시고 수락하거나 거절해 주세요. 수락하시면 손님 연락처를 보실 수 있어요.`;
   // ✂️09-27 대표 B12 — 거절 안내와 연락 규칙을 두 줄로(`tailHtml`이 줄마다 문단을 세운다).
-  const tail = `거절은 이용 시작 전까지 할 수 있고, 손님께 전액 돌아가요.\n${CONTACT_RULE_HOST}`;
+  // ⏳09-27 대표 — 확정 기한(결제 후 48시간·이용 시작 중 먼저 온 쪽)을 첫 줄에. 전엔 「거절은 이용 시작 전까지 할 수 있고,
+  //   손님께 전액 돌아가요」였다. 기한이 생기면서 거절과 «답이 없을 때»가 같은 결과(전액 환불)라 한 줄로 합쳤다.
+  const tail = `결제 후 ${CONFIRM_DEADLINE_HOURS}시간 안에, 이용 시작이 더 빠르면 그 전까지 답해 주세요. 거절하시거나 그때까지 수락하지 않으시면 손님께 전액 돌아가요.\n${CONTACT_RULE_HOST}`;
   // ⚖️09-19 대표 — 결제 메일 끝에 통신판매중개자 한 줄(`BROKER_NOTE`).
   return { to: host?.email ?? "", subject, ...compose(lead, rows, { href: link, label: "들어온 요청 보기" }, tail, BROKER_NOTE) };
 }
@@ -760,6 +763,69 @@ export async function notifyPaymentReturned(
   return sendMailOnce(buildPaymentReturned(booking, space, guest, refund), `rent-payment-returned-${booking.orderId}`);
 }
 
+/** ⑰ 확정 기한이 지나 결제를 취소함 → 손님·사장님 둘 다 (09-27 대표 결정).
+ *  사장님이 결제 후 48시간 안에(이용 시작이 더 빠르면 그 전까지) 확정하지 않은 예약을 정리 작업이 전액 돌려줬다(`rent-unconfirmed.ts`).
+ *  대표 원문: *「사장님이 done이나 confirmed를 안 한 거니, refunded로 되어야 되는 거지」*.
+ *  손님은 결제 때 「예약 완료」 메일을 받았다. 그래서 «결제가 취소됐다»를 제목에 세우고 까닭은 첫 줄에 둔다.
+ *  ✍️09-27 대표 — 결제는 «취소», 돌려드리는 건 «돈»(`buildPaymentReturned`와 같은 결).
+ *  ⚠️환불이 «끝난 뒤에만» 부른다. 부르는 곳 = 정리 작업이 돌려준 직후 · 그 환불이 실패했다가 관리자가 토스에서 확인했을 때(`resyncStuckBookingAction`).
+ *  @param refund 돌려드린 돈(토스에 보낸 잔액 그대로). 결제 완료 예약은 부분 환불이 없어 늘 낸 돈 전부다.
+ *  @param lapse 기한이 무엇으로 지났나 — 결제 후 48시간(`48h`) · 이용 시작(`start`). */
+export function buildUnconfirmedRefund(
+  booking: SpaceBooking, space: Pick<Space, "name" | "slug">, host: Profile | null, guest: Profile | null,
+  refund: number, lapse: ConfirmLapse,
+): Mail[] {
+  const back = Math.max(0, Math.floor(refund || 0));
+  const amount = `${won(back)}${back >= booking.amountTotal ? " 전액" : ""}`;
+  const sDate = subjectDate(booking.useDate);
+
+  // → 손님
+  const gSubject = `[collab5] ${sDate}, 예약이 확정되지 않아 결제가 취소됐어요`;
+  const gLead = `${unconfirmedReasonLine(lapse, CONFIRM_DEADLINE_HOURS)} 결제를 취소했어요. 결제하신 돈은 전액 돌려드려요.`;
+  const gRows: [string, string][] = [
+    [LABEL.when, bookingWhen(booking)],
+    [LABEL.space, space.name],
+    [LABEL.product, productLine(booking)],
+    [LABEL.refund, `${amount}\n${REFUND_TIMING_LINE}`],
+  ];
+  const g = compose(gLead, gRows, { href: `${SITE_URL}/rent`, label: "다른 공간 둘러보기" });
+
+  // → 사장님. 🪪손님 이름은 표의 「성함」 칸으로(09-18 규칙 — 실명을 문장 주어로 세우지 않는다).
+  const hSubject = `[collab5] ${sDate}, 확정하지 않은 예약이 취소됐어요`;
+  const hLead = lapse === "48h"
+    ? `결제 후 ${CONFIRM_DEADLINE_HOURS}시간 안에 확정하지 않은 예약이라 자동으로 취소됐어요. 손님께는 결제하신 돈을 전액 돌려드렸어요.`
+    : "이용 시작 전까지 확정하지 않은 예약이라 자동으로 취소됐어요. 손님께는 결제하신 돈을 전액 돌려드렸어요.";
+  const hRows: [string, string][] = [
+    guestNameRow(booking, guest),
+    [LABEL.when, bookingWhen(booking)],
+    [LABEL.space, space.name],
+    [LABEL.product, productLine(booking, true)],
+    [LABEL.refund, amount],
+    // 호스트 약관 제8조 「환불된 예약은 호스트 정산에서 제외」. 전액이 돌아가 사장님 몫이 없다.
+    [LABEL.payout, "없어요. 이 예약은 정산에서 빠져요."],
+  ];
+  const hTail = `다음 요청부터는 결제 후 ${CONFIRM_DEADLINE_HOURS}시간 안에, 이용 시작이 더 빠르면 그 전까지 수락하거나 거절해 주세요.`;
+  const h = compose(hLead, hRows, { href: `${SITE_URL}/rent/my?tab=host`, label: "내 하루 팝업 보기" }, hTail);
+
+  return [
+    { to: guest?.email ?? "", subject: gSubject, ...g },
+    { to: host?.email ?? "", subject: hSubject, ...h },
+  ];
+}
+
+/** 보내는 쪽 — 🔁정리 작업이 겹쳐 돌거나 관리자가 두 번 눌러도 한 통씩만 가게 주문번호로 멱등키를 단다(`send`).
+ *  한쪽이 실패해도 다른 쪽은 나간다. 정리 작업과 [토스에서 다시 읽기]가 같은 키를 쓴다. */
+export async function notifyUnconfirmedRefund(
+  booking: SpaceBooking, space: Pick<Space, "name" | "slug">, host: Profile | null, guest: Profile | null,
+  refund: number, lapse: ConfirmLapse,
+): Promise<MailResult[]> {
+  const [g, h] = buildUnconfirmedRefund(booking, space, host, guest, refund, lapse);
+  return Promise.all([
+    sendMailOnce(g, `rent-unconfirmed-guest-${booking.orderId}`),
+    sendMailOnce(h, `rent-unconfirmed-host-${booking.orderId}`),
+  ]);
+}
+
 /** ⑥ 공간 공개 → 사장님 (09-17). 검토를 마치고 목록에 올렸다는 소식과, 요청이 오면 할 일.
  *  ⚠️호출부가 «원래 공개가 아니었을 때만» 부른다. 이미 열린 공간을 또 누르면 메일이 또 가면 안 된다. */
 export function buildSpacePublished(
@@ -1044,7 +1110,9 @@ export async function notifyRefundRequest(booking: SpaceBooking, space: Space, h
  *  🆕09-19 저녁 — 결제 승인 직후 그 시간이 차서 자동 환불한 때(`auto-refund`)와 그 환불마저 실패한 때(`auto-refund-failed`). */
 export type DealKind =
   | "paid" | "guest-cancel" | "host-reject" | "host-reject-failed" | "admin-refund"
-  | "auto-refund" | "auto-refund-failed";
+  | "auto-refund" | "auto-refund-failed"
+  // 🆕09-27 사장님이 확정 기한 안에 확정하지 않아 정리 작업이 돌려줬다(기한이 무엇으로 지났나로 둘) · 그 환불이 실패했다.
+  | "unconfirmed-refund-48h" | "unconfirmed-refund-start" | "unconfirmed-refund-failed";
 
 /** ⑪ 거래 알림 → 대표 슬랙 (09-19 오후).
  *  대표 원문: *「결제 알림 — 슬랙에 그렇게 해줘. 식별 가능한 정보 예약 ID라든지 등과 금액, 회원 번호 등등」*.
@@ -1074,8 +1142,12 @@ export function buildDealNotice(kind: DealKind, booking: SpaceBooking, space: Sp
               : kind === "auto-refund-failed"
                 // 🚨한눈에 보이게 머리부터 그 말로 선다. 손님은 결제를 마쳤는데 예약도 환불도 없는 상태다.
                 ? [`손님 돈이 붙잡혀 있어요 · ${won(total)}`, "결제는 됐는데 그 사이 시간이 차서 예약을 못 만들었고, 자동 환불까지 실패했어요. 토스 관리자 화면에서 직접 환불해 주세요. 정산 화면의 손이 필요한 예약에도 떠 있어요."]
-                : [`환불 승인을 마쳤어요 · ${won(back)}`, "관리자 승인으로 손님께 남은 돈을 돌려드렸어요. 이 예약은 사장님 정산에서 빠져요."];
-  const notBack = kind === "host-reject-failed" || kind === "auto-refund-failed";
+                : kind === "unconfirmed-refund-48h" || kind === "unconfirmed-refund-start"
+                  ? [`확정 기한이 지나 자동 환불했어요 · ${won(back)}`, `사장님이 ${kind === "unconfirmed-refund-48h" ? `결제 후 ${CONFIRM_DEADLINE_HOURS}시간 안에` : "이용 시작 전까지"} 예약을 확정하지 않아 결제를 취소하고 손님께 전액 돌려드렸어요. 이 예약은 사장님 정산에서 빠져요.`]
+                  : kind === "unconfirmed-refund-failed"
+                    ? [`손님 돈이 붙잡혀 있어요 · ${won(total)}`, "사장님이 확정 기한 안에 예약을 확정하지 않아 자동으로 돌려드리려 했는데 환불이 실패했어요. 토스 관리자 화면에서 직접 환불해 주세요. 정산 화면의 손이 필요한 예약에도 떠 있어요."]
+                    : [`환불 승인을 마쳤어요 · ${won(back)}`, "관리자 승인으로 손님께 남은 돈을 돌려드렸어요. 이 예약은 사장님 정산에서 빠져요."];
+  const notBack = kind === "host-reject-failed" || kind === "auto-refund-failed" || kind === "unconfirmed-refund-failed";
   const refundRow: [string, string][] =
     kind === "paid" ? [] : [[LABEL.dealRefund, notBack ? "아직 못 돌려드렸어요" : back === 0 ? "없어요" : won(back)]];
   const rows: [string, string][] = [
@@ -1289,14 +1361,23 @@ function sweepLine(run: SweepRun | null | undefined): string {
   const st = run.stale;
   const closed = st ? st.expired + st.closed + st.gaveUp : 0;
   const head = `만료 ${closed}건 · 이용 완료 ${run.done}건 · 취소 뒤 남은 돈 정산 ${run.keptToPayout}건`;
-  if (!st) return `${head}\n결제 시간이 지난 신청은 이번에 읽지 못했어요.`;
+  // 🆕09-27 확정 기한이 지난 결제 완료(②'). 칸이 없으면(옛 정리 작업) 줄을 안 세운다. 못 읽었으면(null) 그렇게 말한다.
+  const u = run.unconfirmed;
+  const unconfirmed = u === undefined ? ""
+    : u === null ? "확정 기한이 지난 결제 완료는 이번에 읽지 못했어요."
+      : [
+        u.refunded > 0 ? `확정 기한 지나 환불 ${u.refunded}건` : "",
+        u.refundFailed > 0 ? `확정 기한 환불 실패 ${u.refundFailed}건` : "",
+        u.deferred > 0 ? `확정 기한이 지났는데 다음으로 미룬 예약 ${u.deferred}건` : "",
+      ].filter(Boolean).join(" · ");
+  if (!st) return [head, "결제 시간이 지난 신청은 이번에 읽지 못했어요.", unconfirmed].filter(Boolean).join("\n");
   const recover = [
     st.refunded > 0 ? `끊긴 결제 환불 ${st.refunded}건` : "",
     st.refundFailed > 0 ? `환불 실패 ${st.refundFailed}건` : "",
     st.gaveUp > 0 ? `확인 못 하고 닫음 ${st.gaveUp}건` : "",
     st.deferred > 0 ? `토스 답을 기다리는 신청 ${st.deferred}건` : "",
   ].filter(Boolean).join(" · ");
-  return recover ? `${head}\n${recover}` : head;
+  return [head, recover, unconfirmed].filter(Boolean).join("\n");
 }
 
 /** 어긋남 갈래의 이름. 슬랙 칸 이름으로 쓴다(값 칸에 주문·금액이 붙는다). */
@@ -1354,6 +1435,8 @@ function moneyBackLine(m: AdminDailySummary["moneyBack"]): string {
     m.hostReject.count > 0 ? `사장님 거절 ${m.hostReject.count}건 · ${refundOf(m.hostReject.refund)}` : "",
     m.adminRefund.count > 0 ? `관리자 환불 ${m.adminRefund.count}건 · ${won(m.adminRefund.refund)}` : "",
     m.autoRefund.count > 0 ? `결제 직후 자동 환불 ${m.autoRefund.count}건 · ${won(m.autoRefund.refund)}` : "",
+    // 🆕09-27 사장님이 확정 기한 안에 확정하지 않아 정리 작업이 돌려준 것. 위 «결제 직후 자동 환불»과 따로 센다.
+    m.unconfirmedRefund?.count ? `확정 기한 지나 자동 환불 ${m.unconfirmedRefund.count}건 · ${won(m.unconfirmedRefund.refund)}` : "",
   ].filter(Boolean);
   return lines.length > 0 ? lines.join("\n") : "없었어요";
 }

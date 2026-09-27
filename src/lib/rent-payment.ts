@@ -122,6 +122,13 @@ export const RECOVER_REFUND_REASON = "승인 응답 유실 — 자동 환불";
 export function isAutoCancelReason(reason: string | undefined | null): boolean {
   return reason === AUTO_REFUND_REASON || reason === AUTO_CANCEL_WAITING_REASON || reason === RECOVER_REFUND_REASON;
 }
+/** 🆕09-27 사장님이 확정 기한(결제 후 48시간·이용 시작 중 먼저 온 쪽) 안에 확정하지 않아 정리 작업이 돌려준 취소(`rent-unconfirmed.ts`).
+ *  위 셋과 따로 둔다. 그 셋은 예약이 `cancelled`로 끝나 손님 취소와 가르는 데 쓰고, 이 취소는 예약이 `refunded`로 끝난다.
+ *  아침 요약·예약 한 건 화면·[토스에서 다시 읽기]가 이 글자로 «확정 없이 기한이 지난 환불»을 알아본다. ⚠️글자를 바꾸면 옛 줄은 못 알아본다. */
+export const UNCONFIRMED_REFUND_REASON = "사장님 확정 기한 지남 — 자동 환불";
+export function isUnconfirmedRefundReason(reason: string | undefined | null): boolean {
+  return reason === UNCONFIRMED_REFUND_REASON;
+}
 
 /** 🆕09-18 밤 QA(G-05) — 취소 팝업이 본 금액보다 실제 환불액이 «적어졌다». 돌려주지 않고 다시 확인받는다. */
 export const PAY_FAIL_REFUND_CHANGED = "RENT_REFUND_CHANGED";

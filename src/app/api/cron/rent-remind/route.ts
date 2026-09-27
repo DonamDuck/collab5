@@ -20,6 +20,9 @@ export const maxDuration = 300;
 /** 🧹크론 한 번에 정리 작업이 토스에 되물을 최대 수(페이지를 열 때는 3건, `SWEEP_PAGE_TOSS_LOOKUPS`).
  *  한 건에 최대 10초라 토스가 느려도 여기서 크게 붙잡히지 않는다(한 번 답을 못 받으면 그 회차엔 더 안 묻는다). */
 const CRON_TOSS_LOOKUPS = 50;
+/** 🆕09-27 크론 한 번에 확정 기한이 지난 결제 완료를 돌려줄 최대 수(페이지를 열 때는 3건, `SWEEP_PAGE_TOSS_REFUNDS`).
+ *  한 건에 토스 취소 한 번 · 메일 두 통이다. 취소가 한 번 실패하면 그 회차엔 더 부르지 않는다(`rent-unconfirmed.ts`). */
+const CRON_TOSS_REFUNDS = 50;
 
 export async function GET(req: Request) {
   const secret = process.env.CRON_SECRET ?? "";
@@ -32,7 +35,7 @@ export async function GET(req: Request) {
   //   ⚠️Vercel 문서(09-27 확인): 크론은 가끔 같은 회차를 두 번 부르거나 한 회차를 빠뜨린다. 그래서 이 작업들이 멱등이어야 한다.
   let sweep: SweepRun | null = null;
   try {
-    sweep = await sweepBookings({ tossLookups: CRON_TOSS_LOOKUPS });
+    sweep = await sweepBookings({ tossLookups: CRON_TOSS_LOOKUPS, tossRefunds: CRON_TOSS_REFUNDS });
   } catch (e) {
     console.error("[cron/rent-remind] 정리 작업 실패 — 리마인드·요약은 그대로 간다", e);
   }

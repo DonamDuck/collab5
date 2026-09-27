@@ -4,8 +4,10 @@
 import {
   buildAdminDaily, buildAdminRefund, buildBookingCancelled, buildBookingCancelledToGuest, buildBookingConfirmed,
   buildBookingConfirmedToHost, buildBookingPaid, buildBookingPaidToGuest, buildBookingRejected, buildDealNotice, buildPaymentReturned,
-  buildRefundRequestNotice, buildRemindGuest, buildRemindHost, buildSpaceFixRequest, buildSpacePublished, buildSpaceReviewNotice, type Mail,
+  buildRefundRequestNotice, buildRemindGuest, buildRemindHost, buildSpaceFixRequest, buildSpacePublished, buildSpaceReviewNotice,
+  buildUnconfirmedRefund, type Mail,
 } from "@/lib/rent-notify";
+import { isUnconfirmedRefundReason } from "@/lib/rent-payment";
 import { buildWorld, MOCK_IDS, type MockWorld } from "@/lib/rent-mock-data";
 import { buildSignupNotice } from "@/lib/notify";
 import { buildSlackPayload, type AdminNotice, type SlackPayload } from "@/lib/admin-notify";
@@ -31,7 +33,11 @@ function dailyPreview(w: MockWorld, remind: RemindRun | null): PreviewMail {
   const today = todayKst();
   const yesterday10 = `${addDaysIso(today, -1)}T01:00:00.000Z`;
   const live = new Set(w.bookings.filter((b) => b.status === "paid" || b.status === "confirmed").map((b) => b.orderId));
-  const payments = w.payments.map((p) => (live.has(p.orderId) && p.approvedAt ? { ...p, approvedAt: yesterday10 } : p));
+  // 🆕09-27 확정 기한이 지나 돌려준 결제는 취소 사유로 알아본다(운영은 `toDailyPayment`가 `toss_raw`에서 같은 일을 한다).
+  const payments = w.payments.map((p) => ({
+    ...(live.has(p.orderId) && p.approvedAt ? { ...p, approvedAt: yesterday10 } : p),
+    unconfirmedCancel: (p.cancelReasons ?? []).some(isUnconfirmedRefundReason),
+  }));
   // 🆕09-19 저녁 — 취소·환불된 예약도 «어제» 그 상태가 된 것으로 옮긴다(목 예약은 한 달 전 시각이라 「어제 취소·환불」이 늘 0이 된다).
   const bookings = w.bookings.map((b) => (b.status === "cancelled" || b.status === "refunded" ? { ...b, updatedAt: yesterday10 } : b));
   const summary = summarizeDaily({
@@ -85,6 +91,11 @@ export function buildPreviewMail(kind: string): PreviewMail | null {
     case "admin-refund-guest": { const x = pick(full, B.refundReq); return buildAdminRefund({ ...x.b, status: "refunded" }, x.sp, x.host, x.guest, x.b.amountTotal)[0]; }
     // 🆕09-27 끊긴 결제를 정리 작업이 찾아 전액 돌려줬을 때 손님께. 결제 직전의 신청(pending)을 돌려준 모양으로 쓴다.
     case "payment-returned-guest": { const x = pick(full, B.pending); return buildPaymentReturned({ ...x.b, status: "cancelled" }, x.sp, x.guest, x.b.amountTotal); }
+    // ⏳09-27 확정 기한이 지나 돌려줌 — [0]은 손님, [1]은 사장님.
+    case "unconfirmed-guest-48h": { const x = pick(full, B.unconfirmedRefunded); return buildUnconfirmedRefund(x.b, x.sp, x.host, x.guest, x.b.amountTotal, "48h")[0]; }
+    case "unconfirmed-guest-start": { const x = pick(full, B.unconfirmedRefunded); return buildUnconfirmedRefund(x.b, x.sp, x.host, x.guest, x.b.amountTotal, "start")[0]; }
+    case "unconfirmed-host-48h": { const x = pick(full, B.unconfirmedRefunded); return buildUnconfirmedRefund(x.b, x.sp, x.host, x.guest, x.b.amountTotal, "48h")[1]; }
+    case "unconfirmed-host-start": { const x = pick(full, B.unconfirmedRefunded); return buildUnconfirmedRefund(x.b, x.sp, x.host, x.guest, x.b.amountTotal, "start")[1]; }
     case "admin-refund-host": { const x = pick(full, B.refundReq); return buildAdminRefund({ ...x.b, status: "refunded" }, x.sp, x.host, x.guest, x.b.amountTotal)[1]; }
     case "published": { const x = pick(full, B.paid); return buildSpacePublished(x.sp, x.host, false); }
     // 📨09-18 메일 전수 — 발송 경로(`publishSpaceAction`)는 계좌 유무를 둘 다 넘기는데 미리보기엔 «없을 때»만 있었다.
@@ -150,6 +161,9 @@ export function buildPreviewMail(kind: string): PreviewMail | null {
     // 🆕09-19 저녁 — 결제 승인 직후 시간이 차서 자동 환불 · 그 환불마저 실패(손님 돈이 붙잡힘). 결제 직전의 신청(pending)을 쓴다.
     case "admin-auto-refund": { const x = pick(full, B.pending); return admin(buildDealNotice("auto-refund", { ...x.b, status: "cancelled" }, x.sp, x.b.amountTotal)); }
     case "admin-auto-refund-failed": { const x = pick(full, B.pending); return admin(buildDealNotice("auto-refund-failed", { ...x.b, status: "rejected" }, x.sp)); }
+    case "admin-unconfirmed-refund": { const x = pick(full, B.unconfirmedRefunded); return admin(buildDealNotice("unconfirmed-refund-48h", x.b, x.sp, x.b.amountTotal)); }
+    case "admin-unconfirmed-refund-start": { const x = pick(full, B.unconfirmedRefunded); return admin(buildDealNotice("unconfirmed-refund-start", x.b, x.sp, x.b.amountTotal)); }
+    case "admin-unconfirmed-refund-failed": { const x = pick(full, B.paid); return admin(buildDealNotice("unconfirmed-refund-failed", { ...x.b, status: "rejected" }, x.sp)); }
     case "admin-refund-approved": { const x = pick(full, B.refundReq); return admin(buildDealNotice("admin-refund", { ...x.b, status: "refunded" }, x.sp, x.b.amountTotal)); }
     default: return null;
   }

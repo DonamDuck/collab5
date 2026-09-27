@@ -758,6 +758,9 @@ export interface Payment {
   status: PaymentStatus;
   approvedAt?: string;
   canceledAt?: string;
+  /** 🆕09-27 토스 취소 내역의 사유들(`toss_raw.cancels[].cancelReason`). 누가 왜 돌려줬는지를 예약 상태만으로 못 가르는 자리
+   *  (확정 기한이 지나 돌려준 환불 등)가 읽는다. 내역이 없거나 옛 줄이면 비어 있다. */
+  cancelReasons?: string[];
   feeRate: number;
   payoutAmount: number;
   payoutStatus: PayoutStatus;

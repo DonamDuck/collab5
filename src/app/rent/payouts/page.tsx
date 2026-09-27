@@ -195,11 +195,12 @@ export default async function RentPayoutsPage() {
           {stuck.unanswered.length > 0 && (
             <StuckList
               // 🔁09-17 QA — 옛 문안은 「사장님이 답을 안 하신 채 날이 지났어요 / 거절하시면 전액 환불」이었다.
-              //   phase 1은 결제가 곧 예약이라 답이 없어도 다녀간 예약은 `sweepBookings`가 done으로 넘겨 정산에 올린다.
-              //   그래서 여기 남는 `paid`는 «환불 신청이 걸린 채 날이 지난 것»이거나 넘기기가 실패한 것뿐이고,
-              //   이용 시작 뒤엔 거절 자체가 막혀 있다(`decideBookingAction`). 목록 조건(`listStuckBookings`)은 그대로 두고 문안만 맞췄다.
+              // 🔁09-27 대표 — 결제 완료(`paid`)는 더 이상 이용 완료로 넘어가지 않는다. 확정 기한(결제 후 48시간·이용 시작 중 먼저 온 쪽)이
+              //   지나면 `sweepBookings` ②'가 전액 돌려준다(`rent-unconfirmed.ts`). 그래서 여기 남는 `paid`는 «환불 신청이 걸린 것»·
+              //   «환불을 확인하지 못한 손님 취소»이거나, 토스 키가 없는 서버·회차 한도로 돌려주기가 아직 안 된 것뿐이다.
+              //   목록 조건(`listStuckBookings`)은 그대로 두고 문안만 맞췄다.
               title="결제 완료 상태로 이용일이 지난 예약"
-              hint="대개 위 환불 신청에 같이 걸려 있는 예약이에요. 신청 없이 여기 있으면 이용 완료로 넘어가지 못한 것이니, 사장님께 다녀가셨는지 여쭤봐 주세요."
+              hint="대개 위 환불 신청에 같이 걸려 있는 예약이에요. 신청 없이 여기 있으면 확정 기한이 지나 자동 환불을 기다리는 예약이에요. 다음 정리 때 전액 돌려드려요."
               rows={stuck.unanswered}
               spaces={spaces}
             />

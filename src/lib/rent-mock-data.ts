@@ -15,6 +15,7 @@ import { addDaysIso, expandRepeat, minutesBetween, todayKst } from "./rent-time"
 import { bookingAmount, compatScopePrice, productsFromLegacy } from "./rent-products";
 // 🔢정산액은 서버(`payout`)와 같은 정수 계산 함수로(09-18 밤 QA SEC-03). 이 파일은 import가 없어 고리가 안 생긴다.
 import { payoutAmount } from "./rent-money";
+import { UNCONFIRMED_REFUND_REASON } from "./rent-payment";
 
 /** `spaces.ts`의 `FEE_RATE`와 같은 값. ⚠️거기서 가져오면 spaces → rent-mock → 이 파일 → spaces로 고리가 생겨 따로 적었다. */
 const MOCK_FEE_RATE = 0.15;
@@ -594,6 +595,10 @@ function fullWorld(today: string, withAccount: boolean): MockWorld {
     // 🧾09-27 자동 취소 실패 — 결제 직후 자리가 차서 자동으로 취소하려다 실패했다. 사장님은 답한 적이 없다(`decidedAt` 없음).
     //   손님 배지는 「환불 진행 중」, 예약 한 건 제목은 「예약이 잡히지 않았어요」(`autoRejected`).
     autoRejected: booking({ id: 90026, spaceId: s6.id, guestUserId: U.guest, status: "rejected", useDate: d(11), startTime: "14:00", endTime: "16:00", plan: "작은 드로잉 모임을 하려고 해요. 여섯 명이에요.", headcount: 6, guestPhone: "010-3456-7890", guestName: "한서윤", ...P6 }, today),
+    // ⏳09-27 확정 기한이 지나 자동으로 취소·환불된 예약 — 결제(이틀 전 12:27 KST) 후 48시간 안에 사장님이 확정하지 않았다.
+    //   사장님은 답한 적이 없다(`decidedAt` 없음). 결제 줄의 토스 취소 사유가 `UNCONFIRMED_REFUND_REASON`이다.
+    //   예약 한 건 제목은 「사장님 확정이 없어 결제를 취소했어요」, 사장님 요청 카드 배지는 「자동 취소」.
+    unconfirmedRefunded: booking({ id: 90027, spaceId: s1.id, guestUserId: U.guest, status: "refunded", useDate: d(5), startTime: "15:00", endTime: "18:00", plan: "동네 작가 셋이 모여 엽서 팝업을 열려고 했어요.", headcount: 5, guestPhone: "010-3456-7890", guestName: "한서윤", updatedAt: `${d(0)}T04:00:00.000Z`, ...P1 }, today),
     hostAsGuest: booking({ id: 90020, spaceId: s6.id, guestUserId: U.host, status: "confirmed", useDate: d(4), startTime: "17:00", endTime: "20:00", plan: "원두 시음회를 다른 동네에서 열어 보려고 해요.", headcount: 10, guestPhone: "010-2345-6789", guestName: "문하람", guestBrandSlug: "mock-slow-afternoon", decidedAt: `${d(-1)}T05:00:00.000Z`, ...P6 }, today),
   };
   const bookings = Object.values(b);
@@ -629,6 +634,8 @@ function fullWorld(today: string, withAccount: boolean): MockWorld {
     { ...payment(b.payChecking, U.host2, { status: "ABORTED" }), approvedAt: undefined, method: "" },
     // 자동 취소가 실패해 돈이 그대로 남은 결제 — 정산 화면 「환불이 안 된 결제」에도 뜬다.
     payment(b.autoRejected, U.host2, { status: "DONE" }),
+    // 확정 기한이 지나 전액 돌려준 결제 — 토스 취소 사유로 «확정 기한 지남»을 알아본다.
+    { ...payment(b.unconfirmedRefunded, U.host, { status: "CANCELED", balance: 0 }), cancelReasons: [UNCONFIRMED_REFUND_REASON] },
   ];
 
   // 🪪09-19 — S8 사장님은 개인 명의(가족) 계좌다. 예금주가 대표자와 달라 검토 화면에 한 줄이 뜬다. 「계좌 없음」 세계에서도 둔다(그 세계는 느린오후 쪽만 뺀다).
@@ -801,6 +808,8 @@ export const MOCK_IDS = {
     payChecking: 90025,
     /** 🧾09-27 자동 취소 실패(사장님이 거절한 적 없는 rejected) */
     autoRejected: 90026,
+    /** ⏳09-27 확정 기한(결제 후 48시간)이 지나 자동으로 취소·환불된 예약 */
+    unconfirmedRefunded: 90027,
   },
 } as const;
 
@@ -822,6 +831,11 @@ export const MOCK_MAIL_KINDS: { kind: string; label: string }[] = [
   { kind: "admin-refund-guest-partial", label: "관리자 승인 환불 → 손님 · 남은 돈이 낸 돈보다 적어 일부만 돌려줌" },
   { kind: "admin-refund-host", label: "관리자 승인 환불 → 사장님" },
   { kind: "payment-returned-guest", label: "결제 되돌림 → 손님 · 승인 응답이 끊겨 돈만 나간 결제를 찾아 전액 돌려드림" },
+  // ⏳09-27 대표 — 사장님이 확정 기한(결제 후 48시간·이용 시작 중 먼저 온 쪽) 안에 확정하지 않아 정리 작업이 전액 돌려줌.
+  { kind: "unconfirmed-guest-48h", label: "확정 기한 지남 → 손님 · 결제 후 48시간 안에 확정되지 않아 결제 취소, 전액 돌려드림" },
+  { kind: "unconfirmed-guest-start", label: "확정 기한 지남 → 손님 · 이용 시작 전까지 확정되지 않아 결제 취소, 전액 돌려드림" },
+  { kind: "unconfirmed-host-48h", label: "확정 기한 지남 → 사장님 · 결제 후 48시간 안에 확정하지 않아 자동 취소" },
+  { kind: "unconfirmed-host-start", label: "확정 기한 지남 → 사장님 · 이용 시작 전까지 확정하지 않아 자동 취소" },
   { kind: "published", label: "공간 공개 → 사장님 · 계좌 등록 전" },
   { kind: "published-account", label: "공간 공개 → 사장님 · 계좌 등록 뒤" },
   // 📣09-19 대표 알림은 슬랙이 먼저다(없으면 대표 메일). 미리보기에 둘 다 뜬다.
@@ -846,6 +860,9 @@ export const MOCK_MAIL_KINDS: { kind: string; label: string }[] = [
   { kind: "admin-refund-approved", label: "거래 → 대표 슬랙 · 관리자 환불 승인" },
   { kind: "admin-auto-refund", label: "거래 → 대표 슬랙 · 결제 직후 시간이 차서 자동 환불" },
   { kind: "admin-auto-refund-failed", label: "거래 → 대표 슬랙 · 자동 환불도 실패, 손님 돈이 붙잡힘 (손이 필요)" },
+  { kind: "admin-unconfirmed-refund", label: "거래 → 대표 슬랙 · 확정 기한(결제 후 48시간)이 지나 자동 환불" },
+  { kind: "admin-unconfirmed-refund-start", label: "거래 → 대표 슬랙 · 확정 기한(이용 시작)이 지나 자동 환불" },
+  { kind: "admin-unconfirmed-refund-failed", label: "거래 → 대표 슬랙 · 확정 기한 자동 환불이 실패, 손님 돈이 붙잡힘 (손이 필요)" },
   { kind: "remind-guest", label: "이용 전날 → 손님" },
   { kind: "remind-host", label: "이용 전날 → 사장님 · 수락한 예약" },
   { kind: "remind-host-unaccepted", label: "이용 전날 → 사장님 · 아직 수락 전" },
