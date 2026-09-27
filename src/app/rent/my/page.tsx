@@ -14,14 +14,14 @@ import { bookingFinished, bookingStarted, dateLabel, durationLabel, minutesBetwe
 import type { SpaceBooking } from "@/lib/types";
 import { ClearQuery } from "./ClearQuery";
 import { PlanQuote } from "./PlanQuote";
-import { GuestBookingRow, loadGuestBookings } from "../GuestBookingRow";
+import { GuestBookingRow, guestTabViews, loadGuestBookings } from "../GuestBookingRow";
 import { StickyTabs } from "@/components/StickyTabs";
 import { autoRefunded, autoRejected, BookingBadge, ListRow as Row, SpaceBadge, primaryBtnCls, secondaryBtnCls, won } from "../ui";
 import { PRODUCT_LABEL } from "@/lib/rent-copy";
 import { bizMissingLine, bizOnFile, spaceListed } from "@/lib/bizcheck";
 import { needsFix } from "@/lib/rent-review";
 import { bookingHasChat, productPrice, sellableProducts } from "@/lib/rent-products";
-import { groupGuestBookings, groupHostBookings, hostBookingGroup, type HostBookingGroup } from "@/lib/rent-groups";
+import { defaultGuestTab, groupHostBookings, hostBookingGroup, parseGuestTab, type GuestTabKey, type HostBookingGroup } from "@/lib/rent-groups";
 
 // 하루 팝업 — 내 공간 · 들어온 요청 · 내가 빌린 공간 (2026-09-13)
 //
@@ -103,7 +103,7 @@ export default async function MyRentPage({
     //   로그인 뒤 «빌린 공간» 칸이 열렸다. 요청을 보러 온 사장님이 남의 칸에 떨어진다.
     //   ⭐복귀 주소는 «지금 열려던 주소»여야 한다. 아는 값만 실어 보낸다(주소를 그대로 이어 붙이지 않는다).
     const backTab = tabParam === "host" ? "host" : tabParam === "guest" ? "guest" : "";
-    const backG = ["upcoming", "past", "cancel"].includes(guestView ?? "") ? guestView : "";
+    const backG = parseGuestTab(guestView) ?? "";
     const back = backTab ? `/rent/my?tab=${backTab}${backTab === "guest" && backG ? `&g=${backG}` : ""}` : "/rent/my";
     return (
       <main className="mx-auto w-full max-w-[560px] px-4 py-14 sm:px-6">
@@ -655,26 +655,21 @@ export default async function MyRentPage({
           ) : (
             <>
               {/* 🏷09-18 대표 코멘트 — 「여기 미니탭이 있어야 할 것 같아. 예약 완료, 예약 취소, 지난 예약 정도」.
-                  나누는 기준:
-                    · 예약 완료 = 결제 완료·확정이고 이용이 안 끝남 + 결제 전인데 날짜가 안 지난 신청(이어서 결제할 수 있다)
-                    · 지난 예약 = 다녀옴, 또는 결제 완료·확정인데 이용이 끝남
-                    · 취소·환불 = 손님 취소·사장님 거절·환불, 그리고 결제 안 한 채 끝난 신청(만료·날짜 지난 결제 전)
-                  칩은 주소(`?g=`)로 나눠 새로고침해도 같은 칸이다. 기본은 «예약 완료». */}
+                  🔁09-27 대표 — 칩 넷(예약 확정 대기 · 예약 확정 완료 · 지난 예약 · 취소 예약). 나눔·이름·순서는 `/rent/requests` 탭과
+                  «같은 한 벌»(`lib/rent-groups`의 `GUEST_TABS`, 줄 순서는 `guestTabViews`)이라 두 화면이 서로 다른 말을 하지 않는다.
+                  결제창만 열고 떠난 신청은 두 화면 다 안 세운다(`loadGuestBookings`).
+                  칩은 주소(`?g=`)로 나눠 새로고침해도 같은 칸이다. 주소에 없으면 줄이 있는 첫 칸을 연다.
+                  ⚠️이 화면은 위에 `StickyTabs`(빌린 공간 · 빌려준 공간)가 이미 붙어 따라와서, 무리는 칩으로 둔다(붙는 탭 둘이 겹친다). */}
               {(() => {
-                // 나누는 판정은 `lib/rent-groups`의 `groupGuestBookings` 한 벌 — `/my`의 「빌린 예약」 숫자가 «예약 완료» 칸을 센다.
-                const { upcoming: upcomingG, past: pastG, cancel: cancelG } = groupGuestBookings(guestBookings, (v) => v.booking);
-                const views = [
-                  // ✍️09-27 대표 B10 — 예약 완료 칸만 다음 행동(둘러보기)이 있다. 나머지 둘은 할 일이 없어 문장만.
-                  { key: "upcoming", label: "예약 완료", list: upcomingG, empty: "다가오는 예약이 없어요." },
-                  { key: "past", label: "지난 예약", list: pastG, empty: "다녀온 예약이 아직 없어요." },
-                  { key: "cancel", label: "취소·환불", list: cancelG, empty: "취소하거나 돌려받은 예약이 없어요." },
-                ] as const;
-                const cur = views.find((x) => x.key === guestView) ?? views[0];
+                const views = guestTabViews(guestBookings);
+                const cur: GuestTabKey = parseGuestTab(guestView)
+                  ?? defaultGuestTab(Object.fromEntries(views.map((x) => [x.key, x.list])) as Record<GuestTabKey, unknown[]>);
+                const curView = views.find((x) => x.key === cur)!;
                 return (
                   <>
                     <div className="mt-4 flex flex-wrap gap-2" role="tablist" aria-label="빌린 공간 나누기">
                       {views.map((x) => {
-                        const on = x.key === cur.key;
+                        const on = x.key === cur;
                         return (
                           <Link
                             key={x.key}
@@ -693,21 +688,23 @@ export default async function MyRentPage({
                         );
                       })}
                     </div>
-                    {cur.list.length === 0 ? (
+                    {curView.list.length === 0 ? (
                       <p className="mt-5 text-[15px] leading-relaxed break-keep text-mute">
-                        {cur.empty}
-                        {cur.key === "upcoming" && (
+                        {curView.empty}
+                        {/* ✍️09-27 대표 B10 — 아직 쓰기 전인 칸만 다음 행동(둘러보기)이 있다. 나머지는 할 일이 없어 문장만.
+                            링크 이름은 `/rent/requests`와 같은 「공간 둘러보기」(대표 B6). */}
+                        {curView.ahead && (
                           <>
                             {" "}
                             <Link href="/rent" className="text-body underline underline-offset-2">
-                              빌릴 공간을 둘러보시겠어요?
+                              공간 둘러보기
                             </Link>
                           </>
                         )}
                       </p>
                     ) : (
                       <ul className="mt-4">
-                        {cur.list.map((v) => (
+                        {curView.list.map((v) => (
                           <GuestBookingRow key={v.booking.id} view={v} />
                         ))}
                       </ul>

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
+import { redirect } from "next/navigation";
 import { getBookingByOrderId, getPaymentByOrderId, getSpaceFull, listLiveBookings, listSpacesByIds } from "@/lib/spaces";
 import { getSessionUserId } from "@/lib/profiles";
 import {
@@ -14,6 +14,7 @@ import { payWindowLeftMs, pendingBookingProblem } from "@/lib/rent-booking-rules
 import { spaceListed } from "@/lib/bizcheck";
 import { bookingWhen, dateLabel, secondaryBtnCls, won } from "../../ui";
 import { COFFEE_CHAT_FREE, COFFEE_CHAT_LABEL, PRODUCT_LABEL } from "@/lib/rent-copy";
+import { guestBookingHref } from "@/lib/rent-groups";
 import { bookingHasChat } from "@/lib/rent-products";
 import { PayPanel } from "./PayPanel";
 
@@ -41,12 +42,12 @@ function minusDays(iso: string, n: number): string {
   return d.toISOString().slice(0, 10);
 }
 
-/** 💸**이 예약 기준** 취소 규정 한 줄 (09-17 QA).
+/** 💸**이 예약 기준** 취소 규정 (09-17 QA).
  *  결제 직전에 망설이게 하는 건 「취소하면 얼마 돌아오나」인데, 규정표를 읽고 날짜를 셈하는 건 손님 몫이었다.
  *  ⭐비율은 `guestCancelRefundRate`에 날짜를 하나씩 넣어 «물어서» 얻는다. 구간표(7·3·1일)를 여기 다시 적지 않는다 —
  *    표가 바뀌는 날 이 문장만 뒤처진다(상세 「환불 규정」 절 주석과 같은 규율).
  *  지금 구간이 언제까지 이어지는지 찾고, 그 날짜와 다음 구간을 말한다. */
-function cancelRuleLine(useDate: string): string {
+function cancelRules(useDate: string): string[] {
   const pct = (r: number) => (r >= 1 ? "전액" : `${Math.round(r * 100)}%`);
   const days = kstDaysUntil(useDate);
   // 표만 묻는다(두 번째 인자 없음). 수락 전·수락 뒤 한 시간은 아래 `head`가 따로 말한다.
@@ -59,14 +60,37 @@ function cancelRuleLine(useDate: string): string {
   //   손님이 가장 먼저 겪는 구간부터 말한다. 수락 뒤 한 시간(`GRACE_MINUTES`)도 같은 전액이라 한 문장에 묶는다.
   //   표는 그 «밖»의 때다. 표가 이용일까지 줄곧 전액이면 두 창이 바꾸는 게 없어서 붙이지 않는다.
   // 🔁09-27 대표 A6 — 손님이 읽는 자리라 「수락」을 「확정」으로. 시간은 여전히 상수(`GRACE_MINUTES` = 60분 → 「1시간」)에서 읽는다.
+  // 📋09-27 대표 코멘트 #156 — 「불렛으로 각각 규정 나누자」 · 「그 밖엔 -> 이후에는」. 한 문단이던 것을 규정 하나에 한 줄로 나눈다.
+  //   날짜·비율은 그대로 이 예약 기준으로 계산한 값이다. 전액 창(확정 전·확정 뒤 1시간)이 첫 줄, 그 «이후»의 표가 다음 줄들이다.
   const head = `사장님이 확정하기 전이나 확정하고 ${GRACE_MINUTES / 60}시간 안에 취소하면 전액 돌려드려요.`;
   if (now >= 1) {
     return next === null || next === now
-      ? `${until}까지 취소하면 전액 돌려드려요.`
-      : `${head} 그 밖엔 ${until}까지 전액이고, 그 뒤엔 ${next > 0 ? `${pct(next)}로 줄어요` : "돌려드릴 수 없어요"}.`;
+      ? [`${until}까지 취소하면 전액 돌려드려요.`]
+      : [
+        head,
+        `이후에는 ${until}까지 취소하면 전액 돌려드려요.`,
+        next > 0 ? `그 뒤에 취소하면 ${pct(next)}를 돌려드려요.` : "그 뒤에 취소하면 돌려드릴 수 없어요.",
+      ];
   }
-  if (now === 0) return `${head} 그 밖엔 오늘 쓰는 예약이라 돌려드릴 수 없어요.`;
-  return `${head} 그 밖엔 ${until}까지 취소하면 ${pct(now)}를 돌려드려요.`;
+  if (now === 0) return [head, "이후에는 오늘 쓰는 예약이라 돌려드릴 수 없어요."];
+  return [head, `이후에는 ${until}까지 취소하면 ${pct(now)}를 돌려드려요.`];
+}
+
+/** 🧹09-27 대표 「결제 중 취소는 그냥 새로 결제하는 걸로 가자」 — 이어서 낼 수 없는 주문(결제 시간이 지났거나, 하루가 지나 지워졌거나,
+ *  내 것이 아닌 주문)은 그 공간의 신청 자리로 돌려보낸다. 거기서 새로 신청하면 된다. 공간이 손님 앞에 안 서면(쉬는 중 등) 목록으로.
+ *  🩸전엔 결제 시간이 지난 주문을 「내 예약」으로 보냈는데, 그 신청은 이제 목록에 안 선다 — 도착한 곳에 아무것도 없었다.
+ *  🔒없는 주문과 남의 주문을 똑같이 다룬다. 둘이 다르게 움직이면 주문번호를 넣어 보며 «있는 주문»을 가려낼 수 있다.
+ *    공간 번호는 주문번호 안에 이미 있다(`rent-{공간}-{날짜}-{난수}`, `startBookingAction`). 새는 정보가 없다. */
+async function backToSpace(spaceId: number | null): Promise<never> {
+  const brief = spaceId ? (await listSpacesByIds([spaceId])).get(spaceId) : undefined;
+  const space = brief ? await getSpaceFull(brief.slug) : null;
+  redirect(space && spaceListed(space) ? `/rent/${space.slug}#apply` : "/rent");
+}
+
+/** 주문번호에 박힌 공간 번호. 모양이 다르면(목 데이터 `mock-order-…` 등) null. */
+function spaceIdOfOrder(orderId: string): number | null {
+  const m = /^rent-(\d+)-\d{8}-/.exec(orderId);
+  return m ? Number(m[1]) : null;
 }
 
 export default async function RentPayPage({ params }: { params: Promise<{ orderId: string }> }) {
@@ -76,10 +100,10 @@ export default async function RentPayPage({ params }: { params: Promise<{ orderI
   if (!uid) redirect(`/login?redirect=${encodeURIComponent(`/rent/pay/${orderId}`)}`);
 
   const b = await getBookingByOrderId(orderId);
-  // 남의 주문이면 404. 「있는데 못 본다」보다 「없다」가 새는 정보가 적다(`/rent/done`과 같은 규칙).
-  if (!b || b.guestUserId !== uid) notFound();
-  // ⏳결제 시간이 지난 신청은 결제 화면을 다시 열지 않는다 — 토스 결제가 이미 EXPIRED라 눌러도 막힌다.
-  if (b.status === "expired") redirect("/rent/requests");
+  // 🔁09-27 — 없는 주문(하루 지나 지워진 결제 이탈 포함)·남의 주문은 404 대신 그 공간으로(`backToSpace` 머리말).
+  if (!b || b.guestUserId !== uid) return backToSpace(spaceIdOfOrder(orderId));
+  // ⏳결제 시간이 지난 신청은 결제 화면을 다시 열지 않는다 — 토스 결제가 이미 EXPIRED라 눌러도 막힌다. 공간에서 새로 신청하게 보낸다.
+  if (b.status === "expired") return backToSpace(b.spaceId);
   if (b.status !== "pending") redirect(`/rent/done/${b.id}`);
 
   // 🔒09-27(fix-money3) — **결제를 시도한 흔적이 있으면 위젯을 그리지 않는다.** 앞선 승인의 결과를 아직 모르는 주문이다
@@ -94,7 +118,8 @@ export default async function RentPayPage({ params }: { params: Promise<{ orderI
         <p className="mt-3 text-[17px] leading-relaxed break-keep text-body">{PAY_CHECKING_BODY}</p>
         <p className="mt-5 border-l-2 border-hairline pl-4 text-[15px] leading-relaxed break-keep text-mute">{PAY_CHECKING_LINE}</p>
         <div className="mt-8 flex flex-wrap gap-2">
-          <Link href="/rent/requests" className={secondaryBtnCls}>
+          {/* 🗂09-27 — 이 신청이 선 탭(「예약 확정 대기」)과 그 줄로 바로 간다. */}
+          <Link href={guestBookingHref(b, true)} className={secondaryBtnCls}>
             내 예약 보기
           </Link>
         </div>
@@ -110,7 +135,7 @@ export default async function RentPayPage({ params }: { params: Promise<{ orderI
   }
 
   const brief = (await listSpacesByIds([b.spaceId])).get(b.spaceId);
-  if (!brief) notFound();
+  if (!brief) return backToSpace(null);
 
   // ⭐09-18 밤 QA(G-01·SC-30) — **결제 승인과 같은 판정을 화면에서도 돌린다.**
   //   이 화면이 위젯을 보여 주면 손님은 「지금 결제된다」고 읽는다. 승인이 거절할 신청에 결제창을 띄우면
@@ -198,7 +223,7 @@ export default async function RentPayPage({ params }: { params: Promise<{ orderI
         scheduleLabel={bookingWhen(b)}
         amountLabel={won(b.amountTotal)}
         breakdown={breakdown}
-        cancelLine={cancelRuleLine(b.useDate)}
+        cancelRules={cancelRules(b.useDate)}
       />
     </main>
   );

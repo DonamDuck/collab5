@@ -38,6 +38,13 @@ export function sellableProducts(sp: ProductFields): RentProduct[] {
   return RENT_PRODUCTS.filter((p) => productPrice(sp, p) > 0);
 }
 
+/** 🛍09-27 대표 코멘트 #149 — 신청 폼에 미리 골라 두는 상품. 「대관만」이 기본이고, 대관만을 안 파는 공간이면 파는 첫 상품이다.
+ *  `sellableProducts`가 대관만 → 공간 전체 순서라 그 첫 칸이 곧 이 규칙이다. 폼(`BookingForm`)과 상세 오른쪽 카드의
+ *  「선택한 상품」 서버 기본값(`page.tsx`)이 이 한 함수를 부른다 — 둘이 다르면 카드가 폼과 다른 상품을 말한다. */
+export function defaultProduct(sp: ProductFields): RentProduct | null {
+  return sellableProducts(sp)[0] ?? null;
+}
+
 /** 「N원부터」의 N. 팔 수 있는 상품이 없으면 0. */
 export function lowestPrice(sp: ProductFields): number {
   const prices = sellableProducts(sp).map((p) => productPrice(sp, p));

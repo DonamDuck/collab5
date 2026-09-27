@@ -817,7 +817,7 @@ export const MOCK_IDS = {
 /** 메일 종류 → 만드는 법. 지도(`/dev/rent-map`)가 링크로 걸고, `/dev/rent-mail/[kind]`가 종류마다 만든다. */
 export const MOCK_MAIL_KINDS: { kind: string; label: string }[] = [
   { kind: "paid-host", label: "결제 완료 → 사장님 (새 요청, 커피챗·손님 소개서 포함)" },
-  { kind: "paid-guest", label: "결제 완료 → 손님 (예약 완료, 사장님 연락처)" },
+  { kind: "paid-guest", label: "결제 완료 → 손님 (사장님 확정 대기, 사장님 연락처)" },
   { kind: "confirmed-guest", label: "수락 → 손님 (예약 확정, 사장님 말씀 포함)" },
   { kind: "confirmed-host", label: "수락 → 사장님 (손님 연락처와 그날 챙길 일)" },
   { kind: "confirmed-host-noaccount", label: "수락 → 사장님 · 정산 계좌가 없을 때" },

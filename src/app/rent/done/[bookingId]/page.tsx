@@ -7,9 +7,10 @@ import { repo } from "@/lib/repo";
 import { ContactBlock } from "../../ContactBlock";
 import { KAKAO_CHAT_URL } from "@/lib/site";
 import { bookingFinished, bookingStarted } from "@/lib/rent-time";
-import { BOOKING_HEADLINE, COFFEE_CHAT_WHEN_GUEST, CONTACT_RULE_GUEST, CONTACT_RULE_GUEST_DONE, PRODUCT_LABEL, REFUND_TIMING_LINE, unconfirmedReasonLine } from "@/lib/rent-copy";
+import { BOOKING_HEADLINE, COFFEE_CHAT_WHEN_GUEST, CONFIRM_BEFORE_USE_GUEST, CONTACT_RULE_GUEST, CONTACT_RULE_GUEST_DONE, PRODUCT_LABEL, REFUND_TIMING_LINE, unconfirmedReasonLine } from "@/lib/rent-copy";
 import { CONFIRM_DEADLINE_HOURS, confirmLapse } from "@/lib/rent-booking-rules";
 import { isUnconfirmedRefundReason } from "@/lib/rent-payment";
+import { guestBookingHref } from "@/lib/rent-groups";
 import { bookingHasChat } from "@/lib/rent-products";
 import type { BookingStatus } from "@/lib/types";
 import { GuestCancel } from "../../my/Actions";
@@ -56,8 +57,10 @@ export default async function RentDonePage({ params }: { params: Promise<{ booki
 
   const b = await getBooking(id);
   if (!b || b.guestUserId !== uid) notFound();
-  // 결제창만 열고 안 낸 자리는 「완료」가 아니다. 보낸 신청 목록으로 보내 상태를 그대로 보게 한다.
-  if (b.status === "pending") redirect("/rent/requests");
+  // 결제창만 열고 안 낸 자리는 「완료」가 아니다. 🔁09-27 — 전엔 내 예약 목록으로 보냈는데, 결제 전 신청은 이제 목록에 안 선다
+  //   (대표 「이어서 결제하기 스펙 자체를 지우자」). 결제 화면이 그 신청의 지금을 말한다 — 결제 시간 안이면 결제창,
+  //   결제를 확인하고 있으면 「결제를 확인하고 있어요」, 시간이 지났으면 공간으로 돌려보낸다(`/rent/pay/[orderId]`).
+  if (b.status === "pending") redirect(`/rent/pay/${b.orderId}`);
 
   const brief = (await listSpacesByIds([b.spaceId])).get(b.spaceId);
   // 👀09-16 phase 1 — 결제를 마치면 사장님 연락처가 바로 열린다(`guestSeesHost`). 원본(주소·안내)도 그때 읽는다.
@@ -76,7 +79,8 @@ export default async function RentDonePage({ params }: { params: Promise<{ booki
   // 🔁09-17 제목은 위 `TITLE`로(대표: 상태 이름에 하루 팝업 맥락). 이모지 자리 규칙은 그대로다.
   // 🧾09-27 대표 — 사장님이 거절한 적 없는 거절(자동 취소 실패)에 「사장님이 어렵다고 하셨어요」가 섰다.
   // (제목은 아래 `pay`를 읽은 뒤에 정한다 — 확정 기한이 지나 돌려준 환불은 결제 줄의 취소 사유로 알아본다.)
-  const emoji = b.status === "paid" ? "✨" : b.status === "confirmed" ? "🎉" : "";
+  // 🔁09-27 대표 — 결제 완료는 이제 «확정 대기»다(`BOOKING_HEADLINE.guestPaid`). 기다리는 자리에 ✨를 붙이면 축하로 읽혀서 뺐다. 🎉는 확정에만.
+  const emoji = b.status === "confirmed" ? "🎉" : "";
   const spaceName = brief?.name ?? "공간";
   // ☕09-19 무료 커피챗(값 0)까지 보는 한 벌.
   const withChat = bookingHasChat(b);
@@ -179,6 +183,9 @@ export default async function RentDonePage({ params }: { params: Promise<{ booki
               <h2 className="text-[19px] font-bold leading-snug tracking-tight text-ink">예약 안내 사항</h2>
               <ul className="mt-4 space-y-3">
                 {[
+                  // 🔑09-27 대표 코멘트 #157 — 「여기 1번 불렛에 … 사장님이 예약확정해야 이용이 가능하다는 내용 여기도 넣자」.
+                  //   신청 확인 팝업 첫 줄(#154)과 같은 상수다. 이미 확정된 예약엔 맞지 않는 말이라 결제 완료(확정 대기)일 때만.
+                  ...(b.status === "paid" ? [CONFIRM_BEFORE_USE_GUEST] : []),
                   // ⏱09-17 대표 — 확정 뒤 2일 안 연락 규칙. 이미 수락된 건은 조건형(「확정하면」) 대신 지난 일로 말한다.
                   b.status === "confirmed" ? CONTACT_RULE_GUEST_DONE : CONTACT_RULE_GUEST,
                   // 🆕09-19 오후 대표 — 수락 전 취소는 전액(`CancelStage`). 수락을 기다리는 동안만 참인 말이라 그때만 선다.
@@ -241,9 +248,11 @@ export default async function RentDonePage({ params }: { params: Promise<{ booki
       )}
 
       {/* ✉️09-17 QA — 확정 메일의 「예약 내용 보기」가 이 화면으로 오는데 취소 버튼이 없었다. 「그날 못 가는데」 싶은
-          손님이 목록을 찾아 헤맸다. 목록 줄과 같은 조건·같은 버튼(`GuestCancel`)을 쓴다 — 조건이 두 벌이면 갈라진다. */}
+          손님이 목록을 찾아 헤맸다.
+          🔁09-27 대표 #159·#161 — 취소는 이제 여기서만 한다(목록 줄의 버튼은 뺐다). 글자 링크였던 것을 아래 버튼들과 같은
+          보조 버튼으로 세운다(`GuestCancel` 안). 누르면 전처럼 환불 견적 팝업이 뜬다. */}
       {(b.status === "paid" || b.status === "confirmed") && !bookingStarted(b) && (
-        <div className="mt-6">
+        <div className="mt-8">
           <GuestCancel bookingId={b.id} />
         </div>
       )}
@@ -254,10 +263,12 @@ export default async function RentDonePage({ params }: { params: Promise<{ booki
           가서, 손님이 자기 신청을 찾으려면 공간·받은 신청 두 덩이를 지나야 했다.
           🔁09-19 대표 [F] — 이름을 「내 예약」 한 벌로(「일단은 내 예약으로 하자」). 메뉴 바·메일·목록 제목이 같은 이름이다. */}
       {/* 🔗09-27 대표 D2 — *「그 해당건에 한해 가는게 맞는거 같음」*. 목록 맨 위가 아니라 이 예약 한 줄로 데려간다
-          (`/rent/requests`의 줄 id `b-<번호>` · 도착하면 `HashFocus`가 그 줄로 내려가 잠깐 옅게 칠한다). */}
+          (`/rent/requests`의 줄 id `b-<번호>` · 도착하면 `HashFocus`가 그 줄로 내려가 잠깐 옅게 칠한다).
+          🗂09-27 #162 — 목록이 탭으로 나뉘어서 그 예약이 선 탭(`?g=`)까지 붙인다(`guestBookingHref`).
+          ✍️09-27 대표 코멘트 #160 — 「내 예약 보기」 → 「예약 내역 확인」. */}
       <div className="mt-9">
-        <Link href={`/rent/requests#b-${b.id}`} className={`${primaryBtnCls} h-[48px] w-full`}>
-          내 예약 보기
+        <Link href={guestBookingHref(b)} className={`${primaryBtnCls} h-[48px] w-full`}>
+          예약 내역 확인
         </Link>
         <Link href="/rent" className={`${secondaryBtnCls} mt-2 h-[48px] w-full`}>
           다른 공간도 둘러보기

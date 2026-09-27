@@ -12,6 +12,7 @@
 //   만들고 있었다. 소개서(`/m`) 사다리와 디자인-시스템 정본에 맞춰 통째로 갈았다.
 //   ⛔`rem` 유틸 금지(루트 17px라 6.25% 부푼다) — 전부 px로 박는다.
 import type { ReactNode } from "react";
+import Link from "next/link";
 import type { BookingStatus, SpaceCategory } from "@/lib/types";
 
 /** 금액은 늘 「12,000원」 한 모양으로. 숫자만 던져두면 자릿수를 눈으로 세게 된다. */
@@ -79,15 +80,17 @@ export function CoffeeChatChip() {
  *  ⛔Kiwi(primary)는 안 쓴다. 브랜드색이 「성공」을 뜻하기 시작하면 희소성이 무너진다
  *    (globals.css의 `--success-pale` 주석과 같은 규율). */
 // 🔁09-17 대표 결정 4 — 이름을 «짧은 명사꼴»로 맞췄다. 제목·첫 줄의 긴 문장은 `rent-copy.ts`의 `BOOKING_HEADLINE`이고,
-//   배지는 그 문장의 짧은 꼴이다(예약 완료 / 예약 확정 / 새 요청). 나머지 상태도 같은 결로 한 번에 갈았다.
+//   배지는 그 문장의 짧은 꼴이다(예약 확정 대기 / 예약 확정 / 새 요청). 나머지 상태도 같은 결로 한 번에 갈았다.
 //   ⭐용어 규칙: 손님은 결제 전 「신청」, 결제 뒤 「예약」. 사장님은 들어온 것이 「요청」, 수락 뒤 「예약」.
 //   🩸09-16까지 손님 쪽은 「예약을 완료했어요」, 사장님 쪽은 「새 신청이에요」라서 같은 건이 화면마다 다른 이름이었다.
-//   ⚠️「완료」를 셋(예약·환불·이용)에 붙이면 목록을 세로로 읽을 때 한 금형이 된다. 예약 완료 하나에만 쓴다.
+//   ⚠️「완료」를 셋(예약·환불·이용)에 붙이면 목록을 세로로 읽을 때 한 금형이 된다. 🔁09-27부터 결제 완료 배지엔 「완료」가 없다(아래).
 const BOOKING_TONE: Record<BookingStatus, { label: string; cls: string }> = {
   // ⭐`pending`은 결제창까지 갔다가 안 내고 돌아온 자리다. 게스트 화면에만 뜨고 호스트에겐 안 보인다.
   //   말투를 「실패」로 쓰지 않는 이유 — 대개는 실패가 아니라 마음이 바뀐 것이다.
   pending: { label: "결제 전", cls: "text-faint" },
-  paid: { label: "예약 완료", cls: "text-mint-on" },
+  // 🔁09-27 대표 — 「예약 완료」 → 「예약 확정 대기」. *「확정 완료가 진짜 예약의 확정이니까」*. 09-16~17의 «결제하면 곧 예약 완료»
+  //   (손님을 사장님 답에 세워 두지 않는다)를 뒤집었다. 기다리는 자리라 색도 위 규칙대로 레몬이다(전엔 완료라서 민트였다).
+  paid: { label: "예약 확정 대기", cls: "text-lemon-on" },
   confirmed: { label: "예약 확정", cls: "text-mint-on" },
   rejected: { label: "사장님 거절", cls: "text-faint" },
   refunded: { label: "전액 환불", cls: "text-faint" },
@@ -98,8 +101,8 @@ const BOOKING_TONE: Record<BookingStatus, { label: string; cls: string }> = {
   expired: { label: "결제 시간 지남", cls: "text-faint" },
 };
 
-/** 👥보는 사람에 따라 같은 상태를 다르게 말하는 자리. 09-16 phase 1 — 손님에게 `paid`는 기다림이 아니라
- *  «예약 완료»다(사장님 답을 기다리게 세워 두지 않는다). 사장님에게 같은 상태는 «새로 들어온 요청»이다(09-17 대표 결정 4). */
+/** 👥보는 사람에 따라 같은 상태를 다르게 말하는 자리. 손님에게 `paid`는 «예약 확정 대기»(09-27 대표 — 09-16 phase 1의
+ *  «예약 완료»를 뒤집었다), 사장님에게 같은 상태는 «새로 들어온 요청»이다(09-17 대표 결정 4, 그대로). */
 const TONE_FOR: Record<"guest" | "host", Partial<Record<BookingStatus, { label: string; cls: string }>>> = {
   guest: {},
   host: {
@@ -267,13 +270,19 @@ export function InfoList({ children, className = "" }: { children: ReactNode; cl
   return <dl className={`space-y-2.5 ${className}`}>{children}</dl>;
 }
 
+/** 항목 줄 한 칸의 틀·라벨·값. 🛍09-27 #150·#151 — 상세 오른쪽 카드가 줄 자리를 먼저 그려 두고 신청 폼이 값을 채울 때
+ *  (`page.tsx` 「선택한 상품」·「커피챗」 자리) 이 모양을 그대로 쓴다. 두 벌로 적으면 한쪽 줄만 폭이 달라진다. */
+export const infoRowCls = "flex gap-3 text-[16px] leading-relaxed break-keep";
+export const infoLabelCls = "w-[88px] shrink-0 text-mute";
+// ↔️09-21 대표 코멘트 — 띄어쓰기 없는 긴 글(「브랜드팝업행사로…」)이 `break-keep`에 걸려 한 덩어리로 서면서
+//   확인 팝업이 옆으로 밀렸다(474폭 실측 378 → 446). 넘칠 때만 글자 사이에서 꺾는다.
+export const infoValueCls = "min-w-0 flex-1 text-body [overflow-wrap:anywhere]";
+
 export function InfoRow({ label, value }: { label: string; value: ReactNode }) {
   return (
-    <div className="flex gap-3 text-[16px] leading-relaxed break-keep">
-      <dt className="w-[88px] shrink-0 text-mute">{label}</dt>
-      {/* ↔️09-21 대표 코멘트 — 띄어쓰기 없는 긴 글(「브랜드팝업행사로…」)이 `break-keep`에 걸려 한 덩어리로 서면서
-          확인 팝업이 옆으로 밀렸다(474폭 실측 378 → 446). 넘칠 때만 글자 사이에서 꺾는다. */}
-      <dd className="min-w-0 flex-1 text-body [overflow-wrap:anywhere]">{value}</dd>
+    <div className={infoRowCls}>
+      <dt className={infoLabelCls}>{label}</dt>
+      <dd className={infoValueCls}>{value}</dd>
     </div>
   );
 }
@@ -297,10 +306,18 @@ export function ListRow({
   children,
   card = false,
   id,
+  href,
+  hrefLabel,
 }: {
   head: ReactNode;
   status: ReactNode;
   children?: ReactNode;
+  /** 🔗09-27 대표 코멘트 #158 — 「자세히 버튼 삭제하고, 섹션 영역 클릭하면 자세히 화면으로」. 카드일 때만 쓴다.
+   *  카드 전체를 덮는 링크 한 겹을 깐다(`<a>` 안에 `<a>`를 넣지 않으려고). 카드 안의 다른 링크(공간 이름·전화·메일)는
+   *  `relative z-[1]`로 그 위에 올라와 따로 눌린다 — 카드 안에 링크를 더할 땐 같은 클래스를 붙일 것. */
+  href?: string;
+  /** 덮는 링크의 이름(낭독기). 링크 안에 글자가 없어서 이게 없으면 「링크」로만 읽힌다. */
+  hrefLabel?: string;
   /** 🔗줄을 주소로 가리킬 이름(09-18 밤 QA H-08). 화면 위 결과 줄이 `#booking-12`로 이 줄까지 데려온다.
    *  `scroll-mt`는 헤더(3.5rem)와 고정 탭이 덮는 만큼을 미리 비켜 둔 값이다. */
   id?: string;
@@ -310,7 +327,19 @@ export function ListRow({
 }) {
   if (card) {
     return (
-      <li id={id} className="mb-3 scroll-mt-32 rounded-xl border border-hairline bg-surface p-4 last:mb-0 sm:p-5">
+      <li
+        id={id}
+        className={`mb-3 scroll-mt-32 rounded-xl border border-hairline bg-surface p-4 last:mb-0 sm:p-5 ${
+          href ? "relative transition-colors hover:bg-surface-soft" : ""
+        }`}
+      >
+        {href && (
+          <Link
+            href={href}
+            aria-label={hrefLabel}
+            className="absolute inset-0 rounded-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+          />
+        )}
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0 flex-1">{head}</div>
           {status}

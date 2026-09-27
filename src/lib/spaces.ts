@@ -1086,6 +1086,89 @@ export async function sweepBookings(
   return run;
 }
 
+/** 🧹결제 이탈 정리가 지우기 전에 기다리는 시간. 크론이 장부 대조(`reconcileLedger`, 전날 거래) «뒤»에 돌아서,
+ *  하루가 지난 신청은 그 대조를 한 번은 지난 뒤다. 토스 쪽에 무슨 일이 있었으면 대조가 먼저 알린다. */
+export const PURGE_AFTER_HOURS = 24;
+
+/** 결제 이탈 정리 한 번이 한 일. */
+export interface PurgeRun {
+  /** 지운 신청 수(결제 줄도 같이 지웠다). */
+  deleted: number;
+  /** 하루가 지난 만료 신청 중 흔적이 있어서(또는 장부 대조가 짚어서) 남긴 수. */
+  kept: number;
+}
+
+/** 결제 줄이 «결제를 시도한 흔적이 전혀 없는» 모양인가 — 결제창만 열고 떠난 줄. 여기서 하나라도 어긋나면 지우지 않는다.
+ *  상태가 READY·EXPIRED이고, 결제 키·승인 시각·취소 시각이 비었고, 지급 상태가 NONE. */
+function untracedPayRow(p: Row): boolean {
+  const st = s(p.status);
+  return (st === "READY" || st === "EXPIRED") && !s(p.payment_key) && !p.approved_at && !p.canceled_at && (s(p.payout_status) || "NONE") === "NONE";
+}
+
+/** 🧹09-27 대표 — 결제창만 열고 떠난 신청을 지운다(매일 아침 크론, 장부 대조 뒤).
+ *  대표 원문: *「결제창 갔다가 껐다가 고민하는 걸 다 남기면 우리 입장에서 너무 큰 데이터 낭비 같아」*.
+ *  ⭐지우는 것 = 만료(`expired`)된 지 `PURGE_AFTER_HOURS`가 지난 신청 중, 딸린 결제 줄이 전부 «흔적 없음»(`untracedPayRow`)인 것.
+ *    결제 줄을 먼저 지우고(예약을 가리키는 칸이 `restrict`라서) 예약을 지운다. 둘 다 조건절을 다시 달아 그 사이 바뀐 줄은 안 지운다.
+ *  🔒절대 안 지우는 것 — 흔적이 있는 신청(ABORTED·결제 키·승인·취소 시각) · 만료가 아닌 모든 상태 · 하루가 안 된 신청
+ *    · 장부 대조가 오늘 짚은 주문(`keepOrderIds`). 토스 거래가 가리킬 수 있는 줄은 이 조건들에 다 걸린다.
+ *  🚨throw하지 않는다. 읽기가 실패하면 null(아침 요약이 「멈췄어요」로 말한다), 지우기가 일부 실패하면 지운 만큼만 센다.
+ *  @param opts.keepOrderIds 오늘 장부 대조가 어긋났다고 짚은 주문 — 사람이 볼 때까지 남긴다.
+ *  @param opts.limit 한 번에 볼 최대 수. 남으면 다음 날 이어 간다. */
+export async function purgeAbandonedCheckouts(
+  opts: { keepOrderIds?: string[]; now?: number; limit?: number } = {},
+): Promise<PurgeRun | null> {
+  if (await rentMockOn()) return { deleted: 0, kept: 0 };
+  const c = db();
+  if (!c) return null;
+  const cutoff = new Date((opts.now ?? Date.now()) - PURGE_AFTER_HOURS * 3_600_000).toISOString();
+  const keep = new Set(opts.keepOrderIds ?? []);
+  const { data: old, error } = await c.from("space_bookings").select("id,order_id,payment_key,created_at")
+    .eq("status", "expired").lt("created_at", cutoff).order("created_at", { ascending: true }).limit(opts.limit ?? 500);
+  if (error) { console.error(`[spaces] 결제 이탈 정리 — 읽기 실패: ${error.message}`); return null; }
+  const rows = (old ?? []) as Row[];
+  if (rows.length === 0) return { deleted: 0, kept: 0 };
+
+  // 딸린 결제 줄 — 예약 번호로도, 주문번호로도 읽는다(어느 쪽으로 이어졌든 빠짐없이). 100건씩 끊는다(주소 길이).
+  const ids = rows.map((r) => n(r.id));
+  const orders = rows.map((r) => s(r.order_id)).filter(Boolean);
+  const pays = new Map<number, Row>();
+  for (const [col, vals] of [["booking_id", ids], ["order_id", orders]] as [string, (number | string)[]][]) {
+    for (let i = 0; i < vals.length; i += 100) {
+      const got = await c.from("payments").select("id,booking_id,order_id,status,payment_key,approved_at,canceled_at,payout_status")
+        .in(col, vals.slice(i, i + 100));
+      if (got.error) { console.error(`[spaces] 결제 이탈 정리 — 결제 줄 읽기 실패: ${got.error.message}`); return null; }
+      for (const p of (got.data ?? []) as Row[]) pays.set(n(p.id), p);
+    }
+  }
+  const paysOf = (r: Row) => [...pays.values()].filter((p) => n(p.booking_id) === n(r.id) || s(p.order_id) === s(r.order_id));
+  const clean = rows.filter((r) => !s(r.payment_key) && !keep.has(s(r.order_id)) && paysOf(r).every(untracedPayRow));
+  const kept = rows.length - clean.length;
+
+  // ① 결제 줄 — 흔적 없음 조건을 지우는 문장에 다시 단다. 그 사이 키가 적힌 줄은 여기서 빠진다.
+  const payIds = clean.flatMap((r) => paysOf(r).map((p) => n(p.id)));
+  const gone = new Set<number>();
+  for (let i = 0; i < payIds.length; i += 100) {
+    const del = await c.from("payments").delete()
+      .in("id", payIds.slice(i, i + 100)).in("status", ["READY", "EXPIRED"]).is("payment_key", null)
+      .is("approved_at", null).is("canceled_at", null).eq("payout_status", "NONE")
+      .select("id");
+    if (del.error) { console.error(`[spaces] 결제 이탈 정리 — 결제 줄 지우기 실패: ${del.error.message}`); break; }
+    for (const p of (del.data ?? []) as Row[]) gone.add(n(p.id));
+  }
+  // ② 예약 — 딸린 결제 줄이 다 지워진 것만. 상태·나이도 다시 단다.
+  const bookingIds = clean.filter((r) => paysOf(r).every((p) => gone.has(n(p.id)))).map((r) => n(r.id));
+  let deleted = 0;
+  for (let i = 0; i < bookingIds.length; i += 100) {
+    const del = await c.from("space_bookings").delete()
+      .in("id", bookingIds.slice(i, i + 100)).eq("status", "expired").lt("created_at", cutoff)
+      .select("id");
+    if (del.error) { console.error(`[spaces] 결제 이탈 정리 — 신청 지우기 실패: ${del.error.message}`); break; }
+    deleted += (del.data ?? []).length;
+  }
+  console.info(`[spaces] 결제 이탈 정리 ${deleted}건 지움 · ${kept}건 남김`);
+  return { deleted, kept };
+}
+
 /** 지급 목록 — 대기·요청·실패·완료. 정산 화면이 판매자별로 묶는다. 예약을 같이 읽어 온다. */
 export async function listPayouts(): Promise<{ payment: Payment; booking: SpaceBooking | null }[]> {
   const m = await getRentMock();
@@ -1217,8 +1300,8 @@ export async function listStuckBookings(): Promise<{ unanswered: SpaceBooking[];
 
 /** 👀손님이 사장님 연락처를 볼 수 있는가 — **결제를 마친 순간부터**(대표 09-16, phase 1).
  *
- *  채팅이 없는 지금은 「사장님 답 기다리는 중」으로 손님을 세워 두지 않는다. 결제가 끝나면 곧 예약 완료고,
- *  사장님 전화번호를 바로 보여 준다. 사장님이 답을 안 하는 일은 우리가 상담(카카오 채널)으로 받아 직접 처리한다.
+ *  채팅이 없는 지금은 사장님 답을 기다리는 동안에도 연락 길을 막지 않는다. 결제가 끝나면 사장님 전화번호를 바로 보여 준다.
+ *  (🔁09-27 대표 — 손님 쪽 이름은 «예약 완료»에서 «예약 확정 대기»로 바뀌었다. 연락처를 여는 때는 그대로 결제 순간이다.) 사장님이 답을 안 하는 일은 우리가 상담(카카오 채널)으로 받아 직접 처리한다.
  *  ⏭나중에 채팅이 붙으면 「채팅으로 메시지를 보낸 이력이 있으면 규정 위반이 아니다」 같은 규정을 그 위에 얹는다.
  *  ⚠️사장님 쪽에서 «손님» 연락처를 여는 문은 여전히 `isRevealed`(수락 뒤)다. 둘을 섞지 마라. */
 export function guestSeesHost(b: SpaceBooking): boolean {

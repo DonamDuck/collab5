@@ -21,7 +21,7 @@ export function PayPanel({
   scheduleLabel,
   amountLabel,
   breakdown,
-  cancelLine,
+  cancelRules,
 }: {
   orderId: string;
   amount: number;
@@ -35,8 +35,8 @@ export function PayPanel({
   amountLabel: string;
   /** 「대관만 4시간 60,000원 + 커피챗 60분 40,000원」(09-18부터 「대여」 자리에 상품 이름). 서버가 예약 행에서 만든다. 비면 합계만. */
   breakdown: string;
-  /** 이 예약 날짜로 계산한 취소 규정 한 줄. 서버가 환불표에 물어 만든다(`page.tsx`). */
-  cancelLine: string;
+  /** 이 예약 날짜로 계산한 취소 규정 — 규정 하나에 한 줄(09-27 #156). 서버가 환불표에 물어 만든다(`page.tsx`). */
+  cancelRules: string[];
 }) {
   const [ready, setReady] = useState(false);
   const [err, setErr] = useState("");
@@ -202,12 +202,23 @@ export function PayPanel({
       <div className="space-y-3">
         {/* 📜09-17 QA — 돈이 실제로 나가는 화면에 취소 규정도 약관 링크도 없었다. 이 예약 날짜로 계산한 한 줄과
             하루 팝업 조항(`/terms#rent`)으로 가는 길. 토스 약관 칸 «위»에 둬서 「읽고 → 동의하고 → 누른다」 순서가 된다. */}
-        <p className="text-[15px] leading-relaxed break-keep text-mute">
-          {cancelLine}{" "}
-          <Link href="/terms#rent" target="_blank" className="text-body underline underline-offset-2">
-            취소 규정 전체 보기
-          </Link>
-        </p>
+        {/* 📋09-27 대표 코멘트 #156 — 규정마다 점 한 줄, 「취소 규정 전체 보기」는 목록 아래. 점 모양은 확인 팝업 「예약 전 유의 사항」과 같다. */}
+        <div>
+          <ul className="space-y-1.5">
+            {cancelRules.map((line) => (
+              <li key={line} className="flex gap-2 text-[15px] leading-relaxed break-keep text-mute">
+                <span aria-hidden="true">·</span>
+                <span className="min-w-0 flex-1">{line}</span>
+              </li>
+            ))}
+          </ul>
+          {/* 글자 링크 — 세로 패딩으로 44px를 채우고 음수 마진으로 줄 간격은 그대로 둔다(디자인-시스템 §터치 타깃). */}
+          <p className="mt-2 text-[15px] leading-relaxed">
+            <Link href="/terms#rent" target="_blank" className="-my-[11px] inline-block py-[11px] text-body underline underline-offset-2">
+              취소 규정 전체 보기
+            </Link>
+          </p>
+        </div>
         <div id="rent-pay-agreement" />
         <button
           type="button"

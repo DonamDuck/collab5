@@ -2,10 +2,11 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { sweepBookings } from "@/lib/spaces";
 import { getSessionUserId } from "@/lib/profiles";
-import { groupGuestBookings } from "@/lib/rent-groups";
-import { GuestBookingRow, loadGuestBookings, type GuestBookingView } from "../GuestBookingRow";
+import { defaultGuestTab, parseGuestTab, type GuestTabKey } from "@/lib/rent-groups";
+import { GuestBookingRow, guestTabViews, loadGuestBookings } from "../GuestBookingRow";
 import { primaryBtnCls } from "../ui";
 import { KAKAO_CHAT_URL } from "@/lib/site";
+import { StickyTabs } from "@/components/StickyTabs";
 import { HashFocus } from "./HashFocus";
 
 // 하루 팝업 — 손님이 보낸 신청만 모아 보는 화면 (2026-09-16 · 백로그 B81)
@@ -17,6 +18,9 @@ import { HashFocus } from "./HashFocus";
 //   나머지(지난 예약·취소·환불)를 「지난 예약」으로 묶는다. (🔁09-27 대표 B5 — 「앞으로 갈 곳」·「지난 신청」에서 이름을 바꿨다.)
 // 🔗09-27 대표 D2 — 메뉴 바·마이페이지의 「내 예약」이 여기로 온다. 완료 화면에서 오면 `#b-<예약번호>`로 그 줄을 짚는다(`HashFocus`).
 //   🩸전엔 여기서 따로 적어서, 이용 시각이 이미 시작된 결제 전 신청이 이 화면엔 「앞으로 갈 곳」, `/rent/my`엔 「취소·환불」로 섰다.
+// 🗂09-27 대표 코멘트 #162 — 「메뉴 탭을 만들어서 관리하자 한 화면에 모두 스크롤로 넣지말고!」. 절 둘(+ 접힌 칸)을 탭 넷으로 바꿨다.
+//   탭 이름·나눔은 `lib/rent-groups`의 `GUEST_TABS` 한 벌이고 `/rent/my` 빌린 공간 칸과 같다. 탭은 주소(`?g=`)에 남는다.
+//   🔻결제창만 열고 떠난 신청(접혀 있던 「결제 안 한 신청」)은 목록에서 뺐다(대표 09-27, `loadGuestBookings`).
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
@@ -27,12 +31,9 @@ export const metadata: Metadata = {
   alternates: { canonical: "/rent/requests" },
 };
 
-const h2Cls = "text-[21px] font-bold leading-snug tracking-tight text-ink";
-
-/** 정렬 열쇠 — 날짜 + 시작 시각. 둘 다 고정폭 글자라 문자열 비교로 순서가 맞다. */
-const whenKey = (v: GuestBookingView) => `${v.booking.useDate} ${v.booking.startTime ?? ""}`;
-
-export default async function RentRequestsPage() {
+export default async function RentRequestsPage({ searchParams }: { searchParams?: Promise<{ g?: string | string[] }> } = {}) {
+  const sp = searchParams ? await searchParams : {};
+  const asked = parseGuestTab(typeof sp.g === "string" ? sp.g : null);
   const uid = await getSessionUserId();
   if (!uid) {
     return (
@@ -55,15 +56,12 @@ export default async function RentRequestsPage() {
   await sweepBookings();
 
   const all = await loadGuestBookings(uid);
-  // 다가오는 것은 가까운 날부터(다음에 챙길 것이 맨 위), 지난 것은 최근 것부터.
-  //   거절·취소된 신청은 날이 남았어도 「지난 신청」이다(더 움직이지 않는다) — 판정은 `groupGuestBookings`가 한다.
-  const { upcoming: ahead } = groupGuestBookings(all, (v) => v.booking);
-  const past = all
-    .filter((v) => !ahead.includes(v))
-    .sort((a, b) => whenKey(b).localeCompare(whenKey(a)));
-  const expired = past.filter((v) => v.booking.status === "expired");
-  const pastKept = past.filter((v) => v.booking.status !== "expired");
-  const upcoming = ahead.sort((a, b) => whenKey(a).localeCompare(whenKey(b)));
+  // 탭마다의 줄과 순서는 `guestTabViews` 한 벌(`/rent/my` 빌린 공간 칸과 같다). 주소에 탭이 없으면 줄이 있는 첫 탭을 연다.
+  const tabs = guestTabViews(all);
+  const cur: GuestTabKey = asked ?? defaultGuestTab(Object.fromEntries(tabs.map((t) => [t.key, t.list])) as Record<GuestTabKey, unknown[]>);
+  const curTab = tabs.find((t) => t.key === cur)!;
+  // 🔗해시(`#b-<번호>`)가 다른 탭의 줄을 짚으면 `HashFocus`가 그 탭으로 옮겨 간다. 어느 줄이 어느 탭인지를 넘긴다.
+  const where = Object.fromEntries(all.map((v) => [v.booking.id, v.tab]));
 
   return (
     <main className="mx-auto w-full max-w-[720px] px-4 pt-8 pb-16 sm:px-6 sm:pt-12">
@@ -82,11 +80,11 @@ export default async function RentRequestsPage() {
         </p>
       </header>
 
-      <HashFocus />
-      {/* ✍️09-27 대표 B5·B6 — 절 이름을 「예약 완료」·「지난 예약」으로(`/rent/my` 빌린 공간 칸의 칩과 같은 이름),
-          빈 줄은 「예약」으로 부르고 둘러보러 가는 링크는 「공간 둘러보기」 한 이름으로. */}
+      {/* 🔑탭이 바뀌면 다시 붙어서(`key`) 새 탭에서 해시를 한 번 더 본다. */}
+      <HashFocus key={cur} active={cur} where={where} />
+      {/* ✍️09-27 대표 B5·B6 — 빈 줄은 「예약」으로 부르고 둘러보러 가는 링크는 「공간 둘러보기」 한 이름으로. */}
       {all.length === 0 ? (
-        // 한 건도 없을 땐 절을 세우지 않는다. 빈 제목 둘이 서면 비어 있다는 말을 두 번 하게 된다.
+        // 한 건도 없을 땐 탭을 세우지 않는다. 빈 탭 넷이 서면 비어 있다는 말을 네 번 하게 된다.
         <p className="mt-8 text-[15px] leading-relaxed break-keep text-faint">
           아직 신청하신 예약이 없어요.{" "}
           <Link href="/rent" className="underline underline-offset-2">
@@ -95,52 +93,31 @@ export default async function RentRequestsPage() {
         </p>
       ) : (
         <>
-          <section className="mt-12">
-            <h2 className={h2Cls}>예약 완료</h2>
-            {upcoming.length === 0 ? (
-              <p className="mt-5 text-[15px] leading-relaxed break-keep text-faint">
-                다가오는 예약이 없어요.{" "}
-                <Link href="/rent" className="underline underline-offset-2">
-                  공간 둘러보기
-                </Link>
-              </p>
-            ) : (
-              <ul className="mt-5">
-                {upcoming.map((v) => (
-                  <GuestBookingRow key={v.booking.id} view={v} />
-                ))}
-              </ul>
-            )}
-          </section>
-
-          {/* 지난 예약이 없으면 절째로 안 그린다. 처음 신청한 분에게 빈 「지난 예약」은 알려 주는 게 없다. */}
-          {past.length > 0 && (
-            <section className="mt-12">
-              <h2 className={h2Cls}>지난 예약</h2>
-              {pastKept.length > 0 && (
-                <ul className="mt-5">
-                  {pastKept.map((v) => (
-                    <GuestBookingRow key={v.booking.id} view={v} />
-                  ))}
-                </ul>
+          {/* 🗂09-27 대표 #162 — 탭 모양은 `/rent/my` 위 칸(빌린 공간 · 빌려준 공간)과 같은 `StickyTabs`. 헤더 밑에 붙어 따라온다. */}
+          <StickyTabs
+            className="mt-8"
+            label="내 예약 나누기"
+            active={cur}
+            items={tabs.map((t) => ({ key: t.key, label: t.label, href: `/rent/requests?g=${t.key}` }))}
+          />
+          {curTab.list.length === 0 ? (
+            <p className="mt-6 text-[15px] leading-relaxed break-keep text-faint">
+              {curTab.empty}
+              {curTab.ahead && (
+                <>
+                  {" "}
+                  <Link href="/rent" className="underline underline-offset-2">
+                    공간 둘러보기
+                  </Link>
+                </>
               )}
-              {/* 🗂09-17 QA — 결제창만 열었다 닫은 흔적(expired)이 16줄 쌓여 진짜 지난 예약이 묻혔다.
-                  기본은 접고 건수만 말한다. 다시 열 길이 없는 줄이라 펼쳐 볼 일은 드물다. */}
-              {expired.length > 0 && (
-                // 🔗09-27 D2 — 주소가 `#b-<번호>`로 이 안의 줄을 짚으면 크롬이 React보다 먼저 접힌 칸을 연다(조각 이동 때 details 자동 펼침).
-                //   그러면 서버 HTML과 `open` 한 칸이 달라 하이드레이션 경고가 뜬다. 해가 없는 차이라 이 요소만 경고를 끈다.
-                <details className="mt-5" suppressHydrationWarning>
-                  <summary className="cursor-pointer py-[12px] text-[15px] text-mute underline underline-offset-2">
-                    결제 안 한 신청 {expired.length}건
-                  </summary>
-                  <ul className="mt-2">
-                    {expired.map((v) => (
-                      <GuestBookingRow key={v.booking.id} view={v} />
-                    ))}
-                  </ul>
-                </details>
-              )}
-            </section>
+            </p>
+          ) : (
+            <ul className="mt-5">
+              {curTab.list.map((v) => (
+                <GuestBookingRow key={v.booking.id} view={v} />
+              ))}
+            </ul>
           )}
         </>
       )}

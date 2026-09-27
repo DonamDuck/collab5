@@ -11,6 +11,7 @@ import {
   decideBooking, requestRefund, clearRefundRequest, markRefundUnconfirmed, clearRefundUnconfirmed,
   setBookingStatus, listSpacesByOwner, listSpacesByIds,
   createPayment, getPaymentByOrderId, rentSync, markPaymentAttempt, clearPaymentAttempt,
+  listBookingsForGuest, listPaymentsByOrderIds,
   type SpaceSaveInput,
   listLiveBookings, setSpaceStatus, approveSpace, markReminded, SLUG_TAKEN,
   rejectSpace, REVIEW_COLUMNS_MISSING,
@@ -54,7 +55,7 @@ import {
   notifyRefundUnconfirmed, notifyPaymentReturned, notifyBookingRejectedOnce, notifyResync, type ResyncKind,
   notifyUnconfirmedRefund,
 } from "./rent-notify";
-import { bookingStarted, dateLabel, kstDaysUntil, durationLabel, isTimeMark, minutesBetween, RENT_MIN_MINUTES, toMinutes, todayKst } from "./rent-time";
+import { bookingStarted, dateLabel, kstDaysUntil, durationLabel, isTimeMark, minutesBetween, overlaps, RENT_MIN_MINUTES, toMinutes, todayKst } from "./rent-time";
 import type { Space, SpaceBooking, SpaceUseType, SpaceCategory, OpenSlot, AccessHow, RentProduct, BizCheckStatus, BizCertRead } from "./types";
 import { bookingAmount, compatScopePrice } from "./rent-products";
 import { HEADCOUNT_MSG_EMPTY, PRODUCT_LABEL, SPACE_FORM_MSG, slotReversedMsg, slotTooShortMsg } from "./rent-copy";
@@ -767,6 +768,42 @@ export interface StartBookingResult extends ActionResult {
   orderName?: string;
 }
 
+/** 🧹09-27 대표 — 새 신청을 시작하기 «직전»에, 같은 손님이 같은 공간·같은 날·겹치는 시간에 걸어 둔 결제 전 신청 중
+ *  «결제를 시도한 흔적이 없는» 것(결제창만 열고 떠난 것)을 만료로 닫는다. 닫은 수를 돌려준다.
+ *  대표 원문: *「결제 중 취소는 그냥 새로 결제하는 걸로 가자. 즉 이어서 결제하기 스펙 자체를 지우자」*.
+ *  ⭐왜 닫나 — 결제 전 신청은 원래 자리를 막지 않는다(`listLiveBookings`·DB 배제 제약 둘 다 `pending`을 뺀다). 그래서 같은 시간을
+ *    바로 다시 신청하는 데엔 이게 없어도 된다. 닫는 이유는 둘이다. ①목록에서 안 보이게 된 옛 신청이 다른 탭에 결제창째로 남아 있다가
+ *    결제되면 같은 사람이 같은 시간을 두 번 잡는다. 닫아 두면 그 결제는 승인 관문에서 「결제 시간이 지났어요」로 돈이 안 움직인다.
+ *    ②닫힌 신청은 하루 뒤 정리 크론이 지운다(`purgeAbandonedCheckouts`).
+ *  🔒건드리지 않는 것 — 남의 신청 · 흔적이 있는 신청(결제 키가 적혔거나 READY가 아님, `hasPayTrace`) · 시간이 안 겹치는 내 신청
+ *    (두 탭에서 다른 시간을 각각 결제하는 손님을 막지 않는다).
+ *  ⚠️결제 줄은 닫기 직전에 한 번 더 읽는다. 그 사이 다른 탭이 승인을 시작했으면(키를 적었으면) 두고 간다. 그래도 남는 아주 좁은 틈
+ *    (다시 읽은 뒤 · 닫기 전)에 승인이 들어오면 `rent_sync`가 만료 → 결제 완료를 받아 주고, 시간이 겹치면 자동 환불 갈래로 간다.
+ *  🚨throw하지 않는다 — 옛 신청을 못 닫아도 새 신청은 이어 간다(전과 같은 결과가 될 뿐이다). */
+async function releaseOwnAbandoned(uid: number, spaceId: number, req: { useDate: string; startTime: string; endTime: string }): Promise<number> {
+  try {
+    const mine = (await listBookingsForGuest(uid)).filter((b) =>
+      b.status === "pending" && b.spaceId === spaceId && b.useDate === req.useDate
+      && overlaps(b.startTime, b.endTime, req.startTime, req.endTime));
+    if (mine.length === 0) return 0;
+    // 결제 줄을 못 읽으면 빈 표다 — 흔적을 모르는 채로는 닫지 않는다.
+    const pays = await listPaymentsByOrderIds(mine.map((b) => b.orderId));
+    let closed = 0;
+    for (const b of mine) {
+      const p = pays.get(b.orderId);
+      if (!p || hasPayTrace({ payStatus: p.status, payKey: p.paymentKey })) continue;
+      const again = await getPaymentByOrderId(b.orderId);
+      if (!again || hasPayTrace({ payStatus: again.status, payKey: again.paymentKey })) continue;
+      if ((await rentSync(b.orderId, { bookingStatus: "expired", toss: { status: "EXPIRED" } })).ok) closed += 1;
+    }
+    if (closed > 0) console.info(`[rent-actions] 새 신청 전에 같은 시간의 결제 전 신청 ${closed}건을 닫았다 guest=${uid} space=${spaceId}`);
+    return closed;
+  } catch (e) {
+    console.error("[rent-actions] 옛 결제 전 신청 닫기 실패 — 새 신청은 이어 간다", e);
+    return 0;
+  }
+}
+
 /** ① 결제창으로 보내기 «직전» — 검사하고 자리를 잡는다.
  *
  *  ⭐**금액을 여기서 정한다.** 화면이 보내 온 금액은 받지도 않는다. 공간 행에서 다시 계산한 값만
@@ -821,6 +858,9 @@ export async function startBookingAction(input: BookingFormInput): Promise<Start
   const amt = bookingAmount(sp, input.product, minutes, input.withChat);
   if (!amt || amt.total <= 0) return { ok: false, message: "아직 값이 안 정해진 공간이라 신청할 수 없어요." };
   const { space: amountSpace, chat: amountChat, total: amountTotal } = amt;
+
+  // 🧹09-27 대표 「결제 중 취소는 그냥 새로 결제하는 걸로 가자」 — 같은 시간에 걸어 둔 내 결제 전 신청을 먼저 닫는다.
+  await releaseOwnAbandoned(uid, sp.id, input);
 
   // 주문번호는 우리가 만든다. 토스에 그대로 실려 가고 돌아올 때 이 값으로 행을 찾는다.
   const orderId = `rent-${sp.id}-${input.useDate.replace(/-/g, "")}-${Math.random().toString(36).slice(2, 10)}`;

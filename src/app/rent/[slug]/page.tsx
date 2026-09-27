@@ -7,12 +7,12 @@ import { getProfileById, getSessionUserId } from "@/lib/profiles";
 import { isRentAdmin } from "@/lib/rent-actions";
 import { repo } from "@/lib/repo";
 import { accessHowLine, COFFEE_CHAT_FREE, COFFEE_CHAT_WHEN_GUEST, CONTACT_RULE_GUEST, PRODUCT_HINT_GUEST, PRODUCT_LABEL } from "@/lib/rent-copy";
-import { coffeeChatFree, lowestPrice, productNote, productPrice, sellableProducts } from "@/lib/rent-products";
+import { coffeeChatFree, defaultProduct, lowestPrice, productNote, productPrice, sellableProducts } from "@/lib/rent-products";
 import { durationLabel, futureSlots, RENT_MIN_MINUTES } from "@/lib/rent-time";
 import { bizMissingLine, bizVerified, spaceListed } from "@/lib/bizcheck";
 import { PhotoSlider } from "@/components/PhotoSlider";
 import { BookingForm } from "./BookingForm";
-import { categoryLabel, Chip, dateLabel, InfoList, InfoRow, won } from "../ui";
+import { categoryLabel, Chip, dateLabel, InfoRow, infoLabelCls, infoRowCls, infoValueCls, won } from "../ui";
 import { AreaMap } from "./AreaMap";
 import { HostBrandCard } from "./HostBrandCard";
 import { SectionNav } from "./SectionNav";
@@ -232,6 +232,8 @@ export default async function SpaceDetailPage({
   const eyebrow = [categoryLabel(sp.category), sp.area].filter(Boolean).join(" · ");
   // 🛍09-18 켜진 공간 상품. 값 줄은 낮은 값, 값이 서로 다르면 「부터」.
   const products = sellableProducts(sp);
+  // 🛍09-27 #149·#150 — 신청 폼이 골라 두는 상품(대관만, 없으면 파는 첫 상품). 오른쪽 카드 「선택한 상품」의 서버 기본값이다.
+  const firstPick = defaultProduct(sp);
   const fromPrice = lowestPrice(sp) || sp.priceHour;
   const priceVaries = new Set(products.map((p) => productPrice(sp, p))).size > 1;
   // 🧾🏪09-18 믿을 근거 둘. 네이버 매칭이 있으면 지도 핀도 네이버가 아는 그 가게 자리에 찍는다.
@@ -633,30 +635,47 @@ export default async function SpaceDetailPage({
               </div>
             </div>
             <TrustMarks biz={bizOk} naver={onNaver} className="mt-4 flex-col" />
-            <InfoList className="mt-5 border-t border-hairline pt-5">
-              {/* 🛍09-18 켜진 상품 이름 — 「부터」가 무엇 중 낮은 값인지 요약 카드에서도 읽히게. */}
-              {products.length > 0 && (
-                <InfoRow
-                  label="상품"
-                  value={
-                    // 한 줄에 둘을 이으면 340 카드에서 「공간 전체 / 30,000원」이 꺾였다(09-18 실측). 상품마다 한 줄.
-                    <>
-                      {products.map((p) => (
-                        <span key={p} className="block">
-                          {PRODUCT_LABEL[p]} <span className="tabular-nums">{won(productPrice(sp, p))}</span>
-                        </span>
-                      ))}
-                    </>
-                  }
-                />
+            {/* 📐09-27 #151 — `InfoList`(space-y) 대신 세로 flex의 `gap`으로 줄 사이를 띄운다. 커피챗 자리는 비어 있으면 숨는데(`empty:hidden`),
+                space-y는 숨은 줄 «앞» 줄에도 아래 여백을 남긴다. gap은 숨은 줄에 간격을 안 만든다. */}
+            <dl className="mt-5 flex flex-col gap-2.5 border-t border-hairline pt-5">
+              {showForm && firstPick ? (
+                // 🛍09-27 대표 코멘트 #150 — 「선택한 상품으로 하고, 우측에는 내가 선택한 상품이 나오게 하자」.
+                //   서버가 폼의 기본 상품(#149)을 먼저 그린다. 폼(`BookingForm`의 `SideSlot`)이 지금 고른 상품을 이 값 자리에 얹으면
+                //   그 덩어리(`data-side-pick`)가 들어온 동안 CSS(`:has`)가 기본값을 숨긴다 — 금액 자리(#147)와 같은 방식이라 하이드레이션이 안 깨진다.
+                <div className={infoRowCls}>
+                  <dt className={infoLabelCls}>선택한 상품</dt>
+                  <dd id="rent-side-product" className={`${infoValueCls} [&:has([data-side-pick])>[data-side-default]]:hidden`}>
+                    <span data-side-default className="block">
+                      <span className="block font-medium text-ink">{PRODUCT_LABEL[firstPick]}</span>
+                      <span className="block text-mute tabular-nums">{won(productPrice(sp, firstPick))} / 시간</span>
+                    </span>
+                  </dd>
+                </div>
+              ) : (
+                products.length > 0 && (
+                  // 🛍09-18 폼이 없는 화면(내 공간·쉬는 중·열린 시간 없음)엔 고를 것이 없다. 켜진 상품 이름을 그대로 둔다.
+                  <InfoRow
+                    label="상품"
+                    value={
+                      // 한 줄에 둘을 이으면 340 카드에서 「공간 전체 / 30,000원」이 꺾였다(09-18 실측). 상품마다 한 줄.
+                      <>
+                        {products.map((p) => (
+                          <span key={p} className="block">
+                            {PRODUCT_LABEL[p]} <span className="tabular-nums">{won(productPrice(sp, p))}</span>
+                          </span>
+                        ))}
+                      </>
+                    }
+                  />
+                )
               )}
               {/* 🔻09-27 대표 코멘트 #139 — 「가까운 날」 줄을 뺐다. 대표: 「신청하기를 누르거나 날짜를 선택해 주세요에서 충분히 확인 가능」.
                   (09-17 디자인팀이 «가장 가까운 열린 시간»을 싣던 자리. 이 줄만 쓰던 값 `nextSlot`도 같이 걷었다.) */}
-              {sp.coffeeChat && sp.coffeeChatMinutes > 0 && (
-                <InfoRow label="커피챗" value={`${sp.coffeeChatMinutes}분 ${coffeeChatFree(sp) ? COFFEE_CHAT_FREE : `+${won(sp.coffeeChatPrice)}`}`} />
-              )}
+              {/* ☕09-27 대표 코멘트 #151 — 「커피챗의 경우도 선택한 경우에만 메뉴 나오게 하자」. 늘 서 있던 커피챗 줄을 빈 자리로 바꿨다.
+                  손님이 확인 팝업에서 커피챗을 담으면 폼이 칸(dt·dd)을 채우고, 안 담았으면 줄 자체가 없다. */}
+              {showForm && sp.coffeeChat && <div id="rent-side-chat" className={`${infoRowCls} empty:hidden`} />}
               {operatorName && <InfoRow label="운영" value={operatorName} />}
-            </InfoList>
+            </dl>
             {/* 🔁09-18 대표 결정 A — 「소개서」 키-값 줄 → 폰과 같은 카드. 표 한 칸의 밑줄 글자는 누를 곳으로 안 읽혔다. */}
             {brandName && sp.brandSlug && (
               <HostBrandCard

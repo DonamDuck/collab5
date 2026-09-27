@@ -210,13 +210,15 @@ export function GuestCancel({ bookingId }: { bookingId: number }) {
   if (done) return <p className="mt-3 text-[15px] leading-relaxed break-keep text-mute">{done}</p>;
 
   return (
-    <div className="mt-2">
+    <div>
       <button
         type="button"
         onClick={ask}
         disabled={pending}
-        // 배경 없는 글자 버튼은 세로 패딩으로 44px를 채운다(디자인-시스템 §터치 타깃).
-        className="py-[12px] text-[15px] text-mute underline underline-offset-2 disabled:opacity-60"
+        // 🔁09-27 대표 코멘트 #159 — 「예약 취소하기 이거 버튼으로 만들자. 하단 위계처럼」. 글자 링크 → 예약 한 건 화면 아래
+        //   「다른 공간도 둘러보기」와 같은 보조 버튼(흰 면 + 테두리, 48px, 폭 전체). 키위 버튼은 화면에 하나(「예약 내역 확인」)라 그대로 둔다.
+        //   목록 줄의 같은 버튼은 09-27 #161로 뺐다 — 이 버튼이 서는 곳은 이제 그 화면 하나다.
+        className={`${secondaryBtnCls} h-[48px] w-full`}
       >
         {/* 🔁09-17 「신청」 → 「예약」 — 이 버튼은 결제를 마친 건(paid·confirmed)에만 뜬다. 결제 뒤는 「예약」이다(대표). */}
         {pending && !quote ? "확인하는 중…" : "예약 취소하기"}
