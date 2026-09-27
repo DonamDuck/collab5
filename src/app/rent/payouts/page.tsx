@@ -14,6 +14,7 @@ import { RefundDecision } from "./RefundDecision";
 import { listPayoutAccounts, maskAccount, toMasked, type PayoutAccount } from "@/lib/payout-accounts";
 import { formatBizNumber } from "@/lib/bizcheck";
 import { AccountReveal } from "./AccountReveal";
+import { ResyncArea, ResyncButton } from "./Resync";
 import { bankName, HOLDER_TYPE_LABEL } from "@/lib/banks";
 import { kstDateKey } from "@/lib/time";
 
@@ -182,6 +183,9 @@ export default async function RentPayoutsPage() {
         </section>
       )}
 
+      {/* 🆕09-27 [토스에서 다시 읽기] — 정리된 줄은 목록에서 사라지므로 결과 한 줄은 이 틀이 절 위에 남긴다(`Resync.tsx`).
+          절이 통째로 사라지는 날(마지막 줄이 정리됨)에도 틀은 그 자리에 있어야 해서 조건 «밖»에 둔다. */}
+      <ResyncArea>
       {(stuck.unanswered.length > 0 || stuck.refundFailed.length > 0 || stuck.refundUnconfirmed.length > 0) && (
         <section className="mt-12 border-t border-hairline pt-8">
           <h2 className="text-[21px] font-bold leading-snug tracking-tight text-ink">손이 필요한 예약</h2>
@@ -203,9 +207,10 @@ export default async function RentPayoutsPage() {
           {stuck.refundFailed.length > 0 && (
             <StuckList
               title="환불이 안 된 결제"
-              hint="토스 관리자 화면에서 직접 취소해 주세요. 손님께 돌려드릴 돈이에요."
+              hint="토스 관리자 화면에서 직접 취소해 주세요. 손님께 돌려드릴 돈이에요. 취소하신 뒤 「토스에서 다시 읽기」를 누르면 장부를 맞추고 손님께 메일을 보내요."
               rows={stuck.refundFailed}
               spaces={spaces}
+              resync
             />
           )}
           {/* 🧾09-27 D5 — 손님이 취소했는데 토스 응답으로 환불을 확인하지 못한 예약. 예약은 결제 완료·확정 그대로다.
@@ -214,14 +219,16 @@ export default async function RentPayoutsPage() {
           {stuck.refundUnconfirmed.length > 0 && (
             <StuckList
               title="환불을 확인하지 못한 취소"
-              hint="손님이 취소하셨는데 토스가 환불 결과를 제대로 돌려주지 않았어요. 토스 관리자 화면에서 주문번호로 찾아 환불됐는지 보시고, 안 됐으면 거기서 취소 규정대로 돌려드려 주세요. 손님께는 확인해서 연락드린다고 말씀드렸어요."
+              hint="손님이 취소하셨는데 토스가 환불 결과를 제대로 돌려주지 않았어요. 토스 관리자 화면에서 주문번호로 찾아 환불됐는지 보시고, 안 됐으면 거기서 취소 규정대로 돌려드려 주세요. 손님께는 확인해서 연락드린다고 말씀드렸어요. 환불이 된 걸 보셨으면 「토스에서 다시 읽기」로 장부를 맞추고 취소 메일을 보내요."
               rows={stuck.refundUnconfirmed}
               spaces={spaces}
               showGuest
+              resync
             />
           )}
         </section>
       )}
+      </ResyncArea>
 
       {done.length > 0 && (
         <section className="mt-12 border-t border-hairline pt-8">
@@ -307,6 +314,7 @@ function StuckList({
   rows,
   spaces,
   showGuest = false,
+  resync = false,
 }: {
   title: string;
   hint: string;
@@ -314,6 +322,9 @@ function StuckList({
   spaces: Map<number, SpaceBrief>;
   /** 손님 성함·연락처를 같이 보인다(손님께 연락드리기로 한 줄). */
   showGuest?: boolean;
+  /** 🆕09-27 줄마다 [토스에서 다시 읽기]. 돈이 걸린 두 무리(환불 실패·환불 확인 못 함)에만 붙인다.
+   *  「결제 완료 상태로 이용일이 지난 예약」은 돈이 아니라 이용 여부를 여쭤볼 줄이라 붙이지 않는다. */
+  resync?: boolean;
 }) {
   return (
     <div className="mt-6">
@@ -332,6 +343,7 @@ function StuckList({
                   손님 {[b.guestName?.trim(), b.guestPhone?.trim()].filter(Boolean).join(" · ") || `회원 번호 ${b.guestUserId}`}
                 </p>
               )}
+              {resync && <ResyncButton bookingId={b.id} orderId={b.orderId} />}
             </div>
             <p className="shrink-0 text-[15px] tabular-nums text-ink">{won(b.amountTotal)}</p>
           </li>

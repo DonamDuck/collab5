@@ -8,7 +8,7 @@ import { getSessionUser } from "./supabase/server";
 import { getRentMock, rentMockOn, RENT_MOCK_BLOCKED } from "./rent-mock";
 import {
   saveSpace, getSpaceFull, getBooking, createPendingBooking, getBookingByOrderId,
-  decideBooking, requestRefund, clearRefundRequest, markRefundUnconfirmed,
+  decideBooking, requestRefund, clearRefundRequest, markRefundUnconfirmed, clearRefundUnconfirmed,
   setBookingStatus, listSpacesByOwner, listSpacesByIds,
   createPayment, getPaymentByOrderId, rentSync,
   type SpaceSaveInput,
@@ -28,7 +28,7 @@ import { downloadCert, signCertUpload } from "./host-docs";
 import { bizCertRateOk, mockBizCertRead, readBizCertFile } from "./bizcert-ocr";
 import { hasPayoutAccount, savePayoutAccount, toMasked, validatePayoutInput, type PayoutAccountInput, type PayoutAccountMasked } from "./payout-accounts";
 import {
-  approvePayment, cancelPayment, guestCancelQuote, AUTO_CANCEL_WAITING_REASON, AUTO_REFUND_REASON,
+  approvePayment, cancelPayment, guestCancelQuote, lookupPayment, lookupPaymentByOrderId, AUTO_CANCEL_WAITING_REASON, AUTO_REFUND_REASON,
   PAY_EXPIRED_LINE, PAY_FAIL_METHOD_UNSUPPORTED, PAY_FAIL_NOT_AVAILABLE, PAY_FAIL_REFUND_CHANGED, PAY_FAIL_SLOT_TAKEN,
   PAY_FAIL_SLOT_TAKEN_REFUNDED, PAY_FAIL_SLOT_TAKEN_REFUND_PENDING, PAY_FAIL_USE_STARTED, PAY_FAIL_WINDOW_OVER,
   PAY_CHECKING_LINE, PAY_CHECKING_TITLE, PAY_IN_FLIGHT_CODES,
@@ -49,7 +49,7 @@ import {
   notifyBookingPaid, notifyBookingConfirmed, notifyBookingRejected, notifyBookingCancelled,
   notifyBookingPaidToGuest, notifyBookingConfirmedToHost, notifyBookingCancelledToGuest, notifyAdminRefund,
   notifySpacePublished, notifySpaceReview, notifyRefundRequest, notifyDeal, notifySpaceFixRequest, type DealKind,
-  notifyRefundUnconfirmed,
+  notifyRefundUnconfirmed, notifyPaymentReturned, notifyBookingRejectedOnce, notifyResync, type ResyncKind,
 } from "./rent-notify";
 import { bookingStarted, dateLabel, kstDaysUntil, durationLabel, isTimeMark, minutesBetween, RENT_MIN_MINUTES, toMinutes, todayKst } from "./rent-time";
 import type { Space, SpaceBooking, SpaceUseType, SpaceCategory, OpenSlot, AccessHow, RentProduct, BizCheckStatus, BizCertRead } from "./types";
@@ -72,6 +72,9 @@ export interface ActionResult {
   field?: string;
   /** 🧾09-18 저장 뒤 국세청 조회 결과. `mismatch`면 폼이 고치기 화면으로 가서 그 칸에 말을 띄운다. */
   bizStatus?: BizCheckStatus;
+  /** 🆕09-27 정산 화면 [토스에서 다시 읽기] — 이 줄이 「손이 필요한 예약」에서 빠졌나(목록을 새로 그리면 줄이 사라진다).
+   *  화면이 결과 한 줄을 줄 옆이 아니라 절 위에 남길지 이 값으로 정한다. */
+  resolved?: boolean;
   /** 🔒09-18 밤 QA(SEC-06) 결제 승인 실패의 사유 코드. 승인 라우트가 실패 화면에 `message` 대신 이걸 넘긴다
    *  (주소의 글을 화면에 쓰면 누구나 우리 화면에 문장을 띄울 수 있다). 토스 코드 또는 `PAY_FAIL_*`. */
   code?: string;
@@ -1300,4 +1303,121 @@ export async function dismissRefundAction(bookingId: number): Promise<ActionResu
   revalidatePath("/rent/payouts");
   revalidatePath("/rent/my");
   return ok ? { ok: true, message: "신청을 닫았어요. 예약은 그대로예요." } : { ok: false, message: "닫지 못했어요." };
+}
+
+// ─── 「손이 필요한 예약」을 토스에서 다시 읽기 (2026-09-27, 대표 「제안대로 고고」) ───
+// 환불이 실패했거나(rejected) 환불을 확인하지 못한(refund_unconfirmed_at) 예약은 대표가 토스 관리자 화면에서 푼다.
+// 그 뒤 우리 장부가 토스를 따라오게 하는 버튼이다. ⭐돈은 움직이지 않는다 — 토스를 «읽고» 장부만 맞춘다.
+//   · 토스에서 전액(또는 손님 취소의 부분) 환불이 끝나 있으면 → 결제 줄을 토스 값으로, 예약을 끝 상태로, 미뤄 둔 손님 메일을 한 통
+//   · 토스엔 여전히 돈이 그대로(DONE) → 아무것도 안 바꾼다
+//   · 금액이 다르거나, 답이 없거나, 모르는 상태 → 아무것도 안 바꾼다
+// 🔒쓰기는 `rent_sync`만 거친다. 결제 줄을 «먼저» 맞추고 장부가 토스 값을 받았는지 다시 읽은 뒤에야 예약을 옮긴다.
+//   한 번에 옮기면 장부가 결제 값을 거절해도 예약만 넘어가, 「예약은 취소, 결제 줄은 딴 값」이 남는다. 반대 순서의 중간 상태
+//   (결제 줄은 환불, 예약은 그대로)는 목록에 그대로 남아 다시 누르면 풀린다. 막히면 막힌 그대로 말한다.
+
+const TOSS_STATUS_KO: Record<string, string> = {
+  READY: "결제 전", IN_PROGRESS: "인증만 끝남", WAITING_FOR_DEPOSIT: "입금 대기", DONE: "승인",
+  CANCELED: "환불", PARTIAL_CANCELED: "부분 환불", ABORTED: "실패", EXPIRED: "만료",
+};
+const statusKo = (st: string) => TOSS_STATUS_KO[st] ?? st;
+const wonKo = (n: number) => `${n.toLocaleString("ko-KR")}원`;
+
+/** 정산 화면 [토스에서 다시 읽기]. 🔒대표만(`isRentAdmin`) — 화면이 버튼을 숨겨도 관문은 여기다. */
+export async function resyncStuckBookingAction(bookingId: number): Promise<ActionResult> {
+  if (await rentMockOn()) return { ...RENT_MOCK_BLOCKED };
+  if (!(await isRentAdmin())) return { ok: false, message: "권한이 없어요." };
+  const b = await getBooking(bookingId);
+  if (!b) return { ok: false, message: "그 예약을 찾지 못했어요." };
+  // 어느 무리인가 — 목록(`listStuckBookings`)과 같은 조건. 둘 다 아니면 그 사이 정리된 것이다.
+  const group: "refund-failed" | "unconfirmed" | null =
+    b.status === "rejected" ? "refund-failed"
+      : b.refundUnconfirmedAt && (b.status === "paid" || b.status === "confirmed") ? "unconfirmed" : null;
+  if (!group) return { ok: true, resolved: true, message: "이미 정리된 예약이에요." };
+
+  const pay = await getPaymentByOrderId(b.orderId);
+  if (!pay) return { ok: false, message: "결제 기록을 찾지 못해 읽지 않았어요." };
+  const key = pay.paymentKey || b.paymentKey;
+  const ans = key ? await lookupPayment(key) : await lookupPaymentByOrderId(b.orderId);
+  if (ans.kind === "error") {
+    return {
+      ok: false,
+      message: ans.reason === "no-key" ? "토스 키가 없어 읽지 못했어요. 바꾼 것은 없어요." : "토스가 답을 주지 않았어요. 바꾼 것은 없어요. 잠시 뒤 다시 눌러 주세요.",
+    };
+  }
+  if (ans.kind === "not-found") {
+    return { ok: false, message: "토스에 이 결제가 없어요. 바꾼 것은 없어요. 토스 관리자 화면에서 주문번호로 찾아봐 주세요." };
+  }
+  const tp = ans.payment;
+  if (tp.orderId && tp.orderId !== b.orderId) return { ok: false, message: "토스가 다른 주문의 결제를 돌려줬어요. 바꾼 것은 없어요." };
+  // 💰금액 대조 — 토스가 말하는 결제 금액이 우리 결제 줄과 다르면 무엇을 맞출지 모른다. 사람이 본다.
+  if (typeof tp.totalAmount !== "number" || tp.totalAmount !== pay.amount) {
+    const theirs = typeof tp.totalAmount === "number" ? wonKo(tp.totalAmount) : "모름";
+    return { ok: false, message: `금액이 달라요(우리 ${wonKo(pay.amount)} · 토스 ${theirs}). 바꾼 것은 없어요. 토스 관리자 화면에서 확인해 주세요.` };
+  }
+  if (tp.status === "DONE") return { ok: true, message: "토스에서도 아직 환불 전이에요. 바꾼 것은 없어요." };
+  const balance = tp.balanceAmount;
+  if ((tp.status !== "CANCELED" && tp.status !== "PARTIAL_CANCELED") || typeof balance !== "number" || balance < 0 || balance > tp.totalAmount) {
+    return { ok: false, message: `토스 상태가 ${statusKo(tp.status)}예요. 바꾼 것은 없어요. 토스 관리자 화면에서 확인해 주세요.` };
+  }
+  const total = tp.totalAmount;
+  const refunded = total - balance;
+
+  // ① 결제 줄을 토스 값으로. 장부가 받았는지 다시 읽어 본다(`rent_sync` 가드는 돈의 상태를 «앞으로만» 옮긴다).
+  const synced = await rentSync(b.orderId, { toss: tp });
+  const payNow = await getPaymentByOrderId(b.orderId);
+  if (!synced.ok || !payNow || payNow.status !== tp.status || payNow.balanceAmount !== balance) {
+    const ours = payNow ? `${statusKo(payNow.status)} · 남은 ${wonKo(payNow.balanceAmount)}` : "읽지 못함";
+    console.error(`[rent-actions] 토스에서 다시 읽기 — 장부가 결제 값을 받지 않았다 order=${b.orderId}: ${synced.message || ours}`);
+    return { ok: false, message: `장부가 토스 값을 받지 않았어요(우리 ${ours} · 토스 ${statusKo(tp.status)} · 남은 ${wonKo(balance)}). 바꾼 것은 없어요.` };
+  }
+  const brief = (await listSpacesByIds([b.spaceId])).get(b.spaceId) ?? null;
+  const facts = { booking: b, space: brief ? { id: brief.id, name: brief.name, ownerUserId: brief.ownerUserId } : null, paid: total, refunded, balance };
+  const tellAdmin = (kind: ResyncKind) => notifyLater(() => notifyResync(kind, facts));
+  revalidatePath("/rent/payouts");
+  revalidatePath("/rent/my");
+
+  // ② 환불이 실패했던 예약 — 전액이 돌아가 있어야 끝난다(거절도 자동 환불도 늘 전액이다). 일부면 손님 돈이 아직 남아 있다.
+  if (group === "refund-failed" && balance > 0) {
+    await tellAdmin("partial");
+    return { ok: true, message: `토스엔 ${wonKo(refunded)}만 돌아가 있어요. 남은 ${wonKo(balance)}은 아직 손님 돈이라 예약은 그대로 두고 결제 줄만 맞췄어요.` };
+  }
+
+  // ③ 예약을 끝 상태로 — 환불 실패는 환불(refunded, `rent_sync`가 rejected에서 받는 유일한 끝), 손님 취소는 취소(cancelled).
+  const target = group === "refund-failed" ? "refunded" as const : "cancelled" as const;
+  await rentSync(b.orderId, { bookingStatus: target });
+  const after = await getBooking(bookingId);
+  if (after?.status !== target) {
+    console.error(`[rent-actions] 토스에서 다시 읽기 — 예약 상태가 가드에 막혔다 order=${b.orderId} ${b.status}→${target}: 지금 ${after?.status ?? "읽지 못함"}`);
+    return { ok: false, message: `결제 줄은 토스 값으로 맞췄는데 예약은 ${after?.status ?? "읽지 못한"} 상태 그대로예요(장부 규칙이 막았어요). 메일은 보내지 않았어요.` };
+  }
+
+  if (group === "unconfirmed") {
+    // 표시를 «이번에» 지운 쪽만 메일을 보낸다. 두 창에서 겹쳐 눌러도 한 번이다.
+    //   손님 취소가 정상으로 끝났을 때(`cancelBookingAction`)와 같은 두 통 — 사장님(자리가 다시 비었다)·손님(얼마가 돌아가나).
+    if (!(await clearRefundUnconfirmed(bookingId))) return { ok: true, resolved: true, message: "이미 정리된 예약이에요." };
+    await notifyLater(async () => {
+      const p = await notifyParties(b);
+      if (!p) return;
+      await notifyBookingCancelled({ ...b, status: "cancelled" }, p.space, p.host, p.guest);
+      await notifyBookingCancelledToGuest({ ...b, status: "cancelled" }, p.space, p.host, p.guest, refunded);
+    });
+    await tellAdmin("cancelled");
+    return { ok: true, resolved: true, message: `토스에서 ${wonKo(refunded)}${balance === 0 ? " 전액" : ""} 환불을 확인했어요. 예약을 취소로 맞추고 손님과 사장님께 취소 메일을 보내요.` };
+  }
+
+  // 환불이 실패했던 예약 — 미뤄 둔 손님 메일. 사장님이 거절한 예약이면 거절 메일, 결제 직후·끊긴 결제의 자동 환불이면 「결제를 전액 돌려드렸어요」.
+  //   사장님이 답한 흔적(`decidedAt`)으로 가른다. 자동 환불 갈래는 pending에서 바로 rejected가 돼서 답한 시각이 없다.
+  //   🔁겹쳐 눌리면 두 통이 될 수 있어 두 메일 다 주문번호 멱등키로 나간다(`notifyBookingRejectedOnce`·`notifyPaymentReturned`).
+  const decided = !!b.decidedAt;
+  await notifyLater(async () => {
+    const p = await notifyParties(b);
+    if (!p) return;
+    if (decided) await notifyBookingRejectedOnce({ ...b, status: "refunded" }, p.space, p.host, p.guest);
+    else await notifyPaymentReturned({ ...b, status: "refunded" }, p.space, p.guest, total);
+  });
+  await tellAdmin("refunded");
+  return {
+    ok: true, resolved: true,
+    message: `토스에서 ${wonKo(total)} 전액 환불을 확인했어요. 예약을 환불로 맞추고 손님께 ${decided ? "거절" : "환불"} 메일을 보내요.`,
+  };
 }

@@ -601,6 +601,14 @@ export async function notifyBookingRejected(
   return sendMail(buildBookingRejected(booking, space, host, guest));
 }
 
+/** 🆕09-27 같은 메일을 «한 번만» — 거절 환불이 실패해 미뤄 둔 이 메일을, 관리자가 토스에서 환불을 확인한 뒤 보낼 때
+ *  (`resyncStuckBookingAction`). 두 창에서 겹쳐 눌러도 한 통만 가게 주문번호로 멱등키를 단다. */
+export async function notifyBookingRejectedOnce(
+  booking: SpaceBooking, space: Space, host: Profile | null, guest: Profile | null,
+): Promise<MailResult> {
+  return sendMailOnce(buildBookingRejected(booking, space, host, guest), `rent-rejected-guest-${booking.orderId}`);
+}
+
 /** ④ 손님 취소 → 사장님. 그날이 다시 비는 날이 됐다는 것만. */
 export function buildBookingCancelled(
   booking: SpaceBooking, space: Space, host: Profile | null, guest: Profile | null,
@@ -1177,6 +1185,59 @@ export function buildRefundUnconfirmedNotice(booking: SpaceBooking, space: Space
 /** 보내는 쪽 — 대표 알림 한 곳(`notifyAdmin`)으로. */
 export async function notifyRefundUnconfirmed(booking: SpaceBooking, space: Space, refund: number) {
   return notifyAdmin(buildRefundUnconfirmedNotice(booking, space, refund));
+}
+
+/** 🆕09-27 「손이 필요한 예약」을 토스에서 다시 읽어 장부를 맞춘 결과 셋(`resyncStuckBookingAction`, 대표 「제안대로 고고」).
+ *  · `refunded` 환불이 실패했던 예약(rejected) — 토스엔 전액 돌아가 있었다. 예약을 환불로 맞췄다
+ *  · `partial` 같은 예약인데 토스엔 일부만 돌아가 있었다. 결제 줄만 맞추고 예약은 그대로 뒀다(손님 돈이 남아 있다)
+ *  · `cancelled` 환불을 확인하지 못한 손님 취소 — 토스엔 환불이 돼 있었다. 예약을 취소로 맞췄다 */
+export type ResyncKind = "refunded" | "partial" | "cancelled";
+
+export interface ResyncFacts {
+  /** 바꾸기 «전»에 읽은 예약(「예약 상태」 칸이 어디서 왔는지를 이 상태로 적는다). */
+  booking: SpaceBooking;
+  space: { id: number; name: string; ownerUserId: number } | null;
+  /** 결제 금액(토스 totalAmount = 우리 결제 줄 금액. 다르면 이 알림까지 오지 않는다). */
+  paid: number;
+  /** 토스 기준 돌아간 돈(낸 돈 − 남은 돈). */
+  refunded: number;
+  /** 토스 기준 남은 돈. */
+  balance: number;
+}
+
+/** ⑯ 토스에서 다시 읽어 장부를 맞춤 → 대표 슬랙. 거래 알림과 같은 규칙 — 🔒예약·주문번호·금액·회원 번호만, 슬랙에만.
+ *  장부를 «바꿨을 때만» 간다. 바꾼 게 없는 결과(아직 환불 전·금액이 다름·답 없음)는 버튼 옆 한 줄로 끝난다. */
+export function buildResyncNotice(kind: ResyncKind, f: ResyncFacts): AdminNotice {
+  const b = f.booking;
+  const [title, lead, move] =
+    kind === "refunded"
+      ? [`토스에서 환불을 확인해 장부를 맞췄어요 · ${won(f.refunded)}`, "환불이 안 된 줄 알았던 예약을 토스에서 다시 읽었더니 전액 돌아가 있었어요. 예약을 환불로 맞추고 손님께 메일을 보내요.", "환불 실패(rejected) → 환불(refunded)"]
+      : kind === "partial"
+        ? [`토스엔 일부만 돌아가 있어요 · 남은 ${won(f.balance)}`, "환불이 안 된 줄 알았던 예약을 토스에서 다시 읽었더니 일부만 돌아가 있었어요. 결제 줄만 토스 값으로 맞추고 예약은 그대로 두었어요. 남은 돈은 토스 관리자 화면에서 돌려드려 주세요.", "환불 실패(rejected) 그대로"]
+        : [`손님 취소의 환불을 확인해 장부를 맞췄어요 · ${won(f.refunded)}`, "환불을 확인하지 못했던 손님 취소를 토스에서 다시 읽었더니 환불이 돼 있었어요. 예약을 취소로 맞추고 손님과 사장님께 취소 메일을 보내요.", `${b.status === "paid" ? "결제 완료(paid)" : "확정(confirmed)"} → 취소(cancelled)`];
+  const rows: [string, string][] = [
+    [LABEL.dealBooking, String(b.id)],
+    [LABEL.dealOrder, b.orderId],
+    [LABEL.dealPaid, won(f.paid)],
+    [LABEL.dealRefund, f.refunded > 0 ? won(f.refunded) : "없어요"],
+    ["남은 돈", won(f.balance)],
+    ["예약 상태", move],
+    [LABEL.dealSpace, f.space ? `${f.space.name} (공간 번호 ${f.space.id})` : ""],
+    [LABEL.dealWhen, bookingWhen(b)],
+    [LABEL.dealGuest, String(b.guestUserId)],
+    [LABEL.dealHost, f.space ? String(f.space.ownerUserId) : ""],
+  ];
+  return {
+    title, lead, rows,
+    link: { href: `${SITE_URL}/rent/payouts`, label: "정산 화면 열기" },
+    note: "거래 알림은 슬랙에만 와요. 이름과 연락처는 싣지 않아요.",
+    slackOnly: true,
+  };
+}
+
+/** 보내는 쪽 — 대표 알림 한 곳(`notifyAdmin`)으로. 슬랙이 없으면 건너뛴다. */
+export async function notifyResync(kind: ResyncKind, f: ResyncFacts) {
+  return notifyAdmin(buildResyncNotice(kind, f));
 }
 
 /** 「3시간」·「2일」 — 결제한 지 얼마나 됐나. 하루가 안 되면 시간, 넘으면 날로. */
