@@ -87,6 +87,8 @@ export function CoffeeChatChip() {
 const BOOKING_TONE: Record<BookingStatus, { label: string; cls: string }> = {
   // ⭐`pending`은 결제창까지 갔다가 안 내고 돌아온 자리다. 게스트 화면에만 뜨고 호스트에겐 안 보인다.
   //   말투를 「실패」로 쓰지 않는 이유 — 대개는 실패가 아니라 마음이 바뀐 것이다.
+  //   🆕09-27(fix-six) 결제를 시도한 흔적이 있으면 「결제 확인 중」(`PAY_CHECKING_TONE`, `checking` 프롭). 흔적 없는 결제 전 신청은
+  //     09-27부터 목록에 안 서서(`loadGuestBookings`) 이 이름은 사실상 보이지 않는다. 모르는 자리의 물러섬으로 남겨 둔다.
   pending: { label: "결제 전", cls: "text-faint" },
   // 🔁09-27 대표 — 「예약 완료」 → 「예약 확정 대기」. *「확정 완료가 진짜 예약의 확정이니까」*. 09-16~17의 «결제하면 곧 예약 완료»
   //   (손님을 사장님 답에 세워 두지 않는다)를 뒤집었다. 기다리는 자리라 색도 위 규칙대로 레몬이다(전엔 완료라서 민트였다).
@@ -131,6 +133,10 @@ const AUTO_REJECTED_TONE = {
   guest: { label: "환불 진행 중", cls: "text-faint" },
   host: { label: "자동 취소", cls: "text-faint" },
 } as const;
+/** 🆕09-27(fix-six) 결제를 시도한 흔적이 있는 결제 전 신청(`pending` + `hasPayTrace`) — 승인 결과를 모른다. 대표 「추천대로」.
+ *  돈이 나갔을 수 있는 줄이라 「결제 전」이면 거짓이 된다. 기다리는 자리라 색은 레몬(위 규칙). 줄 문장은 「결제를 확인하고 있어요」. */
+const PAY_CHECKING_TONE = { label: "결제 확인 중", cls: "text-lemon-on" } as const;
+
 /** 🆕09-27 자동으로 취소돼 전액 돌아간 예약(`autoRefunded`). 손님 쪽은 원래 이름(「전액 환불」)이 그대로 맞아서 사장님 쪽만 바꾼다.
  *  「전액 환불」만 보이면 사장님은 누가 왜 돌려줬는지 모른다. 거절한 적도 없다. */
 const AUTO_REFUNDED_HOST_TONE = { label: "자동 취소", cls: "text-faint" } as const;
@@ -140,9 +146,13 @@ export function BookingBadge({
   viewer = "guest",
   dot = false,
   auto = false,
+  checking = false,
 }: {
   status: BookingStatus;
   viewer?: "guest" | "host";
+  /** 🆕09-27(fix-six) 결제 전(`pending`)인데 결제를 시도한 흔적이 있나(`GuestBookingView.checking`, `hasPayTrace`).
+   *  참이면 「결제 전」 대신 「결제 확인 중」(레몬). `auto`와 같은 방식으로 판정 재료를 호출부가 넘긴다. 다른 상태엔 안 본다. */
+  checking?: boolean;
   /** `autoRejected(b)`의 값. 참이면 `rejected`를 「사장님 거절」·「거절한 요청」 대신 위 말로 그린다.
    *  🆕09-27 `autoRefunded(b)`도 여기로 넘긴다. 참이면 사장님 쪽 `refunded`를 「자동 취소」로 그린다(손님 쪽은 그대로). */
   auto?: boolean;
@@ -150,11 +160,13 @@ export function BookingBadge({
    *  ⚠️알약(면)은 여전히 안 쓴다(09-13 대표 지시). 점은 탭의 「새 요청 있음」 점(`StickyTabs`)과 같은 7px이다. */
   dot?: boolean;
 }) {
-  const t = auto && status === "rejected"
-    ? AUTO_REJECTED_TONE[viewer]
-    : auto && status === "refunded" && viewer === "host"
-      ? AUTO_REFUNDED_HOST_TONE
-      : TONE_FOR[viewer][status] ?? BOOKING_TONE[status] ?? BOOKING_TONE.paid;
+  const t = checking && status === "pending"
+    ? PAY_CHECKING_TONE
+    : auto && status === "rejected"
+      ? AUTO_REJECTED_TONE[viewer]
+      : auto && status === "refunded" && viewer === "host"
+        ? AUTO_REFUNDED_HOST_TONE
+        : TONE_FOR[viewer][status] ?? BOOKING_TONE[status] ?? BOOKING_TONE.paid;
   if (dot) {
     return (
       <span className={`inline-flex shrink-0 items-center gap-1.5 text-[15px] font-medium ${t.cls}`}>

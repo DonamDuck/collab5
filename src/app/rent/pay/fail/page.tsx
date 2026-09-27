@@ -6,15 +6,23 @@ import {
   PAY_FAIL_USE_STARTED, PAY_FAIL_WINDOW_OVER,
 } from "@/lib/rent-payment";
 import { KAKAO_CHAT_URL } from "@/lib/site";
-import { secondaryBtnCls } from "../../ui";
+import { getBookingByOrderId, getSpacePublic, listSpacesByIds } from "@/lib/spaces";
+import { spaceListed } from "@/lib/bizcheck";
+import { primaryBtnCls, secondaryBtnCls } from "../../ui";
 
 // 하루 팝업 — 결제가 안 끝났을 때 (2026-09-13)
 //
 // ⭐말투를 「실패」로 쓰지 않는다. 여기 닿는 사람의 대부분은 고장이 아니라 **마음이 바뀐 쪽**이고,
 //   카드가 안 됐더라도 그건 본인 잘못이 아니다. 다시 돌아갈 길만 분명히 보이면 된다.
 //
-// 🎨09-13 재작업 — 크기만 사다리에 맞췄다(제목 22 · 본문 17 · 사유 15). 버튼은 전부 보조 —
-//   돌아가는 길이 여럿인데 하나만 키위면 「그쪽으로 가라」가 된다. 사유의 회색 상자는 인용선으로.
+// 🎨09-13 재작업 — 크기만 사다리에 맞췄다(제목 22 · 본문 17 · 사유 15). 사유의 회색 상자는 인용선으로.
+//   🔁09-27(fix-six) 버튼은 전부 보조였는데(돌아가는 길이 여럿이라) 이제 «새로 신청하기»가 주 버튼이다(아래 머리말).
+//
+// 🔁09-27(fix-six) 대표 — **같은 주문으로 다시 결제하는 버튼(「다시 결제하기」)을 모든 갈래에서 뺐다.**
+//   대표 원문: 「결제 실패 시에 마이로 들어와서 다시 결제하는 것보다 신규로 시작하는 경우가 대부분일 거야. 그냥 내 의견대로 제거하자.」
+//   대신 그 공간 신청 자리(`/rent/<slug>#apply`)로 가는 「다시 신청하기」가 주 버튼이다. 공간을 모르거나 손님 앞에 안 서는 공간이면
+//   목록(`/rent`)으로 가는 「다른 공간 보기」가 주 버튼이 된다. 결제 전 신청은 자리를 잡지 않아서 같은 시간을 새로 골라도 된다.
+//   🚫«확인 중» 갈래엔 새로 신청하는 길도 두지 않는다(09-27 그대로) — 돈이 나갔을 수 있는데 한 번 더 결제하게 된다. 내 예약·문의만.
 //
 // 🔒09-18 밤 QA(SEC-06) — **주소의 `message`를 화면에 쓰지 않는다.** 전엔 그 글을 그대로 보여 줬는데,
 //   이 주소는 누구나 만들 수 있다. 「결제 점검 중이라 010-…로 계좌이체해 주세요」 같은 글을 우리 화면에 띄운 링크를
@@ -53,18 +61,27 @@ const REASONS = new Map<string, string>([
 const DEFAULT_REASON = "결제를 마치지 못했어요. 잠시 뒤 다시 시도해 주세요.";
 
 /** «확인 중»인 결제 — 처리 중이거나 결과를 모른다. 이 화면의 첫 줄이 「안 됐어요」라고 말하면 안 되는 갈래다.
- *  🚫[다시 결제하기]도 세우지 않는다(09-27). 이미 돈이 나갔을 수 있는데 새 카드로 한 번 더 결제하게 된다. */
+ *  🚫[다시 결제하기]도 새로 신청하는 길도 세우지 않는다(09-27). 이미 돈이 나갔을 수 있는데 한 번 더 결제하게 된다. */
 const CHECKING = new Set<string>(PAY_CHECKING_CODES);
 
-/** 다시 결제할 수 없는 사유 — 그 신청은 이미 닫혔다. */
-const CLOSED = new Set([
-  PAY_FAIL_SLOT_TAKEN_REFUNDED, PAY_FAIL_SLOT_TAKEN_REFUND_PENDING,
-  // 이 넷은 신청 자체가 닫혔거나 조건이 바뀌었다. 같은 주문으로 다시 결제하면 또 막힌다.
-  PAY_FAIL_WINDOW_OVER, PAY_FAIL_USE_STARTED, PAY_FAIL_SLOT_TAKEN, PAY_FAIL_NOT_AVAILABLE,
-]);
+// 🔻09-27(fix-six) `CLOSED`(같은 주문으로 다시 결제할 수 없는 사유 모음)를 지웠다. 이제 어느 갈래도 같은 주문으로 다시 결제하지 않는다.
 
-/** 우리 주문번호 모양(`startBookingAction`: `rent-{공간}-{YYYYMMDD}-{난수}`)과 목 데이터 모양만 받는다. 링크에 그대로 넣기 때문이다. */
+/** 우리 주문번호 모양(`startBookingAction`: `rent-{공간}-{YYYYMMDD}-{난수}`)과 목 데이터 모양만 받는다. */
 const ORDER_ID_RE = /^(rent-\d+-\d{8}-[a-z0-9]{1,16}|mock-order-\d+)$/;
+
+/** 🆕09-27(fix-six) 「다시 신청하기」가 갈 곳 — 그 공간의 신청 자리. 공간을 모르거나 손님 앞에 안 서면(쉬는 중·사업자 번호 없음) 빈 값.
+ *  공간 번호는 주문번호 안에 이미 있다(`rent-{공간}-…`). 그걸 먼저 쓴다 — 누가 넣은 주문번호로 예약 행을 읽지 않는다
+ *  (주문이 «있는지»를 이 화면으로 가려낼 수 없게. 결제 화면의 `backToSpace`와 같은 규율). 목 주문번호만 예약 행으로 공간을 찾는다.
+ *  ⚠️이 화면은 로그인 없이 열린다. 공개 투영(`getSpacePublic`)만 읽고, 손님 목록과 같은 판정(`spaceListed`)으로 가른다. */
+async function applyHrefOf(orderId: string): Promise<string> {
+  if (!orderId) return "";
+  const m = /^rent-(\d+)-\d{8}-/.exec(orderId);
+  const spaceId = m ? Number(m[1]) : (await getBookingByOrderId(orderId))?.spaceId ?? null;
+  if (!spaceId) return "";
+  const brief = (await listSpacesByIds([spaceId])).get(spaceId);
+  const space = brief ? await getSpacePublic(brief.slug) : null;
+  return space && spaceListed(space) ? `/rent/${space.slug}#apply` : "";
+}
 
 export default async function RentPayFailPage({
   searchParams,
@@ -76,10 +93,8 @@ export default async function RentPayFailPage({
   const reason = REASONS.get(code) ?? DEFAULT_REASON;
   const orderId = typeof sp.orderId === "string" && ORDER_ID_RE.test(sp.orderId) ? sp.orderId : "";
   const checking = CHECKING.has(code);
-  // 🔁다시 결제하기 — 30분 안의 신청은 같은 주문으로 다시 결제할 수 있다. 결제 화면이 주인·상태를 다시 본다
-  //   (남의 주문이면 404, 결제 시간이 지났으면 신청 목록, 이미 끝났으면 예약 화면으로 보낸다).
-  //   🚫확인 중 갈래엔 없다(09-27). 결과를 모르는데 다시 결제하면 두 번 나갈 수 있다.
-  const retryHref = orderId && !CLOSED.has(code) && !checking ? `/rent/pay/${orderId}` : "";
+  // 🔁09-27(fix-six) 새로 시작하는 길 — 그 공간 신청 자리. 확인 중 갈래엔 안 읽는다(버튼 자체가 없다).
+  const applyHref = checking ? "" : await applyHrefOf(orderId);
 
   return (
     <main className="mx-auto w-full max-w-[640px] px-4 py-14 sm:px-6">
@@ -93,14 +108,16 @@ export default async function RentPayFailPage({
       </p>
       <p className="mt-5 border-l-2 border-hairline pl-4 text-[15px] leading-relaxed break-keep text-mute">{reason}</p>
       <div className="mt-8 flex flex-wrap gap-2">
-        {retryHref && (
-          <Link href={retryHref} className={secondaryBtnCls}>
-            다시 결제하기
+        {/* 🔁09-27(fix-six) 주 버튼 = 그 공간에서 새로 신청. 공간을 모르면 목록이 주 버튼이다.
+            높이는 옆 보조 버튼과 같은 44px(한 줄에서 높이가 다르면 어긋나 보인다). */}
+        {applyHref && (
+          <Link href={applyHref} className={`${primaryBtnCls} h-[44px] px-5`}>
+            다시 신청하기
           </Link>
         )}
         {/* 확인 중엔 내 예약이 할 일이라 앞에 둔다. 다른 공간으로 보내는 버튼은 세우지 않는다(새로 신청해 한 번 더 결제하게 된다). */}
         {!checking && (
-          <Link href="/rent" className={secondaryBtnCls}>
+          <Link href="/rent" className={applyHref ? secondaryBtnCls : `${primaryBtnCls} h-[44px] px-5`}>
             다른 공간 보기
           </Link>
         )}

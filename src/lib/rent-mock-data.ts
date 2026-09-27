@@ -193,9 +193,15 @@ function booking(p: BookingSeed, today: string): SpaceBooking {
   // 🕒09-18 밤 — 앞으로 있을 «결제 전» 신청은 «방금» 만든 것으로 둔다. 결제 시간(30분)이 생기면서
   //   이틀 전으로 만들면 목 결제 화면이 늘 「시간이 지났어요」로만 보였다(지난 날짜 신청은 그대로 둔다).
   const fresh = rest.status === "pending" && p.useDate >= today;
+  // ⏳09-27(fix-six) 앞으로 올 «결제 완료»(사장님 답을 기다리는) 예약은 세 시간 전에 결제한 것으로 둔다. 결제 줄의 승인 시각이 이 값이다.
+  //   이틀 전으로 두면 한낮이 지나면서 확정 기한(결제 후 48시간)이 지나, 사장님 카드의 수락·거절 버튼이 거둬진 채로만 보인다.
+  //   기한이 지난 모습은 따로 한 건(`paidLapsed`)을 둔다.
+  const waiting = rest.status === "paid" && p.useDate >= today;
   const at = fresh
     ? new Date(Date.now() - 3 * 60 * 1000).toISOString()
-    : `${addDaysIso(p.useDate < today ? p.useDate : today, -2)}T03:${String(p.id % 60).padStart(2, "0")}:00.000Z`;
+    : waiting
+      ? new Date(Date.now() - 3 * 3_600_000).toISOString()
+      : `${addDaysIso(p.useDate < today ? p.useDate : today, -2)}T03:${String(p.id % 60).padStart(2, "0")}:00.000Z`;
   return {
     // 🪪guestName 빈 값 = 성함 칸이 생기기 전 옛 예약. 화면·메일이 프로필 브랜드명으로 물러서는 모양을 같이 본다.
     guestBrandSlug: "", guestPhone: "", guestName: "", hours: "", headcount: undefined,
@@ -365,7 +371,7 @@ function fullWorld(today: string, withAccount: boolean): MockWorld {
 
   // 🟡S2 — 검토 대기
   //   📝09-27 #164 — 칸이 둘이던 때 올린 «옛 공간» 모양을 일부러 남겨 둔다(소개 `body` + 시설 안내 `facilitiesNote`가 다 찼다).
-  //   상세는 두 절(공간 소개 · 공간·시설 안내)로 그대로 보이고, 고치기 화면은 두 글을 빈 줄 하나로 이어 한 칸에 보여 준다.
+  //   상세는 🔁09-27부터 한 절(「공간·시설 안내」)에 두 글을 빈 줄 하나로 이어 보이고, 고치기 화면도 같은 규칙으로 한 칸에 보여 준다.
   const s2 = space({
     id: 9102, slug: "mock-slow-afternoon-showroom", ownerUserId: U.host, status: "pending",
     name: "느린오후 지하 쇼룸", brandSlug: "mock-slow-afternoon", category: "shop", scope: "whole_shop",
@@ -599,6 +605,9 @@ function fullWorld(today: string, withAccount: boolean): MockWorld {
     //   사장님은 답한 적이 없다(`decidedAt` 없음). 결제 줄의 토스 취소 사유가 `UNCONFIRMED_REFUND_REASON`이다.
     //   예약 한 건 제목은 「사장님 확정이 없어 결제를 취소했어요」, 사장님 요청 카드 배지는 「자동 취소」.
     unconfirmedRefunded: booking({ id: 90027, spaceId: s1.id, guestUserId: U.guest, status: "refunded", useDate: d(5), startTime: "15:00", endTime: "18:00", plan: "동네 작가 셋이 모여 엽서 팝업을 열려고 했어요.", headcount: 5, guestPhone: "010-3456-7890", guestName: "한서윤", updatedAt: `${d(0)}T04:00:00.000Z`, ...P1 }, today),
+    // ⏳09-27(fix-six) 확정 기한(결제 후 48시간)이 지났는데 아직 결제 완료로 남은 요청 — 정리 작업이 한도·토스 장애로 미뤘을 때의 모습.
+    //   사장님 카드는 수락·거절 버튼 대신 「확정 기한이 지나 수락할 수 없어요 …」 한 줄이다. 목 모드는 정리 작업이 안 돈다.
+    paidLapsed: booking({ id: 90028, spaceId: s1.id, guestUserId: U.guest2, status: "paid", useDate: d(6), startTime: "10:00", endTime: "13:00", plan: "동네 책방 셋이 모여 작은 북마켓을 열려고 해요.", headcount: 6, guestPhone: "010-5678-9012", guestName: "정다온", createdAt: new Date(Date.now() - 50 * 3_600_000).toISOString(), ...P1 }, today),
     hostAsGuest: booking({ id: 90020, spaceId: s6.id, guestUserId: U.host, status: "confirmed", useDate: d(4), startTime: "17:00", endTime: "20:00", plan: "원두 시음회를 다른 동네에서 열어 보려고 해요.", headcount: 10, guestPhone: "010-2345-6789", guestName: "문하람", guestBrandSlug: "mock-slow-afternoon", decidedAt: `${d(-1)}T05:00:00.000Z`, ...P6 }, today),
   };
   const bookings = Object.values(b);
@@ -626,6 +635,7 @@ function fullWorld(today: string, withAccount: boolean): MockWorld {
     payment(b.payoutFailed, U.host2, { status: "DONE", payoutStatus: "FAILED" }),
     payment(b.payoutWaiting2, U.host2, { status: "DONE", payoutStatus: "WAITING" }),
     payment(b.hostAsGuest, U.host2, { status: "DONE" }),
+    payment(b.paidLapsed, U.host, { status: "DONE" }),
     payment(b.halfPaid, U.host, { status: "DONE" }),
     payment(b.halfConfirmed, U.host, { status: "DONE", method: "간편결제" }),
     payment(b.noBizConfirmed, U.host, { status: "DONE" }),
@@ -810,6 +820,8 @@ export const MOCK_IDS = {
     autoRejected: 90026,
     /** ⏳09-27 확정 기한(결제 후 48시간)이 지나 자동으로 취소·환불된 예약 */
     unconfirmedRefunded: 90027,
+    /** ⏳09-27(fix-six) 확정 기한이 지났는데 아직 결제 완료인 요청(사장님 카드에 버튼 대신 한 줄) */
+    paidLapsed: 90028,
   },
 } as const;
 
@@ -863,9 +875,11 @@ export const MOCK_MAIL_KINDS: { kind: string; label: string }[] = [
   { kind: "admin-unconfirmed-refund", label: "거래 → 대표 슬랙 · 확정 기한(결제 후 48시간)이 지나 자동 환불" },
   { kind: "admin-unconfirmed-refund-start", label: "거래 → 대표 슬랙 · 확정 기한(이용 시작)이 지나 자동 환불" },
   { kind: "admin-unconfirmed-refund-failed", label: "거래 → 대표 슬랙 · 확정 기한 자동 환불이 실패, 손님 돈이 붙잡힘 (손이 필요)" },
-  { kind: "remind-guest", label: "이용 전날 → 손님" },
+  // 🔁09-27 대표 「추천대로」 — 손님 리마인드는 확정된 예약에만. 확정 전 예약은 사장님께만 «기한 전까지 확정하지 않으면 자동 취소» 한 통.
+  { kind: "remind-guest", label: "이용 전날 → 손님 · 확정된 예약만" },
   { kind: "remind-host", label: "이용 전날 → 사장님 · 수락한 예약" },
-  { kind: "remind-host-unaccepted", label: "이용 전날 → 사장님 · 아직 수락 전" },
+  { kind: "remind-host-unaccepted", label: "이용 전날 → 사장님 · 아직 확정 전 (기한은 이용 시작, 손님께는 안 감)" },
+  { kind: "remind-host-unaccepted-48h", label: "이용 전날 → 사장님 · 아직 확정 전 (결제 후 48시간이 먼저 참, 손님께는 안 감)" },
   { kind: "stress-paid-host", label: "긴 글 · 결제 완료 → 사장님" },
   { kind: "paid-host-halfhour", label: "30분 단위 · 결제 완료 → 사장님 (13:00~15:30, 2시간 30분, 무료 커피챗)" },
   { kind: "paid-guest-freechat", label: "무료 커피챗 · 결제 완료 → 손님 (결제액은 공간 값뿐)" },

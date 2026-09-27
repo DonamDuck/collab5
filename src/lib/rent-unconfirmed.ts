@@ -17,6 +17,8 @@ import "server-only"; // 🔒토스 시크릿 키로 결제를 취소하는 파�
 //      실패 → 예약은 ①의 rejected 그대로. 정산 화면 「손이 필요한 예약」에 뜬다(결제 직후 자동 환불 실패와 같은 무리).
 //      답한 시각이 없어 화면은 «자동 취소»로 읽는다(`autoRejected`). 슬랙에 「손님 돈이 붙잡혀 있어요」 한 건. 메일은 안 보낸다(돈이 아직이다).
 //
+// 🆕09-27(fix-six) 사장님이 기한이 지난 예약에 거절·수락을 누르면 그 한 건만 같은 길을 탄다(`refundLapsedBooking`, 대표 09-27).
+//   정리 작업이 아직 안 돌았을 수 있다(페이지 한도 3건 · 크론 전 · 토스 장애로 미룸). 잡기부터 알림까지 이 파일의 한 벌이다.
 // 🤝페이지 열 때와 크론이 같이 돌아도 토스 취소는 한 번이다. 먼저 잡은 쪽만 토스를 부르고, 부르더라도 멱등키(결제 키·잔액·금액)가 같다.
 // 🔒키가 없는 서버(개발 모의 모드)는 돌려주지 않는다. 모의 취소는 돈을 안 움직이는데 장부만 환불로 바뀐다(`rent-recover.ts`와 같은 울타리).
 // ⚡토스 취소가 한 번 실패하면 이번 회차엔 더 부르지 않는다. 장애 중에 여러 건을 한꺼번에 「손이 필요한 예약」으로 떨어뜨리지 않게.
@@ -25,6 +27,7 @@ import { cancelPayment, paymentsLive, UNCONFIRMED_REFUND_REASON } from "./rent-p
 import { confirmDeadline, type ConfirmLapse } from "./rent-booking-rules";
 import { notifyDeal, notifyUnconfirmedRefund, type DealKind } from "./rent-notify";
 import { getProfileById } from "./profiles";
+import type { Payment, SpaceBooking } from "./types";
 
 /** 결제 완료 예약 한 건과 그 결제 줄. `sweepBookings`가 DB에서 읽어 넘긴다. */
 export interface UnconfirmedPaid {
@@ -112,6 +115,24 @@ export async function refundUnconfirmedPaid(
   }
   if (run.due > 0) console.info(`[rent-unconfirmed] ${JSON.stringify(run)}`);
   return run;
+}
+
+/** 🆕09-27(fix-six) 확정 기한이 지난 결제 완료 «한 건»을 지금 돌려준다 — 사장님이 그 예약에 거절·수락을 누른 자리(`decideBookingAction`).
+ *  대표: 「자동 환불되니 문제되는 케이스는 없을 것 같은데, 거절 클릭하면 '이미 취소된 예약입니다' 등과 같은 얼럿을 띄우자」.
+ *  ⭐정리 작업과 같은 함수(`refundUnconfirmedPaid`)에 한 줄만 넘긴다. 잡기(`claimUnconfirmedBooking`)·토스 멱등키(결제 키·잔액·금액)·
+ *    메일 멱등키(주문번호)가 같아서 정리 작업·다른 클릭과 겹쳐도 토스 취소는 한 번, 메일은 한 통씩이다.
+ *  ⚠️결제 줄 값은 정리 작업이 읽는 것과 같은 칸만 쓴다(결제 키도 결제 줄 것만). 둘이 다른 값을 넘기면 멱등키가 갈린다.
+ *  @returns `refunded` 이번에 돌려줬다 · `failed` 돌려주려다 실패(자동 취소로 잡아 둠, 손이 필요한 예약)
+ *    · `skipped` 그 사이 누가 먼저 옮겼다(정리 작업·다른 클릭) · `deferred` 이번엔 못 불렀다(토스 키 없는 서버·예외) */
+export async function refundLapsedBooking(
+  b: Pick<SpaceBooking, "id" | "orderId" | "useDate" | "startTime">, pay: Payment | null, now: Date = new Date(),
+): Promise<"refunded" | "failed" | "skipped" | "deferred"> {
+  const run = await refundUnconfirmedPaid([{
+    bookingId: b.id, orderId: b.orderId, useDate: b.useDate, startTime: (b.startTime || "").slice(0, 5),
+    approvedAt: pay?.approvedAt || undefined,
+    payStatus: pay?.status ?? "", payKey: pay?.paymentKey ?? "", amount: pay?.amount ?? 0, balance: pay?.balanceAmount ?? 0,
+  }], { refunds: 1, now });
+  return run.refunded ? "refunded" : run.refundFailed ? "failed" : run.skipped ? "skipped" : "deferred";
 }
 
 /** 알림 — 성공이면 손님·사장님 메일과 슬랙 거래 알림, 실패면 슬랙만. 🚨알림이 본작업을 막지 않는다 — 조회가 던져도 삼킨다.

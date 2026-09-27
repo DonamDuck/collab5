@@ -9,6 +9,7 @@ import { repo } from "@/lib/repo";
 import { accessHowLine, COFFEE_CHAT_FREE, COFFEE_CHAT_WHEN_GUEST, CONTACT_RULE_GUEST, PRODUCT_HINT_GUEST, PRODUCT_LABEL } from "@/lib/rent-copy";
 import { coffeeChatFree, defaultProduct, lowestPrice, productNote, productPrice, sellableProducts } from "@/lib/rent-products";
 import { durationLabel, futureSlots, RENT_MIN_MINUTES } from "@/lib/rent-time";
+import { joinSpaceAbout } from "@/lib/rent-limits";
 import { bizMissingLine, bizVerified, spaceListed } from "@/lib/bizcheck";
 import { PhotoSlider } from "@/components/PhotoSlider";
 import { BookingForm } from "./BookingForm";
@@ -230,6 +231,8 @@ export default async function SpaceDetailPage({
   const showForm = !isOwner && listed && openDates.length > 0;
 
   const eyebrow = [categoryLabel(sp.category), sp.area].filter(Boolean).join(" · ");
+  // 📝09-27 「공간·시설 안내」 절의 글 — 옛 두 칸(`body` · `facilitiesNote`)을 저장 때와 같은 규칙으로 잇는다(`joinSpaceAbout`).
+  const about = joinSpaceAbout(sp.body ?? "", sp.facilitiesNote ?? "");
   // 🛍09-18 켜진 공간 상품. 값 줄은 낮은 값, 값이 서로 다르면 「부터」.
   const products = sellableProducts(sp);
   // 🛍09-27 #149·#150 — 신청 폼이 골라 두는 상품(대관만, 없으면 파는 첫 상품). 오른쪽 카드 「선택한 상품」의 서버 기본값이다.
@@ -325,32 +328,22 @@ export default async function SpaceDetailPage({
             ) : null}
           </header>
 
-          {sp.body && (
-            <Section title="공간 소개" nav="소개">
-              <p className="whitespace-pre-line text-[17px] leading-relaxed break-keep text-body">
-                {sp.body}
-              </p>
-            </Section>
-          )}
-
-
-          {/* 🔁09-14 「이런 것들이 있어요」 → **「공간·시설 안내」**(대표 지시).
-              ⭐그리고 **태그와 줄글을 같이 싣는다** — 대표: *「여기는 태그도 좋은데, 줄글도 쓸 수 있는
-                구조로 짜야 할 거 같아」*. 태그는 훑어서 고르는 것이고, 줄글은 「HDMI 케이블은 없어요」처럼
-                태그로 못 담는 단서다. 둘 중 하나만 있어도 그 절은 뜬다. */}
-          {(sp.facilities.length > 0 || sp.facilitiesNote) && (
-            <Section title="공간·시설 안내" nav="시설">
+          {/* 🔁09-27 대표 「추천」 — 「공간 소개」 → **「공간·시설 안내」** 한 절(알약 「공간·시설」).
+              등록 폼이 이미 칸 하나(「공간 및 시설 사용에 대해 설명해 주세요.」)로 합쳤다(#164, `joinSpaceAbout`). 이름만 바꾸면
+              바로 아래 시설 절(09-14부터 「공간·시설 안내」)과 이름·알약이 둘씩 겹쳐서 두 절을 하나로 모았다.
+              ⭐글 → 태그 순서. 옛 공간(설명 두 칸이 따로 찬 공간)은 두 글을 저장 때와 같은 규칙(빈 줄 하나)으로 이어서,
+                사장님이 고쳐 저장하기 전과 뒤가 같은 모습이다. 태그는 훑어서 고르는 것, 글은 태그로 못 담는 단서다(09-14 대표). */}
+          {(about || sp.facilities.length > 0) && (
+            <Section title="공간·시설 안내" nav="공간·시설">
+              {about && (
+                <p className="whitespace-pre-line text-[17px] leading-relaxed break-keep text-body">{about}</p>
+              )}
               {sp.facilities.length > 0 && (
-                <div className="flex flex-wrap gap-2">
+                <div className={`flex flex-wrap gap-2 ${about ? "mt-5" : ""}`}>
                   {sp.facilities.map((f) => (
                     <Chip key={f}>{f}</Chip>
                   ))}
                 </div>
-              )}
-              {sp.facilitiesNote && (
-                <p className={`whitespace-pre-line text-[17px] leading-relaxed break-keep text-body ${sp.facilities.length > 0 ? "mt-4" : ""}`}>
-                  {sp.facilitiesNote}
-                </p>
               )}
             </Section>
           )}

@@ -96,12 +96,12 @@ export const RENT_GROUPS: Group[] = [
           { desc: "결제 전 신청 (대관만, 커피챗 담음, 취소 규정은 규정마다 한 줄 · 「취소 규정 전체 보기」는 목록 아래)", c: "guest-full", to: `/rent/pay/mock-order-${B.pending}` },
           { desc: "긴 글 · 큰 금액", c: "stress-guest", to: `/rent/pay/mock-order-${B.stressPending}` },
           // 🔒09-18 밤 — 실패 화면은 주소의 글(`message`)을 안 쓰고 코드로 우리 문장을 고른다. 갈래마다 한 줄.
-          { desc: "결제 실패 · 결제 창을 닫음 (다시 결제하기 버튼)", c: "guest-full", to: `/rent/pay/fail?code=PAY_PROCESS_CANCELED&orderId=mock-order-${B.pending}` },
+          { desc: "결제 실패 · 결제 창을 닫음 (주 버튼 「다시 신청하기」 → 그 공간 신청 자리 · 같은 주문으로 다시 결제하는 버튼은 없음)", c: "guest-full", to: `/rent/pay/fail?code=PAY_PROCESS_CANCELED&orderId=mock-order-${B.pending}` },
           { desc: "결제 실패 · 카드사 거절", c: "guest-full", to: `/rent/pay/fail?code=REJECT_CARD_COMPANY&orderId=mock-order-${B.pending}` },
-          { desc: "결제 실패 · 그 사이 시간이 차서 자동 취소 (다시 결제하기 없음)", c: "guest-full", to: `/rent/pay/fail?code=RENT_SLOT_TAKEN_REFUNDED&orderId=mock-order-${B.pending}` },
+          { desc: "결제 실패 · 그 사이 시간이 차서 자동 취소 (「다시 신청하기」로 다른 시간 고르기)", c: "guest-full", to: `/rent/pay/fail?code=RENT_SLOT_TAKEN_REFUNDED&orderId=mock-order-${B.pending}` },
           { desc: "결제 실패 · 자동 환불도 실패해서 연락드림", c: "guest-full", to: `/rent/pay/fail?code=RENT_SLOT_TAKEN_REFUND_PENDING&orderId=mock-order-${B.pending}` },
-          { desc: "결제 실패 · 모르는 코드나 주소에 글을 붙인 경우 (기본 문장)", c: "guest-full", to: "/rent/pay/fail?message=아무 글이나&code=SOMETHING_ELSE" },
-          { desc: "결제 실패 · 승인 결과를 모름 (「결제를 확인하고 있어요」, 다시 결제하기 없음)", c: "guest-full", to: `/rent/pay/fail?code=RENT_PAY_UNKNOWN&orderId=mock-order-${B.payChecking}` },
+          { desc: "결제 실패 · 모르는 코드나 주소에 글을 붙인 경우 (기본 문장 · 주문번호가 없어 「다른 공간 보기」가 주 버튼)", c: "guest-full", to: "/rent/pay/fail?message=아무 글이나&code=SOMETHING_ELSE" },
+          { desc: "결제 실패 · 승인 결과를 모름 (「결제를 확인하고 있어요」, 다시 결제·다시 신청 없이 내 예약만)", c: "guest-full", to: `/rent/pay/fail?code=RENT_PAY_UNKNOWN&orderId=mock-order-${B.payChecking}` },
           // 🔒09-27(fix-money3) 결제를 시도한 흔적이 있는 주문 — 주소로 직접 열어도 결제창을 안 그린다.
           { desc: "결제 확인 중인 주문을 주소로 열면 결제창 대신 「결제를 확인하고 있어요」와 내 예약 보기", c: "guest-full", to: `/rent/pay/mock-order-${B.payChecking}` },
           // 🧹09-27 대표 「결제 중 취소는 그냥 새로 결제하는 걸로」 — 이어서 낼 수 없는 주문은 그 공간의 신청 자리(`#apply`)로 보내요.
@@ -172,6 +172,7 @@ export const RENT_GROUPS: Group[] = [
         rows: [
           { desc: "모든 상태, 정산 계좌 있음 (요청 줄 첫머리에 대관만·공간 전체 · 검토 대기 공간에 국세청 기록과 다르다는 줄 · 보완 필요 공간에 사유와 「고치고 다시 보내기」)", c: "host-full", to: "/rent/my?tab=host" },
           { desc: "같은 화면, 정산 계좌 없음 (확정 줄마다 계좌 등록 한 줄)", c: "host-noaccount", to: "/rent/my?tab=host" },
+          { desc: "확정 기한(결제 후 48시간)이 지났는데 아직 결제 완료인 새 요청 · 수락·거절 버튼 대신 한 줄", c: "host-full", to: `/rent/my?tab=host#booking-${B.paidLapsed}` },
           { desc: "관리자이기도 한 사장님 (정산하기·검토하기 링크, 검토 대기 공간에 공개하기 버튼)", c: "host-admin", to: "/rent/my?tab=host" },
           { desc: "올린 공간이 없을 때", c: "host-empty", to: "/rent/my?tab=host" },
           { desc: "로그인 안 했을 때", c: "anon", to: "/rent/my?tab=host" },
@@ -206,7 +207,7 @@ export const RENT_GROUPS: Group[] = [
         rows: [
           { desc: "공개 중인 내 공간 (신청 대신 안내 한 줄)", c: "host-full", to: `/rent/${S.full}` },
           // 📝09-27 #164 — 칸이 둘이던 때의 옛 공간. 고치기 전엔 소개 글과 시설 안내 글이 두 절로 따로 서요.
-          { desc: "검토 대기 중인 내 공간 · 칸이 둘이던 때 올린 옛 공간이라 「공간 소개」와 「공간·시설 안내」 절에 글이 따로 서요", c: "host-full", to: `/rent/${S.pending}` },
+          { desc: "검토 대기 중인 내 공간 · 칸이 둘이던 때 올린 옛 공간이라 두 글이 「공간·시설 안내」 한 절에 빈 줄 하나로 이어 서요", c: "host-full", to: `/rent/${S.pending}` },
           { desc: "쉬는 중인 내 공간", c: "host-full", to: `/rent/${S.paused}` },
           { desc: "작성 중(초안)인 내 공간", c: "host-full", to: `/rent/${S.draft}` },
           { desc: "사업자등록번호가 빈 내 공간 (주인은 볼 수 있어요)", c: "host-full", to: `/rent/${S.noBiz}` },
@@ -314,7 +315,7 @@ export const RENT_POPUPS: Popup[] = [
   { where: { desc: "예약 한 건", c: "guest-full", to: `/rent/done/${B.confirmed}` }, button: "「예약 취소하기」", title: "예약을 취소할까요?" },
   // 사장님 버튼은 「빌려준 공간」 칸에 있다. `tab=host` 없이 열면 빌린 공간 칸이 떠서 누를 버튼이 안 보인다(09-18 밤 QA SC-15).
   { where: { desc: "내 하루 팝업", c: "host-full", to: "/rent/my?tab=host" }, button: "새 요청 줄의 「거절」", title: "이 요청을 거절할까요?" },
-  { where: { desc: "내 하루 팝업", c: "host-full", to: "/rent/my?tab=host" }, button: "이용 시간이 시작된 줄의 「관리자에게 환불 신청하기」", title: "관리자에게 환불을 신청할까요?" },
+  { where: { desc: "내 하루 팝업", c: "host-full", to: "/rent/my?tab=host" }, button: "확정된 줄의 「관리자에게 환불 신청하기」", title: "관리자에게 환불을 신청할까요?" },
   { where: { desc: "내 하루 팝업", c: "host-full", to: "/rent/my?tab=host" }, button: "공개 중인 공간 줄의 「잠시 쉬기」", title: "잠시 쉴까요?" },
   { where: { desc: "공간 검토", c: "admin-full", to: "/rent/review" }, button: "검토 대기 줄의 「보완 요청」", title: "○○, 무엇을 고쳐 주시면 될까요? (칩 넷 + 사장님께 보낼 말)" },
   { where: { desc: "정산", c: "admin-full", to: "/rent/payouts" }, button: "환불 신청 줄의 「승인하고 환불」", title: "환불을 승인할까요?" },

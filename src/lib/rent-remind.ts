@@ -8,11 +8,18 @@
 //     그 자리에서 보냄 표시를 찍는다(`confirmBookingAction`). 방금 받은 결제 완료 메일에 같은 내용이 다 들어 있다.
 //   ③**한 건씩 보내다 시간 제한에 걸리면 남은 예약이 통째로 빠졌다** → 다섯 건씩 묶어 보내고 라우트 제한을 300초로 올렸다.
 //
+// 🔁09-27 대표 「추천대로」 — **손님 리마인드는 확정된 예약(`confirmed`)에만** 간다. 확정 전(`paid`)은 사장님께만 한 통:
+//   「아직 확정 전이에요. <기한> 전까지 확정하지 않으면 자동으로 취소되고 손님께 전액 돌아가요」 + [수락하러 가기].
+//   기한은 정리 작업·수락 관문과 같은 함수(`confirmDeadline`·`confirmLapse`)로 잰다. 이미 지난 예약엔 아무 메일도 안 보내고
+//   보냄 표시도 안 한다 — 그 예약은 정리 작업(크론이 이 작업보다 먼저 돈다)이 돌려줄 몫이고, 수락 버튼은 이미 막혀 있다.
+//   ⚠️확정 전에 사장님 리마인드가 나간 뒤 오늘 확정되면, 손님은 리마인드 대신 확정 메일(날짜·주소·연락처가 다 있다)을 받는다.
+//
 // ⏭**「오늘」 제목은 아직이다.** 메일 문안(`rent-notify.ts`)이 「내일」로 박혀 있어서, 오늘 건을 지금 보내면 거짓말이 된다.
 //   그래서 오늘 건은 «대상까지만» 세고 보내지 않는다(`heldToday`). 빌더에 날짜 인자가 붙으면 `TODAY_READY`만 켜면 나간다.
 import { getProfileById } from "./profiles";
-import { getSpaceFull, listBookingsToRemind, listSpacesByIds, markReminded } from "./spaces";
+import { getPaymentByOrderId, getSpaceFull, listBookingsToRemind, listSpacesByIds, markReminded } from "./spaces";
 import { notifyRemindGuest, notifyRemindHost } from "./rent-notify";
+import { confirmDeadline, confirmLapse } from "./rent-booking-rules";
 import { addDaysIso, bookingStarted, nowHhmmKst, todayKst } from "./rent-time";
 import type { Space, SpaceBooking } from "./types";
 
@@ -60,6 +67,22 @@ export async function runRentRemind(today = todayKst()): Promise<{
 
   async function one(b: SpaceBooking): Promise<{ sent: number; failed: number }> {
     const none = { sent: 0, failed: 0 };
+    // 🔁09-27 확정된 예약은 손님·사장님 두 통, 확정 전(`paid`)은 사장님 한 통이다. 실패를 셀 때도 이 수를 쓴다.
+    const confirmed = b.status === "confirmed";
+    const want = confirmed ? 2 : 1;
+    // ⏳확정 전이면 기한부터 잰다(결제 승인 시각은 결제 줄에 있다). 못 읽으면 이용 시작만 본다(`confirmLapse`와 같은 물러섬).
+    //   기한이 이미 지났으면 보내지도 표시하지도 않는다. 수락할 수 없는 예약에 「수락하러 가기」를 보내지 않는다.
+    let deadline: ReturnType<typeof confirmDeadline> = null;
+    if (!confirmed) {
+      let approvedAt: string | undefined;
+      try {
+        approvedAt = (await getPaymentByOrderId(b.orderId))?.approvedAt;
+      } catch (e) {
+        console.error(`[rent-remind] 예약 ${b.id} 결제 줄을 못 읽었다 — 이용 시작으로만 잰다`, e);
+      }
+      if (confirmLapse(b, approvedAt)) return none;
+      deadline = confirmDeadline(b, approvedAt);
+    }
     // 🔒표시를 «먼저» 한다(조건부: `reminded_at is null`인 행만). 작업이 겹쳐 두 번 돌아도
     //   먼저 적은 쪽만 참을 받아 보내고, 나머지는 여기서 건너뛴다. 보낸 뒤에 적으면 둘 다 보낸다.
     // ⚠️그래서 메일이 둘 다 실패해도 표시는 남는다. 의도한 것이다 — 실패를 이유로 표시를 안 하면
@@ -72,19 +95,20 @@ export async function runRentRemind(today = todayKst()): Promise<{
       const space = await full(brief.slug);
       if (!space) return none;
       const [host, guest] = await Promise.all([getProfileById(space.ownerUserId), getProfileById(b.guestUserId)]);
-      const both = await Promise.all([
-        notifyRemindGuest(b, space, host, guest),
-        notifyRemindHost(b, space, host, guest),
-      ]);
+      const mails = await Promise.all(
+        confirmed
+          ? [notifyRemindGuest(b, space, host, guest), notifyRemindHost(b, space, host, guest)]
+          : [notifyRemindHost(b, space, host, guest, deadline, today)],
+      );
       return {
-        sent: both.filter((m) => m.sent).length,
+        sent: mails.filter((m) => m.sent).length,
         // 건너뛴 것(`skipped`)은 실패가 아니다. 이메일 없는 카카오 가입 손님이 있다.
-        failed: both.filter((m) => !m.sent && !m.skipped).length,
+        failed: mails.filter((m) => !m.sent && !m.skipped).length,
       };
     } catch (e) {
       console.error(`[rent-remind] 예약 ${b.id} 리마인드 실패(표시는 남김)`, e);
-      // 조회 단계에서 던졌다 — 두 통 다 못 나갔다.
-      return { sent: 0, failed: 2 };
+      // 조회 단계에서 던졌다 — 이 예약 몫(확정 두 통 · 확정 전 한 통)이 다 못 나갔다.
+      return { sent: 0, failed: want };
     }
   }
 

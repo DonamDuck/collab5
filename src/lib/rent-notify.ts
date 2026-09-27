@@ -19,13 +19,13 @@ import type { AdminDailySummary, DailyRuns, RemindRun } from "./rent-admin-daily
 import type { LedgerKind, LedgerMismatch, LedgerRun } from "./rent-ledger";
 import type { SweepRun } from "./spaces";
 import { KAKAO_CHAT_URL, SITE_URL } from "./site";
-import { bookingWhen, dateLabel } from "./rent-time";
+import { addDaysIso, bookingWhen, dateLabel, todayKst } from "./rent-time";
 import {
   accessMeetLine, hostContactLine, withJosa, BROKER_NOTE, CONFIRM_DEADLINE_GUEST, CONTACT_RULE_GUEST, CONTACT_RULE_GUEST_CONFIRMED, CONTACT_RULE_HOST,
   BOOKING_HEADLINE, COFFEE_CHAT_FREE, COFFEE_CHAT_WHEN_GUEST_ROW, COFFEE_CHAT_WHEN_HOST_ROW, HOST_REQUEST_STEPS,
   PRODUCT_HINT_GUEST, PRODUCT_LABEL, REFUND_TIMING_LINE, unconfirmedReasonLine,
 } from "./rent-copy";
-import { CONFIRM_DEADLINE_HOURS, type ConfirmLapse } from "./rent-booking-rules";
+import { CONFIRM_DEADLINE_HOURS, confirmDeadline, type ConfirmLapse } from "./rent-booking-rules";
 import type { Space, SpaceBooking } from "./types";
 import { bizOnFile } from "./bizcheck";
 import { bookingHasChat } from "./rent-products";
@@ -858,7 +858,9 @@ export async function notifySpacePublished(
 }
 
 /** ⑦ 이용 전날 → 손님 (09-17). 내일 몇 시 어디인지, 누구에게 연락하면 되는지.
- *  우리는 사장님이 안내를 보냈는지 모른다(기록이 없다). 그래서 «못 받았으면» 갈 곳만 열어 둔다. */
+ *  우리는 사장님이 안내를 보냈는지 모른다(기록이 없다). 그래서 «못 받았으면» 갈 곳만 열어 둔다.
+ *  🔁09-27 대표 「추천대로」 — **확정된 예약(`confirmed`)에만 보낸다**(`runRentRemind`가 가른다). 확정 전(`paid`) 예약은
+ *    기한까지 확정되지 않으면 자동으로 취소된다. 그 손님께 「내일 예약하신 날이에요」라고 하면 오지 말아야 할 날에 오게 만들 수 있다. */
 export function buildRemindGuest(
   booking: SpaceBooking, space: Space, host: Profile | null, guest: Profile | null,
 ): Mail {
@@ -889,11 +891,31 @@ export async function notifyRemindGuest(
   return sendMail(buildRemindGuest(booking, space, host, guest));
 }
 
+/** 확정 기한 한 문장 — 「이용이 시작되는 내일 14:00 전까지 확정하지 않으면 …」. 시각은 KST, 날은 `today` 기준 오늘·내일(그 밖은 날짜).
+ *  기한을 모르면(시각 칸이 빈 옛 예약) 「이용 시작 전까지」로만 말한다. */
+function remindDeadlineLine(deadline: { at: number; by: ConfirmLapse } | null, today: string): string {
+  const tail = "확정하지 않으면 자동으로 취소되고 손님께 전액 돌아가요.";
+  if (!deadline) return `이용 시작 전까지 ${tail}`;
+  const kst = new Date(deadline.at + 9 * 3_600_000).toISOString();
+  const date = kst.slice(0, 10);
+  const day = date === today ? "오늘" : date === addDaysIso(today, 1) ? "내일" : dateLabel(date);
+  const when = `${day} ${kst.slice(11, 16)}`;
+  return deadline.by === "48h"
+    ? `결제 후 ${CONFIRM_DEADLINE_HOURS}시간이 되는 ${when} 전까지 ${tail}`
+    : `이용이 시작되는 ${when} 전까지 ${tail}`;
+}
+
 /** ⑦' 이용 전날 → 사장님 (09-17). 내일 누가 몇 시에 오는지와 오늘 챙길 것.
  *  🔒손님 번호는 «수락한 예약»에만 싣는다. 사장님 쪽 연락처 문은 `isRevealed`(수락 뒤) 하나다 —
- *    리마인드가 그 문을 옆으로 열면 수락 버튼의 뜻이 사라진다. 수락 전이면 수락하러 갈 곳을 말한다. */
+ *    리마인드가 그 문을 옆으로 열면 수락 버튼의 뜻이 사라진다. 수락 전이면 수락하러 갈 곳을 말한다.
+ *  🔁09-27 대표 「추천대로」 — 확정 전(`paid`)이면 이 한 통만 간다(손님 리마인드는 안 간다). 할 일이 «오늘 수락»이 아니라
+ *    «기한 안에 확정하지 않으면 자동 취소·전액 환불»이라, 그 기한 시각을 첫 문단에 적는다.
+ *  @param deadline 확정 기한(`confirmDeadline` — 결제 승인 시각과 이용 시작 중 먼저 오는 쪽). 확정 전일 때만 본다.
+ *    안 넘기면 이용 시작으로 잰다(결제 줄을 못 읽었을 때와 같은 물러섬).
+ *  @param today 「오늘·내일」을 가르는 날(KST). 크론은 그날, 미리보기는 이용 전날을 넘긴다. */
 export function buildRemindHost(
   booking: SpaceBooking, space: Space, host: Profile | null, guest: Profile | null,
+  deadline?: { at: number; by: ConfirmLapse } | null, today: string = todayKst(),
 ): Mail {
   const start = booking.startTime || "";
   const accepted = booking.status === "confirmed";
@@ -901,14 +923,15 @@ export function buildRemindHost(
   //   수락 전이면 할 일이 다르니 제목부터 갈라 말한다(전엔 두 갈래 제목이 같았다).
   const subject = accepted
     ? `[collab5] 내일${start ? ` ${start}` : ""}, 하루 팝업 손님이 오세요`
-    : `[collab5] 내일${start ? ` ${start}` : ""}, 아직 수락하지 않은 예약이 있어요`;
+    : `[collab5] 내일${start ? ` ${start}` : ""}, 아직 확정 전인 예약이 있어요`;
   const link = `${SITE_URL}/rent/my?tab=host`;
   const gPhone = booking.guestPhone?.trim() || guest?.phone?.trim() || "";
   const gEmail = guest?.email?.trim() ?? "";
   const guestContact = accepted ? [gPhone, gEmail].filter(Boolean).join(" · ") || "연락처를 안 남기셨어요" : "";
+  // 🔁09-27 — 전엔 「아직 수락 전인 예약이라, 오늘 들어가서 수락해 주세요」였다. 수락하지 않으면 어떻게 되는지를 말하지 않았다.
   const lead = accepted
     ? `내일 ${space.name}에 손님이 와요. 이용 안내를 아직 못 전하셨다면 오늘 챙겨 주세요.`
-    : `내일 ${space.name}에 손님이 와요. 아직 수락 전인 예약이라, 오늘 들어가서 수락해 주세요.`;
+    : `${space.name}에 오실 손님의 예약이 아직 확정 전이에요. ${remindDeadlineLine(deadline === undefined ? confirmDeadline(booking, null) : deadline, today)}`;
   // 🔁09-18 메일 전수 — 칸 순서를 요청·수락 메일과 같게(성함이 맨 위). 「오늘 챙기실 일」 → 「챙기실 일」(수락 메일과 같은 이름).
   const rows: [string, string][] = [
     guestNameRow(booking, guest),
@@ -928,8 +951,9 @@ export function buildRemindHost(
 /** 보내는 쪽 — 문장은 `buildRemindHost`가 만든다(09-17 메일 미리보기 `/dev/rent-mail`이 같은 함수를 부른다). */
 export async function notifyRemindHost(
   booking: SpaceBooking, space: Space, host: Profile | null, guest: Profile | null,
+  deadline?: { at: number; by: ConfirmLapse } | null, today?: string,
 ): Promise<MailResult> {
-  return sendMail(buildRemindHost(booking, space, host, guest));
+  return sendMail(buildRemindHost(booking, space, host, guest, deadline, today));
 }
 
 /** 검토로 내려가기 «전» 공간의 모양 — 새 공간이면 null. */
