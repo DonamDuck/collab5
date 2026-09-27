@@ -228,7 +228,11 @@ export default async function MyRentPage({
       const finished = bookingFinished(b);
       const masked = b.status === "done" || finished;
       const brandName = b.guestBrandSlug ? guestBrands.get(b.guestBrandSlug) : undefined;
-      const refundAskable = b.status === "confirmed" || (b.status === "paid" && bookingStarted(b));
+      // 🙋관리자에게 환불 신청 — 확정한 예약에서만(🔁09-27 대표 「추천대로」). 전엔 수락 안 한 채 이용이 시작된 결제 완료에도 열었다.
+      //   그 예약은 확정 기한(이용 시작)이 지나 자동으로 전액 돌아가서 관리자를 거칠 일이 없다. 서버(`requestRefundAction`)도 받지 않는다.
+      const refundAskable = b.status === "confirmed";
+      // 이미 들어간 신청의 표시는 상태와 상관없이 그대로 선다(09-27 전에 결제 완료로 신청한 예약이 남아 있을 수 있다).
+      const refundPending = (b.status === "confirmed" || b.status === "paid") && !!b.refundRequestedAt;
       const needAccount = !payoutAccount && (b.status === "confirmed" || b.status === "done");
       // 👤카드 몸의 손님 한 줄 토막들. 연락처 판을 안 그리는 카드(수락 전·가려진 뒤)에만 쓴다.
       const guestBits: ReactNode[] = [];
@@ -278,7 +282,7 @@ export default async function MyRentPage({
               tone={tone}
               spaceName={sp?.name ?? "내 공간"}
               // 🙋환불 신청이 들어간 확정 예약 — 상태는 그대로 「예약 확정」이라 머리에 한 토막 더 붙인다.
-              refundPending={refundAskable && !!b.refundRequestedAt}
+              refundPending={refundPending}
             />
           }
         >
@@ -334,19 +338,18 @@ export default async function MyRentPage({
             <p className="mt-4 border-t border-hairline pt-4 text-[15px] leading-relaxed break-keep text-mute">{CONFIRM_LAPSED_HOST.card}</p>
           )}
           {/* 🙋관리자에게 환불 신청(대표 09-16) — 수락해 확정한 예약에서만. 수락 전(결제 완료)엔 거절이 곧 전액 환불이라
-              관리자를 거칠 일이 없다. 단 수락 안 한 채 이용 시간이 시작되면 거절이 막히니 그때는 신청으로 연다.
+              관리자를 거칠 일이 없다. 🔁09-27 수락 안 한 채 이용 시간이 시작된 예약도 이제 자동으로 전액 돌아가서 버튼을 안 연다.
               신청이 들어가 있으면 버튼 대신 상태 한 줄. */}
-          {refundAskable &&
-            (b.refundRequestedAt ? (
-              <p className="mt-3 text-[15px] leading-relaxed break-keep text-lemon-on">
-                환불 신청을 받았어요. 사장님과 손님께 전화로 확인한 뒤 처리해 드릴게요.
-              </p>
-            ) : (
-              // 글자 버튼의 터치 여백(아래 12px)이 카드 아래 여백에 겹쳐 바닥이 휑했다. 보이는 간격만 되돌린다.
-              <div className="-mb-[12px]">
-                <RefundRequest bookingId={b.id} />
-              </div>
-            ))}
+          {refundPending ? (
+            <p className="mt-3 text-[15px] leading-relaxed break-keep text-lemon-on">
+              환불 신청을 받았어요. 사장님과 손님께 전화로 확인한 뒤 처리해 드릴게요.
+            </p>
+          ) : refundAskable ? (
+            // 글자 버튼의 터치 여백(아래 12px)이 카드 아래 여백에 겹쳐 바닥이 휑했다. 보이는 간격만 되돌린다.
+            <div className="-mb-[12px]">
+              <RefundRequest bookingId={b.id} />
+            </div>
+          ) : null}
 
           {/* 🏦수락한 예약인데 계좌가 없으면 한 줄(09-17). 이용일이 지나도 보낼 곳이 없다. 날짜 약속은 안 한다. */}
           {needAccount && (

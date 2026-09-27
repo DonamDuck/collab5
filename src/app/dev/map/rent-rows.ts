@@ -315,7 +315,7 @@ export const RENT_POPUPS: Popup[] = [
   { where: { desc: "예약 한 건", c: "guest-full", to: `/rent/done/${B.confirmed}` }, button: "「예약 취소하기」", title: "예약을 취소할까요?" },
   // 사장님 버튼은 「빌려준 공간」 칸에 있다. `tab=host` 없이 열면 빌린 공간 칸이 떠서 누를 버튼이 안 보인다(09-18 밤 QA SC-15).
   { where: { desc: "내 하루 팝업", c: "host-full", to: "/rent/my?tab=host" }, button: "새 요청 줄의 「거절」", title: "이 요청을 거절할까요?" },
-  { where: { desc: "내 하루 팝업", c: "host-full", to: "/rent/my?tab=host" }, button: "이용 시간이 시작된 줄의 「관리자에게 환불 신청하기」", title: "관리자에게 환불을 신청할까요?" },
+  { where: { desc: "내 하루 팝업", c: "host-full", to: "/rent/my?tab=host" }, button: "확정된 줄의 「관리자에게 환불 신청하기」", title: "관리자에게 환불을 신청할까요?" },
   { where: { desc: "내 하루 팝업", c: "host-full", to: "/rent/my?tab=host" }, button: "공개 중인 공간 줄의 「잠시 쉬기」", title: "잠시 쉴까요?" },
   { where: { desc: "공간 검토", c: "admin-full", to: "/rent/review" }, button: "검토 대기 줄의 「보완 요청」", title: "○○, 무엇을 고쳐 주시면 될까요? (칩 넷 + 사장님께 보낼 말)" },
   { where: { desc: "정산", c: "admin-full", to: "/rent/payouts" }, button: "환불 신청 줄의 「승인하고 환불」", title: "환불을 승인할까요?" },

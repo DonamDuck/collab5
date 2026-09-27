@@ -1392,8 +1392,11 @@ export async function requestRefundAction(bookingId: number, note: string): Prom
   const mine = await listSpacesByOwner(uid);
   if (!mine.some((x) => x.id === b.spaceId)) return { ok: false, message: "내 공간의 예약만 신청할 수 있어요." };
   if (b.status !== "paid" && b.status !== "confirmed") return { ok: false, message: "이미 끝난 예약이에요." };
-  // 수락 전(결제 완료)이고 아직 시작 전이면 거절이 곧 전액 환불이다. 관리자 승인은 확정 뒤에만 거친다(대표 09-16).
-  if (b.status === "paid" && !bookingStarted(b)) {
+  // 수락 전(결제 완료)이면 거절이 곧 전액 환불이다. 관리자 승인은 확정 뒤에만 거친다(대표 09-16).
+  // 🔁09-27(fix-six) 대표 「추천대로」 — 이용이 시작된 결제 완료도 받지 않는다. 전엔 그때만 신청으로 열었는데(거절이 막혀서),
+  //   이제 그 예약은 확정 기한(이용 시작)이 지나 자동으로 전액 돌아간다. 거절을 눌러도 그 자리에서 자동 환불로 간다(`decideBookingAction`).
+  //   화면도 버튼을 확정에만 그린다(`/rent/my`). 관문은 여기다.
+  if (b.status === "paid") {
     return { ok: false, message: "아직 수락 전이라 거절하시면 손님께 바로 전액 돌아가요." };
   }
   if (b.refundRequestedAt) return { ok: true, message: "이미 신청하셨어요. 저희가 곧 연락드릴게요." };
