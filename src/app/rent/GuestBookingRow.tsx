@@ -234,7 +234,8 @@ export function GuestBookingRow({ view }: { view: GuestBookingView }) {
           </div>
         </div>
       }
-      status={<BookingBadge status={b.status} auto={autoRejected(b)} />}
+      // 🆕09-27(fix-six) 흔적 있는 결제 전 신청은 「결제 전」이 아니라 「결제 확인 중」(아래 「결제를 확인하고 있어요」 줄과 같은 뜻).
+      status={<BookingBadge status={b.status} auto={autoRejected(b)} checking={!!checking} />}
     >
       {/* 🔒09-27(fix-money3) 결제를 시도한 흔적이 있는 결제 전 신청 — 승인 결과를 모른다. 확인 중이라는 한 줄만.
           결제 실패 화면이 「몇 분 뒤 내 예약에서 확인해 주세요」라며 손님을 이 줄로 보낸다. 정리 작업이 토스에 되물어 끝낸다.
