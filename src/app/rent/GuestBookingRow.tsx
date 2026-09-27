@@ -9,7 +9,10 @@
 //
 // 훅이 없는 서버 컴포넌트 파일이다(`"use client"` 없음). 취소 버튼(`GuestCancel`)만 클라이언트 조각이다.
 import Link from "next/link";
-import { getSpaceFull, guestSeesHost, listBookingsForGuest, listSpacesByIds, type SpaceBrief } from "@/lib/spaces";
+import { getSpaceFull, guestSeesHost, listBookingsForGuest, listPaymentsByOrderIds, listSpacesByIds, type SpaceBrief } from "@/lib/spaces";
+// 🔒09-27(fix-money3) 결제 전 신청에 «결제를 시도한 흔적»이 있나 — 정리 작업·승인 관문과 같은 판정 한 벌이다.
+import { hasPayTrace } from "@/lib/rent-recover";
+import { PAY_CHECKING_TITLE, PAY_CHECKING_WAIT } from "@/lib/rent-payment";
 import { getProfileById, type Profile } from "@/lib/profiles";
 import { repo } from "@/lib/repo";
 import type { Space, SpaceBooking } from "@/lib/types";
@@ -32,13 +35,19 @@ export type GuestBookingView = {
   reveal?: Reveal;
   /** 확정된 예약에만 읽는다. 아니면 null. */
   host: Profile | null;
+  /** 🆕09-27(fix-money3) 결제 전(`pending`)인데 결제를 시도한 흔적이 있다 — 승인 결과를 아직 모른다. 「이어서 결제하기」를 안 띄운다. */
+  checking?: boolean;
 };
 
 /** 로그인한 사람이 보낸 신청 전부를, 줄을 그리는 데 필요한 것과 함께. 최근에 보낸 것부터. */
 export async function loadGuestBookings(uid: number): Promise<GuestBookingView[]> {
   const bookings = await listBookingsForGuest(uid);
   // 내가 «빌린» 곳은 남의 공간이라 id로 따로 읽는다(`listSpacesByIds` 주석 참조).
-  const spaces = await listSpacesByIds(bookings.map((b) => b.spaceId));
+  // 🔒09-27(fix-money3) 결제 전 신청은 결제 줄도 같이 읽는다. 승인 결과를 모르는 신청에 「이어서 결제하기」를 띄우면 두 번 나갈 수 있다.
+  const [spaces, pays] = await Promise.all([
+    listSpacesByIds(bookings.map((b) => b.spaceId)),
+    listPaymentsByOrderIds(bookings.filter((b) => b.status === "pending").map((b) => b.orderId)),
+  ]);
 
   // 원본·프로필은 열린 예약 것만, 같은 공간·같은 사장님은 한 번만 읽는다.
   const openSpaceIds = new Set<number>();
@@ -71,11 +80,13 @@ export async function loadGuestBookings(uid: number): Promise<GuestBookingView[]
   return bookings.map((b) => {
     const sp = spaces.get(b.spaceId);
     const open = guestSeesHost(b) && !!sp;
+    const pay = b.status === "pending" ? pays.get(b.orderId) : undefined;
     return {
       booking: b,
       space: sp,
       reveal: open ? reveals.get(b.spaceId) : undefined,
       host: open ? (hosts.get(sp!.ownerUserId) ?? null) : null,
+      checking: !!pay && hasPayTrace({ payStatus: pay.status, payKey: pay.paymentKey }),
     };
   });
 }
@@ -128,7 +139,7 @@ function CompactContact({ host, shopPhone, address }: { host: Profile | null; sh
 }
 
 export function GuestBookingRow({ view }: { view: GuestBookingView }) {
-  const { booking: b, space: sp, reveal, host } = view;
+  const { booking: b, space: sp, reveal, host, checking } = view;
   const open = guestSeesHost(b);
   // 🔗09-17 QA — 줄 어디에도 링크가 없어서 완료 화면(`/rent/done`)은 결제 직후 한 번만 볼 수 있었다.
   //   「자세히」는 결제를 마친 건에만 건다 — 결제 전·만료 건은 완료 화면이 보여 줄 게 없다.
@@ -192,7 +203,14 @@ export function GuestBookingRow({ view }: { view: GuestBookingView }) {
           이어서 낼 길도 없어서 목록에 쌓이기만 했다. 결제 화면은 주문번호로 되돌아갈 수 있다. */}
       {/* ⏳날짜가 지난 미결제 신청엔 「이어서 결제하기」를 안 띄운다(09-16). 눌러도 서버가 지난 날짜를 막아서
           (`startBookingAction`) 손님은 결제 화면에서 막다른 길을 만난다. 버튼을 거두고 사실만 말한다. */}
-      {b.status === "pending" ? (
+      {/* 🔒09-27(fix-money3) 결제를 시도한 흔적이 있으면(승인 결과를 모른다) 「이어서 결제하기」 대신 확인 중이라는 한 줄만.
+          결제 실패 화면이 「몇 분 뒤 내 예약에서 확인해 주세요」라며 손님을 이 줄로 보낸다. 여기서 다시 결제하면 두 번 나갈 수 있다.
+          날짜가 지났어도 이 말이 먼저다(「결제를 마치지 않은 채」가 사실이 아닐 수 있다). 정리 작업이 토스에 되물어 끝낸다. */}
+      {b.status === "pending" && checking ? (
+        <p className="mt-3 text-[15px] leading-relaxed break-keep text-faint">
+          {`${PAY_CHECKING_TITLE}. ${PAY_CHECKING_WAIT}`}
+        </p>
+      ) : b.status === "pending" ? (
         bookingStarted(b) ? (
           <p className="mt-3 text-[15px] leading-relaxed break-keep text-faint">
             결제를 마치지 않은 채 날짜가 지났어요. 사장님께는 전달되지 않았어요.

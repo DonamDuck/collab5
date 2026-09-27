@@ -7,7 +7,9 @@ import "server-only"; // 🔒토스 시크릿 키로 결제를 되묻고 환불�
 //
 // ⭐무엇을 하나
 //   · 결제를 «시도한 흔적»이 없는 신청(결제 줄이 READY 그대로, 결제 키도 없음)은 전처럼 바로 만료로 닫는다.
-//     결제창만 열고 떠난 신청이다. 토스 승인은 우리 승인 호출로만 일어나고, 그 호출은 실패하면 ABORTED를 남긴다.
+//     결제창만 열고 떠난 신청이다. 토스 승인은 우리 승인 호출로만 일어나고, 그 호출은 결과를 모르면 ABORTED를 남긴다.
+//     🔁09-27(fix-money3) 토스가 «안 했다»고 분명히 답한 실패(카드 거절 등)는 흔적을 안 남긴다. 돈이 안 움직였고, 흔적이 있으면
+//     아래 판정(`hasPayTrace`)을 쓰는 내 예약 줄·결제 화면·승인 관문이 새 결제를 막아서 손님이 다른 카드로 다시 할 수 없다.
 //   · 흔적이 있는 신청은 토스에 주문번호로 묻는다(`GET /v1/payments/orders/{orderId}`).
 //       - 토스엔 돈이 있다(DONE·부분 취소 뒤 잔액) → 들어온 돈을 장부에 먼저 적고 **전액 자동 환불** + 슬랙 거래 알림.
 //         🆕09-27(대표 「제안대로 고고」) 손님께도 「결제가 취소됐어요」 메일 한 통(`notifyPaymentReturned`).
@@ -68,7 +70,9 @@ export interface RecoverRun {
   gaveUp: number;
 }
 
-/** 결제를 시도한 흔적 — 결제 줄이 READY가 아니거나(승인 실패 ABORTED 등) 결제 키가 적혀 있다. */
+/** 결제를 시도한 흔적 — 결제 줄이 READY가 아니거나(결과를 모르는 승인 ABORTED 등) 결제 키가 적혀 있다.
+ *  🔒09-27(fix-money3) 이 한 벌을 네 곳이 쓴다. 정리 작업(토스에 되물을지) · 내 예약 줄(「이어서 결제하기」 대신 「결제를 확인하고 있어요」)
+ *    · 결제 화면(위젯 대신 같은 안내) · 승인 관문(`confirmBookingAction`, 다른 결제 키의 새 승인을 안 받는다). 판정을 따로 적지 마라. */
 export function hasPayTrace(r: Pick<StalePending, "payStatus" | "payKey">): boolean {
   return (!!r.payStatus && r.payStatus !== "READY") || !!r.payKey;
 }

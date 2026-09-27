@@ -31,8 +31,10 @@ import {
   approvePayment, cancelPayment, guestCancelQuote, lookupPayment, lookupPaymentByOrderId, AUTO_CANCEL_WAITING_REASON, AUTO_REFUND_REASON,
   PAY_EXPIRED_LINE, PAY_FAIL_METHOD_UNSUPPORTED, PAY_FAIL_NOT_AVAILABLE, PAY_FAIL_REFUND_CHANGED, PAY_FAIL_SLOT_TAKEN,
   PAY_FAIL_SLOT_TAKEN_REFUNDED, PAY_FAIL_SLOT_TAKEN_REFUND_PENDING, PAY_FAIL_USE_STARTED, PAY_FAIL_WINDOW_OVER,
-  PAY_CHECKING_LINE, PAY_CHECKING_TITLE, PAY_IN_FLIGHT_CODES,
+  PAY_CHECKING_LINE, PAY_CHECKING_TITLE, PAY_IN_FLIGHT_CODES, PAY_FAIL_UNKNOWN, PAY_ALREADY_PROCESSED,
 } from "./rent-payment";
+// 🆕09-27(fix-money3) «결제를 시도한 흔적» — 정리 작업이 토스에 되물을지 정하는 그 판정 한 벌을 승인 관문도 쓴다.
+import { hasPayTrace } from "./rent-recover";
 // ⭐신청이 «지금도» 말이 되나 — 신청 시작·결제 승인·결제 화면이 같이 쓰는 순수 규칙(09-18 밤 QA G-01).
 import { pendingBookingProblem, validateBookingRequest } from "./rent-booking-rules";
 // 🧾09-19 저녁 저장하면 어느 상태로 가나 — 등록 폼과 같은 순수 함수.
@@ -926,6 +928,19 @@ export async function confirmBookingAction(
   const space = brief ? await getSpaceFull(brief.slug) : null;
   const taken = space ? await listLiveBookings(space.id, b.useDate) : [];
   const problem = pendingBookingProblem(b, space, taken);
+
+  // 🔒09-27(fix-money3) — **결제를 시도한 흔적이 있는 신청엔 새 승인을 받지 않는다.** 앞선 승인의 결과를 모르는 상태다
+  //   (승인 응답이 끊겼거나, 승인 중에 서버가 죽었거나, 다른 요청이 아직 처리 중). 돈이 이미 나갔을 수 있는데
+  //   «다른 결제 키»로 승인을 부르면 한 주문에 두 번 나간다. 토스가 같은 주문번호의 두 번째 승인을 막는다고 믿지 않는다.
+  //   정리 작업이 40분 뒤 토스에 되물어 결론을 낸다(`rent-recover.ts`). 판정은 그 파일의 `hasPayTrace` 하나다.
+  //   ⭐«같은 결제 키»는 들여보낸다. 복귀 주소가 두 번 열린 것이라 멱등키가 같아 토스가 첫 응답을 그대로 준다(돈은 한 번).
+  //   ⏳단 흔적이 있는데 결제 시간이 지났거나 시간이 찼으면(`problem`) 여기서 만료로 닫지 않는다. 닫으면 pending이 아니라서
+  //     정리 작업이 토스에 다시 묻지 않고, 나간 돈이 장부 대조 전까지 그대로 남는다.
+  if (hasPayTrace({ payStatus: pay.status, payKey: pay.paymentKey }) && (!paymentKey || pay.paymentKey !== paymentKey || problem)) {
+    console.warn(`[rent-actions] 결제 확인 중인 신청이라 새 승인을 받지 않는다 order=${orderId} 결제 줄=${pay.status}${problem ? ` · ${problem.code}` : ""}`);
+    return { ok: false, code: PAY_FAIL_UNKNOWN, bookingId: b.id, message: `${PAY_CHECKING_TITLE}. ${PAY_CHECKING_LINE}` };
+  }
+
   if (problem) {
     const expire = problem.code === "expired" || problem.code === "started";
     if (expire) await rentSync(orderId, { bookingStatus: "expired", toss: { status: "EXPIRED" } });
@@ -956,10 +971,17 @@ export async function confirmBookingAction(
         message: `${PAY_CHECKING_TITLE}. ${PAY_CHECKING_LINE}`,
       };
     }
-    // 결제 줄만 ABORTED로 남기고 예약은 그대로 둔다. 대개 돈은 안 움직였다(카드 거절 등 — 30분 안이면 다시 시도할 수 있다).
-    // 🆕09-27 결과를 모르는 승인(`PAY_FAIL_UNKNOWN`)도 여기로 온다. 그땐 돈이 나갔을 수 있어서 ABORTED가 곧 «흔적»이다 —
-    //   정리 작업이 이 흔적을 보고 40분 뒤 토스에 되물어, 돈이 있으면 전액 돌려준다(`rent-recover.ts`). 그래서 손님 말이 참이 된다.
-    await rentSync(orderId, { toss: { status: "ABORTED" } });
+    // 예약은 그대로 둔다. 결제 줄은 갈래가 둘이다.
+    //  · 결과를 모르는 승인(`PAY_FAIL_UNKNOWN`)·「이미 처리된 결제」 → ABORTED를 남긴다. 돈이 나갔을 수 있어서 이게 곧 «흔적»이다.
+    //    정리 작업이 이 흔적을 보고 40분 뒤 토스에 되물어, 돈이 있으면 전액 돌려준다(`rent-recover.ts`). 그래서 손님 말이 참이 된다.
+    //    내 예약 줄·결제 화면·위 관문도 이 흔적을 보고 새 결제를 막는다.
+    //  · 🔁09-27(fix-money3) 토스가 «안 했다»고 분명히 답한 실패(카드 거절 같은 4xx, 되물어 «없다»를 확인한 실패) → 흔적을 남기지 않는다.
+    //    돈이 안 움직였고 손님은 30분 안에 다른 카드로 다시 결제할 수 있어야 한다. 전엔 여기도 ABORTED를 썼는데,
+    //    그 흔적을 보고 막으면 카드가 거절된 손님이 「결제를 확인하고 있어요」에 갇힌다.
+    //    결제 키도 같이 적는다. 그래야 복귀 주소가 한 번 더 열렸을 때 «같은 시도»인지 위 관문이 알아본다(키가 없으면 다른 시도와 못 가른다).
+    if (approved.code === PAY_FAIL_UNKNOWN || approved.code === PAY_ALREADY_PROCESSED) {
+      await rentSync(orderId, { toss: { status: "ABORTED", ...(paymentKey ? { paymentKey } : {}) } });
+    }
     return { ok: false, message: approved.message, code: approved.code };
   }
 

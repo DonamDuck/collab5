@@ -104,6 +104,14 @@ export const PAY_CHECKING_CODES: readonly string[] = [...PAY_IN_FLIGHT_CODES, PA
  *  ⚠️「자동으로 돌려드려요」는 결제 줄에 흔적(ABORTED)이 남아 정리 작업이 토스에 되묻기 때문에 참이다(`confirmBookingAction`). */
 export const PAY_CHECKING_LINE = "몇 분 뒤 내 예약에서 확인해 주세요. 돈이 나갔는데 예약이 안 잡혔으면 자동으로 전액 돌려드려요.";
 export const PAY_CHECKING_TITLE = "결제를 확인하고 있어요";
+/** 🆕09-27(fix-money3) 확인하는 동안 손님께 하는 부탁. 내 예약 줄(`GuestBookingRow`)이 제목 뒤에 이 한 줄만 붙인다. */
+export const PAY_CHECKING_WAIT = "다시 결제하지 말고 기다려 주세요.";
+/** 실패 화면과 결제 화면(`/rent/pay/[orderId]`)의 «확인 중» 본문. 두 화면이 같은 말을 한다. */
+export const PAY_CHECKING_BODY = `조금 전 결제가 끝났는지 아직 확인하는 중이에요. ${PAY_CHECKING_WAIT}`;
+
+/** 🆕09-27(fix-money3) 토스가 「이미 처리된 결제」라고 답한 승인(4xx). 멱등키 덕에 우리 요청끼리는 거의 안 나지만, 나면 «안 했다»가 아니라
+ *  «누가 이미 했다»다. 그래서 다른 4xx와 달리 결제 줄에 흔적(ABORTED)을 남긴다(`confirmBookingAction`). */
+export const PAY_ALREADY_PROCESSED = "ALREADY_PROCESSED_PAYMENT";
 
 /** 🤖사람 손 없이 우리가 되돌리는 취소의 사유 둘(`confirmBookingAction`). 토스 취소 내역(`cancels[].cancelReason`)에 이 글자
  *  그대로 남는다. 아침 요약이 이 글자로 «자동 환불»을 손님 취소와 가른다(둘 다 예약은 `cancelled`라서). ⚠️글자를 바꾸면 옛 줄은 손님 취소로 세진다. */

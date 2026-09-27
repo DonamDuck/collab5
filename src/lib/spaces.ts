@@ -817,6 +817,33 @@ export async function getPaymentByOrderId(orderId: string): Promise<Payment | nu
   return data ? toPayment(data as Row) : null;
 }
 
+/** 🆕09-27(fix-money3) 주문번호 여럿의 결제 줄 — 내 예약 줄이 결제 전 신청의 «결제를 시도한 흔적»을 보려고 읽는다.
+ *  읽기가 실패하면 빈 표다(줄은 「이어서 결제하기」로 물러서고, 결제 화면과 승인 관문이 한 건씩 다시 본다).
+ *  주소 길이 때문에 100건씩 끊는다(정리 작업 ①과 같다). */
+export async function listPaymentsByOrderIds(orderIds: string[]): Promise<Map<string, Payment>> {
+  const out = new Map<string, Payment>();
+  if (orderIds.length === 0) return out;
+  const m = await getRentMock();
+  if (m) {
+    for (const p of m.data.payments) if (orderIds.includes(p.orderId)) out.set(p.orderId, p);
+    return out;
+  }
+  const c = db();
+  if (!c) return out;
+  for (let i = 0; i < orderIds.length; i += 100) {
+    const { data, error } = await c.from("payments").select("*").in("order_id", orderIds.slice(i, i + 100));
+    if (error) {
+      console.error(`[spaces] listPaymentsByOrderIds failed: ${error.message}`);
+      return new Map();
+    }
+    for (const r of data ?? []) {
+      const p = toPayment(r as Row);
+      out.set(p.orderId, p);
+    }
+  }
+  return out;
+}
+
 /** 🔒예약·결제·지급 상태를 «같이» 옮기는 유일한 문. 셋 다 null이면 아무것도 안 바꾼다.
  *  - `bookingStatus` 예약을 무엇으로
  *  - `toss` 토스 Payment 응답(돈의 상태는 우리가 계산하지 않고 토스 말을 옮긴다)
