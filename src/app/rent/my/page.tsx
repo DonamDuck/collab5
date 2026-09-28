@@ -68,9 +68,9 @@ const h3Cls = "mt-6 text-[15px] font-medium text-mute";
  *  🗂순위는 무리 판정 한 벌(`lib/rent-groups`의 `hostBookingGroup`)에서 온다. `/my`의 숫자도 같은 판정을 쓴다(09-18 밤 QA SC-14). */
 const HOST_RANK: Record<HostBookingGroup, number> = { answer: 0, upcoming: 1, past: 2 };
 
-function hostOrder(list: SpaceBooking[]): SpaceBooking[] {
+function hostOrder(list: SpaceBooking[], lapsed?: (b: SpaceBooking) => boolean): SpaceBooking[] {
   const at = (b: SpaceBooking) => `${b.useDate} ${b.startTime || "00:00"}`;
-  const rank = (b: SpaceBooking) => HOST_RANK[hostBookingGroup(b)];
+  const rank = (b: SpaceBooking) => HOST_RANK[hostBookingGroup(b, lapsed)];
   return [...list].sort((a, b) => {
     const r = rank(a) - rank(b);
     if (r !== 0) return r;
@@ -130,7 +130,10 @@ export default async function MyRentPage({
     listBookingsForHost(uid),
     loadGuestBookings(uid),
   ]);
-  const hostBookings = hostOrder(hostBookingsRaw);
+  // ⏳확정 기한 판정엔 결제 승인 시각이 필요하다(예약 행엔 없다). 정렬·무리·카드가 같은 판정을 쓰게 여기서 한 번 읽는다.
+  const paidPays = await listPaymentsByOrderIds(hostBookingsRaw.filter((b) => b.status === "paid").map((b) => b.orderId));
+  const isLapsed = (b: SpaceBooking) => b.status === "paid" && !!confirmLapse(b, paidPays.get(b.orderId)?.approvedAt);
+  const hostBookings = hostOrder(hostBookingsRaw, isLapsed);
   const admin = await isRentAdmin();
   // 🏦정산 받을 계좌(09-17). 🔒원문은 여기서 바로 마스킹본으로 줄인다 — 화면 컴포넌트로 번호 원문이 안 넘어간다.
   //   공간이 없는 분에겐 읽지도 않는다(절 자체가 안 뜬다).
@@ -182,12 +185,11 @@ export default async function MyRentPage({
   // ⏳09-27(fix-six) 확정 기한 — 결제 완료(답을 기다리는) 요청의 결제 승인 시각. 기한이 지난 카드는 수락·거절 버튼을 거둔다.
   //   보통은 위 정리 작업이 이미 돌려줘서 «자동 취소»로 서지만, 한도(3건)·토스 장애로 미룬 예약이 남을 수 있다.
   //   ⚠️못 읽으면(빈 표) 이용 시작만 본다 — 버튼이 남아도 누르면 서버가 그 자리에서 자동 환불로 돌린다(`decideBookingAction`).
-  const paidPays = await listPaymentsByOrderIds(hostBookings.filter((b) => b.status === "paid").map((b) => b.orderId));
   const savedLine = saved ? SAVED_LINE[saved] ?? "" : "";
   const didId = Number(didBooking) || 0;
 
   // 🗂세 무리 — 정렬(`hostOrder`)·카드 색(`tone`)과 같은 판정 한 벌(`lib/rent-groups`). `/my`의 숫자 세 칸도 이걸 센다.
-  const { toAnswer, upcoming, past } = groupHostBookings(hostBookings);
+  const { toAnswer, upcoming, past } = groupHostBookings(hostBookings, isLapsed);
 
   // 💬09-18 밤 QA(H-08) — 수락·거절한 뒤의 결과 한 줄이 **그 카드 안**에 떴다. 답한 카드는 목록 아래쪽이라
   //   1440에서 1,832px, 지난 요청 안이면 2,824px 자리였다. 누른 사람은 화면 맨 위에 있는데 결과는 화면 밖이다.
@@ -220,11 +222,12 @@ export default async function MyRentPage({
       const open = isRevealed(b);
       const brief = guestBriefs.get(b.guestUserId);
       // 무리 판정(`toAnswer`·`upcoming`·`past`)과 같은 함수. 따로 적으면 레몬 칸이 엉뚱한 무리에 선다.
-      const tone: RowTone = hostBookingGroup(b);
+      const tone: RowTone = hostBookingGroup(b, isLapsed);
       // 답할 수 있나 = «답을 기다려요» 무리(결제 완료·이용 시작 전). 수락·거절 버튼과 손님 한 줄이 이걸 본다.
       const answerable = tone === "answer";
       // ⏳기한이 지난 결제 완료 — 답을 받지 않는다. 버튼 자리에 한 줄만(대표 09-27).
-      const lapsed = answerable && !!confirmLapse(b, paidPays.get(b.orderId)?.approvedAt);
+      //   🔁09-27 기한이 지나면 무리가 «지난 요청»으로 옮겨 가서(`isLapsed`) «답할 수 있나»와 따로 본다.
+      const lapsed = isLapsed(b);
       const finished = bookingFinished(b);
       const masked = b.status === "done" || finished;
       const brandName = b.guestBrandSlug ? guestBrands.get(b.guestBrandSlug) : undefined;
@@ -283,6 +286,7 @@ export default async function MyRentPage({
               spaceName={sp?.name ?? "내 공간"}
               // 🙋환불 신청이 들어간 확정 예약 — 상태는 그대로 「예약 확정」이라 머리에 한 토막 더 붙인다.
               refundPending={refundPending}
+              lapsed={lapsed}
             />
           }
         >
@@ -820,11 +824,14 @@ function RequestHead({
   tone,
   spaceName,
   refundPending,
+  lapsed = false,
 }: {
   b: SpaceBooking;
   tone: RowTone;
   spaceName: string;
   refundPending: boolean;
+  /** ⏳확정 기한이 지난 결제 완료(09-27). 「새 요청」 대신 「자동 취소 예정」 — 곧 자동 환불로 닫힌다. */
+  lapsed?: boolean;
 }) {
   const day = dayTag(b, tone);
   // ⏱09-19 길이는 분으로 세고 「2시간 30분」으로 적는다(30분 단위, `durationLabel` 한 벌).
@@ -845,7 +852,15 @@ function RequestHead({
           {/* ⏯수락 안 한 채 이용 시간이 시작된 결제 완료 — phase 1에선 곧 예약 완료다(버튼도 거둔다).
               「새 요청」으로 두면 답할 수 없는 카드가 답을 기다리는 이름을 달고 지난 요청에 선다. 손님 쪽 이름을 빌린다. */}
           {/* 🆕09-27 확정 기한이 지나 자동으로 취소·환불된 요청(`autoRefunded`)은 「전액 환불」 대신 「자동 취소」. 사장님이 거절한 적이 없다. */}
-          <BookingBadge dot status={b.status} auto={autoRejected(b) || autoRefunded(b)} viewer={b.status === "paid" && bookingStarted(b) ? "guest" : "host"} />
+          {lapsed ? (
+            // ⏳09-27 대표 「추천대로」 — 기한 지난 결제 완료는 «새 요청»이 아니다. 숫자·탭 점에서 빠졌고 이름도 맞춘다.
+            <span className="inline-flex shrink-0 items-center gap-1.5 text-[15px] font-medium text-faint">
+              <span aria-hidden="true" className="size-[7px] rounded-full bg-current" />
+              자동 취소 예정
+            </span>
+          ) : (
+            <BookingBadge dot status={b.status} auto={autoRejected(b) || autoRefunded(b)} viewer={b.status === "paid" && bookingStarted(b) ? "guest" : "host"} />
+          )}
           {day && (
             <>
               <span aria-hidden="true" className="text-faint">·</span>

@@ -10,6 +10,7 @@ import { bookingFinished, bookingStarted } from "@/lib/rent-time";
 import { BOOKING_HEADLINE, COFFEE_CHAT_WHEN_GUEST, CONFIRM_BEFORE_USE_GUEST, CONFIRM_DEADLINE_GUEST, CONTACT_RULE_GUEST, CONTACT_RULE_GUEST_DONE, PRODUCT_LABEL, REFUND_TIMING_LINE, unconfirmedReasonLine } from "@/lib/rent-copy";
 import { CONFIRM_DEADLINE_HOURS, confirmLapse } from "@/lib/rent-booking-rules";
 import { isUnconfirmedRefundReason } from "@/lib/rent-payment";
+import { hasPayTrace } from "@/lib/rent-recover";
 import { guestBookingHref } from "@/lib/rent-groups";
 import { bookingHasChat } from "@/lib/rent-products";
 import type { BookingStatus } from "@/lib/types";
@@ -60,7 +61,14 @@ export default async function RentDonePage({ params }: { params: Promise<{ booki
   // 결제창만 열고 안 낸 자리는 「완료」가 아니다. 🔁09-27 — 전엔 내 예약 목록으로 보냈는데, 결제 전 신청은 이제 목록에 안 선다
   //   (대표 「이어서 결제하기 스펙 자체를 지우자」). 결제 화면이 그 신청의 지금을 말한다 — 결제 시간 안이면 결제창,
   //   결제를 확인하고 있으면 「결제를 확인하고 있어요」, 시간이 지났으면 공간으로 돌려보낸다(`/rent/pay/[orderId]`).
-  if (b.status === "pending") redirect(`/rent/pay/${b.orderId}`);
+  //   🔁09-27 대표 「추천대로」 — 같은 주문으로 다시 결제하는 길을 줄인다. 결제를 시도한 흔적이 있으면(확인 중) 결제 화면이
+  //   「결제를 확인하고 있어요」를 말하니 그리로, 흔적이 없으면 공간 신청 폼으로 새로 시작하게 보낸다(실패 화면 「다시 신청하기」와 같은 길).
+  if (b.status === "pending") {
+    const p = await getPaymentByOrderId(b.orderId);
+    if (p && hasPayTrace({ payStatus: p.status, payKey: p.paymentKey })) redirect(`/rent/pay/${b.orderId}`);
+    const sp = (await listSpacesByIds([b.spaceId])).get(b.spaceId);
+    redirect(sp ? `/rent/${sp.slug}#apply` : "/rent");
+  }
 
   const brief = (await listSpacesByIds([b.spaceId])).get(b.spaceId);
   // 👀09-16 phase 1 — 결제를 마치면 사장님 연락처가 바로 열린다(`guestSeesHost`). 원본(주소·안내)도 그때 읽는다.

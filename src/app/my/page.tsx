@@ -22,7 +22,8 @@ import type { CollabReportListItem } from "@/lib/types";
 import { BRIEFS } from "@/lib/brief-samples/registry";
 import { listBriefsByOwner } from "@/lib/briefs";
 import { DEV_OWNED_SLUGS } from "@/lib/dev-session";
-import { listBookingsForGuest, listBookingsForHost, listSpacesByOwner } from "@/lib/spaces";
+import { listBookingsForGuest, listBookingsForHost, listPaymentsByOrderIds, listSpacesByOwner } from "@/lib/spaces";
+import { confirmLapse } from "@/lib/rent-booking-rules";
 import { countGuestAhead, groupHostBookings } from "@/lib/rent-groups";
 
 // 🚨 로그인 사용자별 화면이라 절대 프리렌더되면 안 된다.
@@ -58,7 +59,9 @@ export default async function MyPage({ searchParams }: { searchParams: Promise<{
   // 🔢숫자는 `/rent/my`와 같은 판정 한 벌(`lib/rent-groups`)로 센다(09-18 밤 QA SC-14).
   //   🩸전엔 여기서 따로 적어서 「다가오는 예약」에 답할 새 요청까지 들어갔고(목 host-full 3 vs 2),
   //   「빌린 예약」은 이어서 결제할 수 있는 신청을 빼서 `/rent/my`의 «예약 완료» 칸과 달랐다(guest-full 3 vs 4).
-  const rentHost = groupHostBookings(rentHostBookings);
+  // ⏳09-27 — 확정 기한이 지난 결제 완료는 «새 요청»에서 뺀다(`/rent/my`와 같은 판정). 승인 시각은 결제 줄에만 있다.
+  const rentPaidPays = await listPaymentsByOrderIds(rentHostBookings.filter((b) => b.status === "paid").map((b) => b.orderId));
+  const rentHost = groupHostBookings(rentHostBookings, (b) => b.status === "paid" && !!confirmLapse(b, rentPaidPays.get(b.orderId)?.approvedAt));
   const rentToAnswer = rentHost.toAnswer.length;
   const rentUpcoming = rentHost.upcoming.length;
   // 「내 예약」 = 아직 쓰기 전인 예약 수 — `/rent/requests` 탭 중 «예약 확정 대기»와 «예약 확정 완료»(09-27 대표 네 탭)의 합.

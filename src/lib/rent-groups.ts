@@ -14,17 +14,22 @@ import { bookingFinished, bookingStarted } from "./rent-time";
 /** answer = 답을 기다리는 요청(결제 완료·이용 시작 전) · upcoming = 다가오는 예약 · past = 지난 요청(끝났거나 닫힌 것). */
 export type HostBookingGroup = "answer" | "upcoming" | "past";
 
-export function hostBookingGroup(b: SpaceBooking): HostBookingGroup {
+/** @param lapsed 확정 기한(결제 후 48시간 · 이용 시작 중 먼저)이 지났나. 결제 승인 시각은 예약 행에 없어서 부르는 쪽이 결제 줄을 읽어 넘긴다.
+ *  🔁09-27 대표 — 기한 지난 결제 완료는 곧 자동 환불로 닫힐 예약이다. «새 요청» 숫자·탭 점·답을 기다려요에서 빼고 지난 무리로 둔다. */
+export function hostBookingGroup(b: SpaceBooking, lapsed?: (b: SpaceBooking) => boolean): HostBookingGroup {
+  if (b.status === "paid" && lapsed?.(b)) return "past";
   if (b.status === "paid" && !bookingStarted(b)) return "answer";
   if ((b.status === "paid" || b.status === "confirmed") && !bookingFinished(b)) return "upcoming";
   return "past";
 }
 
 /** 들어온 요청을 세 무리로. 무리 안의 순서는 받은 순서 그대로다(정렬은 화면 몫). */
-export function groupHostBookings<T extends SpaceBooking>(list: T[]): { toAnswer: T[]; upcoming: T[]; past: T[] } {
+export function groupHostBookings<T extends SpaceBooking>(
+  list: T[], lapsed?: (b: SpaceBooking) => boolean,
+): { toAnswer: T[]; upcoming: T[]; past: T[] } {
   const out = { toAnswer: [] as T[], upcoming: [] as T[], past: [] as T[] };
   for (const b of list) {
-    const g = hostBookingGroup(b);
+    const g = hostBookingGroup(b, lapsed);
     (g === "answer" ? out.toAnswer : g === "upcoming" ? out.upcoming : out.past).push(b);
   }
   return out;
