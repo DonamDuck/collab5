@@ -1,0 +1,65 @@
+#!/usr/bin/env python3
+"""소개서 자동 만들기 대기열 (로컬 시험판, 2026-10-03) — 정본 설명 = src/lib/autoDraft.ts 머리말.
+
+  scripts/auto-draft/queue              # 대기 중인 신청 목록(오래된 것부터)
+  scripts/auto-draft/queue next         # 다음에 만들 신청 하나를 통째로 출력(스킬에 넘길 재료)
+  scripts/auto-draft/queue start <id>   # 만들기 시작 → working
+  scripts/auto-draft/queue done <id> <slug>   # 완성 → done (+소개서 주소)
+  scripts/auto-draft/queue fail <id> <사유>    # 실패 → 다시 queued 로 돌리고 사유를 남긴다
+
+규칙: 하루 DAILY_CAP(3)건까지만 start 를 허락한다(KST 날짜 기준). 인스타 한도가 IP·계정 공용이라서다.
+대기열 파일은 `_workspace/auto-draft-queue/*.json` — 사이트(로컬 dev 서버)가 쓴다.
+"""
+import json, sys, os, glob, datetime
+
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+QDIR = os.path.join(ROOT, "_workspace", "auto-draft-queue")
+DAILY_CAP = 3
+KST = datetime.timezone(datetime.timedelta(hours=9))
+
+def now():
+    return datetime.datetime.now(KST).isoformat(timespec="seconds")
+
+def load():
+    out = []
+    for f in sorted(glob.glob(os.path.join(QDIR, "*.json"))):
+        try:
+            out.append((f, json.load(open(f, encoding="utf-8"))))
+        except Exception:
+            pass
+    return out
+
+def save(f, r):
+    json.dump(r, open(f, "w", encoding="utf-8"), ensure_ascii=False, indent=2)
+
+def find(i):
+    for f, r in load():
+        if r["id"] == i:
+            return f, r
+    sys.exit(f"없는 신청: {i}")
+
+def started_today():
+    today = datetime.datetime.now(KST).date().isoformat()
+    return sum(1 for _, r in load() if (r.get("startedAt") or "").startswith(today))
+
+args = sys.argv[1:]
+cmd = args[0] if args else "list"
+if cmd == "list":
+    rows = [r for _, r in load() if r["status"] in ("queued", "working")]
+    print(f"대기 {sum(r['status']=='queued' for r in rows)} · 작업 중 {sum(r['status']=='working' for r in rows)} · 오늘 시작 {started_today()}/{DAILY_CAP}")
+    for r in rows:
+        ch = ", ".join(f"{c['kind']}:{c['url']}" for c in r["channels"])
+        print(f"- [{r['status']}] {r['id']} · {r['brandName']} · {r.get('region','')} · {ch}")
+elif cmd == "next":
+    q = [r for _, r in load() if r["status"] == "queued"]
+    print(json.dumps(q[0], ensure_ascii=False, indent=2) if q else "대기 중인 신청이 없어요.")
+elif cmd == "start":
+    if started_today() >= DAILY_CAP:
+        sys.exit(f"⛔ 오늘 몫({DAILY_CAP}건)을 다 썼어요. 내일 이어서 해요.")
+    f, r = find(args[1]); r["status"] = "working"; r["startedAt"] = now(); save(f, r); print("working", r["id"])
+elif cmd == "done":
+    f, r = find(args[1]); r["status"] = "done"; r["doneAt"] = now(); r["slug"] = args[2] if len(args) > 2 else ""; save(f, r); print("done", r["id"])
+elif cmd == "fail":
+    f, r = find(args[1]); r["status"] = "queued"; r.setdefault("failures", []).append({"at": now(), "why": " ".join(args[2:])}); save(f, r); print("back to queue", r["id"])
+else:
+    sys.exit(__doc__)

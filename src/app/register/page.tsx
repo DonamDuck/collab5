@@ -29,6 +29,7 @@ import type { ActivityHint, CollabHint, EnrichField } from "@/lib/enrich";
 import { blendDescriptions, canRegenDesc, noteRegenDesc } from "@/lib/enrichBlend";
 import { useDraftAutosave, draftKey, agoLabel } from "./useDraftAutosave";
 import { EnrichWizard, type WizardFill } from "./EnrichWizard";
+import { AutoDraftDialog } from "./AutoDraftDialog";
 import { SortableCard, emptyDnd, type DndState } from "./SortableCard";
 import { BlockEditor, emptyBlock } from "./BlockEditor";
 import { PhotoGrid } from "./PhotoGrid";
@@ -304,6 +305,7 @@ function RegisterForm() {
   // ── enrich(딸깍 자동완성) 상태 ──
   const [query, setQuery] = useState(""); // 불러오기 검색어(업체명만)
   const [wizardOpen, setWizardOpen] = useState(false); // 딸깍 자동완성 위저드
+  const [autoDraftOpen, setAutoDraftOpen] = useState(false); // 소개서 자동 만들기 신청(로컬 시험판, 10-03)
   const [aiFilled, setAiFilled] = useState<Set<string>>(new Set()); // AI가 채운 필드
   const [missing, setMissing] = useState<EnrichField[]>([]); // 못 찾은 필드(직접 입력 노티)
   const [reviewMode, setReviewMode] = useState(false); // 검수 게이트 배너
@@ -1270,6 +1272,7 @@ function RegisterForm() {
   // 어떤 레이어(위저드·모달·얼럿·넛지·블록시트·미리보기시트)라도 열려 있으면 플로팅 버튼 숨김.
   const layerOpen =
     wizardOpen ||
+    autoDraftOpen ||
     descModalOpen ||
     showDraftDone ||
     showNudge ||
@@ -1318,6 +1321,31 @@ function RegisterForm() {
       <p className="mt-2 text-[17px] leading-relaxed text-body">
         브랜드 이름 입력하면 AI가 소개서 초안을 준비해드려요. 확인하고 다듬으면 1~3분 안에 완성할 수 있어요.
       </p>
+
+      {/* 🪄 소개서 자동 만들기 신청 — **로컬 시험판**(대표 10-03). 운영 빌드에선 안 보인다.
+          채널과 동의를 받아 대기열에 쌓고, 대표 컴퓨터의 Claude가 컨시어지 스킬로 초안을 만든다.
+          설계 = lib/autoDraft.ts 머리말. 위저드(아래 ✨)와 나란히 두고 시험한 뒤 어느 쪽을 남길지 정한다. */}
+      {process.env.NODE_ENV !== "production" && (
+        <div className="mt-10 rounded-xl border border-border-strong bg-surface px-5 py-5">
+          <p className="text-[17px] font-bold text-ink">
+            🪄 인스타와 블로그를 알려 주시면, 소개서를 대신 만들어 드려요.
+            <span className="ml-2 rounded-pill bg-surface-soft px-2 py-0.5 align-middle text-[11px] font-medium text-mute">
+              베타
+            </span>
+          </p>
+          <p className="mt-1 break-keep text-[15px] leading-relaxed text-mute">
+            그동안 올리신 글과 사진을 저희가 읽고, 활동과 콜라보까지 채운 초안을 만들어요. 하루 세 팀까지 순서대로
+            만들어서, 완성되면 메일로 알려 드려요.
+          </p>
+          <button
+            type="button"
+            onClick={() => setAutoDraftOpen(true)}
+            className="mt-3 h-11 rounded-md bg-ink px-4 text-[14px] font-medium text-on-dark"
+          >
+            자동으로 만들기 신청
+          </button>
+        </div>
+      )}
 
       {/* ✨ 딸깍 자동완성 — 이름만 알려주면 채워드릴게요 */}
       <div className="mt-10 rounded-xl border border-primary bg-primary-pale px-5 py-5">
@@ -2365,6 +2393,10 @@ function RegisterForm() {
             {toast}
           </div>
         </div>
+      )}
+
+      {autoDraftOpen && (
+        <AutoDraftDialog initialName={query.trim()} onClose={() => setAutoDraftOpen(false)} />
       )}
 
       {/* 딸깍 자동완성 위저드 — 가중 키워드 → 백그라운드 크롤 → 한줄/소개 5지선다 */}
