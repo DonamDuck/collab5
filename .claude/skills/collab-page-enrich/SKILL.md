@@ -210,6 +210,10 @@ A1 그리드 열거 → A2 alt 1차 선별 → A3 내부 API 전문 조회 → A
 | **이미지 속 글자** | ⭕640px로 받아 OCR (§A6) | 캡션에 없는 말이 여기 있다. **하이라이트는 이게 사실상 전부다** |
 
 **🆕 A1-alt — 피드 전량은 페이지 넘김으로** (2026-08-19 실측 · 208/209건 · 2년 6개월치)
+> 🚨🆕**10-04 실측 — 이 엔드포인트가 지금은 JSON 대신 HTML을 준다**(로그인 상태, 계정 둘, 반나절 연속). 막혔다고 판정하기 전에 아래 순서로 간다.
+> ①게시물 하나는 `/api/v1/media/{id}/info/`가 **정상 JSON**이다(캐러셀 전체 사진 주소 포함, 85건 연속 OK).
+> ②목록은 **그리드 스크롤 + fetch/XHR 응답 훅**으로 받는다. JS `scrollTo` 다음에 **아주 작은 스크린샷(zoom, scale 0.1)** 한 장 — 화면이 안 그려지면 다음 묶음이 안 실린다. 385건을 약 30회로 받았다. 첫 12건(서버 렌더)은 훅에 안 잡히니 DOM의 게시물 코드 → ①로 메운다.
+> 🪤뒤에 깔린 탭의 `setTimeout`은 분 단위로 늘어진다 · Worker 타이머는 인스타 CSP가 막는다 · 화면이 보낸 커서를 재생하면 같은 페이지만 되풀이된다(헛요청) · 인스타 페이지 → `http://localhost` POST는 크롬이 막는다 → 긴 결과는 클립보드 버튼(실제 클릭) → `pbpaste`.
 ```js
 // ⭐uid 없이 username만으로 된다. 캡션·taken_at·usertags·coauthor_producers가 한 번에 온다.
 '/api/v1/feed/user/{handle}/username/?count=33' + (cursor ? '&max_id=' + encodeURIComponent(cursor) : '')
