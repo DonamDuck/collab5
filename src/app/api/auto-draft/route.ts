@@ -19,6 +19,8 @@ import {
   type AutoDraftRequest,
 } from "@/lib/autoDraft";
 import { kstIso } from "@/lib/time";
+import { getSessionUser } from "@/lib/supabase/server";
+import { getSessionUserId } from "@/lib/profiles";
 
 const QUEUE_DIR = path.join(process.cwd(), "_workspace", "auto-draft-queue");
 const LOCAL_ONLY = process.env.NODE_ENV === "production";
@@ -52,15 +54,20 @@ function notifyMac(title: string, body: string) {
 }
 
 export async function GET() {
-  if (LOCAL_ONLY) return NextResponse.json({ waiting: 0, available: false });
-  const q = await queued();
-  return NextResponse.json({ waiting: q.length, available: true });
+  if (LOCAL_ONLY) return NextResponse.json({ waiting: 0, available: false, loggedIn: false });
+  const [q, user] = await Promise.all([queued(), getSessionUser()]);
+  // 이메일은 «본인에게만» 돌려준다 — 신청 창의 안내 이메일 칸을 미리 채우는 용도
+  return NextResponse.json({ waiting: q.length, available: true, loggedIn: !!user, email: user?.email ?? "" });
 }
 
 export async function POST(req: Request) {
   if (LOCAL_ONLY) {
     return NextResponse.json({ error: "아직 준비 중인 기능이에요." }, { status: 503 });
   }
+  // 🔑로그인한 사람만(대표 10-04). 화면이 막아도 주소로 바로 부르는 길이 남으니 여기서 다시 막는다.
+  const user = await getSessionUser();
+  if (!user) return NextResponse.json({ error: "로그인이 필요해요." }, { status: 401 });
+
   let body: Record<string, unknown>;
   try {
     body = await req.json();
@@ -103,6 +110,7 @@ export async function POST(req: Request) {
     email,
     note: str(body.note, 1000),
     consent: { text: CONSENT_TEXT, at },
+    account: { authId: user.id, email: user.email ?? "", userId: (await getSessionUserId()) ?? null },
   };
 
   await mkdir(QUEUE_DIR, { recursive: true });

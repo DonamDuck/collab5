@@ -30,10 +30,14 @@ import { blendDescriptions, canRegenDesc, noteRegenDesc } from "@/lib/enrichBlen
 import { useDraftAutosave, draftKey, agoLabel } from "./useDraftAutosave";
 import { EnrichWizard, type WizardFill } from "./EnrichWizard";
 import { AutoDraftDialog } from "./AutoDraftDialog";
+
 import { SortableCard, emptyDnd, type DndState } from "./SortableCard";
 import { BlockEditor, emptyBlock } from "./BlockEditor";
 import { PhotoGrid } from "./PhotoGrid";
 import { StubSection } from "./StubSection";
+
+/** 자동 만들기는 로컬 시험판(10-03~) — 운영 빌드에선 꺼 둔다. 운영판 = DB 대기열·완성 메일이 붙은 뒤. */
+const AUTO_DRAFT_ON = process.env.NODE_ENV !== "production";
 
 // 배열 내 순서 이동 (드래그 재정렬용)
 function reorder<T>(arr: T[], from: number, to: number): T[] {
@@ -306,6 +310,7 @@ function RegisterForm() {
   const [query, setQuery] = useState(""); // 불러오기 검색어(업체명만)
   const [wizardOpen, setWizardOpen] = useState(false); // 딸깍 자동완성 위저드
   const [autoDraftOpen, setAutoDraftOpen] = useState(false); // 소개서 자동 만들기 신청(로컬 시험판, 10-03)
+  const [draftOfferHidden, setDraftOfferHidden] = useState(false); // 「직접 쓸게요」로 초안 제안 접기
   const [aiFilled, setAiFilled] = useState<Set<string>>(new Set()); // AI가 채운 필드
   const [missing, setMissing] = useState<EnrichField[]>([]); // 못 찾은 필드(직접 입력 노티)
   const [reviewMode, setReviewMode] = useState(false); // 검수 게이트 배너
@@ -707,17 +712,6 @@ function RegisterForm() {
     setDescModalOpen(false);
   };
 
-  // ── enrich: 업체명 → 위저드 오픈(불러오기) ──
-  // ⭐AI 플로우의 **첫 관문**이라 disabled로 막으면 진입 자체가 봉쇄된다 — 눌리게 두고 왜 안 되는지 말해준다(QA #17).
-  const [queryErr, setQueryErr] = useState("");
-  const openWizard = () => {
-    if (!query.trim()) {
-      setQueryErr("브랜드 이름을 알려주세요.");
-      return;
-    }
-    setQueryErr("");
-    setWizardOpen(true);
-  };
 
   // 힌트 '이 내용으로 시작하기' — 빈 카드 우선 채움, 없으면 새 카드(최대 5), 꽉 차면 불가.
   // inject* = 힌트 값 직접 주입: 위저드 ⑤스텝 즉시 적용은 setActHints 직후라 state 힌트를
@@ -1322,71 +1316,6 @@ function RegisterForm() {
         브랜드 이름 입력하면 AI가 소개서 초안을 준비해드려요. 확인하고 다듬으면 1~3분 안에 완성할 수 있어요.
       </p>
 
-      {/* 🪄 소개서 자동 만들기 신청 — **로컬 시험판**(대표 10-03). 운영 빌드에선 안 보인다.
-          채널과 동의를 받아 대기열에 쌓고, 대표 컴퓨터의 Claude가 컨시어지 스킬로 초안을 만든다.
-          설계 = lib/autoDraft.ts 머리말. 위저드(아래 ✨)와 나란히 두고 시험한 뒤 어느 쪽을 남길지 정한다. */}
-      {process.env.NODE_ENV !== "production" && (
-        <div className="mt-10 rounded-xl border border-border-strong bg-surface px-5 py-5">
-          <p className="text-[17px] font-bold text-ink">
-            🪄 인스타와 블로그를 알려 주시면, 소개서를 대신 만들어 드려요.
-            <span className="ml-2 rounded-pill bg-surface-soft px-2 py-0.5 align-middle text-[11px] font-medium text-mute">
-              베타
-            </span>
-          </p>
-          <p className="mt-1 break-keep text-[15px] leading-relaxed text-mute">
-            그동안 올리신 글과 사진을 저희가 읽고, 활동과 콜라보까지 채운 초안을 만들어요. 하루 세 팀까지 순서대로
-            만들어서, 완성되면 메일로 알려 드려요.
-          </p>
-          <button
-            type="button"
-            onClick={() => setAutoDraftOpen(true)}
-            className="mt-3 h-11 rounded-md bg-ink px-4 text-[14px] font-medium text-on-dark"
-          >
-            자동으로 만들기 신청
-          </button>
-        </div>
-      )}
-
-      {/* ✨ 딸깍 자동완성 — 이름만 알려주면 채워드릴게요 */}
-      <div className="mt-10 rounded-xl border border-primary bg-primary-pale px-5 py-5">
-        <p className="text-[17px] font-bold text-ink">
-          ✨ 브랜드 이름을 알려주세요. 나머지는 AI가 준비해드릴게요.
-        </p>
-        <p className="mt-1 text-[15px] leading-relaxed text-mute">
-          웹, SNS에서 찾은 정보를 기준으로 소개 초안을 준비해드려요. 찾아온 정보는 언제든 자유롭게 수정할 수 있어요.
-        </p>
-        <div className="mt-3 flex gap-2">
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.nativeEvent.isComposing) {
-                e.preventDefault();
-                openWizard();
-              }
-            }}
-            placeholder="예: 캔버스가든"
-            className="h-11 min-w-0 flex-1 rounded-sm border border-hairline bg-surface px-3 text-[17px] text-ink outline-none placeholder:text-faint focus:border-focus"
-          />
-          <button
-            type="button"
-            onClick={openWizard}
-            className="h-11 shrink-0 rounded-md bg-primary px-4 text-[14px] font-medium text-primary-on"
-          >
-            ✨ 시작하기
-          </button>
-        </div>
-        {queryErr && <p className="mt-2 text-[13px] text-danger">{queryErr}</p>}
-      </div>
-
-      {/* AI 불러오기(위) ↔ 직접 입력(아래) 구분 소제목 */}
-      <div className="mt-10 flex items-center gap-3">
-        <div className="h-px flex-1 bg-hairline" />
-        <span className="shrink-0 text-[13px] font-medium text-mute">
-          또는 아래에 직접 입력할 수 있어요.
-        </span>
-        <div className="h-px flex-1 bg-hairline" />
-      </div>
         </>
       )}
 
@@ -1513,6 +1442,55 @@ function RegisterForm() {
               <p className="mt-1.5 text-[13px] text-danger">{errField.msg}</p>
             )}
           </Field>
+          {/* 🪄 초안 준비 제안 — 브랜드 이름을 적으면 바로 아래에 뜬다(대표 10-04 QA #18).
+              전엔 맨 위에 「자동 만들기」 카드와 「✨ 위저드」 상자가 따로 있어 겹쳐 보였다. 이름을 적는 순간에
+              두 길을 한자리에서 고르게 한다. 대신 만들어 달라는 쪽이 더 많을 거라 그쪽을 위에 둔다(대표 판단).
+              ⚠️자동 만들기는 아직 로컬 시험판이라 운영 빌드에선 위저드 줄만 보인다. */}
+          {!editSlug && !enrichment && !draftOfferHidden && name.trim().length >= 2 && (
+            <div className="-mt-4 rounded-xl border border-primary bg-primary-pale px-4 py-4">
+              <p className="break-keep text-[16px] leading-[1.5] text-ink">
+                <b>{name.trim()}</b>의 소개서 초안 준비를 도와드릴까요?
+              </p>
+              <div className="mt-3 space-y-2">
+                {AUTO_DRAFT_ON && (
+                  <button
+                    type="button"
+                    onClick={() => setAutoDraftOpen(true)}
+                    className="flex w-full items-center gap-3 rounded-lg border border-hairline bg-surface px-4 py-3 text-left hover:border-border-strong"
+                  >
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-[15px] font-bold text-ink">🪄 인스타와 블로그 글로 대신 만들어 드려요</span>
+                      <span className="mt-0.5 block break-keep text-[13px] text-mute">
+                        그동안 올리신 글과 사진을 읽고 활동과 콜라보까지 채워요 · 1~3일
+                      </span>
+                    </span>
+                    <span className="shrink-0 rounded-md bg-ink px-3 py-2 text-[13px] font-medium text-on-dark">신청하기</span>
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setQuery(name.trim());
+                    setWizardOpen(true);
+                  }}
+                  className="flex w-full items-center gap-3 rounded-lg border border-hairline bg-surface px-4 py-3 text-left hover:border-border-strong"
+                >
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[15px] font-bold text-ink">✨ 지금 바로 간단히 채우기</span>
+                    <span className="mt-0.5 block break-keep text-[13px] text-mute">웹에서 찾은 정보로 1분 안에 초안을 받아요</span>
+                  </span>
+                  <span className="shrink-0 rounded-md bg-primary px-3 py-2 text-[13px] font-medium text-primary-on">시작하기</span>
+                </button>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDraftOfferHidden(true)}
+                className="mt-2 text-[13px] text-mute underline underline-offset-2 hover:text-ink"
+              >
+                괜찮아요, 직접 쓸게요
+              </button>
+            </div>
+          )}
           <Field label="한두 문장 소개 (선택)" hint={hintFor("oneLiner")}>
             {/* 한두 문장이라 멀티라인 — 한 줄 input이면 두 번째 문장이 가로로 밀려 안 보임. 길이 제한 없음(대표 확정) */}
             <textarea
@@ -2396,7 +2374,7 @@ function RegisterForm() {
       )}
 
       {autoDraftOpen && (
-        <AutoDraftDialog initialName={query.trim()} onClose={() => setAutoDraftOpen(false)} />
+        <AutoDraftDialog initialName={name.trim()} onClose={() => setAutoDraftOpen(false)} />
       )}
 
       {/* 딸깍 자동완성 위저드 — 가중 키워드 → 백그라운드 크롤 → 한줄/소개 5지선다 */}

@@ -50,6 +50,8 @@ export interface AutoDraftRequest {
   note: string;
   /** 동의 문구 원문과 시각 — 무엇에 동의했는지가 남아야 나중에 다툼이 없다 */
   consent: { text: string; at: string };
+  /** 요청한 계정 — 초안을 여기에 바로 붙인다(이관 단계 없음). userId는 public.users.user_id */
+  account?: { authId: string; email: string; userId: number | null };
 }
 
 /** 동의 문구 — 화면과 저장본이 같은 문장을 쓴다(문구를 바꾸면 이후 신청부터 새 문장이 남는다). */
