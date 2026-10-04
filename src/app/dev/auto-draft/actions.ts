@@ -38,19 +38,27 @@ export async function loadDraftAction(formData: FormData) {
   const req = JSON.parse(await readFile(path.join(QUEUE_DIR, `${id}.json`), "utf8")) as AutoDraftRequest & { draft?: string };
   if (!req.draft) throw new Error("이 신청에는 아직 초안 파일이 없어요.");
   const d = JSON.parse(await readFile(req.draft, "utf8")) as DraftFile;
+  // 사진(선택) — 규칙대로 고른 결과. 파일은 public/_auto-draft/ 아래에 두고 주소만 적는다(운영 스토리지 안 씀).
+  // 모양: { profile: string[], activities: string[][], collabs: string[][] } — 순서 = 초안 항목 순서
+  let ph: { profile?: string[]; activities?: string[][]; collabs?: string[][] } = {};
+  if ((req as { photos?: string }).photos) {
+    try {
+      ph = JSON.parse(await readFile((req as { photos?: string }).photos!, "utf8"));
+    } catch {}
+  }
 
-  const activities: Activity[] = d.activities.map((a) => ({
+  const activities: Activity[] = d.activities.map((a, i) => ({
     title: a.title ?? "",
     desc: a.desc,
-    photos: [],
+    photos: ph.activities?.[i] ?? [],
     ...(a.link ? { link: a.link } : {}),
   }));
-  const collabHistory: CollabHistory[] = d.collab_history.map((c) => ({
+  const collabHistory: CollabHistory[] = d.collab_history.map((c, i) => ({
     partner: c.partner ?? "",
     types: c.types ?? [],
     desc: c.desc,
     ...(c.year ? { year: String(c.year) } : {}),
-    photos: [],
+    photos: ph.collabs?.[i] ?? [],
     ...(c.link ? { link: c.link } : {}),
   }));
   const offers = Array.from(new Set(collabHistory.flatMap((c) => c.types))) as CollabType[];
@@ -69,7 +77,7 @@ export async function loadDraftAction(formData: FormData) {
     activities,
     offersDescription: d.offers_description ?? "",
     seeksDescription: d.seeks_description ?? "",
-    photos: [],
+    photos: ph.profile ?? [],
     showcases: [],
     keywords: (d.keywords ?? []).slice(0, 10),
     trust: {
