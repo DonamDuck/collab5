@@ -2,7 +2,11 @@
 
 // 소개서 사전 정보 입력 창 (2026-10-03 로컬 시험판 · 10-04 대표 QA 19건 반영) — 정본 설명은 lib/autoDraft.ts 머리말.
 //
-// 흐름: 로그인 확인 → 브랜드 → (권유) 이름으로 미리 찾아보기 → 인스타 계정 · 그 밖의 주소 → 안내 이메일 → 동의 → 요청
+// 흐름: 로그인 확인 → 브랜드 → (권유) 이름으로 미리 찾아보기 → 인스타 계정 · 그 밖의 주소 → 안내 이메일
+//   → (선택) 요즘 고민 → 그 밖에 → 동의 → 요청
+//
+// 💭고민 칸(대표 10-04) — 문구는 대표가 DM으로 보내던 「질문 4」를 그대로 옮겼다. 브리프(요약 리포트)의 재료다.
+//   ⛔화면에서도 서버에서도 고치지 않는다(앞뒤 공백만). 브리프는 «그 문장»에 답해야 한다.
 //
 // ⭐인스타와 그 밖의 주소를 칸을 나눠 받는다(대표 10-04). 한 칸에 섞어 받았더니 `www.canvasgarden.shop`이
 //   인스타 계정으로 읽혔다. 칸이 갈리면 고객이 무엇을 적는지 스스로 정하고, 판별이 틀릴 여지가 줄어든다.
@@ -40,6 +44,7 @@ export function AutoDraftDialog({ initialName, onClose }: Props) {
   const [urlRows, setUrlRows] = useState<string[]>([""]);
   const [email, setEmail] = useState("");
   const [note, setNote] = useState("");
+  const [concern, setConcern] = useState("");
   const [consent, setConsent] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
@@ -124,6 +129,7 @@ export function AutoDraftDialog({ initialName, onClose }: Props) {
           channels: [...handles.map((h) => `@${h}`), ...urlRows.filter((x) => x.trim())],
           email: email.trim(),
           note: note.trim(),
+          concern,
           consent,
         }),
       });
@@ -196,7 +202,7 @@ export function AutoDraftDialog({ initialName, onClose }: Props) {
               <b className="text-ink">{email.trim()}</b>로 안내해 드릴게요.
             </p>
             <p className="mt-2 break-keep text-[14px] leading-[1.65] text-mute">
-              초안을 받아 보시고, 고칠 곳을 직접 수정한 뒤 공개로 바꾸시면 모든 분이 「{name.trim()}」의 소개서를 볼 수
+              초안과 요약 리포트를 받아 보시고, 소개서는 고칠 곳을 직접 수정한 뒤 공개로 바꾸시면 모든 분이 「{name.trim()}」의 소개서를 볼 수
               있어요.
             </p>
             <button
@@ -214,7 +220,7 @@ export function AutoDraftDialog({ initialName, onClose }: Props) {
                 소개서 사전 정보 입력
               </p>
               <p className="mt-1.5 break-keep text-[14px] leading-[1.65] text-mute">
-                그동안 업로드하셨던 글과 사진을 읽고, 브랜드 소개서 초안을 만들어 드릴게요.
+                그동안 업로드하셨던 글과 사진을 읽고, 브랜드 소개서 초안과 요약 리포트를 만들어 드릴게요.
               </p>
             </div>
 
@@ -366,7 +372,27 @@ export function AutoDraftDialog({ initialName, onClose }: Props) {
               />
             </section>
 
-            {/* 4. 그 밖에 */}
+            {/* 4. 요즘 고민 — 대표가 DM으로 묻던 질문 그대로(10-04). 답이 브리프의 심장이 된다 */}
+            <section className="space-y-2">
+              <p className="break-keep text-[14px] font-bold leading-[1.5] text-ink">
+                혹시 요즘 갖고 계신 고민이나, 오래 담아두고 있는 질문이 있으실까요?{" "}
+                <span className="font-normal text-mute">(선택)</span>
+              </p>
+              <p className="break-keep text-[13px] leading-[1.65] text-mute">
+                소개서를 만들면서 예전 게시글부터 최근 게시글까지 자연스럽게 살펴보게 될 텐데요. 그 과정에서 지금 갖고 계신
+                고민이나 생각과 연결되는 어떤 &lsquo;클루&rsquo;를 발견할 때도 있더라고요! 발견한 것은 소개서와 함께 드리는
+                요약 리포트에 담아 드릴게요.
+              </p>
+              <textarea
+                value={concern}
+                onChange={(e) => setConcern(e.target.value)}
+                rows={3}
+                placeholder="꼭 답해 주시지 않아도 괜찮아요. 없으시다면 편하게 넘어가 주세요."
+                className="w-full rounded-sm border border-hairline bg-surface px-3 py-2.5 text-[15px] leading-[1.6] text-ink outline-none placeholder:text-faint focus:border-focus"
+              />
+            </section>
+
+            {/* 5. 그 밖에 */}
             <section className="space-y-2">
               <p className="break-keep text-[14px] font-bold leading-[1.5] text-ink">
                 그 외 저희가 알면 좋을 만한 것들이 있다면 알려주세요. <span className="font-normal text-mute">(선택)</span>
@@ -380,7 +406,7 @@ export function AutoDraftDialog({ initialName, onClose }: Props) {
               />
             </section>
 
-            {/* 5. 동의 */}
+            {/* 6. 동의 */}
             <section className="rounded-md border border-hairline px-4 py-3.5">
               <label className="flex cursor-pointer items-start gap-2.5">
                 <input

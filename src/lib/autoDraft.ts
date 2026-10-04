@@ -10,8 +10,21 @@
 //
 // 누가 판정하나: 컨시어지 때 대표가 하던 「넣을까 뺄까」는 이제 **고객**이 한다.
 //   초안은 비공개로 시작하고, 고객이 훑어보고 공개한다(대표 10-03 — 스킬에 검증이 이미 달려 있다).
+//   🔁단 **처음 REVIEW_FIRST 건은 대표가 소개서와 브리프를 읽고 승인해야 넘어간다**(대표 10-04).
+//   브리프는 그 사람에 대한 «해석»이라 빗나가면 고칠 칸 없이 그대로 상처가 된다. 다섯 건 동안 대표가 고친 게
+//   거의 없으면 이 단계를 뗀다. 상태 = queued → working → review(승인 대기) → done.
+//
+// 📅읽는 범위 = **최근 24개월**(대표 10-04). 인스타 수확·사진은 2년까지만 받는다. 블로그·홈페이지는 인스타 한도와
+//   무관하니 다 읽되, 소개서 항목은 2년 기준으로 고른다(2년 안에 다시 나오는 이어지는 일은 시작이 더 일러도 넣는다).
+//   정본 = 스킬 collab-brandpage-creation-with-insta §⓪.
+//
+// 📄브리프(요약 리포트)도 같은 수확본으로 함께 만든다(대표 10-04). 재료의 심장은 고객의 «고민»이라
+//   신청 창에 고민 칸을 따로 둔다(`concern`). 정본 = 스킬 collab-brand-brief-gift.
 
 export const DAILY_CAP = 3;
+
+/** 대표가 직접 승인하는 처음 N건(대표 10-04). 이 수만큼 승인되면 그다음부터는 바로 done. */
+export const REVIEW_FIRST = 5;
 
 /** 로컬 «초안 소개서»(/dev/auto-draft)의 수정 비번. 로컬 가짜 로그인은 보기 전용이라 비번으로 연다. 운영엔 안 쓰인다. */
 export const LOCAL_DRAFT_PASSWORD = "0000";
@@ -44,13 +57,18 @@ export interface AutoDraftChannel {
 export interface AutoDraftRequest {
   id: string;
   createdAt: string; // KST ISO
-  status: "queued" | "working" | "done" | "failed";
+  status: "queued" | "working" | "review" | "done" | "failed";
   brandName: string;
   region: string;
   businessType: string;
   channels: AutoDraftChannel[];
   email: string;
   note: string;
+  /** 요즘 고민·오래 담아 둔 질문(선택). ⛔**원문 그대로 둔다** — 브리프는 이 문장에 답한다.
+   *  🩸08-25 「다른게」를 「다르게」로 읽어 오후를 통째로 날렸다(스킬 brief-gift §③). 앞뒤 공백만 걷는다. */
+  concern?: string;
+  /** 대표 승인 시각(처음 REVIEW_FIRST 건만) */
+  approvedAt?: string;
   /** 동의 문구 원문과 시각 — 무엇에 동의했는지가 남아야 나중에 다툼이 없다 */
   consent: { text: string; at: string };
   /** 요청한 계정 — 초안을 여기에 바로 붙인다(이관 단계 없음). userId는 public.users.user_id */

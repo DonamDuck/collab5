@@ -8,13 +8,14 @@
 // 🔒로컬 전용: 개발 서버 + InMemoryRepo(설정 없음)일 때만 돈다. 운영 DB에는 쓰지 않는다.
 //   InMemoryRepo는 서버를 다시 켜면 비워지므로, 이 버튼은 몇 번을 눌러도 같은 결과(다시 만들기)가 나게 짰다.
 // 🔑수정 비번 = LOCAL_DRAFT_PASSWORD. 로컬 가짜 로그인은 «보기 전용»이라 소유자로 수정할 수 없어서 비번으로 연다.
-import { readFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { redirect } from "next/navigation";
 import { repo } from "@/lib/repo";
 import { sha256 } from "@/lib/hash";
 import type { Activity, CollabHistory, CollabType } from "@/lib/types";
 import { LOCAL_DRAFT_PASSWORD, type AutoDraftRequest } from "@/lib/autoDraft";
+import { kstIso } from "@/lib/time";
 
 const QUEUE_DIR = path.join(process.cwd(), "_workspace", "auto-draft-queue");
 
@@ -92,4 +93,17 @@ export async function loadDraftAction(formData: FormData) {
   if (existing) await repo.updateMakerContent(slug, content);
   else await repo.createMaker({ slug, ...content, editPasswordHash: sha256(LOCAL_DRAFT_PASSWORD) });
   redirect(`/m/${slug}`);
+}
+
+/** 대표 승인(처음 REVIEW_FIRST 건, 대표 10-04) — 소개서와 브리프를 둘 다 읽고 누른다. → done.
+ *  운영판에선 여기서 고객 계정 연결 + 완성 메일이 나간다. 로컬에선 상태만 바꾼다. */
+export async function approveAction(formData: FormData) {
+  if (process.env.NODE_ENV !== "development") throw new Error("로컬 개발 서버에서만 쓸 수 있어요.");
+  const id = String(formData.get("id") ?? "").replace(/[^0-9a-z-]/gi, "");
+  const f = path.join(QUEUE_DIR, `${id}.json`);
+  const req = JSON.parse(await readFile(f, "utf8")) as AutoDraftRequest & { brief?: string };
+  if (req.status !== "review") throw new Error("승인 대기 중인 신청이 아니에요.");
+  if (!req.brief) throw new Error("브리프가 아직 없어요. 소개서와 브리프를 둘 다 본 뒤에 승인해 주세요.");
+  await writeFile(f, JSON.stringify({ ...req, status: "done", approvedAt: kstIso(new Date()) }, null, 2), "utf8");
+  redirect("/dev/auto-draft");
 }

@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { BRIEFS, BRIEF_BY_SLUG, type BriefSample } from "./brief-samples/registry";
+import { localDraftBrief } from "./autoDraftBrief";
 
 // 브리프 읽기 (2026-09-14) — 설계 `docs/superpowers/specs/2026-09-14-brief-page-design.md`
 //
@@ -76,6 +77,9 @@ export async function getBrief(slug: string): Promise<Brief | null> {
     // 표가 «있는데» 못 찾았다 = 없거나 내려간 것이다. 목록으로 되살리지 않는다.
     if (!error) return data ? toBrief(data) : null;
   }
+  // 로컬 자동 만들기 초안(`draft-XXXX`)의 브리프 — 표가 없는 로컬에서만(autoDraftBrief.ts 머리말)
+  const local = client ? null : await localDraftBrief(slug);
+  if (local) return { slug, notionUrl: "", ownerUserId: null, ...local };
   const sample = BRIEF_BY_SLUG.get(slug);
   return sample ? fromSample(sample) : null;
 }

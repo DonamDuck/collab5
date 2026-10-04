@@ -1,18 +1,19 @@
 // /dev/auto-draft — 자동 만들기 신청함 (2026-10-04, 로컬 전용)
 // 신청 목록과 상태, 초안이 나온 신청은 [초안 소개서로 보기] 버튼. 사장님께 여쭐 질문도 같이 보여 준다.
+// 🔁10-04: 처음 REVIEW_FIRST 건은 대표가 소개서·브리프를 둘 다 보고 [승인]해야 넘어간다(lib/autoDraft.ts 머리말).
 // ⚠️운영 빌드에선 404. 대기열이 이 컴퓨터의 파일이라 운영에선 의미가 없다(설계 = lib/autoDraft.ts 머리말).
 import { notFound } from "next/navigation";
 import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
-import { CHANNEL_LABEL, LOCAL_DRAFT_PASSWORD, type AutoDraftRequest } from "@/lib/autoDraft";
-import { loadDraftAction } from "./actions";
+import { CHANNEL_LABEL, LOCAL_DRAFT_PASSWORD, REVIEW_FIRST, type AutoDraftRequest } from "@/lib/autoDraft";
+import { approveAction, loadDraftAction } from "./actions";
 
 export const dynamic = "force-dynamic";
 
 const QUEUE_DIR = path.join(process.cwd(), "_workspace", "auto-draft-queue");
-const STATUS: Record<string, string> = { queued: "대기", working: "만드는 중", done: "완성", failed: "실패" };
+const STATUS: Record<string, string> = { queued: "대기", working: "만드는 중", review: "승인 대기", done: "완성", failed: "실패" };
 
-type Row = AutoDraftRequest & { draft?: string; questions?: string[]; counts?: { a: number; c: number } };
+type Row = AutoDraftRequest & { draft?: string; brief?: string; slug?: string; questions?: string[]; counts?: { a: number; c: number } };
 
 async function rows(): Promise<Row[]> {
   let names: string[] = [];
@@ -43,6 +44,7 @@ async function rows(): Promise<Row[]> {
 export default async function AutoDraftInbox() {
   if (process.env.NODE_ENV !== "development") notFound();
   const list = await rows();
+  const approved = list.filter((r) => r.approvedAt).length;
   return (
     <main className="mx-auto w-full max-w-[720px] px-4 pb-24 pt-8 sm:px-6">
       <h1 className="text-[26px] font-bold tracking-[-0.025em] text-ink">자동 만들기 신청함</h1>
@@ -50,6 +52,15 @@ export default async function AutoDraftInbox() {
         로컬 전용 화면이에요. 초안이 나온 신청은 버튼을 누르면 비공개 초안 소개서로 열려요. 수정 비번은{" "}
         <b className="text-ink">{LOCAL_DRAFT_PASSWORD}</b>이에요.
       </p>
+      {approved < REVIEW_FIRST && (
+        <p className="mt-3 rounded-md bg-primary-pale px-4 py-3 text-[14px] leading-relaxed text-ink">
+          처음 {REVIEW_FIRST}건은 소개서와 요약 리포트를 둘 다 보시고 승인하셔야 고객에게 넘어가요. 지금 승인{" "}
+          <b>
+            {approved}/{REVIEW_FIRST}
+          </b>
+          건이에요.
+        </p>
+      )}
 
       {list.length === 0 && <p className="mt-10 text-[15px] text-mute">아직 신청이 없어요.</p>}
 
@@ -58,8 +69,10 @@ export default async function AutoDraftInbox() {
           <li key={r.id} className="rounded-xl border border-hairline bg-surface px-5 py-5">
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-[18px] font-bold text-ink">{r.brandName}</span>
-              <span className="rounded-pill bg-surface-soft px-2.5 py-0.5 text-[12px] font-medium text-body">
-                {STATUS[r.status] ?? r.status}
+              <span
+                className={`rounded-pill px-2.5 py-0.5 text-[12px] font-medium ${r.status === "review" ? "bg-primary text-primary-on" : "bg-surface-soft text-body"}`}
+              >
+                {r.status === "done" && r.approvedAt ? "승인됨" : (STATUS[r.status] ?? r.status)}
               </span>
               <span className="text-[12px] text-faint">{r.createdAt.slice(0, 16).replace("T", " ")}</span>
             </div>
@@ -77,14 +90,44 @@ export default async function AutoDraftInbox() {
               ))}
             </ul>
 
+            {r.concern && (
+              <div className="mt-3 rounded-md border border-hairline px-4 py-3">
+                <p className="text-[12px] font-medium text-mute">요즘 고민 (원문 그대로)</p>
+                <p className="mt-1 whitespace-pre-wrap break-keep text-[14px] leading-[1.65] text-ink">{r.concern}</p>
+              </div>
+            )}
+
             {r.draft ? (
               <>
-                <form action={loadDraftAction} className="mt-4">
-                  <input type="hidden" name="id" value={r.id} />
-                  <button className="h-11 rounded-md bg-primary px-4 text-[14px] font-bold text-primary-on">
-                    초안 소개서로 보기 · 활동 {r.counts?.a} · 콜라보 {r.counts?.c}
-                  </button>
-                </form>
+                <div className="mt-4 flex flex-wrap items-center gap-2">
+                  <form action={loadDraftAction}>
+                    <input type="hidden" name="id" value={r.id} />
+                    <button className="h-11 rounded-md bg-primary px-4 text-[14px] font-bold text-primary-on">
+                      초안 소개서로 보기 · 활동 {r.counts?.a} · 콜라보 {r.counts?.c}
+                    </button>
+                  </form>
+                  {r.brief ? (
+                    <a
+                      href={`/brief/draft-${r.id.slice(-4)}`}
+                      className="flex h-11 items-center rounded-md border border-primary px-4 text-[14px] font-bold text-ink"
+                    >
+                      요약 리포트 보기
+                    </a>
+                  ) : (
+                    <span className="text-[13px] text-faint">요약 리포트는 아직이에요</span>
+                  )}
+                </div>
+                {r.status === "review" && (
+                  <form action={approveAction} className="mt-3">
+                    <input type="hidden" name="id" value={r.id} />
+                    <button
+                      disabled={!r.brief}
+                      className="h-11 rounded-md border border-ink bg-ink px-4 text-[14px] font-bold text-surface disabled:opacity-30"
+                    >
+                      둘 다 확인했어요 · 승인하기
+                    </button>
+                  </form>
+                )}
                 {!!r.questions?.length && (
                   <details className="mt-4 rounded-md bg-surface-soft px-4 py-3">
                     <summary className="cursor-pointer text-[14px] font-medium text-ink">
