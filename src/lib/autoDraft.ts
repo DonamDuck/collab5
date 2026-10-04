@@ -13,6 +13,9 @@
 
 export const DAILY_CAP = 3;
 
+/** 로컬 «초안 소개서»(/dev/auto-draft)의 수정 비번. 로컬 가짜 로그인은 보기 전용이라 비번으로 연다. 운영엔 안 쓰인다. */
+export const LOCAL_DRAFT_PASSWORD = "0000";
+
 export type ChannelKind =
   | "instagram"
   | "naver_blog"
