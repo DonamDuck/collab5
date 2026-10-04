@@ -17,3 +17,13 @@ export const SITE_URL = "https://collab5.co.kr";
  *     받는 사람이 막힌다. 안내하기 «전»에 한 번 열어 볼 것.
  */
 export const OG_IMAGE = "/og-image.png?v=4";  // v4 = 홈 헤더와 «같은» 워드마크로 교체(09-04). v3 = 로고 초록을 키위(#98FF5C)로 교정(08-16)
+
+// ─── 고객센터 연락 창구 (2026-09-16) ───
+// ⭐한 벌로 둔다 — 푸터·고객센터·홈 플로팅·하루 가게 화면이 같은 값을 본다. 한 곳만 바꿔도 전부 따라온다.
+/** 카카오톡 채널 홈(대표 09-16). */
+export const KAKAO_CHANNEL_URL = "https://pf.kakao.com/_xlMeiX";
+/** 누르면 바로 1:1 채팅이 열리는 주소. 상담 버튼은 이쪽을 쓴다 — 채널 홈에서 한 번 더 누르게 하지 않는다.
+ *  ⚠️09-16에 둘 다 열어 확인했다(200). 남의 서비스 주소는 조용히 죽으니 바꿀 땐 다시 열어 볼 것. */
+export const KAKAO_CHAT_URL = "https://pf.kakao.com/_xlMeiX/chat";
+export const SUPPORT_EMAIL = "dudejrthd@gmail.com";
+export const SUPPORT_PHONE = "010-2060-1629";
