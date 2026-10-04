@@ -17,6 +17,7 @@ import {
   DAILY_CAP,
   EMAIL_RE,
   etaDays,
+  isAmbiguousBare,
   parseChannel,
 } from "@/lib/autoDraft";
 
@@ -184,7 +185,8 @@ export function AutoDraftDialog({ initialName, onClose }: Props) {
               {rows.map((r, i) => {
                 const c = parsed[i];
                 return (
-                  <div key={i} className="flex items-center gap-2">
+                  <div key={i}>
+                  <div className="flex items-center gap-2">
                     <input
                       value={r}
                       onChange={(e) => setRow(i, e.target.value)}
@@ -204,6 +206,14 @@ export function AutoDraftDialog({ initialName, onClose }: Props) {
                     >
                       ✕
                     </button>
+                  </div>
+                  {isAmbiguousBare(r) && (
+                    <p className="mt-1 pl-1 text-[12px] text-mute">
+                      {c?.kind === "instagram"
+                        ? "홈페이지 주소라면 앞에 www.를 붙여 주세요."
+                        : "인스타그램 계정이라면 앞에 @를 붙여 주세요."}
+                    </p>
+                  )}
                   </div>
                 );
               })}

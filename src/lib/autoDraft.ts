@@ -58,12 +58,19 @@ export const CONSENT_TEXT =
 
 const LINK_HUB = /(^|\.)(linktr\.ee|litt\.ly|inpock\.co\.kr|inpk\.link|beacons\.ai|bio\.link|lnk\.bio)$/i;
 
+/** 점이 든 맨말이 «웹 주소»로 읽히는 끝말. 여기 없으면 인스타 핸들로 본다(`hey.buddybody` 같은 핸들이 흔하다).
+ *  🩸10-04 대표 첫 시험에서 `www.canvasgarden.shop`이 인스타 계정으로 읽혔다 — 끝말 목록에 shop이 없었다.
+ *  ⚠️`dooroome.store`처럼 핸들이 웹 주소 모양인 경우도 있어서 완벽히는 못 가른다 →
+ *    화면이 판별 결과를 옆에 보여 주고, 애매하면 「인스타면 @를 붙여 주세요」를 띄운다(`isAmbiguousBare`). */
+const WEB_TLD = /\.(com|net|org|kr|co|io|me|ly|ee|shop|store|site|xyz|app|dev|info|biz|link|page|art|studio)$/i;
+
 /** 고객이 넣은 한 줄 → 채널. 인스타는 @핸들만 적어도 받는다. 못 알아보면 null. */
 export function parseChannel(raw: string): AutoDraftChannel | null {
   const v = raw.trim();
   if (!v) return null;
-  // @핸들 또는 핸들만 — 점·밑줄·영숫자로만 된 짧은 말은 인스타 핸들로 본다
-  if (/^@?[A-Za-z0-9._]{2,30}$/.test(v) && !/\.(com|kr|net|co|io|me|ly|ee)$/i.test(v)) {
+  // @가 붙으면 무조건 인스타. 맨말이면 www.로 시작하거나 웹 끝말로 끝날 때만 웹 주소로 본다.
+  const bare = /^@?[A-Za-z0-9._]{2,30}$/.test(v);
+  if (bare && (v.startsWith("@") || (!/^www\./i.test(v) && !WEB_TLD.test(v)))) {
     const h = v.replace(/^@+/, "");
     return { kind: "instagram", url: `https://instagram.com/${h}` };
   }
@@ -89,7 +96,13 @@ export function parseChannel(raw: string): AutoDraftChannel | null {
   return { kind: "homepage", url };
 }
 
-export const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+/** @도 주소 모양(http·/)도 없는 «점 든 맨말» — 인스타 핸들인지 홈페이지인지 고객에게 한 번 확인받을 자리. */
+export function isAmbiguousBare(raw: string): boolean {
+  const v = raw.trim();
+  return /^[A-Za-z0-9._]{2,30}$/.test(v) && v.includes(".") && !/^www\./i.test(v);
+}
+
+export const EMAIL_RE =/^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /** 대기 순서 → 예상 날짜 수. 오늘 몫이 남아 있어도 보수적으로 「다음 날부터」 센다. */
 export function etaDays(position: number): number {
