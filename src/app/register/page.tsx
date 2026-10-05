@@ -39,6 +39,11 @@ import { StubSection } from "./StubSection";
 /** 자동 만들기는 로컬 시험판(10-03~) — 운영 빌드에선 꺼 둔다. 운영판 = DB 대기열·완성 메일이 붙은 뒤. */
 const AUTO_DRAFT_ON = process.env.NODE_ENV !== "production";
 
+/** 0단계 «어떻게 시작할까요?» 카드 — 호버 연두(대표 10-05). 버튼은 데스크톱에선 카드 아래, 폰에선 문구 아래 왼쪽. */
+const START_CARD =
+  "group flex flex-col rounded-lg border border-hairline bg-surface p-4 text-left transition-colors hover:border-primary-strong hover:bg-primary-pale";
+const START_BTN = "mt-4 inline-flex h-9 items-center justify-center self-start rounded-md px-3.5 text-[13px] font-medium sm:mt-auto sm:pt-0";
+
 // 배열 내 순서 이동 (드래그 재정렬용)
 function reorder<T>(arr: T[], from: number, to: number): T[] {
   const c = [...arr];
@@ -310,7 +315,7 @@ function RegisterForm() {
   const [query, setQuery] = useState(""); // 불러오기 검색어(업체명만)
   const [wizardOpen, setWizardOpen] = useState(false); // 딸깍 자동완성 위저드
   const [autoDraftOpen, setAutoDraftOpen] = useState(false); // 소개서 자동 만들기 신청(로컬 시험판, 10-03)
-  const [draftOfferHidden, setDraftOfferHidden] = useState(false); // 「직접 쓸게요」로 초안 제안 접기
+  const [startedSelf, setStartedSelf] = useState(false); // 맨 위 «어떻게 시작할까요?»에서 「직접 쓸게요」를 골랐다
   const [aiFilled, setAiFilled] = useState<Set<string>>(new Set()); // AI가 채운 필드
   const [missing, setMissing] = useState<EnrichField[]>([]); // 못 찾은 필드(직접 입력 노티)
   const [reviewMode, setReviewMode] = useState(false); // 검수 게이트 배너
@@ -1263,8 +1268,13 @@ function RegisterForm() {
     router.push(`/m/${createdSlug}`);
   };
 
+  // 🧭0단계 «소개서를 어떻게 시작할까요?»(대표 10-05) — 새로 만들 때만, 아직 아무것도 시작 안 했을 때만 보인다.
+  //   쓰던 내용(임시저장 배너)이 있거나 위저드가 채웠거나 이름을 이미 적었으면 바로 폼으로 간다 — 다시 물으면 번거롭다.
+  const showStart = !editSlug && !editParam && !enrichment && !startedSelf && !draft.found && !name.trim();
+
   // 어떤 레이어(위저드·모달·얼럿·넛지·블록시트·미리보기시트)라도 열려 있으면 플로팅 버튼 숨김.
   const layerOpen =
+    showStart ||
     wizardOpen ||
     autoDraftOpen ||
     descModalOpen ||
@@ -1319,7 +1329,52 @@ function RegisterForm() {
         </>
       )}
 
-      <div className="mt-8 space-y-12">
+      {showStart && (
+        // 🧭0단계 — 대표 10-05: *「이름 칸 아래 질문은 스크롤로 훑는 사람 눈에 안 들어오고, 이름 쓰기와 맥락도 안 맞는다」*.
+        //   «어떻게 만들지»를 이름보다 먼저, 세 갈래를 한 번에 보여 준다(«필요해요/아니요»를 먼저 묻는 두 단계안은 클릭이 늘어 버렸다).
+        //   「직접 쓸게요」도 같은 무게의 버튼으로 세운다 — 회색 글자면 위 둘 중 하나를 꼭 골라야 하는 것처럼 보였다.
+        <section className="mt-8">
+          <h2 className="text-[19px] font-bold text-ink">소개서를 어떻게 시작할까요?</h2>
+          <div className={`mt-4 grid gap-3 ${AUTO_DRAFT_ON ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
+            {AUTO_DRAFT_ON && (
+              <button type="button" onClick={() => setAutoDraftOpen(true)} className={START_CARD}>
+                <span className="text-[12px] text-mute">선택 1 · 1~2일 소요</span>
+                <span className="mt-1 block break-keep text-[15px] font-medium leading-[1.5] text-ink">
+                  인스타, 블로그 등의 글로 소개서 초안을 만들어 드려요
+                </span>
+                <span className={`${START_BTN} bg-ink text-on-dark`}>신청하기</span>
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => {
+                setQuery("");
+                setWizardOpen(true);
+              }}
+              className={START_CARD}
+            >
+              <span className="text-[12px] text-mute">{AUTO_DRAFT_ON ? "선택 2 · 3분 소요" : "3분 소요"}</span>
+              <span className="mt-1 block break-keep text-[15px] font-medium leading-[1.5] text-ink">
+                브랜드 이름으로 정보를 찾아 초안을 채워 드려요
+              </span>
+              <span className={`${START_BTN} border border-border-strong bg-surface text-ink group-hover:border-primary-strong group-hover:bg-primary group-hover:text-primary-on`}>
+                시작하기
+              </span>
+            </button>
+            <button type="button" onClick={() => setStartedSelf(true)} className={START_CARD}>
+              <span className="text-[12px] text-mute">{AUTO_DRAFT_ON ? "선택 3 · 직접" : "직접"}</span>
+              <span className="mt-1 block break-keep text-[15px] font-medium leading-[1.5] text-ink">
+                처음부터 직접 쓸게요
+              </span>
+              <span className={`${START_BTN} border border-border-strong bg-surface text-ink group-hover:border-primary-strong group-hover:bg-primary group-hover:text-primary-on`}>
+                바로 쓰기
+              </span>
+            </button>
+          </div>
+        </section>
+      )}
+
+      <div className={`mt-8 space-y-12 ${showStart ? "hidden" : ""}`}>
         {/* 이어서 쓰기 배너 — **자동 복구는 절대 하지 않는다.**
             낡은 초안을 덜컥 얹으면 서버에 잘 저장해둔 내용을 되돌려버린다. 그래서 항상 물어본다.
 
@@ -1442,79 +1497,7 @@ function RegisterForm() {
               <p className="mt-1.5 text-[13px] text-danger">{errField.msg}</p>
             )}
           </Field>
-          {/* 🪄 초안 준비 제안 — 브랜드 이름을 적으면 바로 아래에 뜬다(대표 10-04 QA #18).
-              전엔 맨 위에 「자동 만들기」 카드와 「✨ 위저드」 상자가 따로 있어 겹쳐 보였다. 이름을 적는 순간에
-              두 길을 한자리에서 고르게 한다. 대신 만들어 달라는 쪽이 더 많을 거라 그쪽을 위에 둔다(대표 판단).
-              ⚠️자동 만들기는 아직 로컬 시험판이라 운영 빌드에선 위저드 줄만 보인다.
-              🔁10-05 대표 QA: *「자동 만들기 신청 버튼이 안 보인다」* — 이름을 두 글자 넘게 적어야만 떠서, 이름을 쓰기 전엔
-              임시저장 배너만 보였다. 이제 처음부터 보이고, 이름이 있으면 문장에 넣는다. 위저드는 이름이 있어야 돌아서
-              이름이 비었으면 이름 칸으로 보낸다. */}
-          {!editSlug && !enrichment && !draftOfferHidden && (
-            // 🔁10-05 대표 QA 2차 — *「UI가 튀어 보인다. 브랜드 이름을 치기에 너무 이쪽으로 시선이 간다」*.
-            //   연두 큰 상자 + 검정/연두 큰 버튼 → 흰 바탕·얇은 선·작은 글자의 조용한 두 줄로 낮췄다. 주인공은 위의 이름 칸이다.
-            //   「편해요/빨라요」 칩은 빼고(대표: 제거), 라벨은 「선택 1 / 선택 2」만. 이름이 비었을 때 빨간 경고를 띄우지 않고
-            //   이름 칸으로 커서만 보낸다(대표: 「경고가 먼저 나오는 게 이상하다」).
-            // 🔁10-05 3차: 바깥 테두리 없앰 · 질문은 검정 · 안쪽 버튼은 글자 링크 대신 «버튼»으로 — 데스크톱은 문구 아래, 폰은 오른쪽.
-            <div className="-mt-4">
-              <p className="text-[14px] font-medium text-ink">
-                {name.trim() ? (
-                  <>
-                    <b className="font-bold">{name.trim()}</b>의 소개서 초안 준비를 도와드릴까요?
-                  </>
-                ) : (
-                  "소개서 초안 준비를 도와드릴까요?"
-                )}
-              </p>
-              <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                {AUTO_DRAFT_ON && (
-                  <button
-                    type="button"
-                    onClick={() => setAutoDraftOpen(true)}
-                    className="group flex items-center gap-3 rounded-md border border-hairline bg-surface px-3 py-2.5 text-left transition-colors hover:border-primary-strong hover:bg-primary-pale sm:flex-col sm:items-stretch"
-                  >
-                    <span className="min-w-0 flex-1 sm:flex-none sm:pb-3">
-                      <span className="block text-[12px] text-mute">선택 1 · 1~2일 소요</span>
-                      <span className="mt-0.5 block break-keep text-[14px] font-medium leading-[1.45] text-ink">
-                        인스타, 블로그 등의 글로 소개서 초안을 만들어 드릴 수 있어요
-                      </span>
-                    </span>
-                    <span className="inline-flex h-9 shrink-0 items-center justify-center rounded-md bg-ink px-3.5 text-[13px] font-medium text-on-dark sm:mt-auto sm:self-start">
-                      신청하기
-                    </span>
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (!name.trim()) {
-                      document.getElementById("name-field")?.focus();
-                      return;
-                    }
-                    setQuery(name.trim());
-                    setWizardOpen(true);
-                  }}
-                  className="group flex items-center gap-3 rounded-md border border-hairline bg-surface px-3 py-2.5 text-left transition-colors hover:border-primary-strong hover:bg-primary-pale sm:flex-col sm:items-stretch"
-                >
-                  <span className="min-w-0 flex-1 sm:flex-none sm:pb-3">
-                    <span className="block text-[12px] text-mute">{AUTO_DRAFT_ON ? "선택 2 · 3분 소요" : "3분 소요"}</span>
-                    <span className="mt-0.5 block break-keep text-[14px] font-medium leading-[1.45] text-ink">
-                      지금 바로 만들 경우, 간단히 정보를 찾아봐 드릴 수 있어요
-                    </span>
-                  </span>
-                  <span className="inline-flex h-9 shrink-0 items-center justify-center rounded-md border border-border-strong bg-surface px-3.5 text-[13px] font-medium text-ink group-hover:border-primary-strong group-hover:bg-primary group-hover:text-primary-on sm:mt-auto sm:self-start">
-                    시작하기
-                  </span>
-                </button>
-              </div>
-              <button
-                type="button"
-                onClick={() => setDraftOfferHidden(true)}
-                className="mt-2 text-[12px] text-mute underline underline-offset-2 hover:text-ink"
-              >
-                괜찮아요, 직접 쓸게요
-              </button>
-            </div>
-          )}
+          {/* 🔁10-05 이름 칸 아래에 있던 「초안 준비를 도와드릴까요?」 상자는 맨 위 0단계 «어떻게 시작할까요?»로 옮겼다(showStart). */}
           <Field label="한두 문장 소개 (선택)" hint={hintFor("oneLiner")}>
             {/* 한두 문장이라 멀티라인 — 한 줄 input이면 두 번째 문장이 가로로 밀려 안 보임. 길이 제한 없음(대표 확정) */}
             <textarea

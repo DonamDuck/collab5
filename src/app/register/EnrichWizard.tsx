@@ -200,7 +200,7 @@ function groupStoryItems(items: StoryItem[]): StoryGroup[] {
 }
 
 export function EnrichWizard({
-  query,
+  query: initialQuery,
   onClose,
   onApply,
 }: {
@@ -209,6 +209,10 @@ export function EnrichWizard({
   onApply: (fill: WizardFill) => void;
 }) {
   const [kind, setKind] = useState<Kind>("seed");
+  // 🔁10-05 소개서 만들기 맨 위 «어떻게 시작할까요?»에서 이름 없이 바로 들어올 수 있게 되어, 씨앗 단계에서 이름도 받는다.
+  //   폼에 이미 적힌 이름이 있으면 그걸로 채워 둔다. 아래 코드의 `query`는 전부 이 값이다.
+  const [nameInput, setNameInput] = useState(initialQuery);
+  const query = nameInput.trim();
   const [errMsg, setErrMsg] = useState("");
   // ESC로 나가려 할 때 한 번 물어보는 확인창(대표 확정 07-29).
   // ⚠️ 위저드는 몇 스텝에 걸쳐 고른 게 쌓여 있고 되돌릴 방법이 없다 — ESC 한 번에 날리면 안 된다.
@@ -220,7 +224,7 @@ export function EnrichWizard({
   // ⓪ 씨앗 — 지역·업종 둘 다 필수(동명 구분 검증자 + 크롤 정확도)
   const [regionInput, setRegionInput] = useState("");
   const [btype, setBtype] = useState("");
-  const seedReady = !!regionInput.trim() && !!btype.trim();
+  const seedReady = !!query && !!regionInput.trim() && !!btype.trim();
 
   // 크롤 결과
   const [crawlChips, setCrawlChips] = useState<KeywordChip[]>([]);
@@ -671,9 +675,20 @@ export function EnrichWizard({
             <p className="pr-8 text-[13px] font-medium text-primary-on">AI 소개서 작성을 위해 정보가 필요해요.</p>
             <p className="mt-1 pr-8 text-[18px] font-bold text-ink">어디에 있는, 어떤 브랜드인가요?</p>
             <p className="mt-1.5 text-[15px] leading-relaxed text-mute">
-              같은 이름의 다른 곳과 헷갈리지 않게, 딱 두 가지만 알려주세요.
+              같은 이름의 다른 곳과 헷갈리지 않게, 이름과 두 가지만 알려주세요.
             </p>
             <div className="mt-4 space-y-3">
+              <div>
+                <label className="mb-1.5 block text-[16px] font-medium text-body">
+                  브랜드 이름이 무엇인가요? <span className="text-primary-on">*</span>
+                </label>
+                <input
+                  value={nameInput}
+                  onChange={(e) => setNameInput(e.target.value)}
+                  placeholder="캔버스가든"
+                  className="h-11 w-full rounded-sm border border-hairline bg-surface px-3 text-[17px] text-ink outline-none placeholder:text-faint focus:border-focus"
+                />
+              </div>
               <div>
                 <label className="mb-1.5 block text-[16px] font-medium text-body">
                   어떤 지역에 위치하고 있나요? <span className="text-primary-on">*</span>
@@ -706,7 +721,7 @@ export function EnrichWizard({
             {/* 눌리게 두고 무엇이 빠졌는지 말해준다 — 회색 버튼은 이유를 안 남긴다(QA #17) */}
             <button
               type="button"
-              onClick={() => (seedReady ? runCrawl() : setSeedErr("지역과 어떤 브랜드인지를 모두 알려주세요."))}
+              onClick={() => (seedReady ? runCrawl() : setSeedErr("이름, 지역, 어떤 브랜드인지를 모두 알려주세요."))}
               className="mt-5 h-11 w-full rounded-md bg-primary text-[14px] font-medium text-primary-on"
             >
               ✨ 이 정보로 찾아보기
