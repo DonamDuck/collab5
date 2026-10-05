@@ -1,14 +1,15 @@
 // 자동 만들기 — 완성된 초안을 고객에게 «넘기는» 한 단계 (2026-10-05, 로컬 시험판)
 //
 // 넘긴다 = 상태 done + 고객 안내 메일. 두 길에서 부른다.
-//   ① 처음 REVIEW_FIRST 건: 신청함에서 대표가 [승인] → approveAction
-//   ② 그 뒤: 대기열 스크립트 `queue done` → /api/auto-draft/deliver
+//   ① 대표가 신청함에서 [지금 보내기] → approveAction
+//   ② 아침 9시 예약 작업: `queue morning` → /api/auto-draft/deliver
 // ⭐메일이 실패해도 상태는 done으로 둔다(초안은 이미 있다). 대신 mailError를 남겨 신청함에 빨갛게 보인다 —
 //   고객이 기다리는 메일이라 «조용히 실패»하면 안 된다.
 // 🔜운영판에선 여기서 초안을 고객 계정에 붙이고(owner_user_id), 주소는 운영 도메인이 된다.
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { notifyDraftReady } from "./notify";
+import { buildLocalDraft } from "./autoDraftLocal";
 import { kstIso } from "./time";
 import type { AutoDraftRequest } from "./autoDraft";
 
@@ -21,7 +22,8 @@ export async function deliverDraft(
   const safe = id.replace(/[^0-9a-z-]/gi, "");
   const f = path.join(QUEUE_DIR, `${safe}.json`);
   const req = JSON.parse(await readFile(f, "utf8")) as AutoDraftRequest & { slug?: string };
-  const slug = req.slug || `draft-${safe.slice(-4)}`;
+  // 로컬 서버를 다시 켜면 초안 페이지가 비워진다 → 링크가 빈 페이지로 가지 않게 보내기 직전에 다시 만든다
+  const slug = await buildLocalDraft(safe);
   const base = (process.env.NEXT_PUBLIC_SITE_URL || opts.origin).replace(/\/$/, "");
   const r = await notifyDraftReady({ to: req.email, brandName: req.brandName, url: `${base}/m/${slug}` });
   const now = kstIso(new Date());

@@ -118,14 +118,8 @@ export async function notifySignup(n: SignupNotice): Promise<boolean> {
  * 가입 알림은 놓쳐도 대표가 DB를 보면 되지만, 이 메일은 고객이 기다리고 있어서 «못 보냈다»가 보여야 한다.
  * ⚠️발신 주소는 NOTIFY_FROM. 비어 있으면 Resend 시험 주소(onboarding@resend.dev)라 Resend 계정 주인에게만 간다.
  */
-export async function notifyDraftReady(n: {
-  to: string;
-  brandName: string;
-  url: string;
-}): Promise<{ ok: true } | { ok: false; why: string }> {
-  const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) return { ok: false, why: "RESEND_API_KEY 없음" };
-
+/** 안내 메일 내용(제목·글·HTML). 신청함의 «메일 미리보기»(/dev/auto-draft/mail)도 이걸 그대로 그린다. */
+export function draftReadyMail(n: { brandName: string; url: string }): { subject: string; text: string; html: string } {
   const subject = `[collab5] 「${n.brandName}」 소개서 초안이 준비됐어요`;
   const text = [
     `안녕하세요, collab5예요.`,
@@ -149,6 +143,18 @@ export async function notifyDraftReady(n: {
   <p style="margin:0 0 24px;color:#444">초안이 마음에 들지 않으시면 언제든 직접 삭제하실 수도 있어요.</p>
   <p style="margin:0;color:#888;font-size:13px">collab5 — 내 이야기로 시작하는 콜라보 공간</p>
 </div>`;
+
+  return { subject, text, html };
+}
+
+export async function notifyDraftReady(n: {
+  to: string;
+  brandName: string;
+  url: string;
+}): Promise<{ ok: true } | { ok: false; why: string }> {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) return { ok: false, why: "RESEND_API_KEY 없음" };
+  const { subject, text, html } = draftReadyMail(n);
 
   try {
     const res = await fetch(RESEND_ENDPOINT, {
