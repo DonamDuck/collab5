@@ -1450,76 +1450,65 @@ function RegisterForm() {
               임시저장 배너만 보였다. 이제 처음부터 보이고, 이름이 있으면 문장에 넣는다. 위저드는 이름이 있어야 돌아서
               이름이 비었으면 이름 칸으로 보낸다. */}
           {!editSlug && !enrichment && !draftOfferHidden && (
-            <div className="-mt-4 rounded-xl border border-primary bg-primary-pale px-4 py-4">
-              <p className="break-keep text-[16px] leading-[1.5] text-ink">
+            // 🔁10-05 대표 QA 2차 — *「UI가 튀어 보인다. 브랜드 이름을 치기에 너무 이쪽으로 시선이 간다」*.
+            //   연두 큰 상자 + 검정/연두 큰 버튼 → 흰 바탕·얇은 선·작은 글자의 조용한 두 줄로 낮췄다. 주인공은 위의 이름 칸이다.
+            //   「편해요/빨라요」 칩은 빼고(대표: 제거), 라벨은 「선택 1 / 선택 2」만. 이름이 비었을 때 빨간 경고를 띄우지 않고
+            //   이름 칸으로 커서만 보낸다(대표: 「경고가 먼저 나오는 게 이상하다」).
+            <div className="-mt-4 rounded-lg border border-hairline bg-surface px-4 py-3">
+              <p className="text-[13px] text-mute">
                 {name.trim() ? (
                   <>
-                    <b>{name.trim()}</b>의 소개서 초안 준비를 도와드릴까요?
+                    <b className="font-medium text-body">{name.trim()}</b>의 소개서 초안 준비를 도와드릴까요?
                   </>
                 ) : (
                   "소개서 초안 준비를 도와드릴까요?"
                 )}
               </p>
-              {/* 🔁10-05 대표 QA — *「선택 1·2가 너무 붙어 있어서 잘 안 들어온다. 1~2일 소요 but 편함, 3분 소요 but 빠름」*.
-                  한 줄 버튼 둘을 «선택 1 / 선택 2» 카드로 가르고, 칸마다 걸리는 시간과 그 대가(편함·빠름)를 칩으로 맞세운다.
-                  넓은 화면에선 나란히, 폰에선 위아래(사이에 «또는»). 문구는 대표 코멘트 그대로. */}
-              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <div className="mt-2 grid gap-2 sm:grid-cols-2">
                 {AUTO_DRAFT_ON && (
                   <button
                     type="button"
                     onClick={() => setAutoDraftOpen(true)}
-                    className="flex flex-col rounded-lg border border-hairline bg-surface p-4 text-left hover:border-border-strong"
+                    className="group flex items-start gap-3 rounded-md border border-hairline px-3 py-2.5 text-left hover:border-border-strong"
                   >
-                    <span className="text-[12px] font-bold tracking-[0.02em] text-primary-on">선택 1 · 맡기기</span>
-                    <span className="mt-1.5 block break-keep text-[15px] font-bold leading-[1.45] text-ink">
-                      🪄 인스타, 블로그 등의 글로 소개서 초안을 만들어 드릴 수 있어요
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-[12px] text-mute">선택 1 · 1~2일 소요</span>
+                      <span className="mt-0.5 block break-keep text-[14px] font-medium leading-[1.45] text-ink">
+                        인스타, 블로그 등의 글로 소개서 초안을 만들어 드릴 수 있어요
+                      </span>
                     </span>
-                    <span className="mt-3 flex flex-wrap gap-1.5">
-                      <span className="rounded-pill bg-surface-soft px-2.5 py-1 text-[12px] font-medium text-body">⏱ 1~2일 소요</span>
-                      <span className="rounded-pill bg-primary-pale px-2.5 py-1 text-[12px] font-medium text-primary-on">편해요</span>
-                    </span>
-                    <span className="mt-4 flex h-10 items-center justify-center rounded-md bg-ink text-[14px] font-medium text-on-dark sm:mt-auto">
-                      신청하기
+                    <span className="shrink-0 pt-4 text-[13px] font-medium text-body underline-offset-2 group-hover:underline">
+                      신청하기 →
                     </span>
                   </button>
-                )}
-                {AUTO_DRAFT_ON && (
-                  <span aria-hidden="true" className="-my-1 text-center text-[12px] text-mute sm:hidden">
-                    또는
-                  </span>
                 )}
                 <button
                   type="button"
                   onClick={() => {
                     if (!name.trim()) {
-                      setErrField({ anchor: "name-field", msg: "브랜드 이름을 먼저 알려주세요." });
                       document.getElementById("name-field")?.focus();
                       return;
                     }
                     setQuery(name.trim());
                     setWizardOpen(true);
                   }}
-                  className="flex flex-col rounded-lg border border-hairline bg-surface p-4 text-left hover:border-border-strong"
+                  className="group flex items-start gap-3 rounded-md border border-hairline px-3 py-2.5 text-left hover:border-border-strong"
                 >
-                  <span className="text-[12px] font-bold tracking-[0.02em] text-primary-on">
-                    {AUTO_DRAFT_ON ? "선택 2 · 직접 만들기" : "직접 만들기"}
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[12px] text-mute">{AUTO_DRAFT_ON ? "선택 2 · 3분 소요" : "3분 소요"}</span>
+                    <span className="mt-0.5 block break-keep text-[14px] font-medium leading-[1.45] text-ink">
+                      지금 바로 만들 경우, 간단히 정보를 찾아봐 드릴 수 있어요
+                    </span>
                   </span>
-                  <span className="mt-1.5 block break-keep text-[15px] font-bold leading-[1.45] text-ink">
-                    ✨ 지금 바로 만들 경우, 간단히 정보를 찾아봐 드릴 수 있어요
-                  </span>
-                  <span className="mt-3 flex flex-wrap gap-1.5">
-                    <span className="rounded-pill bg-surface-soft px-2.5 py-1 text-[12px] font-medium text-body">⏱ 3분 소요</span>
-                    <span className="rounded-pill bg-primary-pale px-2.5 py-1 text-[12px] font-medium text-primary-on">빨라요</span>
-                  </span>
-                  <span className="mt-4 flex h-10 items-center justify-center rounded-md bg-primary text-[14px] font-medium text-primary-on sm:mt-auto">
-                    시작하기
+                  <span className="shrink-0 pt-4 text-[13px] font-medium text-body underline-offset-2 group-hover:underline">
+                    시작하기 →
                   </span>
                 </button>
               </div>
               <button
                 type="button"
                 onClick={() => setDraftOfferHidden(true)}
-                className="mt-2 text-[13px] text-mute underline underline-offset-2 hover:text-ink"
+                className="mt-2 text-[12px] text-mute underline underline-offset-2 hover:text-ink"
               >
                 괜찮아요, 직접 쓸게요
               </button>
