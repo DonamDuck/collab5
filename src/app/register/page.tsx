@@ -48,7 +48,10 @@ const START_CARD =
   "group flex w-full flex-col rounded-lg border border-hairline bg-surface p-5 text-left transition-colors hover:border-primary-strong hover:bg-primary-pale sm:flex-row sm:items-center sm:gap-5 sm:p-6";
 const START_BTN =
   "mt-4 flex h-11 w-full items-center justify-center rounded-md border border-border-strong bg-surface text-[15px] font-medium text-ink group-hover:border-primary-strong group-hover:bg-primary group-hover:text-primary-on sm:mt-0 sm:h-10 sm:w-auto sm:shrink-0 sm:px-5";
-const START_TAG = "text-[14px] font-bold text-mute";
+// 🔁10-05 대표: *「페이지가 모두 검정인데 선택1·2만 초록이나 키위로」* — 디자인팀은 «연두는 누르는 것의 색»이라 회색을 권했지만
+//   대표 판단으로 연두 알약. 카드 호버 바탕(primary-pale)과 겹치지 않게 호버 땐 진한 연두로 올린다.
+const START_TAG =
+  "inline-flex rounded-pill bg-primary-pale px-2.5 py-0.5 text-[13px] font-bold text-primary-on group-hover:bg-primary";
 const START_CHIP = "shrink-0 rounded-pill bg-surface-soft px-2.5 py-0.5 text-[13px] font-medium text-mute group-hover:bg-surface";
 
 // 배열 내 순서 이동 (드래그 재정렬용)
