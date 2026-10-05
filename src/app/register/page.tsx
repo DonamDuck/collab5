@@ -1470,7 +1470,7 @@ function RegisterForm() {
                   <button
                     type="button"
                     onClick={() => setAutoDraftOpen(true)}
-                    className="group flex items-center gap-3 rounded-md border border-hairline bg-surface px-3 py-2.5 text-left hover:border-border-strong sm:flex-col sm:items-stretch"
+                    className="group flex items-center gap-3 rounded-md border border-hairline bg-surface px-3 py-2.5 text-left transition-colors hover:border-primary-strong hover:bg-primary-pale sm:flex-col sm:items-stretch"
                   >
                     <span className="min-w-0 flex-1 sm:flex-none sm:pb-3">
                       <span className="block text-[12px] text-mute">선택 1 · 1~2일 소요</span>
@@ -1493,7 +1493,7 @@ function RegisterForm() {
                     setQuery(name.trim());
                     setWizardOpen(true);
                   }}
-                  className="group flex items-center gap-3 rounded-md border border-hairline bg-surface px-3 py-2.5 text-left hover:border-border-strong sm:flex-col sm:items-stretch"
+                  className="group flex items-center gap-3 rounded-md border border-hairline bg-surface px-3 py-2.5 text-left transition-colors hover:border-primary-strong hover:bg-primary-pale sm:flex-col sm:items-stretch"
                 >
                   <span className="min-w-0 flex-1 sm:flex-none sm:pb-3">
                     <span className="block text-[12px] text-mute">{AUTO_DRAFT_ON ? "선택 2 · 3분 소요" : "3분 소요"}</span>
@@ -1501,7 +1501,7 @@ function RegisterForm() {
                       지금 바로 만들 경우, 간단히 정보를 찾아봐 드릴 수 있어요
                     </span>
                   </span>
-                  <span className="inline-flex h-9 shrink-0 items-center justify-center rounded-md border border-border-strong bg-surface px-3.5 text-[13px] font-medium text-ink group-hover:bg-surface-soft sm:mt-auto sm:self-start">
+                  <span className="inline-flex h-9 shrink-0 items-center justify-center rounded-md border border-border-strong bg-surface px-3.5 text-[13px] font-medium text-ink group-hover:border-primary-strong group-hover:bg-primary group-hover:text-primary-on sm:mt-auto sm:self-start">
                     시작하기
                   </span>
                 </button>
