@@ -39,10 +39,14 @@ import { StubSection } from "./StubSection";
 /** 자동 만들기는 로컬 시험판(10-03~) — 운영 빌드에선 꺼 둔다. 운영판 = DB 대기열·완성 메일이 붙은 뒤. */
 const AUTO_DRAFT_ON = process.env.NODE_ENV !== "production";
 
-/** 0단계 «어떻게 시작할까요?» 카드 — 호버 연두(대표 10-05). 버튼은 데스크톱에선 카드 아래, 폰에선 문구 아래 왼쪽. */
+/** 0단계 «어떻게 시작할까요?» 카드 — 호버 연두(대표 10-05).
+ *  🔁10-05 2차: 「글과 버튼이 너무 붙어 있다(데스크톱) · 라벨 글자가 너무 작다 · 소요 시간을 칩처럼」 → 여백을 키우고,
+ *  «선택 N»과 소요 시간 칩을 한 줄에, 버튼은 카드 바닥에 꽉 차게. */
 const START_CARD =
-  "group flex flex-col rounded-lg border border-hairline bg-surface p-4 text-left transition-colors hover:border-primary-strong hover:bg-primary-pale";
-const START_BTN = "mt-4 inline-flex h-9 items-center justify-center self-start rounded-md px-3.5 text-[13px] font-medium sm:mt-auto sm:pt-0";
+  "group flex flex-col rounded-xl border border-hairline bg-surface p-5 text-left transition-colors hover:border-primary-strong hover:bg-primary-pale";
+const START_BTN = "mt-6 flex h-11 w-full items-center justify-center rounded-md text-[14px] font-medium sm:mt-auto";
+const START_TAG = "text-[14px] font-bold text-primary-on";
+const START_CHIP = "rounded-pill bg-surface-soft px-2.5 py-1 text-[13px] font-medium text-body group-hover:bg-surface";
 
 // 배열 내 순서 이동 (드래그 재정렬용)
 function reorder<T>(arr: T[], from: number, to: number): T[] {
@@ -1334,13 +1338,19 @@ function RegisterForm() {
         //   «어떻게 만들지»를 이름보다 먼저, 세 갈래를 한 번에 보여 준다(«필요해요/아니요»를 먼저 묻는 두 단계안은 클릭이 늘어 버렸다).
         //   「직접 쓸게요」도 같은 무게의 버튼으로 세운다 — 회색 글자면 위 둘 중 하나를 꼭 골라야 하는 것처럼 보였다.
         <section className="mt-8">
-          <h2 className="text-[19px] font-bold text-ink">소개서를 어떻게 시작할까요?</h2>
+          <h2 className="text-[20px] font-bold text-ink">소개서를 어떻게 시작할까요?</h2>
           <div className={`mt-4 grid gap-3 ${AUTO_DRAFT_ON ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
             {AUTO_DRAFT_ON && (
               <button type="button" onClick={() => setAutoDraftOpen(true)} className={START_CARD}>
-                <span className="text-[12px] text-mute">선택 1 · 1~2일 소요</span>
-                <span className="mt-1 block break-keep text-[15px] font-medium leading-[1.5] text-ink">
+                <span className="flex items-center justify-between gap-2">
+                  <span className={START_TAG}>선택 1</span>
+                  <span className={START_CHIP}>⏱ 1~2일 소요</span>
+                </span>
+                <span className="mt-3 block break-keep text-[16px] font-bold leading-[1.45] text-ink">
                   인스타, 블로그 등의 글로 소개서 초안을 만들어 드려요
+                </span>
+                <span className="mt-1.5 block break-keep text-[14px] leading-[1.55] text-mute sm:mb-6">
+                  그동안 올리신 글과 사진을 읽고 활동과 콜라보까지 채워요
                 </span>
                 <span className={`${START_BTN} bg-ink text-on-dark`}>신청하기</span>
               </button>
@@ -1353,18 +1363,30 @@ function RegisterForm() {
               }}
               className={START_CARD}
             >
-              <span className="text-[12px] text-mute">{AUTO_DRAFT_ON ? "선택 2 · 3분 소요" : "3분 소요"}</span>
-              <span className="mt-1 block break-keep text-[15px] font-medium leading-[1.5] text-ink">
+              <span className="flex items-center justify-between gap-2">
+                <span className={START_TAG}>{AUTO_DRAFT_ON ? "선택 2" : "빠르게"}</span>
+                <span className={START_CHIP}>⏱ 3분 소요</span>
+              </span>
+              <span className="mt-3 block break-keep text-[16px] font-bold leading-[1.45] text-ink">
                 브랜드 이름으로 정보를 찾아 초안을 채워 드려요
+              </span>
+              <span className="mt-1.5 block break-keep text-[14px] leading-[1.55] text-mute sm:mb-6">
+                웹에서 찾은 정보로 바로 초안을 받아 다듬어요
               </span>
               <span className={`${START_BTN} border border-border-strong bg-surface text-ink group-hover:border-primary-strong group-hover:bg-primary group-hover:text-primary-on`}>
                 시작하기
               </span>
             </button>
             <button type="button" onClick={() => setStartedSelf(true)} className={START_CARD}>
-              <span className="text-[12px] text-mute">{AUTO_DRAFT_ON ? "선택 3 · 직접" : "직접"}</span>
-              <span className="mt-1 block break-keep text-[15px] font-medium leading-[1.5] text-ink">
+              <span className="flex items-center justify-between gap-2">
+                <span className={START_TAG}>{AUTO_DRAFT_ON ? "선택 3" : "직접"}</span>
+                <span className={START_CHIP}>✍️ 직접 작성</span>
+              </span>
+              <span className="mt-3 block break-keep text-[16px] font-bold leading-[1.45] text-ink">
                 처음부터 직접 쓸게요
+              </span>
+              <span className="mt-1.5 block break-keep text-[14px] leading-[1.55] text-mute sm:mb-6">
+                빈 양식에 하나씩 채워 나가요
               </span>
               <span className={`${START_BTN} border border-border-strong bg-surface text-ink group-hover:border-primary-strong group-hover:bg-primary group-hover:text-primary-on`}>
                 바로 쓰기
