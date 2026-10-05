@@ -1461,7 +1461,7 @@ function RegisterForm() {
                     <span className="min-w-0 flex-1">
                       <span className="block text-[15px] font-bold text-ink">🪄 인스타와 블로그 글로 대신 만들어 드려요</span>
                       <span className="mt-0.5 block break-keep text-[13px] text-mute">
-                        그동안 올리신 글과 사진을 읽고 활동과 콜라보까지 채워요. 요약 리포트도 함께 드려요 · 1~3일
+                        그동안 올리신 글과 사진을 읽고 활동과 콜라보까지 채워요 · 1~3일
                       </span>
                     </span>
                     <span className="shrink-0 rounded-md bg-ink px-3 py-2 text-[13px] font-medium text-on-dark">신청하기</span>

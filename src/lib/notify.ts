@@ -110,3 +110,61 @@ export async function notifySignup(n: SignupNotice): Promise<boolean> {
     return false;
   }
 }
+
+/**
+ * 소개서 자동 만들기 — 고객에게 «초안이 준비됐어요» 안내 (2026-10-05).
+ *
+ * 가입 알림과 같은 원칙: throw하지 않는다. 대신 무엇 때문에 못 보냈는지를 돌려준다 —
+ * 가입 알림은 놓쳐도 대표가 DB를 보면 되지만, 이 메일은 고객이 기다리고 있어서 «못 보냈다»가 보여야 한다.
+ * ⚠️발신 주소는 NOTIFY_FROM. 비어 있으면 Resend 시험 주소(onboarding@resend.dev)라 Resend 계정 주인에게만 간다.
+ */
+export async function notifyDraftReady(n: {
+  to: string;
+  brandName: string;
+  url: string;
+}): Promise<{ ok: true } | { ok: false; why: string }> {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) return { ok: false, why: "RESEND_API_KEY 없음" };
+
+  const subject = `[collab5] 「${n.brandName}」 소개서 초안이 준비됐어요`;
+  const text = [
+    `안녕하세요, collab5예요.`,
+    ``,
+    `요청해 주신 「${n.brandName}」의 소개서 초안이 완성됐어요.`,
+    `아직 공개되지 않은 상태라, 지금은 요청하신 분만 볼 수 있어요.`,
+    ``,
+    n.url,
+    ``,
+    `그동안 올리신 글과 사진을 읽고 만들었지만, 저희가 잘못 읽은 곳이 있을 수 있어요.`,
+    `고칠 곳은 직접 수정하시고, 마음에 드시면 공개로 바꿔 주세요. 그때부터 모든 분이 소개서를 볼 수 있어요.`,
+    `초안이 마음에 들지 않으시면 언제든 직접 삭제하실 수도 있어요.`,
+    ``,
+    `collab5 — 내 이야기로 시작하는 콜라보 공간`,
+  ].join("\n");
+  const html = `<div style="font-family:-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo',sans-serif;font-size:15px;line-height:1.75;color:#1a1a1a;max-width:520px">
+  <p style="margin:0 0 16px">안녕하세요, <strong>collab5</strong>예요.</p>
+  <p style="margin:0 0 16px">요청해 주신 <strong>「${esc(n.brandName)}」</strong>의 소개서 초안이 완성됐어요.<br>아직 공개되지 않은 상태라, 지금은 요청하신 분만 볼 수 있어요.</p>
+  <p style="margin:0 0 24px"><a href="${esc(n.url)}" style="display:inline-block;padding:12px 20px;border-radius:8px;background:#98ff5c;color:#1f5c00;font-weight:700;text-decoration:none">초안 소개서 보기</a></p>
+  <p style="margin:0 0 8px;color:#444">그동안 올리신 글과 사진을 읽고 만들었지만, 저희가 잘못 읽은 곳이 있을 수 있어요. 고칠 곳은 직접 수정하시고, 마음에 드시면 공개로 바꿔 주세요. 그때부터 모든 분이 소개서를 볼 수 있어요.</p>
+  <p style="margin:0 0 24px;color:#444">초안이 마음에 들지 않으시면 언제든 직접 삭제하실 수도 있어요.</p>
+  <p style="margin:0;color:#888;font-size:13px">collab5 — 내 이야기로 시작하는 콜라보 공간</p>
+</div>`;
+
+  try {
+    const res = await fetch(RESEND_ENDPOINT, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ from: FROM, to: [n.to], subject, text, html }),
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      console.error("[notify] 초안 안내 실패", res.status, body);
+      return { ok: false, why: `발송 실패 ${res.status} ${body.slice(0, 160)}` };
+    }
+    return { ok: true };
+  } catch (e) {
+    console.error("[notify] 초안 안내 예외", e);
+    return { ok: false, why: `발송 예외 ${e instanceof Error ? e.message : String(e)}` };
+  }
+}

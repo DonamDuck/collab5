@@ -4,9 +4,10 @@
   scripts/auto-draft/queue              # 대기 중인 신청 목록(오래된 것부터)
   scripts/auto-draft/queue next         # 다음에 만들 신청 하나를 통째로 출력(스킬에 넘길 재료)
   scripts/auto-draft/queue start <id>   # 만들기 시작 → working
-  scripts/auto-draft/queue brief <id> <md>    # 브리프(요약 리포트) 마크다운 파일 경로를 붙인다
-  scripts/auto-draft/queue done <id> <slug>   # 완성 → 처음 REVIEW_FIRST 건은 review(대표 승인 대기), 그다음부턴 done
-  scripts/auto-draft/queue approve <id>       # 대표 승인 → done (신청함 화면의 버튼과 같은 일)
+  scripts/auto-draft/queue done <id> <slug>   # 완성 → 처음 REVIEW_FIRST 건은 review(대표 승인 대기),
+                                              #   그다음부턴 바로 넘긴다 = done + 고객 안내 메일(로컬 서버 /api/auto-draft/deliver)
+  (승인은 신청함 화면 /dev/auto-draft 의 버튼으로 한다 — 메일이 같이 나가야 해서 스크립트로는 안 한다)
+  (10-05 브리프는 흐름에서 뺐다. 시험용 `brief <id> <md>` 명령만 남겨 둔다)
   scripts/auto-draft/queue fail <id> <사유>    # 실패 → 다시 queued 로 돌리고 사유를 남긴다
 
 규칙: 하루 DAILY_CAP(3)건까지만 start 를 허락한다(KST 날짜 기준). 인스타 한도가 IP·계정 공용이라서다.
@@ -65,11 +66,17 @@ elif cmd == "brief":
 elif cmd == "done":
     f, r = find(args[1]); r["doneAt"] = now(); r["slug"] = args[2] if len(args) > 2 else r.get("slug", "")
     approved = sum(1 for _, x in load() if x.get("approvedAt"))
-    r["status"] = "review" if approved < REVIEW_FIRST else "done"
-    if not r.get("brief"): print("⚠️ 브리프가 아직 안 붙었어요 — queue brief <id> <md>")
-    save(f, r); print(r["status"], r["id"], f"(승인 {approved}/{REVIEW_FIRST})")
-elif cmd == "approve":
-    f, r = find(args[1]); r["status"] = "done"; r["approvedAt"] = now(); save(f, r); print("approved", r["id"])
+    if approved < REVIEW_FIRST:
+        r["status"] = "review"; save(f, r); print("review", r["id"], f"(승인 {approved}/{REVIEW_FIRST}) — 신청함에서 승인하면 메일이 나가요")
+    else:
+        save(f, r)
+        import urllib.request
+        try:
+            q = urllib.request.Request("http://localhost:3001/api/auto-draft/deliver", data=json.dumps({"id": r["id"]}).encode(),
+                                       headers={"Content-Type": "application/json"}, method="POST")
+            print("delivered", r["id"], urllib.request.urlopen(q, timeout=30).read().decode())
+        except Exception as e:
+            sys.exit(f"⛔ 넘기지 못했어요(로컬 서버가 꺼져 있나요?): {e} — 상태는 그대로예요. 서버를 켜고 done 을 다시 부르세요.")
 elif cmd == "fail":
     f, r = find(args[1]); r["status"] = "queued"; r.setdefault("failures", []).append({"at": now(), "why": " ".join(args[2:])}); save(f, r); print("back to queue", r["id"])
 else:

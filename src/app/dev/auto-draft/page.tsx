@@ -1,6 +1,7 @@
 // /dev/auto-draft — 자동 만들기 신청함 (2026-10-04, 로컬 전용)
 // 신청 목록과 상태, 초안이 나온 신청은 [초안 소개서로 보기] 버튼. 사장님께 여쭐 질문도 같이 보여 준다.
-// 🔁10-04: 처음 REVIEW_FIRST 건은 대표가 소개서·브리프를 둘 다 보고 [승인]해야 넘어간다(lib/autoDraft.ts 머리말).
+// 🔁10-04: 처음 REVIEW_FIRST 건은 대표가 초안을 보고 [승인]해야 넘어간다 → 승인하면 고객 안내 메일(lib/autoDraftDeliver.ts).
+// 🔁10-05: 브리프는 흐름에서 뺐다. 시험으로 만든 브리프가 붙은 신청만 참고 링크가 보인다.
 // ⚠️운영 빌드에선 404. 대기열이 이 컴퓨터의 파일이라 운영에선 의미가 없다(설계 = lib/autoDraft.ts 머리말).
 import { notFound } from "next/navigation";
 import { readdir, readFile } from "node:fs/promises";
@@ -54,7 +55,7 @@ export default async function AutoDraftInbox() {
       </p>
       {approved < REVIEW_FIRST && (
         <p className="mt-3 rounded-md bg-primary-pale px-4 py-3 text-[14px] leading-relaxed text-ink">
-          처음 {REVIEW_FIRST}건은 소개서와 요약 리포트를 둘 다 보시고 승인하셔야 고객에게 넘어가요. 지금 승인{" "}
+          처음 {REVIEW_FIRST}건은 초안 소개서를 보시고 승인하셔야 고객에게 넘어가요. 승인하면 신청한 분께 안내 메일이 가요. 지금 승인{" "}
           <b>
             {approved}/{REVIEW_FIRST}
           </b>
@@ -90,11 +91,12 @@ export default async function AutoDraftInbox() {
               ))}
             </ul>
 
-            {r.concern && (
-              <div className="mt-3 rounded-md border border-hairline px-4 py-3">
-                <p className="text-[12px] font-medium text-mute">요즘 고민 (원문 그대로)</p>
-                <p className="mt-1 whitespace-pre-wrap break-keep text-[14px] leading-[1.65] text-ink">{r.concern}</p>
-              </div>
+            {r.status === "done" && (r.mailedAt || r.mailError) && (
+              <p className={`mt-2 text-[13px] ${r.mailError ? "text-danger" : "text-mute"}`}>
+                {r.mailError
+                  ? `안내 메일을 못 보냈어요 — ${r.mailError}`
+                  : `안내 메일 보냄 · ${r.mailedAt?.slice(0, 16).replace("T", " ")} → ${r.email}`}
+              </p>
             )}
 
             {r.draft ? (
@@ -106,25 +108,17 @@ export default async function AutoDraftInbox() {
                       초안 소개서로 보기 · 활동 {r.counts?.a} · 콜라보 {r.counts?.c}
                     </button>
                   </form>
-                  {r.brief ? (
-                    <a
-                      href={`/brief/draft-${r.id.slice(-4)}`}
-                      className="flex h-11 items-center rounded-md border border-primary px-4 text-[14px] font-bold text-ink"
-                    >
-                      요약 리포트 보기
+                  {r.brief && (
+                    <a href={`/brief/draft-${r.id.slice(-4)}`} className="text-[13px] text-mute underline underline-offset-2">
+                      (참고) 시험으로 만든 요약 리포트
                     </a>
-                  ) : (
-                    <span className="text-[13px] text-faint">요약 리포트는 아직이에요</span>
                   )}
                 </div>
                 {r.status === "review" && (
                   <form action={approveAction} className="mt-3">
                     <input type="hidden" name="id" value={r.id} />
-                    <button
-                      disabled={!r.brief}
-                      className="h-11 rounded-md border border-ink bg-ink px-4 text-[14px] font-bold text-surface disabled:opacity-30"
-                    >
-                      둘 다 확인했어요 · 승인하기
+                    <button className="h-11 rounded-md border border-ink bg-ink px-4 text-[14px] font-bold text-surface">
+                      확인했어요 · 승인하고 안내 메일 보내기
                     </button>
                   </form>
                 )}

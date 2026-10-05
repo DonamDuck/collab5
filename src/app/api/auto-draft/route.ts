@@ -109,7 +109,6 @@ export async function POST(req: Request) {
     channels,
     email,
     note: str(body.note, 1000),
-    concern: str(body.concern, 2000),
     consent: { text: CONSENT_TEXT, at },
     account: { authId: user.id, email: user.email ?? "", userId: (await getSessionUserId()) ?? null },
   };
