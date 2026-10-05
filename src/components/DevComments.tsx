@@ -219,10 +219,17 @@ export function DevComments() {
 
   /** 「다 남겼어요」 — 깃발을 세우면 담당 세션이 그걸 보고 바로 작업에 들어간다. */
   const go = async () => {
-    await fetch("/api/dev-comment", {
+    // 🩸10-05 대표 「push 했는데 안 들어온다」 — 개발 서버가 다시 빌드되는 사이에 누르면 요청이 실패하는데,
+    //   전엔 실패를 삼키고 「보냈어요」를 띄워서 대표도 세션도 몰랐다. 실패면 실패라고 말한다.
+    const r = await fetch("/api/dev-comment", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action: "go", url: location.pathname + location.search }),
-    }).catch(() => {});
+    }).catch(() => null);
+    if (!r || !r.ok) {
+      setToast("보내지 못했어요. 잠시 뒤 다시 눌러 주세요");
+      setTimeout(() => setToast(""), 4000);
+      return;
+    }
     // 길이·유지시간을 손대기 전에 `GO_TOAST` 선언부의 주석을 읽을 것.
     setToast(GO_TOAST);
     setTimeout(() => setToast(""), GO_TOAST_MS);

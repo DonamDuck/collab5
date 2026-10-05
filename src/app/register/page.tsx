@@ -1460,21 +1460,33 @@ function RegisterForm() {
                   "소개서 초안 준비를 도와드릴까요?"
                 )}
               </p>
-              <div className="mt-3 space-y-2">
+              {/* 🔁10-05 대표 QA — *「선택 1·2가 너무 붙어 있어서 잘 안 들어온다. 1~2일 소요 but 편함, 3분 소요 but 빠름」*.
+                  한 줄 버튼 둘을 «선택 1 / 선택 2» 카드로 가르고, 칸마다 걸리는 시간과 그 대가(편함·빠름)를 칩으로 맞세운다.
+                  넓은 화면에선 나란히, 폰에선 위아래(사이에 «또는»). 문구는 대표 코멘트 그대로. */}
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
                 {AUTO_DRAFT_ON && (
                   <button
                     type="button"
                     onClick={() => setAutoDraftOpen(true)}
-                    className="flex w-full items-center gap-3 rounded-lg border border-hairline bg-surface px-4 py-3 text-left hover:border-border-strong"
+                    className="flex flex-col rounded-lg border border-hairline bg-surface p-4 text-left hover:border-border-strong"
                   >
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-[15px] font-bold text-ink">🪄 인스타와 블로그 글로 대신 만들어 드려요</span>
-                      <span className="mt-0.5 block break-keep text-[13px] text-mute">
-                        그동안 올리신 글과 사진을 읽고 활동과 콜라보까지 채워요 · 1~3일
-                      </span>
+                    <span className="text-[12px] font-bold tracking-[0.02em] text-primary-on">선택 1 · 맡기기</span>
+                    <span className="mt-1.5 block break-keep text-[15px] font-bold leading-[1.45] text-ink">
+                      🪄 인스타, 블로그 등의 글로 소개서 초안을 만들어 드릴 수 있어요
                     </span>
-                    <span className="shrink-0 rounded-md bg-ink px-3 py-2 text-[13px] font-medium text-on-dark">신청하기</span>
+                    <span className="mt-3 flex flex-wrap gap-1.5">
+                      <span className="rounded-pill bg-surface-soft px-2.5 py-1 text-[12px] font-medium text-body">⏱ 1~2일 소요</span>
+                      <span className="rounded-pill bg-primary-pale px-2.5 py-1 text-[12px] font-medium text-primary-on">편해요</span>
+                    </span>
+                    <span className="mt-4 flex h-10 items-center justify-center rounded-md bg-ink text-[14px] font-medium text-on-dark sm:mt-auto">
+                      신청하기
+                    </span>
                   </button>
+                )}
+                {AUTO_DRAFT_ON && (
+                  <span aria-hidden="true" className="-my-1 text-center text-[12px] text-mute sm:hidden">
+                    또는
+                  </span>
                 )}
                 <button
                   type="button"
@@ -1487,13 +1499,21 @@ function RegisterForm() {
                     setQuery(name.trim());
                     setWizardOpen(true);
                   }}
-                  className="flex w-full items-center gap-3 rounded-lg border border-hairline bg-surface px-4 py-3 text-left hover:border-border-strong"
+                  className="flex flex-col rounded-lg border border-hairline bg-surface p-4 text-left hover:border-border-strong"
                 >
-                  <span className="min-w-0 flex-1">
-                    <span className="block text-[15px] font-bold text-ink">✨ 지금 바로 간단히 채우기</span>
-                    <span className="mt-0.5 block break-keep text-[13px] text-mute">웹에서 찾은 정보로 1분 안에 초안을 받아요</span>
+                  <span className="text-[12px] font-bold tracking-[0.02em] text-primary-on">
+                    {AUTO_DRAFT_ON ? "선택 2 · 직접 만들기" : "직접 만들기"}
                   </span>
-                  <span className="shrink-0 rounded-md bg-primary px-3 py-2 text-[13px] font-medium text-primary-on">시작하기</span>
+                  <span className="mt-1.5 block break-keep text-[15px] font-bold leading-[1.45] text-ink">
+                    ✨ 지금 바로 만들 경우, 간단히 정보를 찾아봐 드릴 수 있어요
+                  </span>
+                  <span className="mt-3 flex flex-wrap gap-1.5">
+                    <span className="rounded-pill bg-surface-soft px-2.5 py-1 text-[12px] font-medium text-body">⏱ 3분 소요</span>
+                    <span className="rounded-pill bg-primary-pale px-2.5 py-1 text-[12px] font-medium text-primary-on">빨라요</span>
+                  </span>
+                  <span className="mt-4 flex h-10 items-center justify-center rounded-md bg-primary text-[14px] font-medium text-primary-on sm:mt-auto">
+                    시작하기
+                  </span>
                 </button>
               </div>
               <button
