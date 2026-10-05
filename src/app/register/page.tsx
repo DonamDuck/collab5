@@ -39,14 +39,17 @@ import { StubSection } from "./StubSection";
 /** 자동 만들기는 로컬 시험판(10-03~) — 운영 빌드에선 꺼 둔다. 운영판 = DB 대기열·완성 메일이 붙은 뒤. */
 const AUTO_DRAFT_ON = process.env.NODE_ENV !== "production";
 
-/** 0단계 «어떻게 시작할까요?» 카드 — 호버 연두(대표 10-05).
- *  🔁10-05 2차: 「글과 버튼이 너무 붙어 있다(데스크톱) · 라벨 글자가 너무 작다 · 소요 시간을 칩처럼」 → 여백을 키우고,
- *  «선택 N»과 소요 시간 칩을 한 줄에, 버튼은 카드 바닥에 꽉 차게. */
+/** 0단계 «어떻게 시작할까요?» 줄 — 호버 연두(대표 10-05).
+ *  🎨10-05 디자인팀 검토: 640px 폭에 세 칸이면 칸이 188px라 16px 굵은 문장이 세 줄로 접히고 높이가 들쭉날쭉했다
+ *  → 폰은 쌓고, sm부터 «가로 한 줄» 세 개. 버튼은 셋 다 같은 보조 모양(검정 버튼은 이 사이트 어휘가 아니다)이고
+ *  호버한 줄만 연두가 된다 — 연두 버튼은 한 번에 하나. 「선택 N」은 연두를 쓰지 않는다(연두는 누르는 것의 색).
+ *  칩은 셋 다 «시간»만 말한다(1~2일 · 3분 · 지금 바로). */
 const START_CARD =
-  "group flex flex-col rounded-xl border border-hairline bg-surface p-5 text-left transition-colors hover:border-primary-strong hover:bg-primary-pale";
-const START_BTN = "mt-6 flex h-11 w-full items-center justify-center rounded-md text-[14px] font-medium sm:mt-auto";
-const START_TAG = "text-[14px] font-bold text-primary-on";
-const START_CHIP = "rounded-pill bg-surface-soft px-2.5 py-1 text-[13px] font-medium text-body group-hover:bg-surface";
+  "group flex w-full flex-col rounded-lg border border-hairline bg-surface p-5 text-left transition-colors hover:border-primary-strong hover:bg-primary-pale sm:flex-row sm:items-center sm:gap-5 sm:p-6";
+const START_BTN =
+  "mt-4 flex h-11 w-full items-center justify-center rounded-md border border-border-strong bg-surface text-[15px] font-medium text-ink group-hover:border-primary-strong group-hover:bg-primary group-hover:text-primary-on sm:mt-0 sm:h-10 sm:w-auto sm:shrink-0 sm:px-5";
+const START_TAG = "text-[14px] font-bold text-mute";
+const START_CHIP = "shrink-0 rounded-pill bg-surface-soft px-2.5 py-0.5 text-[13px] font-medium text-mute group-hover:bg-surface";
 
 // 배열 내 순서 이동 (드래그 재정렬용)
 function reorder<T>(arr: T[], from: number, to: number): T[] {
@@ -1337,60 +1340,47 @@ function RegisterForm() {
         // 🧭0단계 — 대표 10-05: *「이름 칸 아래 질문은 스크롤로 훑는 사람 눈에 안 들어오고, 이름 쓰기와 맥락도 안 맞는다」*.
         //   «어떻게 만들지»를 이름보다 먼저, 세 갈래를 한 번에 보여 준다(«필요해요/아니요»를 먼저 묻는 두 단계안은 클릭이 늘어 버렸다).
         //   「직접 쓸게요」도 같은 무게의 버튼으로 세운다 — 회색 글자면 위 둘 중 하나를 꼭 골라야 하는 것처럼 보였다.
-        <section className="mt-8">
+        <section className="mt-10">
           <h2 className="text-[20px] font-bold text-ink">소개서를 어떻게 시작할까요?</h2>
-          <div className={`mt-4 grid gap-3 ${AUTO_DRAFT_ON ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
+          <p className="mt-1 text-[15px] text-mute">세 가지 중 편한 방법을 골라 주세요.</p>
+          <div className="mt-4 flex flex-col gap-3">
             {AUTO_DRAFT_ON && (
-              <button type="button" onClick={() => setAutoDraftOpen(true)} className={START_CARD}>
-                <span className="flex items-center justify-between gap-2">
-                  <span className={START_TAG}>선택 1</span>
-                  <span className={START_CHIP}>⏱ 1~2일 소요</span>
-                </span>
-                <span className="mt-3 block break-keep text-[16px] font-bold leading-[1.45] text-ink">
+            <button type="button" onClick={() => setAutoDraftOpen(true)} className={START_CARD}>
+              <span className="min-w-0 flex-1">
+                <span className={START_TAG}>선택 1</span>
+                <span className="mt-1 flex flex-wrap items-center gap-2 break-keep text-[17px] font-bold leading-[1.4] text-ink">
                   인스타, 블로그 등의 글로 소개서 초안을 만들어 드려요
+                  <span className={START_CHIP}>⏱ 1~2일</span>
                 </span>
-                <span className="mt-1.5 block break-keep text-[14px] leading-[1.55] text-mute sm:mb-6">
-                  그동안 올리신 글과 사진을 읽고 활동과 콜라보까지 채워요
-                </span>
-                <span className={`${START_BTN} bg-ink text-on-dark`}>신청하기</span>
-              </button>
+                <span className="mt-1.5 block break-keep text-[15px] leading-[1.6] text-mute">그동안 올리신 글과 사진을 읽고 활동과 콜라보까지 채워요</span>
+              </span>
+              <span className={START_BTN}>신청하기</span>
+            </button>
             )}
-            <button
-              type="button"
-              onClick={() => {
+            <button type="button" onClick={() => {
                 setQuery("");
                 setWizardOpen(true);
-              }}
-              className={START_CARD}
-            >
-              <span className="flex items-center justify-between gap-2">
-                <span className={START_TAG}>{AUTO_DRAFT_ON ? "선택 2" : "빠르게"}</span>
-                <span className={START_CHIP}>⏱ 3분 소요</span>
+              }} className={START_CARD}>
+              <span className="min-w-0 flex-1">
+                <span className={START_TAG}>{AUTO_DRAFT_ON ? "선택 2" : "선택 1"}</span>
+                <span className="mt-1 flex flex-wrap items-center gap-2 break-keep text-[17px] font-bold leading-[1.4] text-ink">
+                  브랜드 이름으로 정보를 찾아 초안을 채워 드려요
+                  <span className={START_CHIP}>⏱ 3분</span>
+                </span>
+                <span className="mt-1.5 block break-keep text-[15px] leading-[1.6] text-mute">웹에서 찾은 정보로 바로 초안을 받아 다듬어요</span>
               </span>
-              <span className="mt-3 block break-keep text-[16px] font-bold leading-[1.45] text-ink">
-                브랜드 이름으로 정보를 찾아 초안을 채워 드려요
-              </span>
-              <span className="mt-1.5 block break-keep text-[14px] leading-[1.55] text-mute sm:mb-6">
-                웹에서 찾은 정보로 바로 초안을 받아 다듬어요
-              </span>
-              <span className={`${START_BTN} border border-border-strong bg-surface text-ink group-hover:border-primary-strong group-hover:bg-primary group-hover:text-primary-on`}>
-                시작하기
-              </span>
+              <span className={START_BTN}>시작하기</span>
             </button>
             <button type="button" onClick={() => setStartedSelf(true)} className={START_CARD}>
-              <span className="flex items-center justify-between gap-2">
-                <span className={START_TAG}>{AUTO_DRAFT_ON ? "선택 3" : "직접"}</span>
-                <span className={START_CHIP}>✍️ 직접 작성</span>
+              <span className="min-w-0 flex-1">
+                <span className={START_TAG}>{AUTO_DRAFT_ON ? "선택 3" : "선택 2"}</span>
+                <span className="mt-1 flex flex-wrap items-center gap-2 break-keep text-[17px] font-bold leading-[1.4] text-ink">
+                  처음부터 직접 쓸게요
+                  <span className={START_CHIP}>⏱ 지금 바로</span>
+                </span>
+                <span className="mt-1.5 block break-keep text-[15px] leading-[1.6] text-mute">빈 양식에 하나씩 채워 나가요</span>
               </span>
-              <span className="mt-3 block break-keep text-[16px] font-bold leading-[1.45] text-ink">
-                처음부터 직접 쓸게요
-              </span>
-              <span className="mt-1.5 block break-keep text-[14px] leading-[1.55] text-mute sm:mb-6">
-                빈 양식에 하나씩 채워 나가요
-              </span>
-              <span className={`${START_BTN} border border-border-strong bg-surface text-ink group-hover:border-primary-strong group-hover:bg-primary group-hover:text-primary-on`}>
-                바로 쓰기
-              </span>
+              <span className={START_BTN}>바로 쓰기</span>
             </button>
           </div>
         </section>
