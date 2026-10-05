@@ -1445,11 +1445,20 @@ function RegisterForm() {
           {/* 🪄 초안 준비 제안 — 브랜드 이름을 적으면 바로 아래에 뜬다(대표 10-04 QA #18).
               전엔 맨 위에 「자동 만들기」 카드와 「✨ 위저드」 상자가 따로 있어 겹쳐 보였다. 이름을 적는 순간에
               두 길을 한자리에서 고르게 한다. 대신 만들어 달라는 쪽이 더 많을 거라 그쪽을 위에 둔다(대표 판단).
-              ⚠️자동 만들기는 아직 로컬 시험판이라 운영 빌드에선 위저드 줄만 보인다. */}
-          {!editSlug && !enrichment && !draftOfferHidden && name.trim().length >= 2 && (
+              ⚠️자동 만들기는 아직 로컬 시험판이라 운영 빌드에선 위저드 줄만 보인다.
+              🔁10-05 대표 QA: *「자동 만들기 신청 버튼이 안 보인다」* — 이름을 두 글자 넘게 적어야만 떠서, 이름을 쓰기 전엔
+              임시저장 배너만 보였다. 이제 처음부터 보이고, 이름이 있으면 문장에 넣는다. 위저드는 이름이 있어야 돌아서
+              이름이 비었으면 이름 칸으로 보낸다. */}
+          {!editSlug && !enrichment && !draftOfferHidden && (
             <div className="-mt-4 rounded-xl border border-primary bg-primary-pale px-4 py-4">
               <p className="break-keep text-[16px] leading-[1.5] text-ink">
-                <b>{name.trim()}</b>의 소개서 초안 준비를 도와드릴까요?
+                {name.trim() ? (
+                  <>
+                    <b>{name.trim()}</b>의 소개서 초안 준비를 도와드릴까요?
+                  </>
+                ) : (
+                  "소개서 초안 준비를 도와드릴까요?"
+                )}
               </p>
               <div className="mt-3 space-y-2">
                 {AUTO_DRAFT_ON && (
@@ -1470,6 +1479,11 @@ function RegisterForm() {
                 <button
                   type="button"
                   onClick={() => {
+                    if (!name.trim()) {
+                      setErrField({ anchor: "name-field", msg: "브랜드 이름을 먼저 알려주세요." });
+                      document.getElementById("name-field")?.focus();
+                      return;
+                    }
                     setQuery(name.trim());
                     setWizardOpen(true);
                   }}
