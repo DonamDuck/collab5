@@ -1454,11 +1454,12 @@ function RegisterForm() {
             //   연두 큰 상자 + 검정/연두 큰 버튼 → 흰 바탕·얇은 선·작은 글자의 조용한 두 줄로 낮췄다. 주인공은 위의 이름 칸이다.
             //   「편해요/빨라요」 칩은 빼고(대표: 제거), 라벨은 「선택 1 / 선택 2」만. 이름이 비었을 때 빨간 경고를 띄우지 않고
             //   이름 칸으로 커서만 보낸다(대표: 「경고가 먼저 나오는 게 이상하다」).
-            <div className="-mt-4 rounded-lg border border-hairline bg-surface px-4 py-3">
-              <p className="text-[13px] text-mute">
+            // 🔁10-05 3차: 바깥 테두리 없앰 · 질문은 검정 · 안쪽 버튼은 글자 링크 대신 «버튼»으로 — 데스크톱은 문구 아래, 폰은 오른쪽.
+            <div className="-mt-4">
+              <p className="text-[14px] font-medium text-ink">
                 {name.trim() ? (
                   <>
-                    <b className="font-medium text-body">{name.trim()}</b>의 소개서 초안 준비를 도와드릴까요?
+                    <b className="font-bold">{name.trim()}</b>의 소개서 초안 준비를 도와드릴까요?
                   </>
                 ) : (
                   "소개서 초안 준비를 도와드릴까요?"
@@ -1469,16 +1470,16 @@ function RegisterForm() {
                   <button
                     type="button"
                     onClick={() => setAutoDraftOpen(true)}
-                    className="group flex items-start gap-3 rounded-md border border-hairline px-3 py-2.5 text-left hover:border-border-strong"
+                    className="group flex items-center gap-3 rounded-md border border-hairline bg-surface px-3 py-2.5 text-left hover:border-border-strong sm:flex-col sm:items-stretch"
                   >
-                    <span className="min-w-0 flex-1">
+                    <span className="min-w-0 flex-1 sm:flex-none sm:pb-3">
                       <span className="block text-[12px] text-mute">선택 1 · 1~2일 소요</span>
                       <span className="mt-0.5 block break-keep text-[14px] font-medium leading-[1.45] text-ink">
                         인스타, 블로그 등의 글로 소개서 초안을 만들어 드릴 수 있어요
                       </span>
                     </span>
-                    <span className="shrink-0 pt-4 text-[13px] font-medium text-body underline-offset-2 group-hover:underline">
-                      신청하기 →
+                    <span className="inline-flex h-9 shrink-0 items-center justify-center rounded-md bg-ink px-3.5 text-[13px] font-medium text-on-dark sm:mt-auto sm:self-start">
+                      신청하기
                     </span>
                   </button>
                 )}
@@ -1492,16 +1493,16 @@ function RegisterForm() {
                     setQuery(name.trim());
                     setWizardOpen(true);
                   }}
-                  className="group flex items-start gap-3 rounded-md border border-hairline px-3 py-2.5 text-left hover:border-border-strong"
+                  className="group flex items-center gap-3 rounded-md border border-hairline bg-surface px-3 py-2.5 text-left hover:border-border-strong sm:flex-col sm:items-stretch"
                 >
-                  <span className="min-w-0 flex-1">
+                  <span className="min-w-0 flex-1 sm:flex-none sm:pb-3">
                     <span className="block text-[12px] text-mute">{AUTO_DRAFT_ON ? "선택 2 · 3분 소요" : "3분 소요"}</span>
                     <span className="mt-0.5 block break-keep text-[14px] font-medium leading-[1.45] text-ink">
                       지금 바로 만들 경우, 간단히 정보를 찾아봐 드릴 수 있어요
                     </span>
                   </span>
-                  <span className="shrink-0 pt-4 text-[13px] font-medium text-body underline-offset-2 group-hover:underline">
-                    시작하기 →
+                  <span className="inline-flex h-9 shrink-0 items-center justify-center rounded-md border border-border-strong bg-surface px-3.5 text-[13px] font-medium text-ink group-hover:bg-surface-soft sm:mt-auto sm:self-start">
+                    시작하기
                   </span>
                 </button>
               </div>
