@@ -88,3 +88,78 @@ export async function buildLocalDraft(rawId: string): Promise<string> {
   else await repo.createMaker({ slug, ...content, editPasswordHash: sha256(LOCAL_DRAFT_PASSWORD) });
   return slug;
 }
+
+// ── 초안 페이지 상태 (2026-10-06 대표: 「완성형이 아니라 초안 페이지로 주고, 항목마다 질문을 남기고, 사장님이 마지막에 게시하기」) ──
+// 로컬 시험판이라 «초안인지·게시됐는지»는 대기열 파일(publishedAt)이 들고, 질문은 초안 JSON에서 읽는다.
+// 🔜운영판에선 brands에 «초안/게시» 상태 칸과 항목별 메모 칸이 따로 필요하다 — 지금의 searchVisible(콜라보 찾기에 보이기)은
+//   이미 공개한 소개서도 끌 수 있는 값이라 «초안»과 섞으면 안 된다.
+
+export type DraftNotes = { general: string[]; activities: string[][]; collabs: string[][] };
+export type LocalDraftState = { id: string; publishedAt?: string; notes: DraftNotes };
+
+type NoteItem = { title?: string; partner?: string; questions?: string[] };
+
+/** 질문 문장을 항목에 붙인다. 항목별 questions가 있으면 그걸 쓰고(새 초안), 없으면 open_questions를
+ *  «항목 이름이 문장에 그대로 나오는 경우에만» 그 항목에 붙인다(옛 초안). 어디에도 안 맞으면 전체 질문으로 둔다. */
+function attachNotes(acts: NoteItem[], cols: NoteItem[], open: string[]): DraftNotes {
+  const activities = acts.map((a) => [...(a.questions ?? [])]);
+  const collabs = cols.map((c) => [...(c.questions ?? [])]);
+  const general: string[] = [];
+  const key = (s?: string) => (s ?? "").split(/\s*[·(（「」]\s*/)[0].trim();
+  for (const q of open) {
+    // 딱 «한 항목»만 가리킬 때만 그 항목에 붙인다 — 여러 항목을 묶어 묻는 문장은 전체 질문이다(10-06 QA)
+    const ai = acts.flatMap((a, i) => (key(a.title).length >= 3 && q.includes(key(a.title)) ? [i] : []));
+    const ci = cols.flatMap((c, i) => (key(c.partner).length >= 3 && q.includes(key(c.partner)) ? [i] : []));
+    if (ai.length + ci.length !== 1) general.push(q);
+    else if (ci.length) collabs[ci[0]].push(q);
+    else activities[ai[0]].push(q);
+  }
+  return { general, activities, collabs };
+}
+
+/** `/m/draft-XXXX`가 대기열에서 만든 초안이면 그 상태를, 아니면 null. 운영 빌드에선 늘 null. */
+export async function localDraftState(slug: string): Promise<LocalDraftState | null> {
+  if (process.env.NODE_ENV !== "development") return null;
+  const m = /^draft-([0-9a-z]{4})$/.exec(slug);
+  if (!m) return null;
+  const { readdir } = await import("node:fs/promises");
+  let names: string[] = [];
+  try {
+    names = (await readdir(QUEUE_DIR)).filter((n) => n.endsWith(`-${m[1]}.json`));
+  } catch {
+    return null;
+  }
+  for (const n of names) {
+    try {
+      const r = JSON.parse(await readFile(path.join(QUEUE_DIR, n), "utf8"));
+      if (!r.draft) continue;
+      const d = JSON.parse(await readFile(r.draft, "utf8"));
+      return {
+        id: r.id,
+        publishedAt: r.publishedAt,
+        notes: attachNotes(d.activities ?? [], d.collab_history ?? [], Array.isArray(d.open_questions) ? d.open_questions : []),
+      };
+    } catch {}
+  }
+  return null;
+}
+
+/** `/m/draft-XXXX`에 들어왔는데 초안이 메모리에 없으면(서버 재시작·코드 새로 읽기) 대기열에서 다시 만든다.
+ *  🩸10-06 QA: 코드를 고치자 초안 페이지가 404가 됐다 — 메일 링크로 온 사람도 똑같이 겪는다. 운영 빌드에선 아무것도 안 한다. */
+export async function rebuildLocalDraftBySlug(slug: string): Promise<boolean> {
+  if (process.env.NODE_ENV !== "development" || process.env.SUPABASE_URL) return false;
+  const m = /^draft-([0-9a-z]{4})$/.exec(slug);
+  if (!m) return false;
+  const { readdir } = await import("node:fs/promises");
+  try {
+    const name = (await readdir(QUEUE_DIR)).find((n) => n.endsWith(`-${m[1]}.json`));
+    if (!name) return false;
+    const r = JSON.parse(await readFile(path.join(QUEUE_DIR, name), "utf8"));
+    if (!r.draft) return false;
+    await buildLocalDraft(r.id);
+    if (r.publishedAt) await repo.setMakerFlags(slug, { searchVisible: true }); // 게시한 초안은 다시 만들어도 게시 상태로
+    return true;
+  } catch {
+    return false;
+  }
+}

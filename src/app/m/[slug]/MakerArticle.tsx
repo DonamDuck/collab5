@@ -5,11 +5,14 @@ import { MapCard } from "@/components/MapCard";
 import { BrandSummaryCard } from "./BrandSummaryCard";
 import { BlockSections } from "./BlockSections";
 import { RevealList } from "./RevealList";
+import type { DraftNotes } from "@/lib/autoDraftLocal";
 
 // 소개서 본문 — /m 상세와 /preview 데모가 공유하는 단일 렌더.
-export function MakerArticle({ maker, isOwner, logoUrl, readOnly }: {
+export function MakerArticle({ maker, isOwner, logoUrl, readOnly, draftNotes }: {
   maker: Maker; isOwner: boolean; logoUrl?: string;
   readOnly?: boolean; // /preview 데모용 — 남의 예시라 수정 진입점 자체를 숨긴다
+  /** 초안 페이지(자동 만들기, 10-06)일 때만 — 항목마다 collab5가 사장님께 여쭤볼 것. 게시하면 사라진다 */
+  draftNotes?: DraftNotes;
 }) {
   return (
     <>
@@ -96,6 +99,7 @@ export function MakerArticle({ maker, isOwner, logoUrl, readOnly }: {
                   //    (자세히소개·시작이야기·협업/파트너 서술·콜라보 내용)는 전부 갖고 있었고 활동만 빠져 있었다.
                   <p className="mt-1 whitespace-pre-line text-[16px] leading-relaxed text-mute">{a.desc}</p>
                 )}
+                <DraftNote notes={draftNotes?.activities[i]} />
                 {a.photos.length > 0 && (
                   <div className="mt-3 max-w-[460px] print:mx-auto">
                     <PhotoSlider photos={a.photos} sources={maker.photoSources} />
@@ -140,6 +144,7 @@ export function MakerArticle({ maker, isOwner, logoUrl, readOnly }: {
                   )}
                 </div>
                 {h.desc && <p className="mt-0.5 whitespace-pre-line text-[15px] leading-relaxed text-mute">{h.desc}</p>}
+                <DraftNote notes={draftNotes?.collabs[i]} />
                 {h.photos.length > 0 && (
                   <div className="mt-3 max-w-[460px] print:mx-auto">
                     <PhotoSlider photos={h.photos} sources={maker.photoSources} />
@@ -236,6 +241,22 @@ export function MakerArticle({ maker, isOwner, logoUrl, readOnly }: {
 
 // 소개서 섹션 — 편집물처럼 큰 타이틀 + 상단 구분선 + 내용
 // 인쇄: 섹션 통째 개행보호는 긴 섹션이 통째로 밀려 대공백을 만들어 아이템 단위 보호로 대체
+/** 초안 페이지에서만 — collab5가 이 항목에 대해 여쭤볼 것. 인쇄·게시 후엔 안 보인다.
+ *  🎨본문(회색)과 섞이지 않게 옅은 경고색 바탕에, 말투는 «여쭤봐요». 비어 있으면 아무것도 그리지 않는다. */
+function DraftNote({ notes }: { notes?: string[] }) {
+  if (!notes || notes.length === 0) return null;
+  return (
+    <div className="mt-3 rounded-md border border-[#F0D9A8] bg-[#FFF8EA] px-3.5 py-2.5 print:hidden">
+      <p className="text-[13px] font-bold text-[#8A5A0B]">💬 collab5가 여쭤봐요</p>
+      <ul className="mt-1 space-y-1 text-[14px] leading-[1.6] text-body">
+        {notes.map((n, k) => (
+          <li key={k} className="break-keep">{n}</li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="mt-9 border-t border-hairline pt-8">

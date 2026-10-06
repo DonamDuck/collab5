@@ -118,6 +118,12 @@ export async function notifySignup(n: SignupNotice): Promise<boolean> {
  * 가입 알림은 놓쳐도 대표가 DB를 보면 되지만, 이 메일은 고객이 기다리고 있어서 «못 보냈다»가 보여야 한다.
  * ⚠️발신 주소는 NOTIFY_FROM. 비어 있으면 Resend 시험 주소(onboarding@resend.dev)라 Resend 계정 주인에게만 간다.
  */
+/** 고객 안내 메일의 발신·답장 주소 (대표 10-06: 「notice@collab5.co.kr」).
+ *  가입 알림(alert@)과 갈라 둔다 — 고객이 받는 메일에 «alert»가 찍히면 시스템 경고처럼 보인다.
+ *  보내는 주소는 받는 메일함이 없으니, 고객 답장은 DRAFT_MAIL_REPLY_TO(대표 메일)로 받는다. 비어 있으면 NOTIFY_FROM을 쓴다. */
+const DRAFT_FROM = process.env.DRAFT_MAIL_FROM || FROM;
+const DRAFT_REPLY_TO = process.env.DRAFT_MAIL_REPLY_TO || "";
+
 /** 안내 메일 내용(제목·글·HTML). 신청함의 «메일 미리보기»(/dev/auto-draft/mail)도 이걸 그대로 그린다. */
 export function draftReadyMail(n: { brandName: string; url: string }): { subject: string; text: string; html: string } {
   const subject = `[collab5] 「${n.brandName}」 소개서 초안이 준비됐어요`;
@@ -130,7 +136,7 @@ export function draftReadyMail(n: { brandName: string; url: string }): { subject
     n.url,
     ``,
     `그동안 올리신 글과 사진을 읽고 만들었지만, 저희가 잘못 읽은 곳이 있을 수 있어요.`,
-    `신청하신 계정으로 로그인하시면 바로 고칠 수 있어요. 마음에 드시면 공개로 바꿔 주세요. 그때부터 모든 분이 소개서를 볼 수 있어요.`,
+    `항목마다 저희가 여쭤보고 싶은 것을 남겨 두었어요. 신청하신 계정으로 로그인하시면 바로 고칠 수 있고, 맨 아래 「게시하기」를 누르면 그때부터 모든 분이 소개서를 볼 수 있어요.`,
     `초안이 마음에 들지 않으시면 언제든 직접 삭제하실 수도 있어요.`,
     ``,
     `collab5 — 내 이야기로 시작하는 콜라보 공간`,
@@ -139,7 +145,7 @@ export function draftReadyMail(n: { brandName: string; url: string }): { subject
   <p style="margin:0 0 16px">안녕하세요, <strong>collab5</strong>예요.</p>
   <p style="margin:0 0 16px">요청해 주신 <strong>「${esc(n.brandName)}」</strong>의 소개서 초안이 완성됐어요.<br>아직 공개되지 않은 상태라, 지금은 요청하신 분만 볼 수 있어요.</p>
   <p style="margin:0 0 24px"><a href="${esc(n.url)}" style="display:inline-block;padding:12px 20px;border-radius:8px;background:#98ff5c;color:#1f5c00;font-weight:700;text-decoration:none">초안 소개서 보기</a></p>
-  <p style="margin:0 0 8px;color:#444">그동안 올리신 글과 사진을 읽고 만들었지만, 저희가 잘못 읽은 곳이 있을 수 있어요. 신청하신 계정으로 로그인하시면 바로 고칠 수 있어요. 마음에 드시면 공개로 바꿔 주세요. 그때부터 모든 분이 소개서를 볼 수 있어요.</p>
+  <p style="margin:0 0 8px;color:#444">그동안 올리신 글과 사진을 읽고 만들었지만, 저희가 잘못 읽은 곳이 있을 수 있어요. 항목마다 저희가 여쭤보고 싶은 것을 남겨 두었어요. 신청하신 계정으로 로그인하시면 바로 고칠 수 있고, 맨 아래 「게시하기」를 누르면 그때부터 모든 분이 소개서를 볼 수 있어요.</p>
   <p style="margin:0 0 24px;color:#444">초안이 마음에 들지 않으시면 언제든 직접 삭제하실 수도 있어요.</p>
   <p style="margin:0;color:#888;font-size:13px">collab5 — 내 이야기로 시작하는 콜라보 공간</p>
 </div>`;
@@ -160,7 +166,14 @@ export async function notifyDraftReady(n: {
     const res = await fetch(RESEND_ENDPOINT, {
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ from: FROM, to: [n.to], subject, text, html }),
+      body: JSON.stringify({
+        from: DRAFT_FROM,
+        to: [n.to],
+        ...(DRAFT_REPLY_TO ? { reply_to: DRAFT_REPLY_TO } : {}),
+        subject,
+        text,
+        html,
+      }),
       signal: AbortSignal.timeout(8000),
     });
     if (!res.ok) {

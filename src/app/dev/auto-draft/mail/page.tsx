@@ -28,7 +28,7 @@ export default async function MailPreview({ searchParams }: { searchParams: Prom
   return (
     <main className="mx-auto w-full max-w-[720px] px-4 pb-24 pt-8 sm:px-6">
       <h1 className="text-[22px] font-bold text-ink">안내 메일 미리보기</h1>
-      <p className="mt-2 text-[14px] text-mute">받는 사람 {to} · 보내는 사람 {process.env.NOTIFY_FROM || "collab5 <onboarding@resend.dev>"}</p>
+      <p className="mt-2 text-[14px] text-mute">받는 사람 {to} · 보내는 사람 {process.env.DRAFT_MAIL_FROM || process.env.NOTIFY_FROM || "collab5 <onboarding@resend.dev>"}{process.env.DRAFT_MAIL_REPLY_TO ? ` · 답장 받는 곳 ${process.env.DRAFT_MAIL_REPLY_TO}` : ""}</p>
       <p className="mt-1 text-[14px] text-ink">제목: {m.subject}</p>
       <div className="mt-5 rounded-lg border border-hairline bg-white p-6" dangerouslySetInnerHTML={{ __html: m.html }} />
       <details className="mt-5">

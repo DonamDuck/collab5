@@ -199,7 +199,7 @@ export function AutoDraftDialog({ initialName, onClose }: Props) {
               <b className="text-ink">{email.trim()}</b>로 안내해 드릴게요.
             </p>
             <p className="mt-2 break-keep text-[14px] leading-[1.65] text-mute">
-              초안을 받아 보시고, 고칠 곳을 직접 수정한 뒤 공개로 바꾸시면 모든 분이 「{name.trim()}」의 소개서를 볼 수
+              초안을 받아 보시고, 고칠 곳을 고친 뒤 「게시하기」를 누르시면 모든 분이 「{name.trim()}」의 소개서를 볼 수
               있어요.
             </p>
             <button
