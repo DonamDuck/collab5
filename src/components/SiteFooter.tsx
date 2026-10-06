@@ -53,6 +53,10 @@ export function SiteFooter() {
             <Link href="/privacy" className="inline-flex items-center py-[12px] font-medium hover:text-ink">
               개인정보처리방침
             </Link>
+            {/* 사적인 프로젝트(10-06) — 헤더 링크가 데스크톱 전용이라 모바일 진입로는 여기다. 서비스 링크 뒤 맨 끝에 둔다. */}
+            <Link href="/side" className="inline-flex items-center py-[12px] hover:text-ink">
+              사적인 프로젝트
+            </Link>
           </nav>
         </div>
 
