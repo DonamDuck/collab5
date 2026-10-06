@@ -195,7 +195,7 @@ export function AutoDraftDialog({ initialName, onClose }: Props) {
               요청이 접수됐어요.
             </p>
             <p className="mt-3 break-keep text-[15px] leading-[1.7] text-body">
-              지금 대기 {done.position}번째예요. 하루 {DAILY_CAP}팀씩 순서대로 제작되고 있어서, {done.etaDays}일 정도 뒤에{" "}
+              지금 대기 {done.position}번째예요. 하루 {DAILY_CAP}팀씩 순서대로 제작되고 있어서, {done.etaDays}~{done.etaDays + 1}일 안에{" "}
               <b className="text-ink">{email.trim()}</b>로 안내해 드릴게요.
             </p>
             <p className="mt-2 break-keep text-[14px] leading-[1.65] text-mute">
@@ -217,7 +217,7 @@ export function AutoDraftDialog({ initialName, onClose }: Props) {
                 소개서 사전 정보 입력
               </p>
               <p className="mt-1.5 break-keep text-[14px] leading-[1.65] text-mute">
-                그동안 업로드하셨던 글과 사진을 읽고, 브랜드 소개서 초안을 만들어 드릴게요.
+                그동안 올리신 글과 사진을 읽고, 브랜드 소개서 초안을 만들어 드릴게요.
               </p>
             </div>
 
@@ -225,7 +225,7 @@ export function AutoDraftDialog({ initialName, onClose }: Props) {
             <section className="space-y-2">
               <p className="text-[14px] font-bold text-ink">브랜드</p>
               <input value={name} onChange={(e) => setName(e.target.value)} placeholder="브랜드 이름" className={input} />
-              <div className="flex gap-2">
+              <div className="flex flex-col gap-2 sm:flex-row">
                 <input value={region} onChange={(e) => setRegion(e.target.value)} placeholder="지역 (예: 서울 마포)" className={input} />
                 <input value={btype} onChange={(e) => setBtype(e.target.value)} placeholder="하는 일 (예: 빵집)" className={input} />
               </div>
@@ -335,11 +335,14 @@ export function AutoDraftDialog({ initialName, onClose }: Props) {
                         placeholder="https://"
                         className={input}
                       />
-                      <span
-                        className={`w-[72px] shrink-0 text-center text-[12px] ${c ? "font-medium text-primary-strong" : "text-faint"}`}
-                      >
-                        {c ? CHANNEL_LABEL[c.kind] : r.trim() ? "확인 필요" : ""}
-                      </span>
+                      {/* 종류 표시는 «적었을 때만» 자리를 차지한다 — 빈 칸에 72px 빈자리가 남아 입력칸이 덜 자라 보였다(10-06 QA) */}
+                      {r.trim() && (
+                        <span
+                          className={`w-[72px] shrink-0 text-center text-[12px] ${c ? "font-medium text-primary-strong" : "text-faint"}`}
+                        >
+                          {c ? CHANNEL_LABEL[c.kind] : "확인 필요"}
+                        </span>
+                      )}
                       <button
                         type="button"
                         onClick={() => setUrlRows((p) => (p.length <= 1 ? [""] : p.filter((_, j) => j !== i)))}
@@ -359,7 +362,7 @@ export function AutoDraftDialog({ initialName, onClose }: Props) {
 
             {/* 3. 안내 이메일 — 계정 이메일로 미리 채운다 */}
             <section className="space-y-2">
-              <p className="text-[14px] font-bold text-ink">초안 완성 후, 안내 받을 이메일</p>
+              <p className="text-[14px] font-bold text-ink">초안이 완성되면 안내받을 이메일</p>
               <input
                 type="email"
                 value={email}
@@ -404,7 +407,7 @@ export function AutoDraftDialog({ initialName, onClose }: Props) {
             <div>
               <p className="break-keep text-[13px] leading-[1.6] text-mute">
                 하루 {DAILY_CAP}팀까지 순서대로 제작되고 있어요.
-                {waiting !== null && ` 신청 후 ${etaDays(nextPos)}일 정도 걸릴 수 있고,`} 완성되면 이메일로 안내해 드릴게요.
+                {waiting !== null && ` 지금 신청하시면 ${etaDays(nextPos)}~${etaDays(nextPos) + 1}일쯤 걸리고,`} 완성되면 이메일로 안내해 드릴게요.
               </p>
               {err && <p className="mt-2 text-[13px] text-danger">{err}</p>}
               <button

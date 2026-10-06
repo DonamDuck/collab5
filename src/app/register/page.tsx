@@ -1333,7 +1333,7 @@ function RegisterForm() {
         브랜드 소개서, 생각보다 금방 완성돼요.
       </h1>
       <p className="mt-2 text-[17px] leading-relaxed text-body">
-        브랜드 이름 입력하면 AI가 소개서 초안을 준비해드려요. 확인하고 다듬으면 1~3분 안에 완성할 수 있어요.
+        그동안 해온 활동을 한 페이지로 정리해요. 맡기셔도 되고, 직접 쓰셔도 돼요.
       </p>
 
         </>
@@ -1345,16 +1345,15 @@ function RegisterForm() {
         //   「직접 쓸게요」도 같은 무게의 버튼으로 세운다 — 회색 글자면 위 둘 중 하나를 꼭 골라야 하는 것처럼 보였다.
         <section className="mt-10">
           <h2 className="text-[20px] font-bold text-ink">소개서를 어떻게 시작할까요?</h2>
-          <p className="mt-1 text-[15px] text-mute">세 가지 중 편한 방법을 골라 주세요.</p>
           <div className="mt-4 flex flex-col gap-3">
             {AUTO_DRAFT_ON && (
             <button type="button" onClick={() => setAutoDraftOpen(true)} className={START_CARD}>
               <span className="min-w-0 flex-1">
-                <span className={START_TAG}>선택 1</span>
-                <span className="mt-1 flex flex-wrap items-center gap-2 break-keep text-[17px] font-bold leading-[1.4] text-ink">
-                  인스타, 블로그 등의 글로 소개서 초안을 만들어 드려요
+                <span className="flex flex-wrap items-center gap-1.5">
+                  <span className={START_TAG}>선택 1</span>
                   <span className={START_CHIP}>⏱ 1~2일</span>
                 </span>
+                <span className="mt-2 block break-keep text-[17px] font-bold leading-[1.4] text-ink">인스타, 블로그 등의 글로 소개서 초안을 만들어 드려요</span>
                 <span className="mt-1.5 block break-keep text-[15px] leading-[1.6] text-mute">그동안 올리신 글과 사진을 읽고 활동과 콜라보까지 채워요</span>
               </span>
               <span className={START_BTN}>신청하기</span>
@@ -1365,22 +1364,22 @@ function RegisterForm() {
                 setWizardOpen(true);
               }} className={START_CARD}>
               <span className="min-w-0 flex-1">
-                <span className={START_TAG}>{AUTO_DRAFT_ON ? "선택 2" : "선택 1"}</span>
-                <span className="mt-1 flex flex-wrap items-center gap-2 break-keep text-[17px] font-bold leading-[1.4] text-ink">
-                  브랜드 이름으로 정보를 찾아 초안을 채워 드려요
+                <span className="flex flex-wrap items-center gap-1.5">
+                  <span className={START_TAG}>{AUTO_DRAFT_ON ? "선택 2" : "선택 1"}</span>
                   <span className={START_CHIP}>⏱ 3분</span>
                 </span>
+                <span className="mt-2 block break-keep text-[17px] font-bold leading-[1.4] text-ink">브랜드 이름으로 정보를 찾아 초안을 채워 드려요</span>
                 <span className="mt-1.5 block break-keep text-[15px] leading-[1.6] text-mute">웹에서 찾은 정보로 바로 초안을 받아 다듬어요</span>
               </span>
               <span className={START_BTN}>시작하기</span>
             </button>
             <button type="button" onClick={() => setStartedSelf(true)} className={START_CARD}>
               <span className="min-w-0 flex-1">
-                <span className={START_TAG}>{AUTO_DRAFT_ON ? "선택 3" : "선택 2"}</span>
-                <span className="mt-1 flex flex-wrap items-center gap-2 break-keep text-[17px] font-bold leading-[1.4] text-ink">
-                  처음부터 직접 쓸게요
+                <span className="flex flex-wrap items-center gap-1.5">
+                  <span className={START_TAG}>{AUTO_DRAFT_ON ? "선택 3" : "선택 2"}</span>
                   <span className={START_CHIP}>⏱ 지금 바로</span>
                 </span>
+                <span className="mt-2 block break-keep text-[17px] font-bold leading-[1.4] text-ink">처음부터 직접 쓸게요</span>
                 <span className="mt-1.5 block break-keep text-[15px] leading-[1.6] text-mute">빈 양식에 하나씩 채워 나가요</span>
               </span>
               <span className={START_BTN}>바로 쓰기</span>

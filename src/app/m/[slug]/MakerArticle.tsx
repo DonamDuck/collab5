@@ -25,7 +25,7 @@ export function MakerArticle({ maker, isOwner, logoUrl, readOnly }: {
 
       {/* ① 우리는 이런 브랜드에요 — 자세히 소개 */}
       {maker.description && (
-        <Section title="우리는 이런 브랜드에요">
+        <Section title="우리는 이런 브랜드예요">
           <p className="whitespace-pre-line text-[17px] leading-relaxed text-body">
             {maker.description}
           </p>
@@ -182,7 +182,7 @@ export function MakerArticle({ maker, isOwner, logoUrl, readOnly }: {
 
       {/* ⑧ 우리를 표현하는 키워드에요 — values */}
       {maker.keywords.length > 0 && (
-        <Section title="우리를 표현하는 키워드에요">
+        <Section title="우리를 표현하는 키워드예요">
           <div className="flex flex-wrap gap-2">
             {maker.keywords.map((v) => (
               <span

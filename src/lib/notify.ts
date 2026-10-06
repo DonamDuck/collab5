@@ -130,7 +130,7 @@ export function draftReadyMail(n: { brandName: string; url: string }): { subject
     n.url,
     ``,
     `그동안 올리신 글과 사진을 읽고 만들었지만, 저희가 잘못 읽은 곳이 있을 수 있어요.`,
-    `고칠 곳은 직접 수정하시고, 마음에 드시면 공개로 바꿔 주세요. 그때부터 모든 분이 소개서를 볼 수 있어요.`,
+    `신청하신 계정으로 로그인하시면 바로 고칠 수 있어요. 마음에 드시면 공개로 바꿔 주세요. 그때부터 모든 분이 소개서를 볼 수 있어요.`,
     `초안이 마음에 들지 않으시면 언제든 직접 삭제하실 수도 있어요.`,
     ``,
     `collab5 — 내 이야기로 시작하는 콜라보 공간`,
@@ -139,7 +139,7 @@ export function draftReadyMail(n: { brandName: string; url: string }): { subject
   <p style="margin:0 0 16px">안녕하세요, <strong>collab5</strong>예요.</p>
   <p style="margin:0 0 16px">요청해 주신 <strong>「${esc(n.brandName)}」</strong>의 소개서 초안이 완성됐어요.<br>아직 공개되지 않은 상태라, 지금은 요청하신 분만 볼 수 있어요.</p>
   <p style="margin:0 0 24px"><a href="${esc(n.url)}" style="display:inline-block;padding:12px 20px;border-radius:8px;background:#98ff5c;color:#1f5c00;font-weight:700;text-decoration:none">초안 소개서 보기</a></p>
-  <p style="margin:0 0 8px;color:#444">그동안 올리신 글과 사진을 읽고 만들었지만, 저희가 잘못 읽은 곳이 있을 수 있어요. 고칠 곳은 직접 수정하시고, 마음에 드시면 공개로 바꿔 주세요. 그때부터 모든 분이 소개서를 볼 수 있어요.</p>
+  <p style="margin:0 0 8px;color:#444">그동안 올리신 글과 사진을 읽고 만들었지만, 저희가 잘못 읽은 곳이 있을 수 있어요. 신청하신 계정으로 로그인하시면 바로 고칠 수 있어요. 마음에 드시면 공개로 바꿔 주세요. 그때부터 모든 분이 소개서를 볼 수 있어요.</p>
   <p style="margin:0 0 24px;color:#444">초안이 마음에 들지 않으시면 언제든 직접 삭제하실 수도 있어요.</p>
   <p style="margin:0;color:#888;font-size:13px">collab5 — 내 이야기로 시작하는 콜라보 공간</p>
 </div>`;
