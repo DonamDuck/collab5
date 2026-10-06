@@ -1,8 +1,9 @@
 "use client";
 
 // 헤더의 이동 링크 — 경로에 따라 무엇을 보일지가 갈린다.
-//   · 홈 밖  : 매거진 + 콜라보 찾기(칩)  ← 전역 보조 내비
-//   · 홈     : **매거진만**              ← 08-16 대표 지시
+//   · 홈 밖  : 매거진 + 사적인 프로젝트 + 콜라보 찾기(칩)  ← 전역 보조 내비
+//   · 홈     : **매거진 + 사적인 프로젝트**                ← 08-16 대표 지시, 10-06 하나 더함
+//   (매거진·사적인 프로젝트는 데스크톱에서만 보인다)
 //
 // 🔻이력 — 08-14엔 홈에서 **통째로 숨겼다**(HomeMenuBar가 같은 두 링크를 들고 있어 중복이라서).
 //   08-16에 대표가 메뉴바를 2칸(콜라보 찾기 · 아이디어 추천)으로 줄이면서 매거진이 갈 곳이 없어졌고,
@@ -38,6 +39,16 @@ export function HeaderNavLinks() {
         className="hidden h-[44px] shrink-0 items-center whitespace-nowrap rounded-md px-3 font-medium text-mute transition-colors hover:text-ink sm:flex"
       >
         콜라보 매거진
+      </Link>
+      {/* 사적인 프로젝트(10-06 대표) — 대표가 따로 만든 개인 도구 모음(/side). 서비스 메뉴가 아니라서
+          매거진보다 한 단 낮춘다(font-medium 없음). 🚨매거진과 같은 이유로 **데스크톱 전용**(`hidden sm:flex`).
+          모바일 진입은 풋터 링크가 맡는다. 640px에서 로고+매거진+이것+검색칩+로그인이 한 줄에 들어가는지
+          폭을 다시 잰 뒤에 무언가를 더 얹을 것. */}
+      <Link
+        href="/side"
+        className="hidden h-[44px] shrink-0 items-center whitespace-nowrap rounded-md px-3 text-mute transition-colors hover:text-ink sm:flex"
+      >
+        사적인 프로젝트
       </Link>
       {/* 📏 둘 다 **h-[44px]** — 터치 타깃 권장치(08-15 디자인팀).
           🪤`py-1.5`는 33.75px, `h-9`는 38.25px였다. 루트가 17px이라 rem 유틸이 6.25%씩 크지만
