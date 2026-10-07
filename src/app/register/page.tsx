@@ -1380,7 +1380,7 @@ function RegisterForm() {
                   <span className={START_CHIP}>⏱ 지금 바로</span>
                 </span>
                 <span className="mt-2 block break-keep text-[17px] font-bold leading-[1.4] text-ink">처음부터 직접 쓸게요</span>
-                <span className="mt-1.5 block break-keep text-[15px] leading-[1.6] text-mute">빈 양식에 원하는 항목을 직접 추가해 직접 만들어주세요.</span>
+                <span className="mt-1.5 block break-keep text-[15px] leading-[1.6] text-mute">빈 양식에 원하는 항목을 추가해 직접 만들어주세요.</span>
               </span>
               <span className={START_BTN}>바로 쓰기</span>
             </button>
