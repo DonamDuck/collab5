@@ -27,18 +27,18 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${SITE_URL}/terms`, changeFrequency: "yearly", priority: 0.2 },
     { url: `${SITE_URL}/privacy`, changeFrequency: "yearly", priority: 0.2 },
     // 사적인 프로젝트(10-06) — 대표 개인 도구. MonitorAlign은 한·영 두 판이 서로를 hreflang으로 가리킨다.
-    { url: `${SITE_URL}/side`, changeFrequency: "monthly", priority: 0.3 },
+    { url: `${SITE_URL}/sideproject`, changeFrequency: "monthly", priority: 0.3 },
     {
-      url: `${SITE_URL}/side/monitoralign`,
+      url: `${SITE_URL}/sideproject/monitoralign`,
       changeFrequency: "monthly",
       priority: 0.5,
-      alternates: { languages: { ko: `${SITE_URL}/side/monitoralign`, en: `${SITE_URL}/side/monitoralign/en` } },
+      alternates: { languages: { ko: `${SITE_URL}/sideproject/monitoralign`, en: `${SITE_URL}/sideproject/monitoralign/en` } },
     },
     {
-      url: `${SITE_URL}/side/monitoralign/en`,
+      url: `${SITE_URL}/sideproject/monitoralign/en`,
       changeFrequency: "monthly",
       priority: 0.5,
-      alternates: { languages: { ko: `${SITE_URL}/side/monitoralign`, en: `${SITE_URL}/side/monitoralign/en` } },
+      alternates: { languages: { ko: `${SITE_URL}/sideproject/monitoralign`, en: `${SITE_URL}/sideproject/monitoralign/en` } },
     },
   ];
 
