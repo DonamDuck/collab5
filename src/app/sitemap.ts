@@ -26,6 +26,20 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${SITE_URL}/magazine`, changeFrequency: "weekly", priority: 0.7 },
     { url: `${SITE_URL}/terms`, changeFrequency: "yearly", priority: 0.2 },
     { url: `${SITE_URL}/privacy`, changeFrequency: "yearly", priority: 0.2 },
+    // 사적인 프로젝트(10-06) — 대표 개인 도구. MonitorAlign은 한·영 두 판이 서로를 hreflang으로 가리킨다.
+    { url: `${SITE_URL}/side`, changeFrequency: "monthly", priority: 0.3 },
+    {
+      url: `${SITE_URL}/side/monitoralign`,
+      changeFrequency: "monthly",
+      priority: 0.5,
+      alternates: { languages: { ko: `${SITE_URL}/side/monitoralign`, en: `${SITE_URL}/side/monitoralign/en` } },
+    },
+    {
+      url: `${SITE_URL}/side/monitoralign/en`,
+      changeFrequency: "monthly",
+      priority: 0.5,
+      alternates: { languages: { ko: `${SITE_URL}/side/monitoralign`, en: `${SITE_URL}/side/monitoralign/en` } },
+    },
   ];
 
   // 매거진 — **발행분만**(초안은 공개 상세가 404라 넣으면 크롤러에게 죽은 주소를 주는 꼴).
