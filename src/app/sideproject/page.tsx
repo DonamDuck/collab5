@@ -9,7 +9,7 @@ export const metadata: Metadata = {
   title: "콜랩5의 굉장히 사적인 프로젝트 — collab5",
   description: "콜랩5를 만드는 메이커들의 굉장히 사적인 니즈를 반영하여 구성하고 있는 개발 공간입니다.",
   // ⚠️필수 — 루트 layout의 `canonical: "/"`가 자식 페이지에 그대로 상속된다.
-  alternates: { canonical: "/side" },
+  alternates: { canonical: "/sideproject" },
 };
 
 export default function SideIndexPage() {
@@ -24,7 +24,7 @@ export default function SideIndexPage() {
         {SIDE_PROJECTS.map((p) => (
           <li key={p.slug}>
             <Link
-              href={`/side/${p.slug}`}
+              href={`/sideproject/${p.slug}`}
               className="flex items-center gap-4 rounded-lg border border-hairline bg-surface p-4 transition-colors hover:bg-surface-faint"
             >
               {/* 아이콘 파일이 자체 라운드(맥 앱 아이콘 모양)와 투명 여백을 갖고 있어 여기서 더 깎지 않는다. */}

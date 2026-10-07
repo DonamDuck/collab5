@@ -1,4 +1,4 @@
-// MonitorAlign 상세 — 한국어(/side/monitoralign)와 영어(/side/monitoralign/en)가 같은 틀을 쓴다.
+// MonitorAlign 상세 — 한국어(/sideproject/monitoralign)와 영어(/sideproject/monitoralign/en)가 같은 틀을 쓴다.
 // 문안은 아래 COPY에 언어별로 있다. 영어는 직역이 아니라 영어권 독자에게 맞게 따로 썼다.
 //
 // ⭐내려받기 주소·버전은 version.json 한 파일에서 온다(빌드 때 읽힌다). 앱 업데이터도 같은 파일을 읽으므로
@@ -8,7 +8,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import type { ReactNode } from "react";
-import release from "../../../../public/side/monitoralign/version.json";
+import release from "../../../../public/sideproject/monitoralign/version.json";
 import { getSideProject, type SupportLink } from "../projects";
 import { DownloadButtons, type DownloadItem } from "./DownloadButtons";
 import { HtmlLang } from "./HtmlLang";
@@ -17,8 +17,8 @@ import { StepFigure, WhyFigure } from "./Illustrations";
 export type Lang = "ko" | "en";
 
 const NAME = "MonitorAlign";
-const ICON = "/side/monitoralign/icon.png";
-const PATH: Record<Lang, string> = { ko: "/side/monitoralign", en: "/side/monitoralign/en" };
+const ICON = "/sideproject/monitoralign/icon.png";
+const PATH: Record<Lang, string> = { ko: "/sideproject/monitoralign", en: "/sideproject/monitoralign/en" };
 
 // ── 작은 표시 조각 ─────────────────────────────────────────
 // 단축키·메뉴 이름. 화면 속 글자를 그대로 옮긴 것이라 따옴표 대신 칩·굵은 글씨로 구분한다.
@@ -261,13 +261,13 @@ export function monitorAlignMetadata(lang: Lang): Metadata {
       url: PATH[lang],
       title: c.ogTitle,
       description: c.description,
-      images: [{ url: `/side/monitoralign/og-${lang}.png`, width: 1200, height: 630, alt: c.ogTitle }],
+      images: [{ url: `/sideproject/monitoralign/og-${lang}.png`, width: 1200, height: 630, alt: c.ogTitle }],
     },
     twitter: {
       card: "summary_large_image",
       title: c.ogTitle,
       description: c.description,
-      images: [`/side/monitoralign/og-${lang}.png`],
+      images: [`/sideproject/monitoralign/og-${lang}.png`],
     },
   };
 }
@@ -315,7 +315,7 @@ export function MonitorAlignView({ lang }: { lang: Lang }) {
 
       <div className="flex items-center justify-between gap-3">
         <Link
-          href="/side"
+          href="/sideproject"
           className="-ml-2 inline-flex h-[44px] items-center gap-1 rounded-md px-2 text-[14px] text-mute hover:text-ink"
         >
           <svg aria-hidden="true" viewBox="0 0 20 20" className="size-[16px]" fill="none" stroke="currentColor" strokeWidth="1.9">

@@ -40,12 +40,12 @@ export function HeaderNavLinks() {
       >
         콜라보 매거진
       </Link>
-      {/* 사적인 프로젝트(10-06 대표) — 대표가 따로 만든 개인 도구 모음(/side). 서비스 메뉴가 아니라서
+      {/* 사적인 프로젝트(10-06 대표) — 대표가 따로 만든 개인 도구 모음(/sideproject). 서비스 메뉴가 아니라서
           매거진보다 한 단 낮춘다(font-medium 없음). 🚨매거진과 같은 이유로 **데스크톱 전용**(`hidden sm:flex`).
           모바일 진입은 풋터 링크가 맡는다. 640px에서 로고+매거진+이것+검색칩+로그인이 한 줄에 들어가는지
           폭을 다시 잰 뒤에 무언가를 더 얹을 것. */}
       <Link
-        href="/side"
+        href="/sideproject"
         className="hidden h-[44px] shrink-0 items-center whitespace-nowrap rounded-md px-3 text-mute transition-colors hover:text-ink sm:flex"
       >
         사적인 프로젝트

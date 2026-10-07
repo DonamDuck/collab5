@@ -29,7 +29,7 @@ export const SIDE_PROJECTS: SideProject[] = [
     name: "MonitorAlign",
     tagline: "여러 모니터를 사용할 때 클릭 두 번으로 모니터 정렬을 맞출 수 있어요.",
     meta: "macOS · Windows · 무료",
-    icon: "/side/monitoralign/icon-256.png",
+    icon: "/sideproject/monitoralign/icon-256.png",
     support: {
       ko: [{ label: "토스로 응원하기", url: "" }],
       en: [

@@ -1,11 +1,11 @@
 # MonitorAlign 공유 카드(OG) 1200x630 두 장(ko/en)을 굽는다.
-# 실행: python3 assets/side/build-monitoralign-og.py  (레포 루트에서)
+# 실행: python3 assets/sideproject/build-monitoralign-og.py  (레포 루트에서)
 # 폰트 = 사이트와 같은 Pretendard(~/Library/Fonts). 없으면 AppleSDGothicNeo로 대체.
 import os
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-OUT = os.path.join(ROOT, "public/side/monitoralign")
+OUT = os.path.join(ROOT, "public/sideproject/monitoralign")
 W, H = 1200, 630
 
 def font(weight, size):
