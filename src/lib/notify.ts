@@ -166,7 +166,7 @@ export function draftRequestedMail(n: {
   dailyCap: number;
   channels: string[];
 }): { subject: string; text: string; html: string } {
-  const subject = `[collab5] 「${n.brandName}」 소개서 초안 요청을 받았어요`;
+  const subject = `[collab5] 「${n.brandName}」 소개서 초안 신청이 완료됐어요`;
   const when = `${n.etaDays}~${n.etaDays + 1}일`;
   const canReply = !!DRAFT_REPLY_TO;
   const text = [
