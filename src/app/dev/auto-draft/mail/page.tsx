@@ -33,7 +33,7 @@ export default async function MailPreview({ searchParams }: { searchParams: Prom
       when: `① 신청하면 바로${DRAFT_COPY_TO ? ` · 사본(숨은 참조) ${DRAFT_COPY_TO}` : ""}`,
       m: draftRequestedMail({
         brandName,
-        position: 1,
+        position: null, // 운영 신청 모양(대기 순번 없음). 로컬 신청만 순번이 붙는다
         etaDays: 1,
         dailyCap: DAILY_CAP,
         channels: channels.map((c) => `${CHANNEL_LABEL[c.kind]} ${c.url.replace(/^https:\/\//, "")}`),
@@ -56,7 +56,7 @@ export default async function MailPreview({ searchParams }: { searchParams: Prom
           </details>
         </section>
       ))}
-      <p className="mt-6 text-[13px] text-faint">① 메일의 대기 순번·기간은 예시 값이에요. 실제 메일엔 신청 순간의 값이 들어가요.</p>
+      <p className="mt-6 text-[13px] text-faint">① 메일은 운영 신청 모양이에요(대기 순번 없이 「1~2일쯤」). 로컬에서 신청하면 순번이 붙어요.</p>
     </main>
   );
 }
