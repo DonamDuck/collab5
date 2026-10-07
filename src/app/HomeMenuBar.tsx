@@ -25,7 +25,6 @@
 //    🔻~~세 번째 칸을 소개서 유무로 갈라 라벨을 바꾸던 로직~~은 08-16에 삭제됐고, 그 칸 자체가 08-17에 없어졌다.
 import Link from "next/link";
 import { track } from "@/lib/track";
-import { IDEA_CTA_ANCHOR } from "./HomeIdeaCta";
 
 // 두 칸 공통. 활성/비활성 구분이 없으므로 상태 클래스도 없다(위 ⚠️ 포커싱 항목 참조).
 // 🔤 크기 — 대표 지적 08-14 *"메뉴 치고 폰트가 너무 작다"*. 13/14 → **양쪽 다 15**(디자인팀 확정).
@@ -67,32 +66,8 @@ export function HomeMenuBar() {
   // 🔻08-16 `hasBrand` 조회 **삭제**(3번칸이 소개서 유무로 갈리지 않게 되면서). 그 칸은 08-17에
   //    아예 없어졌다. 방문마다 돌던 세션 쿼리가 하나 줄어 있는 상태다 — 되살리지 마라.
 
-  // 앵커 이동 — 오프셋은 CSS(`scroll-mt-[152px]`)가 정본이라 scrollIntoView가 그대로 존중한다.
-  // JS에서 좌표를 다시 계산하면 값이 두 군데로 갈라진다.
-  //
-  // 🪤**08-16 버그 수정 — `behavior:"smooth"`가 먼 거리에서 죽는다.**
-  //    대표 제보 *"콜라보 아이디어 만들기 누르면 앵커가 제대로 동작 안 해"*.
-  //    실측: 목표가 3739px 아래일 때 `smooth`는 **scrollY가 0에서 꿈쩍도 안 했고**, 같은 요소에
-  //    `auto`를 주면 3579.5px로 정확히 갔다.
-  //    ⭐원인 — 홈은 브랜드 카드·리포트 이미지가 lazy 로드되며 **문서 높이가 계속 변한다.**
-  //      smooth 스크롤은 애니메이션 도중 레이아웃이 바뀌면 브라우저가 조용히 취소한다.
-  //      거리가 멀수록(=시간이 길수록) 그 사이에 이미지가 뜰 확률이 커진다.
-  //    👉그래서 **먼 거리는 즉시 점프**한다. 어차피 4천 px을 부드럽게 흘려보내는 건 몇 초짜리라
-  //      UX로도 나쁘다 — 짧은 거리에서만 smooth가 의미 있다.
-  const goAnchor = (id: string, event: string) => (e: React.MouseEvent<HTMLAnchorElement>) => {
-    const el = document.getElementById(id);
-    if (!el) return; // 못 찾으면 네이티브 해시 점프에 맡긴다
-    e.preventDefault();
-    track(event);
-    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    // 화면 두 개 분량(2×innerHeight)을 넘으면 smooth를 포기한다. 그 이하면 부드럽게.
-    const far = Math.abs(el.getBoundingClientRect().top) > window.innerHeight * 2;
-    // 🎯`block:"start"` — 목적지가 **섹션 제목**이라(08-16 대표 지시로 CTA 버튼에서 옮김)
-    //    위에 붙여야 제목부터 읽힌다. 오프셋은 그 섹션의 `scroll-mt-[152px]`가 알아서 준다.
-    //    ⚠️`"center"`로 두면 제목이 화면 한가운데 떠서 위쪽에 이전 섹션 꼬리가 크게 남는다.
-    el.scrollIntoView({ behavior: reduce || far ? "auto" : "smooth", block: "start" });
-  };
-  const goIdea = goAnchor(IDEA_CTA_ANCHOR, "home_menubar_idea_click");
+  // 🔻10-05 앵커 점프(goAnchor)는 2번칸이 /register 링크가 되면서 쓰는 곳이 없어 지웠다.
+  //    먼 거리 smooth 스크롤이 죽는 함정(08-16)은 git 기록에 있다 — 앵커 칸을 다시 넣을 땐 그 기록부터 볼 것.
 
   return (
     // 🎈**플로팅**(대표 확정 08-14) — 알약만 콘텐츠 **위에** 뜨고, 알약이 덮지 않는 좌우로는
@@ -174,9 +149,12 @@ export function HomeMenuBar() {
               · 옛 「콜라보 아이디어 분석」 124.0
               · **새 「콜라보 그려보기」     94.4** ← 지금 이것 (**−29.6px**, 말이 짧아져 더 안전해졌다)
               🖥그래서 **알약 전체를 다시 쟀다**: 320px 화면에서 **233px**(여유 87px) · 한 줄 · 가로 스크롤 없음. */}
-        <a href={`#${IDEA_CTA_ANCHOR}`} onClick={goIdea} className={ITEM}>
-          콜라보 그려보기
-        </a>
+        {/* ✏️10-05 대표 지시(로컬 코멘트) — 「콜라보 그려보기」 → **「내 소개서 제작」**, 앵커 대신 /register로 바로 간다.
+            소개서 자동 만들기(로컬 시험판)를 붙이면서 홈에서 소개서 만들기로 가는 문을 메뉴에 다시 연다.
+            📏라벨이 한 글자 짧아져(8자 → 7자) 폭은 안전한 방향이다. 콜라보 그려보기의 진입로는 홈 ③구좌 버튼이 남아 있다. */}
+        <Link href="/register" onClick={() => track("home_menubar_register_click")} className={ITEM}>
+          내 소개서 제작
+        </Link>
         {/* 🔻08-17 대표 지시 — 3번칸 **「소개서 등록」 삭제**(2칸으로 복귀).
             ⭐**칸 수와 라벨 길이는 한 쌍**이라는 이 파일의 규칙이 또 한 번 확인됐다. 08-16에
               3칸이 되며 2번칸을 「콜라보 아이디어 찾기」→「아이디어 추천」으로 깎았는데,

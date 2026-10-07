@@ -9,6 +9,8 @@ import { isMyBrandEditedSince, isReportCacheFresh } from "@/lib/collab-report";
 import { makerJsonLd, jsonLdString } from "@/lib/jsonld";
 import { OG_IMAGE } from "@/lib/site";
 import { MakerArticle } from "./MakerArticle";
+import { localDraftState, rebuildLocalDraftBySlug } from "@/lib/autoDraftLocal";
+import { publishDraftAction } from "./draftActions";
 import { ConnectProfileButton } from "./ConnectProfileButton";
 import { MakerActionBar } from "./MakerActionBar";
 import { EnrichBanner, type BannerVariant } from "./EnrichBanner";
@@ -110,7 +112,7 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const { slug } = await params;
-  const maker = await repo.getMakerBySlug(slug);
+  const maker = (await repo.getMakerBySlug(slug)) ?? ((await rebuildLocalDraftBySlug(slug)) ? await repo.getMakerBySlug(slug) : null);
   if (!maker) return { title: "소개서를 찾을 수 없어요 — collab5" };
 
   // 썸네일 — 지금까지는 og:image가 없어 카톡이 본문에서 아무 이미지나 주워왔다. 그걸 우리가 정한다.
@@ -157,7 +159,7 @@ export default async function MakerPage({
   searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ banner?: string; film?: string }>;
+  searchParams: Promise<{ banner?: string; film?: string; published?: string }>;
 }) {
   const { slug } = await params;
   const sp = await searchParams;
@@ -168,8 +170,17 @@ export default async function MakerPage({
   //   ⭐본문 렌더는 손대지 않는다 — 화면에 찍히는 소개서가 실제와 한 픽셀도 달라지면 안 되므로.
   //   데이터·권한은 그대로다(숨기는 건 화면뿐). 열람 자체가 공개라 이 파라미터로 새로 열리는 정보는 없다.
   const film = sp?.film === "1";
-  const maker = await repo.getMakerBySlug(slug);
+  // 로컬 자동 초안(draft-XXXX)이 메모리에서 비워졌으면 대기열에서 다시 만든다(운영 빌드에선 그대로 notFound)
+  const maker = (await repo.getMakerBySlug(slug)) ?? ((await rebuildLocalDraftBySlug(slug)) ? await repo.getMakerBySlug(slug) : null);
   if (!maker) notFound();
+  // 📝초안 페이지(소개서 자동 만들기, 로컬 시험판 10-06) — 게시 전이면 비공개 띠 + 항목별 질문 + 맨 아래 [게시하기].
+  //   운영 빌드에선 늘 null이라 이 페이지는 지금과 똑같다.
+  const draftState = film ? null : await localDraftState(slug);
+  const isDraft = !!draftState && !draftState.publishedAt;
+  const noteCount = draftState
+    ? draftState.notes.general.length +
+      [...draftState.notes.activities, ...draftState.notes.collabs].reduce((n, x) => n + x.length, 0)
+    : 0;
 
   const user = await getSessionUser();
   // 소유 계정 프로필(로고) + 찜 여부 + 제안자(로그인 유저) 본인 프로필·소개서를 병렬 조회.
@@ -225,8 +236,58 @@ export default async function MakerPage({
         />
       )}
 
+      {/* 📝 초안 띠 — 게시 전에만. 대표 10-06: 「비공개 상태인 걸 가로 띠로, 아래 게시하기를 누르면 공개된다고 노트」 */}
+      {isDraft && (
+        <div className="mb-6 rounded-lg border border-[#F0D9A8] bg-[#FFF8EA] px-4 py-3.5 print:hidden">
+          <p className="text-[15px] font-bold text-ink">🔒 아직 공개되지 않은 초안이에요</p>
+          <p className="mt-1 break-keep text-[14px] leading-[1.6] text-body">
+            그동안 올리신 글과 사진을 읽고 만든 초안이라, 지금은 신청하신 분만 볼 수 있어요.
+            {noteCount > 0 && ` 저희가 여쭤보고 싶은 것 ${noteCount}개를 💬 표시로 남겨 두었어요.`} 고칠 곳은 「수정」에서 고치시고, 맨 아래 「게시하기」를 누르면 공개돼요.
+          </p>
+          {draftState!.notes.general.length > 0 && (
+            <details className="mt-2">
+              <summary className="cursor-pointer text-[14px] font-medium text-[#8A5A0B]">
+                💬 소개서 전체에 대해 여쭤볼 것 {draftState!.notes.general.length}개
+              </summary>
+              <ul className="mt-2 list-disc space-y-1 pl-5 text-[14px] leading-[1.6] text-body">
+                {draftState!.notes.general.map((q, k) => (
+                  <li key={k} className="break-keep">{q}</li>
+                ))}
+              </ul>
+            </details>
+          )}
+        </div>
+      )}
+      {draftState?.publishedAt && sp?.published === "1" && (
+        <div className="mb-6 rounded-lg border border-primary bg-primary-pale px-4 py-3 text-[15px] font-medium text-primary-on print:hidden">
+          🎉 게시했어요. 이제 모든 분이 이 소개서를 볼 수 있어요.
+        </div>
+      )}
+
       {/* 소개서 본문 — /preview와 공유하는 단일 렌더 */}
-      <MakerArticle maker={maker} isOwner={isOwner} logoUrl={logoUrl} readOnly={film} />
+      <MakerArticle
+        maker={maker}
+        isOwner={isOwner}
+        logoUrl={logoUrl}
+        readOnly={film}
+        draftNotes={isDraft ? draftState!.notes : undefined}
+      />
+
+      {/* 📝 [게시하기] — 초안 맨 아래 */}
+      {isDraft && (
+        <section className="mt-14 rounded-lg border border-hairline bg-surface px-5 py-5 print:hidden">
+          <p className="text-[17px] font-bold text-ink">확인을 마치셨나요?</p>
+          <p className="mt-1.5 break-keep text-[15px] leading-[1.6] text-mute">
+            게시하면 collab5에서 누구나 이 소개서를 볼 수 있어요. 게시한 뒤에도 「수정」에서 언제든 고칠 수 있어요.
+          </p>
+          <form action={publishDraftAction} className="mt-4">
+            <input type="hidden" name="slug" value={slug} />
+            <button className="flex h-12 w-full items-center justify-center rounded-md bg-primary text-[16px] font-bold text-primary-on">
+              게시하기
+            </button>
+          </form>
+        </section>
+      )}
 
       {/* 인쇄 전용 푸터 — 화면엔 안 보이고 지류에만 URL 노출 */}
       <div className="hidden print:mt-8 print:block print:border-t print:border-hairline print:pt-4 print:text-center print:text-[12px] print:text-mute">
@@ -234,7 +295,8 @@ export default async function MakerPage({
       </div>
 
       {/* 프로필 연결(미점유 귀속) + 소개 자료 — 링크복사·찜은 하단 플로팅바로 이관 */}
-      {!film && (claimable || maker.introFileUrl) && (
+      {/* 📝초안에선 «프로필에 연결하기»를 숨긴다 — 자동 초안은 신청한 계정에 이미 붙는다(운영판) */}
+      {!film && !isDraft && (claimable || maker.introFileUrl) && (
         <div className="mt-12 print:hidden">
           {claimable && (
             <div className="mb-3">
@@ -250,8 +312,9 @@ export default async function MakerPage({
         </div>
       )}
 
-      {/* 하단 고정 플로팅 액션바 — 찜 + 콜라보 제안 시작하기(UI) + 링크복사 */}
-      {!film && (
+      {/* 하단 고정 플로팅 액션바 — 찜 + 콜라보 제안 시작하기(UI) + 링크복사
+          📝초안(게시 전)에선 숨긴다 — 아직 아무도 못 보는 소개서에 «콜라보 제안»이 뜨면 뜻이 꼬인다. */}
+      {!film && !isDraft && (
       <MakerActionBar
         slug={slug}
         makerId={maker.id}

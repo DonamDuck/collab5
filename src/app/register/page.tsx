@@ -29,10 +29,31 @@ import type { ActivityHint, CollabHint, EnrichField } from "@/lib/enrich";
 import { blendDescriptions, canRegenDesc, noteRegenDesc } from "@/lib/enrichBlend";
 import { useDraftAutosave, draftKey, agoLabel } from "./useDraftAutosave";
 import { EnrichWizard, type WizardFill } from "./EnrichWizard";
+import { AutoDraftDialog } from "./AutoDraftDialog";
+
 import { SortableCard, emptyDnd, type DndState } from "./SortableCard";
 import { BlockEditor, emptyBlock } from "./BlockEditor";
 import { PhotoGrid } from "./PhotoGrid";
 import { StubSection } from "./StubSection";
+
+/** 자동 만들기(선택 1). 10-03 로컬 시험판 → 10-07 운영에도 «신청»을 연다(대표: 「신청부터 열고 문구 맞추기」).
+ *  밤 작업이 감당 못 할 만큼 몰리면 Vercel 환경변수 NEXT_PUBLIC_AUTO_DRAFT=off 하나로 다시 숨긴다(재배포 필요). */
+const AUTO_DRAFT_ON = process.env.NEXT_PUBLIC_AUTO_DRAFT !== "off";
+
+/** 0단계 «어떻게 시작할까요?» 줄 — 호버 연두(대표 10-05).
+ *  🎨10-05 디자인팀 검토: 640px 폭에 세 칸이면 칸이 188px라 16px 굵은 문장이 세 줄로 접히고 높이가 들쭉날쭉했다
+ *  → 폰은 쌓고, sm부터 «가로 한 줄» 세 개. 버튼은 셋 다 같은 보조 모양(검정 버튼은 이 사이트 어휘가 아니다)이고
+ *  호버한 줄만 연두가 된다 — 연두 버튼은 한 번에 하나. 「선택 N」은 연두를 쓰지 않는다(연두는 누르는 것의 색).
+ *  칩은 셋 다 «시간»만 말한다(1~2일 · 3분 · 지금 바로). */
+const START_CARD =
+  "group flex w-full flex-col rounded-lg border border-hairline bg-surface p-5 text-left transition-colors hover:border-primary-strong hover:bg-primary-pale sm:flex-row sm:items-center sm:gap-5 sm:p-6";
+const START_BTN =
+  "mt-4 flex h-11 w-full items-center justify-center rounded-md border border-border-strong bg-surface text-[15px] font-medium text-ink group-hover:border-primary-strong group-hover:bg-primary group-hover:text-primary-on sm:mt-0 sm:h-10 sm:w-auto sm:shrink-0 sm:px-5";
+// 🔁10-05 대표: *「페이지가 모두 검정인데 선택1·2만 초록이나 키위로」* — 디자인팀은 «연두는 누르는 것의 색»이라 회색을 권했지만
+//   대표 판단으로 연두 알약. 카드 호버 바탕(primary-pale)과 겹치지 않게 호버 땐 진한 연두로 올린다.
+const START_TAG =
+  "inline-flex rounded-pill bg-primary-pale px-2.5 py-0.5 text-[13px] font-bold text-primary-on group-hover:bg-primary";
+const START_CHIP = "shrink-0 rounded-pill bg-surface-soft px-2.5 py-0.5 text-[13px] font-medium text-mute group-hover:bg-surface";
 
 // 배열 내 순서 이동 (드래그 재정렬용)
 function reorder<T>(arr: T[], from: number, to: number): T[] {
@@ -304,6 +325,8 @@ function RegisterForm() {
   // ── enrich(딸깍 자동완성) 상태 ──
   const [query, setQuery] = useState(""); // 불러오기 검색어(업체명만)
   const [wizardOpen, setWizardOpen] = useState(false); // 딸깍 자동완성 위저드
+  const [autoDraftOpen, setAutoDraftOpen] = useState(false); // 소개서 자동 만들기 신청(로컬 시험판, 10-03)
+  const [startedSelf, setStartedSelf] = useState(false); // 맨 위 «어떻게 시작할까요?»에서 「직접 쓸게요」를 골랐다
   const [aiFilled, setAiFilled] = useState<Set<string>>(new Set()); // AI가 채운 필드
   const [missing, setMissing] = useState<EnrichField[]>([]); // 못 찾은 필드(직접 입력 노티)
   const [reviewMode, setReviewMode] = useState(false); // 검수 게이트 배너
@@ -705,17 +728,6 @@ function RegisterForm() {
     setDescModalOpen(false);
   };
 
-  // ── enrich: 업체명 → 위저드 오픈(불러오기) ──
-  // ⭐AI 플로우의 **첫 관문**이라 disabled로 막으면 진입 자체가 봉쇄된다 — 눌리게 두고 왜 안 되는지 말해준다(QA #17).
-  const [queryErr, setQueryErr] = useState("");
-  const openWizard = () => {
-    if (!query.trim()) {
-      setQueryErr("브랜드 이름을 알려주세요.");
-      return;
-    }
-    setQueryErr("");
-    setWizardOpen(true);
-  };
 
   // 힌트 '이 내용으로 시작하기' — 빈 카드 우선 채움, 없으면 새 카드(최대 5), 꽉 차면 불가.
   // inject* = 힌트 값 직접 주입: 위저드 ⑤스텝 즉시 적용은 setActHints 직후라 state 힌트를
@@ -1267,9 +1279,15 @@ function RegisterForm() {
     router.push(`/m/${createdSlug}`);
   };
 
+  // 🧭0단계 «소개서를 어떻게 시작할까요?»(대표 10-05) — 새로 만들 때만, 아직 아무것도 시작 안 했을 때만 보인다.
+  //   쓰던 내용(임시저장 배너)이 있거나 위저드가 채웠거나 이름을 이미 적었으면 바로 폼으로 간다 — 다시 물으면 번거롭다.
+  const showStart = !editSlug && !editParam && !enrichment && !startedSelf && !draft.found && !name.trim();
+
   // 어떤 레이어(위저드·모달·얼럿·넛지·블록시트·미리보기시트)라도 열려 있으면 플로팅 버튼 숨김.
   const layerOpen =
+    showStart ||
     wizardOpen ||
+    autoDraftOpen ||
     descModalOpen ||
     showDraftDone ||
     showNudge ||
@@ -1316,53 +1334,62 @@ function RegisterForm() {
         브랜드 소개서, 생각보다 금방 완성돼요.
       </h1>
       <p className="mt-2 text-[17px] leading-relaxed text-body">
-        브랜드 이름 입력하면 AI가 소개서 초안을 준비해드려요. 확인하고 다듬으면 1~3분 안에 완성할 수 있어요.
+        그동안 해온 활동을 한 페이지로 정리해요. 맡기셔도 되고, 직접 쓰셔도 돼요.
       </p>
 
-      {/* ✨ 딸깍 자동완성 — 이름만 알려주면 채워드릴게요 */}
-      <div className="mt-10 rounded-xl border border-primary bg-primary-pale px-5 py-5">
-        <p className="text-[17px] font-bold text-ink">
-          ✨ 브랜드 이름을 알려주세요. 나머지는 AI가 준비해드릴게요.
-        </p>
-        <p className="mt-1 text-[15px] leading-relaxed text-mute">
-          웹, SNS에서 찾은 정보를 기준으로 소개 초안을 준비해드려요. 찾아온 정보는 언제든 자유롭게 수정할 수 있어요.
-        </p>
-        <div className="mt-3 flex gap-2">
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.nativeEvent.isComposing) {
-                e.preventDefault();
-                openWizard();
-              }
-            }}
-            placeholder="예: 캔버스가든"
-            className="h-11 min-w-0 flex-1 rounded-sm border border-hairline bg-surface px-3 text-[17px] text-ink outline-none placeholder:text-faint focus:border-focus"
-          />
-          <button
-            type="button"
-            onClick={openWizard}
-            className="h-11 shrink-0 rounded-md bg-primary px-4 text-[14px] font-medium text-primary-on"
-          >
-            ✨ 시작하기
-          </button>
-        </div>
-        {queryErr && <p className="mt-2 text-[13px] text-danger">{queryErr}</p>}
-      </div>
-
-      {/* AI 불러오기(위) ↔ 직접 입력(아래) 구분 소제목 */}
-      <div className="mt-10 flex items-center gap-3">
-        <div className="h-px flex-1 bg-hairline" />
-        <span className="shrink-0 text-[13px] font-medium text-mute">
-          또는 아래에 직접 입력할 수 있어요.
-        </span>
-        <div className="h-px flex-1 bg-hairline" />
-      </div>
         </>
       )}
 
-      <div className="mt-8 space-y-12">
+      {showStart && (
+        // 🧭0단계 — 대표 10-05: *「이름 칸 아래 질문은 스크롤로 훑는 사람 눈에 안 들어오고, 이름 쓰기와 맥락도 안 맞는다」*.
+        //   «어떻게 만들지»를 이름보다 먼저, 세 갈래를 한 번에 보여 준다(«필요해요/아니요»를 먼저 묻는 두 단계안은 클릭이 늘어 버렸다).
+        //   「직접 쓸게요」도 같은 무게의 버튼으로 세운다 — 회색 글자면 위 둘 중 하나를 꼭 골라야 하는 것처럼 보였다.
+        <section className="mt-10">
+          <h2 className="text-[20px] font-bold text-ink">소개서를 어떻게 시작할까요?</h2>
+          <div className="mt-4 flex flex-col gap-3">
+            {AUTO_DRAFT_ON && (
+            <button type="button" onClick={() => setAutoDraftOpen(true)} className={START_CARD}>
+              <span className="min-w-0 flex-1">
+                <span className="flex flex-wrap items-center gap-1.5">
+                  <span className={START_TAG}>선택 1</span>
+                  <span className={START_CHIP}>⏱ 1~2일</span>
+                </span>
+                <span className="mt-2 block break-keep text-[17px] font-bold leading-[1.4] text-ink">인스타, 블로그 등의 글로 소개서 초안을 만들어 드려요</span>
+                <span className="mt-1.5 block break-keep text-[15px] leading-[1.6] text-mute">소개, 활동 내역, 콜라보 등을 정리해 제작해드려요.</span>
+              </span>
+              <span className={START_BTN}>신청하기</span>
+            </button>
+            )}
+            <button type="button" onClick={() => {
+                setQuery("");
+                setWizardOpen(true);
+              }} className={START_CARD}>
+              <span className="min-w-0 flex-1">
+                <span className="flex flex-wrap items-center gap-1.5">
+                  <span className={START_TAG}>{AUTO_DRAFT_ON ? "선택 2" : "선택 1"}</span>
+                  <span className={START_CHIP}>⏱ 3분</span>
+                </span>
+                <span className="mt-2 block break-keep text-[17px] font-bold leading-[1.4] text-ink">지금, 브랜드 이름으로 정보를 찾아 초안을 채워드려요</span>
+                <span className="mt-1.5 block break-keep text-[15px] leading-[1.6] text-mute">빠르게 초안을 만들어 드릴게요.</span>
+              </span>
+              <span className={START_BTN}>시작하기</span>
+            </button>
+            <button type="button" onClick={() => setStartedSelf(true)} className={START_CARD}>
+              <span className="min-w-0 flex-1">
+                <span className="flex flex-wrap items-center gap-1.5">
+                  <span className={START_TAG}>{AUTO_DRAFT_ON ? "선택 3" : "선택 2"}</span>
+                  <span className={START_CHIP}>⏱ 지금 바로</span>
+                </span>
+                <span className="mt-2 block break-keep text-[17px] font-bold leading-[1.4] text-ink">처음부터 직접 쓸게요</span>
+                <span className="mt-1.5 block break-keep text-[15px] leading-[1.6] text-mute">빈 양식에 원하는 항목을 추가해 직접 만들어주세요.</span>
+              </span>
+              <span className={START_BTN}>바로 쓰기</span>
+            </button>
+          </div>
+        </section>
+      )}
+
+      <div className={`mt-8 space-y-12 ${showStart ? "hidden" : ""}`}>
         {/* 이어서 쓰기 배너 — **자동 복구는 절대 하지 않는다.**
             낡은 초안을 덜컥 얹으면 서버에 잘 저장해둔 내용을 되돌려버린다. 그래서 항상 물어본다.
 
@@ -1485,6 +1512,7 @@ function RegisterForm() {
               <p className="mt-1.5 text-[13px] text-danger">{errField.msg}</p>
             )}
           </Field>
+          {/* 🔁10-05 이름 칸 아래에 있던 「초안 준비를 도와드릴까요?」 상자는 맨 위 0단계 «어떻게 시작할까요?»로 옮겼다(showStart). */}
           <Field label="한두 문장 소개 (선택)" hint={hintFor("oneLiner")}>
             {/* 한두 문장이라 멀티라인 — 한 줄 input이면 두 번째 문장이 가로로 밀려 안 보임. 길이 제한 없음(대표 확정) */}
             <textarea
@@ -2365,6 +2393,10 @@ function RegisterForm() {
             {toast}
           </div>
         </div>
+      )}
+
+      {autoDraftOpen && (
+        <AutoDraftDialog initialName={name.trim()} onClose={() => setAutoDraftOpen(false)} />
       )}
 
       {/* 딸깍 자동완성 위저드 — 가중 키워드 → 백그라운드 크롤 → 한줄/소개 5지선다 */}

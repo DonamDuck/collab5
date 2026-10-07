@@ -1,0 +1,133 @@
+#!/usr/bin/env python3
+"""소개서 자동 만들기 대기열 (로컬 시험판, 2026-10-03) — 정본 설명 = src/lib/autoDraft.ts 머리말.
+
+  scripts/auto-draft/queue              # 대기 중인 신청 목록(오래된 것부터)
+  scripts/auto-draft/queue pull         # 운영 신청함(auto_draft_requests 표)에서 새 신청을 «읽어» 로컬 대기열로 가져온다(10-07)
+  scripts/auto-draft/queue next         # 다음에 만들 신청 하나를 통째로 출력(스킬에 넘길 재료)
+  scripts/auto-draft/queue start <id>   # 만들기 시작 → working
+  scripts/auto-draft/queue done <id> <slug>   # 완성 → review(아침 발송 대기). 밤에는 메일을 보내지 않는다
+  scripts/auto-draft/queue morning            # 아침 발송: review 전부를 넘긴다 = done + 고객 안내 메일(로컬 서버 /api/auto-draft/deliver)
+  (대표 10-05: 밤에 만들고 «아침에» 메일. 더 일찍 보내려면 신청함 /dev/auto-draft 의 버튼)
+  (10-05 브리프는 흐름에서 뺐다. 시험용 `brief <id> <md>` 명령만 남겨 둔다)
+  scripts/auto-draft/queue fail <id> <사유>    # 실패 → 다시 queued 로 돌리고 사유를 남긴다
+
+규칙: 하루 DAILY_CAP(3)건까지만 start 를 허락한다(KST 날짜 기준). 인스타 한도가 IP·계정 공용이라서다.
+대기열 파일은 `_workspace/auto-draft-queue/*.json` — 로컬 dev 서버가 쓰거나, `pull`이 운영 표에서 가져와 쓴다.
+⛔`pull`은 운영 DB를 «읽기만» 한다(예약 작업은 운영 DB에 쓰지 않는다 — 10-05 규칙). 그래서 운영 표엔 진행 상태가 없고,
+  «이미 가져왔나»는 로컬 파일(대기열 + 테스트 보관 폴더)의 id로 가른다.
+"""
+import json, sys, os, glob, datetime
+
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+QDIR = os.path.join(ROOT, "_workspace", "auto-draft-queue")
+TESTDIR = os.path.join(ROOT, "_workspace", "auto-draft-test")  # 대표·내가 넣은 테스트 신청을 옮겨 두는 곳 — 다시 가져오지 않는다
+# 운영 키 = 1팀 작업트리 .env.local(scripts/db/sql 과 같은 곳). 서비스 롤 = RLS 우회라 «읽기만» 한다.
+PROD_ENV = os.path.expanduser("~/Desktop/collab5/.env.local")
+DAILY_CAP = 3
+KST = datetime.timezone(datetime.timedelta(hours=9))
+
+def now():
+    return datetime.datetime.now(KST).isoformat(timespec="seconds")
+
+def load():
+    out = []
+    for f in sorted(glob.glob(os.path.join(QDIR, "*.json"))):
+        try:
+            out.append((f, json.load(open(f, encoding="utf-8"))))
+        except Exception:
+            pass
+    return out
+
+def save(f, r):
+    json.dump(r, open(f, "w", encoding="utf-8"), ensure_ascii=False, indent=2)
+
+def find(i):
+    for f, r in load():
+        if r["id"] == i:
+            return f, r
+    sys.exit(f"없는 신청: {i}")
+
+def started_today():
+    today = datetime.datetime.now(KST).date().isoformat()
+    return sum(1 for _, r in load() if (r.get("startedAt") or "").startswith(today))
+
+def pull():
+    import re, urllib.request, urllib.error
+    try:
+        env = open(PROD_ENV, encoding="utf-8").read()
+    except OSError:
+        sys.exit(f"⛔ 운영 키 파일이 없어요: {PROD_ENV}")
+    url = re.search(r"^SUPABASE_URL=(\S+)", env, re.M)
+    key = re.search(r"^SUPABASE_SERVICE_ROLE_KEY=(\S+)", env, re.M)
+    if not (url and key):
+        sys.exit("⛔ SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY 를 못 찾았어요")
+    k = key.group(1).strip()
+    req = urllib.request.Request(
+        f"{url.group(1).strip()}/rest/v1/auto_draft_requests?select=*&order=created_at.asc",
+        headers={"apikey": k, "Authorization": f"Bearer {k}"},
+    )
+    try:
+        rows = json.load(urllib.request.urlopen(req, timeout=30))
+    except urllib.error.HTTPError as e:
+        body = e.read().decode("utf-8", "replace")
+        if e.code == 404 or "auto_draft_requests" in body:
+            print("운영 신청함 표가 아직 없어요 — 가져올 게 없어요."); return
+        sys.exit(f"⛔ 운영 신청함을 못 읽었어요: HTTP {e.code} {body[:300]}")
+    known = {os.path.basename(f)[:-5] for d in (QDIR, TESTDIR) for f in glob.glob(os.path.join(d, "*.json"))}
+    os.makedirs(QDIR, exist_ok=True)
+    got = 0
+    for x in rows:
+        if x["id"] in known:
+            continue
+        created = datetime.datetime.fromisoformat(x["created_at"].replace("Z", "+00:00")).astimezone(KST).isoformat(timespec="milliseconds")
+        r = {
+            "id": x["id"], "createdAt": created, "status": "queued", "source": "prod",
+            "brandName": x["brand_name"], "region": x.get("region") or "", "businessType": x.get("business_type") or "",
+            "channels": x.get("channels") or [], "email": x["email"], "note": x.get("note") or "",
+            "consent": x.get("consent"),
+            "account": {"authId": x.get("auth_id") or "", "email": x.get("account_email") or "", "userId": x.get("user_id")},
+        }
+        if x.get("receipt_at"): r["receiptAt"] = x["receipt_at"]
+        if x.get("receipt_error"): r["receiptError"] = x["receipt_error"]
+        save(os.path.join(QDIR, f"{x['id']}.json"), r)
+        got += 1
+        print(f"+ {x['id']} · {x['brand_name']} · {x['email']}")
+    print(f"운영 신청 {got}건 가져옴 (표 전체 {len(rows)}건)")
+
+args = sys.argv[1:]
+cmd = args[0] if args else "list"
+if cmd == "pull":
+    pull()
+elif cmd == "list":
+    rows = [r for _, r in load() if r["status"] in ("queued", "working", "review")]
+    print(f"대기 {sum(r['status']=='queued' for r in rows)} · 작업 중 {sum(r['status']=='working' for r in rows)} · 아침 발송 대기 {sum(r['status']=='review' for r in rows)} · 오늘 시작 {started_today()}/{DAILY_CAP}")
+    for r in rows:
+        ch = ", ".join(f"{c['kind']}:{c['url']}" for c in r["channels"])
+        print(f"- [{r['status']}] {r['id']} · {r['brandName']} · {r.get('region','')} · {ch}")
+elif cmd == "next":
+    q = [r for _, r in load() if r["status"] == "queued"]
+    print(json.dumps(q[0], ensure_ascii=False, indent=2) if q else "대기 중인 신청이 없어요.")
+elif cmd == "start":
+    if started_today() >= DAILY_CAP:
+        sys.exit(f"⛔ 오늘 몫({DAILY_CAP}건)을 다 썼어요. 내일 이어서 해요.")
+    f, r = find(args[1]); r["status"] = "working"; r["startedAt"] = now(); save(f, r); print("working", r["id"])
+elif cmd == "brief":
+    f, r = find(args[1]); r["brief"] = os.path.abspath(args[2]); save(f, r); print("brief", r["id"], r["brief"])
+elif cmd == "done":
+    f, r = find(args[1]); r["doneAt"] = now(); r["slug"] = args[2] if len(args) > 2 else r.get("slug", "")
+    r["status"] = "review"; save(f, r); print("review", r["id"], "— 아침 발송(queue morning)을 기다려요")
+elif cmd == "morning":
+    import urllib.request
+    ready = [r for _, r in load() if r["status"] == "review"]
+    if not ready: print("아침에 보낼 초안이 없어요.")
+    for r in ready:
+        try:
+            q = urllib.request.Request("http://localhost:3001/api/auto-draft/deliver", data=json.dumps({"id": r["id"]}).encode(),
+                                       headers={"Content-Type": "application/json"}, method="POST")
+            print("delivered", r["id"], r["brandName"], urllib.request.urlopen(q, timeout=30).read().decode())
+        except Exception as e:
+            print(f"⛔ {r['id']} {r['brandName']} 못 넘겼어요(로컬 서버가 꺼져 있나요?): {e} — 상태는 그대로예요")
+elif cmd == "fail":
+    f, r = find(args[1]); r["status"] = "queued"; r.setdefault("failures", []).append({"at": now(), "why": " ".join(args[2:])}); save(f, r); print("back to queue", r["id"])
+else:
+    sys.exit(__doc__)
