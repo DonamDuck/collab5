@@ -27,7 +27,7 @@ export const SIDE_PROJECTS: SideProject[] = [
   {
     slug: "monitoralign",
     name: "MonitorAlign",
-    tagline: "자리를 옮겨서 틀어진 모니터 위치를 클릭 두 번으로 맞춰요.",
+    tagline: "여러 모니터를 사용할 때 클릭 두 번으로 모니터 정렬을 맞출 수 있어요.",
     meta: "macOS · Windows · 무료",
     icon: "/side/monitoralign/icon-256.png",
     support: {
