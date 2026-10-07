@@ -5,7 +5,7 @@ import { notFound } from "next/navigation";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { headers } from "next/headers";
-import { draftReadyMail, draftRequestedMail } from "@/lib/notify";
+import { DRAFT_COPY_TO, draftReadyMail, draftRequestedMail } from "@/lib/notify";
 import { CHANNEL_LABEL, DAILY_CAP, type AutoDraftChannel } from "@/lib/autoDraft";
 
 export const dynamic = "force-dynamic";
@@ -30,7 +30,7 @@ export default async function MailPreview({ searchParams }: { searchParams: Prom
   const base = (process.env.NEXT_PUBLIC_SITE_URL || `http://${h.get("host") ?? "localhost:3001"}`).replace(/\/$/, "");
   const mails = [
     {
-      when: "① 신청하면 바로",
+      when: `① 신청하면 바로${DRAFT_COPY_TO ? ` · 사본(숨은 참조) ${DRAFT_COPY_TO}` : ""}`,
       m: draftRequestedMail({
         brandName,
         position: 1,

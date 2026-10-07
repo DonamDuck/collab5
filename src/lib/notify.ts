@@ -123,6 +123,8 @@ export async function notifySignup(n: SignupNotice): Promise<boolean> {
  *  보내는 주소는 받는 메일함이 없으니, 고객 답장은 DRAFT_MAIL_REPLY_TO(대표 메일)로 받는다. 비어 있으면 NOTIFY_FROM을 쓴다. */
 const DRAFT_FROM = process.env.DRAFT_MAIL_FROM || FROM;
 const DRAFT_REPLY_TO = process.env.DRAFT_MAIL_REPLY_TO || "";
+/** 접수 메일 사본을 받을 곳(숨은 참조). 비어 있으면 가입 알림 받는 곳(ADMIN_EMAIL)으로. */
+export const DRAFT_COPY_TO = process.env.DRAFT_MAIL_COPY_TO || process.env.ADMIN_EMAIL || "";
 
 /** 안내 메일 내용(제목·글·HTML). 신청함의 «메일 미리보기»(/dev/auto-draft/mail)도 이걸 그대로 그린다. */
 export function draftReadyMail(n: { brandName: string; url: string }): { subject: string; text: string; html: string } {
@@ -203,7 +205,9 @@ export async function notifyDraftRequested(n: {
   dailyCap: number;
   channels: string[];
 }): Promise<{ ok: true } | { ok: false; why: string }> {
-  return sendDraftMail(n.to, draftRequestedMail(n), "접수 안내");
+  // 대표 10-07: *「그 이메일을 나한테 하나 더 보내면 고객이 신청했구나 정도를 알 수 있을 것 같아」*
+  //   → 같은 메일을 숨은 참조로 대표에게. 받는 사람 칸에 고객 주소가 그대로 찍혀 누가 신청했는지 보인다.
+  return sendDraftMail(n.to, draftRequestedMail(n), "접수 안내", DRAFT_COPY_TO);
 }
 
 export async function notifyDraftReady(n: {
@@ -219,6 +223,7 @@ async function sendDraftMail(
   to: string,
   { subject, text, html }: { subject: string; text: string; html: string },
   label: string,
+  bcc = "",
 ): Promise<{ ok: true } | { ok: false; why: string }> {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) return { ok: false, why: "RESEND_API_KEY 없음" };
@@ -232,6 +237,7 @@ async function sendDraftMail(
       body: JSON.stringify({
         from: DRAFT_FROM,
         to: [to],
+        ...(bcc && bcc.toLowerCase() !== to.trim().toLowerCase() ? { bcc: [bcc] } : {}),
         ...(DRAFT_REPLY_TO ? { reply_to: DRAFT_REPLY_TO } : {}),
         subject,
         text,
