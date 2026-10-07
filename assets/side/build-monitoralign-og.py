@@ -48,6 +48,6 @@ def build(lang, lines, meta):
     d.text((tx, y), meta, font=font("Regular", 28), fill=(140, 151, 184))
     canvas.convert("RGB").save(os.path.join(OUT, f"og-{lang}.png"), optimize=True)
 
-build("ko", ["듀얼 모니터 배치를", "클릭 두 번으로 맞춰요"], "macOS · Windows · 무료")
+build("ko", ["듀얼 모니터 위치를", "클릭 두 번으로 맞춰요"], "macOS · Windows · 무료")
 build("en", ["Fix your dual-monitor", "layout in two clicks"], "Free for macOS & Windows")
 print("ok")
