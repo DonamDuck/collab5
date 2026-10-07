@@ -17,6 +17,11 @@ const nextConfig: NextConfig = {
   //    프리뷰는 collab5-git-<브랜치>-….vercel.app이라 아래 host 매칭에 안 걸린다(의도된 것).
   async redirects() {
     return [
+      // 사적인 프로젝트 주소를 /side → /sideproject로 옮겼다(10-07 대표).
+      // ⛔지우지 말 것 — 이미 깔린 MonitorAlign 앱(맥 0.8.0·0.8.1)이 옛 주소의
+      //   /side/monitoralign/version.json으로 업데이트를 확인하고 zip을 받는다. 앱은 리다이렉트를 따라간다.
+      { source: "/side", destination: "/sideproject", permanent: true },
+      { source: "/side/:path*", destination: "/sideproject/:path*", permanent: true },
       {
         source: "/:path*", // 경로 보존 — /m/xxx 같은 소개서 링크도 그대로 따라간다
         has: [{ type: "host", value: "collab5.vercel.app" }],
