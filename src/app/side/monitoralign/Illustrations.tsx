@@ -45,6 +45,16 @@ function Desk({ dimMonitor = false, dimLaptop = false }: { dimMonitor?: boolean;
   );
 }
 
+function ArrowHead({ id, color }: { id: string; color: string }) {
+  return (
+    <defs>
+      <marker id={id} viewBox="0 0 10 10" refX="5" refY="5" markerWidth="15" markerHeight="15" markerUnits="userSpaceOnUse" orient="auto">
+        <path d="M0 0 L10 5 L0 10 z" fill={color} />
+      </marker>
+    </defs>
+  );
+}
+
 function Cursor({ x, y }: { x: number; y: number }) {
   return (
     <path
@@ -88,8 +98,8 @@ export function WhyFigure({ lang }: { lang: Lang }) {
       {/* 왼쪽: 실제 책상(작게) */}
       <g transform="translate(-36 26) scale(0.62)">
         <Desk />
-        <path d="M318 200 C 310 175, 300 150, 286 112" fill="none" stroke={C.green} strokeWidth="3.5" strokeLinecap="round" />
-        <path d="M278 120 l8 -10 l5 12" fill="none" stroke={C.green} strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" />
+        <ArrowHead id="ma-arrow-why" color={C.green} />
+        <path d="M322 204 Q 306 160 290 118" fill="none" stroke={C.green} strokeWidth="4" strokeLinecap="round" markerEnd="url(#ma-arrow-why)" />
       </g>
       <text x="140" y="226" textAnchor="middle" fontSize="13" fontWeight="600" fill={C.ink}>
         {t.desk}
@@ -190,7 +200,7 @@ function SecondClickFigure({ lang }: { lang: Lang }) {
       <rect x="118" y="124" width="184" height="4" fill={C.accent} />
       <Dot x={272} y={126} />
       <Cursor x={276} y={133} />
-      <Badge x={258} y={152} n="2" />
+      <Badge x={252} y={107} n="2" />
     </Frame>
   );
 }
@@ -205,8 +215,8 @@ function DoneFigure({ lang }: { lang: Lang }) {
     <Frame label={t.label} viewBox="22 0 520 236">
       <Desk />
       {/* 화살표 끝 너머(같은 방향 왼쪽 위)에 커서를 둬서 서로 안 겹치게 */}
-      <path d="M352 205 C 340 184, 322 152, 298 120" fill="none" stroke={C.green} strokeWidth="4" strokeLinecap="round" />
-      <path d="M290 129 l8 -10 l6 11" fill="none" stroke={C.green} strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
+      <ArrowHead id="ma-arrow-done" color={C.green} />
+      <path d="M350 206 Q 328 162 300 124" fill="none" stroke={C.green} strokeWidth="4" strokeLinecap="round" markerEnd="url(#ma-arrow-done)" />
       <Cursor x={278} y={84} />
       <g transform="translate(350 40)">
         <rect x="0" y="0" width={lang === "ko" ? 112 : 92} height="30" rx="15" fill="#111827" opacity="0.85" />
