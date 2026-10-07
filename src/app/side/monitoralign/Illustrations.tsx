@@ -204,9 +204,10 @@ function DoneFigure({ lang }: { lang: Lang }) {
   return (
     <Frame label={t.label} viewBox="22 0 520 236">
       <Desk />
-      <path d="M352 205 C 338 182, 318 150, 292 108" fill="none" stroke={C.green} strokeWidth="4" strokeLinecap="round" />
-      <path d="M284 117 l8 -10 l6 11" fill="none" stroke={C.green} strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
-      <Cursor x={288} y={96} />
+      {/* 화살표 끝 너머(같은 방향 왼쪽 위)에 커서를 둬서 서로 안 겹치게 */}
+      <path d="M352 205 C 340 184, 322 152, 298 120" fill="none" stroke={C.green} strokeWidth="4" strokeLinecap="round" />
+      <path d="M290 129 l8 -10 l6 11" fill="none" stroke={C.green} strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
+      <Cursor x={278} y={84} />
       <g transform="translate(350 40)">
         <rect x="0" y="0" width={lang === "ko" ? 112 : 92} height="30" rx="15" fill="#111827" opacity="0.85" />
         <circle cx="18" cy="15" r="8" fill={C.green} />

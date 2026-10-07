@@ -107,6 +107,9 @@ const COPY: Record<Lang, Copy> = {
       <>
         메뉴바(윈도우는 작업 표시줄 오른쪽 트레이)에 있는 아이콘을 누르고 <UiLabel>모니터 정렬하기</UiLabel>를 골라요.
         <Shortcuts lead="단축키로도 열려요." mac="⌃⌥⌘A" win="Ctrl+Alt+Shift+A" macLabel="맥" winLabel="윈도우" />
+        <span className="mt-1.5 block">
+          누르기 어려우면 단축키를 직접 정하거나 바꿀 수 있어요. 메뉴의 <UiLabel>설정</UiLabel>에서 원하는 키를 누르면 바로 바뀌어요.
+        </span>
       </>,
       <>
         지금 보는 화면에서, 다른 화면으로 넘어가고 싶은 쪽 가장자리를 눌러요. 모니터가 노트북 왼쪽 위에 있다면 노트북 화면 위쪽의
@@ -115,7 +118,7 @@ const COPY: Record<Lang, Copy> = {
       <>포인터를 다른 화면으로 옮겨서, 거기서 들어오고 싶은 자리를 한 번 더 클릭해요.</>,
       <>확인을 누르면 두 자리가 맞닿아요. 이제 마우스를 그쪽으로 밀면 그대로 넘어가요.</>,
     ],
-    undo: { text: "잘못 이었으면 되돌리기 단축키 한 번에 원래대로 돌아가요.", custom: "단축키는 메뉴의 설정에서 원하는 조합으로 바꿀 수 있어요." },
+    undo: { text: "잘못 이었으면 되돌리기 단축키 한 번에 원래대로 돌아가요.", custom: "" },
     // 기능 목록은 위에서 한 말을 되풀이해서 한국어 페이지에선 뺐다(비우면 절이 안 그려진다).
     featuresTitle: "",
     features: [],
@@ -182,12 +185,16 @@ const COPY: Record<Lang, Copy> = {
       <>
         Click the menu bar icon and choose <UiLabel>Align Monitors</UiLabel>. On Windows, the icon sits in the system tray.
         <Shortcuts lead="Or press" mac="⌃⌥⌘A" win="Ctrl+Alt+Shift+A" macLabel="Mac" winLabel="Windows" />
+        <span className="mt-1.5 block">
+          Hard to reach? You can set or change the shortcut yourself. Open <UiLabel>Settings</UiLabel> from the menu and press the keys you
+          want.
+        </span>
       </>,
       <>On this screen, click near the edge where the pointer should cross over.</>,
       <>Move to the other screen and click where it should come in.</>,
       <>Confirm, and the two points snap together.</>,
     ],
-    undo: { text: "Got it wrong? The undo shortcut puts the previous layout back.", custom: "You can change both shortcuts in Settings." },
+    undo: { text: "Got it wrong? The undo shortcut puts the previous layout back.", custom: "" },
     featuresTitle: "What you get",
     features: [
       "Free to download and use.",
@@ -383,7 +390,7 @@ export function MonitorAlignView({ lang }: { lang: Lang }) {
         <div className="mt-5 rounded-md bg-surface-faint px-4 py-3 text-[15px] leading-relaxed break-keep text-body">
           <p>{c.undo.text}</p>
           <Shortcuts mac="⌃⌥⌘Z" win="Ctrl+Alt+Shift+Z" macLabel={c.macLabel} winLabel={c.winLabel} />
-          <p className="mt-2 text-[14px] text-mute">{c.undo.custom}</p>
+          {c.undo.custom && <p className="mt-2 text-[14px] text-mute">{c.undo.custom}</p>}
         </div>
       </section>
 
