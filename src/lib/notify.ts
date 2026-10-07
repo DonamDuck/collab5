@@ -172,7 +172,7 @@ export function draftRequestedMail(n: {
   const text = [
     `안녕하세요, collab5예요.`,
     ``,
-    `「${n.brandName}」 소개서 초안 요청을 잘 받았어요.`,
+    `「${n.brandName}」 소개서 초안 신청이 완료됐어요.`,
     `하루 ${n.dailyCap}팀씩 순서대로 만들고 있고, 지금 대기 ${n.position}번째예요. ${when} 안에 초안이 완성되면 이 주소로 다시 안내해 드릴게요.`,
     ``,
     `알려 주신 채널`,
@@ -185,7 +185,7 @@ export function draftRequestedMail(n: {
   ].join("\n");
   const html = `<div style="font-family:-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo',sans-serif;font-size:15px;line-height:1.75;color:#1a1a1a;max-width:520px">
   <p style="margin:0 0 16px">안녕하세요, <strong>collab5</strong>예요.</p>
-  <p style="margin:0 0 16px"><strong>「${esc(n.brandName)}」</strong> 소개서 초안 요청을 잘 받았어요.<br>하루 ${n.dailyCap}팀씩 순서대로 만들고 있고, 지금 대기 <strong>${n.position}번째</strong>예요. ${when} 안에 초안이 완성되면 이 주소로 다시 안내해 드릴게요.</p>
+  <p style="margin:0 0 16px"><strong>「${esc(n.brandName)}」</strong> 소개서 초안 신청이 완료됐어요.<br>하루 ${n.dailyCap}팀씩 순서대로 만들고 있고, 지금 대기 <strong>${n.position}번째</strong>예요. ${when} 안에 초안이 완성되면 이 주소로 다시 안내해 드릴게요.</p>
   <div style="margin:0 0 20px;padding:12px 16px;border-radius:8px;background:#f5f7f2">
     <p style="margin:0 0 4px;font-size:13px;color:#666">알려 주신 채널</p>
     ${n.channels.map((c) => `<p style="margin:0;font-size:14px;color:#1a1a1a;word-break:break-all">${esc(c)}</p>`).join("\n    ")}
