@@ -12,6 +12,7 @@ import release from "../../../../public/side/monitoralign/version.json";
 import { getSideProject, type SupportLink } from "../projects";
 import { DownloadButtons, type DownloadItem } from "./DownloadButtons";
 import { HtmlLang } from "./HtmlLang";
+import { StepFigure, WhyFigure } from "./Illustrations";
 
 export type Lang = "ko" | "en";
 
@@ -358,6 +359,7 @@ export function MonitorAlignView({ lang }: { lang: Lang }) {
             {p}
           </p>
         ))}
+        <WhyFigure lang={lang} />
       </section>
 
       <section className={SECTION}>
@@ -371,7 +373,10 @@ export function MonitorAlignView({ lang }: { lang: Lang }) {
               >
                 {i + 1}
               </span>
-              <span className="min-w-0 flex-1">{step}</span>
+              <div className="min-w-0 flex-1">
+                {step}
+                <StepFigure step={i} lang={lang} />
+              </div>
             </li>
           ))}
         </ol>
