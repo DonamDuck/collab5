@@ -171,7 +171,7 @@ function FirstClickFigure({ lang }: { lang: Lang }) {
       <rect x="297" y="147" width="136" height="4" fill={C.accent} />
       <Dot x={312} y={149} />
       <Cursor x={316} y={156} />
-      <Badge x={400} y={190} n="1" />
+      <Badge x={342} y={169} n="1" />
     </Frame>
   );
 }
@@ -188,9 +188,9 @@ function SecondClickFigure({ lang }: { lang: Lang }) {
       <rect x="297" y="147" width="136" height="4" fill={C.accent} />
       <Dot x={312} y={149} />
       <rect x="118" y="124" width="184" height="4" fill={C.accent} />
-      <Dot x={286} y={126} />
-      <Cursor x={290} y={104} />
-      <Badge x={160} y={60} n="2" />
+      <Dot x={272} y={126} />
+      <Cursor x={276} y={133} />
+      <Badge x={258} y={152} n="2" />
     </Frame>
   );
 }
