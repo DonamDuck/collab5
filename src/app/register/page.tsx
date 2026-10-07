@@ -36,8 +36,9 @@ import { BlockEditor, emptyBlock } from "./BlockEditor";
 import { PhotoGrid } from "./PhotoGrid";
 import { StubSection } from "./StubSection";
 
-/** 자동 만들기는 로컬 시험판(10-03~) — 운영 빌드에선 꺼 둔다. 운영판 = DB 대기열·완성 메일이 붙은 뒤. */
-const AUTO_DRAFT_ON = process.env.NODE_ENV !== "production";
+/** 자동 만들기(선택 1). 10-03 로컬 시험판 → 10-07 운영에도 «신청»을 연다(대표: 「신청부터 열고 문구 맞추기」).
+ *  밤 작업이 감당 못 할 만큼 몰리면 Vercel 환경변수 NEXT_PUBLIC_AUTO_DRAFT=off 하나로 다시 숨긴다(재배포 필요). */
+const AUTO_DRAFT_ON = process.env.NEXT_PUBLIC_AUTO_DRAFT !== "off";
 
 /** 0단계 «어떻게 시작할까요?» 줄 — 호버 연두(대표 10-05).
  *  🎨10-05 디자인팀 검토: 640px 폭에 세 칸이면 칸이 188px라 16px 굵은 문장이 세 줄로 접히고 높이가 들쭉날쭉했다

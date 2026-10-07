@@ -5,11 +5,13 @@
 //   ② 아침 9시 예약 작업: `queue morning` → /api/auto-draft/deliver
 // ⭐메일이 실패해도 상태는 done으로 둔다(초안은 이미 있다). 대신 mailError를 남겨 신청함에 빨갛게 보인다 —
 //   고객이 기다리는 메일이라 «조용히 실패»하면 안 된다.
-// 🔜운영판에선 여기서 초안을 고객 계정에 붙이고(owner_user_id), 주소는 운영 도메인이 된다.
+// 🌐10-07: 운영에서 온 신청(source "prod")은 고객 대신 «대표에게» 넘긴다(notifyDraftHandoff).
+//   운영엔 아직 비공개 초안 상태가 없어 고객에게 로컬 링크를 줄 수 없어서다. 대표가 고객 확인을 받고 운영에 올린다.
+// 🔜운영판 2단계에선 여기서 초안을 고객 계정에 붙이고(owner_user_id), 주소는 운영 도메인이 된다.
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { notifyDraftReady } from "./notify";
-import { buildLocalDraft } from "./autoDraftLocal";
+import { notifyDraftHandoff, notifyDraftReady } from "./notify";
+import { buildLocalDraft, localDraftState } from "./autoDraftLocal";
 import { kstIso } from "./time";
 import type { AutoDraftRequest } from "./autoDraft";
 
@@ -25,7 +27,22 @@ export async function deliverDraft(
   // 로컬 서버를 다시 켜면 초안 페이지가 비워진다 → 링크가 빈 페이지로 가지 않게 보내기 직전에 다시 만든다
   const slug = await buildLocalDraft(safe);
   const base = (process.env.NEXT_PUBLIC_SITE_URL || opts.origin).replace(/\/$/, "");
-  const r = await notifyDraftReady({ to: req.email, brandName: req.brandName, url: `${base}/m/${slug}` });
+  let r: { ok: true } | { ok: false; why: string };
+  if (req.source === "prod") {
+    // 대표 컴퓨터에서만 열리는 주소라 운영 도메인(NEXT_PUBLIC_SITE_URL)을 쓰면 안 된다
+    const state = await localDraftState(slug);
+    const n = state?.notes;
+    const questions = n ? n.general.length + [...n.activities, ...n.collabs].reduce((k, q) => k + q.length, 0) : 0;
+    r = await notifyDraftHandoff({
+      brandName: req.brandName,
+      url: `${opts.origin.replace(/\/$/, "")}/m/${slug}`,
+      customerEmail: req.email,
+      accountEmail: req.account?.email ?? "",
+      questions,
+    });
+  } else {
+    r = await notifyDraftReady({ to: req.email, brandName: req.brandName, url: `${base}/m/${slug}` });
+  }
   const now = kstIso(new Date());
   const next: AutoDraftRequest = {
     ...req,

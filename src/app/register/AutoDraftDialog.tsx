@@ -25,6 +25,7 @@ import {
   CHANNEL_LABEL,
   CONSENT_TEXT,
   DAILY_CAP,
+  DELIVERY_PROMISE,
   EMAIL_RE,
   etaDays,
   parseChannel,
@@ -53,7 +54,8 @@ export function AutoDraftDialog({ initialName, onClose }: Props) {
   const [waiting, setWaiting] = useState<number | null>(null);
   const [finding, setFinding] = useState(false);
   const [found, setFound] = useState<string[] | null>(null);
-  const [done, setDone] = useState<{ position: number; etaDays: number } | null>(null);
+  // position = 대기 순번. 운영은 진행 상태를 안 적어 모른다 → null(10-07)
+  const [done, setDone] = useState<{ position: number | null; etaDays: number } | null>(null);
   const [findShown, setFindShown] = useState(false);
   const router = useRouter();
 
@@ -214,13 +216,10 @@ export function AutoDraftDialog({ initialName, onClose }: Props) {
               요청이 접수됐어요.
             </p>
             <p className="mt-3 break-keep text-[15px] leading-[1.7] text-body">
-              지금 대기 {done.position}번째예요. 하루 {DAILY_CAP}팀씩 순서대로 제작되고 있어서, {done.etaDays}~{done.etaDays + 1}일 안에{" "}
-              <b className="text-ink">{email.trim()}</b>로 안내해 드릴게요.
+              {done.position ? `지금 대기 ${done.position}번째예요. ` : ""}하루 {DAILY_CAP}팀씩 순서대로 제작되고 있어서,{" "}
+              {done.etaDays}~{done.etaDays + 1}일 안에 <b className="text-ink">{email.trim()}</b>로 안내해 드릴게요.
             </p>
-            <p className="mt-2 break-keep text-[14px] leading-[1.65] text-mute">
-              초안을 받아 보시고, 고칠 곳을 고친 뒤 「게시하기」를 누르시면 모든 분이 「{name.trim()}」의 소개서를 볼 수
-              있어요.
-            </p>
+            <p className="mt-2 break-keep text-[14px] leading-[1.65] text-mute">{DELIVERY_PROMISE}</p>
             <p className="mt-2 break-keep text-[14px] leading-[1.65] text-mute">접수 안내 메일도 방금 보내 드렸어요.</p>
             <button
               type="button"
@@ -432,15 +431,15 @@ export function AutoDraftDialog({ initialName, onClose }: Props) {
               </label>
               <ul className="mt-2.5 list-disc space-y-1 pl-[46px] text-[13px] leading-[1.6] text-mute">
                 <li>공개 글과 사진을 활용해요.</li>
-                <li>초안은 공개되지 않은 상태로 만들어지고, 공개 여부는 직접 정하실 수 있어요.</li>
-                <li>초안은 언제든 직접 삭제가 가능해요.</li>
+                <li>{DELIVERY_PROMISE}</li>
+                <li>공개한 뒤에도 언제든 직접 고치거나 삭제할 수 있어요.</li>
               </ul>
             </section>
 
             <div>
               <p className="break-keep text-[13px] leading-[1.6] text-mute">
                 하루 {DAILY_CAP}팀까지 순서대로 제작되고 있어요.
-                {waiting !== null && ` 지금 신청하시면 ${etaDays(nextPos)}~${etaDays(nextPos) + 1}일쯤 걸리고,`} 완성되면 이메일로 안내해 드릴게요.
+                {waiting !== null ? ` 지금 신청하시면 ${etaDays(nextPos)}~${etaDays(nextPos) + 1}일쯤 걸리고,` : " 보통 1~2일쯤 걸리고,"} 완성되면 이메일로 안내해 드릴게요.
               </p>
               {err && <p className="mt-2 text-[13px] text-danger">{err}</p>}
               <button

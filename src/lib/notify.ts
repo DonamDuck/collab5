@@ -11,6 +11,7 @@
 // 발송은 Resend REST API를 fetch로 직접 친다. `resend` 패키지를 안 쓰는 이유:
 // 요청이 POST 한 방이라 의존성을 늘릴 이유가 없고, 번들도 안 커진다.
 import { kstIso } from "./time";
+import { DELIVERY_PROMISE } from "./autoDraft";
 
 const RESEND_ENDPOINT = "https://api.resend.com/emails";
 
@@ -161,7 +162,8 @@ export function draftReadyMail(n: { brandName: string; url: string }): { subject
  *  (보내는 주소 notice@는 받는 메일함이 없다). */
 export function draftRequestedMail(n: {
   brandName: string;
-  position: number;
+  /** 대기 순번. 운영은 진행 상태를 표에 안 적어서 모른다 → null이면 순번 없이 쓴다(10-07) */
+  position: number | null;
   etaDays: number;
   dailyCap: number;
   channels: string[];
@@ -173,24 +175,30 @@ export function draftRequestedMail(n: {
     `안녕하세요, collab5예요.`,
     ``,
     `「${n.brandName}」 소개서 초안 신청이 완료됐어요.`,
-    `하루 ${n.dailyCap}팀씩 순서대로 만들고 있고, 지금 대기 ${n.position}번째예요. ${when} 안에 초안이 완성되면 이 주소로 다시 안내해 드릴게요.`,
+    n.position
+      ? `하루 ${n.dailyCap}팀씩 순서대로 만들고 있고, 지금 대기 ${n.position}번째예요. ${when} 안에 초안이 완성되면 이 주소로 다시 안내해 드릴게요.`
+      : `하루 ${n.dailyCap}팀씩 순서대로 만들고 있어서 ${when}쯤 걸려요. 초안이 완성되면 이 주소로 다시 안내해 드릴게요.`,
     ``,
     `알려 주신 채널`,
     ...n.channels.map((c) => `· ${c}`),
     ``,
-    `초안은 공개되지 않은 상태로 만들어져요. 받아 보시고 「게시하기」를 누르셔야 다른 분들께 보여요.`,
+    DELIVERY_PROMISE,
     ...(canReply ? [`잘못 적은 주소가 있거나 더 알려 주실 것이 있으면 이 메일에 답장해 주세요.`] : []),
     ``,
     `collab5 — 내 이야기로 시작하는 콜라보 공간`,
   ].join("\n");
   const html = `<div style="font-family:-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo',sans-serif;font-size:15px;line-height:1.75;color:#1a1a1a;max-width:520px">
   <p style="margin:0 0 16px">안녕하세요, <strong>collab5</strong>예요.</p>
-  <p style="margin:0 0 16px"><strong>「${esc(n.brandName)}」</strong> 소개서 초안 신청이 완료됐어요.<br>하루 ${n.dailyCap}팀씩 순서대로 만들고 있고, 지금 대기 <strong>${n.position}번째</strong>예요. ${when} 안에 초안이 완성되면 이 주소로 다시 안내해 드릴게요.</p>
+  <p style="margin:0 0 16px"><strong>「${esc(n.brandName)}」</strong> 소개서 초안 신청이 완료됐어요.<br>${
+    n.position
+      ? `하루 ${n.dailyCap}팀씩 순서대로 만들고 있고, 지금 대기 <strong>${n.position}번째</strong>예요. ${when} 안에 초안이 완성되면 이 주소로 다시 안내해 드릴게요.`
+      : `하루 ${n.dailyCap}팀씩 순서대로 만들고 있어서 ${when}쯤 걸려요. 초안이 완성되면 이 주소로 다시 안내해 드릴게요.`
+  }</p>
   <div style="margin:0 0 20px;padding:12px 16px;border-radius:8px;background:#f5f7f2">
     <p style="margin:0 0 4px;font-size:13px;color:#666">알려 주신 채널</p>
     ${n.channels.map((c) => `<p style="margin:0;font-size:14px;color:#1a1a1a;word-break:break-all">${esc(c)}</p>`).join("\n    ")}
   </div>
-  <p style="margin:0 0 ${canReply ? "8px" : "24px"};color:#444">초안은 공개되지 않은 상태로 만들어져요. 받아 보시고 「게시하기」를 누르셔야 다른 분들께 보여요.</p>
+  <p style="margin:0 0 ${canReply ? "8px" : "24px"};color:#444">${DELIVERY_PROMISE}</p>
   ${canReply ? `<p style="margin:0 0 24px;color:#444">잘못 적은 주소가 있거나 더 알려 주실 것이 있으면 이 메일에 답장해 주세요.</p>` : ""}
   <p style="margin:0;color:#888;font-size:13px">collab5 — 내 이야기로 시작하는 콜라보 공간</p>
 </div>`;
@@ -200,7 +208,7 @@ export function draftRequestedMail(n: {
 export async function notifyDraftRequested(n: {
   to: string;
   brandName: string;
-  position: number;
+  position: number | null;
   etaDays: number;
   dailyCap: number;
   channels: string[];
@@ -216,6 +224,46 @@ export async function notifyDraftReady(n: {
   url: string;
 }): Promise<{ ok: true } | { ok: false; why: string }> {
   return sendDraftMail(n.to, draftReadyMail(n), "초안 안내");
+}
+
+/** 운영에서 온 신청의 초안이 준비됐을 때 «대표에게» 가는 메일(10-07, 운영 1단계).
+ *  운영엔 아직 비공개 초안 상태가 없어서 고객에게 로컬 링크를 줄 수 없다. 대표가 이 링크로 초안을 보고,
+ *  고객에게 보여 확인받은 뒤 기존 컨시어지처럼 운영에 올리고 신청 계정에 연결한다. */
+export function draftHandoffMail(n: {
+  brandName: string;
+  url: string;
+  customerEmail: string;
+  accountEmail: string;
+  questions: number;
+}): { subject: string; text: string; html: string } {
+  const subject = `[collab5 신청함] 「${n.brandName}」 초안이 준비됐어요 — 고객 확인 받을 차례`;
+  const lines = [
+    `「${n.brandName}」 초안을 밤사이 만들어 뒀어요.`,
+    ``,
+    `초안 보기(대표님 컴퓨터에서만 열려요): ${n.url}`,
+    `안내 받을 이메일: ${n.customerEmail}`,
+    `신청한 계정: ${n.accountEmail || "(알 수 없음)"}`,
+    `항목마다 남긴 질문: ${n.questions}개`,
+    ``,
+    `다음 차례: 초안을 고객께 보여 드리고 확인을 받은 뒤, 운영에 올리고 신청 계정에 연결해 주세요.`,
+    `고객께는 「${DELIVERY_PROMISE}」라고 안내돼 있어요.`,
+  ];
+  const text = lines.join("\n");
+  const html = `<div style="font-family:-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo',sans-serif;font-size:15px;line-height:1.75;color:#1a1a1a;max-width:520px">
+  <p style="margin:0 0 16px"><strong>「${esc(n.brandName)}」</strong> 초안을 밤사이 만들어 뒀어요.</p>
+  <p style="margin:0 0 20px"><a href="${esc(n.url)}" style="display:inline-block;padding:12px 20px;border-radius:8px;background:#98ff5c;color:#1f5c00;font-weight:700;text-decoration:none">초안 보기</a><br><span style="font-size:13px;color:#888">대표님 컴퓨터에서만 열려요</span></p>
+  <p style="margin:0 0 4px;font-size:14px">안내 받을 이메일 · ${esc(n.customerEmail)}</p>
+  <p style="margin:0 0 4px;font-size:14px">신청한 계정 · ${esc(n.accountEmail || "(알 수 없음)")}</p>
+  <p style="margin:0 0 20px;font-size:14px">항목마다 남긴 질문 · ${n.questions}개</p>
+  <p style="margin:0 0 8px;color:#444">다음 차례는 초안을 고객께 보여 드리고 확인을 받은 뒤, 운영에 올리고 신청 계정에 연결하는 거예요.</p>
+  <p style="margin:0;color:#888;font-size:13px">고객께는 「${esc(DELIVERY_PROMISE)}」라고 안내돼 있어요.</p>
+</div>`;
+  return { subject, text, html };
+}
+
+export async function notifyDraftHandoff(n: Parameters<typeof draftHandoffMail>[0]) {
+  if (!DRAFT_COPY_TO) return { ok: false as const, why: "받을 곳 없음(DRAFT_MAIL_COPY_TO·ADMIN_EMAIL)" };
+  return sendDraftMail(DRAFT_COPY_TO, draftHandoffMail(n), "대표 인계");
 }
 
 /** 고객 안내 메일 공통 발송 — 접수·완성 두 통이 같은 발신·답장 주소를 쓴다. throw하지 않는다. */

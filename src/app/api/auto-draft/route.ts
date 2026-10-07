@@ -1,12 +1,14 @@
-// POST /api/auto-draft — 소개서 자동 만들기 신청을 대기열에 쌓는다 (2026-10-03, 로컬 시험판)
-// GET  /api/auto-draft — 지금 대기 중인 신청 수(화면의 「대기 N번째 · 약 D일」 안내용)
+// POST /api/auto-draft — 소개서 자동 만들기 신청을 쌓는다 (2026-10-03 로컬 시험판 · 10-07 운영 신청 열기)
+// GET  /api/auto-draft — 로그인 여부·계정 이메일, 그리고 로컬이면 대기 중인 신청 수(「대기 N번째」 안내용)
 //
-// ⚠️**로컬 전용이다.** 대기열이 이 컴퓨터의 파일(`_workspace/auto-draft-queue/`)이라 Vercel에선 쓸 곳이 없다.
-//   운영에 올릴 땐 DB 표로 옮기고, 대표 컴퓨터가 그 표를 밤마다 꺼내 가게 한다(사이트가 집 컴퓨터로 직접
-//   신호를 쏘면 집 컴퓨터에 문을 열어야 해서 그렇게 하지 않는다).
-// 🔔신청이 들어오면 맥 알림을 띄운다 — 「버튼 → 내 컴퓨터로 푸시」를 로컬에서 흉내 낸 것.
-//   이 세션의 Claude는 같은 폴더를 지켜보다가 새 파일이 생기면 스킬을 시작한다.
+// 🗂**쌓는 곳이 둘이다.**
+//   · 로컬(개발 서버) = 이 컴퓨터의 폴더 `_workspace/auto-draft-queue/` — 밤 작업이 바로 읽는다.
+//   · 운영(Vercel) = `auto_draft_requests` 표 — Vercel엔 그 폴더가 없다. 밤 작업이 `queue pull`로 표를 «읽어»
+//     로컬 폴더로 가져간다(사이트가 집 컴퓨터로 신호를 쏘면 집 컴퓨터에 문을 열어야 해서 그렇게 하지 않는다).
+//   ⚠️운영에선 «대기 N번째»를 안 보여 준다. 표에 진행 상태가 없어서다(밤 작업은 운영 DB에 쓰지 않는다 — 10-05 규칙).
+// 🔔로컬에선 신청이 들어오면 맥 알림을 띄운다. 운영에선 접수 메일의 숨은 참조(대표)가 그 일을 한다.
 import { after, NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
 import { execFile } from "node:child_process";
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -26,7 +28,15 @@ import { getSessionUserId } from "@/lib/profiles";
 import { notifyDraftRequested } from "@/lib/notify";
 
 const QUEUE_DIR = path.join(process.cwd(), "_workspace", "auto-draft-queue");
-const LOCAL_ONLY = process.env.NODE_ENV === "production";
+const PROD = process.env.NODE_ENV === "production";
+
+/** 운영 표 클라이언트(서비스 롤). 키가 없으면 null — 그땐 운영에서도 신청을 받지 않는다(조용히 버리지 않는다). */
+function db() {
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return null;
+  return createClient(url, key, { auth: { persistSession: false } });
+}
 
 const str = (v: unknown, max: number) => (typeof v === "string" ? v.trim().slice(0, max) : "");
 
@@ -57,16 +67,12 @@ function notifyMac(title: string, body: string) {
 }
 
 export async function GET() {
-  if (LOCAL_ONLY) return NextResponse.json({ waiting: 0, available: false, loggedIn: false });
-  const [q, user] = await Promise.all([queued(), getSessionUser()]);
+  const [q, user] = await Promise.all([PROD ? Promise.resolve(null) : queued(), getSessionUser()]);
   // 이메일은 «본인에게만» 돌려준다 — 신청 창의 안내 이메일 칸을 미리 채우는 용도
-  return NextResponse.json({ waiting: q.length, available: true, loggedIn: !!user, email: user?.email ?? "" });
+  return NextResponse.json({ waiting: q ? q.length : null, available: true, loggedIn: !!user, email: user?.email ?? "" });
 }
 
 export async function POST(req: Request) {
-  if (LOCAL_ONLY) {
-    return NextResponse.json({ error: "아직 준비 중인 기능이에요." }, { status: 503 });
-  }
   // 🔑로그인한 사람만(대표 10-04). 화면이 막아도 주소로 바로 부르는 길이 남으니 여기서 다시 막는다.
   const user = await getSessionUser();
   if (!user) return NextResponse.json({ error: "로그인이 필요해요." }, { status: 401 });
@@ -116,6 +122,8 @@ export async function POST(req: Request) {
     account: { authId: user.id, email: user.email ?? "", userId: (await getSessionUserId()) ?? null },
   };
 
+  if (PROD) return await saveToTable(request);
+
   const file = path.join(QUEUE_DIR, `${id}.json`);
   await mkdir(QUEUE_DIR, { recursive: true });
   await writeFile(file, JSON.stringify(request, null, 2), "utf8");
@@ -135,7 +143,7 @@ export async function POST(req: Request) {
       position,
       etaDays: eta,
       dailyCap: DAILY_CAP,
-      channels: channels.map((c) => `${CHANNEL_LABEL[c.kind]} ${c.url.replace(/^https:\/\//, "")}`),
+      channels: channelLines(channels),
     });
     try {
       const cur = JSON.parse(await readFile(file, "utf8")) as AutoDraftRequest;
@@ -148,4 +156,53 @@ export async function POST(req: Request) {
   });
 
   return NextResponse.json({ id, position, etaDays: eta });
+}
+
+const channelLines = (channels: AutoDraftChannel[]) =>
+  channels.map((c) => `${CHANNEL_LABEL[c.kind]} ${c.url.replace(/^https:\/\//, "")}`);
+
+/** 운영 — 표에 한 줄 쌓고, 응답 뒤에 접수 메일을 보낸 다음 그 결과를 같은 줄에 적는다. */
+async function saveToTable(r: AutoDraftRequest) {
+  const client = db();
+  if (!client) {
+    console.error("[auto-draft] 운영 DB 키가 없어 신청을 받지 못함");
+    return NextResponse.json({ error: "지금은 신청을 받지 못했어요. 잠시 뒤 다시 눌러 주세요." }, { status: 503 });
+  }
+  const { error } = await client.from("auto_draft_requests").insert({
+    id: r.id,
+    created_at: new Date().toISOString(),
+    brand_name: r.brandName,
+    region: r.region,
+    business_type: r.businessType,
+    channels: r.channels,
+    email: r.email,
+    note: r.note,
+    consent: r.consent,
+    auth_id: r.account?.authId ?? null,
+    user_id: r.account?.userId ?? null,
+    account_email: r.account?.email ?? "",
+  });
+  if (error) {
+    // 표가 없거나(배포가 DB보다 먼저 나간 경우) 권한 문제 — 「접수됐어요」를 띄우면 신청이 조용히 사라진다
+    console.error("[auto-draft] 신청 저장 실패", error.code, error.message);
+    return NextResponse.json({ error: "지금은 신청을 받지 못했어요. 잠시 뒤 다시 눌러 주세요." }, { status: 503 });
+  }
+  console.log(`[auto-draft] saved ${r.id} ${r.brandName} (${r.channels.map((c) => c.kind).join(",")})`);
+
+  after(async () => {
+    const m = await notifyDraftRequested({
+      to: r.email,
+      brandName: r.brandName,
+      position: null,
+      etaDays: 1,
+      dailyCap: DAILY_CAP,
+      channels: channelLines(r.channels),
+    });
+    await client
+      .from("auto_draft_requests")
+      .update(m.ok ? { receipt_at: new Date().toISOString() } : { receipt_error: m.why })
+      .eq("id", r.id);
+  });
+
+  return NextResponse.json({ id: r.id, position: null, etaDays: 1 });
 }
