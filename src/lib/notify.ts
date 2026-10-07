@@ -153,14 +153,77 @@ export function draftReadyMail(n: { brandName: string; url: string }): { subject
   return { subject, text, html };
 }
 
+/** 신청 접수 메일(대표 10-07: *「소개서 작성 요청하면 이메일로 요청 완료했다고 하나 보내는 거 어때?」*).
+ *  1~2일을 기다리는 동안 «내 신청이 들어갔나»를 메일함에서 확인할 수 있게 한다. 알려 주신 채널도 같이 적어
+ *  잘못 적은 주소를 고객이 먼저 알아채게 한다. 답장 받는 곳이 있을 때만 «답장해 주세요»를 넣는다
+ *  (보내는 주소 notice@는 받는 메일함이 없다). */
+export function draftRequestedMail(n: {
+  brandName: string;
+  position: number;
+  etaDays: number;
+  dailyCap: number;
+  channels: string[];
+}): { subject: string; text: string; html: string } {
+  const subject = `[collab5] 「${n.brandName}」 소개서 초안 요청을 받았어요`;
+  const when = `${n.etaDays}~${n.etaDays + 1}일`;
+  const canReply = !!DRAFT_REPLY_TO;
+  const text = [
+    `안녕하세요, collab5예요.`,
+    ``,
+    `「${n.brandName}」 소개서 초안 요청을 잘 받았어요.`,
+    `하루 ${n.dailyCap}팀씩 순서대로 만들고 있고, 지금 대기 ${n.position}번째예요. ${when} 안에 초안이 완성되면 이 주소로 다시 안내해 드릴게요.`,
+    ``,
+    `알려 주신 채널`,
+    ...n.channels.map((c) => `· ${c}`),
+    ``,
+    `초안은 공개되지 않은 상태로 만들어져요. 받아 보시고 「게시하기」를 누르셔야 다른 분들께 보여요.`,
+    ...(canReply ? [`잘못 적은 주소가 있거나 더 알려 주실 것이 있으면 이 메일에 답장해 주세요.`] : []),
+    ``,
+    `collab5 — 내 이야기로 시작하는 콜라보 공간`,
+  ].join("\n");
+  const html = `<div style="font-family:-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo',sans-serif;font-size:15px;line-height:1.75;color:#1a1a1a;max-width:520px">
+  <p style="margin:0 0 16px">안녕하세요, <strong>collab5</strong>예요.</p>
+  <p style="margin:0 0 16px"><strong>「${esc(n.brandName)}」</strong> 소개서 초안 요청을 잘 받았어요.<br>하루 ${n.dailyCap}팀씩 순서대로 만들고 있고, 지금 대기 <strong>${n.position}번째</strong>예요. ${when} 안에 초안이 완성되면 이 주소로 다시 안내해 드릴게요.</p>
+  <div style="margin:0 0 20px;padding:12px 16px;border-radius:8px;background:#f5f7f2">
+    <p style="margin:0 0 4px;font-size:13px;color:#666">알려 주신 채널</p>
+    ${n.channels.map((c) => `<p style="margin:0;font-size:14px;color:#1a1a1a;word-break:break-all">${esc(c)}</p>`).join("\n    ")}
+  </div>
+  <p style="margin:0 0 ${canReply ? "8px" : "24px"};color:#444">초안은 공개되지 않은 상태로 만들어져요. 받아 보시고 「게시하기」를 누르셔야 다른 분들께 보여요.</p>
+  ${canReply ? `<p style="margin:0 0 24px;color:#444">잘못 적은 주소가 있거나 더 알려 주실 것이 있으면 이 메일에 답장해 주세요.</p>` : ""}
+  <p style="margin:0;color:#888;font-size:13px">collab5 — 내 이야기로 시작하는 콜라보 공간</p>
+</div>`;
+  return { subject, text, html };
+}
+
+export async function notifyDraftRequested(n: {
+  to: string;
+  brandName: string;
+  position: number;
+  etaDays: number;
+  dailyCap: number;
+  channels: string[];
+}): Promise<{ ok: true } | { ok: false; why: string }> {
+  return sendDraftMail(n.to, draftRequestedMail(n), "접수 안내");
+}
+
 export async function notifyDraftReady(n: {
   to: string;
   brandName: string;
   url: string;
 }): Promise<{ ok: true } | { ok: false; why: string }> {
+  return sendDraftMail(n.to, draftReadyMail(n), "초안 안내");
+}
+
+/** 고객 안내 메일 공통 발송 — 접수·완성 두 통이 같은 발신·답장 주소를 쓴다. throw하지 않는다. */
+async function sendDraftMail(
+  to: string,
+  { subject, text, html }: { subject: string; text: string; html: string },
+  label: string,
+): Promise<{ ok: true } | { ok: false; why: string }> {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) return { ok: false, why: "RESEND_API_KEY 없음" };
-  const { subject, text, html } = draftReadyMail(n);
+  // 로컬 가짜 로그인 주소(local@dev.invalid)는 Resend가 «받았다»고 답한 뒤 반송된다(10-07 실측) — 반송이 쌓이면 발신 평판이 깎인다
+  if (/\.invalid$/i.test(to.trim())) return { ok: false, why: "테스트 주소(.invalid)라 보내지 않았어요" };
 
   try {
     const res = await fetch(RESEND_ENDPOINT, {
@@ -168,7 +231,7 @@ export async function notifyDraftReady(n: {
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({
         from: DRAFT_FROM,
-        to: [n.to],
+        to: [to],
         ...(DRAFT_REPLY_TO ? { reply_to: DRAFT_REPLY_TO } : {}),
         subject,
         text,
@@ -178,12 +241,12 @@ export async function notifyDraftReady(n: {
     });
     if (!res.ok) {
       const body = await res.text().catch(() => "");
-      console.error("[notify] 초안 안내 실패", res.status, body);
+      console.error(`[notify] ${label} 실패`, res.status, body);
       return { ok: false, why: `발송 실패 ${res.status} ${body.slice(0, 160)}` };
     }
     return { ok: true };
   } catch (e) {
-    console.error("[notify] 초안 안내 예외", e);
+    console.error(`[notify] ${label} 예외`, e);
     return { ok: false, why: `발송 예외 ${e instanceof Error ? e.message : String(e)}` };
   }
 }

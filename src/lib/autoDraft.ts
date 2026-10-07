@@ -67,6 +67,9 @@ export interface AutoDraftRequest {
   /** 고객 안내 메일 — 보낸 시각, 또는 못 보낸 이유(키 없음·발송 실패). 다시 보낼지는 사람이 정한다 */
   mailedAt?: string;
   mailError?: string;
+  /** 신청 접수 메일(10-07) — 보낸 시각, 또는 못 보낸 이유 */
+  receiptAt?: string;
+  receiptError?: string;
   /** 동의 문구 원문과 시각 — 무엇에 동의했는지가 남아야 나중에 다툼이 없다 */
   consent: { text: string; at: string };
   /** 요청한 계정 — 초안을 여기에 바로 붙인다(이관 단계 없음). userId는 public.users.user_id */

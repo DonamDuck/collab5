@@ -3,7 +3,10 @@
 // 소개서 사전 정보 입력 창 (2026-10-03 로컬 시험판 · 10-04 대표 QA 19건 반영) — 정본 설명은 lib/autoDraft.ts 머리말.
 //
 // 흐름: 로그인 확인 → 브랜드 → (권유) 이름으로 미리 찾아보기 → 인스타 계정 · 그 밖의 주소 → 안내 이메일
-//   → 그 밖에 → 동의 → 요청
+//   → 그 밖에 → 동의 → 요청 → (접수 메일) → 확인을 누르면 홈으로
+//
+// ⏳10-07 대표: 「미리 찾아보기」를 처음부터 띄워 두지 않는다. 브랜드 이름을 치고 1초쯤 지나면 이름 칸 바로 아래에
+//   스르륵 올라온다 — 이름이 있어야 찾을 수 있는 칸이라, 이름보다 먼저 보이면 «뭘 찾는다는 거지?»가 된다.
 //
 // 🔁10-05 대표: 브리프(요약 리포트)는 자동 흐름에서 뺐다(「AI 티가 난다」). 그래서 브리프 재료였던 고민 칸도 뺐다.
 //
@@ -15,6 +18,7 @@
 //   찾은 것은 후보로만 보여 주고 고객이 「추가」를 눌러야 들어간다(위저드의 「맞아요」 원칙 그대로).
 //   10-04 395빵집 시험에서 인스타 후보 셋 중 하나가 다른 가게였다 — 자동으로 넣으면 안 되는 이유다.
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useDismissable } from "@/components/useDismissable";
 import { instagramSlug } from "@/lib/links";
 import {
@@ -50,8 +54,23 @@ export function AutoDraftDialog({ initialName, onClose }: Props) {
   const [finding, setFinding] = useState(false);
   const [found, setFound] = useState<string[] | null>(null);
   const [done, setDone] = useState<{ position: number; etaDays: number } | null>(null);
+  const [findShown, setFindShown] = useState(false);
+  const router = useRouter();
 
-  const dialog = useDismissable(true, { onClose, overlayClose: false, labelledBy: "auto-draft-title" });
+  // 요청을 마치면 홈으로(대표 10-07). ✕·ESC로 닫아도 같다 — 신청 창으로 돌아갈 이유가 없다.
+  const close = done ? () => router.push("/") : onClose;
+  const dialog = useDismissable(true, { onClose: close, overlayClose: false, labelledBy: "auto-draft-title" });
+
+  // 이름을 치고 1초 쉬면 「미리 찾아보기」를 연다. 한 번 열리면 이름을 고쳐도 닫지 않는다(깜빡임 방지) — 다 지우면 닫는다.
+  const hasName = !!name.trim();
+  useEffect(() => {
+    if (!hasName) {
+      setFindShown(false);
+      return;
+    }
+    const t = setTimeout(() => setFindShown(true), 1000);
+    return () => clearTimeout(t);
+  }, [hasName, name]);
 
   useEffect(() => {
     fetch("/api/auto-draft")
@@ -154,7 +173,7 @@ export function AutoDraftDialog({ initialName, onClose }: Props) {
   const closeBtn = (
     <button
       type="button"
-      onClick={onClose}
+      onClick={close}
       aria-label="닫기"
       className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-pill text-[18px] text-mute hover:bg-surface-soft hover:text-ink"
     >
@@ -202,9 +221,10 @@ export function AutoDraftDialog({ initialName, onClose }: Props) {
               초안을 받아 보시고, 고칠 곳을 고친 뒤 「게시하기」를 누르시면 모든 분이 「{name.trim()}」의 소개서를 볼 수
               있어요.
             </p>
+            <p className="mt-2 break-keep text-[14px] leading-[1.65] text-mute">접수 안내 메일도 방금 보내 드렸어요.</p>
             <button
               type="button"
-              onClick={onClose}
+              onClick={close}
               className="mt-5 flex h-12 w-full items-center justify-center rounded-md bg-primary text-[15px] font-bold text-primary-on"
             >
               확인
@@ -224,68 +244,81 @@ export function AutoDraftDialog({ initialName, onClose }: Props) {
             {/* 1. 브랜드 */}
             <section className="space-y-2">
               <p className="text-[14px] font-bold text-ink">브랜드</p>
-              <input value={name} onChange={(e) => setName(e.target.value)} placeholder="브랜드 이름" className={input} />
+              <div>
+                <input value={name} onChange={(e) => setName(e.target.value)} placeholder="브랜드 이름" className={input} />
+                {/* 미리 찾아보기 — 이름을 치고 1초 뒤 이름 칸 바로 아래로 스르륵(대표 10-07). 높이(0fr→1fr)와 함께 올라와서 아래 칸이 툭 밀리지 않는다 */}
+                <div
+                  inert={!findShown}
+                  aria-hidden={!findShown}
+                  className={`grid transition-[grid-template-rows,opacity,translate] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none ${
+                    findShown ? "grid-rows-[1fr] translate-y-0 opacity-100" : "grid-rows-[0fr] translate-y-2 opacity-0"
+                  }`}
+                >
+                  <div className="min-h-0 overflow-hidden">
+                    <div className="pt-2">
+                      <section className="rounded-md border border-primary bg-primary-pale px-4 py-3">
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="break-keep text-[14px] font-medium leading-[1.5] text-ink">
+                            브랜드 이름으로 아래 정보를 미리 찾아볼까요?
+                          </p>
+                          <button
+                            type="button"
+                            onClick={findChannels}
+                            disabled={!name.trim() || finding}
+                            className="h-9 shrink-0 rounded-md bg-primary px-3 text-[13px] font-bold text-primary-on disabled:opacity-40"
+                          >
+                            {finding ? "찾는 중…" : "찾아보기"}
+                          </button>
+                        </div>
+                        {found && (
+                          <div className="mt-3 border-t border-primary/30 pt-3">
+                            {found.length === 0 ? (
+                              <p className="text-[13px] text-mute">찾은 곳이 없어요. 아래에 직접 적어 주세요.</p>
+                            ) : (
+                              <>
+                                <p className="text-[13px] text-mute">정보가 맞다면 추가 버튼으로 추가해주세요.</p>
+                                <ul className="mt-2 space-y-1.5">
+                                  {found.map((u) => {
+                                    const c = parseChannel(u)!;
+                                    return (
+                                      <li key={u} className="flex items-center gap-2">
+                                        <span className="w-[72px] shrink-0 text-[12px] text-mute">{CHANNEL_LABEL[c.kind]}</span>
+                                        <a
+                                          href={u}
+                                          target="_blank"
+                                          rel="noreferrer"
+                                          className="min-w-0 flex-1 truncate text-[13px] text-body underline underline-offset-2"
+                                        >
+                                          {u.replace(/^https:\/\//, "")}
+                                        </a>
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            if (c.kind === "instagram") addIg(`@${instagramSlug(u)}`);
+                                            else addUrl(u);
+                                            setFound((p) => (p ? p.filter((x) => x !== u) : p));
+                                          }}
+                                          className="h-8 shrink-0 rounded-md bg-primary px-3 text-[12px] font-medium text-primary-on"
+                                        >
+                                          추가
+                                        </button>
+                                      </li>
+                                    );
+                                  })}
+                                </ul>
+                              </>
+                            )}
+                          </div>
+                        )}
+                      </section>
+                    </div>
+                  </div>
+                </div>
+              </div>
               <div className="flex flex-col gap-2 sm:flex-row">
                 <input value={region} onChange={(e) => setRegion(e.target.value)} placeholder="지역 (예: 서울 마포)" className={input} />
                 <input value={btype} onChange={(e) => setBtype(e.target.value)} placeholder="하는 일 (예: 빵집)" className={input} />
               </div>
-            </section>
-
-            {/* 미리 찾아보기 — 브랜드와 채널 사이에서 «권하는» 자리(대표 10-04) */}
-            <section className="rounded-md border border-primary bg-primary-pale px-4 py-3">
-              <div className="flex items-center justify-between gap-3">
-                <p className="break-keep text-[14px] font-medium leading-[1.5] text-ink">
-                  브랜드 이름으로 아래 정보를 미리 찾아볼까요?
-                </p>
-                <button
-                  type="button"
-                  onClick={findChannels}
-                  disabled={!name.trim() || finding}
-                  className="h-9 shrink-0 rounded-md bg-primary px-3 text-[13px] font-bold text-primary-on disabled:opacity-40"
-                >
-                  {finding ? "찾는 중…" : "찾아보기"}
-                </button>
-              </div>
-              {found && (
-                <div className="mt-3 border-t border-primary/30 pt-3">
-                  {found.length === 0 ? (
-                    <p className="text-[13px] text-mute">찾은 곳이 없어요. 아래에 직접 적어 주세요.</p>
-                  ) : (
-                    <>
-                      <p className="text-[13px] text-mute">맞는 곳이 있으면 추가해 주세요.</p>
-                      <ul className="mt-2 space-y-1.5">
-                        {found.map((u) => {
-                          const c = parseChannel(u)!;
-                          return (
-                            <li key={u} className="flex items-center gap-2">
-                              <span className="w-[72px] shrink-0 text-[12px] text-mute">{CHANNEL_LABEL[c.kind]}</span>
-                              <a
-                                href={u}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="min-w-0 flex-1 truncate text-[13px] text-body underline underline-offset-2"
-                              >
-                                {u.replace(/^https:\/\//, "")}
-                              </a>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  if (c.kind === "instagram") addIg(`@${instagramSlug(u)}`);
-                                  else addUrl(u);
-                                  setFound((p) => (p ? p.filter((x) => x !== u) : p));
-                                }}
-                                className="h-8 shrink-0 rounded-md bg-primary px-3 text-[12px] font-medium text-primary-on"
-                              >
-                                추가
-                              </button>
-                            </li>
-                          );
-                        })}
-                      </ul>
-                    </>
-                  )}
-                </div>
-              )}
             </section>
 
             {/* 2. 확인할 게시글 채널 — 인스타 / 그 밖의 주소를 칸을 나눠 받는다 */}

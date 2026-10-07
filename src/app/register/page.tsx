@@ -1354,7 +1354,7 @@ function RegisterForm() {
                   <span className={START_CHIP}>⏱ 1~2일</span>
                 </span>
                 <span className="mt-2 block break-keep text-[17px] font-bold leading-[1.4] text-ink">인스타, 블로그 등의 글로 소개서 초안을 만들어 드려요</span>
-                <span className="mt-1.5 block break-keep text-[15px] leading-[1.6] text-mute">그동안 올리신 글과 사진을 읽고 활동과 콜라보까지 채워요</span>
+                <span className="mt-1.5 block break-keep text-[15px] leading-[1.6] text-mute">소개, 활동 내역, 콜라보 등을 정리해 제작해드려요.</span>
               </span>
               <span className={START_BTN}>신청하기</span>
             </button>
@@ -1368,8 +1368,8 @@ function RegisterForm() {
                   <span className={START_TAG}>{AUTO_DRAFT_ON ? "선택 2" : "선택 1"}</span>
                   <span className={START_CHIP}>⏱ 3분</span>
                 </span>
-                <span className="mt-2 block break-keep text-[17px] font-bold leading-[1.4] text-ink">브랜드 이름으로 정보를 찾아 초안을 채워 드려요</span>
-                <span className="mt-1.5 block break-keep text-[15px] leading-[1.6] text-mute">웹에서 찾은 정보로 바로 초안을 받아 다듬어요</span>
+                <span className="mt-2 block break-keep text-[17px] font-bold leading-[1.4] text-ink">지금, 브랜드 이름으로 정보를 찾아 초안을 채워드려요</span>
+                <span className="mt-1.5 block break-keep text-[15px] leading-[1.6] text-mute">빠르게 초안을 만들어 드릴게요.</span>
               </span>
               <span className={START_BTN}>시작하기</span>
             </button>
@@ -1380,7 +1380,7 @@ function RegisterForm() {
                   <span className={START_CHIP}>⏱ 지금 바로</span>
                 </span>
                 <span className="mt-2 block break-keep text-[17px] font-bold leading-[1.4] text-ink">처음부터 직접 쓸게요</span>
-                <span className="mt-1.5 block break-keep text-[15px] leading-[1.6] text-mute">빈 양식에 하나씩 채워 나가요</span>
+                <span className="mt-1.5 block break-keep text-[15px] leading-[1.6] text-mute">빈 양식에 원하는 항목을 직접 추가해 직접 만들어주세요.</span>
               </span>
               <span className={START_BTN}>바로 쓰기</span>
             </button>

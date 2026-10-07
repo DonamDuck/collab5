@@ -6,12 +6,14 @@
 //   신호를 쏘면 집 컴퓨터에 문을 열어야 해서 그렇게 하지 않는다).
 // 🔔신청이 들어오면 맥 알림을 띄운다 — 「버튼 → 내 컴퓨터로 푸시」를 로컬에서 흉내 낸 것.
 //   이 세션의 Claude는 같은 폴더를 지켜보다가 새 파일이 생기면 스킬을 시작한다.
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { execFile } from "node:child_process";
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import {
+  CHANNEL_LABEL,
   CONSENT_TEXT,
+  DAILY_CAP,
   EMAIL_RE,
   etaDays,
   parseChannel,
@@ -21,6 +23,7 @@ import {
 import { kstIso } from "@/lib/time";
 import { getSessionUser } from "@/lib/supabase/server";
 import { getSessionUserId } from "@/lib/profiles";
+import { notifyDraftRequested } from "@/lib/notify";
 
 const QUEUE_DIR = path.join(process.cwd(), "_workspace", "auto-draft-queue");
 const LOCAL_ONLY = process.env.NODE_ENV === "production";
@@ -113,12 +116,36 @@ export async function POST(req: Request) {
     account: { authId: user.id, email: user.email ?? "", userId: (await getSessionUserId()) ?? null },
   };
 
+  const file = path.join(QUEUE_DIR, `${id}.json`);
   await mkdir(QUEUE_DIR, { recursive: true });
-  await writeFile(path.join(QUEUE_DIR, `${id}.json`), JSON.stringify(request, null, 2), "utf8");
+  await writeFile(file, JSON.stringify(request, null, 2), "utf8");
 
   const position = (await queued()).length;
+  const eta = etaDays(position);
   notifyMac("collab5 자동 만들기 신청", `${brandName} · 채널 ${channels.length}개 · 대기 ${position}번째`);
   console.log(`[auto-draft] queued ${id} ${brandName} (${channels.map((c) => c.kind).join(",")})`);
 
-  return NextResponse.json({ id, position, etaDays: etaDays(position) });
+  // ✉️접수 메일(대표 10-07) — 응답을 붙잡지 않게 응답 «뒤에» 보낸다. 신청 한 건에 한 번만 불린다
+  //   (요청 버튼은 누르는 동안 잠기고, 같은 신청 파일로 다시 부르는 길이 없다).
+  //   못 보내도 신청은 그대로 접수다 — 결과만 대기열 파일에 남겨 신청함에서 보이게 한다.
+  after(async () => {
+    const r = await notifyDraftRequested({
+      to: email,
+      brandName,
+      position,
+      etaDays: eta,
+      dailyCap: DAILY_CAP,
+      channels: channels.map((c) => `${CHANNEL_LABEL[c.kind]} ${c.url.replace(/^https:\/\//, "")}`),
+    });
+    try {
+      const cur = JSON.parse(await readFile(file, "utf8")) as AutoDraftRequest;
+      if (r.ok) cur.receiptAt = kstIso(new Date());
+      else cur.receiptError = r.why;
+      await writeFile(file, JSON.stringify(cur, null, 2), "utf8");
+    } catch {
+      // 그 사이 파일이 옮겨졌으면(테스트 보관 등) 남길 곳이 없다 — 신청 자체엔 영향 없음
+    }
+  });
+
+  return NextResponse.json({ id, position, etaDays: eta });
 }

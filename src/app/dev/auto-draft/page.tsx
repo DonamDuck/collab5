@@ -86,6 +86,18 @@ export default async function AutoDraftInbox() {
               ))}
             </ul>
 
+            <p className={`mt-2 text-[13px] ${r.receiptError ? "text-danger" : "text-mute"}`}>
+              {r.receiptError
+                ? `접수 메일을 못 보냈어요 — ${r.receiptError}`
+                : r.receiptAt
+                  ? `접수 메일 보냄 · ${r.receiptAt.slice(0, 16).replace("T", " ")} → ${r.email}`
+                  : "접수 메일 기록 없음"}
+              {" · "}
+              <a href={`/dev/auto-draft/mail?id=${r.id}`} className="underline underline-offset-2">
+                메일 미리보기
+              </a>
+            </p>
+
             {r.status === "done" && (r.mailedAt || r.mailError) && (
               <p className={`mt-2 text-[13px] ${r.mailError ? "text-danger" : "text-mute"}`}>
                 {r.mailError
