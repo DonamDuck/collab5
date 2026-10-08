@@ -325,6 +325,8 @@ function RegisterForm() {
   // ── enrich(딸깍 자동완성) 상태 ──
   const [query, setQuery] = useState(""); // 불러오기 검색어(업체명만)
   const [wizardOpen, setWizardOpen] = useState(false); // 딸깍 자동완성 위저드
+  // 「선택 2」(3분 초안)를 눌렀는가 — 진입 시트를 여기서만 띄운다(대표 10-08)
+  const [chosePath2, setChosePath2] = useState(false);
   const [autoDraftOpen, setAutoDraftOpen] = useState(false); // 소개서 자동 만들기 신청(로컬 시험판, 10-03)
   const [startedSelf, setStartedSelf] = useState(false); // 맨 위 «어떻게 시작할까요?»에서 「직접 쓸게요」를 골랐다
   const [aiFilled, setAiFilled] = useState<Set<string>>(new Set()); // AI가 채운 필드
@@ -1306,9 +1308,11 @@ function RegisterForm() {
 
   return (
     <main className="mx-auto w-full max-w-[640px] px-4 pb-28 pt-8 sm:px-6">
-      {/* 진입 시트 — **새로 작성**하러 온 사람에게만 1초 뒤 올라온다(수정 모드는 제외).
+      {/* 진입 시트 — **「선택 2」(3분 초안)를 고른 사람에게만** 1초 뒤 올라온다(수정 모드는 제외).
+          🔁10-08 대표: 첫 화면(세 갈래)에 들어오자마자 뜨던 걸 선택 2로 옮겼다. 시트 문구가 「AI의 도움으로 간단히
+            만들고 등록하면 저희가 더 채워 드려요」라 선택 2 이야기이고, 맡기기(선택 1)·직접(선택 3)과는 안 맞는다.
           "혼자 다 채우지 않아도 된다"를 먼저 알려 작성 부담으로 인한 이탈을 막는다. 상세는 EnrichIntroSheet.tsx */}
-      <EnrichIntroSheet enabled={!editParam && !editSlug} />
+      <EnrichIntroSheet enabled={!editParam && !editSlug && chosePath2} />
 
       {editSlug ? (
         <>
@@ -1362,6 +1366,7 @@ function RegisterForm() {
             )}
             <button type="button" onClick={() => {
                 setQuery("");
+                setChosePath2(true);
                 setWizardOpen(true);
               }} className={START_CARD}>
               <span className="min-w-0 flex-1">

@@ -1,6 +1,7 @@
 "use client";
 
-// 등록 진입 시트 — /register를 **새로 작성**하러 온 사람에게 1초 뒤 스르륵 올라온다.
+// 등록 진입 시트 — /register에서 **「선택 2」(3분 초안)를 고른** 사람에게 1초 뒤 스르륵 올라온다(10-08 대표, 전엔 진입 직후).
+//   그래서 위저드 창 «위»에 뜬다 — 위저드가 같은 z-50이고 DOM에서 뒤라, 이 시트를 한 단 올렸다(z-[60]).
 // 목적: 소개서 작성이 부담스러워 그냥 나가는 사람에게 "혼자 다 채우지 않아도 된다"를 먼저 알린다.
 //       여기서 신청까지 받지는 않는다 — 소개서가 있어야 보강이 성립하므로 **등록 후**로 보낸다.
 //
@@ -50,7 +51,7 @@ export function EnrichIntroSheet({ enabled }: { enabled: boolean }) {
 
   return (
     <div
-      className={`fixed inset-0 z-50 bg-ink/40 transition-opacity duration-200 ${shown ? "opacity-100" : "opacity-0"}`}
+      className={`fixed inset-0 z-[60] bg-ink/40 transition-opacity duration-200 ${shown ? "opacity-100" : "opacity-0"}`}
       {...dialog.overlayProps}
     >
       <div
