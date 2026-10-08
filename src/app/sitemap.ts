@@ -12,6 +12,12 @@ export const revalidate = 3600;
 import type { MetadataRoute } from "next";
 import { repo } from "@/lib/repo";
 import { SITE_URL } from "@/lib/site";
+import { HREFLANG, LANGS, PATH as MA_PATH } from "./sideproject/monitoralign/langs";
+
+const monitorAlignLanguages: Record<string, string> = {
+  ...Object.fromEntries(LANGS.map((l) => [HREFLANG[l], `${SITE_URL}${MA_PATH[l]}`])),
+  "x-default": `${SITE_URL}${MA_PATH.en}`,
+};
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const [brands, articles] = await Promise.all([
@@ -26,20 +32,16 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${SITE_URL}/magazine`, changeFrequency: "weekly", priority: 0.7 },
     { url: `${SITE_URL}/terms`, changeFrequency: "yearly", priority: 0.2 },
     { url: `${SITE_URL}/privacy`, changeFrequency: "yearly", priority: 0.2 },
-    // 사적인 프로젝트(10-06) — 대표 개인 도구. MonitorAlign은 한·영 두 판이 서로를 hreflang으로 가리킨다.
+    // 사적인 프로젝트(10-06) — 대표 개인 도구.
     { url: `${SITE_URL}/sideproject`, changeFrequency: "monthly", priority: 0.3 },
-    {
-      url: `${SITE_URL}/sideproject/monitoralign`,
-      changeFrequency: "monthly",
+    // MonitorAlign 아홉 언어(10-08) — 주소마다 아홉 판 전부 + x-default(영어)를 hreflang으로 단다.
+    //   언어 목록·주소는 monitoralign/langs.ts 한 곳에서 온다(페이지의 <link rel="alternate">와 같은 값).
+    ...LANGS.map((l) => ({
+      url: `${SITE_URL}${MA_PATH[l]}`,
+      changeFrequency: "monthly" as const,
       priority: 0.5,
-      alternates: { languages: { ko: `${SITE_URL}/sideproject/monitoralign`, en: `${SITE_URL}/sideproject/monitoralign/en` } },
-    },
-    {
-      url: `${SITE_URL}/sideproject/monitoralign/en`,
-      changeFrequency: "monthly",
-      priority: 0.5,
-      alternates: { languages: { ko: `${SITE_URL}/sideproject/monitoralign`, en: `${SITE_URL}/sideproject/monitoralign/en` } },
-    },
+      alternates: { languages: monitorAlignLanguages },
+    })),
   ];
 
   // 매거진 — **발행분만**(초안은 공개 상세가 404라 넣으면 크롤러에게 죽은 주소를 주는 꼴).
