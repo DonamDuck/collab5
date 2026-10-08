@@ -29,17 +29,24 @@ export async function deliverDraft(
   const base = (process.env.NEXT_PUBLIC_SITE_URL || opts.origin).replace(/\/$/, "");
   let r: { ok: true } | { ok: false; why: string };
   if (req.source === "prod") {
-    // 대표 컴퓨터에서만 열리는 주소라 운영 도메인(NEXT_PUBLIC_SITE_URL)을 쓰면 안 된다
+    // 🌐운영 신청 — 고객 대신 «대표에게» 알린다. 운영 초안 올리기·고객 메일은 대표가 신청함 버튼으로(autoDraftPush, 10-08).
+    //   상태는 review 그대로 둔다(버튼이 거기서 보인다). 같은 초안으로 아침마다 다시 보내지 않게 handoffAt을 본다.
+    if (req.handoffAt) return { mailed: false, why: "이미 대표에게 알렸어요" };
+    const origin = opts.origin.replace(/\/$/, ""); // 대표 컴퓨터에서만 열리는 주소 — 운영 도메인(NEXT_PUBLIC_SITE_URL)을 쓰면 안 된다
     const state = await localDraftState(slug);
     const n = state?.notes;
     const questions = n ? n.general.length + [...n.activities, ...n.collabs].reduce((k, q) => k + q.length, 0) : 0;
-    r = await notifyDraftHandoff({
+    const h = await notifyDraftHandoff({
       brandName: req.brandName,
-      url: `${opts.origin.replace(/\/$/, "")}/m/${slug}`,
+      url: `${origin}/m/${slug}`,
+      inboxUrl: `${origin}/dev/auto-draft`,
       customerEmail: req.email,
       accountEmail: req.account?.email ?? "",
       questions,
     });
+    const at = kstIso(new Date());
+    await writeFile(f, JSON.stringify({ ...req, ...(h.ok ? { handoffAt: at } : { mailError: h.why }) }, null, 2), "utf8");
+    return h.ok ? { mailed: true } : { mailed: false, why: h.why };
   } else {
     r = await notifyDraftReady({ to: req.email, brandName: req.brandName, url: `${base}/m/${slug}` });
   }

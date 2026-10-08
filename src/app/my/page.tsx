@@ -35,8 +35,10 @@ export default async function MyPage({ searchParams }: { searchParams: Promise<{
   // 프로필·내 소개서·찜 목록은 서로 독립 조회 — 병렬로 가져와 왕복 단축
   // 소유·찜 조회는 정수 profiles.user_id 기준(07-25 전환) — 프로필을 먼저 풀고 목록을 병렬 조회.
   const profile = await getProfile(user.id);
-  const [makers, saved, reports] = await Promise.all([
+  // 🔒`makers` = 공개 소개서만(제안·리포트·콜라보 기록이 쓴다). 비공개 초안은 «내 소개서» 목록에만 따로 싣는다(10-08).
+  const [makers, rows, saved, reports] = await Promise.all([
     profile ? repo.listMakersByOwner(profile.id) : Promise.resolve([]),
+    profile ? repo.listMakersByOwnerWithDrafts(profile.id) : Promise.resolve([]),
     profile ? repo.listSavedMakers(profile.id) : Promise.resolve([]),
     profile ? repo.listCollabReportsByUser(profile.id) : Promise.resolve([]),
   ]);
@@ -58,7 +60,7 @@ export default async function MyPage({ searchParams }: { searchParams: Promise<{
 
   // 내 소개서 탭 콘텐츠
   const mine =
-    makers.length === 0 ? (
+    rows.length === 0 ? (
       <EmptyState
         title="아직 내 소개서가 없어요"
         desc={
@@ -75,7 +77,7 @@ export default async function MyPage({ searchParams }: { searchParams: Promise<{
       </EmptyState>
     ) : (
       <div className="space-y-2">
-        {makers.map((m) => (
+        {rows.map((m) => (
           <MakerRow
             key={m.slug}
             slug={m.slug}
@@ -83,6 +85,7 @@ export default async function MyPage({ searchParams }: { searchParams: Promise<{
             oneLiner={m.oneLiner}
             searchVisible={m.searchVisible}
             collabPaused={m.collabPaused}
+            isDraft={m.status === "draft"}
           />
         ))}
         <div className="flex justify-center pt-2">

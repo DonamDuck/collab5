@@ -232,11 +232,12 @@ export async function notifyDraftReady(n: {
 export function draftHandoffMail(n: {
   brandName: string;
   url: string;
+  inboxUrl: string;
   customerEmail: string;
   accountEmail: string;
   questions: number;
 }): { subject: string; text: string; html: string } {
-  const subject = `[collab5 신청함] 「${n.brandName}」 초안이 준비됐어요 — 고객 확인 받을 차례`;
+  const subject = `[collab5 신청함] 「${n.brandName}」 초안이 준비됐어요 — 운영에 올릴 차례`;
   const lines = [
     `「${n.brandName}」 초안을 밤사이 만들어 뒀어요.`,
     ``,
@@ -245,8 +246,9 @@ export function draftHandoffMail(n: {
     `신청한 계정: ${n.accountEmail || "(알 수 없음)"}`,
     `항목마다 남긴 질문: ${n.questions}개`,
     ``,
-    `다음 차례: 초안을 고객께 보여 드리고 확인을 받은 뒤, 운영에 올리고 신청 계정에 연결해 주세요.`,
-    `고객께는 「${DELIVERY_PROMISE}」라고 안내돼 있어요.`,
+    `다음 차례: 초안을 훑어보시고 괜찮으면 신청함에서 「운영에 올리고 안내 보내기」를 눌러 주세요.`,
+    `신청함: ${n.inboxUrl}`,
+    `누르면 운영에 비공개 초안으로 올라가 신청 계정에 붙고, 고객께 안내 메일이 가요. 고객이 확인하고 직접 게시해요.`,
   ];
   const text = lines.join("\n");
   const html = `<div style="font-family:-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo',sans-serif;font-size:15px;line-height:1.75;color:#1a1a1a;max-width:520px">
@@ -255,8 +257,8 @@ export function draftHandoffMail(n: {
   <p style="margin:0 0 4px;font-size:14px">안내 받을 이메일 · ${esc(n.customerEmail)}</p>
   <p style="margin:0 0 4px;font-size:14px">신청한 계정 · ${esc(n.accountEmail || "(알 수 없음)")}</p>
   <p style="margin:0 0 20px;font-size:14px">항목마다 남긴 질문 · ${n.questions}개</p>
-  <p style="margin:0 0 8px;color:#444">다음 차례는 초안을 고객께 보여 드리고 확인을 받은 뒤, 운영에 올리고 신청 계정에 연결하는 거예요.</p>
-  <p style="margin:0;color:#888;font-size:13px">고객께는 「${esc(DELIVERY_PROMISE)}」라고 안내돼 있어요.</p>
+  <p style="margin:0 0 8px;color:#444">초안을 훑어보시고 괜찮으면 <a href="${esc(n.inboxUrl)}">신청함</a>에서 「운영에 올리고 안내 보내기」를 눌러 주세요.</p>
+  <p style="margin:0;color:#888;font-size:13px">누르면 운영에 비공개 초안으로 올라가 신청 계정에 붙고, 고객께 안내 메일이 가요. 고객이 확인하고 직접 게시해요.</p>
 </div>`;
   return { subject, text, html };
 }

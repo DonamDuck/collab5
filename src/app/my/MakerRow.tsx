@@ -16,12 +16,15 @@ export function MakerRow({
   oneLiner,
   searchVisible,
   collabPaused,
+  isDraft = false,
 }: {
   slug: string;
   name: string;
   oneLiner?: string;
   searchVisible: boolean;
   collabPaused: boolean;
+  /** 비공개 초안(자동 만들기, 10-08) — 「비공개 초안」 표시 + 공개용 토글 숨김 */
+  isDraft?: boolean;
 }) {
   const router = useRouter();
   const [confirming, setConfirming] = useState(false);
@@ -55,6 +58,11 @@ export function MakerRow({
               **0.125px 차이**로 사실상 같은 크기였다 → /m 사다리(제목 17 / 보조 14)로 벌린다. */}
           <p className="flex items-center gap-1.5 text-[17px] font-bold text-ink">
             <span className="min-w-0 truncate">{name}</span>
+            {isDraft && (
+              <span className="inline-flex h-6 shrink-0 items-center rounded-pill border border-[#F0D9A8] bg-[#FFF8EA] px-2 text-[12px] font-medium text-[#8A5A0B]">
+                🔒 비공개 초안
+              </span>
+            )}
             {isDemoSlug(slug) && (
               <span className="inline-flex h-6 shrink-0 items-center rounded-pill bg-surface-soft px-2 text-[12px] font-medium text-mute">
                 🔒 미리보기 고정본
@@ -89,6 +97,12 @@ export function MakerRow({
           사이트 안의 [콜라보 찾기] 목록뿐이고, 구글·네이버엔 토글과 무관하게 다 나온다.
           🆕08-12에 「요청 잠시 안받기」가 합류 — **두 토글은 서로 다른 축**이다(목록에 뜨나 / 제안을 받나).
              예전엔 앞 토글 하나가 둘을 겸했는데, 08-07에 앞 토글 뜻이 목록으로 좁아지며 뒤가 갈 곳을 잃었다. */}
+      {/* 📝비공개 초안엔 토글 대신 «열어서 확인하고 게시하기» 안내 — 아직 아무도 못 보는 소개서라 목록·제안 토글은 뜻이 없다 */}
+      {isDraft ? (
+        <p className="border-t border-hairline px-4 py-2.5 text-[13px] leading-relaxed break-keep text-mute">
+          아직 나만 볼 수 있어요. 열어서 확인하시고 맨 아래 「게시하기」를 누르면 공개돼요.
+        </p>
+      ) : (
       <div className="space-y-2.5 border-t border-hairline px-4 py-2.5">
         <div>
           <FlagToggle slug={slug} label="콜라보 찾기에 보이기" field="searchVisible" initial={searchVisible} />
@@ -103,6 +117,7 @@ export function MakerRow({
           </p>
         </div>
       </div>
+      )}
 
       {confirming && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4" {...dialog.overlayProps}>

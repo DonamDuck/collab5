@@ -3,7 +3,7 @@
 // (DB는 '공유 → 타인 열람(view) 루프 = 배포 시점'에 투입 — masterbrain 2026-06-21 결정)
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import type { ArticleComment, BrandDna, Collab, CollabCard, CollabInput, CollabOrigin, CollabReportData, CollabReportListItem, CollabStatus, CollabType, MagazineArticle, MagazineListItem, MagazineSaveInput, Maker, MakerStatus, Reaction, ViewEvent } from "./types";
+import type { ArticleComment, BrandDna, Collab, CollabCard, CollabInput, CollabOrigin, CollabReportData, CollabReportListItem, CollabStatus, CollabType, DraftNotes, MagazineArticle, MagazineListItem, MagazineSaveInput, Maker, MakerStatus, Reaction, ViewEvent } from "./types";
 import { kstIso } from "./time";
 import { orderedIdeaTitles } from "./report-cards";
 import { isDemoSlug } from "./demo";
@@ -11,8 +11,13 @@ import { MAX_COLLABS } from "./limits";
 
 export interface Repo {
   // 업체
-  createMaker(input: Omit<Maker, "id" | "createdAt" | "status">): Promise<Maker>;
+  /** status를 주지 않으면 active. 자동 만들기 운영 초안만 status: "draft"로 만든다(10-08) */
+  createMaker(input: Omit<Maker, "id" | "createdAt" | "status"> & { status?: "active" | "draft" }): Promise<Maker>;
   getMakerBySlug(slug: string): Promise<Maker | null>;
+  /** 비공개 초안 한 건(status='draft'). ⚠️주인 확인은 부르는 쪽이 한다 — 이 함수는 누구에게나 돌려준다 */
+  getDraftBySlug(slug: string): Promise<Maker | null>;
+  /** 초안 → 공개(draft → active) + 질문 비우기. 초안이 아니면 false */
+  publishDraft(slug: string): Promise<boolean>;
   getMakerById(id: number): Promise<Maker | null>;
   updateMakerContent(slug: string, content: Omit<Maker, "id" | "slug" | "createdAt" | "ownerUserId" | "editPasswordHash" | "status">): Promise<Maker | null>;
   /** ⚠️`searchVisible` = 화면상 **[콜라보 찾기에 보이기]**(홈·`/search` 목록). 08-07 개명 전 이름이
@@ -24,6 +29,8 @@ export interface Repo {
   setMakerEnrichment(slug: string, enrichment: Maker["enrichment"] | null): Promise<void>;
   deleteMaker(slug: string): Promise<void>;
   listMakersByOwner(ownerUserId: number): Promise<Maker[]>;
+  /** /my 목록 전용 — 내 공개 소개서 + 내 비공개 초안. ⛔다른 곳(제안 보낼 소개서·댓글 작성자 링크)은 listMakersByOwner를 쓴다 */
+  listMakersByOwnerWithDrafts(ownerUserId: number): Promise<Maker[]>;
   searchMakers(q: string): Promise<Maker[]>;
   listHomeMakers(limit: number): Promise<Maker[]>; // 홈 그리드 — 검색 노출(=콜라보 가능) + active, ⭐최신순(07-31 반전: 오래된 순+상한이면 방금 소개서 만든 씨딩 사장님이 홈에서 자기 브랜드를 못 본다)
   /** 사이트맵(구글·네이버에 낼 주소 목록) 전용 — slug와 수정시각만. 08-07 신설.
@@ -448,16 +455,27 @@ class InMemoryRepo implements Repo {
   private nextViewId = 1;
   private nextReactionId = 1;
 
-  async createMaker(input: Omit<Maker, "id" | "createdAt" | "status">): Promise<Maker> {
-    const maker: Maker = { status: "active", ...input, id: this.nextMakerId++, createdAt: now(), updatedAt: now() };
+  async createMaker(input: Omit<Maker, "id" | "createdAt" | "status"> & { status?: "active" | "draft" }): Promise<Maker> {
+    const maker: Maker = { ...input, status: input.status ?? "active", id: this.nextMakerId++, createdAt: now(), updatedAt: now() };
     this.makers.push(maker);
     return maker;
   }
+  // ⚠️10-08: `!== "inactive"` → `=== "active"`. draft가 생기면서 «inactive만 빼기»는 초안을 남에게 연다.
   async getMakerBySlug(slug: string) {
-    return this.makers.find((m) => m.slug === slug && m.status !== "inactive") ?? null;
+    return this.makers.find((m) => m.slug === slug && m.status === "active") ?? null;
   }
   async getMakerById(id: number) {
-    return this.makers.find((m) => m.id === id && m.status !== "inactive") ?? null;
+    return this.makers.find((m) => m.id === id && m.status === "active") ?? null;
+  }
+  async getDraftBySlug(slug: string) {
+    return this.makers.find((m) => m.slug === slug && m.status === "draft") ?? null;
+  }
+  async publishDraft(slug: string): Promise<boolean> {
+    const m = this.makers.find((x) => x.slug === slug && x.status === "draft");
+    if (!m) return false;
+    m.status = "active";
+    m.draftNotes = null;
+    return true;
   }
   async updateMakerContent(slug: string, c: Omit<Maker, "id" | "slug" | "createdAt" | "ownerUserId" | "editPasswordHash" | "status">): Promise<Maker | null> {
     const m = this.makers.find((x) => x.slug === slug);
@@ -490,11 +508,14 @@ class InMemoryRepo implements Repo {
     if (m) m.status = "inactive";
   }
   async listMakersByOwner(ownerUserId: number): Promise<Maker[]> {
-    return this.makers.filter((x) => x.ownerUserId === ownerUserId && x.status !== "inactive");
+    return this.makers.filter((x) => x.ownerUserId === ownerUserId && x.status === "active");
+  }
+  async listMakersByOwnerWithDrafts(ownerUserId: number): Promise<Maker[]> {
+    return this.makers.filter((x) => x.ownerUserId === ownerUserId && (x.status === "active" || x.status === "draft"));
   }
   async searchMakers(q: string) {
     const t = q.trim().toLowerCase();
-    const visible = this.makers.filter((m) => m.searchVisible && m.status !== "inactive");
+    const visible = this.makers.filter((m) => m.searchVisible && m.status === "active");
     if (!t) return visible;
     return visible.filter((m) =>
       [m.name, m.oneLiner, ...m.keywords, ...m.offers, ...m.seeks]
@@ -505,14 +526,14 @@ class InMemoryRepo implements Repo {
   }
   async listHomeMakers(limit: number): Promise<Maker[]> {
     return this.makers
-      .filter((m) => m.searchVisible && m.status !== "inactive")
+      .filter((m) => m.searchVisible && m.status === "active")
       .sort((a, b) => (a.createdAt > b.createdAt ? -1 : 1)) // 최신순 — 인터페이스 주석 참조
       .slice(0, limit);
   }
   async listSitemapBrands(): Promise<{ slug: string; updatedAt: string; name: string; oneLiner: string }[]> {
     // ⚠️`searchVisible`로 거르지 않는다 — 사이트맵은 웹 검색용(Supabase 구현 주석 참조).
     return this.makers
-      .filter((m) => m.status !== "inactive" && !isDemoSlug(m.slug))
+      .filter((m) => m.status === "active" && !isDemoSlug(m.slug))
       .map((m) => ({ slug: m.slug, updatedAt: m.updatedAt || m.createdAt, name: m.name, oneLiner: m.oneLiner || "" }));
   }
 
@@ -590,7 +611,7 @@ class InMemoryRepo implements Repo {
     return this.saved
       .filter((s) => s.userId === userId)
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt)) // 최근 찜 먼저
-      .map((s) => this.makers.find((m) => m.id === s.makerId && m.status !== "inactive"))
+      .map((s) => this.makers.find((m) => m.id === s.makerId && m.status === "active"))
       .filter((m): m is Maker => !!m);
   }
   async recordCollabRequest(fromUserId: number | null, toBrandId: number, channel: string, fromBrandId: number | null = null): Promise<void> {
@@ -749,6 +770,7 @@ interface MakerRow {
   // 수정 비밀번호 해시 — 07-25 claim_token_hash → edit_password_hash 이사(옛 컬럼 폴백)
   edit_password_hash?: string | null; claim_token_hash?: string | null;
   enrichment?: Maker["enrichment"] | null;
+  draft_notes?: DraftNotes | null; // 10-08 신설 — 비공개 초안의 항목별 질문
   // Brand DNA — 파생 해석층(rowToMaker에 싣지 않음: 도메인 객체 비노출, API가 repo로 직접 읽음)
   dna?: BrandDna | null;
 }
@@ -841,6 +863,7 @@ function rowToMaker(r: MakerRow): Maker {
     ownerUserId: r.owner_user_id ?? undefined,
     editPasswordHash: r.edit_password_hash ?? r.claim_token_hash ?? undefined,
     enrichment: r.enrichment ?? undefined,
+    draftNotes: r.draft_notes ?? null,
   };
 }
 function rowToCard(r: CardRow): CollabCard {
@@ -851,7 +874,7 @@ class SupabaseRepo implements Repo {
   private db: SupabaseClient;
   constructor(url: string, key: string) { this.db = createClient(url, key); }
 
-  async createMaker(input: Omit<Maker, "id" | "createdAt" | "status">): Promise<Maker> {
+  async createMaker(input: Omit<Maker, "id" | "createdAt" | "status"> & { status?: "active" | "draft" }): Promise<Maker> {
     // id·created_at·updated_at 은 DB가 자동 부여
     const row = {
       slug: input.slug, name: input.name, one_liner: input.oneLiner,
@@ -868,7 +891,8 @@ class SupabaseRepo implements Repo {
       has_space: input.hasSpace,
       search_visible: input.searchVisible,
       collab_paused: input.collabPaused,
-      status: "active", // 생성 default = active (소프트 삭제 시에만 inactive)
+      status: input.status ?? "active", // 생성 default = active (소프트 삭제 시에만 inactive · 자동 만들기 운영 초안만 draft)
+      ...(input.draftNotes ? { draft_notes: input.draftNotes } : {}),
       enrichment: input.enrichment ?? null,
       owner_user_id: input.ownerUserId ?? null, edit_password_hash: input.editPasswordHash ?? null,
     };
@@ -884,6 +908,21 @@ class SupabaseRepo implements Repo {
   async getMakerById(id: number) {
     const { data } = await this.db.from("brands").select().eq("id", id).eq("status", "active").maybeSingle();
     return data ? rowToMaker(data as MakerRow) : null;
+  }
+  async getDraftBySlug(slug: string) {
+    const { data } = await this.db.from("brands").select().eq("slug", slug).eq("status", "draft").maybeSingle();
+    return data ? rowToMaker(data as MakerRow) : null;
+  }
+  async publishDraft(slug: string): Promise<boolean> {
+    // ⚠️조건에 status='draft'를 같이 건다 — 지운(inactive) 소개서를 이 길로 되살리지 않게
+    const { data, error } = await this.db
+      .from("brands")
+      .update({ status: "active", draft_notes: null })
+      .eq("slug", slug)
+      .eq("status", "draft")
+      .select("id");
+    if (error) throw error;
+    return (data ?? []).length === 1;
   }
   async updateMakerContent(
     slug: string,
@@ -922,6 +961,15 @@ class SupabaseRepo implements Repo {
   async listMakersByOwner(ownerUserId: number): Promise<Maker[]> {
     // /my — 소프트 삭제분은 목록에서 제외(status='active'만)
     const { data } = await this.db.from("brands").select(LIST_CARD_COLS).eq("owner_user_id", ownerUserId).eq("status", "active").order("created_at", { ascending: false });
+    return (data ?? []).map((r) => rowToMaker(r as MakerRow));
+  }
+  async listMakersByOwnerWithDrafts(ownerUserId: number): Promise<Maker[]> {
+    const { data } = await this.db
+      .from("brands")
+      .select(LIST_CARD_COLS)
+      .eq("owner_user_id", ownerUserId)
+      .in("status", ["active", "draft"])
+      .order("created_at", { ascending: false });
     return (data ?? []).map((r) => rowToMaker(r as MakerRow));
   }
   async searchMakers(q: string) {
@@ -1449,6 +1497,11 @@ class SupabaseRepo implements Repo {
 // DB 접근은 전부 서버(server action/컴포넌트)에서만 일어남 → RLS를 켜고 서버는
 // service_role 키로 접근(RLS 우회)하는 게 정석. service_role 키가 없으면 anon으로 폴백.
 // ⚠️ service_role 키는 서버 전용 — 절대 NEXT_PUBLIC_로 노출 금지.
+/** 다른 Supabase(운영)로 붙는 repo — 로컬 신청함의 «운영에 초안 올리기»(10-08)만 쓴다. 대표가 버튼을 누를 때만 불린다. */
+export function createSupabaseRepo(url: string, key: string): Repo {
+  return new SupabaseRepo(url, key);
+}
+
 const SUPABASE_KEY =
   process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY;
 export const repo: Repo =

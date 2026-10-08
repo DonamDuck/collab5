@@ -321,13 +321,24 @@ export async function claimBySlugAction(
   return { slug };
 }
 
+/** 공개 소개서, 또는 «내» 비공개 초안(10-08 자동 만들기 2단계). 남의 초안은 없는 것처럼 null.
+ *  ⭐초안을 여는 문은 주인에게만 연다 — 수정 불러오기·저장·삭제·특장점 지우기가 이 한 길을 쓴다. */
+async function getMakerOrOwnDraft(slug: string): Promise<Maker | null> {
+  const active = await repo.getMakerBySlug(slug);
+  if (active) return active;
+  const draft = await repo.getDraftBySlug(slug);
+  if (!draft) return null;
+  const uid = await getSessionUserId();
+  return uid && draft.ownerUserId === uid ? draft : null;
+}
+
 /** edit 모드 제출 → 소유자 세션 또는 수정 비번 재검증 후 내용 업데이트 (쿠키 비의존) */
 export async function updateMakerAction(
   slug: string,
   input: RegisterInput,
   password?: string
 ): Promise<{ error?: string; slug?: string }> {
-  const maker = await repo.getMakerBySlug(slug);
+  const maker = await getMakerOrOwnDraft(slug);
   if (!maker) return { error: "소개서를 찾을 수 없어요." };
   const sessionUserId = await getSessionUserId();
   const isOwner = !!sessionUserId && maker.ownerUserId === sessionUserId;
@@ -529,7 +540,7 @@ export async function recordCollabAction(input: {
 
 /** 소개서 삭제 — 로그인 소유자만. /my에서 사용. 카드·지표는 FK CASCADE로 함께 삭제. */
 export async function deleteMakerAction(slug: string): Promise<{ error?: string }> {
-  const maker = await repo.getMakerBySlug(slug);
+  const maker = await getMakerOrOwnDraft(slug);
   if (!maker) return { error: "소개서를 찾을 수 없어요." };
   const sessionUserId = await getSessionUserId();
   if (!sessionUserId || maker.ownerUserId !== sessionUserId) return { error: "삭제 권한이 없어요." };
@@ -540,7 +551,7 @@ export async function deleteMakerAction(slug: string): Promise<{ error?: string 
 /** 특장점(ownerNote) 지우기 — 소유자 세션만. '다시 받기'의 보이지 않는 재주입 방지(B35 스펙 4-4).
  *  enrichment 자체는 updateMakerAction이 의도적으로 보존하는 필드라, 지우기만 이 전용 액션으로 연다. */
 export async function clearOwnerNoteAction(slug: string): Promise<{ ok: boolean }> {
-  const maker = await repo.getMakerBySlug(slug);
+  const maker = await getMakerOrOwnDraft(slug);
   if (!maker?.enrichment?.ownerNote) return { ok: true }; // 지울 게 없으면 성공으로
   const sessionUserId = await getSessionUserId();
   if (!sessionUserId || maker.ownerUserId !== sessionUserId) return { ok: false };
@@ -562,7 +573,8 @@ export async function getAuthStateAction(): Promise<{ loggedIn: boolean; userId?
 /** edit 모드 프리필 데이터 — 공개 데이터(/m과 동일)라 게이트 없이 반환.
  *  단 민감 필드(비번 해시·소유자 id)는 절대 클라로 내보내지 않음. 실제 저장은 updateMakerAction에서 재검증. */
 export async function getEditDataAction(slug: string): Promise<Maker | null> {
-  const maker = await repo.getMakerBySlug(slug);
+  // 비공개 초안은 주인에게만(10-08). 공개 소개서는 지금처럼 누구에게나 — 실제 저장은 updateMakerAction이 재검증
+  const maker = await getMakerOrOwnDraft(slug);
   if (!maker) return null;
   return { ...maker, editPasswordHash: undefined, ownerUserId: undefined };
 }

@@ -85,8 +85,13 @@ export interface Enrichment {
   ownerNote?: string; // 사장이 직접 쓴 특장점 한 문장(B35, 2026-08-06) — '다시 받기'가 재사용. 의미 반영 계약(verbatim 아님)
 }
 
-/** 소개서 상태 — active=정상 / inactive=소프트 삭제(비노출·DB 보관, 2026-07-22) */
-export type MakerStatus = "active" | "inactive";
+/** 소개서 상태 — active=정상 / inactive=소프트 삭제(비노출·DB 보관, 2026-07-22)
+ *  / draft=비공개 초안(10-08, 자동 만들기 2단계) — 주인만 `/m/{slug}`로 보고 「게시하기」로 active가 된다.
+ *  ⭐모든 목록·조회가 `status='active'`로 거르므로 draft는 «기본이 숨김»이다. 주인에게 여는 곳만 따로 연다. */
+export type MakerStatus = "active" | "inactive" | "draft";
+
+/** 비공개 초안의 «collab5가 여쭤봐요» 질문 — 전체 질문 + 항목 순서대로 활동·콜라보별 질문(10-06 로컬 → 10-08 운영 brands.draft_notes) */
+export type DraftNotes = { general: string[]; activities: string[][]; collabs: string[][] };
 
 /** 업체 프로필 = 콜라보 카드의 '집' + 공개 상세페이지(검색 대상) */
 export interface Maker {
@@ -139,7 +144,9 @@ export interface Maker {
    *  ⚠️`searchVisible`과 **다른 축**이다: 목록엔 그대로 보이되 지금은 요청만 안 받는 상태.
    *  (07-31에 둘을 하나로 묶었다가 08-07에 그 전제가 깨져 08-12에 다시 분리 — DB=collab_paused, 기본 false) */
   collabPaused: boolean;
-  status: MakerStatus; // active=정상 / inactive=소프트 삭제(전 노출면 비노출, DB 보관). DB=status, 기본 active
+  status: MakerStatus; // active=정상 / inactive=소프트 삭제(전 노출면 비노출, DB 보관) / draft=비공개 초안. DB=status, 기본 active
+  /** 비공개 초안일 때만 — 항목별 질문(DB=draft_notes). 게시하면 비운다 */
+  draftNotes?: DraftNotes | null;
   ownerUserId?: number; // 소유 계정 = profiles.user_id(정수). 07-25 auth uuid→user_id 전환
   editPasswordHash?: string; // 수정 비밀번호 해시(비회원 생성 시). DB=edit_password_hash
   createdAt: string; // ISO (DB timestamptz)

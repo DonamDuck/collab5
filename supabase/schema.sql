@@ -94,8 +94,10 @@ create table brands (
   --        ⚠️그 "단일화"는 08-07에 우리 손으로 깨졌다(아래 두 컬럼이 서로 다른 걸 뜻한다).
   search_visible     boolean not null default true,  -- [콜라보 찾기에 보이기] — 홈·/search 목록 노출. 웹 검색(구글·네이버)과는 무관(08-07 개명)
   collab_paused      boolean not null default false, -- [콜라보 요청 잠시 안받기] — true면 /m 제안 버튼 잠김 + 안내 칩. 목록 노출과는 별개(08-12)
-  status             text    not null default 'active' check (status in ('active','inactive')),
+  status             text    not null default 'active' check (status in ('active','inactive','draft')),
                                                      -- 소프트 삭제: /my 삭제 = inactive(행 보관). 전 조회 함수가 active만 필터
+                                                     -- draft = 비공개 초안(10-08 자동 만들기) — 주인만 /m에서 보고 「게시하기」로 active
+  draft_notes        jsonb,                          -- 비공개 초안의 «collab5가 여쭤봐요» 질문(10-08). 게시하면 null
   owner_user_id      bigint references users(user_id) on delete set null,  -- 소유 계정(구 owner_uuid)
   edit_password_hash text,                           -- 비회원 생성 시 수정 비밀번호 해시(구 claim_token_hash)
   created_at         timestamptz not null default now(),
