@@ -1279,7 +1279,7 @@ function RegisterForm() {
     router.push(`/m/${createdSlug}`);
   };
 
-  // 🧭0단계 «소개서를 어떻게 시작할까요?»(대표 10-05) — 새로 만들 때만, 아직 아무것도 시작 안 했을 때만 보인다.
+  // 🧭0단계 «소개서 작성 방법을 골라주세요.»(대표 10-05 · 제목 10-08) — 새로 만들 때만, 아직 아무것도 시작 안 했을 때만 보인다.
   //   쓰던 내용(임시저장 배너)이 있거나 위저드가 채웠거나 이름을 이미 적었으면 바로 폼으로 간다 — 다시 물으면 번거롭다.
   const showStart = !editSlug && !editParam && !enrichment && !startedSelf && !draft.found && !name.trim();
 
@@ -1345,7 +1345,7 @@ function RegisterForm() {
         //   «어떻게 만들지»를 이름보다 먼저, 세 갈래를 한 번에 보여 준다(«필요해요/아니요»를 먼저 묻는 두 단계안은 클릭이 늘어 버렸다).
         //   「직접 쓸게요」도 같은 무게의 버튼으로 세운다 — 회색 글자면 위 둘 중 하나를 꼭 골라야 하는 것처럼 보였다.
         <section className="mt-10">
-          <h2 className="text-[20px] font-bold text-ink">소개서를 어떻게 시작할까요?</h2>
+          <h2 className="text-[20px] font-bold text-ink">소개서 작성 방법을 골라주세요.</h2>
           <div className="mt-4 flex flex-col gap-3">
             {AUTO_DRAFT_ON && (
             <button type="button" onClick={() => setAutoDraftOpen(true)} className={START_CARD}>
