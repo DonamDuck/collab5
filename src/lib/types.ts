@@ -90,7 +90,8 @@ export interface Enrichment {
  *  ⭐모든 목록·조회가 `status='active'`로 거르므로 draft는 «기본이 숨김»이다. 주인에게 여는 곳만 따로 연다. */
 export type MakerStatus = "active" | "inactive" | "draft";
 
-/** 비공개 초안의 «collab5가 여쭤봐요» 질문 — 전체 질문 + 항목 순서대로 활동·콜라보별 질문(10-06 로컬 → 10-08 운영 brands.draft_notes) */
+/** 비공개 초안의 «이렇게 썼어요» 메모 — 전체 메모 + 항목 순서대로 활동·콜라보별 메모(10-06 로컬 → 10-08 운영 brands.draft_notes).
+ *  10-09 대표: 질문이 아니라 메모(사장님이 답할 길이 없다). */
 export type DraftNotes = { general: string[]; activities: string[][]; collabs: string[][] };
 
 /** 업체 프로필 = 콜라보 카드의 '집' + 공개 상세페이지(검색 대상) */

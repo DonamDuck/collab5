@@ -254,12 +254,12 @@ export default async function MakerPage({
           <p className="text-[15px] font-bold text-ink">🔒 아직 공개되지 않은 초안이에요</p>
           <p className="mt-1 break-keep text-[14px] leading-[1.6] text-body">
             그동안 올리신 글과 사진을 읽고 만든 초안이라, 지금은 신청하신 분만 볼 수 있어요.
-            {noteCount > 0 && ` 저희가 여쭤보고 싶은 것 ${noteCount}개를 💬 표시로 남겨 두었어요.`} 고칠 곳은 「수정」에서 고치시고, 맨 아래 「게시하기」를 누르면 공개돼요.
+            {noteCount > 0 && ` 어떤 글을 보고 어떻게 썼는지 📝 메모 ${noteCount}개로 남겨 두었어요.`} 고칠 곳은 「수정」에서 고치시고, 맨 아래 「게시하기」를 누르면 공개돼요.
           </p>
           {draftState!.notes.general.length > 0 && (
             <details className="mt-2">
               <summary className="cursor-pointer text-[14px] font-medium text-[#8A5A0B]">
-                💬 소개서 전체에 대해 여쭤볼 것 {draftState!.notes.general.length}개
+                📝 소개서 전체에 대한 메모 {draftState!.notes.general.length}개
               </summary>
               <ul className="mt-2 list-disc space-y-1 pl-5 text-[14px] leading-[1.6] text-body">
                 {draftState!.notes.general.map((q, k) => (
