@@ -7,7 +7,7 @@ import { notFound } from "next/navigation";
 import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import { CHANNEL_LABEL, LOCAL_DRAFT_PASSWORD, type AutoDraftRequest } from "@/lib/autoDraft";
-import { approveAction, loadDraftAction } from "./actions";
+import { approveAction, loadDraftAction, pushProdAction } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -124,13 +124,38 @@ export default async function AutoDraftInbox() {
                     </a>
                   )}
                 </div>
-                {r.status === "review" && (
-                  <form action={approveAction} className="mt-3">
-                    <input type="hidden" name="id" value={r.id} />
-                    <button className="h-11 rounded-md border border-ink bg-ink px-4 text-[14px] font-bold text-surface">
-                      지금 보내기
-                    </button>
-                  </form>
+                {r.source === "prod" ? (
+                  // 🌐운영 신청 — 운영에 비공개 초안으로 올리고 고객 안내(10-08). 운영 DB에 쓰는 버튼이라 대표만 누른다.
+                  r.prodSlug ? (
+                    <p className="mt-3 text-[13px] text-mute">
+                      운영에 올림 · {r.pushedAt?.slice(0, 16).replace("T", " ")} ·{" "}
+                      <a href={`https://collab5.co.kr/m/${r.prodSlug}`} target="_blank" rel="noreferrer" className="underline underline-offset-2">
+                        collab5.co.kr/m/{r.prodSlug}
+                      </a>{" "}
+                      (신청 계정으로 로그인해야 보여요)
+                    </p>
+                  ) : (
+                    (r.status === "review" || r.status === "done") && (
+                      <form action={pushProdAction} className="mt-3">
+                        <input type="hidden" name="id" value={r.id} />
+                        <button className="h-11 rounded-md border border-ink bg-ink px-4 text-[14px] font-bold text-surface">
+                          운영에 올리고 안내 보내기
+                        </button>
+                        <p className="mt-1.5 text-[12px] text-faint">
+                          운영에 비공개 초안으로 올라가 신청 계정({r.account?.email || "계정 이메일 없음"})에 붙고, {r.email}로 안내 메일이 가요.
+                        </p>
+                      </form>
+                    )
+                  )
+                ) : (
+                  r.status === "review" && (
+                    <form action={approveAction} className="mt-3">
+                      <input type="hidden" name="id" value={r.id} />
+                      <button className="h-11 rounded-md border border-ink bg-ink px-4 text-[14px] font-bold text-surface">
+                        지금 보내기
+                      </button>
+                    </form>
+                  )
                 )}
                 {!!r.questions?.length && (
                   <details className="mt-4 rounded-md bg-surface-soft px-4 py-3">

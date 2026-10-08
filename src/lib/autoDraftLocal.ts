@@ -7,7 +7,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { repo } from "./repo";
 import { sha256 } from "./hash";
-import type { Activity, CollabHistory, CollabType } from "./types";
+import type { Activity, CollabHistory, CollabType, DraftNotes } from "./types";
 import { LOCAL_DRAFT_PASSWORD, type AutoDraftRequest } from "./autoDraft";
 
 const QUEUE_DIR = path.join(process.cwd(), "_workspace", "auto-draft-queue");
@@ -24,16 +24,14 @@ type DraftFile = {
   collab_history: DraftItem[];
 };
 
-/** 신청 id → 로컬 초안 소개서를 만들거나 덮어쓰고 slug를 돌려준다. */
-export async function buildLocalDraft(rawId: string): Promise<string> {
-  if (process.env.NODE_ENV !== "development" || process.env.SUPABASE_URL) {
-    throw new Error("로컬 개발 서버(InMemoryRepo)에서만 쓸 수 있어요.");
-  }
+/** 신청 id → 소개서 내용·항목별 질문·사진 주소를 읽는다(파일만 읽는다 — 로컬 초안과 운영 올리기가 같이 쓴다, 10-08). */
+export async function readDraftBundle(rawId: string) {
   const id = rawId.replace(/[^0-9a-z-]/gi, "");
   const req = JSON.parse(await readFile(path.join(QUEUE_DIR, `${id}.json`), "utf8")) as AutoDraftRequest & { draft?: string };
   if (!req.draft) throw new Error("이 신청에는 아직 초안 파일이 없어요.");
-  const d = JSON.parse(await readFile(req.draft, "utf8")) as DraftFile;
-  // 사진(선택) — 규칙대로 고른 결과. 파일은 public/_auto-draft/ 아래에 두고 주소만 적는다(운영 스토리지 안 씀).
+  const raw = JSON.parse(await readFile(req.draft, "utf8"));
+  const d = raw as DraftFile;
+  // 사진(선택) — 규칙대로 고른 결과. 파일은 public/_auto-draft/ 아래에 두고 주소만 적는다.
   // 모양: { profile: string[], activities: string[][], collabs: string[][] } — 순서 = 초안 항목 순서
   let ph: { profile?: string[]; activities?: string[][]; collabs?: string[][] } = {};
   if ((req as { photos?: string }).photos) {
@@ -57,7 +55,6 @@ export async function buildLocalDraft(rawId: string): Promise<string> {
     ...(c.link ? { link: c.link } : {}),
   }));
   const offers = Array.from(new Set(collabHistory.flatMap((c) => c.types))) as CollabType[];
-  const slug = `draft-${id.slice(-4)}`;
 
   const content = {
     name: req.brandName,
@@ -79,10 +76,24 @@ export async function buildLocalDraft(rawId: string): Promise<string> {
       instagram: req.channels.find((c) => c.kind === "instagram")?.url.replace("https://instagram.com/", ""),
       homepage: req.channels.find((c) => c.kind === "homepage")?.url,
     },
-    searchVisible: false, // 초안은 비공개로 시작한다 — 고객이 훑어보고 공개한다
+    searchVisible: false, // 로컬 초안은 비공개로 시작한다 — 고객이 훑어보고 공개한다(운영은 status='draft'가 맡는다)
     collabPaused: false,
   };
+  const notes = attachNotes(
+    raw.activities ?? [],
+    raw.collab_history ?? [],
+    Array.isArray(raw.open_questions) ? raw.open_questions : [],
+  );
+  return { id, req, content, notes };
+}
 
+/** 신청 id → 로컬 초안 소개서를 만들거나 덮어쓰고 slug를 돌려준다. */
+export async function buildLocalDraft(rawId: string): Promise<string> {
+  if (process.env.NODE_ENV !== "development" || process.env.SUPABASE_URL) {
+    throw new Error("로컬 개발 서버(InMemoryRepo)에서만 쓸 수 있어요.");
+  }
+  const { id, content } = await readDraftBundle(rawId);
+  const slug = `draft-${id.slice(-4)}`;
   const existing = await repo.getMakerBySlug(slug);
   if (existing) await repo.updateMakerContent(slug, content);
   else await repo.createMaker({ slug, ...content, editPasswordHash: sha256(LOCAL_DRAFT_PASSWORD) });
@@ -94,7 +105,7 @@ export async function buildLocalDraft(rawId: string): Promise<string> {
 // 🔜운영판에선 brands에 «초안/게시» 상태 칸과 항목별 메모 칸이 따로 필요하다 — 지금의 searchVisible(콜라보 찾기에 보이기)은
 //   이미 공개한 소개서도 끌 수 있는 값이라 «초안»과 섞으면 안 된다.
 
-export type DraftNotes = { general: string[]; activities: string[][]; collabs: string[][] };
+export type { DraftNotes } from "./types";
 export type LocalDraftState = { id: string; publishedAt?: string; notes: DraftNotes };
 
 type NoteItem = { title?: string; partner?: string; questions?: string[] };

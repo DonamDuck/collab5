@@ -15,6 +15,7 @@ import { headers } from "next/headers";
 import type { AutoDraftRequest } from "@/lib/autoDraft";
 import { deliverDraft } from "@/lib/autoDraftDeliver";
 import { buildLocalDraft } from "@/lib/autoDraftLocal";
+import { pushDraftToProd } from "@/lib/autoDraftPush";
 
 const QUEUE_DIR = path.join(process.cwd(), "_workspace", "auto-draft-queue");
 
@@ -31,5 +32,13 @@ export async function approveAction(formData: FormData) {
   if (req.status !== "review") throw new Error("발송 대기 중인 신청이 아니에요.");
   const h = await headers();
   await deliverDraft(id, { origin: `http://${h.get("host") ?? "localhost:3001"}`, approved: true });
+  redirect("/dev/auto-draft");
+}
+
+/** [운영에 올리고 안내 보내기] — 운영 신청의 초안을 운영에 «비공개 초안»으로 올리고 고객에게 안내 메일(10-08, 2단계).
+ *  🔑운영 DB에 쓰는 버튼이다. 대표가 누르는 것 자체가 그 건의 「고고」다 — 예약 작업은 이걸 부르지 않는다. */
+export async function pushProdAction(formData: FormData) {
+  if (process.env.NODE_ENV !== "development") throw new Error("로컬 개발 서버에서만 쓸 수 있어요.");
+  await pushDraftToProd(String(formData.get("id") ?? ""));
   redirect("/dev/auto-draft");
 }

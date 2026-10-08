@@ -113,7 +113,12 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { slug } = await params;
   const maker = (await repo.getMakerBySlug(slug)) ?? ((await rebuildLocalDraftBySlug(slug)) ? await repo.getMakerBySlug(slug) : null);
-  if (!maker) return { title: "소개서를 찾을 수 없어요 — collab5" };
+  if (!maker) {
+    // 비공개 초안(10-08) — 주인에게만 제목을 주고, 검색엔진엔 절대 안 싣는다. 남에겐 «없는 페이지»와 똑같이.
+    const draft = await ownDraft(slug);
+    if (draft) return { title: `[초안] ${draft.name} 소개서 — collab5`, robots: { index: false, follow: false } };
+    return { title: "소개서를 찾을 수 없어요 — collab5" };
+  }
 
   // 썸네일 — 지금까지는 og:image가 없어 카톡이 본문에서 아무 이미지나 주워왔다. 그걸 우리가 정한다.
   // ⚠️**브랜드 사진이 먼저다.** 로고(`profiles.profile_image`)는 브랜드가 아니라 **계정**의 것이라,
@@ -171,12 +176,19 @@ export default async function MakerPage({
   //   데이터·권한은 그대로다(숨기는 건 화면뿐). 열람 자체가 공개라 이 파라미터로 새로 열리는 정보는 없다.
   const film = sp?.film === "1";
   // 로컬 자동 초안(draft-XXXX)이 메모리에서 비워졌으면 대기열에서 다시 만든다(운영 빌드에선 그대로 notFound)
-  const maker = (await repo.getMakerBySlug(slug)) ?? ((await rebuildLocalDraftBySlug(slug)) ? await repo.getMakerBySlug(slug) : null);
+  // 🔒운영 비공개 초안(status='draft', 10-08)은 «주인에게만» 연다. 남에겐 없는 페이지와 똑같이 404.
+  const active = await repo.getMakerBySlug(slug);
+  const dbDraft = active ? null : await ownDraft(slug);
+  const maker = active ?? dbDraft ?? ((await rebuildLocalDraftBySlug(slug)) ? await repo.getMakerBySlug(slug) : null);
   if (!maker) notFound();
-  // 📝초안 페이지(소개서 자동 만들기, 로컬 시험판 10-06) — 게시 전이면 비공개 띠 + 항목별 질문 + 맨 아래 [게시하기].
-  //   운영 빌드에선 늘 null이라 이 페이지는 지금과 똑같다.
-  const draftState = film ? null : await localDraftState(slug);
-  const isDraft = !!draftState && !draftState.publishedAt;
+  // 📝초안 페이지 — 게시 전이면 비공개 띠 + 항목별 질문 + 맨 아래 [게시하기].
+  //   운영 = brands.status 'draft' + draft_notes(10-08) / 로컬 시험판 = 대기열 파일(10-06).
+  const draftState = film
+    ? null
+    : dbDraft
+      ? { id: "", notes: dbDraft.draftNotes ?? { general: [], activities: [], collabs: [] } }
+      : await localDraftState(slug);
+  const isDraft = !!draftState && !("publishedAt" in draftState && draftState.publishedAt);
   const noteCount = draftState
     ? draftState.notes.general.length +
       [...draftState.notes.activities, ...draftState.notes.collabs].reduce((n, x) => n + x.length, 0)
@@ -220,14 +232,14 @@ export default async function MakerPage({
           ⭐09-01 실측으로 **전 페이지에 0개**였던 것을 여기서 채운다(백로그 B73 → 41·89번).
           🔻`film`(=/preview 데모)에서는 내보내지 않는다 — 남의 예시를 실재 브랜드로 색인시키면 안 된다.
           🚨문자열 만들기는 `lib/jsonld.ts`가 한다 — XSS 방어(`<`→`\u003c`)가 거기 한 곳에 있다. */}
-      {!film && (
+      {!film && !isDraft && (
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: jsonLdString(makerJsonLd(maker)) }}
         />
       )}
       {/* 소개서 보강 신청 배너 — 주인에게만, 사진이 5장 미만일 때. 나머지(1일 숨김·7일 수명)는 클라 판정 */}
-      {!film && (bannerPreview || (isOwner && countAllPhotos(maker) < ENRICH_MIN_PHOTOS)) && (
+      {!film && !isDraft && (bannerPreview || (isOwner && countAllPhotos(maker) < ENRICH_MIN_PHOTOS)) && (
         <EnrichBanner
           slug={slug}
           formUrl={ENRICH_FORM_URL}
@@ -258,7 +270,7 @@ export default async function MakerPage({
           )}
         </div>
       )}
-      {draftState?.publishedAt && sp?.published === "1" && (
+      {sp?.published === "1" && !isDraft && (isOwner || !!(draftState && "publishedAt" in draftState && draftState.publishedAt)) && (
         <div className="mb-6 rounded-lg border border-primary bg-primary-pale px-4 py-3 text-[15px] font-medium text-primary-on print:hidden">
           🎉 게시했어요. 이제 모든 분이 이 소개서를 볼 수 있어요.
         </div>
@@ -338,4 +350,14 @@ export default async function MakerPage({
       )}
     </main>
   );
+}
+
+/** 운영 비공개 초안(status='draft') — 보는 사람이 그 주인일 때만 돌려준다. 아니면 null(= 404와 같다). */
+async function ownDraft(slug: string): Promise<Maker | null> {
+  const draft = await repo.getDraftBySlug(slug);
+  if (!draft?.ownerUserId) return null;
+  const user = await getSessionUser();
+  if (!user) return null;
+  const me = await getProfile(user.id);
+  return me?.id === draft.ownerUserId ? draft : null;
 }
