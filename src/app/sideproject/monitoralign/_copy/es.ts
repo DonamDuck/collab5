@@ -24,7 +24,7 @@ export const es: Copy = {
   autoUpdate: "Cuando hay una versión nueva, la app te avisa y puedes actualizar en el momento.",
   whyTitle: "Por qué existe",
   why: [
-    "El lunes en casa, el martes en un café, el miércoles en la oficina. El monitor externo queda de un lado distinto cada vez, pero tu computadora sigue recordando la disposición anterior, así que el puntero se escapa por el borde equivocado.",
+    "Trabajo en lugares distintos y el monitor termina en un sitio diferente cada vez. Pero la computadora sigue recordando la disposición anterior, así que el puntero se escapa por el borde equivocado.",
     "En lugar de arrastrar rectángulos en la configuración de pantalla, solo haces clic donde quieres pasar.",
   ],
   howTitle: "Cómo funciona",

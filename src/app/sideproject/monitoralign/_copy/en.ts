@@ -29,7 +29,7 @@ export const en: Copy = {
   autoUpdate: "When there's a new version, the app lets you know and you can update right away.",
   whyTitle: "Why it exists",
   why: [
-    "Home desk on Monday, a café on Tuesday, the office on Wednesday. Your external monitor lands on a different side each time, but your computer still remembers the old arrangement, so the pointer slides off the wrong edge.",
+    "I work in different places, and my monitor ends up on a different side each time. But the computer still remembers the old arrangement, so the pointer slides off the wrong edge.",
     "Instead of dragging rectangles around in display settings, you just click where you want to cross.",
   ],
   howTitle: "How it works",

@@ -23,7 +23,7 @@ export const fr: Copy = {
   autoUpdate: "Quand une nouvelle version sort, l’app vous prévient et vous pouvez la mettre à jour tout de suite.",
   whyTitle: "Pourquoi cette app",
   why: [
-    "Lundi à la maison, mardi dans un café, mercredi au bureau. Votre écran externe se retrouve d’un côté différent à chaque fois, mais l’ordinateur garde en mémoire l’ancienne disposition, et le pointeur s’échappe par le mauvais bord.",
+    "Je travaille souvent dans des endroits différents, et l’écran se retrouve à une place différente à chaque fois. Mais l’ordinateur garde en mémoire l’ancienne disposition, et le pointeur s’échappe par le mauvais bord.",
     "Au lieu de faire glisser des rectangles dans les réglages d’affichage, vous cliquez simplement là où vous voulez passer.",
   ],
   howTitle: "Comment ça marche",

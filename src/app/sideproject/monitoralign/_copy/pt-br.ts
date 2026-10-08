@@ -23,7 +23,7 @@ export const ptBR: Copy = {
   autoUpdate: "Quando sai uma versão nova, o app avisa e você atualiza na hora.",
   whyTitle: "Por que existe",
   why: [
-    "Segunda em casa, terça num café, quarta no escritório. O monitor externo fica de um lado diferente a cada vez, mas o computador continua lembrando a disposição antiga, e o ponteiro escapa pela borda errada.",
+    "Eu trabalho em lugares diferentes, e o monitor fica numa posição diferente a cada vez. Mas o computador continua lembrando a disposição antiga, e o ponteiro escapa pela borda errada.",
     "Em vez de arrastar retângulos nos ajustes de tela, você só clica onde quer passar.",
   ],
   howTitle: "Como funciona",

@@ -22,7 +22,7 @@ export const de: Copy = {
   autoUpdate: "Gibt es eine neue Version, sagt dir die App Bescheid, und du kannst sofort aktualisieren.",
   whyTitle: "Warum es das gibt",
   why: [
-    "Montag zu Hause, Dienstag im Café, Mittwoch im Büro. Der externe Monitor steht jedes Mal auf einer anderen Seite, aber dein Computer merkt sich die alte Anordnung, und der Mauszeiger rutscht an der falschen Kante hinaus.",
+    "Ich arbeite oft an verschiedenen Orten, und der Monitor steht jedes Mal woanders. Aber der Computer merkt sich die alte Anordnung, und der Mauszeiger rutscht an der falschen Kante hinaus.",
     "Statt in den Anzeigeeinstellungen Rechtecke herumzuschieben, klickst du einfach dort, wo du hinüberwechseln willst.",
   ],
   howTitle: "So funktioniert’s",
