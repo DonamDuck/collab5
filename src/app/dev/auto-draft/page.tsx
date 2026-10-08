@@ -1,5 +1,5 @@
 // /dev/auto-draft — 자동 만들기 신청함 (2026-10-04, 로컬 전용)
-// 신청 목록과 상태, 초안이 나온 신청은 [초안 소개서로 보기] 버튼. 사장님께 여쭐 질문도 같이 보여 준다.
+// 신청 목록과 상태, 초안이 나온 신청은 [초안 소개서로 보기] 버튼. 사장님께 남긴 전체 메모도 같이 보여 준다.
 // 🔁10-05: 밤에 만든 초안은 아침 9시 예약 작업(queue morning)이 안내 메일과 함께 넘긴다. 그 전에 보내려면 [지금 보내기].
 // 🔁10-05: 브리프는 흐름에서 뺐다. 시험으로 만든 브리프가 붙은 신청만 참고 링크가 보인다.
 // ⚠️운영 빌드에선 404. 대기열이 이 컴퓨터의 파일이라 운영에선 의미가 없다(설계 = lib/autoDraft.ts 머리말).
@@ -30,7 +30,7 @@ async function rows(): Promise<Row[]> {
       if (r.draft) {
         try {
           const d = JSON.parse(await readFile(r.draft, "utf8"));
-          r.questions = Array.isArray(d.open_questions) ? d.open_questions : [];
+          r.questions = Array.isArray(d.open_notes) ? d.open_notes : Array.isArray(d.open_questions) ? d.open_questions : [];
           r.counts = { a: d.activities?.length ?? 0, c: d.collab_history?.length ?? 0 };
         } catch {
           r.draft = undefined;
@@ -160,7 +160,7 @@ export default async function AutoDraftInbox() {
                 {!!r.questions?.length && (
                   <details className="mt-4 rounded-md bg-surface-soft px-4 py-3">
                     <summary className="cursor-pointer text-[14px] font-medium text-ink">
-                      사장님께 여쭐 질문 {r.questions.length}개
+                      전체 메모 {r.questions.length}개
                     </summary>
                     <ol className="mt-2 list-decimal space-y-1.5 pl-5 text-[13px] leading-[1.6] text-body">
                       {r.questions.map((q, i) => (

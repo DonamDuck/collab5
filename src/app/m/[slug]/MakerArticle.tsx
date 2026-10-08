@@ -11,7 +11,7 @@ import type { DraftNotes } from "@/lib/autoDraftLocal";
 export function MakerArticle({ maker, isOwner, logoUrl, readOnly, draftNotes }: {
   maker: Maker; isOwner: boolean; logoUrl?: string;
   readOnly?: boolean; // /preview 데모용 — 남의 예시라 수정 진입점 자체를 숨긴다
-  /** 초안 페이지(자동 만들기, 10-06)일 때만 — 항목마다 collab5가 사장님께 여쭤볼 것. 게시하면 사라진다 */
+  /** 초안 페이지(자동 만들기, 10-06)일 때만 — 항목마다 collab5가 «어떻게 썼는지» 남긴 메모. 게시하면 사라진다 */
   draftNotes?: DraftNotes;
 }) {
   return (
@@ -241,13 +241,14 @@ export function MakerArticle({ maker, isOwner, logoUrl, readOnly, draftNotes }: 
 
 // 소개서 섹션 — 편집물처럼 큰 타이틀 + 상단 구분선 + 내용
 // 인쇄: 섹션 통째 개행보호는 긴 섹션이 통째로 밀려 대공백을 만들어 아이템 단위 보호로 대체
-/** 초안 페이지에서만 — collab5가 이 항목에 대해 여쭤볼 것. 인쇄·게시 후엔 안 보인다.
- *  🎨본문(회색)과 섞이지 않게 옅은 경고색 바탕에, 말투는 «여쭤봐요». 비어 있으면 아무것도 그리지 않는다. */
+/** 초안 페이지에서만 — collab5가 이 항목을 어떻게 썼는지 남긴 메모. 인쇄·게시 후엔 안 보인다.
+ *  🔁10-09 대표: 질문(«여쭤봐요»)이 아니라 메모다 — 사장님이 답할 길이 없다. «이렇게 썼어요 · 이 점을 생각했어요 · 혹시 ~면».
+ *  🎨본문(회색)과 섞이지 않게 옅은 경고색 바탕. 비어 있으면 아무것도 그리지 않는다. */
 function DraftNote({ notes }: { notes?: string[] }) {
   if (!notes || notes.length === 0) return null;
   return (
     <div className="mt-3 rounded-md border border-[#F0D9A8] bg-[#FFF8EA] px-3.5 py-2.5 print:hidden">
-      <p className="text-[13px] font-bold text-[#8A5A0B]">💬 collab5가 여쭤봐요</p>
+      <p className="text-[13px] font-bold text-[#8A5A0B]">📝 이렇게 썼어요</p>
       <ul className="mt-1 space-y-1 text-[14px] leading-[1.6] text-body">
         {notes.map((n, k) => (
           <li key={k} className="break-keep">{n}</li>

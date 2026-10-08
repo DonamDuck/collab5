@@ -82,7 +82,7 @@ export async function readDraftBundle(rawId: string) {
   const notes = attachNotes(
     raw.activities ?? [],
     raw.collab_history ?? [],
-    Array.isArray(raw.open_questions) ? raw.open_questions : [],
+    openNotes(raw),
   );
   return { id, req, content, notes };
 }
@@ -108,13 +108,19 @@ export async function buildLocalDraft(rawId: string): Promise<string> {
 export type { DraftNotes } from "./types";
 export type LocalDraftState = { id: string; publishedAt?: string; notes: DraftNotes };
 
-type NoteItem = { title?: string; partner?: string; questions?: string[] };
+// 🔁10-09 대표: 질문이 아니라 «메모»다 — 사장님이 답할 길이 없으니 «이렇게 썼어요»로 남긴다. 새 초안은 notes/open_notes,
+//   옛 초안(questions/open_questions)도 그대로 읽는다.
+type NoteItem = { title?: string; partner?: string; notes?: string[]; questions?: string[] };
+const itemNotes = (x: NoteItem) => x.notes ?? x.questions ?? [];
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const openNotes = (raw: any): string[] =>
+  Array.isArray(raw?.open_notes) ? raw.open_notes : Array.isArray(raw?.open_questions) ? raw.open_questions : [];
 
 /** 질문 문장을 항목에 붙인다. 항목별 questions가 있으면 그걸 쓰고(새 초안), 없으면 open_questions를
  *  «항목 이름이 문장에 그대로 나오는 경우에만» 그 항목에 붙인다(옛 초안). 어디에도 안 맞으면 전체 질문으로 둔다. */
 function attachNotes(acts: NoteItem[], cols: NoteItem[], open: string[]): DraftNotes {
-  const activities = acts.map((a) => [...(a.questions ?? [])]);
-  const collabs = cols.map((c) => [...(c.questions ?? [])]);
+  const activities = acts.map((a) => [...itemNotes(a)]);
+  const collabs = cols.map((c) => [...itemNotes(c)]);
   const general: string[] = [];
   const key = (s?: string) => (s ?? "").split(/\s*[·(（「」]\s*/)[0].trim();
   for (const q of open) {
@@ -148,7 +154,7 @@ export async function localDraftState(slug: string): Promise<LocalDraftState | n
       return {
         id: r.id,
         publishedAt: r.publishedAt,
-        notes: attachNotes(d.activities ?? [], d.collab_history ?? [], Array.isArray(d.open_questions) ? d.open_questions : []),
+        notes: attachNotes(d.activities ?? [], d.collab_history ?? [], openNotes(d)),
       };
     } catch {}
   }
