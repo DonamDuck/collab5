@@ -65,7 +65,7 @@ export const fr: Copy = {
     },
     {
       q: "Comment organiser les écrans sous Windows ?",
-      a: "Dans les Paramètres, sous Système, ouvrez les réglages d’affichage, faites glisser les rectangles numérotés pour qu’ils correspondent à la place réelle de vos écrans, puis appliquez. MonitorAlign pour Windows (bientôt disponible) fait la même chose en deux clics.",
+      a: "Dans les Paramètres, sous Système, ouvrez les réglages d’affichage, faites glisser les rectangles numérotés pour qu’ils correspondent à la place réelle de vos écrans, puis appliquez. MonitorAlign pour Windows fait la même chose en deux clics.",
     },
     {
       q: "Pourquoi la souris ne passe-t-elle pas sur le deuxième écran ?",

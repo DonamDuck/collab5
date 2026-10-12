@@ -65,7 +65,7 @@ export const ptBR: Copy = {
     },
     {
       q: "Como organizar os monitores no Windows?",
-      a: "Em Configurações › Sistema, abra os ajustes de tela, arraste os retângulos numerados até a posição real dos monitores e clique em Aplicar. O MonitorAlign para Windows (em breve) faz o mesmo em dois cliques.",
+      a: "Em Configurações › Sistema, abra os ajustes de tela, arraste os retângulos numerados até a posição real dos monitores e clique em Aplicar. O MonitorAlign para Windows faz o mesmo em dois cliques.",
     },
     {
       q: "Por que o mouse não passa para o segundo monitor?",
