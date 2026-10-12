@@ -68,7 +68,7 @@ export const en: Copy = {
     },
     {
       q: "How do I rearrange monitors in Windows?",
-      a: "Go to Settings › System › Display, drag the numbered boxes to match where your monitors really are, and select Apply. MonitorAlign for Windows (coming soon) does the same thing in two clicks.",
+      a: "Go to Settings › System › Display, drag the numbered boxes to match where your monitors really are, and select Apply. MonitorAlign for Windows does the same thing in two clicks.",
     },
     {
       q: "Why won't my mouse move to my second monitor?",

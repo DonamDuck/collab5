@@ -64,7 +64,7 @@ export const de: Copy = {
     },
     {
       q: "Wie ordne ich Monitore unter Windows an?",
-      a: "Öffne in den Einstellungen unter System die Anzeigeeinstellungen, zieh die nummerierten Rechtecke an die Stellen, an denen deine Monitore tatsächlich stehen, und übernimm die Änderung. MonitorAlign für Windows (bald verfügbar) erledigt das mit zwei Klicks.",
+      a: "Öffne in den Einstellungen unter System die Anzeigeeinstellungen, zieh die nummerierten Rechtecke an die Stellen, an denen deine Monitore tatsächlich stehen, und übernimm die Änderung. MonitorAlign für Windows erledigt das mit zwei Klicks.",
     },
     {
       q: "Warum wechselt die Maus nicht auf den zweiten Monitor?",
