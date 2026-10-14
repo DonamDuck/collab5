@@ -14,9 +14,9 @@ export const metadata: Metadata = {
 
 export default function SideIndexPage() {
   return (
-    <main className="mx-auto w-full max-w-[560px] px-4 pt-10 pb-16 sm:px-6 sm:pt-14">
+    <main className="mx-auto w-full max-w-[720px] px-4 pt-10 pb-16 sm:px-6 sm:pt-14">
       <h1 className="text-[28px] font-bold leading-[1.25] tracking-[-0.02em] text-ink">콜랩5의 굉장히 사적인 프로젝트</h1>
-      <p className="mt-3 text-[17px] leading-relaxed break-keep text-mute">
+      <p className="mt-3 text-[17px] leading-relaxed break-keep text-pretty text-mute">
         콜랩5를 만드는 메이커들의 굉장히 사적인 니즈를 반영하여 구성하고 있는 개발 공간입니다 🤩
       </p>
 
@@ -32,7 +32,7 @@ export default function SideIndexPage() {
               <img src={p.icon} alt="" aria-hidden="true" width={64} height={64} className="size-[64px] shrink-0" />
               <div className="min-w-0 flex-1">
                 <p className="text-[17px] font-bold leading-snug text-ink">{p.name}</p>
-                <p className="mt-1 text-[15px] leading-relaxed break-keep text-body">{p.tagline}</p>
+                <p className="mt-1 text-[15px] leading-relaxed break-keep text-pretty text-body">{p.tagline}</p>
                 <p className="mt-1 text-[13px] text-mute">{p.meta}</p>
               </div>
               <svg aria-hidden="true" viewBox="0 0 20 20" className="size-[18px] shrink-0 text-mute" fill="none" stroke="currentColor" strokeWidth="1.9">

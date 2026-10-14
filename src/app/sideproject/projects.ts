@@ -38,6 +38,13 @@ export const SIDE_PROJECTS: SideProject[] = [
       ],
     },
   },
+  {
+    slug: "limitglance",
+    name: "LimitGlance",
+    tagline: "Claude 사용량을 메뉴 막대에 늘 띄워 둬요. 챗, 코워크, Claude Code를 합친 숫자예요.",
+    meta: "macOS · Windows · 브라우저 확장 · 무료",
+    icon: "/sideproject/limitglance/icon-256.png",
+  },
 ];
 
 export function getSideProject(slug: string): SideProject {

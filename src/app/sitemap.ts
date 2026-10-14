@@ -12,11 +12,16 @@ export const revalidate = 3600;
 import type { MetadataRoute } from "next";
 import { repo } from "@/lib/repo";
 import { SITE_URL } from "@/lib/site";
+import { HREFLANG as LG_HREFLANG, LANGS as LG_LANGS, PATH as LG_PATH } from "./sideproject/limitglance/langs";
 import { HREFLANG, LANGS, PATH as MA_PATH } from "./sideproject/monitoralign/langs";
 
 const monitorAlignLanguages: Record<string, string> = {
   ...Object.fromEntries(LANGS.map((l) => [HREFLANG[l], `${SITE_URL}${MA_PATH[l]}`])),
   "x-default": `${SITE_URL}${MA_PATH.en}`,
+};
+const limitGlanceLanguages: Record<string, string> = {
+  ...Object.fromEntries(LG_LANGS.map((l) => [LG_HREFLANG[l], `${SITE_URL}${LG_PATH[l]}`])),
+  "x-default": `${SITE_URL}${LG_PATH.en}`,
 };
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
@@ -41,6 +46,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: "monthly" as const,
       priority: 0.5,
       alternates: { languages: monitorAlignLanguages },
+    })),
+    // LimitGlance 한국어·영어(10-14) — 언어 목록·주소는 limitglance/langs.ts에서 온다.
+    ...LG_LANGS.map((l) => ({
+      url: `${SITE_URL}${LG_PATH[l]}`,
+      changeFrequency: "monthly" as const,
+      priority: 0.5,
+      alternates: { languages: limitGlanceLanguages },
     })),
   ];
 
