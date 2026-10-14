@@ -14,6 +14,7 @@ import type { ReactNode } from "react";
 import { SITE_URL } from "@/lib/site";
 import release from "../../../../public/sideproject/monitoralign/version.json";
 import { getSideProject, type SupportLink } from "../projects";
+import { koWrapDeep } from "../koWrap";
 import { COPY, type Copy, type Step } from "./_copy";
 import { DownloadButtons, type DownloadItem } from "./DownloadButtons";
 import { HtmlLang } from "./HtmlLang";
@@ -25,7 +26,7 @@ export type { Lang } from "./langs";
 const NAME = "MonitorAlign";
 const ICON = "/sideproject/monitoralign/icon.png";
 const SHORTCUT = { align: { mac: "⌃⌥⌘A", win: "Ctrl+Alt+Shift+A" }, undo: { mac: "⌃⌥⌘Z", win: "Ctrl+Alt+Shift+Z" } };
-// 띄어쓰기 없이 쓰는 언어. 줄바꿈 규칙(break-keep 해제)과 평문 이어 붙이기(공백·마침표)가 달라진다.
+// 띄어쓰기 없이 쓰는 언어. 줄바꿈 규칙(break-keep text-pretty 해제)과 평문 이어 붙이기(공백·마침표)가 달라진다.
 const NO_SPACES: ReadonlySet<Lang> = new Set<Lang>(["ja", "zh-cn", "zh-tw"]);
 
 // ── 작은 표시 조각 ─────────────────────────────────────────
@@ -226,7 +227,8 @@ function LanguageMenu({ lang }: { lang: Lang }) {
 }
 
 export function MonitorAlignView({ lang }: { lang: Lang }) {
-  const c = COPY[lang];
+  // 한국어는 화면에 그릴 때만 덩어리 줄바꿈을 다듬는다(../koWrap.ts). 구조화 데이터는 원문 COPY를 쓴다.
+  const c = lang === "ko" ? koWrapDeep(COPY.ko) : COPY[lang];
   const project = getSideProject("monitoralign");
   const live = (xs: SupportLink[] | undefined) => (xs ?? []).filter((x) => x.url.trim());
   // 후원 창구는 한국 것(ko)과 해외 것(en) 두 벌이다. 한국어가 아닌 페이지는 모두 해외 창구를 쓴다.
@@ -235,7 +237,7 @@ export function MonitorAlignView({ lang }: { lang: Lang }) {
   const supportAbroad = lang === "ko" ? live(project.support?.en) : [];
   const hasSupport = supportMain.length > 0 || supportAbroad.length > 0;
   const font = FONT_STACK[lang];
-  // 일본어·중국어는 띄어쓰기가 없어서 `break-keep`(띄어쓰기에서만 줄바꿈)이면 한 문장이 한 덩어리가 되어
+  // 일본어·중국어는 띄어쓰기가 없어서 `break-keep text-pretty`(띄어쓰기에서만 줄바꿈)이면 한 문장이 한 덩어리가 되어
   // 좁은 폰에서 옆으로 넘친다. 이 두 언어에선 글자 사이 줄바꿈을 되살린다.
   const noSpaces = NO_SPACES.has(lang);
 
@@ -248,7 +250,7 @@ export function MonitorAlignView({ lang }: { lang: Lang }) {
     <main
       lang={HREFLANG[lang]}
       style={font ? { fontFamily: font } : undefined}
-      className={`mx-auto w-full max-w-[560px] px-4 pt-8 pb-16 sm:px-6 sm:pt-12${noSpaces ? " [&_.break-keep]:break-normal" : ""}`}
+      className={`mx-auto w-full max-w-[720px] px-4 pt-8 pb-16 sm:px-6 sm:pt-12${noSpaces ? " [&_.break-keep]:break-normal" : ""}`}
     >
       {lang !== "ko" && <HtmlLang lang={HREFLANG[lang]} />}
       <script
@@ -278,21 +280,28 @@ export function MonitorAlignView({ lang }: { lang: Lang }) {
         <img src={ICON} alt={`${NAME} icon`} width={96} height={96} className="size-[96px]" />
         <div>
           <h1 className="text-[28px] font-bold leading-[1.25] tracking-[-0.02em] text-ink">{NAME}</h1>
-          <p className="mt-2 text-[17px] leading-relaxed break-keep text-body">{c.lead}</p>
+          {/* 문장마다 줄을 새로 시작하고 문장 안은 고르게 나눈다(10-14 대표: 줄바꿈이 어색함). */}
+          <p className="mt-2 text-[17px] leading-relaxed break-keep text-balance text-body">
+            {c.lead.split(/(?<=[.?!。])\s+/).map((sentence, i) => (
+              <span key={i} className="block">
+                {sentence}
+              </span>
+            ))}
+          </p>
         </div>
       </div>
 
       <div className="mt-8">
         <DownloadButtons items={downloads} />
       </div>
-      <p className="mt-3 text-[14px] leading-relaxed break-keep text-mute">
+      <p className="mt-3 text-[14px] leading-relaxed break-keep text-pretty text-mute">
         <span className="font-medium text-body">{c.free}</span> {c.autoUpdate}
       </p>
 
       <section className={SECTION}>
         <h2 className={H2}>{c.whyTitle}</h2>
         {c.why.map((p, i) => (
-          <p key={i} className="mt-3 text-[16px] leading-relaxed break-keep text-body">
+          <p key={i} className="mt-3 text-[16px] leading-relaxed break-keep text-pretty text-body">
             {p}
           </p>
         ))}
@@ -303,7 +312,7 @@ export function MonitorAlignView({ lang }: { lang: Lang }) {
         <h2 className={H2}>{c.howTitle}</h2>
         <ol className="mt-4 flex flex-col gap-3">
           {c.steps.map((step, i) => (
-            <li key={i} className="flex gap-3 text-[16px] leading-relaxed break-keep text-body">
+            <li key={i} className="flex gap-3 text-[16px] leading-relaxed break-keep text-pretty text-body">
               <span
                 aria-hidden="true"
                 className="mt-[2px] flex size-[24px] shrink-0 items-center justify-center rounded-pill bg-primary-pale text-[13px] font-bold text-primary-on"
@@ -321,7 +330,7 @@ export function MonitorAlignView({ lang }: { lang: Lang }) {
             </li>
           ))}
         </ol>
-        <div className="mt-5 rounded-md bg-surface-faint px-4 py-3 text-[15px] leading-relaxed break-keep text-body">
+        <div className="mt-5 rounded-md bg-surface-faint px-4 py-3 text-[15px] leading-relaxed break-keep text-pretty text-body">
           <p>{c.undo.text}</p>
           <Shortcuts mac={SHORTCUT.undo.mac} win={SHORTCUT.undo.win} macLabel={c.macLabel} winLabel={c.winLabel} />
           {c.undo.custom && <p className="mt-2 text-[14px] text-mute">{c.undo.custom}</p>}
@@ -333,7 +342,7 @@ export function MonitorAlignView({ lang }: { lang: Lang }) {
           <h2 className={H2}>{c.featuresTitle}</h2>
           <ul className="mt-4 flex flex-col gap-2">
             {c.features.map((f) => (
-              <li key={f} className="flex gap-2.5 text-[16px] leading-relaxed break-keep text-body">
+              <li key={f} className="flex gap-2.5 text-[16px] leading-relaxed break-keep text-pretty text-body">
                 <svg aria-hidden="true" viewBox="0 0 20 20" className="mt-[5px] size-[16px] shrink-0 text-primary-on" fill="none" stroke="currentColor" strokeWidth="2.2">
                   <path d="m4.5 10.5 3.5 3.5 7.5-8" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
@@ -346,12 +355,12 @@ export function MonitorAlignView({ lang }: { lang: Lang }) {
 
       <section className={SECTION}>
         <h2 className={H2}>{c.firstTitle}</h2>
-        <p className="mt-3 text-[16px] leading-relaxed break-keep text-body">{c.firstIntro}</p>
+        <p className="mt-3 text-[16px] leading-relaxed break-keep text-pretty text-body">{c.firstIntro}</p>
         <dl className="mt-4 flex flex-col gap-3">
           {[c.firstMac, c.firstWin].map(([label, body]) => (
             <div key={label} className="rounded-md border border-hairline px-4 py-3">
               <dt className="text-[14px] font-bold text-ink">{label}</dt>
-              <dd className="mt-1 text-[15px] leading-relaxed break-keep text-body">{rich(body)}</dd>
+              <dd className="mt-1 text-[15px] leading-relaxed break-keep text-pretty text-body">{rich(body)}</dd>
             </div>
           ))}
         </dl>
@@ -362,8 +371,8 @@ export function MonitorAlignView({ lang }: { lang: Lang }) {
         <dl className="mt-4 flex flex-col gap-5">
           {c.faq.map((f) => (
             <div key={f.q}>
-              <dt className="text-[16px] font-bold leading-snug break-keep text-ink">{f.q}</dt>
-              <dd className="mt-1.5 text-[15px] leading-relaxed break-keep text-body">{f.a}</dd>
+              <dt className="text-[16px] font-bold leading-snug break-keep text-pretty text-ink">{f.q}</dt>
+              <dd className="mt-1.5 text-[15px] leading-relaxed break-keep text-pretty text-body">{f.a}</dd>
             </div>
           ))}
         </dl>
@@ -373,7 +382,7 @@ export function MonitorAlignView({ lang }: { lang: Lang }) {
       {hasSupport && (
         <section id="support" className={`${SECTION} scroll-mt-[72px]`}>
           <h2 className={H2}>{c.supportTitle}</h2>
-          <p className="mt-3 text-[16px] leading-relaxed break-keep text-body">{c.supportText}</p>
+          <p className="mt-3 text-[16px] leading-relaxed break-keep text-pretty text-body">{c.supportText}</p>
           {supportMain.length > 0 && <SupportButtons links={supportMain} />}
           {supportAbroad.length > 0 && (
             <>
@@ -384,7 +393,7 @@ export function MonitorAlignView({ lang }: { lang: Lang }) {
         </section>
       )}
 
-      <p className="mt-12 border-t border-hairline pt-5 text-[13px] leading-relaxed break-keep text-mute">{c.footer}</p>
+      <p className="mt-12 border-t border-hairline pt-5 text-[13px] leading-relaxed break-keep text-pretty text-mute">{c.footer}</p>
     </main>
   );
 }

@@ -22,7 +22,7 @@ const FONT = "Pretendard, -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Ne
 
 function Frame({ label, children, viewBox = "0 0 520 236", font }: { label: string; children: ReactNode; viewBox?: string; font?: string }) {
   return (
-    <figure className="mt-3 overflow-hidden rounded-md border border-hairline bg-surface-faint">
+    <figure className="mt-3 max-w-[600px] overflow-hidden rounded-md border border-hairline bg-surface-faint">
       <svg role="img" aria-label={label} viewBox={viewBox} className="block h-auto w-full" fontFamily={font ?? FONT}>
         {children}
       </svg>
