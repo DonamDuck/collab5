@@ -52,8 +52,8 @@ export const en: Copy = {
   menuNote:
     "Click the icon to see your 5-hour and 7-day limits and how long until each one resets. The number turns orange past 70% and red past 90%.",
   firstTitle: "Opening it the first time",
-  firstIntro: "The app isn't signed by Apple or Microsoft yet, so you'll see a warning the first time.",
-  firstMac: ["Mac", "If macOS says it can't be opened, go to **System Settings › Privacy & Security** and click **Open Anyway**."],
+  firstIntro: "The Mac app is notarized by Apple, so it opens without a warning. The Windows app isn't signed by Microsoft yet, so you'll see a warning once.",
+  firstMac: ["Mac", "The first time, macOS asks whether to open an app downloaded from the internet. Click **Open**."],
   firstWin: ["Windows", "If **Windows protected your PC** appears, click **More info**, then **Run anyway**."],
   faqTitle: "FAQ",
   faq: [
