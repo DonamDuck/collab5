@@ -3,7 +3,8 @@
 //
 // ⭐내려받기 주소·버전은 version.json 한 파일에서 온다(빌드 때 읽힌다). 앱 업데이터도 같은 파일을 읽으므로
 //   ⛔키 이름·모양을 바꾸지 말 것. `url`이 비어 있으면 그 버튼은 「준비 중」으로 잠긴다.
-// ⭐후원 창구는 version.json이 아니라 `../projects.ts`의 `support`에 있다(업데이터가 모르는 모양이라서).
+// ⭐후원 창구는 version.json이 아니라 `../support/channels.ts` 한 곳에 있다(업데이터가 모르는 모양이라서).
+//   이 페이지의 응원 절은 후원하기 페이지(/sideproject/support, 다른 언어는 /en)로 가는 버튼 하나만 그린다.
 //   앱의 [응원하기] 메뉴가 `#support`로 들어오므로 그 절의 id를 바꾸지 말 것.
 // ⭐검색 노출(10-08): 페이지마다 hreflang 아홉 개+x-default, 그 언어 og 이미지, JSON-LD(앱·FAQ·사용법·빵부스러기)를 낸다.
 //   JSON-LD의 문장은 화면 문안에서 바로 만든다(따로 적지 않는다) → 화면과 구조화 데이터가 어긋날 수 없다.
@@ -13,8 +14,8 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { SITE_URL } from "@/lib/site";
 import release from "../../../../public/sideproject/monitoralign/version.json";
-import { getSideProject, type SupportLink } from "../projects";
 import { koWrapDeep } from "../koWrap";
+import { supportPathFor } from "../support/langs";
 import { COPY, type Copy, type Step } from "./_copy";
 import { DownloadButtons, type DownloadItem } from "./DownloadButtons";
 import { HtmlLang } from "./HtmlLang";
@@ -167,25 +168,6 @@ function structuredData(lang: Lang) {
 const H2 = "text-[19px] font-bold leading-snug tracking-tight text-ink";
 const SECTION = "mt-10 border-t border-hairline pt-7";
 
-function SupportButtons({ links }: { links: SupportLink[] }) {
-  return (
-    <div className="mt-4 flex flex-wrap gap-2">
-      {links.map((l) => (
-        <a
-          key={l.label}
-          href={l.url}
-          target="_blank"
-          rel="noreferrer"
-          className="inline-flex h-[44px] items-center justify-center rounded-md border border-border-strong px-5 text-[15px] font-medium text-ink transition-colors hover:bg-surface-soft"
-        >
-          {l.label}
-          {l.note && <span className="ml-2 text-[13px] font-normal text-mute">{l.note}</span>}
-        </a>
-      ))}
-    </div>
-  );
-}
-
 // 언어 바꾸기 — 아홉 개라 한 줄에 못 늘어놓는다. JS 없이 열리는 <details> 메뉴에 링크를 담는다.
 // 닫혀 있어도 링크는 HTML에 그대로 있어서 크롤러가 따라간다. 언어마다 그 언어 글자로 적는다.
 // `key={lang}` — 다른 언어로 옮겨 가면 메뉴를 새로 그려 열린 채로 남지 않게 한다.
@@ -229,13 +211,6 @@ function LanguageMenu({ lang }: { lang: Lang }) {
 export function MonitorAlignView({ lang }: { lang: Lang }) {
   // 한국어는 화면에 그릴 때만 덩어리 줄바꿈을 다듬는다(../koWrap.ts). 구조화 데이터는 원문 COPY를 쓴다.
   const c = lang === "ko" ? koWrapDeep(COPY.ko) : COPY[lang];
-  const project = getSideProject("monitoralign");
-  const live = (xs: SupportLink[] | undefined) => (xs ?? []).filter((x) => x.url.trim());
-  // 후원 창구는 한국 것(ko)과 해외 것(en) 두 벌이다. 한국어가 아닌 페이지는 모두 해외 창구를 쓴다.
-  const supportMain = live(lang === "ko" ? project.support?.ko : project.support?.en);
-  // 한국어 페이지는 해외 창구도 「해외에서는」 아래 작게 보여 준다. 다른 언어 페이지엔 한국 창구를 안 띄운다.
-  const supportAbroad = lang === "ko" ? live(project.support?.en) : [];
-  const hasSupport = supportMain.length > 0 || supportAbroad.length > 0;
   const font = FONT_STACK[lang];
   // 일본어·중국어는 띄어쓰기가 없어서 `break-keep text-pretty`(띄어쓰기에서만 줄바꿈)이면 한 문장이 한 덩어리가 되어
   // 좁은 폰에서 옆으로 넘친다. 이 두 언어에선 글자 사이 줄바꿈을 되살린다.
@@ -378,20 +353,18 @@ export function MonitorAlignView({ lang }: { lang: Lang }) {
         </dl>
       </section>
 
-      {/* 응원하기 — 앱의 [응원하기] 메뉴가 `#support`로 들어온다. 보여 줄 창구가 없으면 절을 그리지 않는다. */}
-      {hasSupport && (
-        <section id="support" className={`${SECTION} scroll-mt-[72px]`}>
-          <h2 className={H2}>{c.supportTitle}</h2>
-          <p className="mt-3 text-[16px] leading-relaxed break-keep text-pretty text-body">{c.supportText}</p>
-          {supportMain.length > 0 && <SupportButtons links={supportMain} />}
-          {supportAbroad.length > 0 && (
-            <>
-              <p className="mt-5 text-[14px] text-mute">{c.supportAbroad}</p>
-              <SupportButtons links={supportAbroad} />
-            </>
-          )}
-        </section>
-      )}
+      {/* 응원하기 — 앱의 [응원하기] 메뉴가 `#support`로 들어온다. 창구는 후원하기 페이지 한 곳에 있고 여기선 그리로 보낸다.
+          한국어 페이지는 한국어 후원 페이지로, 나머지 여덟 언어는 영어 후원 페이지로 간다(../support/langs.ts). */}
+      <section id="support" className={`${SECTION} scroll-mt-[72px]`}>
+        <h2 className={H2}>{c.support.title}</h2>
+        <Link
+          href={supportPathFor(lang)}
+          hrefLang={lang === "ko" ? "ko" : "en"}
+          className="mt-4 inline-flex h-[44px] items-center justify-center rounded-md border border-border-strong px-5 text-[15px] font-medium text-ink transition-colors hover:bg-surface-soft"
+        >
+          {c.support.button}
+        </Link>
+      </section>
 
       <p className="mt-12 border-t border-hairline pt-5 text-[13px] leading-relaxed break-keep text-pretty text-mute">{c.footer}</p>
     </main>

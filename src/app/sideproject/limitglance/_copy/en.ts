@@ -92,6 +92,7 @@ export const en: Copy = {
       a: "On Mac, macOS 13 or later on Intel or Apple silicon. On Windows, Windows 10 or 11.",
     },
   ],
+  support: { title: "If this app helped", button: "Support" },
   footer:
     "A tool one of the makers behind collab5 built for their own needs. It's separate from the collab5 service and not affiliated with Anthropic. Claude is a trademark of Anthropic.",
   fig: {

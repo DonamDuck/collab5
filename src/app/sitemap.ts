@@ -14,6 +14,7 @@ import { repo } from "@/lib/repo";
 import { SITE_URL } from "@/lib/site";
 import { HREFLANG as LG_HREFLANG, LANGS as LG_LANGS, PATH as LG_PATH } from "./sideproject/limitglance/langs";
 import { HREFLANG, LANGS, PATH as MA_PATH } from "./sideproject/monitoralign/langs";
+import { HREFLANG as SP_HREFLANG, LANGS as SP_LANGS, PATH as SP_PATH } from "./sideproject/support/langs";
 
 const monitorAlignLanguages: Record<string, string> = {
   ...Object.fromEntries(LANGS.map((l) => [HREFLANG[l], `${SITE_URL}${MA_PATH[l]}`])),
@@ -22,6 +23,10 @@ const monitorAlignLanguages: Record<string, string> = {
 const limitGlanceLanguages: Record<string, string> = {
   ...Object.fromEntries(LG_LANGS.map((l) => [LG_HREFLANG[l], `${SITE_URL}${LG_PATH[l]}`])),
   "x-default": `${SITE_URL}${LG_PATH.en}`,
+};
+const supportLanguages: Record<string, string> = {
+  ...Object.fromEntries(SP_LANGS.map((l) => [SP_HREFLANG[l], `${SITE_URL}${SP_PATH[l]}`])),
+  "x-default": `${SITE_URL}${SP_PATH.en}`,
 };
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
@@ -53,6 +58,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: "monthly" as const,
       priority: 0.5,
       alternates: { languages: limitGlanceLanguages },
+    })),
+    // 사적인 프로젝트 후원하기 한국어·영어(10-15) — 언어 목록·주소는 support/langs.ts에서 온다.
+    ...SP_LANGS.map((l) => ({
+      url: `${SITE_URL}${SP_PATH[l]}`,
+      changeFrequency: "monthly" as const,
+      priority: 0.3,
+      alternates: { languages: supportLanguages },
     })),
   ];
 
