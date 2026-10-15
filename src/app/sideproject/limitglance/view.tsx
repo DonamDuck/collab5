@@ -202,6 +202,9 @@ export function LimitGlanceView({ lang }: { lang: Lang }) {
           <StoreButton label={c.extension.edge} url={EXTENSION_STORES.edge} soon={c.extension.soon} />
           <StoreButton label={c.extension.whale} url={EXTENSION_STORES.whale} soon={c.extension.soon} />
         </div>
+        {c.extension.note && (
+          <p className="mt-2.5 text-[13px] leading-relaxed break-keep text-pretty text-mute">{c.extension.note}</p>
+        )}
       </div>
 
       <p className="mt-3 text-[14px] leading-relaxed break-keep text-pretty text-mute">

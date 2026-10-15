@@ -49,10 +49,10 @@ export const es: Copy = {
     "Atajos que puedes cambiar y actualizaciones que se instalan desde la propia app.",
   ],
   firstTitle: "La primera vez que la abres",
-  firstIntro: "La app todavía no está firmada por Apple ni por Microsoft, así que verás una advertencia la primera vez que la abras.",
+  firstIntro: "La app de Mac está notarizada por Apple, así que se abre sin ninguna advertencia desde la primera vez. La app de Windows todavía no está firmada por Microsoft, así que verás una advertencia una sola vez.",
   firstMac: [
     "Mac",
-    "Si macOS dice que no puede verificar al desarrollador, ve a **Ajustes del Sistema › Privacidad y seguridad** y haz clic en **Abrir igualmente**. En el macOS de Latinoamérica se llama **Configuración del Sistema** y el botón dice **Abrir de todos modos**.",
+    "Si macOS dice que no se puede abrir la app, tienes una descarga antigua. Vuelve a descargarla y se abrirá enseguida.",
   ],
   firstWin: [
     "Windows",

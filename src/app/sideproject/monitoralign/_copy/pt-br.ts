@@ -48,10 +48,10 @@ export const ptBR: Copy = {
     "Atalhos que você pode trocar e atualizações que se instalam de dentro do app.",
   ],
   firstTitle: "Ao abrir pela primeira vez",
-  firstIntro: "O app ainda não é assinado pela Apple nem pela Microsoft, então um aviso aparece na primeira vez que você o abrir.",
+  firstIntro: "O app para Mac é autenticado pela Apple, então abre sem aviso já na primeira vez. O app para Windows ainda não é assinado pela Microsoft, então um aviso aparece uma vez.",
   firstMac: [
     "Mac",
-    "Se o macOS disser que não é possível verificar o desenvolvedor, vá em **Ajustes do Sistema › Privacidade e Segurança** e clique em **Abrir Mesmo Assim**.",
+    "Se o macOS disser que o app não pode ser aberto, você está com um download antigo. Baixe de novo e ele abre na hora.",
   ],
   firstWin: [
     "Windows",

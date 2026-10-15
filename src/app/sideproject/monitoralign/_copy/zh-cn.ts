@@ -46,8 +46,8 @@ export const zhCN: Copy = {
     "快捷键可以自定义，更新也能在应用里直接完成。",
   ],
   firstTitle: "首次打开时",
-  firstIntro: "应用还没有经过 Apple 和 Microsoft 签名，所以第一次打开时会看到警告。",
-  firstMac: ["Mac", "如果 macOS 提示无法验证开发者，请前往 **系统设置 › 隐私与安全**，点击 **仍要打开**。"],
+  firstIntro: "Mac 版应用已经通过 Apple 公证，第一次打开也不会有警告，直接就能打开。Windows 版还没有经过 Microsoft 签名，所以第一次打开时会看到一次警告。",
+  firstMac: ["Mac", "如果 macOS 提示无法打开，说明这是之前下载的旧文件。重新下载一次就能直接打开。"],
   firstWin: ["Windows", "如果看到 **Windows 已保护你的电脑**，请点击 **更多信息**，再点击 **仍要运行**。"],
   faqTitle: "常见问题",
   faq: [
