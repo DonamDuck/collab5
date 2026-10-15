@@ -46,8 +46,8 @@ export const zhTW: Copy = {
     "快速鍵可以自訂，更新也能在 App 裡直接完成。",
   ],
   firstTitle: "第一次打開時",
-  firstIntro: "App 還沒有經過 Apple 和 Microsoft 簽署，所以第一次打開時會看到警告。",
-  firstMac: ["Mac", "如果 macOS 顯示無法驗證開發者，請到 **系統設定 › 隱私權與安全性**，按一下 **強制打開**。"],
+  firstIntro: "Mac 版 App 已經通過 Apple 公證，第一次打開也不會出現警告，可以直接打開。Windows 版還沒有經過 Microsoft 簽署，所以第一次打開時會看到一次警告。",
+  firstMac: ["Mac", "如果 macOS 顯示無法打開，表示這是之前下載的舊檔案。重新下載一次就能直接打開。"],
   firstWin: ["Windows", "如果出現 Windows SmartScreen 保護電腦的提示，請按 **其他資訊**，再按 **仍要執行**。"],
   faqTitle: "常見問題",
   faq: [

@@ -47,10 +47,10 @@ export const de: Copy = {
     "Tastenkürzel lassen sich ändern, Updates installierst du direkt in der App.",
   ],
   firstTitle: "Beim ersten Öffnen",
-  firstIntro: "Die App ist noch nicht von Apple oder Microsoft signiert. Deshalb erscheint beim ersten Öffnen eine Warnung.",
+  firstIntro: "Die Mac-App ist von Apple beglaubigt. Deshalb öffnet sie sich schon beim ersten Mal ohne Warnung. Die Windows-App ist noch nicht von Microsoft signiert, darum erscheint einmal eine Warnung.",
   firstMac: [
     "Mac",
-    "Meldet macOS, dass der Entwickler nicht überprüft werden kann, öffne **Systemeinstellungen › Datenschutz & Sicherheit** und klicke auf **Dennoch öffnen**.",
+    "Meldet macOS, dass die App nicht geöffnet werden kann, hast du einen älteren Download. Lade sie noch einmal herunter, dann öffnet sie sich sofort.",
   ],
   firstWin: [
     "Windows",

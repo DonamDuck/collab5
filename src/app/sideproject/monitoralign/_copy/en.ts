@@ -54,10 +54,10 @@ export const en: Copy = {
     "Shortcuts you can remap, and updates that install from inside the app.",
   ],
   firstTitle: "Opening it the first time",
-  firstIntro: "The app isn't signed by Apple or Microsoft yet, so you'll see a warning the first time you open it.",
+  firstIntro: "The Mac app is notarized by Apple, so it opens without a warning the first time. The Windows app isn't signed by Microsoft yet, so you'll see a warning once.",
   firstMac: [
     "Mac",
-    "If macOS says the developer can't be verified, go to **System Settings › Privacy & Security** and click **Open Anyway**.",
+    "If macOS says the app can't be opened, you have an older download. Download it again and it opens right away.",
   ],
   firstWin: ["Windows", "If you see **Windows protected your PC**, click **More info**, then **Run anyway**."],
   faqTitle: "FAQ",

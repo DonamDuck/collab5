@@ -48,10 +48,10 @@ export const fr: Copy = {
     "Des raccourcis modifiables, et des mises à jour qui s’installent depuis l’app.",
   ],
   firstTitle: "À la première ouverture",
-  firstIntro: "L’app n’est pas encore signée par Apple ni par Microsoft, vous verrez donc un avertissement la première fois que vous l’ouvrirez.",
+  firstIntro: "L’app Mac est notarisée par Apple, elle s’ouvre donc sans avertissement dès la première fois. L’app Windows n’est pas encore signée par Microsoft, vous verrez donc un avertissement une seule fois.",
   firstMac: [
     "Mac",
-    "Si macOS indique que le développeur ne peut pas être vérifié, allez dans **Réglages Système › Confidentialité et sécurité** et cliquez sur **Ouvrir quand même**.",
+    "Si macOS indique que l’app ne peut pas être ouverte, vous avez un ancien téléchargement. Téléchargez-la à nouveau et elle s’ouvrira tout de suite.",
   ],
   firstWin: [
     "Windows",
