@@ -28,7 +28,8 @@ export type Copy = {
   back: string;
   lead: string;
   downloads: { mac: [string, string]; windows: [string, string]; soon: string };
-  extension: { title: string; text: string; chrome: string; edge: string; whale: string; soon: string };
+  /** `note`는 버튼 아래 작은 글씨(엣지의 「다른 스토어 허용」 안내). 비우면 안 그린다. */
+  extension: { title: string; text: string; chrome: string; edge: string; whale: string; soon: string; note: string };
   free: string;
   autoUpdate: string;
   whyTitle: string;
