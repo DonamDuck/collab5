@@ -104,14 +104,22 @@ const HOME_ORDER: string[] = [
 //   10칸은 실제 신규가 6곳이라 **더보기가 영영 안 뜬다.** 6 = 지금 데이터에 맞춘 «보여줄 칸 수»이고,
 //   나머지는 「더보기」가 받는다.
 //   ⚠️`GRID_LIMIT`(24)보다 작아야 한다 — 신규는 그 24곳 «안에서» 고른다.
+// 🔁**10-18 바닥 5곳 추가(대표 지시).** 위 30일 상한 때문에 조용한 달엔 섹션이 1곳만 남았다
+//   (10-18 실측: 홈 21곳 중 30일 안은 395빵집 하나). 대표 판정은 「휑하다, 시간 규칙이 지나도
+//   최근 기준으로 최소 5개」. 그래서 30일 안이 5곳 미만이면 **최신순으로 5곳까지 채운다.**
+//   ⭐08-25의 「석 달 된 소개서가 NEW를 단다」 걱정을 대표가 알고 넘긴 결정이다 — 휑한 쪽이 더 나쁘다.
+//   30일 안이 5곳 이상이면 예전처럼 그 안에서 최대 6곳(바닥은 상한을 안 건드린다).
 const NEW_MAX = 6;
+const NEW_MIN = 5;
 const NEW_WINDOW_DAYS = 30;
 function pickNewcomers(list: Maker[]): Maker[] {
   const cutoff = Date.now() - NEW_WINDOW_DAYS * 24 * 60 * 60 * 1000;
-  return [...list]
-    .filter((m) => m.createdAt && new Date(m.createdAt).getTime() >= cutoff)
-    .sort((a, b) => (a.createdAt > b.createdAt ? -1 : 1))
-    .slice(0, NEW_MAX);
+  const newest = [...list]
+    .filter((m) => m.createdAt)
+    .sort((a, b) => (a.createdAt > b.createdAt ? -1 : 1));
+  const fresh = newest.filter((m) => new Date(m.createdAt).getTime() >= cutoff).slice(0, NEW_MAX);
+  // 최신순이라 30일 안 것은 늘 앞쪽이다 → 앞에서 5곳을 자르면 그대로 포함된다.
+  return fresh.length >= NEW_MIN ? fresh : newest.slice(0, NEW_MIN);
 }
 
 // ⚠️이 한 줄이 없으면 목록이 **배포 시점에 얼어붙는다**(서버 컴포넌트 프리렌더 함정, /search·/my와 동일).
