@@ -45,6 +45,13 @@ export const SIDE_PROJECTS: SideProject[] = [
     meta: "macOS · Windows · 브라우저 확장 · 무료",
     icon: "/sideproject/limitglance/icon-256.png",
   },
+  {
+    slug: "hanmadi",
+    name: "한마디",
+    tagline: "스크린샷을 찍으면 뜨는 작은 카드에 글이나 말로 한마디 남겨요. 찍은 화면과 같이 한곳에 모여요.",
+    meta: "macOS · 무료",
+    icon: "/sideproject/hanmadi/icon-256.png",
+  },
 ];
 
 export function getSideProject(slug: string): SideProject {
