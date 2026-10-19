@@ -48,7 +48,7 @@ export const SIDE_PROJECTS: SideProject[] = [
   {
     slug: "hanmadi",
     name: "한마디",
-    tagline: "스크린샷을 찍으면 뜨는 작은 카드에 글이나 말로 한마디 남겨요. 찍은 화면과 같이 한곳에 모여요.",
+    tagline: "스크린샷을 찍고 메모를 함께 남길 수 있어요. 컴퓨터의 기존 메모들도 가져와 함께 관리해 보세요.",
     meta: "macOS · 무료",
     icon: "/sideproject/hanmadi/icon-256.png",
   },
