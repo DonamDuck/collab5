@@ -4,7 +4,7 @@ import type { BriefSample } from "./registry";
 // 정본은 노션이다. 여기는 사본이고, 노션이 바뀌면 다시 받아야 한다.
 
 export const GOYO: BriefSample = {
-  slug: "m-jse4bs",
+  slug: "goyo", // 10-19 주소를 m-jse4bs → goyo로 바꿨다(대표 지시, DB brands.slug와 맞춤)
   brandName: "고요 古么",
   publishedAt: "2026-09-08",
   notionUrl: "https://collab5.notion.site/3caa36ae26238139be66dbe254ae4b57",
