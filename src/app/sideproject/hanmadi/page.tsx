@@ -13,7 +13,7 @@ import { DownloadButtons } from "../monitoralign/DownloadButtons";
 import { HANMADI } from "./copy";
 import { CardFigure, ListFigure } from "./Illustrations";
 
-const NAME = "한마디";
+const NAME = "Hanmadi";
 const PATH = "/sideproject/hanmadi";
 const ICON = "/sideproject/hanmadi/icon.png";
 const OG = "/sideproject/hanmadi/og-ko.png";
@@ -54,6 +54,7 @@ function structuredData() {
         "@type": "SoftwareApplication",
         "@id": `${url}#app`,
         name: NAME,
+        alternateName: "한마디",
         description: c.description,
         url,
         image: `${SITE_URL}${ICON}`,
