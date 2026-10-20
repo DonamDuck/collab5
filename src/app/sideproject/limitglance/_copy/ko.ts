@@ -22,7 +22,7 @@ export const ko: Copy = {
     "Claude Max 사용량",
     "Claude Pro 한도",
   ],
-  back: "사적인 프로젝트",
+  back: "딴짓",
   lead: "Claude 한도가 지금 몇\u00a0퍼센트 찼는지, 언제 리셋되는지 메뉴 막대에 늘 떠\u00a0있어요. 챗이든\u00a0코워크든 Claude Code든 계정 하나의 숫자로요.",
   downloads: {
     mac: ["macOS용 내려받기", "macOS 13 이상 · 인텔/애플 실리콘"],

@@ -2,11 +2,11 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { SIDE_PROJECTS } from "./projects";
 
-// 사적인 프로젝트 목록 (10-06 대표)
+// 딴짓 목록 (10-06 대표, 「사적인 프로젝트」→「딴짓」은 10-20 대표)
 // collab5를 만드는 사람이 따로 만든 개인 도구를 모아 두는 자리다. 서비스 화면이 아니라서
 // 헤더에서도 보조 링크(데스크톱만)와 풋터 링크로만 들어온다.
 export const metadata: Metadata = {
-  title: "콜랩5의 굉장히 사적인 프로젝트 — collab5",
+  title: "콜랩5의 딴짓 — collab5",
   description: "콜랩5를 만드는 메이커들의 굉장히 사적인 니즈를 반영하여 구성하고 있는 개발 공간입니다.",
   // ⚠️필수 — 루트 layout의 `canonical: "/"`가 자식 페이지에 그대로 상속된다.
   alternates: { canonical: "/sideproject" },
@@ -15,7 +15,7 @@ export const metadata: Metadata = {
 export default function SideIndexPage() {
   return (
     <main className="mx-auto w-full max-w-[720px] px-4 pt-10 pb-16 sm:px-6 sm:pt-14">
-      <h1 className="text-[28px] font-bold leading-[1.25] tracking-[-0.02em] text-ink">콜랩5의 굉장히 사적인 프로젝트</h1>
+      <h1 className="text-[28px] font-bold leading-[1.25] tracking-[-0.02em] text-ink">콜랩5의 딴짓</h1>
       <p className="mt-3 text-[17px] leading-relaxed break-keep text-pretty text-mute">
         콜랩5를 만드는 메이커들의 굉장히 사적인 니즈를 반영하여 구성하고 있는 개발 공간입니다 🤩
       </p>

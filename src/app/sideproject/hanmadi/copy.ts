@@ -66,7 +66,7 @@ export const HANMADI: HanmadiCopy = {
     "애플 메모 모아 보기",
     "스티커 메모 모아 보기",
   ],
-  back: "사적인 프로젝트",
+  back: "딴짓",
   lead: "스크린샷을 찍고 메모를 함께 남길 수 있어요. 컴퓨터의 기존 메모들도 가져와 함께 관리해 보세요.",
   download: ["macOS용 내려받기", "macOS 13 이상 · 인텔/애플 실리콘"],
   soon: "준비 중",
