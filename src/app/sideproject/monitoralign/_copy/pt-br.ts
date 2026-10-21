@@ -39,6 +39,13 @@ export const ptBR: Copy = {
     { text: "Confirme, e os dois pontos se encaixam." },
   ],
   undo: { text: "Errou? O atalho de desfazer traz a disposição anterior de volta.", custom: "" },
+  presetsTitle: "Disposições salvas",
+  presets: [
+    "Salve a disposição dos monitores dos lugares onde você costuma trabalhar, como em casa ou no escritório, e volte a ela de uma vez só.",
+    "No menu, abra **Saved Layouts** (disposições salvas), escolha **Save Current Layout…** (salvar a disposição atual) e dê um nome. Se deixar o nome em branco, ela é salva como Layout 1, Layout 2.",
+    "Para aplicar uma disposição salva, escolha-a no mesmo menu. Em **Manage Layouts…** (gerenciar disposições) você também pode dar um atalho para cada uma.",
+    "Quando você conecta de novo os mesmos monitores, o app pergunta antes se deve mudar para essa disposição. Para não ser perguntado, desligue **Suggest a saved layout when monitors change** (sugerir uma disposição salva quando os monitores mudarem) no menu.",
+  ],
   featuresTitle: "O que você ganha",
   features: [
     "Grátis para baixar e usar.",
@@ -76,6 +83,7 @@ export const ptBR: Copy = {
       a: "Só a disposição das telas. É a mesma mudança que você faria arrastando as telas nos ajustes do macOS ou do Windows, e o atalho de desfazer traz a disposição anterior de volta.",
     },
     { q: "Funciona com três monitores?", a: "Ainda não. Por enquanto, só com duas telas." },
+    { q: "E se eu tiver dois monitores iguais?", a: "Cada monitor é identificado pelo número de série embutido. Entre monitores sem número de série, ele escolhe a combinação que menos os move de onde estão agora; se errar, um toque no atalho de desfazer desfaz tudo." },
     {
       q: "Ele coleta dados?",
       a: "Não. Não tem conta nem ferramenta de análise no app. A única conexão é para baixar um pequeno arquivo de atualização de collab5.co.kr.",

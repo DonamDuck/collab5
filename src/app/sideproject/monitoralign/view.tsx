@@ -337,6 +337,17 @@ export function MonitorAlignView({ lang }: { lang: Lang }) {
         </div>
       </section>
 
+      {c.presets.length > 0 && (
+        <section className={SECTION}>
+          <h2 className={H2}>{c.presetsTitle}</h2>
+          {c.presets.map((p, i) => (
+            <p key={i} className="mt-3 text-[16px] leading-relaxed break-keep text-pretty text-body">
+              {rich(p)}
+            </p>
+          ))}
+        </section>
+      )}
+
       {c.features.length > 0 && (
         <section className={SECTION}>
           <h2 className={H2}>{c.featuresTitle}</h2>
