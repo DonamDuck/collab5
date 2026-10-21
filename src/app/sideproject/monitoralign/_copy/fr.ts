@@ -39,6 +39,13 @@ export const fr: Copy = {
     { text: "Confirmez, et les deux points se rejoignent." },
   ],
   undo: { text: "Une erreur ? Le raccourci d’annulation rétablit la disposition précédente.", custom: "" },
+  presetsTitle: "Dispositions enregistrées",
+  presets: [
+    "Enregistrez la disposition des écrans des endroits où vous vous installez souvent, comme chez vous ou au bureau, et retrouvez-la d’un seul geste.",
+    "Dans le menu, ouvrez **Saved Layouts** (dispositions enregistrées), choisissez **Save Current Layout…** (enregistrer la disposition actuelle) et donnez-lui un nom. Sans nom, elle est enregistrée sous Layout 1, Layout 2.",
+    "Pour appliquer une disposition enregistrée, choisissez-la dans le même menu. Dans **Manage Layouts…** (gérer les dispositions), vous pouvez aussi attribuer un raccourci à chacune.",
+    "Quand vous rebranchez les mêmes écrans, l’app vous demande d’abord s’il faut passer à cette disposition. Pour ne plus être sollicité, désactivez **Suggest a saved layout when monitors change** (suggérer une disposition enregistrée quand les écrans changent) dans le menu.",
+  ],
   featuresTitle: "Ce que vous obtenez",
   features: [
     "Gratuit à télécharger et à utiliser.",
@@ -76,6 +83,7 @@ export const fr: Copy = {
       a: "Uniquement la disposition des écrans. C’est le même changement que si vous déplaciez les écrans dans les réglages de macOS ou de Windows, et le raccourci d’annulation rétablit la disposition précédente.",
     },
     { q: "Ça marche avec trois écrans ?", a: "Pas encore. Deux écrans seulement pour l’instant." },
+    { q: "Et si j’ai deux écrans identiques ?", a: "Chaque écran est reconnu par son numéro de série intégré. Pour des écrans sans numéro de série, l’app choisit la correspondance qui les déplace le moins par rapport à leur position actuelle ; en cas d’erreur, le raccourci d’annulation rétablit tout en une fois." },
     {
       q: "L’app collecte-t-elle des données ?",
       a: "Non. Pas de compte, pas d’outil d’analyse dans l’app. Sa seule connexion sert à récupérer un petit fichier de mise à jour sur collab5.co.kr.",
