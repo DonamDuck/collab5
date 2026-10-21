@@ -152,8 +152,13 @@ export function HomeMenuBar() {
         {/* ✏️10-05 대표 지시(로컬 코멘트) — 「콜라보 그려보기」 → **「내 소개서 제작」**, 앵커 대신 /register로 바로 간다.
             소개서 자동 만들기(로컬 시험판)를 붙이면서 홈에서 소개서 만들기로 가는 문을 메뉴에 다시 연다.
             📏라벨이 한 글자 짧아져(8자 → 7자) 폭은 안전한 방향이다. 콜라보 그려보기의 진입로는 홈 ③구좌 버튼이 남아 있다. */}
+        {/* ✏️10-21 대표(로컬 코멘트) — 「내 소개서 제작」 → **「내 소개서 만들기」**, 그리고 3번칸 **「딴짓」 추가**. */}
         <Link href="/register" onClick={() => track("home_menubar_register_click")} className={ITEM}>
-          내 소개서 제작
+          내 소개서 만들기
+        </Link>
+        <Divider />
+        <Link href="/sideproject" onClick={() => track("home_menubar_sideproject_click")} className={ITEM}>
+          딴짓
         </Link>
         {/* 🔻08-17 대표 지시 — 3번칸 **「소개서 등록」 삭제**(2칸으로 복귀).
             ⭐**칸 수와 라벨 길이는 한 쌍**이라는 이 파일의 규칙이 또 한 번 확인됐다. 08-16에
