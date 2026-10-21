@@ -22,10 +22,13 @@
 //    (경로는 세션이 아니라서 캐시를 깨지 않는다).
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useMobileNavVariant } from "./MobileNavTest";
 
 export function HeaderNavLinks() {
   const pathname = usePathname();
   const isHome = pathname === "/";
+  // 🧪 시험판 A일 땐 모바일에서 칩을 숨긴다 — 메뉴 버튼 자리를 내주려고(메뉴 안에 「콜라보 찾기」가 있다).
+  const mnav = useMobileNavVariant();
 
   return (
     <>
@@ -66,7 +69,7 @@ export function HeaderNavLinks() {
       {!isHome && (
         <Link
           href="/search"
-          className="flex h-[44px] min-w-0 items-center gap-1.5 rounded-pill bg-surface-soft pl-3 pr-4 text-mute transition-colors hover:bg-primary-pale hover:text-primary-on"
+          className={`${mnav === "a" ? "hidden sm:flex" : "flex"} h-[44px] min-w-0 items-center gap-1.5 rounded-pill bg-surface-soft pl-3 pr-4 text-mute transition-colors hover:bg-primary-pale hover:text-primary-on`}
         >
           <svg viewBox="0 0 20 20" className="h-[17px] w-[17px] shrink-0" fill="none" stroke="currentColor" strokeWidth="1.9">
             <circle cx="8.5" cy="8.5" r="5.5" />
