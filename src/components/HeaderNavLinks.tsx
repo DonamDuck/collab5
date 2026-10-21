@@ -3,7 +3,7 @@
 // 헤더의 이동 링크 — 경로에 따라 무엇을 보일지가 갈린다.
 //   · 홈 밖  : 매거진 + 딴짓 + 콜라보 찾기(칩)  ← 전역 보조 내비
 //   · 홈     : **매거진 + 딴짓**                ← 08-16 대표 지시, 10-06 하나 더함
-//   (매거진·딴짓은 데스크톱에서만 보인다. 「사적인 프로젝트」→「딴짓」 10-20 대표)
+//   (매거진·딴짓·콜라보 찾기는 데스크톱에서만 보인다. 모바일은 헤더 메뉴 버튼(MobileMenu, 10-21 대표 A안)이 셋을 다 담는다.)
 //
 // 🔻이력 — 08-14엔 홈에서 **통째로 숨겼다**(HomeMenuBar가 같은 두 링크를 들고 있어 중복이라서).
 //   08-16에 대표가 메뉴바를 2칸(콜라보 찾기 · 아이디어 추천)으로 줄이면서 매거진이 갈 곳이 없어졌고,
@@ -22,13 +22,10 @@
 //    (경로는 세션이 아니라서 캐시를 깨지 않는다).
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useMobileNavVariant } from "./MobileNavTest";
 
 export function HeaderNavLinks() {
   const pathname = usePathname();
   const isHome = pathname === "/";
-  // 🧪 시험판 A일 땐 모바일에서 칩을 숨긴다 — 메뉴 버튼 자리를 내주려고(메뉴 안에 「콜라보 찾기」가 있다).
-  const mnav = useMobileNavVariant();
 
   return (
     <>
@@ -65,11 +62,13 @@ export function HeaderNavLinks() {
              헤더에 실검색을 넣으면 페이지마다 상태를 들고 다녀야 한다.
              그래서 시각만 검색창(surface-soft 필·pill·좌측 돋보기)으로 빌려오고 동작은 이동.
           🚫**홈에서는 숨긴다**(08-16) — 홈 메뉴바 1번칸이 같은 「콜라보 찾기」다.
-             같은 목적지가 한 화면에 두 번 나오면 어느 쪽이 진짜인지 고민하게 된다. */}
+             같은 목적지가 한 화면에 두 번 나오면 어느 쪽이 진짜인지 고민하게 된다.
+          📱10-21 **모바일에선 숨긴다**(`hidden sm:flex`) — 메뉴 버튼(MobileMenu) 자리를 내주려고. 메뉴 안에 같은 링크가 있다.
+             360px에서 로고+칩+로그인+메뉴 버튼이 한 줄에 안 들어간다(07-29 가로 스크롤 사고와 같은 자리). */}
       {!isHome && (
         <Link
           href="/search"
-          className={`${mnav === "a" ? "hidden sm:flex" : "flex"} h-[44px] min-w-0 items-center gap-1.5 rounded-pill bg-surface-soft pl-3 pr-4 text-mute transition-colors hover:bg-primary-pale hover:text-primary-on`}
+          className={`hidden h-[44px] min-w-0 items-center gap-1.5 rounded-pill bg-surface-soft pl-3 pr-4 text-mute transition-colors hover:bg-primary-pale hover:text-primary-on sm:flex`}
         >
           <svg viewBox="0 0 20 20" className="h-[17px] w-[17px] shrink-0" fill="none" stroke="currentColor" strokeWidth="1.9">
             <circle cx="8.5" cy="8.5" r="5.5" />
