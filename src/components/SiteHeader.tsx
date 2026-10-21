@@ -4,6 +4,7 @@ import { getSessionUserLight } from "@/lib/supabase/server";
 import { getProfile } from "@/lib/profiles";
 import { Avatar } from "./Avatar";
 import { HeaderNavLinks } from "./HeaderNavLinks";
+import { MobileNavExtras, MobileNavMenuButton } from "./MobileNavTest";
 
 export async function SiteHeader() {
   const user = await getSessionUserLight();
@@ -11,6 +12,7 @@ export async function SiteHeader() {
   const displayName = profile?.brandName || user?.email?.split("@")[0] || "";
 
   return (
+    <>
     <header className="sticky top-0 z-10 flex h-14 items-center justify-between border-b border-hairline bg-canvas px-4 sm:px-6 print:hidden">
       {/* 로고 — 모바일에서도 워드마크 노출(대표 지시 07-31).
           ⚠️ 예전엔 모바일=심볼만이었다. 좁은 폰(375·360)에서 워드마크(123px)+우측메뉴(244px)가
@@ -65,7 +67,12 @@ export async function SiteHeader() {
             로그인
           </Link>
         )}
+        {/* 🧪 모바일 메뉴 시험판 A(`?mnav=a`일 때만, 모바일만). MobileNavTest.tsx 머리말 참조. */}
+        <MobileNavMenuButton loggedIn={!!user} />
       </nav>
     </header>
+    {/* 🧪 시험판 B(헤더 아래 메뉴 줄)·C(아래 탭 막대). 스위치가 없으면 아무것도 안 그린다. */}
+    <MobileNavExtras loggedIn={!!user} />
+    </>
   );
 }
