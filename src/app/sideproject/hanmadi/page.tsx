@@ -212,7 +212,12 @@ export default function HanmadiPage() {
         </dl>
       </section>
 
-      <p className="mt-12 border-t border-hairline pt-5 text-[13px] leading-relaxed break-keep text-pretty text-mute">{c.footer}</p>
+      <p className="mt-12 border-t border-hairline pt-5 text-[13px] leading-relaxed break-keep text-pretty text-mute">
+        {c.footer}{" "}
+        <Link href="/sideproject/hanmadi/privacy" className="underline underline-offset-2 hover:text-ink">
+          개인정보 처리방침
+        </Link>
+      </p>
     </main>
   );
 }
