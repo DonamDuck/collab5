@@ -9,7 +9,7 @@ import Link from "next/link";
 export const metadata: Metadata = {
   title: "Hanmadi 개인정보 처리방침 — collab5",
   description: "Hanmadi는 개인정보를 수집하지 않아요. 남긴 메모, 사진, 녹음은 모두 내 기기 안에만 저장돼요.",
-  alternates: { canonical: "/sideproject/hanmadi/privacy" },
+  alternates: { canonical: "/sideproject/hanmadi/privacy", languages: { ko: "/sideproject/hanmadi/privacy", en: "/sideproject/hanmadi/privacy/en" } },
 };
 
 const H2 = "mt-9 text-[18px] font-bold leading-snug text-ink";
@@ -19,15 +19,21 @@ const LI = "text-[16px] leading-relaxed break-keep text-pretty text-body";
 export default function HanmadiPrivacyPage() {
   return (
     <main lang="ko" className="mx-auto w-full max-w-[720px] px-4 pt-8 pb-16 sm:px-6 sm:pt-12">
-      <Link
-        href="/sideproject/hanmadi"
-        className="-ml-2 inline-flex h-[44px] items-center gap-1 rounded-md px-2 text-[14px] text-mute hover:text-ink"
-      >
-        <svg aria-hidden="true" viewBox="0 0 20 20" className="size-[16px] shrink-0" fill="none" stroke="currentColor" strokeWidth="1.9">
-          <path d="m12 5-5 5 5 5" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-        Hanmadi
-      </Link>
+      <div className="flex items-center justify-between gap-3">
+        <Link
+          href="/sideproject/hanmadi"
+          className="-ml-2 inline-flex h-[44px] items-center gap-1 rounded-md px-2 text-[14px] text-mute hover:text-ink"
+        >
+          <svg aria-hidden="true" viewBox="0 0 20 20" className="size-[16px] shrink-0" fill="none" stroke="currentColor" strokeWidth="1.9">
+            <path d="m12 5-5 5 5 5" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          Hanmadi
+        </Link>
+        {/* 영어판(10-29, 아이폰 1.1 영어 앱스토어용). 내용은 이 페이지를 옮긴 것이라 여기를 고치면 en/도 같이 고친다 */}
+        <Link href="/sideproject/hanmadi/privacy/en" lang="en" className="inline-flex h-[44px] items-center px-2 text-[14px] text-mute hover:text-ink">
+          English
+        </Link>
+      </div>
 
       <h1 className="mt-4 text-[28px] font-bold leading-[1.25] tracking-[-0.02em] text-ink">Hanmadi 개인정보 처리방침</h1>
       <p className="mt-3 text-[17px] leading-relaxed break-keep text-pretty text-body">
