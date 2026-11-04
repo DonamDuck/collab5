@@ -3,7 +3,10 @@
 // 내려받기 버튼 두 개 — 방문자의 OS에 맞는 쪽을 주 버튼으로 남기고 다른 쪽은 한 단 낮춘다.
 // 서버 렌더(=OS 모름)에선 둘 다 주 버튼이다. OS를 못 알아내면(폰·리눅스) 그대로 둔다.
 // url이 빈 항목은 OS와 상관없이 잠근 모양(「준비 중」).
+// 누르면 내려받기 기록을 한 줄 보낸다(11-05). 주소는 그대로 zip이라 기록이 실패해도 내려받기는 된다.
 import { useSyncExternalStore } from "react";
+import { usePathname } from "next/navigation";
+import { mineFlag, sendSideEvent, sideProjectOf } from "@/lib/sideprojectEvents";
 
 export type DownloadItem = {
   os: "mac" | "windows";
@@ -30,6 +33,21 @@ const subscribe = () => () => {};
 
 export function DownloadButtons({ items }: { items: DownloadItem[] }) {
   const os = useSyncExternalStore<Os>(subscribe, detectOs, () => null);
+  const project = sideProjectOf(usePathname() ?? "");
+  // 가운데 단추(새 탭으로 열기)도 내려받기라 onAuxClick에도 붙인다
+  const record = (it: DownloadItem) => {
+    if (!project) return;
+    sendSideEvent({
+      kind: "download",
+      project,
+      path: it.url.split("/").pop() ?? "",
+      os: it.os,
+      version: it.version,
+      // 이 방문자가 처음 타고 들어온 곳(사이트 안에서 옮겨 다녀도 첫 값이 남는다)
+      ref: document.referrer,
+      mine: mineFlag(),
+    });
+  };
 
   return (
     <div className="grid gap-3 sm:grid-cols-2">
@@ -51,6 +69,8 @@ export function DownloadButtons({ items }: { items: DownloadItem[] }) {
           <a
             key={it.os}
             href={it.url}
+            onClick={() => record(it)}
+            onAuxClick={(e) => e.button === 1 && record(it)}
             className={
               secondary
                 ? "flex min-h-[64px] flex-col items-center justify-center rounded-md border border-border-strong bg-surface px-4 py-3 text-center text-ink transition-colors hover:bg-surface-soft"
