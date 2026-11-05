@@ -10,7 +10,7 @@
 export type ChannelId = "kakaopay" | "buymeacoffee";
 
 export const SUPPORT_CHANNELS: Record<ChannelId, { url: string }> = {
-  kakaopay: { url: "" },
+  kakaopay: { url: "https://qr.kakaopay.com/Fbu58HN54" },
   buymeacoffee: { url: "" },
 };
 
