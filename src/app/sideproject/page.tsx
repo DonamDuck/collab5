@@ -42,6 +42,19 @@ export default function SideIndexPage() {
           </li>
         ))}
       </ul>
+
+      {/* 후원하기(10-15) — 카드 아래 작은 링크 하나. 창구는 support/channels.ts 한 곳에 있다. */}
+      <p className="mt-6">
+        <Link
+          href="/sideproject/support"
+          className="-ml-2 inline-flex h-[44px] items-center gap-1 rounded-md px-2 text-[14px] text-mute hover:text-ink"
+        >
+          후원하기
+          <svg aria-hidden="true" viewBox="0 0 20 20" className="size-[14px] shrink-0" fill="none" stroke="currentColor" strokeWidth="1.9">
+            <path d="m8 5 5 5-5 5" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </Link>
+      </p>
     </main>
   );
 }

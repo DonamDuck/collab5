@@ -44,6 +44,8 @@ export type Copy = {
   firstWin: [string, string];
   faqTitle: string;
   faq: { q: string; a: string }[];
+  /** 응원 절(`#support`) — 제목 한 줄과 후원하기 페이지로 가는 버튼. 창구 주소는 ../../support/channels.ts 한 곳에 있다. */
+  support: { title: string; button: string };
   footer: string;
   fig: FigCopy;
 };

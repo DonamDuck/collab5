@@ -95,6 +95,7 @@ export const ko: Copy = {
       a: "맥은 macOS 13 이상이면 인텔이든 애플 실리콘이든 돼요. 윈도우는 10이나 11이면 써요.",
     },
   ],
+  support: { title: "이 앱이 도움이 됐다면", button: "후원하기" },
   footer:
     "콜랩5를 만드는 메이커가 자기 필요로 만든 도구예요. 콜랩5 서비스와는 별개이고 Anthropic과도 관계없어요. Claude는 Anthropic의 상표예요.",
   fig: {
