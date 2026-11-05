@@ -3,6 +3,8 @@
 //
 // ⭐앱 상세의 응원 절(`#support`)은 버튼 하나로 여기를 가리킨다. 앱의 [응원하기] 메뉴는 그 절로 들어오니
 //   창구를 바꿀 땐 channels.ts만 고치면 앱·상세·이 페이지가 같이 따라온다.
+// ⭐창구 칸은 산사 후원 창구 모양이다(11-05 대표): 계좌 카드(복사) → 카카오페이 줄 → Buy Me a Coffee 줄 → 작은 안내 한 줄.
+//   계좌는 한국어에만, 주소가 빈 줄은 숨는다. 영어는 BMC 한 줄이라 그게 비면 「Coming soon」으로 잠가 둔다.
 // ⭐공유 카드(og) 그림은 따로 굽지 않았다. 사적인 프로젝트 목록처럼 사이트 기본 그림(OG_IMAGE)을 쓴다.
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -13,7 +15,9 @@ import { HtmlLang } from "../monitoralign/HtmlLang";
 import { en as monitorAlignEn } from "../monitoralign/_copy/en";
 import { SIDE_PROJECTS } from "../projects";
 import { COPY } from "./_copy";
-import { SUPPORT_CHANNELS } from "./channels";
+import { SUPPORT_ACCOUNT, SUPPORT_CHANNELS, type ChannelId } from "./channels";
+import type { ChannelRow } from "./_copy/types";
+import { AccountCard } from "./AccountCard";
 import { HREFLANG, LANGS, NATIVE_NAME, OG_LOCALE, PATH, type Lang } from "./langs";
 
 export type { Lang } from "./langs";
@@ -24,6 +28,9 @@ const EN_TAGLINE: Partial<Record<string, string>> = {
   monitoralign: monitorAlignEn.lead,
   limitglance: limitGlanceEn.lead,
 };
+
+// 「후원받는 앱」에서 빼는 앱. 한마디는 나중에 유료로 갈 앱이라 후원을 받지 않는다(10-15 대표).
+const NO_SUPPORT: ReadonlySet<string> = new Set(["hanmadi"]);
 
 const pageTitle = (lang: Lang) => `${COPY[lang].title} — ${COPY[lang].eyebrow} · collab5`;
 
@@ -71,28 +78,51 @@ function structuredData(lang: Lang) {
 const H2 = "text-[19px] font-bold leading-snug tracking-tight text-ink";
 const SECTION = "mt-10 border-t border-hairline pt-7";
 
-/** 주 후원 버튼. 주소가 비어 있으면 내려받기 버튼의 「준비 중」과 같은 모양으로 잠근다. */
-function ChannelLink({ label, sub, url, soon }: { label: string; sub: string; url: string; soon: string }) {
-  if (!url) {
+// 창구 줄의 색 — 카카오 공식 노랑, Buy Me a Coffee 공식 노랑. 글자는 둘 다 검정(각 브랜드 버튼 규격).
+const ROW_TONE: Record<ChannelId, string> = {
+  kakaopay: "bg-[#FEE500] text-[#191919] hover:bg-[#F2DA00]",
+  buymeacoffee: "bg-[#FFDD00] text-[#0D0C22] hover:bg-[#F2D200]",
+};
+
+function RowIcon({ id }: { id: ChannelId }) {
+  if (id === "kakaopay") {
     return (
-      <span
-        aria-disabled="true"
-        className="flex min-h-[64px] cursor-not-allowed flex-col items-center justify-center rounded-md bg-surface-soft px-4 py-3 text-center text-mute"
-      >
-        <span className="text-[16px] font-bold">{label}</span>
-        <span className="mt-0.5 text-[13px]">{soon}</span>
+      <svg aria-hidden="true" viewBox="0 0 20 20" className="size-[20px] shrink-0" fill="currentColor">
+        <path d="M10 3C5.6 3 2 5.8 2 9.2c0 2.2 1.5 4.1 3.7 5.2l-.8 2.9c-.1.3.2.5.4.3l3.4-2.3c.4 0 .9.1 1.3.1 4.4 0 8-2.8 8-6.2S14.4 3 10 3Z" />
+      </svg>
+    );
+  }
+  return (
+    <svg aria-hidden="true" viewBox="0 0 20 20" className="size-[20px] shrink-0" fill="none" stroke="currentColor" strokeWidth="1.6">
+      <path d="M4.5 6.5h11l-1.3 10a1.5 1.5 0 0 1-1.5 1.3H7.3a1.5 1.5 0 0 1-1.5-1.3l-1.3-10Z" strokeLinejoin="round" />
+      <path d="M3.5 6.5h13M6 6.5 6.8 3h6.4l.8 3.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+/** 창구 한 줄 — 왼쪽 이름, 오른쪽 할 일(산사 후원 창구 모양). `soon`이 있으면 잠근 모양으로 그린다. */
+function ChannelRowLink({ row, url, soon }: { row: ChannelRow; url: string; soon?: string }) {
+  const inner = (
+    <>
+      <span className="flex min-w-0 items-center gap-2.5">
+        <RowIcon id={row.id} />
+        <span className="text-[16px] font-bold whitespace-nowrap">{row.label}</span>
+        {row.sub && !soon && <span className="truncate text-[13px] opacity-70">{row.sub}</span>}
+      </span>
+      <span className="shrink-0 text-[15px] font-bold">{soon ?? row.action}</span>
+    </>
+  );
+  const box = "flex min-h-[64px] items-center justify-between gap-3 rounded-[16px] px-5";
+  if (soon) {
+    return (
+      <span aria-disabled="true" className={`${box} cursor-not-allowed bg-surface-soft text-mute`}>
+        {inner}
       </span>
     );
   }
   return (
-    <a
-      href={url}
-      target="_blank"
-      rel="noreferrer"
-      className="flex min-h-[64px] flex-col items-center justify-center rounded-md bg-primary px-4 py-3 text-center text-primary-on transition-colors hover:bg-primary-strong"
-    >
-      <span className="text-[16px] font-bold">{label}</span>
-      <span className="mt-0.5 text-[13px]">{sub}</span>
+    <a href={url} target="_blank" rel="noreferrer" className={`${box} transition-colors ${ROW_TONE[row.id]}`}>
+      {inner}
     </a>
   );
 }
@@ -101,7 +131,9 @@ export function SupportView({ lang }: { lang: Lang }) {
   // 한국어는 화면에 그릴 때만 덩어리 줄바꿈을 다듬는다(../koWrap.ts). 메타데이터는 원문 COPY를 쓴다.
   const c = lang === "ko" ? koWrapDeep(COPY.ko) : COPY[lang];
   const other = LANGS.find((l) => l !== lang) as Lang;
-  const overseasUrl = c.overseas ? SUPPORT_CHANNELS[c.overseas.id].url.trim() : "";
+  const liveRows = c.rows.filter((r) => SUPPORT_CHANNELS[r.id].url.trim());
+  // 계좌도 링크도 하나 없으면(영어 페이지에 BMC가 아직 없을 때) 첫 줄을 「준비 중」으로 잠가 둔다. 빈 칸으로 두지 않는다.
+  const lockedRow = !c.account && liveRows.length === 0 ? c.rows[0] : null;
 
   return (
     <main lang={HREFLANG[lang]} className="mx-auto w-full max-w-[720px] px-4 pt-8 pb-16 sm:px-6 sm:pt-12">
@@ -145,37 +177,28 @@ export function SupportView({ lang }: { lang: Lang }) {
 
       <section className={SECTION}>
         <h2 className={H2}>{c.channelsTitle}</h2>
-        <div className="mt-4 grid gap-3 sm:grid-cols-2">
-          {c.buttons.map((b) => (
-            <ChannelLink key={b.id} label={b.label} sub={b.sub} url={SUPPORT_CHANNELS[b.id].url.trim()} soon={c.soon} />
+        <div className="mt-4 flex flex-col gap-3">
+          {c.account && (
+            <AccountCard
+              bank={SUPPORT_ACCOUNT.bank}
+              holder={SUPPORT_ACCOUNT.holder}
+              number={SUPPORT_ACCOUNT.number}
+              copy={c.account.copy}
+              copied={c.account.copied}
+            />
+          )}
+          {liveRows.map((r) => (
+            <ChannelRowLink key={r.id} row={r} url={SUPPORT_CHANNELS[r.id].url.trim()} />
           ))}
+          {lockedRow && <ChannelRowLink row={lockedRow} url="" soon={c.soon} />}
         </div>
-        {c.overseas && (
-          <p className="mt-3 text-[14px] leading-relaxed text-mute">
-            {c.overseas.text}{" "}
-            {overseasUrl ? (
-              <a
-                href={overseasUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="font-medium text-body underline underline-offset-4 hover:text-ink"
-              >
-                {c.overseas.link}
-              </a>
-            ) : (
-              <span>
-                {c.overseas.link} · {c.soon}
-              </span>
-            )}
-          </p>
-        )}
-        <p className="mt-5 rounded-md bg-surface-faint px-4 py-3 text-[15px] leading-relaxed break-keep text-pretty text-body">{c.note}</p>
+        <p className="mt-4 text-[14px] leading-relaxed break-keep text-pretty text-mute">{c.note}</p>
       </section>
 
       <section className={SECTION}>
         <h2 className={H2}>{c.appsTitle}</h2>
         <ul className="mt-4 flex flex-col gap-3">
-          {SIDE_PROJECTS.map((p) => {
+          {SIDE_PROJECTS.filter((p) => !NO_SUPPORT.has(p.slug)).map((p) => {
             const tagline = lang === "en" ? (EN_TAGLINE[p.slug] ?? p.tagline) : koWrap(p.tagline);
             return (
               <li key={p.slug}>

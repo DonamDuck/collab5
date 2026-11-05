@@ -11,8 +11,8 @@
 
 export type SideEventKind = "view" | "download";
 
-/** 표에 들어가는 project 값. list = 딴짓 목록 페이지(/sideproject) */
-export const SIDE_EVENT_PROJECTS = ["list", "monitoralign", "limitglance", "hanmadi"] as const;
+/** 표에 들어가는 project 값. list = 딴짓 목록 페이지(/sideproject) · support = 후원하기(/sideproject/support) */
+export const SIDE_EVENT_PROJECTS = ["list", "monitoralign", "limitglance", "hanmadi", "support"] as const;
 export type SideEventProject = (typeof SIDE_EVENT_PROJECTS)[number];
 
 /** /sideproject/monitoralign/ja → monitoralign · /sideproject → list · 모르는 주소 → null */

@@ -6,7 +6,7 @@ export const en: Copy = {
   title: "Support",
   lead: "Every app here is free. No sign-up, no ads. If one of them helped, you can buy me a coffee.",
   channelsTitle: "Ways to support",
-  buttons: [{ id: "buymeacoffee", label: "Buy Me a Coffee", sub: "Card payment from any country" }],
+  rows: [{ id: "buymeacoffee", label: "Buy Me a Coffee", action: "Support", sub: "Any country" }],
   soon: "Coming soon",
   note: "Support is optional. Every feature stays free either way.",
   appsTitle: "Apps you're supporting",

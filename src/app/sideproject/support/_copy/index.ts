@@ -4,6 +4,6 @@ import { en } from "./en";
 import { ko } from "./ko";
 import type { Copy } from "./types";
 
-export type { ChannelButton, Copy } from "./types";
+export type { ChannelRow, Copy } from "./types";
 
 export const COPY: Record<Lang, Copy> = { ko, en };
