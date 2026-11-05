@@ -18,7 +18,7 @@ import { COPY } from "./_copy";
 import { SUPPORT_ACCOUNT, SUPPORT_CHANNELS, type ChannelId } from "./channels";
 import type { ChannelRow } from "./_copy/types";
 import { AccountCard } from "./AccountCard";
-import { HREFLANG, LANGS, NATIVE_NAME, OG_LOCALE, PATH, type Lang } from "./langs";
+import { DEFAULT_LANG, HREFLANG, NATIVE_NAME, OG_LOCALE, OPEN_LANGS, PATH, type Lang } from "./langs";
 
 export type { Lang } from "./langs";
 
@@ -37,8 +37,8 @@ const pageTitle = (lang: Lang) => `${COPY[lang].title} — ${COPY[lang].eyebrow}
 // ── 메타데이터 ─────────────────────────────────────────────
 export function supportMetadata(lang: Lang): Metadata {
   const c = COPY[lang];
-  const languages: Record<string, string> = Object.fromEntries(LANGS.map((l) => [HREFLANG[l], PATH[l]]));
-  languages["x-default"] = PATH.en;
+  const languages: Record<string, string> = Object.fromEntries(OPEN_LANGS.map((l) => [HREFLANG[l], PATH[l]]));
+  languages["x-default"] = PATH[DEFAULT_LANG];
   const title = pageTitle(lang);
   return {
     title,
@@ -48,7 +48,7 @@ export function supportMetadata(lang: Lang): Metadata {
       type: "website",
       siteName: "collab5",
       locale: OG_LOCALE[lang],
-      alternateLocale: LANGS.filter((l) => l !== lang).map((l) => OG_LOCALE[l]),
+      alternateLocale: OPEN_LANGS.filter((l) => l !== lang).map((l) => OG_LOCALE[l]),
       url: PATH[lang],
       title,
       description: c.lead,
@@ -130,9 +130,11 @@ function ChannelRowLink({ row, url, soon }: { row: ChannelRow; url: string; soon
 export function SupportView({ lang }: { lang: Lang }) {
   // 한국어는 화면에 그릴 때만 덩어리 줄바꿈을 다듬는다(../koWrap.ts). 메타데이터는 원문 COPY를 쓴다.
   const c = lang === "ko" ? koWrapDeep(COPY.ko) : COPY[lang];
-  const other = LANGS.find((l) => l !== lang) as Lang;
+  // 다른 언어 링크는 그 언어가 열렸을 때만(영어는 Buy Me a Coffee 주소가 들어와야 연다).
+  const other = OPEN_LANGS.find((l) => l !== lang);
   const liveRows = c.rows.filter((r) => SUPPORT_CHANNELS[r.id].url.trim());
-  // 계좌도 링크도 하나 없으면(영어 페이지에 BMC가 아직 없을 때) 첫 줄을 「준비 중」으로 잠가 둔다. 빈 칸으로 두지 않는다.
+  // 계좌도 링크도 하나 없으면 첫 줄을 「준비 중」으로 잠가 둔다. 빈 칸으로 두지 않는다.
+  // (11-05부터 영어는 창구 주소가 없으면 페이지 자체가 404라 평소엔 안 나온다. 주소를 비웠을 때의 안전망이다.)
   const lockedRow = !c.account && liveRows.length === 0 ? c.rows[0] : null;
 
   return (
@@ -153,14 +155,16 @@ export function SupportView({ lang }: { lang: Lang }) {
           </svg>
           <span className="truncate">{c.eyebrow}</span>
         </Link>
-        <Link
-          href={PATH[other]}
-          hrefLang={HREFLANG[other]}
-          lang={HREFLANG[other]}
-          className="-mr-2 inline-flex h-[44px] shrink-0 items-center rounded-md px-2 text-[14px] text-mute hover:text-ink"
-        >
-          {NATIVE_NAME[other]}
-        </Link>
+        {other && (
+          <Link
+            href={PATH[other]}
+            hrefLang={HREFLANG[other]}
+            lang={HREFLANG[other]}
+            className="-mr-2 inline-flex h-[44px] shrink-0 items-center rounded-md px-2 text-[14px] text-mute hover:text-ink"
+          >
+            {NATIVE_NAME[other]}
+          </Link>
+        )}
       </div>
 
       <div className="mt-4">

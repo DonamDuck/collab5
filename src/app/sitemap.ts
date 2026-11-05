@@ -14,7 +14,7 @@ import { repo } from "@/lib/repo";
 import { SITE_URL } from "@/lib/site";
 import { HREFLANG as LG_HREFLANG, LANGS as LG_LANGS, PATH as LG_PATH } from "./sideproject/limitglance/langs";
 import { HREFLANG, LANGS, PATH as MA_PATH } from "./sideproject/monitoralign/langs";
-import { HREFLANG as SP_HREFLANG, LANGS as SP_LANGS, PATH as SP_PATH } from "./sideproject/support/langs";
+import { DEFAULT_LANG as SP_DEFAULT, HREFLANG as SP_HREFLANG, OPEN_LANGS as SP_LANGS, PATH as SP_PATH } from "./sideproject/support/langs";
 
 const monitorAlignLanguages: Record<string, string> = {
   ...Object.fromEntries(LANGS.map((l) => [HREFLANG[l], `${SITE_URL}${MA_PATH[l]}`])),
@@ -26,7 +26,7 @@ const limitGlanceLanguages: Record<string, string> = {
 };
 const supportLanguages: Record<string, string> = {
   ...Object.fromEntries(SP_LANGS.map((l) => [SP_HREFLANG[l], `${SITE_URL}${SP_PATH[l]}`])),
-  "x-default": `${SITE_URL}${SP_PATH.en}`,
+  "x-default": `${SITE_URL}${SP_PATH[SP_DEFAULT]}`,
 };
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
@@ -59,7 +59,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.5,
       alternates: { languages: limitGlanceLanguages },
     })),
-    // 사적인 프로젝트 후원하기 한국어·영어(10-15) — 언어 목록·주소는 support/langs.ts에서 온다.
+    // 사적인 프로젝트 후원하기 한국어·영어(10-15) — 언어 목록·주소는 support/langs.ts에서 온다. 영어는 창구가 열려야 들어간다(11-05).
     ...SP_LANGS.map((l) => ({
       url: `${SITE_URL}${SP_PATH[l]}`,
       changeFrequency: "monthly" as const,
