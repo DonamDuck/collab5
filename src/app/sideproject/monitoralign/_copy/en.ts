@@ -45,6 +45,13 @@ export const en: Copy = {
     { text: "Confirm, and the two points snap together." },
   ],
   undo: { text: "Got it wrong? The undo shortcut puts the previous layout back.", custom: "" },
+  presetsTitle: "Saved layouts",
+  presets: [
+    "Save the monitor layout for places you sit often, like home or the office, and switch back to it in one go.",
+    "Open **Saved Layouts** in the menu, choose **Save Current Layout…**, and give it a name. Leave the name empty and it’s saved as Layout 1, Layout 2.",
+    "Pick a saved layout from the same menu to apply it. In **Manage Layouts…** you can also give each layout its own shortcut.",
+    "When you plug the same monitors back in, the app first asks whether to switch to that layout. To stop the question, turn off **Suggest a saved layout when monitors change** in the menu.",
+  ],
   featuresTitle: "What you get",
   features: [
     "Free to download and use.",
@@ -79,6 +86,7 @@ export const en: Copy = {
       a: "Only your display arrangement setting. It's the same change you'd make by dragging the screens around in System Settings or Windows display settings, and the undo shortcut restores the previous layout.",
     },
     { q: "Does it work with three monitors?", a: "Not yet. Two displays only for now." },
+    { q: "What if I have two identical monitors?", a: "Each monitor is told apart by its built-in serial number. For monitors without one, it picks the match that moves things the least from where they are now, and if it gets it wrong, one press of the undo shortcut puts it back." },
     {
       q: "Does it collect any data?",
       a: "No. There's no account and no analytics in the app. The only network request is a small update file it fetches from collab5.co.kr.",

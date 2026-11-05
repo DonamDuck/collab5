@@ -4,6 +4,7 @@ import { getSessionUserLight } from "@/lib/supabase/server";
 import { getProfile } from "@/lib/profiles";
 import { Avatar } from "./Avatar";
 import { HeaderNavLinks } from "./HeaderNavLinks";
+import { MobileMenu } from "./MobileMenu";
 
 export async function SiteHeader() {
   const user = await getSessionUserLight();
@@ -65,6 +66,8 @@ export async function SiteHeader() {
             로그인
           </Link>
         )}
+        {/* 모바일 메뉴 버튼(10-21 대표 A안) — 오른쪽에서 목록이 밀려 나온다. 데스크톱엔 없다. */}
+        <MobileMenu />
       </nav>
     </header>
   );

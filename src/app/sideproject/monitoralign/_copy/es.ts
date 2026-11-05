@@ -40,6 +40,13 @@ export const es: Copy = {
     { text: "Confirma y los dos puntos quedan unidos." },
   ],
   undo: { text: "¿Te equivocaste? El atajo de deshacer devuelve la disposición anterior.", custom: "" },
+  presetsTitle: "Disposiciones guardadas",
+  presets: [
+    "Guarda la disposición de los monitores de los sitios donde trabajas a menudo, como casa o la oficina, y vuelve a ella de una sola vez.",
+    "En el menú, abre **Saved Layouts** (disposiciones guardadas), elige **Save Current Layout…** (guardar la disposición actual) y ponle un nombre. Si lo dejas vacío, se guarda como Layout 1, Layout 2.",
+    "Para aplicar una disposición guardada, elígela en el mismo menú. En **Manage Layouts…** (gestionar disposiciones) también puedes darle a cada una su propio atajo.",
+    "Cuando vuelves a conectar los mismos monitores, la app pregunta primero si quieres pasar a esa disposición. Si no quieres que pregunte, desactiva **Suggest a saved layout when monitors change** (sugerir una disposición guardada al cambiar los monitores) en el menú.",
+  ],
   featuresTitle: "Lo que incluye",
   features: [
     "Gratis para descargar y usar.",
@@ -77,6 +84,7 @@ export const es: Copy = {
       a: "Solo la configuración de disposición de pantallas. Es el mismo cambio que harías arrastrando las pantallas en los ajustes de macOS o en la configuración de pantalla de Windows, y el atajo de deshacer devuelve la disposición anterior.",
     },
     { q: "¿Funciona con tres monitores?", a: "Todavía no. Por ahora solo con dos pantallas." },
+    { q: "¿Y si tengo dos monitores idénticos?", a: "Distingue cada monitor por su número de serie integrado. Entre monitores sin número de serie, elige la combinación que menos los mueve desde donde están; si se equivoca, el atajo de deshacer lo devuelve con una sola pulsación." },
     {
       q: "¿Recopila datos?",
       a: "No. No hay cuenta ni herramientas de análisis en la app. Lo único que descarga es un pequeño archivo de actualización desde collab5.co.kr.",

@@ -66,6 +66,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.3,
       alternates: { languages: supportLanguages },
     })),
+    // 한마디(10-19) — 한국어만.
+    { url: `${SITE_URL}/sideproject/hanmadi`, changeFrequency: "monthly" as const, priority: 0.5 },
+    { url: `${SITE_URL}/sideproject/hanmadi/privacy`, changeFrequency: "yearly" as const, priority: 0.2 },
   ];
 
   // 매거진 — **발행분만**(초안은 공개 상세가 404라 넣으면 크롤러에게 죽은 주소를 주는 꼴).

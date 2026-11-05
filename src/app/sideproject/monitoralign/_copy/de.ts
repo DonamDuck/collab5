@@ -38,6 +38,13 @@ export const de: Copy = {
     { text: "Bestätige, und die beiden Punkte rasten aneinander ein." },
   ],
   undo: { text: "Danebengegangen? Das Tastenkürzel zum Widerrufen stellt die vorherige Anordnung wieder her.", custom: "" },
+  presetsTitle: "Anordnungen speichern",
+  presets: [
+    "Speichere die Monitoranordnung für Orte, an denen du oft sitzt, etwa zu Hause oder im Büro, und wechsle mit einem Klick dorthin zurück.",
+    "Öffne im Menü **Saved Layouts** (gespeicherte Anordnungen), wähle **Save Current Layout…** (aktuelle Anordnung speichern) und gib einen Namen ein. Ohne Namen wird sie als Layout 1, Layout 2 gespeichert.",
+    "Eine gespeicherte Anordnung wählst du im selben Menü aus. Unter **Manage Layouts…** (Anordnungen verwalten) kannst du jeder Anordnung auch ein eigenes Tastenkürzel geben.",
+    "Wenn du dieselben Monitore wieder anschließt, fragt die App zuerst, ob sie zu dieser Anordnung wechseln soll. Wenn du das nicht möchtest, schalte im Menü **Suggest a saved layout when monitors change** (gespeicherte Anordnung vorschlagen, wenn sich die Monitore ändern) aus.",
+  ],
   featuresTitle: "Was du bekommst",
   features: [
     "Kostenlos herunterladen und nutzen.",
@@ -75,6 +82,7 @@ export const de: Copy = {
       a: "Nur die Bildschirmanordnung. Es ist dieselbe Änderung, die du beim Verschieben der Bildschirme in den Systemeinstellungen oder den Windows-Anzeigeeinstellungen machst, und das Tastenkürzel zum Widerrufen stellt die vorherige Anordnung wieder her.",
     },
     { q: "Funktioniert es mit drei Monitoren?", a: "Noch nicht. Im Moment nur mit zwei Bildschirmen." },
+    { q: "Was ist, wenn ich zwei identische Monitore habe?", a: "Jeder Monitor wird an seiner eingebauten Seriennummer erkannt. Bei Monitoren ohne Seriennummer wählt die App die Zuordnung, bei der sich gegenüber der jetzigen Position am wenigsten ändert. Liegt sie daneben, stellt das Tastenkürzel zum Widerrufen mit einem Druck alles wieder her." },
     {
       q: "Werden Daten gesammelt?",
       a: "Nein. Es gibt kein Konto und keine Analysetools in der App. Die einzige Verbindung lädt eine kleine Update-Datei von collab5.co.kr.",

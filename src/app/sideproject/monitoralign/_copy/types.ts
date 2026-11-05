@@ -39,6 +39,9 @@ export type Copy = {
   howToName: string;
   steps: Step[];
   undo: { text: string; custom: string };
+  /** 배치 저장 절(0.9.1). 문단마다 `**메뉴 이름**` 굵게. 비우면 절이 안 그려진다. */
+  presetsTitle: string;
+  presets: string[];
   featuresTitle: string;
   features: string[];
   firstTitle: string;
