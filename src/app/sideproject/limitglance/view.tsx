@@ -142,8 +142,6 @@ export function LimitGlanceView({ lang }: { lang: Lang }) {
   // 한국어는 화면에 그릴 때만 덩어리 줄바꿈을 다듬는다(../koWrap.ts). 구조화 데이터는 원문 COPY를 쓴다.
   const c = lang === "ko" ? koWrapDeep(COPY.ko) : COPY[lang];
   const other = LANGS.find((l) => l !== lang) as Lang;
-  // 응원 절이 거는 후원 페이지. 영어 후원 페이지가 아직 안 열렸으면 null이라 한국어 아닌 페이지는 응원 절을 안 그린다.
-  const supportPath = supportPathFor(lang);
 
   const downloads: DownloadItem[] = [
     { os: "mac", label: c.downloads.mac[0], sub: c.downloads.mac[1], url: release.mac.url, version: release.mac.version, soon: c.downloads.soon },
@@ -274,18 +272,16 @@ export function LimitGlanceView({ lang }: { lang: Lang }) {
       </section>
 
       {/* 응원하기 — MonitorAlign과 같은 자리(자주 묻는 질문 다음). 한국어는 한국어 후원 페이지, 영어는 영어 후원 페이지로 간다. */}
-      {supportPath && (
-        <section id="support" className={`${SECTION} scroll-mt-[72px]`}>
-          <h2 className={H2}>{c.support.title}</h2>
-          <Link
-            href={supportPath}
-            hrefLang={lang === "ko" ? "ko" : "en"}
-            className="mt-4 inline-flex h-[44px] items-center justify-center rounded-md border border-border-strong px-5 text-[15px] font-medium text-ink transition-colors hover:bg-surface-soft"
-          >
-            {c.support.button}
-          </Link>
-        </section>
-      )}
+      <section id="support" className={`${SECTION} scroll-mt-[72px]`}>
+        <h2 className={H2}>{c.support.title}</h2>
+        <Link
+          href={supportPathFor(lang)}
+          hrefLang={lang === "ko" ? "ko" : "en"}
+          className="mt-4 inline-flex h-[44px] items-center justify-center rounded-md border border-border-strong px-5 text-[15px] font-medium text-ink transition-colors hover:bg-surface-soft"
+        >
+          {c.support.button}
+        </Link>
+      </section>
 
       <p className="mt-12 border-t border-hairline pt-5 text-[13px] leading-relaxed break-keep text-pretty text-mute">{c.footer}</p>
     </main>
