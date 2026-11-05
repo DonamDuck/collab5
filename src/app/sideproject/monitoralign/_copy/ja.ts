@@ -83,7 +83,7 @@ export const ja: Copy = {
       a: "macOS 13以降（Intel・Appleシリコン）、またはWindows 10・11です。",
     },
   ],
-  support: { title: "このアプリが役に立ったら", button: "応援する" },
+  support: { title: "応援する", text: "ちょっとした手間が減ったなら、応援してもらえるとうれしいです。こういう小さな道具を作り続ける力になります。", button: "応援する" },
   footer: "collab5をつくっている開発者の個人プロジェクトです。collab5のサービスとは別のものです。",
   macLabel: "Mac",
   winLabel: "Windows",

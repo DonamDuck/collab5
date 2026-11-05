@@ -4,7 +4,7 @@
 // ⭐내려받기 주소·버전은 version.json 한 파일에서 온다(빌드 때 읽힌다). 앱 업데이터도 같은 파일을 읽으므로
 //   ⛔키 이름·모양을 바꾸지 말 것. `url`이 비어 있으면 그 버튼은 「준비 중」으로 잠긴다.
 // ⭐후원 창구는 version.json이 아니라 `../support/channels.ts` 한 곳에 있다(업데이터가 모르는 모양이라서).
-//   이 페이지의 응원 절은 후원하기 페이지(/sideproject/support, 다른 언어는 /en)로 가는 버튼 하나만 그린다.
+//   이 페이지의 응원 절은 제목·문장 아래에 후원하기 페이지(/sideproject/support, 다른 언어는 /en)로 가는 버튼 하나만 그린다.
 //   앱의 [응원하기] 메뉴가 `#support`로 들어오므로 그 절의 id를 바꾸지 말 것.
 // ⭐검색 노출(10-08): 페이지마다 hreflang 아홉 개+x-default, 그 언어 og 이미지, JSON-LD(앱·FAQ·사용법·빵부스러기)를 낸다.
 //   JSON-LD의 문장은 화면 문안에서 바로 만든다(따로 적지 않는다) → 화면과 구조화 데이터가 어긋날 수 없다.
@@ -357,6 +357,7 @@ export function MonitorAlignView({ lang }: { lang: Lang }) {
           한국어 페이지는 한국어 후원 페이지로, 나머지 여덟 언어는 영어 후원 페이지로 간다(../support/langs.ts). */}
       <section id="support" className={`${SECTION} scroll-mt-[72px]`}>
         <h2 className={H2}>{c.support.title}</h2>
+        <p className="mt-3 text-[16px] leading-relaxed break-keep text-pretty text-body">{c.support.text}</p>
         <Link
           href={supportPathFor(lang)}
           hrefLang={lang === "ko" ? "ko" : "en"}

@@ -77,7 +77,7 @@ export const zhCN: Copy = {
       a: "macOS 13 或更高版本（Intel 或 Apple 芯片），或 Windows 10、11。",
     },
   ],
-  support: { title: "如果这款应用帮到了你", button: "支持一下" },
+  support: { title: "支持一下", text: "如果它帮你省了点麻烦，欢迎支持一下。这能让我继续做这样的小工具。", button: "支持一下" },
   footer: "这是 collab5 开发者的个人项目，与 collab5 服务无关。",
   macLabel: "Mac",
   winLabel: "Windows",

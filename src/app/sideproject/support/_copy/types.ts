@@ -11,7 +11,7 @@ export type Copy = {
   /** 히어로 문장. 화면에선 문장마다 줄을 새로 시작한다. */
   lead: string;
   channelsTitle: string;
-  /** 주 버튼들 — 한국어는 토스·카카오페이, 영어는 Buy Me a Coffee. */
+  /** 주 버튼들 — 한국어는 카카오페이, 영어는 Buy Me a Coffee. */
   buttons: ChannelButton[];
   /** 주 버튼 아래 작은 줄(한국어만): 「해외 카드로는 Buy Me a Coffee」. 없으면 안 그린다. */
   overseas?: { text: string; link: string; id: ChannelId };
@@ -19,7 +19,5 @@ export type Copy = {
   soon: string;
   note: string;
   appsTitle: string;
-  costsTitle: string;
-  costsText: string;
   footer: string;
 };

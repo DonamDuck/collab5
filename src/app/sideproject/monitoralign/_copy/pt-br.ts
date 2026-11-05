@@ -85,7 +85,7 @@ export const ptBR: Copy = {
       a: "macOS 13 ou posterior em Intel ou Apple silicon, ou Windows 10 ou 11.",
     },
   ],
-  support: { title: "Se este app te ajudou", button: "Apoiar" },
+  support: { title: "Apoie", text: "Se ele te poupou um pouco de trabalho, você pode contribuir. Isso me ajuda a continuar fazendo ferramentas pequenas como esta.", button: "Apoiar" },
   footer: "Um projeto pessoal de quem faz o collab5. Não faz parte do serviço collab5.",
   macLabel: "Mac",
   winLabel: "Windows",

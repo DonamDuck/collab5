@@ -200,11 +200,6 @@ export function SupportView({ lang }: { lang: Lang }) {
         </ul>
       </section>
 
-      <section className={SECTION}>
-        <h2 className={H2}>{c.costsTitle}</h2>
-        <p className="mt-3 text-[16px] leading-relaxed break-keep text-pretty text-body">{c.costsText}</p>
-      </section>
-
       <p className="mt-12 border-t border-hairline pt-5 text-[13px] leading-relaxed break-keep text-pretty text-mute">{c.footer}</p>
     </main>
   );

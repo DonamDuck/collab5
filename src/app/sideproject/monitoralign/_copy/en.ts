@@ -88,7 +88,7 @@ export const en: Copy = {
       a: "macOS 13 or later on Intel or Apple silicon, or Windows 10 or 11.",
     },
   ],
-  support: { title: "If this app helped", button: "Support" },
+  support: { title: "Support", text: "If it saves you a bit of hassle, you can chip in. It helps me keep building small tools like this.", button: "Support" },
   footer: "A personal project by the maker of collab5. It isn't part of the collab5 service.",
   macLabel: "Mac",
   winLabel: "Windows",

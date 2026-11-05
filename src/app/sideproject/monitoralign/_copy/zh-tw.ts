@@ -77,7 +77,7 @@ export const zhTW: Copy = {
       a: "macOS 13 以上（Intel 或 Apple 晶片），或 Windows 10、11。",
     },
   ],
-  support: { title: "如果這個 App 幫到了你", button: "支持一下" },
+  support: { title: "支持一下", text: "如果它幫你省了點麻煩，歡迎支持一下。這能讓我繼續做這種小工具。", button: "支持一下" },
   footer: "這是 collab5 開發者的個人專案，和 collab5 服務無關。",
   macLabel: "Mac",
   winLabel: "Windows",

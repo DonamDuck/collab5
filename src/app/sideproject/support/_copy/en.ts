@@ -10,7 +10,5 @@ export const en: Copy = {
   soon: "Coming soon",
   note: "Support is optional. Every feature stays free either way.",
   appsTitle: "Apps you're supporting",
-  costsTitle: "Where it goes",
-  costsText: "Signing the apps with Apple costs a yearly developer fee. Support covers that first.",
   footer: "A personal project by the maker of collab5. It isn't part of the collab5 service.",
 };
