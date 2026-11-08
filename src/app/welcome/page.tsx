@@ -20,6 +20,7 @@ import { Field, authInputCls } from "@/components/Field";
 import { LoadingDots } from "@/components/LoadingDots";
 import { LoadingOverlay } from "@/components/LoadingOverlay";
 import { formatPhone } from "@/lib/validation";
+import { takeReturnPath } from "@/lib/return-path";
 
 type Phase = "checking" | "form" | "expired";
 
@@ -80,7 +81,8 @@ export default function WelcomePage() {
         //    한 번 더 로그인하면 문서를 새로 받아 되는 것도 이 때문이다).
         //    ⭐GoogleButton이 `window.location.replace`를 쓰는 이유와 **같은 버그**다(07-31 기록).
         //      로그인은 세션 경계라 문서를 새로 받는 게 맞다.
-        window.location.replace("/");
+        // 🔙11-09 — 로그인 화면이 적어 둔 «돌아갈 곳»이 있으면 거기로(리포트·소개서 수정 등). 없으면 홈.
+        window.location.replace(takeReturnPath());
         return;
       }
       setEmail(st.email);
@@ -144,7 +146,7 @@ export default function WelcomePage() {
       // 위 `st.done` 분기와 같은 이유로 **하드 내비게이션**. 여기는 서버액션(completeOnboardingAction)을
       // 거쳐서 Next가 캐시를 무를 여지가 있지만, 이 경로도 결국 **소셜 로그인 직후**라 라우터 캐시에
       // 로그인 전 홈이 남아 있을 수 있다. 방금 프로필까지 새로 채웠으니 문서를 새로 받는 게 확실하다.
-      window.location.replace("/");
+      window.location.replace(takeReturnPath());
     });
 
   if (phase === "checking") {

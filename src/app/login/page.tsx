@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState, useTransition } from "react";
+import { Suspense, useEffect, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signInAction } from "@/lib/auth-actions";
@@ -11,21 +11,7 @@ import { PasswordInput } from "@/components/PasswordInput";
 import { GoogleButton } from "@/components/GoogleButton";
 import { KakaoButton } from "@/components/KakaoButton";
 import { SocialDivider } from "@/components/SocialDivider";
-
-/** 로그인 뒤 돌아갈 주소 — 우리 사이트 안 경로만 돌려준다.
- *  🔒09-18 밤 QA — 예전 검사(`/`로 시작하고 `//`로 시작하지 않음)는 `/\evil.example`이나 탭이 낀 `/\t/evil.example`을
- *    통과시켰고, 브라우저는 그걸 남의 사이트 주소로 읽었다. 글자 모양 대신 «실제로 해석한 주소의 origin»을 비교한다.
- *  이벤트 처리 안에서만 부른다(window가 있을 때). */
-function safeRedirect(raw: string | null): string {
-  if (!raw) return "/";
-  try {
-    const u = new URL(raw, window.location.origin);
-    if (u.origin !== window.location.origin) return "/";
-    return u.pathname + u.search + u.hash;
-  } catch {
-    return "/";
-  }
-}
+import { rememberReturnPath, safeReturnPath, takeReturnPath } from "@/lib/return-path";
 
 export default function LoginPage() {
   return (
@@ -44,6 +30,13 @@ function LoginForm() {
   const [password, setPassword] = useState("");
   const [err, setErr] = useState("");
 
+  // 🔙돌아갈 곳을 탭 저장소에도 적어 둔다 — 카카오·구글은 `/welcome`을 돌아오며 쿼리를 잃어서
+  //   거기서 이걸 꺼낸다(`lib/return-path.ts` 머리말). 이메일 로그인은 아래에서 쿼리를 바로 쓴다.
+  const redirectParam = searchParams.get("redirect");
+  useEffect(() => {
+    rememberReturnPath(redirectParam);
+  }, [redirectParam]);
+
   const submit = () =>
     start(async () => {
       setErr("");
@@ -57,7 +50,8 @@ function LoginForm() {
         return;
       }
       // 로그인 후 복귀 경로 — 우리 사이트 안 주소만 허용(오픈 리다이렉트 방지). 없으면 홈.
-      const dest = safeRedirect(searchParams.get("redirect"));
+      const dest = safeReturnPath(searchParams.get("redirect")) ?? "/";
+      takeReturnPath(); // 소셜용으로 적어 둔 값은 여기서 쓸 일이 없으니 비운다
       router.replace(dest); // push+refresh 중복 제거 — 서버 렌더가 새 세션 헤더 반영
     });
 
