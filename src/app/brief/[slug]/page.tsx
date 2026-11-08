@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { markdownToBriefDoc } from "@/lib/brief-doc";
 import { getBrief, briefSlugsForPrerender } from "@/lib/briefs";
@@ -10,10 +10,8 @@ import { BriefBody } from "./BriefBody";
 //
 // 🔑**주소가 소개서 slug와 같다** — `/brief/m-7wu2d0` ↔ `/m/m-7wu2d0`. 노출 수준을 새로 만들지 않는다.
 //
-// 🚨**접근 제어가 아직 없다.** 대표 확정은 「브리프 주인만」인데(기획서 §대표 확정),
-//   `brand_briefs` 테이블과 계정 연결이 아직이라 지금은 «링크를 아는 사람»이 본다.
-//   👉지금 노션 링크와 «같은 수준»이라 노출이 늘지는 않는다(09-14 로그아웃 브라우저로 8건 전수 확인).
-//   ⏭넣을 자리는 여기다 — `owner_user_id`를 **서버에서** 세션과 대조하고 아니면 `notFound()`.
+// 🔑**누가 보나** = `brand_briefs.owner_user_id`가 정한다(대표가 손으로 연결한다). 판정은 아래 페이지 본문에서.
+//   주인 없음 → 링크를 아는 사람 누구나(노션 링크와 같은 수준) · 주인 있음 → 그 계정만.
 //   🔗매거진이 같은 구멍을 겪었다(`magazine-auth.ts`): *「클라이언트의 버튼 숨김은 UX일 뿐 보안이 아니다」*.
 
 export function generateStaticParams() {
@@ -49,11 +47,15 @@ export default async function BriefPage({ params }: { params: Promise<{ slug: st
   //     *「클라이언트의 버튼 숨김은 UX일 뿐 보안이 아니다」*.
   //   ⚠️주인이 «없으면»(아직 연결 전) 링크를 아는 사람까지 본다 — 오늘 노션과 같은 수준이다.
   //     대표가 손으로 연결하는 순간(대표 확정) 그 브리프만 문이 닫힌다.
-  //   ⛔없는 문서와 «못 볼» 문서를 같은 404로 돌린다. 「있는데 못 본다」를 알려 주지 않는다.
+  //   🔁11-09 대표 — 문이 닫혔을 때 404로 숨기지 않는다(처음엔 「있는데 못 본다」를 안 알리려고 404였다).
+  //     ①로그인 안 함 → 로그인 화면으로, 끝나면 이 리포트로 돌아온다(카카오·구글도 — `lib/return-path.ts`).
+  //       첫 주인 연결(star지안) 뒤 «받은 링크를 카톡에서 누르면 없는 페이지»가 되는 게 문제였다.
+  //     ②다른 계정 → 「연결된 계정으로만 볼 수 있어요」. 본문은 여전히 안 보낸다.
   if (brief.ownerUserId !== null) {
     const user = await getSessionUser();
-    const profile = user ? await getProfile(user.id) : null;
-    if (!profile || profile.id !== brief.ownerUserId) notFound();
+    if (!user) redirect(`/login?redirect=${encodeURIComponent(`/brief/${slug}`)}`);
+    const profile = await getProfile(user.id);
+    if (!profile || profile.id !== brief.ownerUserId) return <OwnerOnly />;
   }
 
   const doc = markdownToBriefDoc(brief.markdown);
@@ -100,6 +102,26 @@ export default async function BriefPage({ params }: { params: Promise<{ slug: st
       <article className="mt-6">
         <BriefBody doc={doc} />
       </article>
+    </main>
+  );
+}
+
+/** 다른 계정으로 로그인한 사람이 주인 있는 리포트를 열었을 때. 전역 404와 같은 틀(가운데 정렬·버튼 280)을 쓴다. */
+function OwnerOnly() {
+  return (
+    <main className="mx-auto flex w-full max-w-[640px] flex-col items-center px-4 py-24 text-center sm:px-6">
+      <p className="text-[15px] font-medium text-faint">collab5 요약 리포트</p>
+      <h1 className="mt-2 text-[22px] font-bold text-ink">연결된 계정으로만 볼 수 있어요</h1>
+      <p className="mt-2 text-[15px] leading-relaxed text-mute break-keep">
+        이 리포트는 한 계정에 연결되어 있어요. 연결된 계정으로 로그인하면 볼 수 있어요.
+      </p>
+      <div className="mt-7 flex w-full max-w-[280px] flex-col gap-2">
+        <Link
+          href="/"
+          className="flex h-12 w-full items-center justify-center rounded-md border border-border-strong bg-surface text-[16px] font-medium text-ink">
+          홈으로
+        </Link>
+      </div>
     </main>
   );
 }
