@@ -9,7 +9,12 @@ export const ko: Copy = {
   channelsTitle: "후원하는 방법",
   account: { copy: "복사", copied: "복사했어요" },
   rows: [
-    { id: "kakaopay", label: "카카오페이", action: "후원하기" },
+    {
+      id: "kakaopay",
+      label: "카카오페이",
+      action: "후원하기",
+      qr: { hint: "휴대폰 카메라로 찍으면 카카오페이가 열려요.", close: "닫기" },
+    },
     { id: "buymeacoffee", label: "Buy Me a Coffee", action: "후원하기", sub: "해외 카드" },
   ],
   soon: "준비 중",

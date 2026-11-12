@@ -4,6 +4,7 @@
 // ⭐앱 상세의 응원 절(`#support`)은 버튼 하나로 여기를 가리킨다. 앱의 [응원하기] 메뉴는 그 절로 들어오니
 //   창구를 바꿀 땐 channels.ts만 고치면 앱·상세·이 페이지가 같이 따라온다.
 // ⭐창구 칸은 산사 후원 창구 모양이다(11-05 대표): 계좌 카드(복사) → 카카오페이 줄 → Buy Me a Coffee 줄 → 작은 안내 한 줄.
+//   카카오페이 줄은 데스크탑(마우스)에서 누르면 링크 대신 그 자리에 QR이 펼쳐진다(11-12 대표, ./QrChannelRow.tsx).
 //   계좌는 한국어에만, 주소가 빈 줄은 숨는다. 영어는 BMC 한 줄이라 그게 비면 「Coming soon」으로 잠가 둔다.
 // ⭐공유 카드(og) 그림은 따로 굽지 않았다. 사적인 프로젝트 목록처럼 사이트 기본 그림(OG_IMAGE)을 쓴다.
 import type { Metadata } from "next";
@@ -18,6 +19,8 @@ import { COPY } from "./_copy";
 import { SUPPORT_ACCOUNT, SUPPORT_CHANNELS, type ChannelId } from "./channels";
 import type { ChannelRow } from "./_copy/types";
 import { AccountCard } from "./AccountCard";
+import { qrPath } from "./qr";
+import { QrChannelRow } from "./QrChannelRow";
 import { HREFLANG, LANGS, NATIVE_NAME, OG_LOCALE, PATH, type Lang } from "./langs";
 
 export type { Lang } from "./langs";
@@ -187,9 +190,28 @@ export function SupportView({ lang }: { lang: Lang }) {
               copied={c.account.copied}
             />
           )}
-          {liveRows.map((r) => (
-            <ChannelRowLink key={r.id} row={r} url={SUPPORT_CHANNELS[r.id].url.trim()} />
-          ))}
+          {liveRows.map((r) => {
+            const url = SUPPORT_CHANNELS[r.id].url.trim();
+            if (!r.qr) return <ChannelRowLink key={r.id} row={r} url={url} />;
+            return (
+              <QrChannelRow
+                key={r.id}
+                head={
+                  <span className="flex min-w-0 items-center gap-2.5">
+                    <RowIcon id={r.id} />
+                    <span className="text-[16px] font-bold whitespace-nowrap">{r.label}</span>
+                  </span>
+                }
+                label={r.label}
+                action={r.action}
+                close={r.qr.close}
+                hint={r.qr.hint}
+                url={url}
+                qr={qrPath(url)}
+                tone={ROW_TONE[r.id]}
+              />
+            );
+          })}
           {lockedRow && <ChannelRowLink row={lockedRow} url="" soon={c.soon} />}
         </div>
         <p className="mt-4 text-[14px] leading-relaxed break-keep text-pretty text-mute">{c.note}</p>

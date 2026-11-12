@@ -2,7 +2,14 @@
 import type { ChannelId } from "../channels";
 
 /** 창구 한 줄(산사 후원 창구처럼 왼쪽 이름 · 오른쪽 할 일). 주소는 ../channels.ts에서 `id`로 찾는다. */
-export type ChannelRow = { id: ChannelId; label: string; action: string; sub?: string };
+export type ChannelRow = {
+  id: ChannelId;
+  label: string;
+  action: string;
+  sub?: string;
+  /** 데스크탑(마우스)에서 링크 대신 QR을 펼칠 때의 글자. 있으면 그 줄은 데스크탑에서 QR 줄이 된다(11-12, 카카오페이). */
+  qr?: { hint: string; close: string };
+};
 
 export type Copy = {
   /** 맨 위 「뒤로」 링크 글자(딴짓 목록으로 간다). 빵부스러기 이름도 이걸 쓴다. */
