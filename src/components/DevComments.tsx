@@ -20,7 +20,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 const GO_TOAST = "보냈어요 · 이제 고칩니다. 화면이 저절로 새로고침돼요";
 const GO_TOAST_MS = 4000;
 
-type Mode = "off" | "picking" | "writing";
+type Mode = "off" | "picking" | "writing" | "list";
+type Row = { at: string; url: string; note: string; text: string; selector: string };
 type Target = { selector: string; text: string; rect: DOMRect | null; box: string; font: string; color: string };
 
 /** 요소를 다시 찾아갈 수 있을 만큼의 경로. id를 만나면 거기서 끊는다(그 위는 볼 필요가 없다). */
@@ -71,11 +72,32 @@ export function DevComments() {
   const [prior, setPrior] = useState<string[]>([]);
   const rootRef = useRef<HTMLDivElement>(null);
   const [stale, setStale] = useState(false);
+  /** ✏️ 「목록」(대표 11-15 「코멘트 남긴거 내가 보내기 전에 삭제하거나 수정가능하게 … 모든 프로젝트에서」).
+   *  아직 보내지 않은 코멘트를 펼쳐 놓고 한 줄씩 고치거나 지운다. 지우기는 한 번 묻는다. */
+  const [rows, setRows] = useState<Row[]>([]);
+  const [editAt, setEditAt] = useState<string | null>(null);
+  const [editText, setEditText] = useState("");
+  const [askDel, setAskDel] = useState<string | null>(null);
 
   const refreshCount = useCallback(() => {
     fetch("/api/dev-comment").then((r) => r.json()).then((d) => setCount(d.count ?? 0)).catch(() => {});
   }, []);
   useEffect(refreshCount, [refreshCount]);
+  const loadList = useCallback(() => {
+    fetch("/api/dev-comment?list=1").then((r) => r.json())
+      .then((d) => { setRows(Array.isArray(d.list) ? d.list : []); setCount(d.count ?? 0); })
+      .catch(() => setRows([]));
+  }, []);
+  useEffect(() => { if (mode === "list") loadList(); }, [mode, loadList]);
+  const change = async (action: "edit" | "delete", at: string, note?: string) => {
+    const r = await fetch("/api/dev-comment", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action, at, note }),
+    }).catch(() => null);
+    if (!r || !r.ok) { setToast(r && r.status === 409 ? "이미 처리된 코멘트예요" : "저장하지 못했어요. 다시 눌러 주세요"); setTimeout(() => setToast(""), 3000); }
+    else { setToast(action === "edit" ? "고쳤어요" : "지웠어요"); setTimeout(() => setToast(""), 1600); }
+    setEditAt(null); setAskDel(null); loadList();
+  };
 
   /** 🚨**지금 화면에 「잃을 것」이 있는가.**
    *
@@ -271,6 +293,52 @@ export function DevComments() {
           <div style={{ background: "#222", color: "#fff", fontSize: 13, padding: "8px 12px", borderRadius: 10 }}>{toast}</div>
         )}
 
+        {mode === "list" && (
+          <div style={{
+            width: 340, background: "#fff", borderRadius: 14, boxShadow: "0 8px 32px rgba(0,0,0,.18)",
+            padding: 14, display: "flex", flexDirection: "column", gap: 10,
+          }}>
+            <div>
+              <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: "#222" }}>보낼 코멘트 {rows.length}건</p>
+              <p style={{ margin: "2px 0 0", fontSize: 12, color: "#6b6b6b" }}>작업 시작을 누르기 전에 고치거나 지울 수 있어요</p>
+            </div>
+            <div style={{ maxHeight: "50vh", overflowY: "auto", display: "flex", flexDirection: "column", gap: 8 }}>
+              {rows.map((r) => (
+                <div key={r.at} style={{ border: "1px solid #ececef", borderRadius: 10, padding: "8px 10px" }}>
+                  <p style={{ margin: "0 0 3px", fontSize: 12, color: "#8a8a8f", wordBreak: "break-all" }}>
+                    {r.text ? `「${r.text.slice(0, 30)}」` : r.selector === "(화면 전체)" ? "화면 전체" : "고른 자리"} · {r.url}
+                  </p>
+                  {editAt === r.at ? (
+                    <textarea autoFocus value={editText} onChange={(e) => setEditText(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) change("edit", r.at, editText); }}
+                      style={{ width: "100%", minHeight: 64, resize: "vertical", fontSize: 14, lineHeight: 1.5, padding: 8, borderRadius: 8,
+                        border: "1px solid #d7d7db", outline: "none", fontFamily: "inherit", boxSizing: "border-box" }} />
+                  ) : (
+                    <p style={{ margin: 0, fontSize: 13, lineHeight: 1.45, color: "#333", whiteSpace: "pre-wrap" }}>{r.note}</p>
+                  )}
+                  <div style={{ display: "flex", gap: 6, justifyContent: "flex-end", alignItems: "center", marginTop: 6 }}>
+                    {editAt === r.at ? (<>
+                      <button style={{ ...btn("#f5f5f6", "#4a4a4a"), height: 28 }} onClick={() => setEditAt(null)}>그만</button>
+                      <button style={{ ...btn("#98ff5c", "#1f5c00"), height: 28 }} onClick={() => change("edit", r.at, editText)}>저장</button>
+                    </>) : askDel === r.at ? (<>
+                      <span style={{ marginRight: "auto", fontSize: 12, color: "#b42318" }}>이 코멘트를 지울까요?</span>
+                      <button style={{ ...btn("#f5f5f6", "#4a4a4a"), height: 28 }} onClick={() => setAskDel(null)}>아니요</button>
+                      <button style={{ ...btn("#d92d20", "#fff"), height: 28 }} onClick={() => change("delete", r.at)}>지우기</button>
+                    </>) : (<>
+                      <button style={{ ...btn("#f5f5f6", "#4a4a4a"), height: 28 }} onClick={() => { setEditAt(r.at); setEditText(r.note); setAskDel(null); }}>고치기</button>
+                      <button style={{ ...btn("#f5f5f6", "#4a4a4a"), height: 28 }} onClick={() => { setAskDel(r.at); setEditAt(null); }}>지우기</button>
+                    </>)}
+                  </div>
+                </div>
+              ))}
+              {rows.length === 0 && <p style={{ margin: 0, fontSize: 13, color: "#6b6b6b" }}>보낼 코멘트가 없어요</p>}
+            </div>
+            <div style={{ display: "flex", justifyContent: "flex-end" }}>
+              <button style={btn("#f5f5f6", "#4a4a4a")} onClick={() => { setMode("off"); setEditAt(null); setAskDel(null); refreshCount(); }}>닫기</button>
+            </div>
+          </div>
+        )}
+
         {mode === "writing" && (
           <div style={{
             width: 320, background: "#fff", borderRadius: 14, boxShadow: "0 8px 32px rgba(0,0,0,.18)",
@@ -313,6 +381,9 @@ export function DevComments() {
             <button style={{ ...btn("#222", "#fff"), boxShadow: "0 2px 10px rgba(0,0,0,.16)" }} onClick={go}>
               {count}건 보내고 작업 시작
             </button>
+          )}
+          {mode === "off" && count > 0 && (
+            <button style={{ ...btn("#fff", "#222"), boxShadow: "0 2px 10px rgba(0,0,0,.16)" }} onClick={() => setMode("list")}>목록 {count}</button>
           )}
           {mode === "off" && (
             <button style={{ ...btn("#fff", "#222"), boxShadow: "0 2px 10px rgba(0,0,0,.16)" }}
