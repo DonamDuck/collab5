@@ -29,6 +29,23 @@ export async function POST(req: NextRequest) {
     await writeFile(FLAG, `${n}건 · 마지막 화면 ${s(b.url, 200)}\n`, "utf8");
     return NextResponse.json({ ok: true, count: n });
   }
+  // ✏️ 보내기 전에 고치기·지우기 (대표 11-15 「코멘트 남긴거 내가 보내기 전에 삭제하거나 수정가능하게 … 모든 프로젝트에서」).
+  //   한 줄을 가리키는 이름표는 남긴 시각 `at`이다(같은 밀리초에 두 줄이 생길 일은 없다).
+  //   ⭐바꾸기 직전에 파일을 다시 읽고 통째로 쓴다 — 그 사이 세션이 처리한 줄을 덮지 않으려고.
+  if (b.action === "edit" || b.action === "delete") {
+    const at = s(b.at, 40);
+    const raw = await readFile(FILE, "utf8").catch(() => "");
+    const rows = raw.split("\n").filter(Boolean).map((l) => JSON.parse(l) as Record<string, unknown>);
+    const i = rows.findIndex((r) => r.at === at);
+    if (i < 0 || rows[i].done) return NextResponse.json({ ok: false, message: "이미 처리된 코멘트예요." }, { status: 409 });
+    if (b.action === "edit") {
+      const note = s(b.note, 1000);
+      if (!note.trim()) return NextResponse.json({ ok: false, message: "내용이 비었어요." }, { status: 400 });
+      rows[i] = { ...rows[i], note, edited: new Date().toISOString() };
+    } else rows.splice(i, 1);
+    await writeFile(FILE, rows.map((r) => JSON.stringify(r)).join("\n") + (rows.length ? "\n" : ""), "utf8");
+    return NextResponse.json({ ok: true, count: rows.length });
+  }
   // ⚠️받은 값을 그대로 믿지 않고 길이를 자른다. 한 줄이 길어지면 내가 읽을 때 그 줄만으로 화면이 찬다.
   const row = {
     at: new Date().toISOString(),
@@ -60,6 +77,11 @@ export async function GET(req: NextRequest) {
   const raw = await readFile(FILE, "utf8").catch(() => "");
   const rows = raw.split("\n").filter(Boolean).map((l) => JSON.parse(l) as Record<string, string>);
 
+  // ✏️ 「목록」(11-15) — 아직 보내지 않은 코멘트 전부. 위젯이 고치기·지우기에 쓴다.
+  if (req.nextUrl.searchParams.get("list")) {
+    const list = rows.filter((r) => !r.done).map((r) => ({ at: r.at, url: r.url, note: r.note, text: r.text, selector: r.selector }));
+    return NextResponse.json({ count: rows.length, list });
+  }
   const sel = req.nextUrl.searchParams.get("selector");
   if (sel) {
     // ⚠️화면 주소까지 맞춘다 — 같은 생김새의 요소가 다른 페이지에도 있다(버튼·입력칸이 그렇다).
