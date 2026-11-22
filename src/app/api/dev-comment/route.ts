@@ -25,7 +25,8 @@ export async function POST(req: NextRequest) {
   // 「다 남겼어요, 작업 시작」 — 깃발만 세우고 끝낸다.
   if (b.action === "go") {
     const raw = await readFile(FILE, "utf8").catch(() => "");
-    const n = raw.split("\n").filter(Boolean).length;
+    // 11-22: 아직 안 끝낸 것만 센다. 세션이 다 처리한 5건이 「5건 보내고 작업 시작」으로 보였다(가구가구에서 대표가 짚음).
+    const n = raw.split("\n").filter(Boolean).filter((l) => !(JSON.parse(l) as { done?: boolean }).done).length;
     await writeFile(FLAG, `${n}건 · 마지막 화면 ${s(b.url, 200)}\n`, "utf8");
     return NextResponse.json({ ok: true, count: n });
   }
@@ -44,7 +45,7 @@ export async function POST(req: NextRequest) {
       rows[i] = { ...rows[i], note, edited: new Date().toISOString() };
     } else rows.splice(i, 1);
     await writeFile(FILE, rows.map((r) => JSON.stringify(r)).join("\n") + (rows.length ? "\n" : ""), "utf8");
-    return NextResponse.json({ ok: true, count: rows.length });
+    return NextResponse.json({ ok: true, count: rows.filter((r) => !r.done).length });
   }
   // ⚠️받은 값을 그대로 믿지 않고 길이를 자른다. 한 줄이 길어지면 내가 읽을 때 그 줄만으로 화면이 찬다.
   const row = {
@@ -76,18 +77,21 @@ export async function GET(req: NextRequest) {
   if (!DEV) return new NextResponse(null, { status: 404 });
   const raw = await readFile(FILE, "utf8").catch(() => "");
   const rows = raw.split("\n").filter(Boolean).map((l) => JSON.parse(l) as Record<string, string>);
+  // 위젯이 보여 주는 수(「목록 N」·「N건 보내고 작업 시작」)는 아직 안 끝낸 코멘트다. 11-22까지는 끝낸 줄도 세서
+  // 다 처리한 코멘트가 기다리는 것처럼 보였다. 아래 `mine`은 끝낸 것까지 일부러 보여 준다(같은 자리 앞서 쓴 말).
+  const open = rows.filter((r) => !r.done).length;
 
   // ✏️ 「목록」(11-15) — 아직 보내지 않은 코멘트 전부. 위젯이 고치기·지우기에 쓴다.
   if (req.nextUrl.searchParams.get("list")) {
     const list = rows.filter((r) => !r.done).map((r) => ({ at: r.at, url: r.url, note: r.note, text: r.text, selector: r.selector }));
-    return NextResponse.json({ count: rows.length, list });
+    return NextResponse.json({ count: open, list });
   }
   const sel = req.nextUrl.searchParams.get("selector");
   if (sel) {
     // ⚠️화면 주소까지 맞춘다 — 같은 생김새의 요소가 다른 페이지에도 있다(버튼·입력칸이 그렇다).
     const url = req.nextUrl.searchParams.get("url") ?? "";
     const mine = rows.filter((r) => r.selector === sel && r.url === url).map((r) => r.note);
-    return NextResponse.json({ count: rows.length, mine });
+    return NextResponse.json({ count: open, mine });
   }
-  return NextResponse.json({ count: rows.length });
+  return NextResponse.json({ count: open });
 }
